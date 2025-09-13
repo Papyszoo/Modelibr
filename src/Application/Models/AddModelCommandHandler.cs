@@ -7,12 +7,12 @@ namespace Application.Models
     {
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
         {
-            using (var fileStream = File.Create(""))
-            {
-                command.FileStream.Seek(0, SeekOrigin.Begin);
-                await command.FileStream.CopyToAsync(fileStream, cancellationToken);
-            };
-            
+            var file = command.File;
+            var targetPath = Path.Combine(Path.GetTempPath(), file.FileName);
+
+            await using var target = File.Create(targetPath);
+            await file.CopyToAsync(target, cancellationToken);
+
             return Result.Success(new AddModelCommandResponse(1));
         }
     }
