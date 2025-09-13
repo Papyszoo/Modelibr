@@ -5,10 +5,15 @@ namespace Application.Models
 {
     internal class AddModelCommandHandler : ICommandHandler<AddModelCommand, AddModelCommandResponse>
     {
-        public Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
+        public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
         {
-
-            throw new NotImplementedException();
+            using (var fileStream = File.Create(""))
+            {
+                command.FileStream.Seek(0, SeekOrigin.Begin);
+                await command.FileStream.CopyToAsync(fileStream, cancellationToken);
+            };
+            
+            return Result.Success(new AddModelCommandResponse(1));
         }
     }
 }

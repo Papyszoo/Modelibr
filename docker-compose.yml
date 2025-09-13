@@ -49,3 +49,7 @@ services:
 
 volumes:
     mssql-data:
+
+networks:
+  modelibr:
+    driver: bridge
