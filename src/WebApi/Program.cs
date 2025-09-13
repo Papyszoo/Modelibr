@@ -1,5 +1,8 @@
 using Application;
+using Application.Abstractions.Messaging;
+using Application.Models;
 using Infrastructure;
+using WebApi.Files;
 
 namespace WebApi
 {
@@ -31,24 +34,17 @@ namespace WebApi
 
             app.UseAuthorization();
 
-            var summaries = new[]
+            app.MapPost("/uploadModel", async (IFormFile file, ICommandHandler<AddModelCommand, AddModelCommandResponse> commandHandler) =>
             {
-                "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-            };
+                if (file.Length > 0)
+                {
+                    var result = await commandHandler.Handle(new AddModelCommand(new FormFileUpload(file)), CancellationToken.None);
 
-            app.MapGet("/weatherforecast", (HttpContext httpContext) =>
-            {
-                var forecast = Enumerable.Range(1, 5).Select(index =>
-                    new WeatherForecast
-                    {
-                        Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                        TemperatureC = Random.Shared.Next(-20, 55),
-                        Summary = summaries[Random.Shared.Next(summaries.Length)]
-                    })
-                    .ToArray();
-                return forecast;
+                    return Results.Ok(result);
+                }
+                return Results.BadRequest("Invalid file.");
             })
-            .WithName("GetWeatherForecast");
+            .WithName("Upload Model");
 
             app.Run();
         }
