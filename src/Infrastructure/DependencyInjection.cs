@@ -13,7 +13,17 @@ namespace Infrastructure
         {
             services.AddDbContext<ApplicationDbContext>(optionsBuilder =>
             {
-                optionsBuilder.UseSqlServer(configuration.GetConnectionString("Default"));
+                var connectionString = configuration.GetConnectionString("Default");
+                if (connectionString?.Contains("Data Source=") == true)
+                {
+                    // SQLite connection
+                    optionsBuilder.UseSqlite(connectionString);
+                }
+                else
+                {
+                    // SQL Server connection
+                    optionsBuilder.UseSqlServer(connectionString);
+                }
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();

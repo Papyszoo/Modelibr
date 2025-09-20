@@ -2,6 +2,7 @@ using Application;
 using Application.Abstractions.Messaging;
 using Application.Models;
 using Infrastructure;
+using Infrastructure.Persistence;
 using WebApi.Files;
 using WebApi.Infrastructure;
 using Application.Abstractions.Storage;
@@ -30,6 +31,14 @@ namespace WebApi
 
             var app = builder.Build();
 
+            // Ensure database is created (for development)
+            if (app.Environment.IsDevelopment())
+            {
+                using var scope = app.Services.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                context.Database.EnsureCreated();
+            }
+
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -50,7 +59,8 @@ namespace WebApi
                 }
                 return Results.BadRequest("Invalid file.");
             })
-            .WithName("Upload Model");
+            .WithName("Upload Model")
+            .DisableAntiforgery();
 
             app.Run();
         }
