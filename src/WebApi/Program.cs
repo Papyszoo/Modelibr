@@ -17,7 +17,8 @@ namespace WebApi
 
             builder.Services.AddAuthorization();
 
-            builder.Services.AddOpenApi();
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
 
             builder.Services
                 .AddApplication()
@@ -31,7 +32,8 @@ namespace WebApi
 
             if (app.Environment.IsDevelopment())
             {
-                app.MapOpenApi();
+                app.UseSwagger();
+                app.UseSwaggerUI();
             }
 
             app.UseHttpsRedirection();
