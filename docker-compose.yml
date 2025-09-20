@@ -4,25 +4,28 @@ services:
         build:
             context: .
             dockerfile: src/WebApi/Dockerfile
+            args:
+                APP_UID: ${HOST_UID:-1000}
+                APP_GID: ${HOST_GID:-1000}
         container_name: webapi
         environment:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
             - ASPNETCORE_HTTPS_PORTS=${WEBAPI_HTTPS_PORT}
+            - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
         ports:
             - "${WEBAPI_HTTP_PORT}"
             - "${WEBAPI_HTTPS_PORT}"
         volumes:
-            - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-            - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
-            - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
-            - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
+            # Use platform-appropriate secret/cert paths; on macOS $HOME works (APPDATA is Windows-specific)
+            - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro
+            - ${HOME}/.aspnet/https:/home/app/.aspnet/https:ro
+            - ./data/uploads:/var/lib/modelibr/uploads
         depends_on:
             mssql:
                 condition: service_healthy
         networks:
             - modelibr
-
     mssql:
         image: mcr.microsoft.com/mssql/server:2022-latest
         container_name: mssql
@@ -33,11 +36,7 @@ services:
         ports:
             - "${MSSQL_PORT}:1433"
         healthcheck:
-            test:
-                [
-                    "CMD-SHELL",
-                    "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -Q 'SELECT 1' || exit 1",
-                ]
+            test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
             interval: 15s
             timeout: 5s
             retries: 10

@@ -3,6 +3,9 @@ using Application.Abstractions.Messaging;
 using Application.Models;
 using Infrastructure;
 using WebApi.Files;
+using WebApi.Infrastructure;
+using Application.Abstractions.Storage;
+using Infrastructure.Storage;
 
 namespace WebApi
 {
@@ -19,6 +22,10 @@ namespace WebApi
             builder.Services
                 .AddApplication()
                 .AddInfrastructure(builder.Configuration);
+
+            builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
+            builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
+            builder.Services.AddHostedService<UploadDirectoryInitializer>();
 
             var app = builder.Build();
 
