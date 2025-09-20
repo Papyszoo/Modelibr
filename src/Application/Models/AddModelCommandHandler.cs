@@ -1,7 +1,9 @@
 ﻿using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
 using Application.Abstractions.Storage;
 using Domain.Files;
+using Domain.Models;
 using SharedKernel;
 
 namespace Application.Models
@@ -9,10 +11,12 @@ namespace Application.Models
     internal class AddModelCommandHandler : ICommandHandler<AddModelCommand, AddModelCommandResponse>
     {
         private readonly IFileStorage _storage;
+        private readonly IModelRepository _modelRepository;
 
-        public AddModelCommandHandler(IFileStorage storage)
+        public AddModelCommandHandler(IFileStorage storage, IModelRepository modelRepository)
         {
             _storage = storage;
+            _modelRepository = modelRepository;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -22,11 +26,17 @@ namespace Application.Models
 
             var stored = await _storage.SaveAsync(command.File, FileType.Model3D, cancellationToken);
 
-            // TODO: persist StoredFile entity with metadata:
-            // stored.RelativePath, stored.StoredName, stored.Sha256, stored.SizeBytes,
-            // original, ext, mime (command.File.ContentType?), FileType.Model3D
+            // Create and persist Model entity to database
+            var model = new Model
+            {
+                FilePath = stored.RelativePath,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
 
-            return Result.Success(new AddModelCommandResponse(1));
+            var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
+
+            return Result.Success(new AddModelCommandResponse(savedModel.Id));
         }
     }
 
