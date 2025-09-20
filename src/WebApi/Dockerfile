@@ -1,14 +1,12 @@
 # See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
+# Runtime base
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
-USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-
-# This stage is used to build the service project
+# Build stage
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
@@ -22,13 +20,25 @@ COPY . .
 WORKDIR "/src/src/WebApi"
 RUN dotnet build "./WebApi.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# This stage is used to publish the service project to be copied to the final stage
+# Publish stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./WebApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
+# Final stage
 FROM base AS final
-WORKDIR /app
+# Allow customizing UID/GID to match host for bind-mounted uploads directory
+ARG APP_UID=1000
+ARG APP_GID=1000
+# Create app user/group and data directories
+RUN groupadd -g $APP_GID app && \
+    useradd -u $APP_UID -g app -m -d /home/app app && \
+    mkdir -p /var/lib/modelibr/uploads && \
+    chown -R app:app /var/lib/modelibr
+# Copy published output
 COPY --from=publish /app/publish .
+# Ensure app files owned by non-root user
+RUN chown -R app:app /app
+ENV UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
+USER app
 ENTRYPOINT ["dotnet", "WebApi.dll"]
