@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Services;
 using Domain.Services;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.Models
@@ -11,25 +12,22 @@ namespace Application.Models
     {
         private readonly IModelRepository _modelRepository;
         private readonly IFileCreationService _fileCreationService;
-        private readonly IFileProcessingService _fileProcessingService;
         private readonly IDateTimeProvider _dateTimeProvider;
 
         public AddFileToModelCommandHandler(
             IModelRepository modelRepository, 
             IFileCreationService fileCreationService,
-            IFileProcessingService fileProcessingService,
             IDateTimeProvider dateTimeProvider)
         {
             _modelRepository = modelRepository;
             _fileCreationService = fileCreationService;
-            _fileProcessingService = fileProcessingService;
             _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<Result<AddFileToModelCommandResponse>> Handle(AddFileToModelCommand command, CancellationToken cancellationToken)
         {
-            // Validate file type for upload
-            var fileTypeResult = _fileProcessingService.ValidateFileForUpload(command.File.FileName);
+            // Validate file type for upload using Value Object directly
+            var fileTypeResult = FileType.ValidateForUpload(command.File.FileName);
             if (!fileTypeResult.IsSuccess)
             {
                 return Result.Failure<AddFileToModelCommandResponse>(fileTypeResult.Error);

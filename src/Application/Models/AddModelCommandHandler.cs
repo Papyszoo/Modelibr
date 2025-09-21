@@ -1,9 +1,10 @@
-﻿using Application.Abstractions.Files;
+using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.Models
@@ -12,25 +13,22 @@ namespace Application.Models
     {
         private readonly IModelRepository _modelRepository;
         private readonly IFileCreationService _fileCreationService;
-        private readonly IFileProcessingService _fileProcessingService;
         private readonly IDateTimeProvider _dateTimeProvider;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository, 
             IFileCreationService fileCreationService,
-            IFileProcessingService fileProcessingService,
             IDateTimeProvider dateTimeProvider)
         {
             _modelRepository = modelRepository;
             _fileCreationService = fileCreationService;
-            _fileProcessingService = fileProcessingService;
             _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
         {
-            // Validate file type for model upload
-            var fileTypeResult = _fileProcessingService.ValidateFileForModelUpload(command.File.FileName);
+            // Validate file type for model upload using Value Object directly
+            var fileTypeResult = FileType.ValidateForModelUpload(command.File.FileName);
             if (!fileTypeResult.IsSuccess)
             {
                 return Result.Failure<AddModelCommandResponse>(fileTypeResult.Error);
@@ -58,7 +56,7 @@ namespace Application.Models
 
             // Create new model
             var modelName = command.ModelName ?? 
-                           _fileProcessingService.ExtractFileNameWithoutExtension(command.File.FileName);
+                           Path.GetFileNameWithoutExtension(command.File.FileName);
 
             try
             {

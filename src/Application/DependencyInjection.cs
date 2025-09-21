@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Messaging;
+using Application.Abstractions.Messaging;
 using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Services;
@@ -15,7 +15,6 @@ namespace Application
             services.AddScoped<IFileUtilityService, FileUtilityService>();
             services.AddScoped<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped<IFileCreationService, FileCreationService>();
-            services.AddScoped<IFileProcessingService, FileProcessingService>();
             return services;
         }
 

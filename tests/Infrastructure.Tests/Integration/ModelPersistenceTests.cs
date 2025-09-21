@@ -1,7 +1,6 @@
 using Application.Models;
 using Application.Services;
 using Domain.Models;
-using Domain.Services;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Infrastructure.Storage;
@@ -48,9 +47,8 @@ public class ModelPersistenceTests
         var fileUtilityService = new FileUtilityService();
         
         var fileCreationService = new FileCreationService(storage, fileRepository, fileUtilityService, dateTimeProvider);
-        var fileProcessingService = new FileProcessingService();
         
-        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, fileProcessingService, dateTimeProvider);
+        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider);
         
         Assert.NotNull(handler);
     }
