@@ -1,13 +1,31 @@
 import { useState } from 'react'
 import './App.css'
 import ModelList from './ModelList'
-import ApiClient from './services/ApiClient'
+import { useFileUpload } from './hooks/useFileUpload'
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadStatus, setUploadStatus] = useState('')
-  const [isUploading, setIsUploading] = useState(false)
-  const [currentView, setCurrentView] = useState('upload') // 'upload' or 'models'
+  const [currentView, setCurrentView] = useState('models') // 'upload' or 'models'
+
+  // Use the file upload hook for the upload page (no Three.js requirement)
+  const { uploading: isUploading, uploadFile } = useFileUpload({
+    requireThreeJSRenderable: false,
+    onSuccess: (file, result) => {
+      setUploadStatus(`Upload successful! File ID: ${result.value?.id || 'Generated'}`)
+      setSelectedFile(null)
+      // Reset file input
+      const fileInput = document.getElementById('file-input')
+      if (fileInput) fileInput.value = ''
+    },
+    onError: (file, error) => {
+      if (error.type === 'UNSUPPORTED_FORMAT') {
+        setUploadStatus(`Upload failed: ${error.message}`)
+      } else {
+        setUploadStatus(`Upload failed: ${error.message}`)
+      }
+    }
+  })
 
   const handleFileSelect = (event) => {
     setSelectedFile(event.target.files[0])
@@ -20,25 +38,12 @@ function App() {
       return
     }
 
-    setIsUploading(true)
     setUploadStatus('Uploading...')
 
     try {
-      const result = await ApiClient.uploadModel(selectedFile)
-
-      if (result.isSuccess) {
-        setUploadStatus(`Upload successful! File ID: ${result.value?.id || 'Generated'}`)
-        setSelectedFile(null)
-        // Reset file input
-        const fileInput = document.getElementById('file-input')
-        if (fileInput) fileInput.value = ''
-      } else {
-        setUploadStatus(`Upload failed: ${result.error?.message || 'Unknown error'}`)
-      }
+      await uploadFile(selectedFile)
     } catch (error) {
-      setUploadStatus(`Upload error: ${error.message}`)
-    } finally {
-      setIsUploading(false)
+      // Error handling is done in the hook's onError callback
     }
   }
 

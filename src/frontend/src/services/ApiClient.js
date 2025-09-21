@@ -33,6 +33,10 @@ class ApiClient {
   getModelFileUrl(modelId) {
     return `${this.baseURL}/models/${modelId}/file`
   }
+
+  getFileUrl(fileId) {
+    return `${this.baseURL}/files/${fileId}`
+  }
 }
 
 export default new ApiClient()
