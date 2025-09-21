@@ -35,7 +35,9 @@ Always reference these instructions first and fallback to search or bash command
   - `docker compose version` -- verify Docker Compose v2.x is available
   - Configuration in `docker-compose.yml` with SQL Server database
   - Uses ports 8080 (HTTP) and 8081 (HTTPS) in containers
-  - Environment variables in `.env.example`
+  - **REQUIRED**: Create `.env` file from `.env.example` before running docker-compose
+  - `cp .env.example .env` -- copy environment configuration
+  - Environment variables in `.env.example` contain all required parameters
 
 ## Validation
 - ALWAYS manually test the Web API after changes by running `dotnet run` and verifying it starts successfully
@@ -114,6 +116,12 @@ export SA_PASSWORD=ChangeThisStrongPassword123!
 - Permission denied on upload directory: Set `UPLOAD_STORAGE_PATH` to writable location like `/tmp/modelibr/uploads`
 - .NET version errors: Ensure .NET 9.0 SDK is installed and in PATH
 - Missing packages: Run `dotnet restore Modelibr.sln` to restore all dependencies
+
+### Important: Database Configuration
+- **NEVER modify `src/Infrastructure/DependencyInjection.cs` to use in-memory database** - The application is designed to work with SQL Server via Docker Compose
+- **NEVER remove connection strings from `src/WebApi/appsettings.Development.json`** - These are required for proper database connectivity
+- If database connectivity issues occur, use Docker Compose to start the SQL Server service rather than falling back to in-memory databases
+- For development database issues, create a separate GitHub issue to investigate Docker Compose setup
 
 ### Development Workflow
 1. Make code changes

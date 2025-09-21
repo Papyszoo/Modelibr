@@ -484,3 +484,12 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 .azure
+
+# Allow sample 3D model files in docs directory
+!docs/*.obj
+!docs/*.fbx
+!docs/*.dae
+!docs/*.3ds
+!docs/*.blend
+!docs/*.gltf
+!docs/*.glb
