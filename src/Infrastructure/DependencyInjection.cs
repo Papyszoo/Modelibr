@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Repositories;
+using Application.Abstractions.Repositories;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -13,17 +13,7 @@ namespace Infrastructure
         {
             services.AddDbContext<ApplicationDbContext>(optionsBuilder =>
             {
-                var connectionString = configuration.GetConnectionString("Default");
-                if (connectionString?.Contains("Data Source=") == true)
-                {
-                    // SQLite connection
-                    optionsBuilder.UseSqlite(connectionString);
-                }
-                else
-                {
-                    // SQL Server connection
-                    optionsBuilder.UseSqlServer(connectionString);
-                }
+                optionsBuilder.UseSqlServer(configuration.GetConnectionString("Default"));
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();
