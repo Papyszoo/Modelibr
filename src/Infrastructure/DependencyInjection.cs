@@ -16,13 +16,10 @@ namespace Infrastructure
                 var connectionString = configuration.GetConnectionString("Default");
                 if (string.IsNullOrEmpty(connectionString))
                 {
-                    // Use in-memory database for demo purposes when SQL Server is not available
-                    optionsBuilder.UseInMemoryDatabase("ModelibrDemo");
+                    throw new InvalidOperationException("Database connection string 'Default' is not configured.");
                 }
-                else
-                {
-                    optionsBuilder.UseSqlServer(connectionString);
-                }
+                
+                optionsBuilder.UseSqlServer(connectionString);
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();

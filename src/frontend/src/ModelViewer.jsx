@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfo from './components/ModelInfo'
+import { getModelFileFormat } from './utils/fileUtils'
 import './ModelViewer.css'
 
 function ModelViewer({ model, onBack }) {
@@ -17,9 +18,7 @@ function ModelViewer({ model, onBack }) {
         <div className="model-details">
           <span className="model-id">Model #{model.id}</span>
           <span className="model-format">
-            {model.files && model.files.length > 0 
-              ? model.files[0].originalFileName.split('.').pop().toUpperCase()
-              : 'UNKNOWN'}
+            {getModelFileFormat(model)}
           </span>
         </div>
       </header>

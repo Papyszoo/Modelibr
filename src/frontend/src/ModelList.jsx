@@ -7,6 +7,14 @@ import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import { ProgressBar } from 'primereact/progressbar'
+import { 
+  getFileExtension, 
+  getFileName, 
+  getModelFileFormat, 
+  formatFileSize,
+  isThreeJSRenderable,
+  isSupportedModelFormat 
+} from './utils/fileUtils'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
@@ -53,14 +61,23 @@ function ModelList({ onBackToUpload }) {
         const file = files[i]
         
         // Check if file type is supported
-        const supportedTypes = ['.obj', '.fbx', '.dae', '.3ds', '.blend', '.gltf', '.glb']
         const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
         
-        if (!supportedTypes.includes(fileExtension)) {
+        if (!isSupportedModelFormat(fileExtension)) {
           toast.current.show({
             severity: 'warn', 
             summary: 'Unsupported File', 
             detail: `File ${file.name} is not a supported 3D model format`
+          })
+          continue
+        }
+
+        // Check if file is renderable by Three.js (for models being added to DataTable)
+        if (!isThreeJSRenderable(fileExtension)) {
+          toast.current.show({
+            severity: 'warn', 
+            summary: 'Non-renderable Format', 
+            detail: `File ${file.name} (${fileExtension.toUpperCase()}) is supported but not renderable in 3D viewer. Use the upload page for this file type.`
           })
           continue
         }
@@ -291,25 +308,6 @@ function ModelList({ onBackToUpload }) {
       )}
     </div>
   )
-}
-
-function getFileExtension(filePath) {
-  return filePath.split('.').pop() || 'unknown'
-}
-
-function getFileName(filePath) {
-  const parts = filePath.split('/')
-  return parts[parts.length - 1] || 'unknown'
-}
-
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes'
-  
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 export default ModelList

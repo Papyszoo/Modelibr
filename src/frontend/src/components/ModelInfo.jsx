@@ -1,3 +1,5 @@
+import { getModelFileFormat } from '../utils/fileUtils'
+
 function ModelInfo({ model }) {
   return (
     <>
@@ -18,11 +20,7 @@ function ModelInfo({ model }) {
           </div>
           <div className="info-item">
             <label>Format:</label>
-            <span>
-              {model.files && model.files.length > 0 
-                ? model.files[0].originalFileName.split('.').pop().toUpperCase()
-                : 'UNKNOWN'}
-            </span>
+            <span>{getModelFileFormat(model)}</span>
           </div>
         </div>
       </div>
