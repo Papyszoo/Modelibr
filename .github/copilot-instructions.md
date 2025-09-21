@@ -84,10 +84,9 @@ The database connection string supports environment variable substitution using 
 - Format: Use `%VARIABLE_NAME%` syntax in connection strings for environment variable expansion
 - Example: `Server=localhost,%MSSQL_PORT%;Database=Modelibr;User Id=sa;Password=%SA_PASSWORD%;TrustServerCertificate=true;`
 
-For development, set these environment variables:
+For development, create .env file from .env.example:
 ```bash
-export MSSQL_PORT=1433
-export SA_PASSWORD=ChangeThisStrongPassword123!
+cp .env.example .env
 ```
 
 #### Code Simplicity Guidelines
