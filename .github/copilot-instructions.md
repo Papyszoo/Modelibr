@@ -69,6 +69,33 @@ The solution follows Clean Architecture with the following projects:
 - Database connection string configured in Infrastructure layer
 - Docker environment variables in `.env.example`
 
+#### Environment Variable Priority and Configuration
+**ALWAYS prioritize environment variables that are defined in .env files.** If something is parameterized in .env file, use that variable rather than hardcoding values.
+
+Environment variables override configuration values automatically in ASP.NET Core:
+- Use double underscore (`__`) to represent nested configuration: `ConnectionStrings__Default`
+- Environment variables from .env file take precedence over appsettings.json values
+- Docker Compose automatically substitutes `${VARIABLE_NAME}` with values from .env file
+
+#### Database Connection String Environment Variables
+The database connection string supports environment variable substitution using `Environment.ExpandEnvironmentVariables()`:
+- `MSSQL_PORT` - SQL Server port (default: 1433)
+- `SA_PASSWORD` - SQL Server SA password (from .env file)
+- Format: Use `%VARIABLE_NAME%` syntax in connection strings for environment variable expansion
+- Example: `Server=localhost,%MSSQL_PORT%;Database=Modelibr;User Id=sa;Password=%SA_PASSWORD%;TrustServerCertificate=true;`
+
+For development, create .env file from .env.example:
+```bash
+cp .env.example .env
+```
+
+#### Code Simplicity Guidelines
+**Keep code as simple, readable, and minimalistic as possible:**
+- Avoid unnecessary abstraction layers when environment variables work natively
+- Use ASP.NET Core's built-in configuration system rather than custom logic
+- Remove duplicate configuration files when one can serve multiple environments
+- Leverage framework features (like environment variable overrides) instead of custom code
+
 ### Common File Locations
 - Main application entry point: `src/WebApi/Program.cs`
 - Application setup: `src/Application/DependencyInjection.cs`

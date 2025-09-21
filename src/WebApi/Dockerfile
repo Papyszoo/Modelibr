@@ -31,8 +31,8 @@ FROM base AS final
 ARG APP_UID=1000
 ARG APP_GID=1000
 # Create app user/group and data directories
-RUN groupadd -g $APP_GID app && \
-    useradd -u $APP_UID -g app -m -d /home/app app && \
+RUN groupadd -g $APP_GID app || true && \
+    useradd -u $APP_UID -g app -m -d /home/app app || true && \
     mkdir -p /var/lib/modelibr/uploads && \
     chown -R app:app /var/lib/modelibr
 # Copy published output

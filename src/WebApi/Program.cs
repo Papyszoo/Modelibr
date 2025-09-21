@@ -28,6 +28,7 @@ namespace WebApi
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
+            builder.Services.AddHostedService<DatabaseInitializer>();
 
             var app = builder.Build();
 
@@ -47,6 +48,7 @@ namespace WebApi
             app.UseAuthorization();
 
             // Map endpoints
+            app.MapHealthCheckEndpoints();
             app.MapModelEndpoints();
             app.MapModelsEndpoints();
             app.MapFilesEndpoints();
