@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.Models
@@ -30,7 +31,7 @@ namespace Application.Models
                     OriginalFileName = f.OriginalFileName,
                     MimeType = f.MimeType,
                     FileType = f.FileType,
-                    IsRenderable = f.FileType.IsRenderable(),
+                    IsRenderable = f.FileType.IsRenderable,
                     SizeBytes = f.SizeBytes
                 }).ToList()
             }).ToList();

@@ -21,7 +21,8 @@ public class ModelPersistenceTests
             .Options;
         
         using var context = new ApplicationDbContext(options);
-        var repository = new ModelRepository(context);
+        var dateTimeProvider = new DateTimeProvider();
+        var repository = new ModelRepository(context, dateTimeProvider);
         
         Assert.NotNull(repository);
     }
@@ -35,7 +36,8 @@ public class ModelPersistenceTests
             .Options;
         
         using var context = new ApplicationDbContext(options);
-        var modelRepository = new ModelRepository(context);
+        var dateTimeProvider = new DateTimeProvider();
+        var modelRepository = new ModelRepository(context, dateTimeProvider);
         var fileRepository = new FileRepository(context);
         
         var root = Path.Combine(Path.GetTempPath(), "modelibr_test", Path.GetRandomFileName());
@@ -44,7 +46,9 @@ public class ModelPersistenceTests
         var storage = new HashBasedFileStorage(pathProvider);
         var fileUtilityService = new FileUtilityService();
         
-        var handler = new AddModelCommandHandler(storage, modelRepository, fileRepository, fileUtilityService);
+        var fileCreationService = new FileCreationService(storage, fileRepository, fileUtilityService, dateTimeProvider);
+        
+        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider);
         
         Assert.NotNull(handler);
     }

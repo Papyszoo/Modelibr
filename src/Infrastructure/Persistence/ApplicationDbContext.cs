@@ -1,4 +1,5 @@
 ﻿using Domain.Models;
+using Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence
@@ -25,10 +26,34 @@ namespace Infrastructure.Persistence
                 entity.Property(f => f.FilePath).IsRequired();
                 entity.Property(f => f.MimeType).IsRequired();
                 entity.Property(f => f.Sha256Hash).IsRequired();
-                entity.Property(f => f.FileType).IsRequired();
+                
+                // Configure FileType Value Object to be stored as string
+                entity.Property(f => f.FileType)
+                    .HasConversion(
+                        v => v.Value,
+                        v => MapFromDatabaseValue(v))
+                    .IsRequired();
             });
 
             base.OnModelCreating(modelBuilder);
+        }
+
+        private static FileType MapFromDatabaseValue(string value)
+        {
+            return value switch
+            {
+                "obj" => FileType.Obj,
+                "fbx" => FileType.Fbx,
+                "gltf" => FileType.Gltf,
+                "glb" => FileType.Glb,
+                "blend" => FileType.Blend,
+                "max" => FileType.Max,
+                "maya" => FileType.Maya,
+                "texture" => FileType.Texture,
+                "material" => FileType.Material,
+                "other" => FileType.Other,
+                _ => FileType.Unknown
+            };
         }
     }
 }

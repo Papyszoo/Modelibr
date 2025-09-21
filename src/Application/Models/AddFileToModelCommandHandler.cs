@@ -1,73 +1,55 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
-using Application.Abstractions.Storage;
-using Domain.Files;
-using Domain.Models;
+using Application.Services;
+using Domain.Services;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.Models
 {
     internal class AddFileToModelCommandHandler : ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse>
     {
-        private readonly IFileStorage _storage;
         private readonly IModelRepository _modelRepository;
-        private readonly IFileRepository _fileRepository;
-        private readonly IFileUtilityService _fileUtilityService;
+        private readonly IFileCreationService _fileCreationService;
+        private readonly IDateTimeProvider _dateTimeProvider;
 
         public AddFileToModelCommandHandler(
-            IFileStorage storage, 
             IModelRepository modelRepository, 
-            IFileRepository fileRepository,
-            IFileUtilityService fileUtilityService)
+            IFileCreationService fileCreationService,
+            IDateTimeProvider dateTimeProvider)
         {
-            _storage = storage;
             _modelRepository = modelRepository;
-            _fileRepository = fileRepository;
-            _fileUtilityService = fileUtilityService;
+            _fileCreationService = fileCreationService;
+            _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<Result<AddFileToModelCommandResponse>> Handle(AddFileToModelCommand command, CancellationToken cancellationToken)
         {
-            var original = Path.GetFileName(command.File.FileName);
-            var ext = Path.GetExtension(original) ?? string.Empty;
-            var fileType = FileTypeExtensions.GetFileTypeFromExtension(ext);
-
-            // Calculate hash first to check for existing files before saving to disk
-            var hash = await _fileUtilityService.CalculateFileHashAsync(command.File, cancellationToken);
-
-            // Check if file already exists in database by hash
-            var existingFile = await _fileRepository.GetBySha256HashAsync(hash, cancellationToken);
-            
-            Domain.Models.File fileEntity;
-            if (existingFile != null)
+            // Validate file type for upload using Value Object directly
+            var fileTypeResult = FileType.ValidateForUpload(command.File.FileName);
+            if (!fileTypeResult.IsSuccess)
             {
-                // File already exists, check if it's already linked to this model
-                if (existingFile.Models.Any(m => m.Id == command.ModelId))
-                {
-                    return Result.Success(new AddFileToModelCommandResponse(existingFile.Id, true));
-                }
-                
-                fileEntity = existingFile;
+                return Result.Failure<AddFileToModelCommandResponse>(fileTypeResult.Error);
             }
-            else
+
+            // Create or get existing file
+            var fileResult = await _fileCreationService.CreateOrGetExistingFileAsync(
+                command.File, 
+                fileTypeResult.Value, 
+                cancellationToken);
+
+            if (!fileResult.IsSuccess)
             {
-                // File doesn't exist, save to disk and create file entity
-                var stored = await _storage.SaveAsync(command.File, Domain.Files.FileType.Model3D, cancellationToken);
-                
-                fileEntity = new Domain.Models.File
-                {
-                    OriginalFileName = original,
-                    StoredFileName = stored.StoredName,
-                    FilePath = stored.RelativePath,
-                    MimeType = _fileUtilityService.GetMimeType(ext),
-                    FileType = fileType,
-                    SizeBytes = 0, // We'll set this properly later
-                    Sha256Hash = stored.Sha256,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
+                return Result.Failure<AddFileToModelCommandResponse>(fileResult.Error);
+            }
+
+            var fileEntity = fileResult.Value;
+
+            // Check if file is already linked to this model
+            if (fileEntity.IsLinkedToModel(command.ModelId))
+            {
+                return Result.Success(new AddFileToModelCommandResponse(fileEntity.Id, true));
             }
 
             try

@@ -1,5 +1,6 @@
 using Application.Abstractions.Repositories;
 using Domain.Models;
+using Domain.Services;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +9,12 @@ namespace Infrastructure.Repositories;
 internal sealed class ModelRepository : IModelRepository
 {
     private readonly ApplicationDbContext _context;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
-    public ModelRepository(ApplicationDbContext context)
+    public ModelRepository(ApplicationDbContext context, IDateTimeProvider dateTimeProvider)
     {
         _context = context;
+        _dateTimeProvider = dateTimeProvider;
     }
 
     public async Task<Model> AddAsync(Model model, CancellationToken cancellationToken = default)
@@ -36,9 +39,8 @@ internal sealed class ModelRepository : IModelRepository
         _context.Files.Add(file);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Add the file to the model
-        model.Files.Add(file);
-        model.UpdatedAt = DateTime.UtcNow;
+        // Add the file to the model using domain method
+        model.AddFile(file, _dateTimeProvider.UtcNow);
         
         await _context.SaveChangesAsync(cancellationToken);
         

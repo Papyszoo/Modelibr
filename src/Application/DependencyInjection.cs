@@ -1,6 +1,7 @@
-﻿using Application.Abstractions.Messaging;
+using Application.Abstractions.Messaging;
 using Application.Abstractions.Services;
 using Application.Services;
+using Domain.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
@@ -12,6 +13,8 @@ namespace Application
         {
             services.AddMediator();
             services.AddScoped<IFileUtilityService, FileUtilityService>();
+            services.AddScoped<IDateTimeProvider, DateTimeProvider>();
+            services.AddScoped<IFileCreationService, FileCreationService>();
             return services;
         }
 
