@@ -51,6 +51,14 @@ namespace WebApi
             .WithName("Upload Model")
             .DisableAntiforgery();
 
+            app.MapGet("/models", async (IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
+            {
+                var result = await queryHandler.Handle(new GetAllModelsQuery(), CancellationToken.None);
+                
+                return Results.Ok(result);
+            })
+            .WithName("Get All Models");
+
             app.Run();
         }
     }
