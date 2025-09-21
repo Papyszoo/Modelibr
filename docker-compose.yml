@@ -13,6 +13,7 @@ services:
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
             - ASPNETCORE_HTTPS_PORTS=${WEBAPI_HTTPS_PORT}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
+            - ConnectionStrings__Default=Server=mssql,${MSSQL_PORT};Database=Modelibr;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true;
         ports:
             - "${WEBAPI_HTTP_PORT}"
             - "${WEBAPI_HTTPS_PORT}"
@@ -47,7 +48,7 @@ services:
         ports:
             - "${MSSQL_PORT}:1433"
         healthcheck:
-            test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
+            test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -C -Q 'SELECT 1' || exit 1"]
             interval: 15s
             timeout: 5s
             retries: 10

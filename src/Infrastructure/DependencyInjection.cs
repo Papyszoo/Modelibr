@@ -19,6 +19,9 @@ namespace Infrastructure
                     throw new InvalidOperationException("Database connection string 'Default' is not configured.");
                 }
                 
+                // Expand environment variables in connection string
+                connectionString = Environment.ExpandEnvironmentVariables(connectionString);
+                
                 optionsBuilder.UseSqlServer(connectionString);
             });
 
