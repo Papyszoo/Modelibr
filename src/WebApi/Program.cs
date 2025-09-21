@@ -17,6 +17,9 @@ namespace WebApi
 
             builder.Services.AddAuthorization();
 
+            // Add CORS for frontend development
+            builder.Services.AddCors();
+
             builder.Services.AddOpenApi();
 
             builder.Services
@@ -35,6 +38,12 @@ namespace WebApi
             }
 
             app.UseHttpsRedirection();
+
+            // Add CORS for frontend development
+            app.UseCors(policy => policy
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader());
 
             app.UseAuthorization();
 
@@ -59,7 +68,51 @@ namespace WebApi
             })
             .WithName("Get All Models");
 
+            app.MapGet("/models/{id}/file", async (int id, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, IUploadPathProvider pathProvider) =>
+            {
+                var result = await queryHandler.Handle(new GetAllModelsQuery(), CancellationToken.None);
+                
+                if (!result.IsSuccess)
+                {
+                    return Results.Problem("Failed to retrieve models");
+                }
+
+                var model = result.Value.Models.FirstOrDefault(m => m.Id == id);
+                if (model == null)
+                {
+                    return Results.NotFound("Model not found");
+                }
+
+                var fullPath = Path.Combine(pathProvider.UploadRootPath, model.FilePath);
+                if (!File.Exists(fullPath))
+                {
+                    return Results.NotFound("Model file not found");
+                }
+
+                var fileStream = File.OpenRead(fullPath);
+                var contentType = GetContentType(model.FilePath);
+                
+                return Results.File(fileStream, contentType, enableRangeProcessing: true);
+            })
+            .WithName("Get Model File");
+
             app.Run();
+        }
+
+        private static string GetContentType(string filePath)
+        {
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            return extension switch
+            {
+                ".obj" => "text/plain",
+                ".fbx" => "application/octet-stream",
+                ".dae" => "application/xml",
+                ".3ds" => "application/octet-stream",
+                ".blend" => "application/octet-stream",
+                ".gltf" => "application/json",
+                ".glb" => "application/octet-stream",
+                _ => "application/octet-stream"
+            };
         }
     }
 }

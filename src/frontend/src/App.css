@@ -18,6 +18,39 @@
 .App-header p {
   font-size: 1.2rem;
   color: #888;
+  margin-bottom: 2rem;
+}
+
+.app-nav {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.nav-button {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid #646cff;
+  background: transparent;
+  color: #646cff;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.nav-button:hover {
+  background: #f0f0ff;
+}
+
+.nav-button.active {
+  background: #646cff;
+  color: white;
+}
+
+.nav-button.active:hover {
+  background: #535bf2;
 }
 
 .upload-section {
@@ -105,6 +138,26 @@
   background: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;
+}
+
+.post-upload-actions {
+  margin-top: 1rem;
+}
+
+.view-models-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.view-models-button:hover {
+  background: #218838;
 }
 
 .info-section {
