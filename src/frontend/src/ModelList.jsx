@@ -1,13 +1,43 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './ModelList.css'
 import ModelViewer from './ModelViewer'
 import ApiClient from './services/ApiClient'
+import { DataTable } from 'primereact/datatable'
+import { Column } from 'primereact/column'
+import { Button } from 'primereact/button'
+import { Toast } from 'primereact/toast'
+import { ProgressBar } from 'primereact/progressbar'
+import { useFileUpload, useDragAndDrop } from './hooks/useFileUpload'
+import { 
+  getFileExtension, 
+  getFileName, 
+  getModelFileFormat, 
+  formatFileSize
+} from './utils/fileUtils'
+import 'primereact/resources/themes/lara-light-blue/theme.css'
+import 'primereact/resources/primereact.min.css'
+import 'primeicons/primeicons.css'
 
 function ModelList({ onBackToUpload }) {
   const [models, setModels] = useState([])
   const [selectedModel, setSelectedModel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const toast = useRef(null)
+  const dt = useRef(null)
+
+  // Use the file upload hook with Three.js renderability requirement
+  const { uploading, uploadProgress, uploadMultipleFiles } = useFileUpload({
+    requireThreeJSRenderable: true,
+    toast,
+    onSuccess: () => {
+      // Refresh the models list after successful upload
+      fetchModels()
+    }
+  })
+
+  // Use drag and drop hook
+  const { onDrop, onDragOver, onDragEnter } = useDragAndDrop(uploadMultipleFiles)
 
   useEffect(() => {
     fetchModels()
@@ -38,6 +68,52 @@ function ModelList({ onBackToUpload }) {
     setSelectedModel(null)
   }
 
+  // Template functions for DataTable columns
+  const idBodyTemplate = (rowData) => {
+    return `#${rowData.id}`
+  }
+
+  const nameBodyTemplate = (rowData) => {
+    // Get the first file's name or use the model name
+    const fileName = rowData.files && rowData.files.length > 0 
+      ? rowData.files[0].originalFileName 
+      : rowData.name || `Model ${rowData.id}`
+    return fileName
+  }
+
+  const filesBodyTemplate = (rowData) => {
+    const fileCount = rowData.files ? rowData.files.length : 0
+    if (fileCount === 0) return 'No files'
+    
+    const formats = rowData.files
+      .map(f => getFileExtension(f.originalFileName).toUpperCase())
+      .join(', ')
+    
+    return `${fileCount} file${fileCount > 1 ? 's' : ''} (${formats})`
+  }
+
+  const sizeBodyTemplate = (rowData) => {
+    if (!rowData.files || rowData.files.length === 0) return '-'
+    
+    const totalSize = rowData.files.reduce((sum, file) => sum + (file.sizeBytes || 0), 0)
+    return formatFileSize(totalSize)
+  }
+
+  const dateBodyTemplate = (rowData) => {
+    return new Date(rowData.createdAt).toLocaleDateString()
+  }
+
+  const actionBodyTemplate = (rowData) => {
+    return (
+      <Button 
+        icon="pi pi-eye" 
+        className="p-button-text p-button-rounded" 
+        onClick={() => handleModelSelect(rowData)}
+        tooltip="View Model"
+      />
+    )
+  }
+
   if (selectedModel) {
     return (
       <ModelViewer 
@@ -49,74 +125,118 @@ function ModelList({ onBackToUpload }) {
 
   return (
     <div className="model-list">
+      <Toast ref={toast} />
+      
       <header className="model-list-header">
         <div className="header-controls">
-          <button onClick={onBackToUpload} className="back-to-upload-button">
-            ← Back to Upload
-          </button>
+          <Button 
+            icon="pi pi-upload" 
+            label="Upload Page" 
+            className="p-button-outlined" 
+            onClick={onBackToUpload}
+          />
         </div>
         <h1>3D Model Library</h1>
-        <p>Select a model to view in 3D</p>
+        <p>Drag and drop 3D model files onto the table to upload, or select a model to view in 3D</p>
       </header>
 
+      {uploading && (
+        <div className="upload-progress">
+          <p>Uploading files...</p>
+          <ProgressBar value={uploadProgress} />
+        </div>
+      )}
+
       {loading && (
-        <div className="loading">Loading models...</div>
+        <div className="loading">
+          <ProgressBar mode="indeterminate" style={{ height: '6px' }} />
+          <p>Loading models...</p>
+        </div>
       )}
 
       {error && (
         <div className="error-message">
-          {error}
-          <button onClick={fetchModels} className="retry-button">
-            Retry
-          </button>
+          <i className="pi pi-exclamation-triangle"></i>
+          <span>{error}</span>
+          <Button 
+            label="Retry" 
+            icon="pi pi-refresh" 
+            className="p-button-sm" 
+            onClick={fetchModels}
+          />
         </div>
       )}
 
       {!loading && !error && models.length === 0 && (
         <div className="empty-state">
+          <i className="pi pi-box" style={{ fontSize: '4rem', color: 'var(--surface-500)' }}></i>
           <h3>No models found</h3>
-          <p>Upload some 3D models to get started!</p>
+          <p>Drag and drop 3D model files here to get started!</p>
         </div>
       )}
 
       {!loading && !error && models.length > 0 && (
-        <div className="models-grid">
-          {models.map((model) => (
-            <div 
-              key={model.id} 
-              className="model-card"
-              onClick={() => handleModelSelect(model)}
-            >
-              <div className="model-preview">
-                <div className="model-icon">📦</div>
-                <div className="model-format">
-                  {getFileExtension(model.filePath).toUpperCase()}
-                </div>
-              </div>
-              <div className="model-info">
-                <h3>Model #{model.id}</h3>
-                <p className="model-filename">
-                  {getFileName(model.filePath)}
-                </p>
-                <p className="model-date">
-                  Created: {new Date(model.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          ))}
+        <div 
+          className="datatable-container"
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragEnter={onDragEnter}
+        >
+          <DataTable 
+            ref={dt}
+            value={models} 
+            responsiveLayout="scroll"
+            stripedRows
+            showGridlines
+            paginator 
+            rows={10} 
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            className="model-datatable"
+            emptyMessage="No models found"
+            globalFilterFields={['name', 'files.originalFileName']}
+          >
+            <Column 
+              field="id" 
+              header="ID" 
+              body={idBodyTemplate}
+              sortable 
+              style={{ width: '80px' }}
+            />
+            <Column 
+              field="name" 
+              header="Name" 
+              body={nameBodyTemplate}
+              sortable 
+              style={{ minWidth: '200px' }}
+            />
+            <Column 
+              header="Files" 
+              body={filesBodyTemplate}
+              style={{ minWidth: '150px' }}
+            />
+            <Column 
+              header="Size" 
+              body={sizeBodyTemplate}
+              sortable 
+              style={{ width: '100px' }}
+            />
+            <Column 
+              field="createdAt" 
+              header="Created" 
+              body={dateBodyTemplate}
+              sortable 
+              style={{ width: '120px' }}
+            />
+            <Column 
+              header="Actions" 
+              body={actionBodyTemplate}
+              style={{ width: '80px' }}
+            />
+          </DataTable>
         </div>
       )}
     </div>
   )
-}
-
-function getFileExtension(filePath) {
-  return filePath.split('.').pop() || 'unknown'
-}
-
-function getFileName(filePath) {
-  const parts = filePath.split('/')
-  return parts[parts.length - 1] || 'unknown'
 }
 
 export default ModelList
