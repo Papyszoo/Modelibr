@@ -7,13 +7,12 @@ import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import { ProgressBar } from 'primereact/progressbar'
+import { useFileUpload, useDragAndDrop } from './hooks/useFileUpload'
 import { 
   getFileExtension, 
   getFileName, 
   getModelFileFormat, 
-  formatFileSize,
-  isThreeJSRenderable,
-  isSupportedModelFormat 
+  formatFileSize
 } from './utils/fileUtils'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
@@ -24,10 +23,21 @@ function ModelList({ onBackToUpload }) {
   const [selectedModel, setSelectedModel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const toast = useRef(null)
   const dt = useRef(null)
+
+  // Use the file upload hook with Three.js renderability requirement
+  const { uploading, uploadProgress, uploadMultipleFiles } = useFileUpload({
+    requireThreeJSRenderable: true,
+    toast,
+    onSuccess: () => {
+      // Refresh the models list after successful upload
+      fetchModels()
+    }
+  })
+
+  // Use drag and drop hook
+  const { onDrop, onDragOver, onDragEnter } = useDragAndDrop(uploadMultipleFiles)
 
   useEffect(() => {
     fetchModels()
@@ -48,87 +58,6 @@ function ModelList({ onBackToUpload }) {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleFileUpload = async (files) => {
-    if (!files || files.length === 0) return
-
-    setUploading(true)
-    setUploadProgress(0)
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        
-        // Check if file type is supported
-        const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
-        
-        if (!isSupportedModelFormat(fileExtension)) {
-          toast.current.show({
-            severity: 'warn', 
-            summary: 'Unsupported File', 
-            detail: `File ${file.name} is not a supported 3D model format`
-          })
-          continue
-        }
-
-        // Check if file is renderable by Three.js (for models being added to DataTable)
-        if (!isThreeJSRenderable(fileExtension)) {
-          toast.current.show({
-            severity: 'warn', 
-            summary: 'Non-renderable Format', 
-            detail: `File ${file.name} (${fileExtension.toUpperCase()}) is supported but not renderable in 3D viewer. Use the upload page for this file type.`
-          })
-          continue
-        }
-
-        setUploadProgress(((i) / files.length) * 100)
-
-        const result = await ApiClient.uploadModel(file)
-        
-        if (result.isSuccess) {
-          toast.current.show({
-            severity: 'success', 
-            summary: 'Upload Successful', 
-            detail: `${file.name} uploaded successfully`
-          })
-        } else {
-          toast.current.show({
-            severity: 'error', 
-            summary: 'Upload Failed', 
-            detail: `Failed to upload ${file.name}: ${result.error?.message || 'Unknown error'}`
-          })
-        }
-      }
-      
-      setUploadProgress(100)
-      // Refresh the models list
-      await fetchModels()
-      
-    } catch (err) {
-      toast.current.show({
-        severity: 'error', 
-        summary: 'Upload Error', 
-        detail: err.message
-      })
-    } finally {
-      setUploading(false)
-      setUploadProgress(0)
-    }
-  }
-
-  const onDrop = (e) => {
-    e.preventDefault()
-    const files = Array.from(e.dataTransfer.files)
-    handleFileUpload(files)
-  }
-
-  const onDragOver = (e) => {
-    e.preventDefault()
-  }
-
-  const onDragEnter = (e) => {
-    e.preventDefault()
   }
 
   const handleModelSelect = (model) => {
