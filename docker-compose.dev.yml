@@ -2,6 +2,8 @@ services:
   frontend:
     build:
       target: development
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     volumes:
@@ -9,3 +11,4 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}

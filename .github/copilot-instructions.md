@@ -67,7 +67,8 @@ The solution follows Clean Architecture with the following projects:
 - Upload storage path: `UPLOAD_STORAGE_PATH` (defaults to `/var/lib/modelibr/uploads`)
 - ASP.NET Core environment: `ASPNETCORE_ENVIRONMENT`
 - Database connection string configured in Infrastructure layer
-- Docker environment variables in `.env.example`
+- Frontend API base URL: `VITE_API_BASE_URL` (defaults to `https://localhost:8081`)
+- **ALL environment variables are centralized in the main `.env` file** - users should only configure this single file, not separate files for individual projects
 
 #### Environment Variable Priority and Configuration
 **ALWAYS prioritize environment variables that are defined in .env files.** If something is parameterized in .env file, use that variable rather than hardcoding values.
@@ -76,6 +77,12 @@ Environment variables override configuration values automatically in ASP.NET Cor
 - Use double underscore (`__`) to represent nested configuration: `ConnectionStrings__Default`
 - Environment variables from .env file take precedence over appsettings.json values
 - Docker Compose automatically substitutes `${VARIABLE_NAME}` with values from .env file
+
+#### Frontend Environment Variables
+Frontend environment variables (prefixed with `VITE_`) are injected at build time through Docker build arguments:
+- `VITE_API_BASE_URL` - Frontend API base URL (from main .env file)
+- Docker Compose passes these as build arguments to the frontend container
+- **NEVER create separate .env files in src/frontend/ - use only the main .env file**
 
 #### Database Connection String Environment Variables
 The database connection string supports environment variable substitution using `Environment.ExpandEnvironmentVariables()`:
