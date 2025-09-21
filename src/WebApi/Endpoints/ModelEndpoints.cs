@@ -8,7 +8,7 @@ public static class ModelEndpoints
 {
     public static void MapModelEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/uploadModel", async (IFormFile file, ICommandHandler<AddModelCommand, AddModelCommandResponse> commandHandler) =>
+        app.MapPost("/models", async (IFormFile file, ICommandHandler<AddModelCommand, AddModelCommandResponse> commandHandler) =>
         {
             if (file.Length > 0)
             {
@@ -18,7 +18,7 @@ public static class ModelEndpoints
             }
             return Results.BadRequest("Invalid file.");
         })
-        .WithName("Upload Model")
+        .WithName("Create Model")
         .DisableAntiforgery();
 
         app.MapPost("/models/{modelId}/files", async (int modelId, IFormFile file, ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse> commandHandler) =>
