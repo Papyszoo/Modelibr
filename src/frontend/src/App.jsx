@@ -7,7 +7,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadStatus, setUploadStatus] = useState('')
   const [isUploading, setIsUploading] = useState(false)
-  const [currentView, setCurrentView] = useState('upload') // 'upload' or 'models'
+  const [currentView, setCurrentView] = useState('models') // 'upload' or 'models'
 
   const handleFileSelect = (event) => {
     setSelectedFile(event.target.files[0])

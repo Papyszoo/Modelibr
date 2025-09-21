@@ -5,8 +5,20 @@ import LoadingPlaceholder from './LoadingPlaceholder'
 import ApiClient from '../services/ApiClient'
 
 function Scene({ model }) {
-  const fileExtension = model.filePath.split('.').pop().toLowerCase()
-  const modelUrl = ApiClient.getModelFileUrl(model.id)
+  // Find the first renderable file
+  const renderableFile = model.files?.find(f => f.isRenderable) || model.files?.[0]
+  
+  if (!renderableFile) {
+    return (
+      <mesh>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="gray" />
+      </mesh>
+    )
+  }
+  
+  const fileExtension = renderableFile.originalFileName.split('.').pop().toLowerCase()
+  const modelUrl = ApiClient.getFileUrl(renderableFile.id)
 
   return (
     <>

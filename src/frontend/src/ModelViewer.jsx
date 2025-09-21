@@ -17,7 +17,9 @@ function ModelViewer({ model, onBack }) {
         <div className="model-details">
           <span className="model-id">Model #{model.id}</span>
           <span className="model-format">
-            {model.filePath.split('.').pop().toUpperCase()}
+            {model.files && model.files.length > 0 
+              ? model.files[0].originalFileName.split('.').pop().toUpperCase()
+              : 'UNKNOWN'}
           </span>
         </div>
       </header>

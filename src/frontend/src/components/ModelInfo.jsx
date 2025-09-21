@@ -18,7 +18,11 @@ function ModelInfo({ model }) {
           </div>
           <div className="info-item">
             <label>Format:</label>
-            <span>{model.filePath.split('.').pop().toUpperCase()}</span>
+            <span>
+              {model.files && model.files.length > 0 
+                ? model.files[0].originalFileName.split('.').pop().toUpperCase()
+                : 'UNKNOWN'}
+            </span>
           </div>
         </div>
       </div>
