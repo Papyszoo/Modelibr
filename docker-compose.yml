@@ -9,7 +9,7 @@ services:
                 APP_GID: ${HOST_GID:-1000}
         container_name: webapi
         environment:
-            - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+            - ASPNETCORE_ENVIRONMENT=Docker
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
             - ASPNETCORE_HTTPS_PORTS=${WEBAPI_HTTPS_PORT}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
@@ -47,7 +47,7 @@ services:
         ports:
             - "${MSSQL_PORT}:1433"
         healthcheck:
-            test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
+            test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -C -Q 'SELECT 1' || exit 1"]
             interval: 15s
             timeout: 5s
             retries: 10
