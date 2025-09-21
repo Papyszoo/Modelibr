@@ -1,6 +1,7 @@
 using Application;
 using Application.Abstractions.Messaging;
 using Application.Models;
+using Application.Files;
 using Infrastructure;
 using WebApi.Files;
 using WebApi.Infrastructure;
@@ -69,33 +70,36 @@ namespace WebApi
             })
             .WithName("Get All Models");
 
-            app.MapGet("/models/{id}/file", async (int id, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, IUploadPathProvider pathProvider) =>
+            // New endpoint to serve files directly by file ID
+            app.MapGet("/files/{id}", async (int id, IQueryHandler<GetFileQuery, GetFileQueryResponse> queryHandler) =>
             {
-                var result = await queryHandler.Handle(new GetAllModelsQuery(), CancellationToken.None);
+                var result = await queryHandler.Handle(new GetFileQuery(id), CancellationToken.None);
                 
                 if (!result.IsSuccess)
                 {
-                    return Results.Problem("Failed to retrieve models");
+                    return Results.NotFound(result.Error.Message);
                 }
 
-                var model = result.Value.Models.FirstOrDefault(m => m.Id == id);
-                if (model == null)
-                {
-                    return Results.NotFound("Model not found");
-                }
-
-                var fullPath = Path.Combine(pathProvider.UploadRootPath, model.FilePath);
-                if (!File.Exists(fullPath))
-                {
-                    return Results.NotFound("Model file not found");
-                }
-
-                var fileStream = File.OpenRead(fullPath);
-                var contentType = ContentTypeProvider.GetContentType(model.FilePath);
+                var fileStream = System.IO.File.OpenRead(result.Value.FullPath);
+                var contentType = ContentTypeProvider.GetContentType(result.Value.OriginalFileName);
                 
-                return Results.File(fileStream, contentType, enableRangeProcessing: true);
+                return Results.File(fileStream, contentType, result.Value.OriginalFileName, enableRangeProcessing: true);
             })
-            .WithName("Get Model File");
+            .WithName("Get File");
+
+            // New endpoint to add files to existing models
+            app.MapPost("/models/{modelId}/files", async (int modelId, IFormFile file, ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse> commandHandler) =>
+            {
+                if (file.Length > 0)
+                {
+                    var result = await commandHandler.Handle(new AddFileToModelCommand(modelId, new FormFileUpload(file)), CancellationToken.None);
+
+                    return Results.Ok(result);
+                }
+                return Results.BadRequest("Invalid file.");
+            })
+            .WithName("Add File to Model")
+            .DisableAntiforgery();
 
             app.Run();
         }
