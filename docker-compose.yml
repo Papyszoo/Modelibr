@@ -33,6 +33,8 @@ services:
             context: ./src/frontend
             dockerfile: Dockerfile
             target: production
+            args:
+                VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         container_name: frontend
         ports:
             - "${FRONTEND_PORT:-3000}:80"
