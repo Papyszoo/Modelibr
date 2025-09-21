@@ -3,6 +3,7 @@ using Infrastructure;
 using WebApi.Endpoints;
 using WebApi.Infrastructure;
 using WebApi.Services;
+using WebApi.Extensions;
 using Application.Abstractions.Storage;
 using Infrastructure.Storage;
 
@@ -10,7 +11,7 @@ namespace WebApi
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -28,9 +29,11 @@ namespace WebApi
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
-            builder.Services.AddHostedService<DatabaseInitializer>();
 
             var app = builder.Build();
+
+            // Initialize database
+            await app.InitializeDatabaseAsync();
 
             if (app.Environment.IsDevelopment())
             {
