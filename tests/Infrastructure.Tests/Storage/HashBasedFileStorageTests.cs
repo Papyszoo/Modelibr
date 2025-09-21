@@ -1,7 +1,3 @@
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Domain.Files;
 using Infrastructure.Storage;
 using Infrastructure.Tests.Fakes;
