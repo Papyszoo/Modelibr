@@ -18,6 +18,21 @@ namespace Infrastructure.Persistence
                 .WithMany(f => f.Models)
                 .UsingEntity(j => j.ToTable("ModelFiles"));
 
+            // Configure Model entity
+            modelBuilder.Entity<Model>(entity =>
+            {
+                entity.HasKey(m => m.Id);
+                entity.Property(m => m.Name).IsRequired();
+                entity.Property(m => m.CreatedAt).IsRequired();
+                entity.Property(m => m.UpdatedAt).IsRequired();
+
+                // Configure one-to-many relationship with Thumbnails
+                entity.HasMany(m => m.Thumbnails)
+                    .WithOne(t => t.Model)
+                    .HasForeignKey(t => t.ModelId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             // Configure File entity
             modelBuilder.Entity<Domain.Models.File>(entity =>
             {
@@ -34,19 +49,13 @@ namespace Infrastructure.Persistence
                         v => v.Value,
                         v => MapFromDatabaseValue(v))
                     .IsRequired();
-
-                // Configure one-to-many relationship with Thumbnails
-                entity.HasMany(f => f.Thumbnails)
-                    .WithOne(t => t.File)
-                    .HasForeignKey(t => t.FileId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Configure Thumbnail entity
             modelBuilder.Entity<Thumbnail>(entity =>
             {
                 entity.HasKey(t => t.Id);
-                entity.Property(t => t.FileId).IsRequired();
+                entity.Property(t => t.ModelId).IsRequired();
                 entity.Property(t => t.Format).IsRequired().HasMaxLength(50);
                 entity.Property(t => t.Status).IsRequired();
                 entity.Property(t => t.ThumbnailPath).HasMaxLength(500);
@@ -54,8 +63,8 @@ namespace Infrastructure.Persistence
                 entity.Property(t => t.CreatedAt).IsRequired();
                 entity.Property(t => t.UpdatedAt).IsRequired();
 
-                // Create unique index for FileId + Format to prevent duplicate thumbnails
-                entity.HasIndex(t => new { t.FileId, t.Format }).IsUnique();
+                // Create unique index for ModelId + Format to prevent duplicate thumbnails
+                entity.HasIndex(t => new { t.ModelId, t.Format }).IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);

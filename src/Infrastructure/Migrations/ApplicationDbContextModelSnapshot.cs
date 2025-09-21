@@ -106,15 +106,15 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<int>("FileId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Format")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<int?>("Height")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ModelId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("ProcessedAt")
@@ -138,7 +138,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FileId", "Format")
+                    b.HasIndex("ModelId", "Format")
                         .IsUnique();
 
                     b.ToTable("Thumbnails");
@@ -161,13 +161,13 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.Thumbnail", b =>
                 {
-                    b.HasOne("Domain.Models.File", "File")
+                    b.HasOne("Domain.Models.Model", "Model")
                         .WithMany("Thumbnails")
-                        .HasForeignKey("FileId")
+                        .HasForeignKey("ModelId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("File");
+                    b.Navigation("Model");
                 });
 
             modelBuilder.Entity("FileModel", b =>
@@ -185,7 +185,7 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Models.File", b =>
+            modelBuilder.Entity("Domain.Models.Model", b =>
                 {
                     b.Navigation("Thumbnails");
                 });

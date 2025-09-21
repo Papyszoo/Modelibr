@@ -10,9 +10,9 @@ public class Thumbnail
     public int Id { get; set; }
     
     /// <summary>
-    /// The ID of the source file this thumbnail was generated from.
+    /// The ID of the model this thumbnail was generated for.
     /// </summary>
-    public int FileId { get; private set; }
+    public int ModelId { get; private set; }
     
     /// <summary>
     /// The format/type of the thumbnail (e.g., "png", "webp", "gif", "poster").
@@ -65,19 +65,19 @@ public class Thumbnail
     public DateTime? ProcessedAt { get; private set; }
     
     // Navigation property
-    public File File { get; set; } = null!;
+    public Model Model { get; set; } = null!;
 
     /// <summary>
     /// Creates a new thumbnail record for processing.
     /// </summary>
-    public static Thumbnail Create(int fileId, string format, DateTime createdAt)
+    public static Thumbnail Create(int modelId, string format, DateTime createdAt)
     {
-        ValidateFileId(fileId);
+        ValidateModelId(modelId);
         ValidateFormat(format);
 
         return new Thumbnail
         {
-            FileId = fileId,
+            ModelId = modelId,
             Format = format.ToLowerInvariant().Trim(),
             Status = ThumbnailStatus.Pending,
             CreatedAt = createdAt,
@@ -137,10 +137,10 @@ public class Thumbnail
         UpdatedAt = updatedAt;
     }
 
-    private static void ValidateFileId(int fileId)
+    private static void ValidateModelId(int modelId)
     {
-        if (fileId <= 0)
-            throw new ArgumentException("File ID must be greater than 0.", nameof(fileId));
+        if (modelId <= 0)
+            throw new ArgumentException("Model ID must be greater than 0.", nameof(modelId));
     }
 
     private static void ValidateFormat(string format)

@@ -3,6 +3,7 @@
     public class Model
     {
         private readonly List<File> _files = new();
+        private readonly List<Thumbnail> _thumbnails = new();
 
         public int Id { get; set; }
         public string Name { get; private set; } = string.Empty;
@@ -18,6 +19,18 @@
                 _files.Clear();
                 if (value != null)
                     _files.AddRange(value);
+            }
+        }
+
+        // Navigation property for one-to-many relationship with thumbnails
+        public ICollection<Thumbnail> Thumbnails
+        {
+            get => _thumbnails;
+            set
+            {
+                _thumbnails.Clear();
+                if (value != null)
+                    _thumbnails.AddRange(value);
             }
         }
 

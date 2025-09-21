@@ -5,7 +5,6 @@ namespace Domain.Models;
 public class File
 {
     private readonly List<Model> _models = new();
-    private readonly List<Thumbnail> _thumbnails = new();
 
     public int Id { get; set; }
     public string OriginalFileName { get; private set; } = string.Empty;
@@ -27,18 +26,6 @@ public class File
             _models.Clear();
             if (value != null)
                 _models.AddRange(value);
-        }
-    }
-
-    // Navigation property for one-to-many relationship with thumbnails
-    public ICollection<Thumbnail> Thumbnails
-    {
-        get => _thumbnails;
-        set
-        {
-            _thumbnails.Clear();
-            if (value != null)
-                _thumbnails.AddRange(value);
         }
     }
 
