@@ -35,7 +35,9 @@ Always reference these instructions first and fallback to search or bash command
   - `docker compose version` -- verify Docker Compose v2.x is available
   - Configuration in `docker-compose.yml` with SQL Server database
   - Uses ports 8080 (HTTP) and 8081 (HTTPS) in containers
-  - Environment variables in `.env.example`
+  - **REQUIRED**: Create `.env` file from `.env.example` before running docker-compose
+  - `cp .env.example .env` -- copy environment configuration
+  - Environment variables in `.env.example` contain all required parameters
 
 ## Validation
 - ALWAYS manually test the Web API after changes by running `dotnet run` and verifying it starts successfully
