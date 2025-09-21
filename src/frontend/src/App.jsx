@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import './App.css'
+import ModelList from './ModelList'
+import ApiClient from './services/ApiClient'
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadStatus, setUploadStatus] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [currentView, setCurrentView] = useState('upload') // 'upload' or 'models'
 
   const handleFileSelect = (event) => {
     setSelectedFile(event.target.files[0])
@@ -21,20 +24,16 @@ function App() {
     setUploadStatus('Uploading...')
 
     try {
-      const formData = new FormData()
-      formData.append('file', selectedFile)
+      const result = await ApiClient.uploadModel(selectedFile)
 
-      // Assuming the WebAPI is available on port 8080 as configured in docker-compose
-      const response = await fetch('http://localhost:8080/uploadModel', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        setUploadStatus(`Upload successful! File ID: ${result.id || 'Generated'}`)
+      if (result.isSuccess) {
+        setUploadStatus(`Upload successful! File ID: ${result.value?.id || 'Generated'}`)
+        setSelectedFile(null)
+        // Reset file input
+        const fileInput = document.getElementById('file-input')
+        if (fileInput) fileInput.value = ''
       } else {
-        setUploadStatus(`Upload failed: ${response.statusText}`)
+        setUploadStatus(`Upload failed: ${result.error?.message || 'Unknown error'}`)
       }
     } catch (error) {
       setUploadStatus(`Upload error: ${error.message}`)
@@ -43,11 +42,38 @@ function App() {
     }
   }
 
+  const switchToModels = () => {
+    setCurrentView('models')
+  }
+
+  const switchToUpload = () => {
+    setCurrentView('upload')
+  }
+
+  if (currentView === 'models') {
+    return <ModelList onBackToUpload={switchToUpload} />
+  }
+
   return (
     <div className="App">
       <header className="App-header">
         <h1>Modelibr</h1>
         <p>3D Model File Upload Service</p>
+        
+        <nav className="app-nav">
+          <button 
+            className={`nav-button ${currentView === 'upload' ? 'active' : ''}`}
+            onClick={switchToUpload}
+          >
+            Upload
+          </button>
+          <button 
+            className={`nav-button ${currentView === 'models' ? 'active' : ''}`}
+            onClick={switchToModels}
+          >
+            View Models
+          </button>
+        </nav>
       </header>
       
       <main className="upload-section">
@@ -80,6 +106,14 @@ function App() {
               {uploadStatus}
             </div>
           )}
+          
+          {uploadStatus.includes('successful') && (
+            <div className="post-upload-actions">
+              <button onClick={switchToModels} className="view-models-button">
+                View All Models
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="info-section">
@@ -91,6 +125,14 @@ function App() {
             <li>.3ds - 3D Studio Max</li>
             <li>.blend - Blender</li>
             <li>.gltf/.glb - GL Transmission Format</li>
+          </ul>
+          
+          <h3>Features</h3>
+          <ul>
+            <li>✓ Hash-based file deduplication</li>
+            <li>✓ Three.js TSL rendering</li>
+            <li>✓ Interactive 3D model viewer</li>
+            <li>✓ Real-time PBR materials</li>
           </ul>
         </div>
       </main>
