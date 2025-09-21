@@ -67,17 +67,26 @@ The solution follows Clean Architecture with the following projects:
 - Database connection string configured in Infrastructure layer
 - Docker environment variables in `.env.example`
 
+#### Environment Variable Priority and Configuration
+**ALWAYS prioritize environment variables that are defined in .env files.** If something is parameterized in .env file, use that variable rather than hardcoding values.
+
+Environment variables override configuration values automatically in ASP.NET Core:
+- Use double underscore (`__`) to represent nested configuration: `ConnectionStrings__Default`
+- Environment variables from .env file take precedence over appsettings.json values
+- Docker Compose automatically substitutes `${VARIABLE_NAME}` with values from .env file
+
 #### Database Connection String Environment Variables
-When using environment variables for database configuration, the following variables are supported:
+The database connection string supports environment variable substitution:
 - `MSSQL_PORT` - SQL Server port (default: 1433)
 - `SA_PASSWORD` - SQL Server SA password (from .env file)
-- `Database:Server` - Database server hostname (default: localhost)
-- `Database:Port` - Database port override
-- `Database:Name` - Database name (default: Modelibr)
-- `Database:UserId` - Database user ID (default: sa)
-- `Database:Password` - Database password override
+- Example: `Server=mssql,${MSSQL_PORT};Database=Modelibr;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true;`
 
-The connection string in `appsettings.Development.json` uses `${USE_ENV_VARIABLES}` placeholder to trigger environment variable resolution in `Infrastructure/DependencyInjection.cs`.
+#### Code Simplicity Guidelines
+**Keep code as simple, readable, and minimalistic as possible:**
+- Avoid unnecessary abstraction layers when environment variables work natively
+- Use ASP.NET Core's built-in configuration system rather than custom logic
+- Remove duplicate configuration files when one can serve multiple environments
+- Leverage framework features (like environment variable overrides) instead of custom code
 
 ### Common File Locations
 - Main application entry point: `src/WebApi/Program.cs`

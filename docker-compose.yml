@@ -9,10 +9,11 @@ services:
                 APP_GID: ${HOST_GID:-1000}
         container_name: webapi
         environment:
-            - ASPNETCORE_ENVIRONMENT=Docker
+            - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
             - ASPNETCORE_HTTPS_PORTS=${WEBAPI_HTTPS_PORT}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
+            - ConnectionStrings__Default=Server=mssql,${MSSQL_PORT};Database=Modelibr;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true;
         ports:
             - "${WEBAPI_HTTP_PORT}"
             - "${WEBAPI_HTTPS_PORT}"
