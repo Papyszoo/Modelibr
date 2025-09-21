@@ -1,9 +1,9 @@
 using Application;
 using Infrastructure;
+using Infrastructure.Extensions;
 using WebApi.Endpoints;
 using WebApi.Infrastructure;
 using WebApi.Services;
-using WebApi.Extensions;
 using Application.Abstractions.Storage;
 using Infrastructure.Storage;
 

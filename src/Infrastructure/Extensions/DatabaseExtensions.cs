@@ -1,7 +1,10 @@
 using Infrastructure.Persistence;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-namespace WebApi.Extensions;
+namespace Infrastructure.Extensions;
 
 public static class DatabaseExtensions
 {

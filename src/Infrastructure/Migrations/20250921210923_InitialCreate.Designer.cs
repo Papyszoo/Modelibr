@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250921135123_InitialCreate")]
+    [Migration("20250921210923_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -40,8 +40,9 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("FileType")
-                        .HasColumnType("int");
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("MimeType")
                         .IsRequired()
