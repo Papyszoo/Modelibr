@@ -1,8 +1,9 @@
 .App {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   padding: 2rem;
   text-align: center;
+  min-height: 100vh;
 }
 
 .App-header {
