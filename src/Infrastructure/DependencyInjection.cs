@@ -13,7 +13,16 @@ namespace Infrastructure
         {
             services.AddDbContext<ApplicationDbContext>(optionsBuilder =>
             {
-                optionsBuilder.UseSqlServer(configuration.GetConnectionString("Default"));
+                var connectionString = configuration.GetConnectionString("Default");
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    // Use in-memory database for testing when no connection string is provided
+                    optionsBuilder.UseInMemoryDatabase("ModelibrTestDb");
+                }
+                else
+                {
+                    optionsBuilder.UseSqlServer(connectionString);
+                }
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();
