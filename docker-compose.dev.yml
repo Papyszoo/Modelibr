@@ -1,0 +1,9 @@
+services:
+  frontend:
+    build:
+      target: development
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./src/frontend:/app
+      - /app/node_modules
