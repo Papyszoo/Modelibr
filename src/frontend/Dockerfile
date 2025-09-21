@@ -11,8 +11,7 @@ CMD ["nginx", "-g", "daemon off;"]
 FROM node:20-alpine AS development
 WORKDIR /app
 COPY package*.json ./
-# Skip npm install in Docker for now due to certificate issues
-# RUN npm install
+RUN npm install
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
