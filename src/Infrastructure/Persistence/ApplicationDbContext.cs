@@ -25,6 +25,7 @@ namespace Infrastructure.Persistence
                 entity.Property(f => f.FilePath).IsRequired();
                 entity.Property(f => f.MimeType).IsRequired();
                 entity.Property(f => f.Sha256Hash).IsRequired();
+                entity.Property(f => f.FileType).IsRequired();
             });
 
             base.OnModelCreating(modelBuilder);

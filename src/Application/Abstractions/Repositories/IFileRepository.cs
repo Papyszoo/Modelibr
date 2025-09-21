@@ -4,7 +4,6 @@ namespace Application.Abstractions.Repositories;
 
 public interface IFileRepository
 {
-    Task<Domain.Models.File> AddAsync(Domain.Models.File file, CancellationToken cancellationToken = default);
     Task<Domain.Models.File?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Domain.Models.File?> GetBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default);
     Task<IEnumerable<Domain.Models.File>> GetAllAsync(CancellationToken cancellationToken = default);

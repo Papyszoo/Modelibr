@@ -14,13 +14,6 @@ internal sealed class FileRepository : IFileRepository
         _context = context;
     }
 
-    public async Task<Domain.Models.File> AddAsync(Domain.Models.File file, CancellationToken cancellationToken = default)
-    {
-        _context.Files.Add(file);
-        await _context.SaveChangesAsync(cancellationToken);
-        return file;
-    }
-
     public async Task<Domain.Models.File?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Files

@@ -29,6 +29,8 @@ namespace Application.Models
                     Id = f.Id,
                     OriginalFileName = f.OriginalFileName,
                     MimeType = f.MimeType,
+                    FileType = f.FileType,
+                    IsRenderable = f.FileType.IsRenderable(),
                     SizeBytes = f.SizeBytes
                 }).ToList()
             }).ToList();
@@ -55,6 +57,8 @@ namespace Application.Models
         public int Id { get; init; }
         public string OriginalFileName { get; init; } = string.Empty;
         public string MimeType { get; init; } = string.Empty;
+        public FileType FileType { get; init; }
+        public bool IsRenderable { get; init; }
         public long SizeBytes { get; init; }
     }
 }

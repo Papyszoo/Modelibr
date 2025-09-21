@@ -87,6 +87,20 @@ namespace WebApi
             })
             .WithName("Get File");
 
+            // New endpoint to add files to existing models
+            app.MapPost("/models/{modelId}/files", async (int modelId, IFormFile file, ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse> commandHandler) =>
+            {
+                if (file.Length > 0)
+                {
+                    var result = await commandHandler.Handle(new AddFileToModelCommand(modelId, new FormFileUpload(file)), CancellationToken.None);
+
+                    return Results.Ok(result);
+                }
+                return Results.BadRequest("Invalid file.");
+            })
+            .WithName("Add File to Model")
+            .DisableAntiforgery();
+
             app.Run();
         }
     }

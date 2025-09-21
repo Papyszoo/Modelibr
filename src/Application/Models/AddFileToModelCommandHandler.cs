@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Files;
+using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Storage;
@@ -8,40 +8,26 @@ using SharedKernel;
 
 namespace Application.Models
 {
-    internal class AddModelCommandHandler : ICommandHandler<AddModelCommand, AddModelCommandResponse>
+    internal class AddFileToModelCommandHandler : ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse>
     {
         private readonly IFileStorage _storage;
         private readonly IModelRepository _modelRepository;
         private readonly IFileRepository _fileRepository;
 
-        public AddModelCommandHandler(IFileStorage storage, IModelRepository modelRepository, IFileRepository fileRepository)
+        public AddFileToModelCommandHandler(IFileStorage storage, IModelRepository modelRepository, IFileRepository fileRepository)
         {
             _storage = storage;
             _modelRepository = modelRepository;
             _fileRepository = fileRepository;
         }
 
-        public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
+        public async Task<Result<AddFileToModelCommandResponse>> Handle(AddFileToModelCommand command, CancellationToken cancellationToken)
         {
             var original = Path.GetFileName(command.File.FileName);
             var ext = Path.GetExtension(original) ?? string.Empty;
             var fileType = FileTypeExtensions.GetFileTypeFromExtension(ext);
 
-            // Only accept renderable files for model upload
-            if (!fileType.IsRenderable())
-            {
-                return Result.Failure<AddModelCommandResponse>(
-                    new Error("InvalidFileType", $"File type '{ext}' is not supported for model upload. Only .obj, .fbx, .gltf, and .glb files are allowed."));
-            }
-
             var stored = await _storage.SaveAsync(command.File, Domain.Files.FileType.Model3D, cancellationToken);
-
-            // Check if a model already exists with this file hash
-            var existingModel = await _modelRepository.GetByFileHashAsync(stored.Sha256, cancellationToken);
-            if (existingModel != null)
-            {
-                return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
-            }
 
             // Check if file already exists in database by hash
             var existingFile = await _fileRepository.GetBySha256HashAsync(stored.Sha256, cancellationToken);
@@ -49,7 +35,12 @@ namespace Application.Models
             Domain.Models.File fileEntity;
             if (existingFile != null)
             {
-                // File already exists, reuse it
+                // File already exists, check if it's already linked to this model
+                if (existingFile.Models.Any(m => m.Id == command.ModelId))
+                {
+                    return Result.Success(new AddFileToModelCommandResponse(existingFile.Id, true));
+                }
+                
                 fileEntity = existingFile;
             }
             else
@@ -69,20 +60,15 @@ namespace Application.Models
                 };
             }
 
-            // Create and persist Model entity to database
-            var model = new Model
+            try
             {
-                Name = command.ModelName ?? Path.GetFileNameWithoutExtension(original),
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            // Add the file to the model
-            model.Files.Add(fileEntity);
-
-            var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
-
-            return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
+                await _modelRepository.AddFileAsync(command.ModelId, fileEntity, cancellationToken);
+                return Result.Success(new AddFileToModelCommandResponse(fileEntity.Id, false));
+            }
+            catch (ArgumentException ex)
+            {
+                return Result.Failure<AddFileToModelCommandResponse>(new Error("ModelNotFound", ex.Message));
+            }
         }
 
         private static string GetMimeType(string extension)
@@ -98,11 +84,20 @@ namespace Application.Models
                 ".3ds" => "application/x-3ds",
                 ".ply" => "application/octet-stream",
                 ".stl" => "model/stl",
+                ".jpg" => "image/jpeg",
+                ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".tga" => "image/tga",
+                ".bmp" => "image/bmp",
+                ".mtl" => "text/plain",
+                ".max" => "application/octet-stream",
+                ".ma" => "application/octet-stream",
+                ".mb" => "application/octet-stream",
                 _ => "application/octet-stream"
             };
         }
     }
 
-    public record AddModelCommand(IFileUpload File, string? ModelName = null) : ICommand<AddModelCommandResponse>;
-    public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
+    public record AddFileToModelCommand(int ModelId, IFileUpload File) : ICommand<AddFileToModelCommandResponse>;
+    public record AddFileToModelCommandResponse(int FileId, bool AlreadyLinked = false);
 }
