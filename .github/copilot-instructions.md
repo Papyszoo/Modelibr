@@ -67,6 +67,18 @@ The solution follows Clean Architecture with the following projects:
 - Database connection string configured in Infrastructure layer
 - Docker environment variables in `.env.example`
 
+#### Database Connection String Environment Variables
+When using environment variables for database configuration, the following variables are supported:
+- `MSSQL_PORT` - SQL Server port (default: 1433)
+- `SA_PASSWORD` - SQL Server SA password (from .env file)
+- `Database:Server` - Database server hostname (default: localhost)
+- `Database:Port` - Database port override
+- `Database:Name` - Database name (default: Modelibr)
+- `Database:UserId` - Database user ID (default: sa)
+- `Database:Password` - Database password override
+
+The connection string in `appsettings.Development.json` uses `${USE_ENV_VARIABLES}` placeholder to trigger environment variable resolution in `Infrastructure/DependencyInjection.cs`.
+
 ### Common File Locations
 - Main application entry point: `src/WebApi/Program.cs`
 - Application setup: `src/Application/DependencyInjection.cs`
