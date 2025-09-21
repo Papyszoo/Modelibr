@@ -289,6 +289,10 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# Frontend build artifacts
+dist/
+.vite/
+
 # Visual Studio 6 build log
 *.plg
 

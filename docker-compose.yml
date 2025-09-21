@@ -26,6 +26,17 @@ services:
                 condition: service_healthy
         networks:
             - modelibr
+    frontend:
+        image: ${DOCKER_REGISTRY-}frontend
+        build:
+            context: ./src/frontend
+            dockerfile: Dockerfile
+            target: production
+        container_name: frontend
+        ports:
+            - "${FRONTEND_PORT:-3000}:80"
+        networks:
+            - modelibr
     mssql:
         image: mcr.microsoft.com/mssql/server:2022-latest
         container_name: mssql
