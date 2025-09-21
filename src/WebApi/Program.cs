@@ -18,7 +18,19 @@ namespace WebApi
             builder.Services.AddAuthorization();
 
             // Add CORS for frontend development
-            builder.Services.AddCors();
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.WithOrigins(
+                              "http://localhost:3000",
+                              "https://localhost:3000"
+                          )
+                          .AllowAnyMethod()
+                          .AllowAnyHeader()
+                          .AllowCredentials();
+                });
+            });
 
             builder.Services.AddOpenApi();
 
@@ -43,10 +55,7 @@ namespace WebApi
             app.UseHttpsRedirection();
 
             // Add CORS for frontend development
-            app.UseCors(policy => policy
-                .AllowAnyOrigin()
-                .AllowAnyMethod()
-                .AllowAnyHeader());
+            app.UseCors();
 
             app.UseAuthorization();
 
