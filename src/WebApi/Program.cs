@@ -1,9 +1,6 @@
 using Application;
-using Application.Abstractions.Messaging;
-using Application.Models;
-using Application.Files;
 using Infrastructure;
-using WebApi.Files;
+using WebApi.Endpoints;
 using WebApi.Infrastructure;
 using WebApi.Services;
 using Application.Abstractions.Storage;
@@ -49,57 +46,10 @@ namespace WebApi
 
             app.UseAuthorization();
 
-            app.MapPost("/uploadModel", async (IFormFile file, ICommandHandler<AddModelCommand, AddModelCommandResponse> commandHandler) =>
-            {
-                if (file.Length > 0)
-                {
-                    var result = await commandHandler.Handle(new AddModelCommand(new FormFileUpload(file)), CancellationToken.None);
-
-                    return Results.Ok(result);
-                }
-                return Results.BadRequest("Invalid file.");
-            })
-            .WithName("Upload Model")
-            .DisableAntiforgery();
-
-            app.MapGet("/models", async (IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
-            {
-                var result = await queryHandler.Handle(new GetAllModelsQuery(), CancellationToken.None);
-                
-                return Results.Ok(result);
-            })
-            .WithName("Get All Models");
-
-            // New endpoint to serve files directly by file ID
-            app.MapGet("/files/{id}", async (int id, IQueryHandler<GetFileQuery, GetFileQueryResponse> queryHandler) =>
-            {
-                var result = await queryHandler.Handle(new GetFileQuery(id), CancellationToken.None);
-                
-                if (!result.IsSuccess)
-                {
-                    return Results.NotFound(result.Error.Message);
-                }
-
-                var fileStream = System.IO.File.OpenRead(result.Value.FullPath);
-                var contentType = ContentTypeProvider.GetContentType(result.Value.OriginalFileName);
-                
-                return Results.File(fileStream, contentType, result.Value.OriginalFileName, enableRangeProcessing: true);
-            })
-            .WithName("Get File");
-
-            // New endpoint to add files to existing models
-            app.MapPost("/models/{modelId}/files", async (int modelId, IFormFile file, ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse> commandHandler) =>
-            {
-                if (file.Length > 0)
-                {
-                    var result = await commandHandler.Handle(new AddFileToModelCommand(modelId, new FormFileUpload(file)), CancellationToken.None);
-
-                    return Results.Ok(result);
-                }
-                return Results.BadRequest("Invalid file.");
-            })
-            .WithName("Add File to Model")
-            .DisableAntiforgery();
+            // Map endpoints
+            app.MapModelEndpoints();
+            app.MapModelsEndpoints();
+            app.MapFilesEndpoints();
 
             app.Run();
         }
