@@ -98,7 +98,28 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 
 ### Development Setup
 
-#### Backend (.NET API)
+#### Recommended: Docker Compose (Full Stack)
+
+1. **Clone and configure**
+   ```bash
+   git clone https://github.com/Papyszoo/Modelibr.git
+   cd Modelibr
+   cp .env.example .env
+   ```
+
+2. **Start all services**
+   ```bash
+   docker compose up -d
+   ```
+
+This will start the complete application stack:
+- Frontend: http://localhost:3000
+- API: http://localhost:8080
+- SQL Server: localhost:1433
+
+#### Alternative: Local Development
+
+##### Backend (.NET API)
 
 1. **Install .NET 9.0 SDK**
    ```bash
@@ -126,7 +147,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 
 The API will be available at http://localhost:5009
 
-#### Frontend (React)
+##### Frontend (React)
 
 1. **Install dependencies**
    ```bash
