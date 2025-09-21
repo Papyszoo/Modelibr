@@ -1,12 +1,36 @@
-# React + Vite
+# Modelibr Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern React frontend for the Modelibr 3D model upload service.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Clean, responsive UI for 3D model file uploads
+- Support for common 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
+- Real-time upload status feedback
+- Dockerized deployment with nginx for production
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Docker
+
+The frontend is containerized and can be run in either development or production mode:
+
+- **Production**: Uses nginx to serve static files built by Vite
+- **Development**: Runs the Vite development server with hot reloading
+
+Access the frontend at http://localhost:3000 when running via Docker Compose.
+
+## API Integration
+
+The frontend connects to the WebAPI service running on port 8080 to upload 3D model files via the `/uploadModel` endpoint.
