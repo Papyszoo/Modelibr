@@ -34,14 +34,15 @@ public class ModelPersistenceTests
             .Options;
         
         using var context = new ApplicationDbContext(options);
-        var repository = new ModelRepository(context);
+        var modelRepository = new ModelRepository(context);
+        var fileRepository = new FileRepository(context);
         
         var root = Path.Combine(Path.GetTempPath(), "modelibr_test", Path.GetRandomFileName());
         Directory.CreateDirectory(root);
         var pathProvider = new FakeUploadPathProvider(root);
         var storage = new HashBasedFileStorage(pathProvider);
         
-        var handler = new AddModelCommandHandler(storage, repository);
+        var handler = new AddModelCommandHandler(storage, modelRepository, fileRepository);
         
         Assert.NotNull(handler);
     }

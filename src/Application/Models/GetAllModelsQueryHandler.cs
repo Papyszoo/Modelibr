@@ -21,9 +21,16 @@ namespace Application.Models
             var modelDtos = models.Select(m => new ModelDto
             {
                 Id = m.Id,
-                FilePath = m.FilePath,
+                Name = m.Name,
                 CreatedAt = m.CreatedAt,
-                UpdatedAt = m.UpdatedAt
+                UpdatedAt = m.UpdatedAt,
+                Files = m.Files.Select(f => new FileDto
+                {
+                    Id = f.Id,
+                    OriginalFileName = f.OriginalFileName,
+                    MimeType = f.MimeType,
+                    SizeBytes = f.SizeBytes
+                }).ToList()
             }).ToList();
 
             return Result.Success(new GetAllModelsQueryResponse(modelDtos));
@@ -37,8 +44,17 @@ namespace Application.Models
     public record ModelDto
     {
         public int Id { get; init; }
-        public string FilePath { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
         public DateTime UpdatedAt { get; init; }
+        public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
+    }
+
+    public record FileDto
+    {
+        public int Id { get; init; }
+        public string OriginalFileName { get; init; } = string.Empty;
+        public string MimeType { get; init; } = string.Empty;
+        public long SizeBytes { get; init; }
     }
 }

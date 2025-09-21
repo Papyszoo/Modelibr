@@ -26,6 +26,7 @@ namespace Infrastructure
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();
+            services.AddScoped<IFileRepository, FileRepository>();
 
             return services;
         }
