@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 import ModelList from './ModelList'
+import ApiClient from './services/ApiClient'
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
@@ -23,24 +24,16 @@ function App() {
     setUploadStatus('Uploading...')
 
     try {
-      const formData = new FormData()
-      formData.append('file', selectedFile)
+      const result = await ApiClient.uploadModel(selectedFile)
 
-      // Use port 5009 for direct API access during development
-      const response = await fetch('http://localhost:5009/uploadModel', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (response.ok) {
-        const result = await response.json()
+      if (result.isSuccess) {
         setUploadStatus(`Upload successful! File ID: ${result.value?.id || 'Generated'}`)
         setSelectedFile(null)
         // Reset file input
         const fileInput = document.getElementById('file-input')
         if (fileInput) fileInput.value = ''
       } else {
-        setUploadStatus(`Upload failed: ${response.statusText}`)
+        setUploadStatus(`Upload failed: ${result.error?.message || 'Unknown error'}`)
       }
     } catch (error) {
       setUploadStatus(`Upload error: ${error.message}`)

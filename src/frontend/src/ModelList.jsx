@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './ModelList.css'
 import ModelViewer from './ModelViewer'
+import ApiClient from './services/ApiClient'
 
 function ModelList({ onBackToUpload }) {
   const [models, setModels] = useState([])
@@ -15,14 +16,12 @@ function ModelList({ onBackToUpload }) {
   const fetchModels = async () => {
     try {
       setLoading(true)
-      // Use port 5009 for direct API access during development
-      const response = await fetch('http://localhost:5009/models')
+      const result = await ApiClient.getModels()
       
-      if (response.ok) {
-        const result = await response.json()
+      if (result.isSuccess) {
         setModels(result.value?.models || [])
       } else {
-        setError(`Failed to fetch models: ${response.statusText}`)
+        setError(`Failed to fetch models: ${result.error?.message || 'Unknown error'}`)
       }
     } catch (err) {
       setError(`Error fetching models: ${err.message}`)

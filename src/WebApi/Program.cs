@@ -4,6 +4,7 @@ using Application.Models;
 using Infrastructure;
 using WebApi.Files;
 using WebApi.Infrastructure;
+using WebApi.Services;
 using Application.Abstractions.Storage;
 using Infrastructure.Storage;
 
@@ -90,29 +91,13 @@ namespace WebApi
                 }
 
                 var fileStream = File.OpenRead(fullPath);
-                var contentType = GetContentType(model.FilePath);
+                var contentType = ContentTypeProvider.GetContentType(model.FilePath);
                 
                 return Results.File(fileStream, contentType, enableRangeProcessing: true);
             })
             .WithName("Get Model File");
 
             app.Run();
-        }
-
-        private static string GetContentType(string filePath)
-        {
-            var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return extension switch
-            {
-                ".obj" => "text/plain",
-                ".fbx" => "application/octet-stream",
-                ".dae" => "application/xml",
-                ".3ds" => "application/octet-stream",
-                ".blend" => "application/octet-stream",
-                ".gltf" => "application/json",
-                ".glb" => "application/octet-stream",
-                _ => "application/octet-stream"
-            };
         }
     }
 }
