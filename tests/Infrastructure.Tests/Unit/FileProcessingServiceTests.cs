@@ -1,5 +1,6 @@
 using Domain.Models;
 using Domain.Services;
+using Domain.ValueObjects;
 using SharedKernel;
 using Xunit;
 
@@ -15,18 +16,18 @@ public class FileProcessingServiceTests
     }
 
     [Theory]
-    [InlineData("test.obj", FileType.Obj)]
-    [InlineData("model.fbx", FileType.Fbx)]
-    [InlineData("scene.gltf", FileType.Gltf)]
-    [InlineData("asset.glb", FileType.Glb)]
-    public void ValidateFileForModelUpload_WithRenderableFiles_ReturnsSuccess(string fileName, FileType expectedFileType)
+    [InlineData("test.obj", "obj")]
+    [InlineData("model.fbx", "fbx")]
+    [InlineData("scene.gltf", "gltf")]
+    [InlineData("asset.glb", "glb")]
+    public void ValidateFileForModelUpload_WithRenderableFiles_ReturnsSuccess(string fileName, string expectedValue)
     {
         // Act
         var result = _fileProcessingService.ValidateFileForModelUpload(fileName);
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal(expectedFileType, result.Value);
+        Assert.Equal(expectedValue, result.Value.Value);
     }
 
     [Theory]
@@ -56,18 +57,18 @@ public class FileProcessingServiceTests
     }
 
     [Theory]
-    [InlineData("test.obj", FileType.Obj)]
-    [InlineData("texture.jpg", FileType.Texture)]
-    [InlineData("project.blend", FileType.Blend)]
-    [InlineData("material.mtl", FileType.Material)]
-    public void ValidateFileForUpload_WithSupportedFiles_ReturnsSuccess(string fileName, FileType expectedFileType)
+    [InlineData("test.obj", "obj")]
+    [InlineData("texture.jpg", "texture")]
+    [InlineData("project.blend", "blend")]
+    [InlineData("material.mtl", "material")]
+    public void ValidateFileForUpload_WithSupportedFiles_ReturnsSuccess(string fileName, string expectedValue)
     {
         // Act
         var result = _fileProcessingService.ValidateFileForUpload(fileName);
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal(expectedFileType, result.Value);
+        Assert.Equal(expectedValue, result.Value.Value);
     }
 
     [Fact]

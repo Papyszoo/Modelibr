@@ -5,6 +5,7 @@ using Application.Abstractions.Storage;
 using Domain.Models;
 using Domain.Services;
 using SharedKernel;
+using FileTypeVO = Domain.ValueObjects.FileType;
 
 namespace Application.Services;
 
@@ -12,7 +13,7 @@ public interface IFileCreationService
 {
     Task<Result<Domain.Models.File>> CreateOrGetExistingFileAsync(
         IFileUpload fileUpload,
-        FileType fileType,
+        FileTypeVO fileType,
         CancellationToken cancellationToken = default);
 }
 
@@ -37,7 +38,7 @@ internal sealed class FileCreationService : IFileCreationService
 
     public async Task<Result<Domain.Models.File>> CreateOrGetExistingFileAsync(
         IFileUpload fileUpload,
-        FileType fileType,
+        FileTypeVO fileType,
         CancellationToken cancellationToken = default)
     {
         // Calculate hash first to check for existing files before saving to disk
@@ -51,10 +52,11 @@ internal sealed class FileCreationService : IFileCreationService
         }
 
         // File doesn't exist, save to disk and create file entity
-        var stored = await _storage.SaveAsync(fileUpload, Domain.Files.FileType.Model3D, cancellationToken);
+        // Map to the appropriate storage file type based on category
+        var storageFileType = MapToStorageFileType(fileType);
+        var stored = await _storage.SaveAsync(fileUpload, storageFileType, cancellationToken);
 
         var originalFileName = Path.GetFileName(fileUpload.FileName);
-        var extension = Path.GetExtension(originalFileName) ?? string.Empty;
 
         try
         {
@@ -62,7 +64,7 @@ internal sealed class FileCreationService : IFileCreationService
                 originalFileName,
                 stored.StoredName,
                 stored.RelativePath,
-                _fileUtilityService.GetMimeType(extension),
+                fileType.GetMimeType(),
                 fileType,
                 0, // We'll set this properly later
                 stored.Sha256,
@@ -75,5 +77,16 @@ internal sealed class FileCreationService : IFileCreationService
         {
             return Result.Failure<Domain.Models.File>(new Error("FileCreationFailed", ex.Message));
         }
+    }
+
+    private static Domain.Files.FileType MapToStorageFileType(FileTypeVO fileType)
+    {
+        return fileType.Category switch
+        {
+            Domain.ValueObjects.FileTypeCategory.Model3D => Domain.Files.FileType.Model3D,
+            Domain.ValueObjects.FileTypeCategory.Texture => Domain.Files.FileType.Texture,
+            Domain.ValueObjects.FileTypeCategory.Project => Domain.Files.FileType.Project,
+            _ => Domain.Files.FileType.Unknown
+        };
     }
 }

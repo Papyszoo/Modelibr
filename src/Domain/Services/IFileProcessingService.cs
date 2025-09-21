@@ -1,12 +1,11 @@
-using Domain.Models;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Domain.Services;
 
 /// <summary>
 /// Domain service for file processing operations.
-/// Note: Core file type validation logic has been moved to the FileType Value Object.
-/// This service maintains backward compatibility while delegating to the Value Object.
+/// Now directly works with FileType Value Object instead of legacy enums.
 /// </summary>
 public interface IFileProcessingService
 {

@@ -1,3 +1,5 @@
+using Domain.ValueObjects;
+
 namespace Domain.Models;
 
 public class File
@@ -98,10 +100,10 @@ public class File
             throw new ArgumentException("MIME type cannot exceed 100 characters.", nameof(mimeType));
     }
 
-    private static void ValidateFileType(FileType fileType)
+    private static void ValidateFileType(FileType? fileType)
     {
-        if (!Enum.IsDefined(typeof(FileType), fileType))
-            throw new ArgumentException("Invalid file type.", nameof(fileType));
+        if (fileType is null)
+            throw new ArgumentNullException(nameof(fileType), "File type cannot be null.");
     }
 
     private static void ValidateSizeBytes(long sizeBytes)

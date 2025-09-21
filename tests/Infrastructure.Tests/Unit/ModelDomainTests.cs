@@ -1,4 +1,5 @@
 using Domain.Models;
+using Domain.ValueObjects;
 using Xunit;
 using DomainFile = Domain.Models.File;
 
