@@ -7,3 +7,5 @@ services:
     volumes:
       - ./src/frontend:/app
       - /app/node_modules
+    environment:
+      - NODE_ENV=development
