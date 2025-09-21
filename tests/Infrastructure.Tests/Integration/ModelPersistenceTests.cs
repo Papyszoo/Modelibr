@@ -1,4 +1,5 @@
 using Application.Models;
+using Application.Services;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
@@ -34,14 +35,16 @@ public class ModelPersistenceTests
             .Options;
         
         using var context = new ApplicationDbContext(options);
-        var repository = new ModelRepository(context);
+        var modelRepository = new ModelRepository(context);
+        var fileRepository = new FileRepository(context);
         
         var root = Path.Combine(Path.GetTempPath(), "modelibr_test", Path.GetRandomFileName());
         Directory.CreateDirectory(root);
         var pathProvider = new FakeUploadPathProvider(root);
         var storage = new HashBasedFileStorage(pathProvider);
+        var fileUtilityService = new FileUtilityService();
         
-        var handler = new AddModelCommandHandler(storage, repository);
+        var handler = new AddModelCommandHandler(storage, modelRepository, fileRepository, fileUtilityService);
         
         Assert.NotNull(handler);
     }

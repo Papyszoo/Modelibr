@@ -1,4 +1,6 @@
 ﻿using Application.Abstractions.Messaging;
+using Application.Abstractions.Services;
+using Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
@@ -9,6 +11,7 @@ namespace Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddMediator();
+            services.AddScoped<IFileUtilityService, FileUtilityService>();
             return services;
         }
 
