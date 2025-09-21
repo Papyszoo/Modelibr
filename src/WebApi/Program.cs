@@ -4,6 +4,7 @@ using Application.Models;
 using Infrastructure;
 using WebApi.Files;
 using WebApi.Infrastructure;
+using WebApi.Services;
 using Application.Abstractions.Storage;
 using Infrastructure.Storage;
 
@@ -16,6 +17,9 @@ namespace WebApi
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddAuthorization();
+
+            // Add CORS for frontend development
+            builder.Services.AddCors();
 
             builder.Services.AddOpenApi();
 
@@ -35,6 +39,12 @@ namespace WebApi
             }
 
             app.UseHttpsRedirection();
+
+            // Add CORS for frontend development
+            app.UseCors(policy => policy
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader());
 
             app.UseAuthorization();
 
@@ -58,6 +68,34 @@ namespace WebApi
                 return Results.Ok(result);
             })
             .WithName("Get All Models");
+
+            app.MapGet("/models/{id}/file", async (int id, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, IUploadPathProvider pathProvider) =>
+            {
+                var result = await queryHandler.Handle(new GetAllModelsQuery(), CancellationToken.None);
+                
+                if (!result.IsSuccess)
+                {
+                    return Results.Problem("Failed to retrieve models");
+                }
+
+                var model = result.Value.Models.FirstOrDefault(m => m.Id == id);
+                if (model == null)
+                {
+                    return Results.NotFound("Model not found");
+                }
+
+                var fullPath = Path.Combine(pathProvider.UploadRootPath, model.FilePath);
+                if (!File.Exists(fullPath))
+                {
+                    return Results.NotFound("Model file not found");
+                }
+
+                var fileStream = File.OpenRead(fullPath);
+                var contentType = ContentTypeProvider.GetContentType(model.FilePath);
+                
+                return Results.File(fileStream, contentType, enableRangeProcessing: true);
+            })
+            .WithName("Get Model File");
 
             app.Run();
         }
