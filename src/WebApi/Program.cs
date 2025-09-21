@@ -48,7 +48,8 @@ namespace WebApi
                 }
                 return Results.BadRequest("Invalid file.");
             })
-            .WithName("Upload Model");
+            .WithName("Upload Model")
+            .DisableAntiforgery();
 
             app.Run();
         }
