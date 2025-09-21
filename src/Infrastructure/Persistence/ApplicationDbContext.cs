@@ -8,6 +8,7 @@ namespace Infrastructure.Persistence
     {
         public DbSet<Model> Models => Set<Model>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
+        public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,6 +34,28 @@ namespace Infrastructure.Persistence
                         v => v.Value,
                         v => MapFromDatabaseValue(v))
                     .IsRequired();
+
+                // Configure one-to-many relationship with Thumbnails
+                entity.HasMany(f => f.Thumbnails)
+                    .WithOne(t => t.File)
+                    .HasForeignKey(t => t.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure Thumbnail entity
+            modelBuilder.Entity<Thumbnail>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.FileId).IsRequired();
+                entity.Property(t => t.Format).IsRequired().HasMaxLength(50);
+                entity.Property(t => t.Status).IsRequired();
+                entity.Property(t => t.ThumbnailPath).HasMaxLength(500);
+                entity.Property(t => t.ErrorMessage).HasMaxLength(1000);
+                entity.Property(t => t.CreatedAt).IsRequired();
+                entity.Property(t => t.UpdatedAt).IsRequired();
+
+                // Create unique index for FileId + Format to prevent duplicate thumbnails
+                entity.HasIndex(t => new { t.FileId, t.Format }).IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);
