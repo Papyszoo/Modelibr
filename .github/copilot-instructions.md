@@ -76,10 +76,17 @@ Environment variables override configuration values automatically in ASP.NET Cor
 - Docker Compose automatically substitutes `${VARIABLE_NAME}` with values from .env file
 
 #### Database Connection String Environment Variables
-The database connection string supports environment variable substitution:
+The database connection string supports environment variable substitution using `Environment.ExpandEnvironmentVariables()`:
 - `MSSQL_PORT` - SQL Server port (default: 1433)
 - `SA_PASSWORD` - SQL Server SA password (from .env file)
-- Example: `Server=mssql,${MSSQL_PORT};Database=Modelibr;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true;`
+- Format: Use `%VARIABLE_NAME%` syntax in connection strings for environment variable expansion
+- Example: `Server=localhost,%MSSQL_PORT%;Database=Modelibr;User Id=sa;Password=%SA_PASSWORD%;TrustServerCertificate=true;`
+
+For development, set these environment variables:
+```bash
+export MSSQL_PORT=1433
+export SA_PASSWORD=ChangeThisStrongPassword123!
+```
 
 #### Code Simplicity Guidelines
 **Keep code as simple, readable, and minimalistic as possible:**
