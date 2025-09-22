@@ -15,6 +15,7 @@ namespace Application
             services.AddScoped<IFileUtilityService, FileUtilityService>();
             services.AddScoped<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped<IFileCreationService, FileCreationService>();
+            services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
             return services;
         }
 
@@ -22,7 +23,7 @@ namespace Application
         {
             Assembly assembly = Assembly.GetExecutingAssembly();
 
-            services.RegisterHandlersForInterfaceTypes(assembly, [typeof(IQueryHandler<,>), typeof(ICommandHandler<>), typeof(ICommandHandler<,>)]);
+            services.RegisterHandlersForInterfaceTypes(assembly, [typeof(IQueryHandler<,>), typeof(ICommandHandler<>), typeof(ICommandHandler<,>), typeof(IDomainEventHandler<>)]);
 
             return services;
         }

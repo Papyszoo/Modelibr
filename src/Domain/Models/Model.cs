@@ -1,6 +1,8 @@
-﻿namespace Domain.Models
+﻿using Domain.Events;
+
+namespace Domain.Models
 {
-    public class Model
+    public class Model : AggregateRoot
     {
         private readonly List<File> _files = new();
 
@@ -70,6 +72,20 @@
                 return false;
 
             return _files.Any(f => f.Sha256Hash == sha256Hash);
+        }
+
+        /// <summary>
+        /// Raises a ModelUploaded domain event for this model.
+        /// Should be called when a model upload is completed.
+        /// </summary>
+        /// <param name="modelHash">The SHA256 hash of the uploaded model file</param>
+        /// <param name="isNewModel">Whether this is a new model or an existing one</param>
+        public void RaiseModelUploadedEvent(string modelHash, bool isNewModel)
+        {
+            if (string.IsNullOrWhiteSpace(modelHash))
+                throw new ArgumentException("Model hash cannot be null or empty.", nameof(modelHash));
+
+            RaiseDomainEvent(new ModelUploadedEvent(Id, modelHash, isNewModel));
         }
     }
 }
