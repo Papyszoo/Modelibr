@@ -38,6 +38,21 @@ class ApiClient {
     getFileUrl(fileId) {
         return `${this.baseURL}/files/${fileId}`;
     }
+
+    // Thumbnail methods
+    async getThumbnailStatus(modelId) {
+        const response = await this.client.get(`/models/${modelId}/thumbnail`);
+        return response.data;
+    }
+
+    getThumbnailUrl(modelId) {
+        return `${this.baseURL}/models/${modelId}/thumbnail/file`;
+    }
+
+    async regenerateThumbnail(modelId) {
+        const response = await this.client.post(`/models/${modelId}/thumbnail/regenerate`);
+        return response.data;
+    }
 }
 
 export default new ApiClient();

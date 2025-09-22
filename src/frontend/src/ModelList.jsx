@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import './ModelList.css'
 import ModelViewer from './ModelViewer'
 import ApiClient from './services/ApiClient'
+import ThumbnailDisplay from './components/ThumbnailDisplay'
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
@@ -67,6 +68,16 @@ function ModelList({ onBackToUpload }) {
   }
 
   // Template functions for DataTable columns
+  const thumbnailBodyTemplate = (rowData) => {
+    return (
+      <ThumbnailDisplay 
+        modelId={rowData.id}
+        size="small"
+        alt={`Thumbnail for ${rowData.files?.[0]?.originalFileName || `model ${rowData.id}`}`}
+      />
+    )
+  }
+
   const idBodyTemplate = (rowData) => {
     return `#${rowData.id}`
   }
@@ -200,6 +211,11 @@ function ModelList({ onBackToUpload }) {
             emptyMessage="No models found"
             globalFilterFields={['name', 'files.originalFileName']}
           >
+            <Column 
+              header="Preview" 
+              body={thumbnailBodyTemplate}
+              style={{ width: '80px' }}
+            />
             <Column 
               field="id" 
               header="ID" 
