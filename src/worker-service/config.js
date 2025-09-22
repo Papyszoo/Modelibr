@@ -37,6 +37,15 @@ export const config = {
     enableNormalization: process.env.ENABLE_NORMALIZATION !== 'false',
     normalizedScale: parseFloat(process.env.NORMALIZED_SCALE) || 2.0 // Scale to fit in a 2x2x2 cube
   },
+
+  // Frame encoding settings
+  encoding: {
+    enabled: process.env.ENCODING_ENABLED !== 'false', // enable frame encoding
+    framerate: parseFloat(process.env.ENCODING_FRAMERATE) || 10, // frames per second for WebP
+    webpQuality: parseInt(process.env.WEBP_QUALITY) || 75, // WebP quality (0-100)
+    jpegQuality: parseInt(process.env.JPEG_QUALITY) || 85, // JPEG quality for poster (0-100)
+    cleanupTempFiles: process.env.CLEANUP_TEMP_FILES !== 'false' // cleanup temp files after encoding
+  },
   
   // Logging settings
   logging: {
@@ -101,6 +110,18 @@ export function validateConfig() {
   
   if (config.modelProcessing.normalizedScale <= 0) {
     errors.push('NORMALIZED_SCALE must be greater than 0');
+  }
+
+  if (config.encoding.framerate <= 0 || config.encoding.framerate > 60) {
+    errors.push('ENCODING_FRAMERATE must be between 0 and 60 fps');
+  }
+
+  if (config.encoding.webpQuality < 0 || config.encoding.webpQuality > 100) {
+    errors.push('WEBP_QUALITY must be between 0 and 100');
+  }
+
+  if (config.encoding.jpegQuality < 0 || config.encoding.jpegQuality > 100) {
+    errors.push('JPEG_QUALITY must be between 0 and 100');
   }
   
   if (errors.length > 0) {

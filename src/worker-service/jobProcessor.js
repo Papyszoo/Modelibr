@@ -2,6 +2,7 @@ import { ThumbnailJobService } from './thumbnailJobService.js';
 import { ModelFileService } from './modelFileService.js';
 import { ModelLoaderService } from './modelLoaderService.js';
 import { OrbitFrameRenderer } from './orbitFrameRenderer.js';
+import { FrameEncoderService } from './frameEncoderService.js';
 import { config } from './config.js';
 import logger, { withJobContext } from './logger.js';
 
@@ -14,6 +15,7 @@ export class JobProcessor {
     this.modelFileService = new ModelFileService();
     this.modelLoaderService = new ModelLoaderService();
     this.orbitRenderer = null; // Will be initialized when needed
+    this.frameEncoder = null; // Will be initialized when needed
     this.isShuttingDown = false;
     this.activeJobs = new Map();
   }
@@ -188,11 +190,43 @@ export class JobProcessor {
           }
         });
         
-        // Note: Frames are stored in memory as requested, not saved to files
+        // Note: Frames are stored in memory for processing
         jobLogger.info('Frames stored in memory for processing', {
           frameCount: frames.length,
           memoryUsageMB: memoryStats.totalSizeMB
         });
+        
+        // Step 4: Encode frames into animated WebP and poster if enabled
+        if (config.encoding.enabled) {
+          jobLogger.info('Starting frame encoding');
+          
+          // Initialize frame encoder if not already done
+          if (!this.frameEncoder) {
+            this.frameEncoder = new FrameEncoderService();
+          }
+
+          // Encode frames to WebP and poster
+          const encodingResult = await this.frameEncoder.encodeFrames(frames, jobLogger);
+          
+          jobLogger.info('Frame encoding completed successfully', {
+            webpPath: encodingResult.webpPath,
+            posterPath: encodingResult.posterPath,
+            encodeTimeMs: encodingResult.encodeTimeMs,
+            frameCount: encodingResult.frameCount
+          });
+
+          // Clean up temporary files if configured
+          if (config.encoding.cleanupTempFiles) {
+            await this.frameEncoder.cleanupEncodingResult(encodingResult);
+            jobLogger.info('Temporary encoding files cleaned up');
+          } else {
+            jobLogger.info('Temporary encoding files preserved', {
+              workingDir: encodingResult.workingDir
+            });
+          }
+        } else {
+          jobLogger.info('Frame encoding disabled, skipping WebP and poster generation');
+        }
         
       } else {
         // Fall back to simple processing log
@@ -257,6 +291,11 @@ export class JobProcessor {
       if (!this.isShuttingDown) {
         try {
           await this.modelFileService.cleanupOldFiles();
+          
+          // Also cleanup old frame encoder files if encoder is initialized
+          if (this.frameEncoder) {
+            await this.frameEncoder.cleanupOldFiles();
+          }
         } catch (error) {
           logger.warn('Periodic cleanup failed', { error: error.message });
         }
@@ -283,6 +322,12 @@ export class JobProcessor {
     if (this.orbitRenderer) {
       this.orbitRenderer.dispose();
       this.orbitRenderer = null;
+    }
+
+    // Clean up frame encoder resources
+    if (this.frameEncoder) {
+      await this.frameEncoder.cleanupOldFiles(0); // Clean all files immediately
+      this.frameEncoder = null;
     }
 
     // Wait for active jobs to complete (with timeout)
