@@ -16,10 +16,15 @@ describe('Drag and Drop Utilities', () => {
       e.preventDefault()
     }
 
+    const onDragLeave = (e) => {
+      e.preventDefault()
+    }
+
     return {
       onDrop,
       onDragOver,
-      onDragEnter
+      onDragEnter,
+      onDragLeave
     }
   }
 
@@ -30,6 +35,7 @@ describe('Drag and Drop Utilities', () => {
     expect(typeof handlers.onDrop).toBe('function')
     expect(typeof handlers.onDragOver).toBe('function')
     expect(typeof handlers.onDragEnter).toBe('function')
+    expect(typeof handlers.onDragLeave).toBe('function')
   })
 
   it('should call onFilesDropped when files are dropped', () => {

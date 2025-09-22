@@ -21,40 +21,40 @@
 }
 
 .model-list-header h1 {
-  color: #333;
+  color: #e2e8f0;
   margin-bottom: 0.5rem;
 }
 
 .model-list-header p {
-  color: #666;
+  color: #b8c4d0;
   font-size: 1.1rem;
 }
 
 .upload-progress {
   margin: 1rem 0;
   padding: 1rem;
-  background: #f8f9fa;
+  background: #2a2a2a;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 1px solid #4a4a4a;
 }
 
 .upload-progress p {
   margin: 0 0 0.5rem 0;
-  color: #495057;
+  color: #e2e8f0;
   font-weight: 500;
 }
 
 .loading {
   text-align: center;
   padding: 3rem;
-  background: #f8f9fa;
+  background: #2a2a2a;
   border-radius: 8px;
   margin: 2rem 0;
 }
 
 .loading p {
   margin-top: 1rem;
-  color: #666;
+  color: #ccc;
 }
 
 .error-message {
@@ -64,9 +64,9 @@
   gap: 1rem;
   text-align: center;
   padding: 1.5rem;
-  background: #fee;
-  color: #c53030;
-  border: 1px solid #fed7d7;
+  background: #4a2c2c;
+  color: #ff6b6b;
+  border: 1px solid #6b3333;
   border-radius: 8px;
   margin: 2rem 0;
 }
@@ -74,18 +74,20 @@
 .empty-state {
   text-align: center;
   padding: 4rem;
-  background: #f8f9fa;
+  background: #2a2a2a;
   border-radius: 8px;
   margin: 2rem 0;
+  border: 2px dashed #444;
+  transition: all 0.3s ease;
 }
 
 .empty-state h3 {
-  color: #555;
+  color: #ccc;
   margin: 1rem 0 0.5rem 0;
 }
 
 .empty-state p {
-  color: #777;
+  color: #999;
   margin: 0;
 }
 
@@ -105,11 +107,24 @@
   background: rgba(49, 130, 206, 0.05);
 }
 
+/* Drag and drop states */
+.datatable-container.drag-over {
+  border-color: #3182ce;
+  background: rgba(49, 130, 206, 0.1);
+  transform: scale(1.02);
+}
+
+.empty-state.drag-over {
+  border-color: #3182ce;
+  background: #3a3a3a;
+  transform: scale(1.02);
+}
+
 .model-datatable {
-  background: white;
+  background: #2a2a2a;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -122,34 +137,36 @@
 
 /* Override PrimeReact styles to match app theme */
 .p-datatable .p-datatable-header {
-  background: #f7fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: #3a3a3a;
+  border-bottom: 1px solid #4a4a4a;
   padding: 1rem;
 }
 
 .p-datatable .p-datatable-thead > tr > th {
-  background: #f7fafc;
-  color: #2d3748;
+  background: #3a3a3a;
+  color: #e2e8f0;
   font-weight: 600;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid #4a4a4a;
   padding: 0.75rem;
 }
 
 .p-datatable .p-datatable-tbody > tr > td {
   padding: 0.75rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #4a4a4a;
+  background: #2a2a2a;
+  color: #e2e8f0;
 }
 
 .p-datatable .p-datatable-tbody > tr:hover {
-  background: #f7fafc;
+  background: #3a3a3a;
 }
 
 .p-datatable .p-datatable-tbody > tr:nth-child(even) {
-  background: #fafafa;
+  background: #333;
 }
 
 .p-datatable .p-datatable-tbody > tr:nth-child(even):hover {
-  background: #f0f4f8;
+  background: #3a3a3a;
 }
 
 .p-button.p-button-outlined {

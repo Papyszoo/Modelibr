@@ -9,9 +9,7 @@ import { Toast } from 'primereact/toast'
 import { ProgressBar } from 'primereact/progressbar'
 import { useFileUpload, useDragAndDrop } from './hooks/useFileUpload'
 import { 
-  getFileExtension, 
-  getFileName, 
-  getModelFileFormat, 
+  getFileExtension,
   formatFileSize
 } from './utils/fileUtils'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
@@ -37,7 +35,7 @@ function ModelList({ onBackToUpload }) {
   })
 
   // Use drag and drop hook
-  const { onDrop, onDragOver, onDragEnter } = useDragAndDrop(uploadMultipleFiles)
+  const { onDrop, onDragOver, onDragEnter, onDragLeave } = useDragAndDrop(uploadMultipleFiles)
 
   useEffect(() => {
     fetchModels()
@@ -168,7 +166,13 @@ function ModelList({ onBackToUpload }) {
       )}
 
       {!loading && !error && models.length === 0 && (
-        <div className="empty-state">
+        <div 
+          className="empty-state"
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragEnter={onDragEnter}
+          onDragLeave={onDragLeave}
+        >
           <i className="pi pi-box" style={{ fontSize: '4rem', color: 'var(--surface-500)' }}></i>
           <h3>No models found</h3>
           <p>Drag and drop 3D model files here to get started!</p>
@@ -181,6 +185,7 @@ function ModelList({ onBackToUpload }) {
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragEnter={onDragEnter}
+          onDragLeave={onDragLeave}
         >
           <DataTable 
             ref={dt}

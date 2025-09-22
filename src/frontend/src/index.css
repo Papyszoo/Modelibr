@@ -66,3 +66,13 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Global drag and drop styles */
+.dragging-file {
+  cursor: copy !important;
+}
+
+.dragging-file * {
+  cursor: copy !important;
+  pointer-events: none;
+}

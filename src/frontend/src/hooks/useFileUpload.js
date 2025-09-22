@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import ApiClient from '../services/ApiClient'
 import { isSupportedModelFormat, isThreeJSRenderable } from '../utils/fileUtils'
 
@@ -194,21 +194,49 @@ export function useFileUpload(options = {}) {
 export function useDragAndDrop(onFilesDropped) {
   const onDrop = (e) => {
     e.preventDefault()
+    e.stopPropagation()
+    
+    // Remove drag visual feedback
+    document.body.classList.remove('dragging-file')
+    e.currentTarget.classList.remove('drag-over')
+    
     const files = Array.from(e.dataTransfer.files)
     onFilesDropped(files)
   }
 
   const onDragOver = (e) => {
     e.preventDefault()
+    e.stopPropagation()
+    
+    // Add drag visual feedback
+    document.body.classList.add('dragging-file')
+    e.currentTarget.classList.add('drag-over')
   }
 
   const onDragEnter = (e) => {
     e.preventDefault()
+    e.stopPropagation()
+    
+    // Add drag visual feedback
+    document.body.classList.add('dragging-file')
+    e.currentTarget.classList.add('drag-over')
+  }
+
+  const onDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Only remove drag feedback if we're leaving the container
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      document.body.classList.remove('dragging-file')
+      e.currentTarget.classList.remove('drag-over')
+    }
   }
 
   return {
     onDrop,
     onDragOver,
-    onDragEnter
+    onDragEnter,
+    onDragLeave
   }
 }

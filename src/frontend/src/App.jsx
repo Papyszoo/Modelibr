@@ -42,7 +42,7 @@ function App() {
 
     try {
       await uploadFile(selectedFile)
-    } catch (error) {
+    } catch {
       // Error handling is done in the hook's onError callback
     }
   }
