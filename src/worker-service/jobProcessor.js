@@ -3,6 +3,7 @@ import { ModelFileService } from './modelFileService.js';
 import { ModelLoaderService } from './modelLoaderService.js';
 import { OrbitFrameRenderer } from './orbitFrameRenderer.js';
 import { FrameEncoderService } from './frameEncoderService.js';
+import { ThumbnailStorageService } from './thumbnailStorageService.js';
 import { config } from './config.js';
 import logger, { withJobContext } from './logger.js';
 
@@ -14,6 +15,7 @@ export class JobProcessor {
     this.jobService = new ThumbnailJobService();
     this.modelFileService = new ModelFileService();
     this.modelLoaderService = new ModelLoaderService();
+    this.thumbnailStorage = new ThumbnailStorageService();
     this.orbitRenderer = null; // Will be initialized when needed
     this.frameEncoder = null; // Will be initialized when needed
     this.isShuttingDown = false;
@@ -139,7 +141,25 @@ export class JobProcessor {
         modelHash: job.modelHash
       });
 
-      // Step 1: Fetch the model file
+      // Step 1: Check if thumbnails already exist for this model hash
+      jobLogger.info('Checking for existing thumbnails', { modelHash: job.modelHash });
+      const existingThumbnails = await this.thumbnailStorage.checkThumbnailsExist(job.modelHash);
+      
+      if (existingThumbnails.skipRendering) {
+        jobLogger.info('Thumbnails already exist, skipping rendering', {
+          modelHash: job.modelHash,
+          webpExists: existingThumbnails.webpExists,
+          posterExists: existingThumbnails.posterExists,
+          webpPath: existingThumbnails.paths?.webpPath,
+          posterPath: existingThumbnails.paths?.posterPath
+        });
+        
+        // Update thumbnail metadata if needed (thumbnails exist but job was still created)
+        // This can happen in edge cases where job was queued before thumbnails were stored
+        return;
+      }
+
+      // Step 2: Fetch the model file
       jobLogger.info('Fetching model file from API');
       const fileInfo = await this.modelFileService.fetchModelFile(job.modelId);
       tempFilePath = fileInfo.filePath;
@@ -150,7 +170,7 @@ export class JobProcessor {
         filePath: fileInfo.filePath
       });
 
-      // Step 2: Load and normalize the model
+      // Step 3: Load and normalize the model
       jobLogger.info('Loading and normalizing model');
       const model = await this.modelLoaderService.loadModel(fileInfo.filePath, fileInfo.fileType);
 
@@ -160,7 +180,7 @@ export class JobProcessor {
         fileType: fileInfo.fileType
       });
 
-      // Step 3: Generate orbit frames using three.js renderer
+      // Step 4: Generate orbit frames using three.js renderer
       if (config.orbit.enabled) {
         jobLogger.info('Starting orbit frame rendering');
         
@@ -196,7 +216,7 @@ export class JobProcessor {
           memoryUsageMB: memoryStats.totalSizeMB
         });
         
-        // Step 4: Encode frames into animated WebP and poster if enabled
+        // Step 5: Encode frames into animated WebP and poster if enabled
         if (config.encoding.enabled) {
           jobLogger.info('Starting frame encoding');
           
@@ -214,6 +234,27 @@ export class JobProcessor {
             encodeTimeMs: encodingResult.encodeTimeMs,
             frameCount: encodingResult.frameCount
           });
+
+          // Step 6: Store thumbnails in persistent storage
+          if (this.thumbnailStorage.enabled) {
+            jobLogger.info('Storing thumbnails in persistent storage');
+            
+            const storageResult = await this.thumbnailStorage.storeThumbnails(
+              job.modelHash,
+              encodingResult.webpPath,
+              encodingResult.posterPath
+            );
+            
+            jobLogger.info('Thumbnail storage completed', {
+              stored: storageResult.stored,
+              webpStored: storageResult.webpStored,
+              posterStored: storageResult.posterStored,
+              finalWebpPath: storageResult.webpPath,
+              finalPosterPath: storageResult.posterPath
+            });
+          } else {
+            jobLogger.info('Persistent thumbnail storage disabled');
+          }
 
           // Clean up temporary files if configured
           if (config.encoding.cleanupTempFiles) {

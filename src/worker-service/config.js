@@ -46,6 +46,13 @@ export const config = {
     jpegQuality: parseInt(process.env.JPEG_QUALITY) || 85, // JPEG quality for poster (0-100)
     cleanupTempFiles: process.env.CLEANUP_TEMP_FILES !== 'false' // cleanup temp files after encoding
   },
+
+  // Thumbnail storage settings
+  thumbnailStorage: {
+    enabled: process.env.THUMBNAIL_STORAGE_ENABLED !== 'false', // enable persistent thumbnail storage
+    basePath: process.env.THUMBNAIL_STORAGE_PATH || '/var/lib/modelibr/thumbnails', // base path for thumbnail storage
+    skipDuplicates: process.env.SKIP_DUPLICATE_THUMBNAILS !== 'false' // skip rendering when thumbnails exist
+  },
   
   // Logging settings
   logging: {
@@ -122,6 +129,10 @@ export function validateConfig() {
 
   if (config.encoding.jpegQuality < 0 || config.encoding.jpegQuality > 100) {
     errors.push('JPEG_QUALITY must be between 0 and 100');
+  }
+
+  if (config.thumbnailStorage.enabled && !config.thumbnailStorage.basePath) {
+    errors.push('THUMBNAIL_STORAGE_PATH must be specified when thumbnail storage is enabled');
   }
   
   if (errors.length > 0) {
