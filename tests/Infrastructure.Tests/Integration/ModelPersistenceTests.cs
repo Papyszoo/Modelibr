@@ -1,3 +1,4 @@
+using Application.Abstractions.Services;
 using Application.Models;
 using Application.Services;
 using Domain.Models;
@@ -6,6 +7,8 @@ using Infrastructure.Repositories;
 using Infrastructure.Storage;
 using Infrastructure.Tests.Fakes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using SharedKernel;
 using Xunit;
 
 namespace Infrastructure.Tests.Integration;
@@ -48,8 +51,23 @@ public class ModelPersistenceTests
         
         var fileCreationService = new FileCreationService(storage, fileRepository, fileUtilityService, dateTimeProvider);
         
-        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider);
+        // Create a fake domain event dispatcher for testing
+        var domainEventDispatcher = new FakeDomainEventDispatcher();
+        
+        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider, domainEventDispatcher);
         
         Assert.NotNull(handler);
+    }
+}
+
+/// <summary>
+/// Fake domain event dispatcher for testing that does nothing.
+/// </summary>
+internal class FakeDomainEventDispatcher : IDomainEventDispatcher
+{
+    public Task<Result> PublishAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken = default)
+    {
+        // Do nothing for tests
+        return Task.FromResult(Result.Success());
     }
 }

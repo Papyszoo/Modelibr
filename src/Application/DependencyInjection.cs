@@ -22,7 +22,7 @@ namespace Application
         {
             Assembly assembly = Assembly.GetExecutingAssembly();
 
-            services.RegisterHandlersForInterfaceTypes(assembly, [typeof(IQueryHandler<,>), typeof(ICommandHandler<>), typeof(ICommandHandler<,>)]);
+            services.RegisterHandlersForInterfaceTypes(assembly, [typeof(IQueryHandler<,>), typeof(ICommandHandler<>), typeof(ICommandHandler<,>), typeof(IDomainEventHandler<>)]);
 
             return services;
         }
