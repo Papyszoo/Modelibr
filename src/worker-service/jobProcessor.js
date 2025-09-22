@@ -1,6 +1,7 @@
 import { ThumbnailJobService } from './thumbnailJobService.js';
 import { ModelFileService } from './modelFileService.js';
 import { ModelLoaderService } from './modelLoaderService.js';
+import { OrbitFrameRenderer } from './orbitFrameRenderer.js';
 import { config } from './config.js';
 import logger, { withJobContext } from './logger.js';
 
@@ -12,6 +13,7 @@ export class JobProcessor {
     this.jobService = new ThumbnailJobService();
     this.modelFileService = new ModelFileService();
     this.modelLoaderService = new ModelLoaderService();
+    this.orbitRenderer = null; // Will be initialized when needed
     this.isShuttingDown = false;
     this.activeJobs = new Map();
   }
@@ -156,18 +158,55 @@ export class JobProcessor {
         fileType: fileInfo.fileType
       });
 
-      // Step 3: TODO - Generate thumbnail using three.js renderer
-      // For now, we'll just log that the model was processed successfully
-      jobLogger.info('Model processing completed', {
-        polygonCount,
-        processingConfig: {
-          outputWidth: config.rendering.outputWidth,
-          outputHeight: config.rendering.outputHeight,
-          outputFormat: config.rendering.outputFormat,
-          maxPolygonCount: config.modelProcessing.maxPolygonCount,
-          normalizedScale: config.modelProcessing.normalizedScale
+      // Step 3: Generate orbit frames using three.js renderer
+      if (config.orbit.enabled) {
+        jobLogger.info('Starting orbit frame rendering');
+        
+        // Initialize orbit renderer if not already done
+        if (!this.orbitRenderer) {
+          this.orbitRenderer = new OrbitFrameRenderer();
         }
-      });
+
+        // Render orbit frames
+        const frames = await this.orbitRenderer.renderOrbitFrames(model, jobLogger);
+        
+        // Log memory statistics
+        const memoryStats = this.orbitRenderer.getMemoryStats(frames);
+        jobLogger.info('Orbit frame rendering completed successfully', {
+          polygonCount,
+          ...memoryStats,
+          processingConfig: {
+            outputWidth: config.rendering.outputWidth,
+            outputHeight: config.rendering.outputHeight,
+            outputFormat: config.rendering.outputFormat,
+            orbitAngleStep: config.orbit.angleStep,
+            orbitStartAngle: config.orbit.startAngle,
+            orbitEndAngle: config.orbit.endAngle,
+            cameraDistance: config.rendering.cameraDistance,
+            maxPolygonCount: config.modelProcessing.maxPolygonCount,
+            normalizedScale: config.modelProcessing.normalizedScale
+          }
+        });
+        
+        // Note: Frames are stored in memory as requested, not saved to files
+        jobLogger.info('Frames stored in memory for processing', {
+          frameCount: frames.length,
+          memoryUsageMB: memoryStats.totalSizeMB
+        });
+        
+      } else {
+        // Fall back to simple processing log
+        jobLogger.info('Orbit rendering disabled, model processing completed', {
+          polygonCount,
+          processingConfig: {
+            outputWidth: config.rendering.outputWidth,
+            outputHeight: config.rendering.outputHeight,
+            outputFormat: config.rendering.outputFormat,
+            maxPolygonCount: config.modelProcessing.maxPolygonCount,
+            normalizedScale: config.modelProcessing.normalizedScale
+          }
+        });
+      }
 
     } catch (error) {
       jobLogger.error('Model processing failed', {
@@ -238,6 +277,12 @@ export class JobProcessor {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
+    }
+
+    // Dispose of orbit renderer resources
+    if (this.orbitRenderer) {
+      this.orbitRenderer.dispose();
+      this.orbitRenderer = null;
     }
 
     // Wait for active jobs to complete (with timeout)
