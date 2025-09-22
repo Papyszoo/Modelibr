@@ -1,6 +1,8 @@
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
+using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +29,8 @@ namespace Infrastructure
 
             services.AddScoped<IModelRepository, ModelRepository>();
             services.AddScoped<IFileRepository, FileRepository>();
+            services.AddScoped<IThumbnailJobRepository, ThumbnailJobRepository>();
+            services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
 
             return services;
         }
