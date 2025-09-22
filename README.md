@@ -122,23 +122,17 @@ This will start the complete application stack:
 ##### Backend (.NET API)
 
 1. **Install .NET 9.0 SDK**
-   ```bash
-   curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 9.0
-   export PATH="$HOME/.dotnet:$PATH"
-   ```
+   - Download from [official .NET site](https://dotnet.microsoft.com/download/dotnet/9.0)
+   - Or use the installation script (see copilot instructions for details)
 
-2. **Restore and build**
+2. **Build and test**
    ```bash
    dotnet restore Modelibr.sln
    dotnet build Modelibr.sln
-   ```
-
-3. **Run tests**
-   ```bash
    dotnet test Modelibr.sln --no-build
    ```
 
-4. **Start the API**
+3. **Start the API**
    ```bash
    cd src/WebApi
    export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads"
