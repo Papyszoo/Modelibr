@@ -9,6 +9,7 @@ namespace Infrastructure.Persistence
         public DbSet<Model> Models => Set<Model>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
+        public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -64,6 +65,34 @@ namespace Infrastructure.Persistence
 
                 // Create unique index for ModelId to ensure one thumbnail per model
                 entity.HasIndex(t => t.ModelId).IsUnique();
+            });
+
+            // Configure ThumbnailJob entity
+            modelBuilder.Entity<ThumbnailJob>(entity =>
+            {
+                entity.HasKey(tj => tj.Id);
+                entity.Property(tj => tj.ModelId).IsRequired();
+                entity.Property(tj => tj.ModelHash).IsRequired().HasMaxLength(64);
+                entity.Property(tj => tj.Status).IsRequired();
+                entity.Property(tj => tj.AttemptCount).IsRequired();
+                entity.Property(tj => tj.MaxAttempts).IsRequired();
+                entity.Property(tj => tj.ErrorMessage).HasMaxLength(2000);
+                entity.Property(tj => tj.LockedBy).HasMaxLength(100);
+                entity.Property(tj => tj.LockTimeoutMinutes).IsRequired();
+                entity.Property(tj => tj.CreatedAt).IsRequired();
+                entity.Property(tj => tj.UpdatedAt).IsRequired();
+
+                // Create unique index for ModelHash to prevent duplicate jobs
+                entity.HasIndex(tj => tj.ModelHash).IsUnique();
+                
+                // Create index for efficient job querying
+                entity.HasIndex(tj => new { tj.Status, tj.CreatedAt });
+
+                // Configure relationship with Model
+                entity.HasOne(tj => tj.Model)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.ModelId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             base.OnModelCreating(modelBuilder);
