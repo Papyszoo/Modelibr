@@ -21,6 +21,13 @@ export const config = {
     cameraDistance: parseFloat(process.env.CAMERA_DISTANCE) || 5,
     enableAntialiasing: process.env.ENABLE_ANTIALIASING !== 'false'
   },
+
+  // Model processing settings
+  modelProcessing: {
+    maxPolygonCount: parseInt(process.env.MAX_POLYGON_COUNT) || 1000000, // 1M polygons by default
+    enableNormalization: process.env.ENABLE_NORMALIZATION !== 'false',
+    normalizedScale: parseFloat(process.env.NORMALIZED_SCALE) || 2.0 // Scale to fit in a 2x2x2 cube
+  },
   
   // Logging settings
   logging: {
@@ -65,6 +72,14 @@ export function validateConfig() {
   
   if (config.rendering.cameraDistance <= 0) {
     errors.push('CAMERA_DISTANCE must be greater than 0');
+  }
+  
+  if (config.modelProcessing.maxPolygonCount < 1000) {
+    errors.push('MAX_POLYGON_COUNT must be at least 1000');
+  }
+  
+  if (config.modelProcessing.normalizedScale <= 0) {
+    errors.push('NORMALIZED_SCALE must be greater than 0');
   }
   
   if (errors.length > 0) {
