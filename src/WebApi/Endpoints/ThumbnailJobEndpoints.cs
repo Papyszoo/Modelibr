@@ -66,6 +66,30 @@ public static class ThumbnailJobEndpoints
         })
         .WithName("Complete Thumbnail Job")
         .WithTags("ThumbnailJobs");
+
+        // Test endpoint to simulate thumbnail completion for testing SignalR
+        app.MapPost("/api/test/thumbnail-complete/{modelId:int}", async (
+            int modelId,
+            [FromBody] TestThumbnailCompleteRequest request,
+            Application.Abstractions.Services.IThumbnailNotificationService notificationService) =>
+        {
+            try
+            {
+                await notificationService.SendThumbnailStatusChangedAsync(
+                    modelId,
+                    request.Status,
+                    request.ThumbnailUrl,
+                    request.ErrorMessage);
+
+                return Results.Ok(new { Message = "Test notification sent successfully" });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Error = ex.Message });
+            }
+        })
+        .WithName("Test Thumbnail Complete Notification")
+        .WithTags("Testing");
     }
 }
 
@@ -78,3 +102,8 @@ public record DequeueRequest(string WorkerId);
 /// Request model for completing thumbnail jobs.
 /// </summary>
 public record CompleteJobRequest(string ThumbnailPath, long SizeBytes, int Width, int Height);
+
+/// <summary>
+/// Request model for testing thumbnail completion.
+/// </summary>
+public record TestThumbnailCompleteRequest(string Status, string? ThumbnailUrl = null, string? ErrorMessage = null);
