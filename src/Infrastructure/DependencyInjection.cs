@@ -31,6 +31,7 @@ namespace Infrastructure
             services.AddScoped<IFileRepository, FileRepository>();
             services.AddScoped<IThumbnailJobRepository, ThumbnailJobRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
+            services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
             return services;
         }

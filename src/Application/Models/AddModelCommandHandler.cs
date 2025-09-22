@@ -1,6 +1,7 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -14,15 +15,18 @@ namespace Application.Models
         private readonly IModelRepository _modelRepository;
         private readonly IFileCreationService _fileCreationService;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly IDomainEventDispatcher _domainEventDispatcher;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository, 
             IFileCreationService fileCreationService,
-            IDateTimeProvider dateTimeProvider)
+            IDateTimeProvider dateTimeProvider,
+            IDomainEventDispatcher domainEventDispatcher)
         {
             _modelRepository = modelRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
+            _domainEventDispatcher = domainEventDispatcher;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -51,6 +55,13 @@ namespace Application.Models
             var existingModel = await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
             if (existingModel != null)
             {
+                // Raise domain event for existing model upload
+                existingModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
+                
+                // Publish domain events
+                await _domainEventDispatcher.PublishAsync(existingModel.DomainEvents, cancellationToken);
+                existingModel.ClearDomainEvents();
+                
                 return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
             }
 
@@ -64,6 +75,14 @@ namespace Application.Models
                 model.AddFile(fileEntity, _dateTimeProvider.UtcNow);
 
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
+                
+                // Raise domain event for new model upload
+                savedModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, true);
+                
+                // Publish domain events
+                await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);
+                savedModel.ClearDomainEvents();
+                
                 return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
             }
             catch (ArgumentException ex)
