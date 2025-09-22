@@ -30,5 +30,8 @@ export default {
       lines: 60,
       statements: 60
     }
-  }
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!(.*\\.mjs$))'
+  ]
 }

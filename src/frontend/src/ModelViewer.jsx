@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfo from './components/ModelInfo'
+import ThumbnailDisplay from './components/ThumbnailDisplay'
 import { getModelFileFormat } from './utils/fileUtils'
 import './ModelViewer.css'
 
@@ -50,7 +51,21 @@ function ModelViewer({ model, onBack }) {
       </div>
 
       <div className="viewer-info">
-        <ModelInfo model={model} />
+        <div className="viewer-info-left">
+          <ModelInfo model={model} />
+        </div>
+        <div className="viewer-info-right">
+          <div className="thumbnail-section">
+            <h3>Animated Thumbnail</h3>
+            <ThumbnailDisplay 
+              modelId={model.id}
+              size="large"
+              showAnimation={true}
+              showControls={true}
+              alt={`Animated thumbnail for ${model.files?.[0]?.originalFileName || `model ${model.id}`}`}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )
