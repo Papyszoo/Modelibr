@@ -3,7 +3,7 @@ using Application.Abstractions.Services;
 using Domain.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Application.Services;
+namespace Infrastructure.Services;
 
 /// <summary>
 /// Service implementation for thumbnail generation queue operations.

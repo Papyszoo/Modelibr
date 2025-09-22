@@ -1,12 +1,12 @@
 using Application.Abstractions.Repositories;
-using Application.Services;
 using Domain.Models;
 using Domain.ValueObjects;
+using Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Application.Tests.Services;
+namespace Infrastructure.Tests.Services;
 
 public class ThumbnailQueueTests
 {

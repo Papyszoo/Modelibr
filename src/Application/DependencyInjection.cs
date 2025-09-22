@@ -15,7 +15,6 @@ namespace Application
             services.AddScoped<IFileUtilityService, FileUtilityService>();
             services.AddScoped<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped<IFileCreationService, FileCreationService>();
-            services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             return services;
         }
 
