@@ -9,7 +9,7 @@ namespace Application.Services;
 /// <summary>
 /// Service for dispatching domain events to their registered handlers.
 /// </summary>
-internal class DomainEventDispatcher : IDomainEventDispatcher
+public class DomainEventDispatcher : IDomainEventDispatcher
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<DomainEventDispatcher> _logger;

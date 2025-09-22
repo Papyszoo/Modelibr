@@ -9,7 +9,7 @@ namespace Application.EventHandlers;
 /// <summary>
 /// Handles ModelUploadedEvent by enqueueing a thumbnail generation job.
 /// </summary>
-internal class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
+public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
 {
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ILogger<ModelUploadedEventHandler> _logger;
