@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
 
-namespace Application.Services;
+namespace Infrastructure.Services;
 
 /// <summary>
 /// Service for dispatching domain events to their registered handlers.

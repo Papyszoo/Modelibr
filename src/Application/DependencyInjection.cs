@@ -15,7 +15,6 @@ namespace Application
             services.AddScoped<IFileUtilityService, FileUtilityService>();
             services.AddScoped<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped<IFileCreationService, FileCreationService>();
-            services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
             return services;
         }
 

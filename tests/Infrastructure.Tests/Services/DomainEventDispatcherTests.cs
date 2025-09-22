@@ -1,13 +1,13 @@
 using Application.Abstractions.Messaging;
-using Application.Services;
 using Domain.Events;
+using Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SharedKernel;
 using Xunit;
 
-namespace Application.Tests.Services;
+namespace Infrastructure.Tests.Services;
 
 public class DomainEventDispatcherTests
 {
