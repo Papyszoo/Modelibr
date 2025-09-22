@@ -2,6 +2,9 @@
 
 FROM node:20-alpine AS base
 
+# Install FFmpeg for video/image processing
+RUN apk add --no-cache ffmpeg
+
 WORKDIR /app
 
 # Copy package files
