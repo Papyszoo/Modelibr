@@ -135,3 +135,37 @@ cp .env.example .env
 3. Test: `dotnet test Modelibr.sln --no-build`
 4. Run: `cd src/WebApi && export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads" && dotnet run`
 5. Validate application starts and responds on http://localhost:5009
+
+## Documentation Maintenance
+
+### Keeping Documentation Clean and Synchronized
+
+**ALWAYS update both README.md and .github/copilot-instructions.md when making relevant changes.** These files serve different purposes but must stay synchronized to avoid confusion and redundancy.
+
+#### File Responsibilities
+- **README.md**: User-facing documentation, getting started guides, feature descriptions, high-level architecture overview
+- **.github/copilot-instructions.md**: Developer-focused technical instructions, build details, troubleshooting, environment setup
+
+#### When to Update Documentation
+Update both files when changes affect:
+- Prerequisites or setup requirements (e.g., .NET version, Node.js version)
+- Build or test procedures
+- Environment variables or configuration
+- Docker setup or deployment
+- Project structure or architecture
+- Development workflow or debugging procedures
+
+#### Guidelines for Updates
+- **Remove redundancy**: Avoid duplicating the same information in both files
+- **Keep content focused**: README.md should be accessible to new users; copilot-instructions.md should be comprehensive for developers
+- **Maintain consistency**: Use the same versions, commands, and terminology across both files
+- **Update examples**: Ensure code examples, URLs, and commands are current and working
+- **Validate changes**: Test any instructions you add to ensure they work correctly
+
+#### Content Separation Guidelines
+- **README.md should contain**: Features, screenshots, high-level getting started, basic Docker commands, contribution guidelines
+- **copilot-instructions.md should contain**: Detailed build instructions with timings, troubleshooting steps, environment variable details, development tips
+
+**Example of good separation:**
+- README.md: "Install .NET 9.0 SDK" (with link)
+- copilot-instructions.md: "Install .NET 9.0 SDK - REQUIRED (the project targets net9.0): curl command, export PATH, verification steps"
