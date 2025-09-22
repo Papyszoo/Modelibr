@@ -5,7 +5,7 @@ using SharedKernel;
 
 namespace Application.Thumbnails;
 
-internal class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse>
+public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse>
 {
     private readonly IModelRepository _modelRepository;
 

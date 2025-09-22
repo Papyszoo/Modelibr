@@ -7,7 +7,7 @@ using SharedKernel;
 
 namespace Application.Thumbnails;
 
-internal class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumbnailCommand, RegenerateThumbnailCommandResponse>
+public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumbnailCommand, RegenerateThumbnailCommandResponse>
 {
     private readonly IModelRepository _modelRepository;
     private readonly IThumbnailRepository _thumbnailRepository;
