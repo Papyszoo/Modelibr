@@ -34,6 +34,13 @@ The service is configured via environment variables. See `.env.example` for all 
 - `CAMERA_DISTANCE`: Camera distance from model (default: `5`)
 - `ENABLE_ANTIALIASING`: Enable antialiasing (default: `true`)
 
+### Orbit Animation
+- `ORBIT_ENABLED`: Enable orbit frame rendering (default: `true`)
+- `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `15`)
+- `ORBIT_START_ANGLE`: Starting angle in degrees (default: `0`)
+- `ORBIT_END_ANGLE`: Ending angle in degrees (default: `360`)
+- `ORBIT_CAMERA_HEIGHT`: Vertical camera offset from center (default: `0`)
+
 ### Logging
 - `LOG_LEVEL`: Logging level: error, warn, info, debug (default: `info`)
 - `LOG_FORMAT`: Log format: json or simple (default: `json`)
@@ -196,13 +203,21 @@ Log levels and contexts:
 
 This skeleton is ready for the actual three.js rendering implementation. Next steps:
 
-1. **Model Loading**: Implement loaders for supported 3D formats (.obj, .fbx, .gltf, etc.)
-2. **Three.js Rendering**: Set up scene, camera, lights, and renderer
-3. **Thumbnail Generation**: Capture rendered frames as images
-4. **Output Storage**: Save thumbnails to storage and update job status
-5. **Performance Optimization**: Implement caching, resource pooling, and optimization
+1. **Model Loading**: ✅ Implemented loaders for supported 3D formats (.obj, .fbx, .gltf, etc.)
+2. **Three.js Rendering**: ✅ Set up scene, camera, lights, and renderer
+3. **Orbit Frame Generation**: ✅ Implemented orbit camera animation with configurable angles
+4. **Memory Management**: ✅ Frames stored in memory with logging and statistics
+5. **Thumbnail Generation**: Capture rendered frames as images (pending full WebGL setup)
+6. **Output Storage**: Save thumbnails to storage and update job status
+7. **Performance Optimization**: Implement caching, resource pooling, and optimization
 
-The current implementation includes simulation mode for testing the job processing pipeline without actual rendering.
+The current implementation includes:
+- **Orbit Frame Rendering Pipeline**: Complete orbit animation system that positions camera at calculated distances around models and renders frames at configurable angles (e.g., every 5–15°)
+- **Configurable Lighting**: Ambient and directional lighting setup matching the frontend Scene component
+- **Memory Management**: Frame data stored in memory with detailed logging and memory usage tracking
+- **Frame Collection**: Rendered frames collected and stored without file encoding as requested
+
+**Current Status**: Orbit frame rendering pipeline is implemented and functional. The system can render frames for each orbit angle with consistent lighting and controllable memory usage.
 
 ## Monitoring
 

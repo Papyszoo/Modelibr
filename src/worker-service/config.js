@@ -22,6 +22,15 @@ export const config = {
     enableAntialiasing: process.env.ENABLE_ANTIALIASING !== 'false'
   },
 
+  // Orbit animation settings
+  orbit: {
+    angleStep: parseFloat(process.env.ORBIT_ANGLE_STEP) || 15, // degrees between each frame
+    startAngle: parseFloat(process.env.ORBIT_START_ANGLE) || 0, // starting angle in degrees
+    endAngle: parseFloat(process.env.ORBIT_END_ANGLE) || 360, // ending angle in degrees
+    cameraHeight: parseFloat(process.env.ORBIT_CAMERA_HEIGHT) || 0, // vertical offset from center
+    enabled: process.env.ORBIT_ENABLED !== 'false' // enable orbit rendering
+  },
+
   // Model processing settings
   modelProcessing: {
     maxPolygonCount: parseInt(process.env.MAX_POLYGON_COUNT) || 1000000, // 1M polygons by default
@@ -72,6 +81,18 @@ export function validateConfig() {
   
   if (config.rendering.cameraDistance <= 0) {
     errors.push('CAMERA_DISTANCE must be greater than 0');
+  }
+
+  if (config.orbit.angleStep <= 0 || config.orbit.angleStep > 90) {
+    errors.push('ORBIT_ANGLE_STEP must be between 0 and 90 degrees');
+  }
+
+  if (config.orbit.startAngle < 0 || config.orbit.startAngle >= 360) {
+    errors.push('ORBIT_START_ANGLE must be between 0 and 359 degrees');
+  }
+
+  if (config.orbit.endAngle <= config.orbit.startAngle || config.orbit.endAngle > 360) {
+    errors.push('ORBIT_END_ANGLE must be greater than start angle and up to 360 degrees');
   }
   
   if (config.modelProcessing.maxPolygonCount < 1000) {
