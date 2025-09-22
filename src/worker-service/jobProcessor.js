@@ -1,4 +1,6 @@
 import { ThumbnailJobService } from './thumbnailJobService.js';
+import { ModelFileService } from './modelFileService.js';
+import { ModelLoaderService } from './modelLoaderService.js';
 import { config } from './config.js';
 import logger, { withJobContext } from './logger.js';
 
@@ -8,6 +10,8 @@ import logger, { withJobContext } from './logger.js';
 export class JobProcessor {
   constructor() {
     this.jobService = new ThumbnailJobService();
+    this.modelFileService = new ModelFileService();
+    this.modelLoaderService = new ModelLoaderService();
     this.isShuttingDown = false;
     this.activeJobs = new Map();
   }
@@ -19,7 +23,8 @@ export class JobProcessor {
     logger.info('Starting job processor', {
       workerId: config.workerId,
       pollInterval: config.pollIntervalMs,
-      maxConcurrentJobs: config.maxConcurrentJobs
+      maxConcurrentJobs: config.maxConcurrentJobs,
+      modelProcessing: config.modelProcessing
     });
 
     // Test API connection before starting
@@ -27,6 +32,9 @@ export class JobProcessor {
     if (!isConnected) {
       logger.warn('API connection test failed, but continuing anyway');
     }
+
+    // Start periodic cleanup of old temporary files
+    this.startPeriodicCleanup();
 
     this.pollLoop();
   }
@@ -89,9 +97,8 @@ export class JobProcessor {
     try {
       jobLogger.info('Starting thumbnail generation');
       
-      // TODO: This is where the actual three.js rendering will be implemented
-      // For now, we'll simulate processing time and mark as completed
-      await this.simulateProcessing(job, jobLogger);
+      // Process the model
+      await this.processModel(job, jobLogger);
       
       await this.jobService.markJobCompleted(job.id);
       jobLogger.info('Thumbnail generation completed successfully');
@@ -111,6 +118,68 @@ export class JobProcessor {
       }
     } finally {
       this.activeJobs.delete(job.id);
+    }
+  }
+
+  /**
+   * Process a model for thumbnail generation
+   * @param {Object} job - The job being processed
+   * @param {Object} jobLogger - Logger with job context
+   */
+  async processModel(job, jobLogger) {
+    let tempFilePath = null;
+
+    try {
+      jobLogger.info('Starting model processing', {
+        modelId: job.modelId,
+        modelHash: job.modelHash
+      });
+
+      // Step 1: Fetch the model file
+      jobLogger.info('Fetching model file from API');
+      const fileInfo = await this.modelFileService.fetchModelFile(job.modelId);
+      tempFilePath = fileInfo.filePath;
+
+      jobLogger.info('Model file fetched successfully', {
+        originalFileName: fileInfo.originalFileName,
+        fileType: fileInfo.fileType,
+        filePath: fileInfo.filePath
+      });
+
+      // Step 2: Load and normalize the model
+      jobLogger.info('Loading and normalizing model');
+      const model = await this.modelLoaderService.loadModel(fileInfo.filePath, fileInfo.fileType);
+
+      const polygonCount = this.modelLoaderService.countPolygons(model);
+      jobLogger.info('Model loaded and normalized successfully', {
+        polygonCount,
+        fileType: fileInfo.fileType
+      });
+
+      // Step 3: TODO - Generate thumbnail using three.js renderer
+      // For now, we'll just log that the model was processed successfully
+      jobLogger.info('Model processing completed', {
+        polygonCount,
+        processingConfig: {
+          outputWidth: config.rendering.outputWidth,
+          outputHeight: config.rendering.outputHeight,
+          outputFormat: config.rendering.outputFormat,
+          maxPolygonCount: config.modelProcessing.maxPolygonCount,
+          normalizedScale: config.modelProcessing.normalizedScale
+        }
+      });
+
+    } catch (error) {
+      jobLogger.error('Model processing failed', {
+        error: error.message,
+        modelId: job.modelId
+      });
+      throw error;
+    } finally {
+      // Clean up temporary file
+      if (tempFilePath) {
+        await this.modelFileService.cleanupFile(tempFilePath);
+      }
     }
   }
 
@@ -141,11 +210,35 @@ export class JobProcessor {
   }
 
   /**
+   * Start periodic cleanup of temporary files
+   */
+  startPeriodicCleanup() {
+    // Clean up old files every 30 minutes
+    this.cleanupInterval = setInterval(async () => {
+      if (!this.isShuttingDown) {
+        try {
+          await this.modelFileService.cleanupOldFiles();
+        } catch (error) {
+          logger.warn('Periodic cleanup failed', { error: error.message });
+        }
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+
+    logger.debug('Started periodic cleanup of temporary files');
+  }
+
+  /**
    * Gracefully shutdown the processor
    */
   async shutdown() {
     logger.info('Shutting down job processor');
     this.isShuttingDown = true;
+
+    // Stop periodic cleanup
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
 
     // Wait for active jobs to complete (with timeout)
     const shutdownTimeout = 30000; // 30 seconds
