@@ -16,6 +16,7 @@ namespace WebApi
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddAuthorization();
+            builder.Services.AddHttpContextAccessor();
 
             // Add CORS for frontend development
             builder.Services.AddCors(options =>
@@ -64,6 +65,7 @@ namespace WebApi
             app.MapModelEndpoints();
             app.MapModelsEndpoints();
             app.MapFilesEndpoints();
+            app.MapThumbnailEndpoints();
 
             app.Run();
         }
