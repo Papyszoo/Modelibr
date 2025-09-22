@@ -235,22 +235,23 @@ export class JobProcessor {
             frameCount: encodingResult.frameCount
           });
 
-          // Step 6: Store thumbnails in persistent storage
+          // Step 6: Store thumbnails via API upload
           if (this.thumbnailStorage.enabled) {
-            jobLogger.info('Storing thumbnails in persistent storage');
+            jobLogger.info('Uploading thumbnails to API');
             
             const storageResult = await this.thumbnailStorage.storeThumbnails(
               job.modelHash,
               encodingResult.webpPath,
-              encodingResult.posterPath
+              encodingResult.posterPath,
+              job.modelId // Pass model ID for API upload
             );
             
-            jobLogger.info('Thumbnail storage completed', {
+            jobLogger.info('Thumbnail API upload completed', {
               stored: storageResult.stored,
               webpStored: storageResult.webpStored,
               posterStored: storageResult.posterStored,
-              finalWebpPath: storageResult.webpPath,
-              finalPosterPath: storageResult.posterPath
+              uploadResults: storageResult.uploadResults?.length || 0,
+              allSuccessful: storageResult.apiResponse?.allSuccessful
             });
           } else {
             jobLogger.info('Persistent thumbnail storage disabled');

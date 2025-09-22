@@ -49,9 +49,9 @@ export const config = {
 
   // Thumbnail storage settings
   thumbnailStorage: {
-    enabled: process.env.THUMBNAIL_STORAGE_ENABLED !== 'false', // enable persistent thumbnail storage
-    basePath: process.env.THUMBNAIL_STORAGE_PATH || '/var/lib/modelibr/thumbnails', // base path for thumbnail storage
-    skipDuplicates: process.env.SKIP_DUPLICATE_THUMBNAILS !== 'false' // skip rendering when thumbnails exist
+    enabled: process.env.THUMBNAIL_STORAGE_ENABLED !== 'false', // enable thumbnail upload to API
+    basePath: process.env.THUMBNAIL_STORAGE_PATH || '/tmp/thumbnails', // temp path for generated files (not used for persistent storage)
+    skipDuplicates: false // always false for API upload - backend handles deduplication
   },
   
   // Logging settings
