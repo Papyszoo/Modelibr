@@ -176,10 +176,12 @@ export class FrameEncoderService {
   async createAnimatedWebP(pngFiles, workingDir, jobLogger) {
     const webpPath = path.join(workingDir, 'animation.webp');
     const framerate = config.encoding?.framerate || 10; // frames per second
+    const quality = config.encoding?.webpQuality || 75; // WebP quality
     
     jobLogger.info('Creating animated WebP', {
       inputFrames: pngFiles.length,
       framerate,
+      quality,
       outputPath: webpPath
     });
 
@@ -193,7 +195,7 @@ export class FrameEncoderService {
         .outputOptions([
           '-c:v libwebp',
           '-lossless 0',
-          '-quality 75',
+          `-quality ${quality}`,
           '-method 6', // Better compression
           '-loop 0', // Infinite loop
           '-preset photo'
@@ -239,16 +241,18 @@ export class FrameEncoderService {
    */
   async createPosterFrame(firstPngPath, workingDir, jobLogger) {
     const posterPath = path.join(workingDir, 'poster.jpg');
+    const quality = config.encoding?.jpegQuality || 85; // JPEG quality
     
     jobLogger.info('Creating poster frame', {
       inputPath: firstPngPath,
-      outputPath: posterPath
+      outputPath: posterPath,
+      quality
     });
 
     try {
       await sharp(firstPngPath)
         .jpeg({ 
-          quality: 85,
+          quality: quality,
           progressive: true,
           mozjpeg: true
         })
