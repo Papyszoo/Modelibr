@@ -21,6 +21,9 @@
             }
         }
 
+        // Navigation property for one-to-one relationship with thumbnail
+        public Thumbnail? Thumbnail { get; set; }
+
         public static Model Create(string name, DateTime createdAt)
         {
             if (string.IsNullOrWhiteSpace(name))
