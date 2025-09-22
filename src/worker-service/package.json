@@ -1,0 +1,25 @@
+{
+  "name": "modelibr-thumbnail-worker",
+  "version": "1.0.0",
+  "description": "Node.js worker service for three.js thumbnail rendering",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["thumbnail", "threejs", "worker", "modelibr"],
+  "author": "Modelibr",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "three": "^0.180.0",
+    "winston": "^3.11.0",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

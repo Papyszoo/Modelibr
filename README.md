@@ -94,6 +94,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 4. **Access the application**
    - Frontend: http://localhost:3000
    - API: http://localhost:8080
+   - Thumbnail Worker: http://localhost:3001 (health check)
    - SQL Server: localhost:1433
 
 ### Development Setup
@@ -115,6 +116,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 This will start the complete application stack:
 - Frontend: http://localhost:3000
 - API: http://localhost:8080
+- Thumbnail Worker: http://localhost:3001 (health check)
 - SQL Server: localhost:1433
 
 #### Alternative: Local Development
@@ -156,6 +158,27 @@ The API will be available at http://localhost:5009
 
 The frontend will be available at http://localhost:3000
 
+##### Thumbnail Worker (Node.js)
+
+1. **Install dependencies**
+   ```bash
+   cd src/worker-service
+   npm install
+   ```
+
+2. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env file with API connection settings
+   ```
+
+3. **Start the worker**
+   ```bash
+   npm start
+   ```
+
+The worker service will be available at http://localhost:3001 (health check)
+
 ## 📁 Supported File Formats
 
 | Format | Extension | Description |
@@ -178,6 +201,10 @@ The frontend will be available at http://localhost:3000
 | `FRONTEND_PORT` | Frontend port mapping | `3000` |
 | `WEBAPI_HTTP_PORT` | API HTTP port | `8080` |
 | `WEBAPI_HTTPS_PORT` | API HTTPS port | `8081` |
+| `WORKER_PORT` | Thumbnail worker port | `3001` |
+| `MAX_CONCURRENT_JOBS` | Worker concurrent jobs | `3` |
+| `RENDER_WIDTH` | Thumbnail width | `256` |
+| `RENDER_HEIGHT` | Thumbnail height | `256` |
 
 ### Database Configuration
 
