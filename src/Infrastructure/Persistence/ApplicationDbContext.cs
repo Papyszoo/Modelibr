@@ -26,10 +26,10 @@ namespace Infrastructure.Persistence
                 entity.Property(m => m.CreatedAt).IsRequired();
                 entity.Property(m => m.UpdatedAt).IsRequired();
 
-                // Configure one-to-many relationship with Thumbnails
-                entity.HasMany(m => m.Thumbnails)
+                // Configure one-to-one relationship with Thumbnail
+                entity.HasOne(m => m.Thumbnail)
                     .WithOne(t => t.Model)
-                    .HasForeignKey(t => t.ModelId)
+                    .HasForeignKey<Thumbnail>(t => t.ModelId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
@@ -56,15 +56,14 @@ namespace Infrastructure.Persistence
             {
                 entity.HasKey(t => t.Id);
                 entity.Property(t => t.ModelId).IsRequired();
-                entity.Property(t => t.Format).IsRequired().HasMaxLength(50);
                 entity.Property(t => t.Status).IsRequired();
                 entity.Property(t => t.ThumbnailPath).HasMaxLength(500);
                 entity.Property(t => t.ErrorMessage).HasMaxLength(1000);
                 entity.Property(t => t.CreatedAt).IsRequired();
                 entity.Property(t => t.UpdatedAt).IsRequired();
 
-                // Create unique index for ModelId + Format to prevent duplicate thumbnails
-                entity.HasIndex(t => new { t.ModelId, t.Format }).IsUnique();
+                // Create unique index for ModelId to ensure one thumbnail per model
+                entity.HasIndex(t => t.ModelId).IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);

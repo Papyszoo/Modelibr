@@ -106,11 +106,6 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<string>("Format")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<int?>("Height")
                         .HasColumnType("int");
 
@@ -138,7 +133,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelId", "Format")
+                    b.HasIndex("ModelId")
                         .IsUnique();
 
                     b.ToTable("Thumbnails");
@@ -162,8 +157,8 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.Thumbnail", b =>
                 {
                     b.HasOne("Domain.Models.Model", "Model")
-                        .WithMany("Thumbnails")
-                        .HasForeignKey("ModelId")
+                        .WithOne("Thumbnail")
+                        .HasForeignKey("Domain.Models.Thumbnail", "ModelId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -187,7 +182,7 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.Model", b =>
                 {
-                    b.Navigation("Thumbnails");
+                    b.Navigation("Thumbnail");
                 });
 #pragma warning restore 612, 618
         }

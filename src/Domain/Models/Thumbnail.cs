@@ -15,11 +15,6 @@ public class Thumbnail
     public int ModelId { get; private set; }
     
     /// <summary>
-    /// The format/type of the thumbnail (e.g., "png", "webp", "gif", "poster").
-    /// </summary>
-    public string Format { get; private set; } = string.Empty;
-    
-    /// <summary>
     /// Current status of the thumbnail generation workflow.
     /// </summary>
     public ThumbnailStatus Status { get; private set; } = ThumbnailStatus.Pending;
@@ -70,15 +65,13 @@ public class Thumbnail
     /// <summary>
     /// Creates a new thumbnail record for processing.
     /// </summary>
-    public static Thumbnail Create(int modelId, string format, DateTime createdAt)
+    public static Thumbnail Create(int modelId, DateTime createdAt)
     {
         ValidateModelId(modelId);
-        ValidateFormat(format);
 
         return new Thumbnail
         {
             ModelId = modelId,
-            Format = format.ToLowerInvariant().Trim(),
             Status = ThumbnailStatus.Pending,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
@@ -141,15 +134,6 @@ public class Thumbnail
     {
         if (modelId <= 0)
             throw new ArgumentException("Model ID must be greater than 0.", nameof(modelId));
-    }
-
-    private static void ValidateFormat(string format)
-    {
-        if (string.IsNullOrWhiteSpace(format))
-            throw new ArgumentException("Format cannot be null or empty.", nameof(format));
-        
-        if (format.Length > 50)
-            throw new ArgumentException("Format cannot exceed 50 characters.", nameof(format));
     }
 
     private static void ValidateThumbnailPath(string thumbnailPath)
