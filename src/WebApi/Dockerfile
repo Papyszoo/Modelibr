@@ -36,6 +36,8 @@ RUN dotnet publish "./WebApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:
 
 # Final stage
 FROM base AS final
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 # Allow customizing UID/GID to match host for bind-mounted uploads directory
 ARG APP_UID=1000
 ARG APP_GID=1000
@@ -46,6 +48,9 @@ RUN groupadd -g $APP_GID app || true && \
     chown -R app:app /var/lib/modelibr
 # Copy published output
 COPY --from=publish /app/publish .
+# Copy health check script
+COPY scripts/health-check.sh /usr/local/bin/health-check.sh
+RUN chmod +x /usr/local/bin/health-check.sh
 # Ensure app files owned by non-root user
 RUN chown -R app:app /app
 ENV UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
