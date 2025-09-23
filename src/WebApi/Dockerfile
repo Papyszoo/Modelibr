@@ -48,6 +48,9 @@ RUN groupadd -g $APP_GID app || true && \
     chown -R app:app /var/lib/modelibr
 # Copy published output
 COPY --from=publish /app/publish .
+# Copy health check script
+COPY scripts/health-check.sh /usr/local/bin/health-check.sh
+RUN chmod +x /usr/local/bin/health-check.sh
 # Ensure app files owned by non-root user
 RUN chown -R app:app /app
 ENV UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
