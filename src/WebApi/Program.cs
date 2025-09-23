@@ -59,7 +59,13 @@ namespace WebApi
                 app.MapOpenApi();
             }
 
-            app.UseHttpsRedirection();
+            // Only use HTTPS redirection when not running in a container
+            // This prevents certificate issues with internal Docker communication
+            var disableHttpsRedirection = builder.Configuration.GetValue<bool>("DisableHttpsRedirection");
+            if (!disableHttpsRedirection)
+            {
+                app.UseHttpsRedirection();
+            }
 
             // Add CORS for frontend development
             app.UseCors();

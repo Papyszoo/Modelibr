@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 import { config } from './config.js';
 import logger from './logger.js';
 
@@ -7,12 +8,18 @@ import logger from './logger.js';
  */
 export class ThumbnailJobService {
   constructor() {
+    const httpsAgent = config.apiBaseUrl.startsWith('https:') ? 
+      new https.Agent({ rejectUnauthorized: config.rejectUnauthorized }) : 
+      undefined;
+      
     this.apiClient = axios.create({
       baseURL: config.apiBaseUrl,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
       },
+      // Handle self-signed certificates in development/docker environments
+      httpsAgent,
     });
   }
 

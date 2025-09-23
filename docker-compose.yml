@@ -14,6 +14,7 @@ services:
             - ASPNETCORE_HTTPS_PORTS=${WEBAPI_HTTPS_PORT}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
             - ConnectionStrings__Default=Server=mssql,${MSSQL_PORT};Database=Modelibr;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true;
+            - DisableHttpsRedirection=true
         ports:
             - "${WEBAPI_HTTP_PORT}:8080"
             - "${WEBAPI_HTTPS_PORT}:8081"
@@ -56,6 +57,7 @@ services:
             - RENDER_HEIGHT=${RENDER_HEIGHT:-256}
             - RENDER_FORMAT=${RENDER_FORMAT:-png}
             - LOG_LEVEL=${LOG_LEVEL:-info}
+            - NODE_TLS_REJECT_UNAUTHORIZED=1
         ports:
             - "${WORKER_PORT:-3001}:3001"
         depends_on:
