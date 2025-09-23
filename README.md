@@ -252,6 +252,20 @@ docker compose -f docker-compose.dev.yml up frontend
 docker compose -f docker-compose.dev.yml up
 ```
 
+## 🔧 Troubleshooting
+
+### Docker Health Check Issues
+If you encounter "container webapi is unhealthy" errors:
+
+1. **Verify health endpoint**: Test manually with `curl http://localhost:8080/health`
+2. **Check logs**: Use `docker compose logs webapi` to see startup issues
+3. **Alternative health check**: See [docs/docker-health-check-fix.md](docs/docker-health-check-fix.md) for details
+
+### Common Issues
+- **Database connection errors**: Ensure SQL Server container is running and healthy
+- **Port conflicts**: Make sure ports 3000, 8080, 8081, 1433, and 3001 are available
+- **Upload permission errors**: Set `UPLOAD_STORAGE_PATH` to a writable directory
+
 ## 🤝 Contributing
 
 1. Fork the repository
