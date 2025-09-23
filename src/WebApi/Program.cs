@@ -4,7 +4,9 @@ using Infrastructure.Extensions;
 using WebApi.Endpoints;
 using WebApi.Infrastructure;
 using WebApi.Services;
+using WebApi.Hubs;
 using Application.Abstractions.Storage;
+using Application.Abstractions.Services;
 using Infrastructure.Storage;
 
 namespace WebApi
@@ -33,6 +35,9 @@ namespace WebApi
                 });
             });
 
+            // Add SignalR for real-time notifications
+            builder.Services.AddSignalR();
+
             builder.Services.AddOpenApi();
 
             builder.Services
@@ -41,6 +46,7 @@ namespace WebApi
 
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
+            builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
 
             var app = builder.Build();
@@ -66,6 +72,10 @@ namespace WebApi
             app.MapModelsEndpoints();
             app.MapFilesEndpoints();
             app.MapThumbnailEndpoints();
+            app.MapThumbnailJobEndpoints();
+
+            // Map SignalR hubs
+            app.MapHub<ThumbnailHub>("/thumbnailHub");
 
             app.Run();
         }

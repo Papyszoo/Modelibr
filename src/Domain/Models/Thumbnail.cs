@@ -1,11 +1,12 @@
 using Domain.ValueObjects;
+using Domain.Events;
 
 namespace Domain.Models;
 
 /// <summary>
 /// Represents a thumbnail generated for a file, with support for multiple formats and extensibility.
 /// </summary>
-public class Thumbnail
+public class Thumbnail : AggregateRoot
 {
     public int Id { get; set; }
     
@@ -85,6 +86,8 @@ public class Thumbnail
     {
         Status = ThumbnailStatus.Processing;
         UpdatedAt = updatedAt;
+        
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, Status));
     }
 
     /// <summary>
@@ -104,6 +107,9 @@ public class Thumbnail
         ErrorMessage = null;
         ProcessedAt = processedAt;
         UpdatedAt = processedAt;
+        
+        var thumbnailUrl = $"/models/{ModelId}/thumbnail/file";
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, Status, thumbnailUrl));
     }
 
     /// <summary>
@@ -117,6 +123,8 @@ public class Thumbnail
         ErrorMessage = errorMessage.Trim();
         ProcessedAt = processedAt;
         UpdatedAt = processedAt;
+        
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, Status, null, ErrorMessage));
     }
 
     /// <summary>

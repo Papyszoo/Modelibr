@@ -9,7 +9,7 @@ const THUMBNAIL_STATUS = {
   FAILED: 'Failed'
 }
 
-export function useThumbnailManager(modelId) {
+export function useThumbnailManagerWithSignalR(modelId) {
   const [thumbnailStatus, setThumbnailStatus] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -187,7 +187,7 @@ export function useThumbnailManager(modelId) {
     thumbnailUrl,
     isLoading,
     error,
-    isConnected, // New property to show connection status
+    isConnected,
     isProcessing,
     isReady,
     isFailed,
