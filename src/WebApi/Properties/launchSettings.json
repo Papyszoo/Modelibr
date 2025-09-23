@@ -5,25 +5,20 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:8080"
+      "dotnetRunMessages": true
     },
     "https": {
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "dotnetRunMessages": true,
-      "applicationUrl": "https://localhost:8081;http://localhost:8080"
+      "dotnetRunMessages": true
     },
     "Container (Dockerfile)": {
       "commandName": "Docker",
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
       "environmentVariables": {
-        "ASPNETCORE_HTTPS_PORTS": "8081",
-        "ASPNETCORE_HTTP_PORTS": "8080",
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "UPLOAD_STORAGE_PATH": "/var/lib/modelibr/uploads",
         "DisableHttpsRedirection": "true"
       },
       "publishAllPorts": true,
