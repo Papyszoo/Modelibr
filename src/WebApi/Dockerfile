@@ -11,8 +11,8 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Configure NuGet to skip SSL verification for build environments
-RUN dotnet nuget add source https://api.nuget.org/v3/index.json -n nuget.org --configfile /tmp/nuget.config || true
+# Update CA certificates and configure for NuGet SSL issues
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
 COPY ["src/WebApi/WebApi.csproj", "src/WebApi/"]
 COPY ["src/Application/Application.csproj", "src/Application/"]
