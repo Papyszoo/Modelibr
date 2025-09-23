@@ -1,6 +1,7 @@
 import fs from 'fs';
 import FormData from 'form-data';
 import axios from 'axios';
+import https from 'https';
 import { config } from './config.js';
 import logger from './logger.js';
 
@@ -10,12 +11,18 @@ import logger from './logger.js';
 export class ThumbnailApiService {
   constructor() {
     this.apiBaseUrl = config.apiBaseUrl;
+    const httpsAgent = this.apiBaseUrl.startsWith('https:') ? 
+      new https.Agent({ rejectUnauthorized: config.rejectUnauthorized }) : 
+      undefined;
+      
     this.client = axios.create({
       baseURL: this.apiBaseUrl,
       timeout: 30000, // 30 second timeout
       headers: {
         'User-Agent': 'Modelibr-ThumbnailWorker/1.0'
-      }
+      },
+      // Handle self-signed certificates in development/docker environments
+      httpsAgent,
     });
   }
 
