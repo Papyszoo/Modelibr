@@ -19,7 +19,7 @@ services:
             - "${WEBAPI_HTTP_PORT}:${WEBAPI_HTTP_PORT}"
             - "${WEBAPI_HTTPS_PORT}:${WEBAPI_HTTPS_PORT}"
         healthcheck:
-            test: ["CMD-SHELL", "curl -f http://localhost:${WEBAPI_HTTP_PORT}/health || exit 1"]
+            test: ["CMD-SHELL", "curl -f http://127.0.0.1:${WEBAPI_HTTP_PORT}/health || exit 1"]
             interval: 30s
             timeout: 10s
             retries: 5
