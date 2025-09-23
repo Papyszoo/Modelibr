@@ -2,6 +2,8 @@ using Application.Abstractions.Messaging;
 using Application.Thumbnails;
 using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
+using SharedKernel;
+using WebApi.Files;
 
 namespace WebApi.Endpoints;
 
@@ -69,6 +71,42 @@ public static class ThumbnailEndpoints
         .WithName("Regenerate Thumbnail")
         .WithTags("Thumbnails");
 
+        app.MapPost("/models/{id}/thumbnail/upload", async (
+            int id,
+            IFormFile file,
+            [FromForm] int? width,
+            [FromForm] int? height,
+            ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> commandHandler) =>
+        {
+            // Validate file
+            var validationResult = ValidateThumbnailFile(file);
+            if (!validationResult.IsSuccess)
+            {
+                return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
+            }
+
+            var command = new UploadThumbnailCommand(id, new FormFileUpload(file), width, height);
+            var result = await commandHandler.Handle(command, CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new 
+            { 
+                Message = "Thumbnail uploaded successfully", 
+                ModelId = result.Value.ModelId,
+                ThumbnailPath = result.Value.ThumbnailPath,
+                SizeBytes = result.Value.SizeBytes,
+                Width = result.Value.Width,
+                Height = result.Value.Height
+            });
+        })
+        .WithName("Upload Thumbnail")
+        .WithTags("Thumbnails")
+        .DisableAntiforgery();
+
         app.MapGet("/models/{id}/thumbnail/file", async (
             int id,
             IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler) =>
@@ -107,5 +145,29 @@ public static class ThumbnailEndpoints
         })
         .WithName("Get Thumbnail File")
         .WithTags("Thumbnails");
+    }
+
+    private static Result ValidateThumbnailFile(IFormFile file)
+    {
+        if (file == null || file.Length <= 0)
+        {
+            return Result.Failure(new Error("InvalidThumbnailFile", "Thumbnail file is empty or invalid."));
+        }
+
+        if (file.Length > 10_485_760) // 10MB
+        {
+            return Result.Failure(new Error("ThumbnailFileTooLarge", "Thumbnail file size cannot exceed 10MB."));
+        }
+
+        // Validate content type
+        var contentType = file.ContentType?.ToLowerInvariant();
+        if (contentType != "image/png" && contentType != "image/jpeg" && 
+            contentType != "image/jpg" && contentType != "image/webp")
+        {
+            return Result.Failure(new Error("InvalidThumbnailFormat", 
+                "Thumbnail must be a valid image file (png, jpg, jpeg, webp)."));
+        }
+
+        return Result.Success();
     }
 }

@@ -75,6 +75,18 @@ namespace Domain.Models
         }
 
         /// <summary>
+        /// Sets the thumbnail for this model.
+        /// </summary>
+        /// <param name="thumbnail">The thumbnail to associate with this model</param>
+        public void SetThumbnail(Thumbnail thumbnail)
+        {
+            if (thumbnail == null)
+                throw new ArgumentNullException(nameof(thumbnail));
+
+            Thumbnail = thumbnail;
+        }
+
+        /// <summary>
         /// Raises a ModelUploaded domain event for this model.
         /// Should be called when a model upload is completed.
         /// </summary>
