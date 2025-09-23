@@ -506,6 +506,7 @@ Before adding any new code, ask yourself:
 - **Minimal APIs**: Endpoint mapping in WebApi layer with clear request/response handling
 
 ### Environment Configuration
+- **RULE #1**: **NEVER override parameters from .env file in docker-compose.yml or other configuration files.** Always use `${VARIABLE_NAME}` syntax to read from .env file to keep the entire project configurable from a single source.
 - Upload storage path: `UPLOAD_STORAGE_PATH` (defaults to `/var/lib/modelibr/uploads`)
 - ASP.NET Core environment: `ASPNETCORE_ENVIRONMENT`
 - Database connection string configured in Infrastructure layer
