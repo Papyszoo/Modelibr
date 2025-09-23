@@ -1,37 +1,45 @@
 import fs from 'fs';
 import path from 'path';
 import { config } from './config.js';
+import { ThumbnailApiService } from './thumbnailApiService.js';
 import logger from './logger.js';
 
 /**
- * Service for managing persistent thumbnail storage with hash-based deduplication
+ * Service for managing thumbnail storage via API upload instead of filesystem
  */
 export class ThumbnailStorageService {
   constructor() {
     this.basePath = config.thumbnailStorage.basePath;
     this.enabled = config.thumbnailStorage.enabled;
     this.skipDuplicates = config.thumbnailStorage.skipDuplicates;
+    this.apiService = new ThumbnailApiService();
     
+    // Test API connection on startup
     if (this.enabled) {
-      this.ensureStorageDirectory();
+      this.testApiConnection();
     }
   }
 
   /**
-   * Ensure the thumbnail storage directory exists
+   * Test API connection
    */
-  ensureStorageDirectory() {
+  async testApiConnection() {
     try {
-      if (!fs.existsSync(this.basePath)) {
-        fs.mkdirSync(this.basePath, { recursive: true });
-        logger.info('Created thumbnail storage directory', { basePath: this.basePath });
+      const isConnected = await this.apiService.testConnection();
+      if (isConnected) {
+        logger.info('API connection test successful', { 
+          apiBaseUrl: config.apiBaseUrl 
+        });
+      } else {
+        logger.warn('API connection test failed, but service will continue', {
+          apiBaseUrl: config.apiBaseUrl
+        });
       }
     } catch (error) {
-      logger.error('Failed to create thumbnail storage directory', {
-        basePath: this.basePath,
+      logger.error('Error testing API connection', {
+        apiBaseUrl: config.apiBaseUrl,
         error: error.message
       });
-      throw error;
     }
   }
 
@@ -66,6 +74,8 @@ export class ThumbnailStorageService {
 
   /**
    * Check if thumbnails already exist for a given model hash
+   * Since we're using API storage, we'll always return false to allow processing
+   * The API backend will handle deduplication based on file hashes
    * @param {string} modelHash - The SHA256 hash of the model
    * @returns {Promise<Object>} Object with existence flags and file info
    */
@@ -75,31 +85,24 @@ export class ThumbnailStorageService {
     }
 
     try {
-      const paths = this.getThumbnailPaths(modelHash);
-      
-      const webpExists = fs.existsSync(paths.webpPath);
-      const posterExists = fs.existsSync(paths.posterPath);
-      
-      // Skip rendering if both files exist and skipDuplicates is enabled
-      const skipRendering = this.skipDuplicates && webpExists && posterExists;
-      
+      logger.debug('Checking thumbnail existence via API (always allowing rendering)', {
+        modelHash,
+        skipDuplicates: this.skipDuplicates
+      });
+
+      // When using API storage, we let the backend handle deduplication
+      // Always allow rendering since the API can handle duplicate uploads efficiently
       const result = {
-        webpExists,
-        posterExists,
-        skipRendering,
-        paths
+        webpExists: false,
+        posterExists: false,
+        skipRendering: false, // Always render when using API
+        paths: this.getThumbnailPaths(modelHash)
       };
 
-      if (webpExists || posterExists) {
-        logger.info('Found existing thumbnails', {
-          modelHash,
-          webpExists,
-          posterExists,
-          skipRendering,
-          webpPath: paths.webpPath,
-          posterPath: paths.posterPath
-        });
-      }
+      logger.debug('Thumbnail existence check completed', {
+        modelHash,
+        result
+      });
 
       return result;
     } catch (error) {
@@ -114,156 +117,121 @@ export class ThumbnailStorageService {
   }
 
   /**
-   * Store generated thumbnail files in persistent storage
+   * Store generated thumbnail files by uploading to API
    * @param {string} modelHash - The SHA256 hash of the model
    * @param {string} webpSourcePath - Path to the generated WebP file
    * @param {string} posterSourcePath - Path to the generated poster file
-   * @returns {Promise<Object>} Object with final storage paths and metadata
+   * @param {number} modelId - The model ID for API upload
+   * @returns {Promise<Object>} Object with upload results and metadata
    */
-  async storeThumbnails(modelHash, webpSourcePath, posterSourcePath) {
+  async storeThumbnails(modelHash, webpSourcePath, posterSourcePath, modelId = null) {
     if (!this.enabled) {
-      logger.warn('Thumbnail storage is disabled, skipping storage');
+      logger.warn('Thumbnail storage is disabled, skipping API upload');
       return { stored: false, webpPath: null, posterPath: null };
     }
 
     try {
-      const paths = this.getThumbnailPaths(modelHash);
-      
-      // Ensure the hash directory exists
-      if (!fs.existsSync(paths.directory)) {
-        fs.mkdirSync(paths.directory, { recursive: true });
-        logger.debug('Created hash directory', { directory: paths.directory });
+      logger.info('Starting API-based thumbnail storage', {
+        modelHash,
+        modelId,
+        webpSourcePath,
+        posterSourcePath
+      });
+
+      // Validate model ID
+      if (!modelId) {
+        throw new Error(`Model ID is required for API upload. Hash: ${modelHash}`);
       }
+
+      // Upload thumbnails via API
+      const uploadResult = await this.apiService.uploadMultipleThumbnails(modelId, {
+        webpPath: webpSourcePath,
+        posterPath: posterSourcePath
+      });
 
       const results = {
-        stored: true,
-        webpPath: paths.webpPath,
-        posterPath: paths.posterPath,
+        stored: uploadResult.allSuccessful,
+        webpPath: webpSourcePath, // Keep original paths for reference
+        posterPath: posterSourcePath,
         webpStored: false,
-        posterStored: false
+        posterStored: false,
+        uploadResults: uploadResult.uploads,
+        apiResponse: uploadResult
       };
 
-      // Copy WebP file if it exists and doesn't already exist in storage
-      if (webpSourcePath && fs.existsSync(webpSourcePath)) {
-        if (!fs.existsSync(paths.webpPath)) {
-          fs.copyFileSync(webpSourcePath, paths.webpPath);
+      // Check individual upload results
+      uploadResult.uploads.forEach(upload => {
+        if (upload.type === 'webp' && upload.success) {
           results.webpStored = true;
-          logger.debug('Stored WebP thumbnail', { 
-            source: webpSourcePath, 
-            destination: paths.webpPath 
-          });
-        } else {
-          logger.debug('WebP thumbnail already exists in storage', { path: paths.webpPath });
         }
-      }
-
-      // Copy poster file if it exists and doesn't already exist in storage
-      if (posterSourcePath && fs.existsSync(posterSourcePath)) {
-        if (!fs.existsSync(paths.posterPath)) {
-          fs.copyFileSync(posterSourcePath, paths.posterPath);
+        if (upload.type === 'poster' && upload.success) {
           results.posterStored = true;
-          logger.debug('Stored poster thumbnail', { 
-            source: posterSourcePath, 
-            destination: paths.posterPath 
-          });
-        } else {
-          logger.debug('Poster thumbnail already exists in storage', { path: paths.posterPath });
         }
-      }
+      });
 
-      logger.info('Thumbnail storage completed', {
+      logger.info('API-based thumbnail storage completed', {
         modelHash,
+        modelId,
+        stored: results.stored,
         webpStored: results.webpStored,
         posterStored: results.posterStored,
-        webpPath: paths.webpPath,
-        posterPath: paths.posterPath
+        totalUploads: uploadResult.uploads.length,
+        allSuccessful: uploadResult.allSuccessful
       });
 
       return results;
     } catch (error) {
-      logger.error('Failed to store thumbnails', {
+      logger.error('Failed to store thumbnails via API', {
         modelHash,
+        modelId,
         webpSourcePath,
         posterSourcePath,
-        error: error.message
+        error: error.message,
+        stack: error.stack
       });
-      throw error;
+      
+      // Return failed result but don't throw to allow job to continue
+      return {
+        stored: false,
+        webpPath: null,
+        posterPath: null,
+        webpStored: false,
+        posterStored: false,
+        error: error.message
+      };
     }
   }
 
   /**
-   * Get metadata about stored thumbnails
+   * Get model ID from model hash (no longer needed since we pass model ID directly)
+   * @param {string} modelHash - The SHA256 hash of the model
+   * @returns {Promise<number|null>} Model ID or null if not found
+   */
+  async getModelIdFromHash(modelHash) {
+    logger.debug('getModelIdFromHash called but no longer needed', { modelHash });
+    return null;
+  }
+
+  /**
+   * Get metadata about stored thumbnails (not applicable for API storage)
    * @param {string} modelHash - The SHA256 hash of the model
    * @returns {Promise<Object>} Metadata about the stored thumbnails
    */
   async getThumbnailMetadata(modelHash) {
-    if (!this.enabled) {
-      return { available: false };
-    }
-
-    try {
-      const paths = this.getThumbnailPaths(modelHash);
-      const metadata = { available: false, files: [] };
-
-      if (fs.existsSync(paths.webpPath)) {
-        const stats = fs.statSync(paths.webpPath);
-        metadata.files.push({
-          type: 'webp',
-          path: paths.webpPath,
-          size: stats.size,
-          created: stats.birthtime,
-          modified: stats.mtime
-        });
-      }
-
-      if (fs.existsSync(paths.posterPath)) {
-        const stats = fs.statSync(paths.posterPath);
-        metadata.files.push({
-          type: 'poster',
-          path: paths.posterPath,
-          size: stats.size,
-          created: stats.birthtime,
-          modified: stats.mtime
-        });
-      }
-
-      metadata.available = metadata.files.length > 0;
-      return metadata;
-    } catch (error) {
-      logger.error('Error getting thumbnail metadata', {
-        modelHash,
-        error: error.message
-      });
-      return { available: false, error: error.message };
-    }
+    return { 
+      available: false, 
+      message: 'Metadata not available for API-based storage',
+      modelHash 
+    };
   }
 
   /**
-   * Clean up thumbnails for a specific model hash
+   * Clean up thumbnails for a specific model hash (not applicable for API storage)
    * @param {string} modelHash - The SHA256 hash of the model
    * @returns {Promise<boolean>} Success status
    */
   async cleanupThumbnails(modelHash) {
-    if (!this.enabled) {
-      return false;
-    }
-
-    try {
-      const paths = this.getThumbnailPaths(modelHash);
-      
-      if (fs.existsSync(paths.directory)) {
-        fs.rmSync(paths.directory, { recursive: true, force: true });
-        logger.info('Cleaned up thumbnails', { modelHash, directory: paths.directory });
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      logger.error('Error cleaning up thumbnails', {
-        modelHash,
-        error: error.message
-      });
-      return false;
-    }
+    logger.info('Cleanup not required for API-based storage', { modelHash });
+    return true;
   }
 }
