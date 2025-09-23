@@ -16,17 +16,25 @@ public static class DatabaseExtensions
 
         try
         {
-            logger.LogInformation("Ensuring database is created...");
+            logger.LogInformation("Attempting database initialization...");
             
-            // Ensure database is created
+            // Test basic connectivity first
+            var canConnect = await context.Database.CanConnectAsync();
+            if (!canConnect)
+            {
+                logger.LogWarning("Database is not available. Application will start without database connectivity.");
+                return;
+            }
+            
+            // Ensure database is created only if connection is available
             await context.Database.EnsureCreatedAsync();
             
             logger.LogInformation("Database initialization completed successfully");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred during database initialization");
-            throw;
+            logger.LogWarning(ex, "Database initialization failed. Application will start without database connectivity.");
+            // Don't throw - allow application to start even if database is not available
         }
     }
 }

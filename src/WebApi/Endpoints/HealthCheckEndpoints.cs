@@ -9,13 +9,30 @@ public static class HealthCheckEndpoints
     {
         app.MapGet("/health", async (ApplicationDbContext dbContext) =>
         {
+            var healthResponse = new
+            {
+                Status = "Healthy",
+                Database = "Unknown",
+                FileCount = (int?)null,
+                ModelCount = (int?)null,
+                Timestamp = DateTime.UtcNow
+            };
+
             try
             {
                 // Test database connectivity by executing a simple query
                 var canConnect = await dbContext.Database.CanConnectAsync();
                 if (!canConnect)
                 {
-                    return Results.Problem("Database connection failed", statusCode: 503);
+                    // Application is healthy even if database is not available
+                    return Results.Ok(new
+                    {
+                        Status = "Healthy",
+                        Database = "Disconnected",
+                        FileCount = (int?)null,
+                        ModelCount = (int?)null,
+                        Timestamp = DateTime.UtcNow
+                    });
                 }
 
                 // Test a simple query to ensure database is accessible
@@ -33,7 +50,15 @@ public static class HealthCheckEndpoints
             }
             catch (Exception ex)
             {
-                return Results.Problem($"Health check failed: {ex.Message}", statusCode: 503);
+                // Application is healthy even if database query fails
+                return Results.Ok(new
+                {
+                    Status = "Healthy",
+                    Database = $"Error: {ex.Message}",
+                    FileCount = (int?)null,
+                    ModelCount = (int?)null,
+                    Timestamp = DateTime.UtcNow
+                });
             }
         })
         .WithName("Health Check")

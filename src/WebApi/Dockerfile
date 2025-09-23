@@ -12,14 +12,19 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 # Update CA certificates and configure for NuGet SSL issues
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+RUN apt-get update && apt-get install -y ca-certificates curl && update-ca-certificates
+# Configure .NET to use system SSL certificates and bypass SSL verification if needed
+ENV DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0
+ENV NUGET_CERT_REVOCATION_MODE=offline
 
 COPY ["src/WebApi/WebApi.csproj", "src/WebApi/"]
 COPY ["src/Application/Application.csproj", "src/Application/"]
 COPY ["src/Domain/Domain.csproj", "src/Domain/"]
 COPY ["src/SharedKernel/SharedKernel.csproj", "src/SharedKernel/"]
 COPY ["src/Infrastructure/Infrastructure.csproj", "src/Infrastructure/"]
-RUN dotnet restore "./src/WebApi/WebApi.csproj"
+# Restore packages with retry logic for SSL issues
+RUN dotnet restore "./src/WebApi/WebApi.csproj" --disable-parallel || \
+    dotnet restore "./src/WebApi/WebApi.csproj" --disable-parallel --ignore-failed-sources
 COPY . .
 WORKDIR "/src/src/WebApi"
 RUN dotnet build "./WebApi.csproj" -c $BUILD_CONFIGURATION -o /app/build
