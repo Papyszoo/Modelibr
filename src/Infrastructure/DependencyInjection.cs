@@ -24,7 +24,7 @@ namespace Infrastructure
                 // Expand environment variables in connection string
                 connectionString = Environment.ExpandEnvironmentVariables(connectionString);
                 
-                optionsBuilder.UseSqlServer(connectionString);
+                optionsBuilder.UseNpgsql(connectionString);
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();
