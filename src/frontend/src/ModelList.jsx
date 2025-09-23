@@ -19,7 +19,6 @@ import 'primeicons/primeicons.css'
 
 function ModelList({ onBackToUpload, isTabContent = false }) {
   const [models, setModels] = useState([])
-  // Remove selectedModel state since it's not used in tab mode
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const toast = useRef(null)
@@ -71,16 +70,6 @@ function ModelList({ onBackToUpload, isTabContent = false }) {
       console.log('Model selected:', model)
     }
   }
-
-  // Remove the selectedModel check since we're handling navigation differently
-  // if (selectedModel) {
-  //   return (
-  //     <ModelViewer 
-  //       model={selectedModel} 
-  //       onBack={handleBackToList}
-  //     />
-  //   )
-  // }
 
   // Template functions for DataTable columns
   const thumbnailBodyTemplate = (rowData) => {
