@@ -13,6 +13,10 @@ class ApiClient {
         });
     }
 
+    getBaseURL() {
+        return this.baseURL;
+    }
+
     async uploadModel(file) {
         const formData = new FormData();
         formData.append("file", file);
