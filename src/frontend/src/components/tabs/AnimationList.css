@@ -1,0 +1,145 @@
+.animation-list {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+}
+
+.animation-list-header {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.animation-list-header h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.5rem;
+}
+
+.animation-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.animation-list-content {
+  flex: 1;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.animation-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.animation-duration {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+}
+
+.animation-frames {
+  color: #64748b;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.animation-preview {
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  padding: 1rem;
+  max-height: 250px;
+  overflow: auto;
+}
+
+.animation-preview h3 {
+  margin: 0 0 1rem 0;
+  color: #1e293b;
+  font-size: 1rem;
+}
+
+.animation-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-row .label {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.detail-row .value {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.animation-progress {
+  margin-bottom: 1rem;
+}
+
+.animation-progress p {
+  margin: 0.5rem 0 0 0;
+  color: #3b82f6;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.animation-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  background: #f1f5f9;
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.animation-placeholder p {
+  margin: 0.5rem 0 0 0;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .animation-details {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .animation-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .animation-stats {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
