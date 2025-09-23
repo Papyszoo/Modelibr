@@ -507,6 +507,7 @@ Before adding any new code, ask yourself:
 
 ### Environment Configuration
 - **RULE #1**: **NEVER override parameters from .env file in docker-compose.yml or other configuration files.** Always use `${VARIABLE_NAME}` syntax to read from .env file to keep the entire project configurable from a single source.
+- **RULE #2**: **ALWAYS update .env.example when adding or modifying variables in .env file.** The .env.example file serves as documentation and template for all required environment variables.
 - Upload storage path: `UPLOAD_STORAGE_PATH` (defaults to `/var/lib/modelibr/uploads`)
 - ASP.NET Core environment: `ASPNETCORE_ENVIRONMENT`
 - Database connection string configured in Infrastructure layer
