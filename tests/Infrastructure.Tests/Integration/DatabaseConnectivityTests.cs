@@ -8,8 +8,8 @@ using Xunit;
 namespace Infrastructure.Tests.Integration;
 
 /// <summary>
-/// Integration tests for MSSQL database connectivity
-/// These tests require a running MSSQL instance with the connection string from appsettings
+/// Integration tests for PostgreSQL database connectivity
+/// These tests require a running PostgreSQL instance with the connection string from appsettings
 /// </summary>
 public class DatabaseConnectivityTests : IDisposable
 {
@@ -36,7 +36,7 @@ public class DatabaseConnectivityTests : IDisposable
             var connectionString = configuration.GetConnectionString("Default");
             if (!string.IsNullOrEmpty(connectionString))
             {
-                options.UseSqlServer(connectionString);
+                options.UseNpgsql(connectionString);
             }
         });
 
