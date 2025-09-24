@@ -233,3 +233,60 @@
     font-size: 0.8rem;
   }
 }
+
+/* Styles for tab content version */
+.model-viewer-tab {
+  background: #f8fafc;
+  color: #374151;
+}
+
+.viewer-header-tab {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.viewer-header-tab h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.5rem;
+}
+
+.model-info-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.model-info-summary .model-format {
+  background: #3b82f6;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.model-info-summary .model-name {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.model-viewer-tab .viewer-container {
+  background: white;
+  margin: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.model-viewer-tab .viewer-info {
+  background: white;
+  margin: 0 1rem 1rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}

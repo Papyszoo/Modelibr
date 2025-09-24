@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import './ModelList.css'
-import ModelViewer from './ModelViewer'
 import ApiClient from './services/ApiClient'
 import ThumbnailDisplay from './components/ThumbnailDisplay'
 import { DataTable } from 'primereact/datatable'
@@ -9,6 +8,7 @@ import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import { ProgressBar } from 'primereact/progressbar'
 import { useFileUpload, useDragAndDrop } from './hooks/useFileUpload'
+import { useTabContext } from './hooks/useTabContext.jsx'
 import { 
   getFileExtension,
   formatFileSize
@@ -17,13 +17,15 @@ import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
 
-function ModelList({ onBackToUpload }) {
+function ModelList({ onBackToUpload, isTabContent = false }) {
   const [models, setModels] = useState([])
-  const [selectedModel, setSelectedModel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const toast = useRef(null)
   const dt = useRef(null)
+
+  // Get tab context if running within a tab
+  const tabContext = isTabContent ? useTabContext() : null
 
   // Use the file upload hook with Three.js renderability requirement
   const { uploading, uploadProgress, uploadMultipleFiles } = useFileUpload({
@@ -60,11 +62,13 @@ function ModelList({ onBackToUpload }) {
   }
 
   const handleModelSelect = (model) => {
-    setSelectedModel(model)
-  }
-
-  const handleBackToList = () => {
-    setSelectedModel(null)
+    if (isTabContent && tabContext) {
+      // Open model details in new tab
+      tabContext.openModelDetailsTab(model)
+    } else {
+      // For backward compatibility when not in tab mode - just log for now
+      console.log('Model selected:', model)
+    }
   }
 
   // Template functions for DataTable columns
@@ -118,36 +122,41 @@ function ModelList({ onBackToUpload }) {
         icon="pi pi-eye" 
         className="p-button-text p-button-rounded" 
         onClick={() => handleModelSelect(rowData)}
-        tooltip="View Model"
-      />
-    )
-  }
-
-  if (selectedModel) {
-    return (
-      <ModelViewer 
-        model={selectedModel} 
-        onBack={handleBackToList}
+        tooltip={isTabContent ? "Open in New Tab" : "View Model"}
       />
     )
   }
 
   return (
-    <div className="model-list">
+    <div className={`model-list ${isTabContent ? 'model-list-tab' : ''}`}>
       <Toast ref={toast} />
       
-      <header className="model-list-header">
-        <div className="header-controls">
-          <Button 
-            icon="pi pi-upload" 
-            label="Upload Page" 
-            className="p-button-outlined" 
-            onClick={onBackToUpload}
-          />
-        </div>
-        <h1>3D Model Library</h1>
-        <p>Drag and drop 3D model files onto the table to upload, or select a model to view in 3D</p>
-      </header>
+      {!isTabContent && (
+        <header className="model-list-header">
+          <div className="header-controls">
+            <Button 
+              icon="pi pi-upload" 
+              label="Upload Page" 
+              className="p-button-outlined" 
+              onClick={onBackToUpload}
+            />
+          </div>
+          <h1>3D Model Library</h1>
+          <p>Drag and drop 3D model files onto the table to upload, or select a model to view in 3D</p>
+        </header>
+      )}
+
+      {isTabContent && (
+        <header className="model-list-header-tab">
+          <h1>3D Model Library</h1>
+          <div className="model-stats">
+            <span className="stat-item">
+              <i className="pi pi-box"></i>
+              {models.length} models
+            </span>
+          </div>
+        </header>
+      )}
 
       {uploading && (
         <div className="upload-progress">

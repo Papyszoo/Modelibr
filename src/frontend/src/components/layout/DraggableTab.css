@@ -1,0 +1,120 @@
+.draggable-tab {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  background: #334155;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  overflow: hidden;
+}
+
+.draggable-tab:hover {
+  background: #475569;
+  border-color: #64748b;
+}
+
+.draggable-tab.active {
+  background: #3b82f6;
+  border-color: #2563eb;
+}
+
+.draggable-tab.active:hover {
+  background: #2563eb;
+}
+
+/* Tab Icon */
+.tab-icon {
+  color: #e2e8f0;
+  font-size: 1.1rem;
+}
+
+.draggable-tab.active .tab-icon {
+  color: white;
+}
+
+/* Tab Thumbnail */
+.tab-thumbnail {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1e293b;
+}
+
+.tab-thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Close Button */
+.tab-close-button {
+  position: absolute !important;
+  top: -6px !important;
+  right: -6px !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  background: #ef4444 !important;
+  border: 1px solid white !important;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.tab-close-button .p-button-icon {
+  font-size: 0.6rem !important;
+  color: white !important;
+}
+
+.draggable-tab:hover .tab-close-button {
+  opacity: 1;
+}
+
+.tab-close-button:hover {
+  background: #dc2626 !important;
+}
+
+/* Drag feedback */
+.draggable-tab:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+/* Drag ghost styles */
+.draggable-tab.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg) scale(0.9);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .draggable-tab {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .tab-thumbnail {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .tab-icon {
+    font-size: 1rem;
+  }
+  
+  .tab-close-button {
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
+  }
+  
+  .tab-close-button .p-button-icon {
+    font-size: 0.5rem !important;
+  }
+}

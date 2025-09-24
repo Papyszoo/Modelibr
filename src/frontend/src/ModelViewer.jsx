@@ -6,23 +6,39 @@ import ThumbnailDisplay from './components/ThumbnailDisplay'
 import { getModelFileFormat } from './utils/fileUtils'
 import './ModelViewer.css'
 
-function ModelViewer({ model, onBack }) {
+function ModelViewer({ model, onBack, isTabContent = false }) {
   const [error, setError] = useState('')
 
   return (
-    <div className="model-viewer">
-      <header className="viewer-header">
-        <button onClick={onBack} className="back-button">
-          ← Back to Models
-        </button>
-        <h1>3D Model Viewer</h1>
-        <div className="model-details">
-          <span className="model-id">Model #{model.id}</span>
-          <span className="model-format">
-            {getModelFileFormat(model)}
-          </span>
-        </div>
-      </header>
+    <div className={`model-viewer ${isTabContent ? 'model-viewer-tab' : ''}`}>
+      {!isTabContent && (
+        <header className="viewer-header">
+          <button onClick={onBack} className="back-button">
+            ← Back to Models
+          </button>
+          <h1>3D Model Viewer</h1>
+          <div className="model-details">
+            <span className="model-id">Model #{model.id}</span>
+            <span className="model-format">
+              {getModelFileFormat(model)}
+            </span>
+          </div>
+        </header>
+      )}
+
+      {isTabContent && (
+        <header className="viewer-header-tab">
+          <h1>Model #{model.id}</h1>
+          <div className="model-info-summary">
+            <span className="model-format">
+              {getModelFileFormat(model)}
+            </span>
+            <span className="model-name">
+              {model.files?.[0]?.originalFileName || `Model ${model.id}`}
+            </span>
+          </div>
+        </header>
+      )}
 
       <div className="viewer-container">
         {error ? (
