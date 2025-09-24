@@ -8,6 +8,40 @@
   margin: 0;
 }
 
+.model-list-tab {
+  height: 100%;
+  padding: 0;
+  background: #f8fafc;
+}
+
+.model-list-header-tab {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.model-list-header-tab h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.5rem;
+}
+
+.model-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
 .model-list-header {
   text-align: center;
   margin-bottom: 2rem;
@@ -190,6 +224,66 @@
   background: linear-gradient(90deg, #3182ce, #4299e1);
 }
 
+/* Styles for tab content vs standalone view */
+.model-list-tab .datatable-container {
+  flex: 1;
+  margin: 1rem;
+  border: none;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.model-list-tab .model-datatable {
+  background: white;
+  box-shadow: none;
+}
+
+.model-list-tab .p-datatable .p-datatable-thead > tr > th {
+  background: #f8fafc;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.model-list-tab .p-datatable .p-datatable-tbody > tr > td {
+  background: white;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.model-list-tab .p-datatable .p-datatable-tbody > tr:hover {
+  background: #f9fafb;
+}
+
+.model-list-tab .p-datatable .p-datatable-tbody > tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.model-list-tab .p-datatable .p-datatable-tbody > tr:nth-child(even):hover {
+  background: #f3f4f6;
+}
+
+.model-list-tab .loading,
+.model-list-tab .error-message,
+.model-list-tab .empty-state {
+  margin: 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+}
+
+.model-list-tab .loading p,
+.model-list-tab .empty-state h3,
+.model-list-tab .empty-state p {
+  color: #6b7280;
+}
+
+.model-list-tab .error-message {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
 @media (max-width: 768px) {
   .model-list {
     padding: 1rem;
@@ -206,5 +300,16 @@
   
   .datatable-container {
     overflow-x: auto;
+  }
+  
+  .model-list-header-tab {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .model-stats {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }

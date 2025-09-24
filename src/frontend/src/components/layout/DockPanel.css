@@ -1,0 +1,121 @@
+.dock-panel {
+  height: 100%;
+  display: flex;
+  background: #f8fafc;
+}
+
+.dock-panel-left {
+  flex-direction: row;
+}
+
+.dock-panel-right {
+  flex-direction: row-reverse;
+}
+
+/* Dock Bar (Side menu with tabs) */
+.dock-bar {
+  width: 60px;
+  background: #1e293b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.dock-bar-left {
+  border-right: 1px solid #334155;
+}
+
+.dock-bar-right {
+  border-left: 1px solid #334155;
+}
+
+.dock-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.dock-add {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid #334155;
+}
+
+.dock-add-button {
+  color: #94a3b8 !important;
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.dock-add-button:hover {
+  background: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dock-add-menu {
+  margin-left: 0.5rem;
+}
+
+/* Content Area */
+.dock-content {
+  flex: 1;
+  background: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.dock-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #6b7280;
+  text-align: center;
+  padding: 2rem;
+}
+
+.dock-empty h3 {
+  margin: 1rem 0 0.5rem 0;
+  font-size: 1.25rem;
+  color: #374151;
+}
+
+.dock-empty p {
+  margin: 0;
+  color: #9ca3af;
+}
+
+/* Drag and drop feedback */
+.dock-content.drag-over {
+  background: #f0f9ff;
+  border: 2px dashed #3b82f6;
+}
+
+.dock-content.drag-over::after {
+  content: 'Drop tab here';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 1.25rem;
+  pointer-events: none;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .dock-bar {
+    width: 50px;
+  }
+  
+  .dock-add-button {
+    width: 35px !important;
+    height: 35px !important;
+  }
+}
