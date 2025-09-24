@@ -214,9 +214,10 @@ export class ThumbnailApiService {
    */
   async testConnection() {
     try {
-      // Try to reach a simple endpoint or health check
-      const response = await this.client.get('/health', { timeout: 5000 });
-      return response.status === 200;
+      // Try to reach the API by making a simple request to check if the service is running
+      // We'll use the thumbnail jobs endpoint since that's what the worker needs to access
+      const response = await this.client.head('/api/thumbnail-jobs/dequeue', { timeout: 5000 });
+      return response.status >= 200 && response.status < 500; // Accept any response that indicates the service is running
     } catch (error) {
       logger.warn('API connectivity test failed', {
         apiBaseUrl: this.apiBaseUrl,
