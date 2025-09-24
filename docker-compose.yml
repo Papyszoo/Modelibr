@@ -16,16 +16,20 @@ services:
             - ConnectionStrings__Default=Host=postgres;Port=${POSTGRES_PORT};Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
             - DisableHttpsRedirection=true
         ports:
-            - "${WEBAPI_HTTP_PORT}:${WEBAPI_HTTP_PORT}"
-            - "${WEBAPI_HTTPS_PORT}:${WEBAPI_HTTPS_PORT}"
-        healthcheck:
-            # Primary health check using curl
-            test: ["CMD-SHELL", "curl -f http://127.0.0.1:${WEBAPI_HTTP_PORT}/health || exit 1"]
-            # Alternative health check (if curl fails): ["CMD-SHELL", "/usr/local/bin/health-check.sh ${WEBAPI_HTTP_PORT}"]
-            interval: 30s
-            timeout: 10s
-            retries: 5
-            start_period: 60s
+            - "${WEBAPI_HTTP_PORT}:8080"
+            - "${WEBAPI_HTTPS_PORT}:8081"
+        # healthcheck:
+        #     # Primary health check using curl
+        #     test:
+        #         [
+        #             "CMD-SHELL",
+        #             "curl -f http://localhost:${WEBAPI_HTTP_PORT}/health || exit 1",
+        #         ]
+        #     # Alternative health check (if curl fails): ["CMD-SHELL", "/usr/local/bin/health-check.sh ${WEBAPI_HTTP_PORT}"]
+        #     interval: 30s
+        #     timeout: 10s
+        #     retries: 2
+        #     start_period: 60s
         volumes:
             # Use platform-appropriate secret/cert paths; on macOS $HOME works (APPDATA is Windows-specific)
             - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro
@@ -68,9 +72,9 @@ services:
             - NODE_TLS_REJECT_UNAUTHORIZED=1
         ports:
             - "${WORKER_PORT:-3001}:3001"
-        depends_on:
-            webapi:
-                condition: service_healthy
+        # depends_on:
+        #     webapi:
+        #         condition: service_healthy
         networks:
             - modelibr
         restart: unless-stopped
@@ -98,5 +102,5 @@ volumes:
     postgres-data:
 
 networks:
-  modelibr:
-    driver: bridge
+    modelibr:
+        driver: bridge
