@@ -13,7 +13,7 @@ services:
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
             - ASPNETCORE_HTTPS_PORTS=${WEBAPI_HTTPS_PORT}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
-            - ConnectionStrings__Default=Server=mssql,${MSSQL_PORT};Database=Modelibr;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true;
+            - ConnectionStrings__Default=Host=postgres;Port=${POSTGRES_PORT};Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
             - DisableHttpsRedirection=true
         ports:
             - "${WEBAPI_HTTP_PORT}:${WEBAPI_HTTP_PORT}"
@@ -32,7 +32,7 @@ services:
             - ${HOME}/.aspnet/https:/home/app/.aspnet/https:ro
             - ./data/uploads:/var/lib/modelibr/uploads
         depends_on:
-            mssql:
+            postgres:
                 condition: service_healthy
         networks:
             - modelibr
@@ -74,28 +74,28 @@ services:
         networks:
             - modelibr
         restart: unless-stopped
-    mssql:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        container_name: mssql
+    postgres:
+        image: postgres:16-alpine
+        container_name: postgres
         environment:
-            ACCEPT_EULA: "${ACCEPT_EULA}"
-            SA_PASSWORD: "${SA_PASSWORD}"
-            MSSQL_PID: "${MSSQL_PID}"
+            POSTGRES_DB: Modelibr
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         ports:
-            - "${MSSQL_PORT}:1433"
+            - "${POSTGRES_PORT}:5432"
         healthcheck:
-            test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -C -Q 'SELECT 1' || exit 1"]
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d Modelibr"]
             interval: 15s
             timeout: 5s
             retries: 10
             start_period: 20s
         volumes:
-            - mssql-data:/var/opt/mssql
+            - postgres-data:/var/lib/postgresql/data
         networks:
             - modelibr
 
 volumes:
-    mssql-data:
+    postgres-data:
 
 networks:
   modelibr:

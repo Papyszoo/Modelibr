@@ -1,5 +1,5 @@
 # Modelibr
-Modelibr is a .NET 9.0 C# Web API application built using Clean Architecture principles. It provides a file upload service for 3D models with hash-based storage and deduplication. The application is containerized using Docker and includes database integration with SQL Server.
+Modelibr is a .NET 9.0 C# Web API application built using Clean Architecture principles. It provides a file upload service for 3D models with hash-based storage and deduplication. The application is containerized using Docker and includes database integration with PostgreSQL.
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
@@ -28,12 +28,12 @@ Always reference these instructions first and fallback to search or bash command
   - `dotnet run` -- application starts on http://localhost:5009
 - Available endpoints:
   - POST `/uploadModel` - Upload 3D model files
-  - The application requires SQL Server connection for full functionality
+  - The application requires PostgreSQL connection for full functionality
 
 ### Docker Support
 - Docker Compose setup available:
   - `docker compose version` -- verify Docker Compose v2.x is available
-  - Configuration in `docker-compose.yml` with SQL Server database
+  - Configuration in `docker-compose.yml` with PostgreSQL database
   - Uses ports 8080 (HTTP) and 8081 (HTTPS) in containers
   - **REQUIRED**: Create `.env` file from `.env.example` before running docker-compose
   - `cp .env.example .env` -- copy environment configuration
@@ -530,10 +530,11 @@ Frontend environment variables (prefixed with `VITE_`) are injected at build tim
 
 #### Database Connection String Environment Variables
 The database connection string supports environment variable substitution using `Environment.ExpandEnvironmentVariables()`:
-- `MSSQL_PORT` - SQL Server port (default: 1433)
-- `SA_PASSWORD` - SQL Server SA password (from .env file)
+- `POSTGRES_PORT` - PostgreSQL server port (default: 5432)
+- `POSTGRES_USER` - PostgreSQL username (from .env file)
+- `POSTGRES_PASSWORD` - PostgreSQL password (from .env file)  
 - Format: Use `%VARIABLE_NAME%` syntax in connection strings for environment variable expansion
-- Example: `Server=localhost,%MSSQL_PORT%;Database=Modelibr;User Id=sa;Password=%SA_PASSWORD%;TrustServerCertificate=true;`
+- Example: `Host=localhost;Port=%POSTGRES_PORT%;Database=Modelibr;Username=%POSTGRES_USER%;Password=%POSTGRES_PASSWORD%;`
 
 For development, create .env file from .env.example:
 ```bash
@@ -568,9 +569,9 @@ cp .env.example .env
 - Missing packages: Run `dotnet restore Modelibr.sln` to restore all dependencies
 
 ### Important: Database Configuration
-- **NEVER modify `src/Infrastructure/DependencyInjection.cs` to use in-memory database** - The application is designed to work with SQL Server via Docker Compose
+- **NEVER modify `src/Infrastructure/DependencyInjection.cs` to use in-memory database** - The application is designed to work with PostgreSQL via Docker Compose
 - **NEVER remove connection strings from `src/WebApi/appsettings.Development.json`** - These are required for proper database connectivity
-- If database connectivity issues occur, use Docker Compose to start the SQL Server service rather than falling back to in-memory databases
+- If database connectivity issues occur, use Docker Compose to start the PostgreSQL service rather than falling back to in-memory databases
 - For development database issues, create a separate GitHub issue to investigate Docker Compose setup
 
 ### Development Workflow

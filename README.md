@@ -49,7 +49,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 **Backend:**
 - .NET 9.0 Web API
 - Entity Framework Core
-- SQL Server
+- PostgreSQL
 - Clean Architecture pattern
 - Minimal APIs with endpoint mapping
 
@@ -61,7 +61,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 
 **Infrastructure:**
 - Docker & Docker Compose
-- SQL Server 2022
+- PostgreSQL 16
 - nginx for production frontend serving
 
 ## 🚀 Getting Started
@@ -95,7 +95,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
    - Frontend: http://localhost:3000
    - API: http://localhost:8080
    - Thumbnail Worker: http://localhost:3001 (health check)
-   - SQL Server: localhost:1433
+   - PostgreSQL: localhost:5432
 
 ### Development Setup
 
@@ -117,7 +117,7 @@ This will start the complete application stack:
 - Frontend: http://localhost:3000
 - API: http://localhost:8080
 - Thumbnail Worker: http://localhost:3001 (health check)
-- SQL Server: localhost:1433
+- PostgreSQL: localhost:5432
 
 #### Alternative: Local Development
 
@@ -208,7 +208,7 @@ The worker service will be available at http://localhost:3001 (health check)
 
 ### Database Configuration
 
-The application uses SQL Server with Entity Framework Core. Connection strings are configured in `appsettings.json` and can be overridden via environment variables or user secrets.
+The application uses PostgreSQL with Entity Framework Core. Connection strings are configured in `appsettings.json` and can be overridden via environment variables or user secrets.
 
 ## 🎮 API Endpoints
 
@@ -262,8 +262,8 @@ If you encounter "container webapi is unhealthy" errors:
 3. **Alternative health check**: See [docs/docker-health-check-fix.md](docs/docker-health-check-fix.md) for details
 
 ### Common Issues
-- **Database connection errors**: Ensure SQL Server container is running and healthy
-- **Port conflicts**: Make sure ports 3000, 8080, 8081, 1433, and 3001 are available
+- **Database connection errors**: Ensure PostgreSQL container is running and healthy
+- **Port conflicts**: Make sure ports 3000, 8080, 8081, 5432, and 3001 are available
 - **Upload permission errors**: Set `UPLOAD_STORAGE_PATH` to a writable directory
 
 ## 🤝 Contributing
