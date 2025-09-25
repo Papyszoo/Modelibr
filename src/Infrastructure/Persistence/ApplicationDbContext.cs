@@ -8,6 +8,7 @@ namespace Infrastructure.Persistence
     {
         public DbSet<Model> Models => Set<Model>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
+        public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
 
@@ -50,6 +51,28 @@ namespace Infrastructure.Persistence
                         v => v.Value,
                         v => MapFromDatabaseValue(v))
                     .IsRequired();
+            });
+
+            // Configure Texture entity
+            modelBuilder.Entity<Texture>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.FileId).IsRequired();
+                entity.Property(t => t.TextureType).IsRequired();
+                entity.Property(t => t.CreatedAt).IsRequired();
+                entity.Property(t => t.UpdatedAt).IsRequired();
+
+                // Configure relationship with File
+                entity.HasOne(t => t.File)
+                    .WithMany()
+                    .HasForeignKey(t => t.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Create index for efficient querying by texture type
+                entity.HasIndex(t => t.TextureType);
+                
+                // Create composite index for file and texture type to ensure uniqueness
+                entity.HasIndex(t => new { t.FileId, t.TextureType }).IsUnique();
             });
 
             // Configure Thumbnail entity
