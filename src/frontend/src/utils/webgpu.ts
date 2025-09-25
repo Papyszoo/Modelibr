@@ -1,5 +1,15 @@
 // WebGPU detection utility
-export const detectWebGPU = async () => {
+
+export interface WebGPUDetectionResult {
+  supported: boolean
+  reason?: string
+  adapter?: GPUAdapter
+  device?: GPUDevice
+  features?: string[]
+  limits?: GPUSupportedLimits
+}
+
+export const detectWebGPU = async (): Promise<WebGPUDetectionResult> => {
   if (!navigator.gpu) {
     return { supported: false, reason: 'WebGPU not available' }
   }
@@ -19,11 +29,12 @@ export const detectWebGPU = async () => {
       limits: adapter.limits 
     }
   } catch (error) {
-    return { supported: false, reason: error.message }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return { supported: false, reason: errorMessage }
   }
 }
 
 // Check if WebGPU is supported
-export const isWebGPUSupported = () => {
+export const isWebGPUSupported = (): boolean => {
   return typeof navigator !== 'undefined' && 'gpu' in navigator
 }
