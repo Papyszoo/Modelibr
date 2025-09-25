@@ -1,16 +1,16 @@
-import * as THREE from 'three';
-import { config } from './config.js';
-import logger from './logger.js';
+import * as THREE from 'three'
+import { config } from './config.js'
+import logger from './logger.js'
 
 /**
  * Service for rendering orbit animation frames using three.js
  */
 export class OrbitFrameRenderer {
   constructor() {
-    this.renderer = null;
-    this.scene = null;
-    this.camera = null;
-    this.setupRenderer();
+    this.renderer = null
+    this.scene = null
+    this.camera = null
+    this.setupRenderer()
   }
 
   /**
@@ -19,7 +19,7 @@ export class OrbitFrameRenderer {
    */
   setupRenderer() {
     // Create scene
-    this.scene = new THREE.Scene();
+    this.scene = new THREE.Scene()
 
     // Setup camera
     this.camera = new THREE.PerspectiveCamera(
@@ -27,16 +27,16 @@ export class OrbitFrameRenderer {
       config.rendering.outputWidth / config.rendering.outputHeight, // aspect ratio
       0.1, // near plane
       1000 // far plane
-    );
+    )
 
     // Setup lighting to match frontend Scene.jsx
-    this.setupLighting();
+    this.setupLighting()
 
     logger.debug('OrbitFrameRenderer initialized (simplified mode)', {
       renderSize: `${config.rendering.outputWidth}x${config.rendering.outputHeight}`,
       backgroundColor: config.rendering.backgroundColor,
-      antialiasing: config.rendering.enableAntialiasing
-    });
+      antialiasing: config.rendering.enableAntialiasing,
+    })
   }
 
   /**
@@ -44,55 +44,55 @@ export class OrbitFrameRenderer {
    */
   setupLighting() {
     // Ambient light for general illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
-    this.scene.add(ambientLight);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3)
+    this.scene.add(ambientLight)
 
     // Directional light (main light source)
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(10, 10, 5);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.camera.left = -10;
-    directionalLight.shadow.camera.right = 10;
-    directionalLight.shadow.camera.top = 10;
-    directionalLight.shadow.camera.bottom = -10;
-    this.scene.add(directionalLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0)
+    directionalLight.position.set(10, 10, 5)
+    directionalLight.castShadow = true
+    directionalLight.shadow.mapSize.width = 2048
+    directionalLight.shadow.mapSize.height = 2048
+    directionalLight.shadow.camera.near = 0.5
+    directionalLight.shadow.camera.far = 500
+    directionalLight.shadow.camera.left = -10
+    directionalLight.shadow.camera.right = 10
+    directionalLight.shadow.camera.top = 10
+    directionalLight.shadow.camera.bottom = -10
+    this.scene.add(directionalLight)
 
     // Point light for additional fill lighting
-    const pointLight = new THREE.PointLight(0xffffff, 0.5);
-    pointLight.position.set(-10, -10, -10);
-    this.scene.add(pointLight);
+    const pointLight = new THREE.PointLight(0xffffff, 0.5)
+    pointLight.position.set(-10, -10, -10)
+    this.scene.add(pointLight)
 
     // Spot light for dramatic effect
-    const spotLight = new THREE.SpotLight(0xffffff, 0.8);
-    spotLight.position.set(0, 10, 0);
-    spotLight.angle = 0.3;
-    spotLight.penumbra = 1;
-    spotLight.castShadow = true;
-    this.scene.add(spotLight);
+    const spotLight = new THREE.SpotLight(0xffffff, 0.8)
+    spotLight.position.set(0, 10, 0)
+    spotLight.angle = 0.3
+    spotLight.penumbra = 1
+    spotLight.castShadow = true
+    this.scene.add(spotLight)
 
     // Ground plane for shadows (optional)
-    const groundGeometry = new THREE.PlaneGeometry(10, 10);
+    const groundGeometry = new THREE.PlaneGeometry(10, 10)
     const groundMaterial = new THREE.MeshStandardMaterial({
       color: 0xf0f0f0,
       metalness: 0.0,
-      roughness: 0.8
-    });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -2;
-    ground.receiveShadow = true;
-    this.scene.add(ground);
+      roughness: 0.8,
+    })
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial)
+    ground.rotation.x = -Math.PI / 2
+    ground.position.y = -2
+    ground.receiveShadow = true
+    this.scene.add(ground)
 
     logger.debug('Lighting setup completed', {
       ambientIntensity: 0.3,
       directionalIntensity: 1.0,
       pointIntensity: 0.5,
-      spotIntensity: 0.8
-    });
+      spotIntensity: 0.8,
+    })
   }
 
   /**
@@ -102,19 +102,19 @@ export class OrbitFrameRenderer {
    * @returns {Promise<Array>} Array of rendered frame data
    */
   async renderOrbitFrames(model, jobLogger) {
-    const frames = [];
-    const startTime = Date.now();
+    const frames = []
+    const startTime = Date.now()
 
     try {
       // Add model to scene
-      this.scene.add(model);
+      this.scene.add(model)
 
       // Calculate optimal camera distance based on model bounds
-      const cameraDistance = this.calculateOptimalCameraDistance(model);
-      
+      const cameraDistance = this.calculateOptimalCameraDistance(model)
+
       // Calculate frame count
-      const angleRange = config.orbit.endAngle - config.orbit.startAngle;
-      const frameCount = Math.ceil(angleRange / config.orbit.angleStep);
+      const angleRange = config.orbit.endAngle - config.orbit.startAngle
+      const frameCount = Math.ceil(angleRange / config.orbit.angleStep)
 
       jobLogger.info('Starting orbit frame rendering', {
         angleStep: config.orbit.angleStep,
@@ -122,49 +122,50 @@ export class OrbitFrameRenderer {
         endAngle: config.orbit.endAngle,
         frameCount: frameCount,
         cameraDistance: cameraDistance,
-        cameraHeight: config.orbit.cameraHeight
-      });
+        cameraHeight: config.orbit.cameraHeight,
+      })
 
       // Render frames at each orbit angle
       for (let i = 0; i < frameCount; i++) {
-        const angle = config.orbit.startAngle + (i * config.orbit.angleStep);
-        const frameData = await this.renderFrame(angle, cameraDistance, i);
-        frames.push(frameData);
+        const angle = config.orbit.startAngle + i * config.orbit.angleStep
+        const frameData = await this.renderFrame(angle, cameraDistance, i)
+        frames.push(frameData)
 
         // Log progress every 10 frames or at the end
         if ((i + 1) % 10 === 0 || i === frameCount - 1) {
-          const memoryUsage = process.memoryUsage();
+          const memoryUsage = process.memoryUsage()
           jobLogger.info('Orbit rendering progress', {
             framesCompleted: i + 1,
             totalFrames: frameCount,
             currentAngle: angle,
             memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-            memoryTotalMB: Math.round(memoryUsage.heapTotal / 1024 / 1024)
-          });
+            memoryTotalMB: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+          })
         }
       }
 
       // Remove model from scene to free memory
-      this.scene.remove(model);
+      this.scene.remove(model)
 
-      const renderTime = Date.now() - startTime;
+      const renderTime = Date.now() - startTime
       jobLogger.info('Orbit frame rendering completed', {
         frameCount: frames.length,
         renderTimeMs: renderTime,
         averageTimePerFrameMs: Math.round(renderTime / frames.length),
-        totalDataSizeKB: Math.round(frames.reduce((sum, f) => sum + f.size, 0) / 1024)
-      });
+        totalDataSizeKB: Math.round(
+          frames.reduce((sum, f) => sum + f.size, 0) / 1024
+        ),
+      })
 
-      return frames;
-
+      return frames
     } catch (error) {
       // Clean up on error
-      this.scene.remove(model);
+      this.scene.remove(model)
       jobLogger.error('Orbit frame rendering failed', {
         error: error.message,
-        framesCompleted: frames.length
-      });
-      throw error;
+        framesCompleted: frames.length,
+      })
+      throw error
     }
   }
 
@@ -177,20 +178,21 @@ export class OrbitFrameRenderer {
    */
   async renderFrame(angle, distance, frameIndex) {
     // Convert angle to radians
-    const radians = (angle * Math.PI) / 180;
+    const radians = (angle * Math.PI) / 180
 
     // Position camera in orbit around the model
-    this.camera.position.x = Math.cos(radians) * distance;
-    this.camera.position.z = Math.sin(radians) * distance;
-    this.camera.position.y = config.orbit.cameraHeight;
+    this.camera.position.x = Math.cos(radians) * distance
+    this.camera.position.z = Math.sin(radians) * distance
+    this.camera.position.y = config.orbit.cameraHeight
 
     // Look at center of scene
-    this.camera.lookAt(0, 0, 0);
+    this.camera.lookAt(0, 0, 0)
 
     // For this implementation, we simulate rendering by creating frame metadata
     // In a full implementation, this would render the scene and capture pixel data
-    const frameSize = config.rendering.outputWidth * config.rendering.outputHeight * 4; // RGBA bytes
-    
+    const frameSize =
+      config.rendering.outputWidth * config.rendering.outputHeight * 4 // RGBA bytes
+
     // Create simulated frame data object (stored in memory, not encoded to file)
     const frameData = {
       index: frameIndex,
@@ -203,24 +205,24 @@ export class OrbitFrameRenderer {
       cameraPosition: {
         x: this.camera.position.x,
         y: this.camera.position.y,
-        z: this.camera.position.z
+        z: this.camera.position.z,
       },
       // Simulated rendering state
       simulated: true,
       renderSettings: {
         backgroundColor: config.rendering.backgroundColor,
-        antialiasing: config.rendering.enableAntialiasing
-      }
-    };
+        antialiasing: config.rendering.enableAntialiasing,
+      },
+    }
 
     logger.debug('Frame rendered (simulated)', {
       frameIndex,
       angle,
       dataSize: frameSize,
-      cameraPos: frameData.cameraPosition
-    });
+      cameraPos: frameData.cameraPosition,
+    })
 
-    return frameData;
+    return frameData
   }
 
   /**
@@ -229,26 +231,26 @@ export class OrbitFrameRenderer {
    * @returns {number} Optimal camera distance
    */
   calculateOptimalCameraDistance(model) {
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const maxDimension = Math.max(size.x, size.y, size.z);
-    
+    const box = new THREE.Box3().setFromObject(model)
+    const size = box.getSize(new THREE.Vector3())
+    const maxDimension = Math.max(size.x, size.y, size.z)
+
     // Use configured distance as base, adjusted by model size
-    const baseDistance = config.rendering.cameraDistance;
-    const calculatedDistance = baseDistance * (maxDimension / 2);
-    
+    const baseDistance = config.rendering.cameraDistance
+    const calculatedDistance = baseDistance * (maxDimension / 2)
+
     // Ensure minimum distance
-    const optimalDistance = Math.max(calculatedDistance, baseDistance);
-    
+    const optimalDistance = Math.max(calculatedDistance, baseDistance)
+
     logger.debug('Camera distance calculated', {
       modelSize: { x: size.x, y: size.y, z: size.z },
       maxDimension,
       baseDistance,
       calculatedDistance,
-      optimalDistance
-    });
-    
-    return optimalDistance;
+      optimalDistance,
+    })
+
+    return optimalDistance
   }
 
   /**
@@ -257,16 +259,16 @@ export class OrbitFrameRenderer {
    * @returns {Object} Memory usage statistics
    */
   getMemoryStats(frames) {
-    const totalBytes = frames.reduce((sum, frame) => sum + frame.size, 0);
-    const averageFrameSize = frames.length > 0 ? totalBytes / frames.length : 0;
-    
+    const totalBytes = frames.reduce((sum, frame) => sum + frame.size, 0)
+    const averageFrameSize = frames.length > 0 ? totalBytes / frames.length : 0
+
     return {
       frameCount: frames.length,
       totalSizeBytes: totalBytes,
-      totalSizeMB: Math.round(totalBytes / 1024 / 1024 * 100) / 100,
-      averageFrameSizeKB: Math.round(averageFrameSize / 1024 * 100) / 100,
-      processMemoryUsage: process.memoryUsage()
-    };
+      totalSizeMB: Math.round((totalBytes / 1024 / 1024) * 100) / 100,
+      averageFrameSizeKB: Math.round((averageFrameSize / 1024) * 100) / 100,
+      processMemoryUsage: process.memoryUsage(),
+    }
   }
 
   /**
@@ -276,27 +278,27 @@ export class OrbitFrameRenderer {
     if (this.scene) {
       // Clean up scene objects
       while (this.scene.children.length > 0) {
-        const child = this.scene.children[0];
-        this.scene.remove(child);
-        
+        const child = this.scene.children[0]
+        this.scene.remove(child)
+
         if (child.geometry) {
-          child.geometry.dispose();
+          child.geometry.dispose()
         }
-        
+
         if (child.material) {
           if (Array.isArray(child.material)) {
-            child.material.forEach(material => material.dispose());
+            child.material.forEach(material => material.dispose())
           } else {
-            child.material.dispose();
+            child.material.dispose()
           }
         }
       }
-      
-      this.scene = null;
+
+      this.scene = null
     }
-    
-    this.camera = null;
-    
-    logger.debug('OrbitFrameRenderer disposed');
+
+    this.camera = null
+
+    logger.debug('OrbitFrameRenderer disposed')
   }
 }

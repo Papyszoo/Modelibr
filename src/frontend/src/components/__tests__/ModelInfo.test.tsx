@@ -6,9 +6,7 @@ describe('ModelInfo', () => {
     id: 'test-model-123',
     createdAt: '2024-01-15T10:30:00Z',
     updatedAt: '2024-01-16T14:45:00Z',
-    files: [
-      { originalFileName: 'test-model.obj' }
-    ]
+    files: [{ originalFileName: 'test-model.obj' }],
   }
 
   it('should render model information correctly', () => {
@@ -26,7 +24,7 @@ describe('ModelInfo', () => {
     // Check if dates are formatted (will depend on locale)
     const createdDate = new Date(mockModel.createdAt).toLocaleString()
     const updatedDate = new Date(mockModel.updatedAt).toLocaleString()
-    
+
     expect(screen.getByText(createdDate)).toBeInTheDocument()
     expect(screen.getByText(updatedDate)).toBeInTheDocument()
   })
@@ -35,10 +33,18 @@ describe('ModelInfo', () => {
     render(<ModelInfo model={mockModel} />)
 
     expect(screen.getByText('TSL Rendering Features')).toBeInTheDocument()
-    expect(screen.getByText(/Real-time physically based rendering/)).toBeInTheDocument()
-    expect(screen.getByText(/Dynamic lighting with shadow mapping/)).toBeInTheDocument()
-    expect(screen.getByText(/Material metalness and roughness controls/)).toBeInTheDocument()
-    expect(screen.getByText(/Environment mapping for reflections/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Real-time physically based rendering/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Dynamic lighting with shadow mapping/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Material metalness and roughness controls/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Environment mapping for reflections/)
+    ).toBeInTheDocument()
     expect(screen.getByText(/Interactive orbit controls/)).toBeInTheDocument()
   })
 
@@ -56,7 +62,7 @@ describe('ModelInfo', () => {
       id: 'test-model-456',
       createdAt: '2024-01-15T10:30:00Z',
       updatedAt: '2024-01-16T14:45:00Z',
-      files: []
+      files: [],
     }
 
     render(<ModelInfo model={modelWithoutFiles} />)
@@ -72,8 +78,8 @@ describe('ModelInfo', () => {
       updatedAt: '2024-01-16T14:45:00Z',
       files: [
         { originalFileName: 'model.gltf' },
-        { originalFileName: 'texture.jpg' }
-      ]
+        { originalFileName: 'texture.jpg' },
+      ],
     }
 
     render(<ModelInfo model={modelWithMultipleFiles} />)
@@ -86,8 +92,14 @@ describe('ModelInfo', () => {
     render(<ModelInfo model={mockModel} />)
 
     // Check that all three main sections are present
-    expect(screen.getByRole('heading', { name: 'Model Information' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'TSL Rendering Features' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Model Information' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'TSL Rendering Features' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Controls' })
+    ).toBeInTheDocument()
   })
 })

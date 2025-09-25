@@ -14,7 +14,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
     switch (tab.type) {
       case 'modelList':
         return <ModelList isTabContent={true} />
-      
+
       case 'modelViewer':
         if (!tab.modelId) {
           return (
@@ -25,13 +25,13 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
           )
         }
         return <ModelViewer modelId={tab.modelId} isTabContent={true} />
-      
+
       case 'texture':
         return <TextureList />
-      
+
       case 'animation':
         return <AnimationList />
-      
+
       default:
         return (
           <div className="tab-error">
@@ -42,11 +42,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
     }
   }
 
-  return (
-    <div className="tab-content">
-      {renderContent()}
-    </div>
-  )
+  return <div className="tab-content">{renderContent()}</div>
 }
 
 export default TabContent

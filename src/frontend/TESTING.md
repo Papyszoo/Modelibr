@@ -5,7 +5,7 @@ This directory contains tests for the Modelibr frontend React application.
 ## Test Structure
 
 - `src/utils/__tests__/` - Tests for utility functions
-- `src/components/__tests__/` - Tests for React components  
+- `src/components/__tests__/` - Tests for React components
 - `src/services/__tests__/` - Tests for API client services
 - `src/setupTests.js` - Jest setup configuration
 
@@ -27,6 +27,7 @@ npm run test:coverage
 Current test coverage includes:
 
 ### Utility Functions (100% coverage)
+
 - `fileUtils.js` - File format validation, size formatting, extension handling
   - File extension extraction
   - File format validation for 3D models
@@ -34,14 +35,17 @@ Current test coverage includes:
   - File size formatting
   - File name extraction
 
-### Components  
+### Components
+
 - `ModelInfo.jsx` - Model information display component
 - `LoadingPlaceholder.jsx` - 3D loading placeholder component
 
 ### Services
+
 - `ApiClient.js` - API interface and URL generation methods
 
 ### Additional Utilities
+
 - Drag and drop functionality testing
 
 ## Test Infrastructure

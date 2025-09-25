@@ -59,11 +59,11 @@ export function getModelFileFormat(model: Model): string {
  */
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes'
-  
+
   const k = 1024
   const sizes = ['Bytes', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
@@ -71,26 +71,32 @@ export function formatFileSize(bytes: number): string {
  * Three.js supported file formats that can be rendered
  */
 export const THREEJS_SUPPORTED_FORMATS = [
-  '.obj',   // OBJLoader
-  '.gltf',  // GLTFLoader
-  '.glb'    // GLTFLoader
+  '.obj', // OBJLoader
+  '.gltf', // GLTFLoader
+  '.glb', // GLTFLoader
 ] as const
 
 /**
  * All supported 3D model file formats
  */
 export const ALL_SUPPORTED_FORMATS = [
-  '.obj', '.fbx', '.dae', '.3ds', '.blend', '.gltf', '.glb'
+  '.obj',
+  '.fbx',
+  '.dae',
+  '.3ds',
+  '.blend',
+  '.gltf',
+  '.glb',
 ] as const
 
 /**
  * Check if file extension is supported by Three.js loaders
  */
 export function isThreeJSRenderable(fileExtension: string): boolean {
-  const ext = fileExtension.startsWith('.') 
-    ? fileExtension.toLowerCase() 
+  const ext = fileExtension.startsWith('.')
+    ? fileExtension.toLowerCase()
     : '.' + fileExtension.toLowerCase()
-  
+
   return (THREEJS_SUPPORTED_FORMATS as readonly string[]).includes(ext)
 }
 
@@ -98,9 +104,9 @@ export function isThreeJSRenderable(fileExtension: string): boolean {
  * Check if file extension is a supported 3D model format
  */
 export function isSupportedModelFormat(fileExtension: string): boolean {
-  const ext = fileExtension.startsWith('.') 
-    ? fileExtension.toLowerCase() 
+  const ext = fileExtension.startsWith('.')
+    ? fileExtension.toLowerCase()
     : '.' + fileExtension.toLowerCase()
-  
+
   return (ALL_SUPPORTED_FORMATS as readonly string[]).includes(ext)
 }

@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { OrbitControls } from '@react-three/drei'
 import Model from './Model'
 import LoadingPlaceholder from './LoadingPlaceholder'
+// eslint-disable-next-line no-restricted-imports
 import ApiClient from '../services/ApiClient'
 import { Model as ModelType } from '../utils/fileUtils'
 
@@ -11,8 +12,9 @@ interface SceneProps {
 
 function Scene({ model }: SceneProps): JSX.Element {
   // Find the first renderable file
-  const renderableFile = model.files?.find(f => f.isRenderable) || model.files?.[0]
-  
+  const renderableFile =
+    model.files?.find(f => f.isRenderable) || model.files?.[0]
+
   if (!renderableFile) {
     return (
       <mesh>
@@ -21,51 +23,46 @@ function Scene({ model }: SceneProps): JSX.Element {
       </mesh>
     )
   }
-  
-  const fileExtension = renderableFile.originalFileName.split('.').pop().toLowerCase()
+
+  const fileExtension = renderableFile.originalFileName
+    .split('.')
+    .pop()
+    .toLowerCase()
   const modelUrl = ApiClient.getFileUrl(renderableFile.id)
 
   return (
     <>
       {/* Enhanced lighting setup for TSL-style rendering */}
       <ambientLight intensity={0.3} />
-      <directionalLight 
-        position={[10, 10, 5]} 
-        intensity={1.0} 
+      <directionalLight
+        position={[10, 10, 5]}
+        intensity={1.0}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
       <pointLight position={[-10, -10, -10]} intensity={0.5} />
-      <spotLight 
-        position={[0, 10, 0]} 
-        angle={0.3} 
-        penumbra={1} 
+      <spotLight
+        position={[0, 10, 0]}
+        angle={0.3}
+        penumbra={1}
         intensity={0.8}
         castShadow
       />
-      
+
       {/* Model with TSL-inspired shading */}
       <Suspense fallback={<LoadingPlaceholder />}>
         <Model modelUrl={modelUrl} fileExtension={fileExtension} />
       </Suspense>
-      
+
       {/* Ground plane with receiving shadows */}
-      <mesh 
-        rotation={[-Math.PI / 2, 0, 0]} 
-        position={[0, -2, 0]} 
-        receiveShadow
-      >
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow>
         <planeGeometry args={[10, 10]} />
-        <meshStandardMaterial 
-          color="#f0f0f0" 
-          metalness={0.0}
-          roughness={0.8}
-        />
+        <meshStandardMaterial color="#f0f0f0" metalness={0.0} roughness={0.8} />
       </mesh>
-      
+
       {/* Orbit controls for interaction */}
-      <OrbitControls 
+      <OrbitControls
         enablePan={true}
         enableZoom={true}
         enableRotate={true}

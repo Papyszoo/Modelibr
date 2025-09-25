@@ -1,17 +1,17 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import { ThumbnailJobService } from './thumbnailJobService.js';
-import logger from './logger.js';
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
+import { ThumbnailJobService } from './thumbnailJobService.js'
+import logger from './logger.js'
 
 /**
  * Service for fetching and managing model files
  */
 export class ModelFileService {
   constructor() {
-    this.jobService = new ThumbnailJobService();
-    this.tempDir = path.join(os.tmpdir(), 'modelibr-worker');
-    this.ensureTempDirectory();
+    this.jobService = new ThumbnailJobService()
+    this.tempDir = path.join(os.tmpdir(), 'modelibr-worker')
+    this.ensureTempDirectory()
   }
 
   /**
@@ -19,8 +19,8 @@ export class ModelFileService {
    */
   ensureTempDirectory() {
     if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
-      logger.debug('Created temporary directory', { tempDir: this.tempDir });
+      fs.mkdirSync(this.tempDir, { recursive: true })
+      logger.debug('Created temporary directory', { tempDir: this.tempDir })
     }
   }
 
@@ -30,61 +30,61 @@ export class ModelFileService {
    * @returns {Promise<{filePath: string, fileType: string, originalFileName: string}>} File information
    */
   async fetchModelFile(modelId) {
-    logger.debug('Fetching model file', { modelId });
+    logger.debug('Fetching model file', { modelId })
 
     try {
       // Get file stream from API
-      const response = await this.jobService.getModelFile(modelId);
-      
+      const response = await this.jobService.getModelFile(modelId)
+
       if (!response || !response.data) {
-        throw new Error('No file data received from API');
+        throw new Error('No file data received from API')
       }
 
       // Extract file information from response headers
-      const contentDisposition = response.headers['content-disposition'] || '';
-      const contentType = response.headers['content-type'] || 'application/octet-stream';
-      
+      const contentDisposition = response.headers['content-disposition'] || ''
+      const _contentType =
+        response.headers['content-type'] || 'application/octet-stream'
+
       // Parse filename from content-disposition header
-      let originalFileName = this.parseFilenameFromHeader(contentDisposition);
+      let originalFileName = this.parseFilenameFromHeader(contentDisposition)
       if (!originalFileName) {
-        originalFileName = `model_${modelId}`;
+        originalFileName = `model_${modelId}`
       }
 
       // Determine file extension and type
-      const fileExtension = path.extname(originalFileName).toLowerCase();
-      const fileType = this.getFileTypeFromExtension(fileExtension);
+      const fileExtension = path.extname(originalFileName).toLowerCase()
+      const fileType = this.getFileTypeFromExtension(fileExtension)
 
       if (!fileType) {
-        throw new Error(`Unsupported file type: ${fileExtension}`);
+        throw new Error(`Unsupported file type: ${fileExtension}`)
       }
 
       // Create temporary file
-      const tempFileName = `${modelId}_${Date.now()}${fileExtension}`;
-      const tempFilePath = path.join(this.tempDir, tempFileName);
+      const tempFileName = `${modelId}_${Date.now()}${fileExtension}`
+      const tempFilePath = path.join(this.tempDir, tempFileName)
 
       // Write stream to temporary file
-      await this.writeStreamToFile(response.data, tempFilePath);
+      await this.writeStreamToFile(response.data, tempFilePath)
 
       logger.info('Model file fetched successfully', {
         modelId,
         originalFileName,
         fileType,
         tempFilePath,
-        fileSize: fs.statSync(tempFilePath).size
-      });
+        fileSize: fs.statSync(tempFilePath).size,
+      })
 
       return {
         filePath: tempFilePath,
         fileType,
-        originalFileName
-      };
-
+        originalFileName,
+      }
     } catch (error) {
       logger.error('Failed to fetch model file', {
         modelId,
-        error: error.message
-      });
-      throw error;
+        error: error.message,
+      })
+      throw error
     }
   }
 
@@ -95,14 +95,14 @@ export class ModelFileService {
   async cleanupFile(filePath) {
     try {
       if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        logger.debug('Cleaned up temporary file', { filePath });
+        fs.unlinkSync(filePath)
+        logger.debug('Cleaned up temporary file', { filePath })
       }
     } catch (error) {
       logger.warn('Failed to cleanup temporary file', {
         filePath,
-        error: error.message
-      });
+        error: error.message,
+      })
     }
   }
 
@@ -114,22 +114,22 @@ export class ModelFileService {
    */
   async writeStreamToFile(stream, filePath) {
     return new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(filePath);
-      
-      stream.pipe(writeStream);
-      
+      const writeStream = fs.createWriteStream(filePath)
+
+      stream.pipe(writeStream)
+
       writeStream.on('finish', () => {
-        resolve();
-      });
-      
-      writeStream.on('error', (error) => {
-        reject(new Error(`Failed to write file: ${error.message}`));
-      });
-      
-      stream.on('error', (error) => {
-        reject(new Error(`Stream error: ${error.message}`));
-      });
-    });
+        resolve()
+      })
+
+      writeStream.on('error', error => {
+        reject(new Error(`Failed to write file: ${error.message}`))
+      })
+
+      stream.on('error', error => {
+        reject(new Error(`Stream error: ${error.message}`))
+      })
+    })
   }
 
   /**
@@ -138,30 +138,30 @@ export class ModelFileService {
    * @returns {string|null} Parsed filename or null
    */
   parseFilenameFromHeader(contentDisposition) {
-    if (!contentDisposition) return null;
+    if (!contentDisposition) return null
 
     // Try different patterns to extract filename
     const patterns = [
       /filename\*=UTF-8''([^;]+)/,
       /filename="([^"]+)"/,
-      /filename=([^;]+)/
-    ];
+      /filename=([^;]+)/,
+    ]
 
     for (const pattern of patterns) {
-      const match = contentDisposition.match(pattern);
+      const match = contentDisposition.match(pattern)
       if (match) {
-        let filename = match[1];
+        let filename = match[1]
         // Decode URI component if needed
         try {
-          filename = decodeURIComponent(filename);
-        } catch (e) {
+          filename = decodeURIComponent(filename)
+        } catch {
           // Keep original if decode fails
         }
-        return filename.trim();
+        return filename.trim()
       }
     }
 
-    return null;
+    return null
   }
 
   /**
@@ -173,10 +173,10 @@ export class ModelFileService {
     const supportedTypes = {
       '.obj': 'obj',
       '.gltf': 'gltf',
-      '.glb': 'glb'
-    };
+      '.glb': 'glb',
+    }
 
-    return supportedTypes[extension.toLowerCase()] || null;
+    return supportedTypes[extension.toLowerCase()] || null
   }
 
   /**
@@ -185,33 +185,33 @@ export class ModelFileService {
    */
   async cleanupOldFiles(maxAgeMs = 60 * 60 * 1000) {
     try {
-      if (!fs.existsSync(this.tempDir)) return;
+      if (!fs.existsSync(this.tempDir)) return
 
-      const files = fs.readdirSync(this.tempDir);
-      const now = Date.now();
-      let cleanedCount = 0;
+      const files = fs.readdirSync(this.tempDir)
+      const now = Date.now()
+      let cleanedCount = 0
 
       for (const file of files) {
-        const filePath = path.join(this.tempDir, file);
-        const stats = fs.statSync(filePath);
-        
+        const filePath = path.join(this.tempDir, file)
+        const stats = fs.statSync(filePath)
+
         if (now - stats.mtime.getTime() > maxAgeMs) {
-          await this.cleanupFile(filePath);
-          cleanedCount++;
+          await this.cleanupFile(filePath)
+          cleanedCount++
         }
       }
 
       if (cleanedCount > 0) {
         logger.info('Cleaned up old temporary files', {
           cleanedCount,
-          tempDir: this.tempDir
-        });
+          tempDir: this.tempDir,
+        })
       }
     } catch (error) {
       logger.warn('Failed to cleanup old files', {
         error: error.message,
-        tempDir: this.tempDir
-      });
+        tempDir: this.tempDir,
+      })
     }
   }
 }

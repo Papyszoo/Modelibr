@@ -32,6 +32,7 @@ npm run test:coverage
 ## Testing
 
 The frontend includes a comprehensive test suite covering:
+
 - Utility functions (file validation, formatting)
 - React components (ModelInfo, LoadingPlaceholder)
 - API client interfaces
