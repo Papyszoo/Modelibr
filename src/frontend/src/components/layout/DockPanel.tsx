@@ -18,6 +18,8 @@ interface DockPanelProps {
   setOtherTabs: (tabs: Tab[]) => void
   otherActiveTab: string
   setOtherActiveTab: (tabId: string) => void
+  draggedTab: Tab | null
+  setDraggedTab: (tab: Tab | null) => void
 }
 
 function DockPanel({
@@ -30,8 +32,9 @@ function DockPanel({
   setOtherTabs,
   otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
   setOtherActiveTab,
+  draggedTab,
+  setDraggedTab,
 }: DockPanelProps): JSX.Element {
-  const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
   const menuRef = useRef<Menu>(null)
 
   // Menu items for adding new tabs
@@ -109,7 +112,8 @@ function DockPanel({
 
   const handleDropOnOtherPanel = (e: React.DragEvent): void => {
     e.preventDefault()
-    if (draggedTab) {
+    // Only process drop if there's a dragged tab and it's not from this panel
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
       moveTabToOtherPanel(draggedTab)
       setDraggedTab(null)
     }
@@ -117,6 +121,26 @@ function DockPanel({
 
   const handleDragOver = (e: React.DragEvent): void => {
     e.preventDefault()
+    // Only allow drop if there's a dragged tab and it's not from this panel
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      e.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Add visual feedback for valid drop zone
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      e.currentTarget.classList.add('drag-over')
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Remove visual feedback - only if we're actually leaving the drop zone
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      e.currentTarget.classList.remove('drag-over')
+    }
   }
 
   const activeTabData = tabs.find(tab => tab.id === activeTab)
@@ -124,7 +148,13 @@ function DockPanel({
   return (
     <div className={`dock-panel dock-panel-${side}`}>
       {/* Dock/Menu Bar */}
-      <div className={`dock-bar dock-bar-${side}`}>
+      <div 
+        className={`dock-bar dock-bar-${side}`}
+        onDrop={handleDropOnOtherPanel}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+      >
         {/* Tab icons */}
         <div className="dock-tabs">
           {tabs.map(tab => (
@@ -164,6 +194,8 @@ function DockPanel({
         className="dock-content"
         onDrop={handleDropOnOtherPanel}
         onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
       >
         {activeTabData ? (
           <TabProvider

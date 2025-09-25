@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
 import DockPanel from './DockPanel'
@@ -5,6 +6,9 @@ import { Tab, SplitterEvent } from '../../types'
 import './SplitterLayout.css'
 
 function SplitterLayout(): JSX.Element {
+  // Global drag state for cross-panel tab dragging
+  const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
+  
   // URL state for splitter size (percentage for left panel)
   const [splitterSize, setSplitterSize] = useQueryState('split', {
     defaultValue: '50',
@@ -84,6 +88,8 @@ function SplitterLayout(): JSX.Element {
             setOtherTabs={setRightTabs}
             otherActiveTab={activeRightTab}
             setOtherActiveTab={setActiveRightTab}
+            draggedTab={draggedTab}
+            setDraggedTab={setDraggedTab}
           />
         </SplitterPanel>
         <SplitterPanel size={rightSize} minSize={20}>
@@ -97,6 +103,8 @@ function SplitterLayout(): JSX.Element {
             setOtherTabs={setLeftTabs}
             otherActiveTab={activeLeftTab}
             setOtherActiveTab={setActiveLeftTab}
+            draggedTab={draggedTab}
+            setDraggedTab={setDraggedTab}
           />
         </SplitterPanel>
       </Splitter>
