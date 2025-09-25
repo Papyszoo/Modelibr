@@ -31,19 +31,20 @@ function ModelList({ onBackToUpload, isTabContent = false }: ModelListProps): JS
     return <ModelListWithTabContext onBackToUpload={onBackToUpload} />
   }
 
-  return <ModelListContent onBackToUpload={onBackToUpload} tabContext={null} />
+  return <ModelListContent onBackToUpload={onBackToUpload} tabContext={null} isTabContent={false} />
 }
 
 // Wrapper component for tab context
 function ModelListWithTabContext({ onBackToUpload }: { onBackToUpload?: () => void }): JSX.Element {
   const tabContext = useTabContext()
-  return <ModelListContent onBackToUpload={onBackToUpload} tabContext={tabContext} />
+  return <ModelListContent onBackToUpload={onBackToUpload} tabContext={tabContext} isTabContent={true} />
 }
 
 // Main component content
-function ModelListContent({ onBackToUpload, tabContext }: { 
+function ModelListContent({ onBackToUpload, tabContext, isTabContent }: { 
   onBackToUpload?: () => void
   tabContext: TabContextValue | null
+  isTabContent: boolean
 }): JSX.Element {
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState<boolean>(true)
