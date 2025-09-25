@@ -1,4 +1,6 @@
-import { Button } from 'primereact/button'
+import { useRef } from 'react'
+import { ContextMenu } from 'primereact/contextmenu'
+import { MenuItem } from 'primereact/menuitem'
 import { Tab } from '../../types'
 import './DraggableTab.css'
 
@@ -55,6 +57,16 @@ function DraggableTab({
   onDragEnd,
   side: _side, // prefix with underscore to indicate intentionally unused
 }: DraggableTabProps): JSX.Element {
+  const contextMenuRef = useRef<ContextMenu>(null)
+
+  const contextMenuItems: MenuItem[] = [
+    {
+      label: 'Close Tab',
+      icon: 'pi pi-times',
+      command: () => onClose(),
+    },
+  ]
+
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', tab.id)
@@ -65,39 +77,36 @@ function DraggableTab({
     onDragEnd()
   }
 
-  const handleClick = (e: React.MouseEvent): void => {
-    // Don't select tab if clicking close button
-    if ((e.target as Element).closest('.tab-close-button')) {
-      return
-    }
+  const handleClick = (): void => {
     onSelect()
   }
 
-  const handleCloseClick = (e: React.MouseEvent): void => {
-    e.stopPropagation()
-    onClose()
+  const handleContextMenu = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    contextMenuRef.current?.show(e)
   }
 
   return (
-    <div
-      className={`draggable-tab ${isActive ? 'active' : ''}`}
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onClick={handleClick}
-      title={getTabTooltip(tab)}
-    >
-      {/* Tab content - always show icon for now */}
-      <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
+    <>
+      <div
+        className={`draggable-tab ${isActive ? 'active' : ''}`}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        title={getTabTooltip(tab)}
+      >
+        {/* Tab content - always show icon for now */}
+        <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
+      </div>
 
-      {/* Close button */}
-      <Button
-        icon="pi pi-times"
-        className="p-button-text p-button-rounded tab-close-button"
-        onClick={handleCloseClick}
-        size="small"
+      <ContextMenu
+        model={contextMenuItems}
+        ref={contextMenuRef}
+        className="tab-context-menu"
       />
-    </div>
+    </>
   )
 }
 

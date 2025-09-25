@@ -52,32 +52,25 @@
   object-fit: cover;
 }
 
-/* Close Button */
-.tab-close-button {
-  position: absolute !important;
-  top: -6px !important;
-  right: -6px !important;
-  width: 16px !important;
-  height: 16px !important;
-  min-width: 16px !important;
-  background: #ef4444 !important;
-  border: 1px solid white !important;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 10;
+/* Context Menu */
+.tab-context-menu {
+  border: 1px solid #475569;
+  border-radius: 4px;
+  background: #334155;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
-.tab-close-button .p-button-icon {
-  font-size: 0.6rem !important;
-  color: white !important;
+.tab-context-menu .p-menuitem-link {
+  color: #e2e8f0;
+  padding: 8px 12px;
 }
 
-.draggable-tab:hover .tab-close-button {
-  opacity: 1;
+.tab-context-menu .p-menuitem-link:hover {
+  background: #475569;
 }
 
-.tab-close-button:hover {
-  background: #dc2626 !important;
+.tab-context-menu .p-menuitem-icon {
+  color: #ef4444;
 }
 
 /* Drag feedback */
@@ -106,15 +99,5 @@
 
   .tab-icon {
     font-size: 1rem;
-  }
-
-  .tab-close-button {
-    width: 14px !important;
-    height: 14px !important;
-    min-width: 14px !important;
-  }
-
-  .tab-close-button .p-button-icon {
-    font-size: 0.5rem !important;
   }
 }
