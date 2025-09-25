@@ -214,15 +214,27 @@ export class ThumbnailApiService {
    */
   async testConnection() {
     try {
-      // Try to reach the API by making a simple request to check if the service is running
-      // We'll use the thumbnail jobs endpoint since that's what the worker needs to access
-      const response = await this.client.head('/api/thumbnail-jobs/dequeue', { timeout: 5000 });
-      return response.status >= 200 && response.status < 500; // Accept any response that indicates the service is running
-    } catch (error) {
-      logger.warn('API connectivity test failed', {
-        apiBaseUrl: this.apiBaseUrl,
-        error: error.message
+      // Simple connectivity test - check if we can establish a TCP connection to the API server
+      const url = new URL(this.apiBaseUrl);
+      const hostname = url.hostname;
+      const port = url.port || (url.protocol === 'https:' ? 443 : 80);
+      
+      // Use a simple HTTP request with a very short timeout just to test connectivity
+      // We don't care about the response content, just that the server is reachable
+      const response = await this.client.get('/', { 
+        timeout: 3000,
+        validateStatus: () => true // Accept any status code, we just want to know if server responds
       });
+      
+      return true; // If we get any response, the server is reachable
+    } catch (error) {
+      // Only log if it's not a simple connection refused error
+      if (!error.code || !['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT'].includes(error.code)) {
+        logger.warn('API connectivity test failed', {
+          apiBaseUrl: this.apiBaseUrl,
+          error: error.message
+        });
+      }
       return false;
     }
   }
