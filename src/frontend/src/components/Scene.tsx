@@ -3,8 +3,13 @@ import { OrbitControls } from '@react-three/drei'
 import Model from './Model'
 import LoadingPlaceholder from './LoadingPlaceholder'
 import ApiClient from '../services/ApiClient'
+import { Model as ModelType } from '../utils/fileUtils'
 
-function Scene({ model }) {
+interface SceneProps {
+  model: ModelType
+}
+
+function Scene({ model }: SceneProps): JSX.Element {
   // Find the first renderable file
   const renderableFile = model.files?.find(f => f.isRenderable) || model.files?.[0]
   

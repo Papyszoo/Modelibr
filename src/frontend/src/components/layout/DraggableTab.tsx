@@ -1,38 +1,49 @@
 import { Button } from 'primereact/button'
+import { Tab } from '../../types'
 import './DraggableTab.css'
 
-const getTabIcon = (tabType) => {
+const getTabIcon = (tabType: Tab['type']): string => {
   switch (tabType) {
     case 'modelList':
       return 'pi pi-list'
-    case 'modelDetails':
+    case 'modelViewer':
       return 'pi pi-eye'
-    case 'textureList':
+    case 'texture':
       return 'pi pi-image'
-    case 'animationList':
+    case 'animation':
       return 'pi pi-play'
     default:
       return 'pi pi-file'
   }
 }
 
-const getTabTooltip = (tab) => {
-  if (tab.title) {
-    return tab.title
+const getTabTooltip = (tab: Tab): string => {
+  if (tab.label) {
+    return tab.label
   }
   
   switch (tab.type) {
     case 'modelList':
       return 'Models List'
-    case 'modelDetails':
-      return `Model: ${tab.data?.name || tab.data?.id || 'Unknown'}`
-    case 'textureList':
+    case 'modelViewer':
+      return `Model: ${tab.modelId || 'Unknown'}`
+    case 'texture':
       return 'Textures List'
-    case 'animationList':
+    case 'animation':
       return 'Animations List'
     default:
       return 'Unknown Tab'
   }
+}
+
+interface DraggableTabProps {
+  tab: Tab
+  isActive: boolean
+  onSelect: () => void
+  onClose: () => void
+  onDragStart: (tab: Tab) => void
+  onDragEnd: () => void
+  side: 'left' | 'right'
 }
 
 function DraggableTab({ 
@@ -43,26 +54,26 @@ function DraggableTab({
   onDragStart, 
   onDragEnd,
   side 
-}) {
-  const handleDragStart = (e) => {
+}: DraggableTabProps): JSX.Element {
+  const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', tab.id)
     onDragStart(tab)
   }
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (): void => {
     onDragEnd()
   }
 
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent): void => {
     // Don't select tab if clicking close button
-    if (e.target.closest('.tab-close-button')) {
+    if ((e.target as Element).closest('.tab-close-button')) {
       return
     }
     onSelect()
   }
 
-  const handleCloseClick = (e) => {
+  const handleCloseClick = (e: React.MouseEvent): void => {
     e.stopPropagation()
     onClose()
   }
@@ -76,18 +87,8 @@ function DraggableTab({
       onClick={handleClick}
       title={getTabTooltip(tab)}
     >
-      {/* Tab content based on type */}
-      {tab.type === 'modelDetails' && tab.data?.thumbnailUrl ? (
-        <div className="tab-thumbnail">
-          <img 
-            src={tab.data.thumbnailUrl} 
-            alt={`Model ${tab.data.id}`}
-            className="tab-thumbnail-img"
-          />
-        </div>
-      ) : (
-        <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
-      )}
+      {/* Tab content - always show icon for now */}
+      <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
 
       {/* Close button */}
       <Button

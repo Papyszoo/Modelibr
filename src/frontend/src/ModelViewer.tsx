@@ -1,13 +1,59 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfo from './components/ModelInfo'
 import ThumbnailDisplay from './components/ThumbnailDisplay'
-import { getModelFileFormat } from './utils/fileUtils'
+import { getModelFileFormat, Model } from './utils/fileUtils'
+import ApiClient from './services/ApiClient'
 import './ModelViewer.css'
 
-function ModelViewer({ model, onBack, isTabContent = false }) {
-  const [error, setError] = useState('')
+interface ModelViewerProps {
+  model?: Model
+  modelId?: string
+  onBack?: () => void
+  isTabContent?: boolean
+}
+
+function ModelViewer({ model: propModel, modelId, onBack, isTabContent = false }: ModelViewerProps): JSX.Element {
+  const [error, setError] = useState<string>('')
+  const [model, setModel] = useState<Model | null>(propModel || null)
+  const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
+
+  useEffect(() => {
+    if (!propModel && modelId) {
+      fetchModel(modelId)
+    }
+  }, [propModel, modelId])
+
+  const fetchModel = async (id: string): Promise<void> => {
+    try {
+      setLoading(true)
+      setError('')
+      const models = await ApiClient.getModels()
+      const foundModel = models.find(m => m.id === id)
+      if (foundModel) {
+        setModel(foundModel)
+      } else {
+        setError('Model not found')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load model')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="model-viewer-loading">Loading model...</div>
+  }
+
+  if (error) {
+    return <div className="model-viewer-error">Error: {error}</div>
+  }
+
+  if (!model) {
+    return <div className="model-viewer-error">No model data available</div>
+  }
 
   return (
     <div className={`model-viewer ${isTabContent ? 'model-viewer-tab' : ''}`}>
