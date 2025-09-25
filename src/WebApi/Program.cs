@@ -73,7 +73,6 @@ namespace WebApi
             app.UseAuthorization();
 
             // Map endpoints
-            app.MapHealthCheckEndpoints();
             app.MapModelEndpoints();
             app.MapModelsEndpoints();
             app.MapFilesEndpoints();
