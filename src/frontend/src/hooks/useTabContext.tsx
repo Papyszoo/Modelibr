@@ -1,18 +1,7 @@
-import { createContext, useContext, ReactNode } from 'react'
+import { useContext, ReactNode } from 'react'
+import TabContext, { TabContextValue } from '../contexts/TabContext'
 import { Tab } from '../types'
 import { Model } from '../utils/fileUtils'
-
-interface TabContextValue {
-  side: 'left' | 'right'
-  tabs: Tab[]
-  setTabs: (tabs: Tab[]) => void
-  activeTab: string
-  setActiveTab: (tabId: string) => void
-  openModelDetailsTab: (model: Model) => void
-  openTab: (type: Tab['type'], title: string, data?: any) => void
-}
-
-const TabContext = createContext<TabContextValue | null>(null)
 
 export const useTabContext = (): TabContextValue => {
   const context = useContext(TabContext)
@@ -57,14 +46,14 @@ export const TabProvider = ({ children, side, tabs, setTabs, activeTab, setActiv
     setActiveTab(newTab.id)
   }
 
-  const openTab = (type: Tab['type'], title: string, data: any = null): void => {
+  const openTab = (type: Tab['type'], title: string, data: unknown = null): void => {
     // Check if tab already exists for certain types
     const existingTab = tabs.find(tab => 
       tab.type === type && (
         type === 'modelList' ||
         type === 'texture' ||
         type === 'animation' ||
-        (type === 'modelViewer' && tab.modelId === data?.id)
+        (type === 'modelViewer' && tab.modelId === (data as { id?: string })?.id)
       )
     )
     
@@ -78,7 +67,7 @@ export const TabProvider = ({ children, side, tabs, setTabs, activeTab, setActiv
       id: `${type}-${Date.now()}`,
       type,
       label: title,
-      modelId: type === 'modelViewer' ? data?.id : undefined
+      modelId: type === 'modelViewer' ? (data as { id?: string })?.id : undefined
     }
     
     const newTabs = [...tabs, newTab]

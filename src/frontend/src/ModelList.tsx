@@ -9,6 +9,7 @@ import { Toast } from 'primereact/toast'
 import { ProgressBar } from 'primereact/progressbar'
 import { useFileUpload, useDragAndDrop } from './hooks/useFileUpload'
 import { useTabContext } from './hooks/useTabContext'
+import { TabContextValue } from './contexts/TabContext'
 import { 
   getFileExtension,
   formatFileSize,
@@ -24,19 +25,31 @@ interface ModelListProps {
 }
 
 function ModelList({ onBackToUpload, isTabContent = false }: ModelListProps): JSX.Element {
+  // To avoid conditional hook usage, we need to restructure
+  // For now, we'll use a wrapper component approach
+  if (isTabContent) {
+    return <ModelListWithTabContext onBackToUpload={onBackToUpload} />
+  }
+
+  return <ModelListContent onBackToUpload={onBackToUpload} tabContext={null} />
+}
+
+// Wrapper component for tab context
+function ModelListWithTabContext({ onBackToUpload }: { onBackToUpload?: () => void }): JSX.Element {
+  const tabContext = useTabContext()
+  return <ModelListContent onBackToUpload={onBackToUpload} tabContext={tabContext} />
+}
+
+// Main component content
+function ModelListContent({ onBackToUpload, tabContext }: { 
+  onBackToUpload?: () => void
+  tabContext: TabContextValue | null
+}): JSX.Element {
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string>('')
   const toast = useRef<Toast>(null)
   const dt = useRef<DataTable<Model[]>>(null)
-
-  // Always call useTabContext, but only use it when in tab context
-  let tabContext = null
-  try {
-    tabContext = useTabContext()
-  } catch {
-    // Not in a tab context, that's fine
-  }
 
   // Use the file upload hook with Three.js renderability requirement
   const { uploading, uploadProgress, uploadMultipleFiles } = useFileUpload({

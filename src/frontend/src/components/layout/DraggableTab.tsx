@@ -53,7 +53,7 @@ function DraggableTab({
   onClose, 
   onDragStart, 
   onDragEnd,
-  side 
+  side: _side // prefix with underscore to indicate intentionally unused
 }: DraggableTabProps): JSX.Element {
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'

@@ -28,7 +28,7 @@ function DockPanel({
   setActiveTab,
   otherTabs,
   setOtherTabs,
-  otherActiveTab,
+  otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
   setOtherActiveTab
 }: DockPanelProps): JSX.Element {
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
