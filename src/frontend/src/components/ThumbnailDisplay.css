@@ -222,12 +222,12 @@
     width: 80px;
     height: 80px;
   }
-  
+
   .thumbnail-large {
     width: 120px;
     height: 120px;
   }
-  
+
   .thumbnail-status-text {
     font-size: 0.65rem;
   }
@@ -238,11 +238,11 @@
   .thumbnail-spinner {
     animation: none;
   }
-  
+
   .thumbnail-image {
     transition: none;
   }
-  
+
   .thumbnail-image:hover {
     transform: none;
   }
@@ -259,7 +259,7 @@
   .thumbnail-display {
     border-width: 2px;
   }
-  
+
   .thumbnail-loading,
   .thumbnail-error,
   .thumbnail-placeholder {

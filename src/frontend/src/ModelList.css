@@ -288,26 +288,26 @@
   .model-list {
     padding: 1rem;
   }
-  
+
   .header-controls {
     position: static;
     margin-bottom: 1rem;
   }
-  
+
   .model-list-header {
     text-align: left;
   }
-  
+
   .datatable-container {
     overflow-x: auto;
   }
-  
+
   .model-list-header-tab {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .model-stats {
     flex-direction: column;
     gap: 0.5rem;

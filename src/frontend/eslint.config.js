@@ -4,6 +4,8 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from '@typescript-eslint/eslint-plugin'
 import tsParser from '@typescript-eslint/parser'
+import prettier from 'eslint-plugin-prettier'
+import prettierConfig from 'eslint-config-prettier'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
@@ -35,6 +37,7 @@ export default defineConfig([
       '@typescript-eslint': tseslint,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
+      prettier: prettier,
     },
     languageOptions: {
       parser: tsParser,
@@ -52,13 +55,26 @@ export default defineConfig([
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs['recommended-latest'].rules,
       ...reactRefresh.configs.vite.rules,
-      '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      ...prettierConfig.rules,
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+      ],
       'no-unused-vars': 'off', // Disable base rule as it can report incorrect errors
+      'prettier/prettier': 'error',
+
+      // Architectural boundary rules - will be overridden for specific directories
+      'no-restricted-imports': 'off',
     },
   },
   // Configuration for test files
   {
-    files: ['**/*.test.{js,jsx,ts,tsx}', '**/__tests__/**/*.{js,jsx,ts,tsx}', '**/setupTests.{js,ts}', '**/__mocks__/**/*.{js,jsx,ts,tsx}'],
+    files: [
+      '**/*.test.{js,jsx,ts,tsx}',
+      '**/__tests__/**/*.{js,jsx,ts,tsx}',
+      '**/setupTests.{js,ts}',
+      '**/__mocks__/**/*.{js,jsx,ts,tsx}',
+    ],
     languageOptions: {
       globals: {
         ...globals.jest,
@@ -68,6 +84,80 @@ export default defineConfig([
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-require-imports': 'off', // Allow require() in tests
+      'no-restricted-imports': 'off', // Allow direct imports in tests
+    },
+  },
+  // Architectural boundary rules for components
+  {
+    files: ['**/components/**/*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/services/*'],
+              message:
+                'Components should not directly import services. Use hooks or contexts instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Architectural boundary rules for utils
+  {
+    files: ['**/utils/**/*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '../components/*',
+                '../../components/*',
+                '**/components/*',
+              ],
+              message:
+                'Utils should not import from components to maintain clean architecture.',
+            },
+            {
+              group: ['../hooks/*', '../../hooks/*', '**/hooks/*'],
+              message:
+                'Utils should not import from hooks to maintain clean architecture.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Architectural boundary rules for services
+  {
+    files: ['**/services/**/*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '../components/*',
+                '../../components/*',
+                '**/components/*',
+              ],
+              message:
+                'Services should not import from components to maintain clean architecture.',
+            },
+            {
+              group: ['../hooks/*', '../../hooks/*', '**/hooks/*'],
+              message:
+                'Services should not import from hooks to maintain clean architecture.',
+            },
+          ],
+        },
+      ],
     },
   },
 ])

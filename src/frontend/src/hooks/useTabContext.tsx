@@ -3,6 +3,7 @@ import TabContext, { TabContextValue } from '../contexts/TabContext'
 import { Tab } from '../types'
 import { Model } from '../utils/fileUtils'
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTabContext = (): TabContextValue => {
   const context = useContext(TabContext)
   if (!context) {
@@ -20,13 +21,20 @@ interface TabProviderProps {
   setActiveTab: (tabId: string) => void
 }
 
-export const TabProvider = ({ children, side, tabs, setTabs, activeTab, setActiveTab }: TabProviderProps): JSX.Element => {
+export const TabProvider = ({
+  children,
+  side,
+  tabs,
+  setTabs,
+  activeTab,
+  setActiveTab,
+}: TabProviderProps): JSX.Element => {
   const openModelDetailsTab = (model: Model): void => {
     // Check if tab already exists
-    const existingTab = tabs.find(tab => 
-      tab.type === 'modelViewer' && tab.modelId === model.id
+    const existingTab = tabs.find(
+      tab => tab.type === 'modelViewer' && tab.modelId === model.id
     )
-    
+
     if (existingTab) {
       // Switch to existing tab
       setActiveTab(existingTab.id)
@@ -38,25 +46,30 @@ export const TabProvider = ({ children, side, tabs, setTabs, activeTab, setActiv
       id: `model-${model.id}-${Date.now()}`,
       type: 'modelViewer',
       label: model.name || `Model ${model.id}`,
-      modelId: model.id
+      modelId: model.id,
     }
-    
+
     const newTabs = [...tabs, newTab]
     setTabs(newTabs)
     setActiveTab(newTab.id)
   }
 
-  const openTab = (type: Tab['type'], title: string, data: unknown = null): void => {
+  const openTab = (
+    type: Tab['type'],
+    title: string,
+    data: unknown = null
+  ): void => {
     // Check if tab already exists for certain types
-    const existingTab = tabs.find(tab => 
-      tab.type === type && (
-        type === 'modelList' ||
-        type === 'texture' ||
-        type === 'animation' ||
-        (type === 'modelViewer' && tab.modelId === (data as { id?: string })?.id)
-      )
+    const existingTab = tabs.find(
+      tab =>
+        tab.type === type &&
+        (type === 'modelList' ||
+          type === 'texture' ||
+          type === 'animation' ||
+          (type === 'modelViewer' &&
+            tab.modelId === (data as { id?: string })?.id))
     )
-    
+
     if (existingTab) {
       setActiveTab(existingTab.id)
       return
@@ -67,9 +80,10 @@ export const TabProvider = ({ children, side, tabs, setTabs, activeTab, setActiv
       id: `${type}-${Date.now()}`,
       type,
       label: title,
-      modelId: type === 'modelViewer' ? (data as { id?: string })?.id : undefined
+      modelId:
+        type === 'modelViewer' ? (data as { id?: string })?.id : undefined,
     }
-    
+
     const newTabs = [...tabs, newTab]
     setTabs(newTabs)
     setActiveTab(newTab.id)
@@ -82,14 +96,10 @@ export const TabProvider = ({ children, side, tabs, setTabs, activeTab, setActiv
     activeTab,
     setActiveTab,
     openModelDetailsTab,
-    openTab
+    openTab,
   }
 
-  return (
-    <TabContext.Provider value={value}>
-      {children}
-    </TabContext.Provider>
-  )
+  return <TabContext.Provider value={value}>{children}</TabContext.Provider>
 }
 
 export default TabContext

@@ -2,21 +2,21 @@
 describe('Drag and Drop Utilities', () => {
   // Mock implementation of the drag and drop function
   function useDragAndDrop(onFilesDropped) {
-    const onDrop = (e) => {
+    const onDrop = e => {
       e.preventDefault()
       const files = Array.from(e.dataTransfer.files)
       onFilesDropped(files)
     }
 
-    const onDragOver = (e) => {
+    const onDragOver = e => {
       e.preventDefault()
     }
 
-    const onDragEnter = (e) => {
+    const onDragEnter = e => {
       e.preventDefault()
     }
 
-    const onDragLeave = (e) => {
+    const onDragLeave = e => {
       e.preventDefault()
     }
 
@@ -24,7 +24,7 @@ describe('Drag and Drop Utilities', () => {
       onDrop,
       onDragOver,
       onDragEnter,
-      onDragLeave
+      onDragLeave,
     }
   }
 
@@ -42,12 +42,14 @@ describe('Drag and Drop Utilities', () => {
     const onFilesDropped = jest.fn()
     const handlers = useDragAndDrop(onFilesDropped)
 
-    const mockFile = new File(['content'], 'test.obj', { type: 'application/octet-stream' })
+    const mockFile = new File(['content'], 'test.obj', {
+      type: 'application/octet-stream',
+    })
     const mockEvent = {
       preventDefault: jest.fn(),
       dataTransfer: {
-        files: [mockFile]
-      }
+        files: [mockFile],
+      },
     }
 
     handlers.onDrop(mockEvent)
@@ -72,13 +74,17 @@ describe('Drag and Drop Utilities', () => {
     const onFilesDropped = jest.fn()
     const handlers = useDragAndDrop(onFilesDropped)
 
-    const mockFile1 = new File(['content1'], 'test1.obj', { type: 'application/octet-stream' })
-    const mockFile2 = new File(['content2'], 'test2.gltf', { type: 'application/octet-stream' })
+    const mockFile1 = new File(['content1'], 'test1.obj', {
+      type: 'application/octet-stream',
+    })
+    const mockFile2 = new File(['content2'], 'test2.gltf', {
+      type: 'application/octet-stream',
+    })
     const mockEvent = {
       preventDefault: jest.fn(),
       dataTransfer: {
-        files: [mockFile1, mockFile2]
-      }
+        files: [mockFile1, mockFile2],
+      },
     }
 
     handlers.onDrop(mockEvent)

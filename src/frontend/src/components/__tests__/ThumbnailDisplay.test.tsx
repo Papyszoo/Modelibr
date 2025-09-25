@@ -9,8 +9,8 @@ jest.mock('../../hooks/useThumbnailManager', () => ({
     PENDING: 'Pending',
     PROCESSING: 'Processing',
     READY: 'Ready',
-    FAILED: 'Failed'
-  }
+    FAILED: 'Failed',
+  },
 }))
 
 const { useThumbnailManager } = require('../../hooks/useThumbnailManager')
@@ -29,11 +29,11 @@ describe('ThumbnailDisplay', () => {
       isProcessing: true,
       isReady: false,
       isFailed: false,
-      regenerateThumbnail: jest.fn()
+      regenerateThumbnail: jest.fn(),
     })
 
     render(<ThumbnailDisplay modelId={1} />)
-    
+
     expect(screen.getByLabelText('Loading thumbnail')).toBeInTheDocument()
     expect(screen.getByText('Generating thumbnail...')).toBeInTheDocument()
   })
@@ -47,11 +47,11 @@ describe('ThumbnailDisplay', () => {
       isProcessing: false,
       isReady: false,
       isFailed: false,
-      regenerateThumbnail: jest.fn()
+      regenerateThumbnail: jest.fn(),
     })
 
     render(<ThumbnailDisplay modelId={1} />)
-    
+
     expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
   })
 
@@ -64,7 +64,7 @@ describe('ThumbnailDisplay', () => {
       isProcessing: false,
       isReady: false,
       isFailed: false,
-      regenerateThumbnail: jest.fn()
+      regenerateThumbnail: jest.fn(),
     })
 
     const { container } = render(<ThumbnailDisplay modelId={1} size="small" />)

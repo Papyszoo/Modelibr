@@ -1,18 +1,18 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import ffmpeg from 'fluent-ffmpeg';
-import sharp from 'sharp';
-import { config } from './config.js';
-import logger from './logger.js';
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
+import ffmpeg from 'fluent-ffmpeg'
+import sharp from 'sharp'
+import { config } from './config.js'
+import logger from './logger.js'
 
 /**
  * Service for encoding orbit frames into animated WebP and poster images
  */
 export class FrameEncoderService {
   constructor() {
-    this.tempDir = path.join(os.tmpdir(), 'modelibr-frame-encoder');
-    this.ensureTempDirectory();
+    this.tempDir = path.join(os.tmpdir(), 'modelibr-frame-encoder')
+    this.ensureTempDirectory()
   }
 
   /**
@@ -20,8 +20,10 @@ export class FrameEncoderService {
    */
   ensureTempDirectory() {
     if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
-      logger.debug('Created frame encoder temporary directory', { tempDir: this.tempDir });
+      fs.mkdirSync(this.tempDir, { recursive: true })
+      logger.debug('Created frame encoder temporary directory', {
+        tempDir: this.tempDir,
+      })
     }
   }
 
@@ -32,37 +34,45 @@ export class FrameEncoderService {
    * @returns {Promise<Object>} Encoding result with file paths and metadata
    */
   async encodeFrames(frames, jobLogger) {
-    const startTime = Date.now();
-    const jobId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-    const workingDir = path.join(this.tempDir, `job-${jobId}`);
-    
+    const startTime = Date.now()
+    const jobId = Date.now().toString(36) + Math.random().toString(36).substr(2)
+    const workingDir = path.join(this.tempDir, `job-${jobId}`)
+
     try {
       // Create job-specific working directory
-      fs.mkdirSync(workingDir, { recursive: true });
-      
+      fs.mkdirSync(workingDir, { recursive: true })
+
       jobLogger.info('Starting frame encoding', {
         frameCount: frames.length,
         workingDir,
-        targetFormat: 'webp'
-      });
+        targetFormat: 'webp',
+      })
 
       // Step 1: Convert frames to temporary PNG files
-      const pngFiles = await this.framesToPNG(frames, workingDir, jobLogger);
-      
+      const pngFiles = await this.framesToPNG(frames, workingDir, jobLogger)
+
       // Step 2: Create animated WebP from PNG sequence
-      const webpPath = await this.createAnimatedWebP(pngFiles, workingDir, jobLogger);
-      
+      const webpPath = await this.createAnimatedWebP(
+        pngFiles,
+        workingDir,
+        jobLogger
+      )
+
       // Step 3: Extract poster frame (first frame as JPG)
-      const posterPath = await this.createPosterFrame(pngFiles[0], workingDir, jobLogger);
-      
-      const encodeTime = Date.now() - startTime;
-      
+      const posterPath = await this.createPosterFrame(
+        pngFiles[0],
+        workingDir,
+        jobLogger
+      )
+
+      const encodeTime = Date.now() - startTime
+
       jobLogger.info('Frame encoding completed successfully', {
         encodeTimeMs: encodeTime,
         webpPath,
         posterPath,
-        frameCount: frames.length
-      });
+        frameCount: frames.length,
+      })
 
       return {
         webpPath,
@@ -70,19 +80,18 @@ export class FrameEncoderService {
         tempFiles: pngFiles,
         workingDir,
         encodeTimeMs: encodeTime,
-        frameCount: frames.length
-      };
-
+        frameCount: frames.length,
+      }
     } catch (error) {
       jobLogger.error('Frame encoding failed', {
         error: error.message,
         frameCount: frames.length,
-        workingDir
-      });
-      
+        workingDir,
+      })
+
       // Clean up on error
-      await this.cleanupDirectory(workingDir);
-      throw error;
+      await this.cleanupDirectory(workingDir)
+      throw error
     }
   }
 
@@ -94,42 +103,50 @@ export class FrameEncoderService {
    * @returns {Promise<Array>} Array of PNG file paths
    */
   async framesToPNG(frames, workingDir, jobLogger) {
-    const pngFiles = [];
-    
+    const pngFiles = []
+
     jobLogger.info('Converting frames to PNG files', {
-      frameCount: frames.length
-    });
+      frameCount: frames.length,
+    })
 
     for (let i = 0; i < frames.length; i++) {
-      const frame = frames[i];
-      const fileName = `frame_${String(i).padStart(4, '0')}.png`;
-      const filePath = path.join(workingDir, fileName);
-      
+      const frame = frames[i]
+      const fileName = `frame_${String(i).padStart(4, '0')}.png`
+      const filePath = path.join(workingDir, fileName)
+
       // For the simulated implementation, create a placeholder PNG
       // In a real implementation, this would use the actual pixel data from frame.pixels
       if (frame.simulated) {
         // Create a simple colored image as placeholder
-        const buffer = await this.createPlaceholderImage(frame.width, frame.height, frame.angle);
-        fs.writeFileSync(filePath, buffer);
+        const buffer = await this.createPlaceholderImage(
+          frame.width,
+          frame.height,
+          frame.angle
+        )
+        fs.writeFileSync(filePath, buffer)
       } else {
         // Real implementation would convert frame.pixels (RGBA buffer) to PNG
         // For now, create placeholder
-        const buffer = await this.createPlaceholderImage(frame.width, frame.height, frame.angle);
-        fs.writeFileSync(filePath, buffer);
+        const buffer = await this.createPlaceholderImage(
+          frame.width,
+          frame.height,
+          frame.angle
+        )
+        fs.writeFileSync(filePath, buffer)
       }
-      
-      pngFiles.push(filePath);
-      
+
+      pngFiles.push(filePath)
+
       // Log progress every 10 frames
       if ((i + 1) % 10 === 0 || i === frames.length - 1) {
         jobLogger.debug('PNG conversion progress', {
           framesCompleted: i + 1,
-          totalFrames: frames.length
-        });
+          totalFrames: frames.length,
+        })
       }
     }
 
-    return pngFiles;
+    return pngFiles
   }
 
   /**
@@ -141,9 +158,9 @@ export class FrameEncoderService {
    */
   async createPlaceholderImage(width, height, angle) {
     // Create a gradient image with angle-based color variation
-    const hue = Math.floor((angle / 360) * 360); // Convert angle to hue
-    const color = `hsl(${hue}, 70%, 50%)`;
-    
+    const hue = Math.floor((angle / 360) * 360) // Convert angle to hue
+    const color = `hsl(${hue}, 70%, 50%)`
+
     // Create a simple gradient image using Sharp
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -159,11 +176,9 @@ export class FrameEncoderService {
           Frame ${Math.floor(angle)}°
         </text>
       </svg>
-    `;
-    
-    return await sharp(Buffer.from(svg))
-      .png()
-      .toBuffer();
+    `
+
+    return await sharp(Buffer.from(svg)).png().toBuffer()
   }
 
   /**
@@ -174,21 +189,21 @@ export class FrameEncoderService {
    * @returns {Promise<string>} Path to created WebP file
    */
   async createAnimatedWebP(pngFiles, workingDir, jobLogger) {
-    const webpPath = path.join(workingDir, 'animation.webp');
-    const framerate = config.encoding?.framerate || 10; // frames per second
-    const quality = config.encoding?.webpQuality || 75; // WebP quality
-    
+    const webpPath = path.join(workingDir, 'animation.webp')
+    const framerate = config.encoding?.framerate || 10 // frames per second
+    const quality = config.encoding?.webpQuality || 75 // WebP quality
+
     jobLogger.info('Creating animated WebP', {
       inputFrames: pngFiles.length,
       framerate,
       quality,
-      outputPath: webpPath
-    });
+      outputPath: webpPath,
+    })
 
     return new Promise((resolve, reject) => {
       // Create input file list for FFmpeg
-      const inputPattern = path.join(workingDir, 'frame_%04d.png');
-      
+      const inputPattern = path.join(workingDir, 'frame_%04d.png')
+
       ffmpeg()
         .input(inputPattern)
         .inputFPS(framerate)
@@ -198,38 +213,38 @@ export class FrameEncoderService {
           `-quality ${quality}`,
           '-method 6', // Better compression
           '-loop 0', // Infinite loop
-          '-preset photo'
+          '-preset photo',
         ])
         .output(webpPath)
-        .on('start', (commandLine) => {
-          jobLogger.debug('FFmpeg command started', { commandLine });
+        .on('start', commandLine => {
+          jobLogger.debug('FFmpeg command started', { commandLine })
         })
-        .on('progress', (progress) => {
+        .on('progress', progress => {
           if (progress.percent) {
             jobLogger.debug('WebP encoding progress', {
               percent: Math.round(progress.percent),
               fps: progress.currentFps,
-              frames: progress.frames
-            });
+              frames: progress.frames,
+            })
           }
         })
         .on('end', () => {
           jobLogger.info('Animated WebP created successfully', {
             outputPath: webpPath,
-            sizeBytes: fs.existsSync(webpPath) ? fs.statSync(webpPath).size : 0
-          });
-          resolve(webpPath);
+            sizeBytes: fs.existsSync(webpPath) ? fs.statSync(webpPath).size : 0,
+          })
+          resolve(webpPath)
         })
-        .on('error', (error) => {
+        .on('error', error => {
           jobLogger.error('WebP encoding failed', {
             error: error.message,
             inputPattern,
-            outputPath: webpPath
-          });
-          reject(error);
+            outputPath: webpPath,
+          })
+          reject(error)
         })
-        .run();
-    });
+        .run()
+    })
   }
 
   /**
@@ -240,39 +255,39 @@ export class FrameEncoderService {
    * @returns {Promise<string>} Path to created poster JPG
    */
   async createPosterFrame(firstPngPath, workingDir, jobLogger) {
-    const posterPath = path.join(workingDir, 'poster.jpg');
-    const quality = config.encoding?.jpegQuality || 85; // JPEG quality
-    
+    const posterPath = path.join(workingDir, 'poster.jpg')
+    const quality = config.encoding?.jpegQuality || 85 // JPEG quality
+
     jobLogger.info('Creating poster frame', {
       inputPath: firstPngPath,
       outputPath: posterPath,
-      quality
-    });
+      quality,
+    })
 
     try {
       await sharp(firstPngPath)
-        .jpeg({ 
+        .jpeg({
           quality: quality,
           progressive: true,
-          mozjpeg: true
+          mozjpeg: true,
         })
-        .toFile(posterPath);
-      
-      const posterSize = fs.statSync(posterPath).size;
-      
+        .toFile(posterPath)
+
+      const posterSize = fs.statSync(posterPath).size
+
       jobLogger.info('Poster frame created successfully', {
         outputPath: posterPath,
-        sizeBytes: posterSize
-      });
-      
-      return posterPath;
+        sizeBytes: posterSize,
+      })
+
+      return posterPath
     } catch (error) {
       jobLogger.error('Poster frame creation failed', {
         error: error.message,
         inputPath: firstPngPath,
-        outputPath: posterPath
-      });
-      throw error;
+        outputPath: posterPath,
+      })
+      throw error
     }
   }
 
@@ -283,14 +298,14 @@ export class FrameEncoderService {
   async cleanupDirectory(workingDir) {
     try {
       if (fs.existsSync(workingDir)) {
-        fs.rmSync(workingDir, { recursive: true, force: true });
-        logger.debug('Cleaned up working directory', { workingDir });
+        fs.rmSync(workingDir, { recursive: true, force: true })
+        logger.debug('Cleaned up working directory', { workingDir })
       }
     } catch (error) {
       logger.warn('Failed to cleanup working directory', {
         workingDir,
-        error: error.message
-      });
+        error: error.message,
+      })
     }
   }
 
@@ -300,7 +315,7 @@ export class FrameEncoderService {
    */
   async cleanupEncodingResult(encodingResult) {
     if (encodingResult && encodingResult.workingDir) {
-      await this.cleanupDirectory(encodingResult.workingDir);
+      await this.cleanupDirectory(encodingResult.workingDir)
     }
   }
 
@@ -311,22 +326,22 @@ export class FrameEncoderService {
   async cleanupOldFiles(maxAgeMs = 2 * 60 * 60 * 1000) {
     try {
       if (!fs.existsSync(this.tempDir)) {
-        return;
+        return
       }
 
-      const entries = fs.readdirSync(this.tempDir, { withFileTypes: true });
-      const now = Date.now();
-      let cleanedCount = 0;
+      const entries = fs.readdirSync(this.tempDir, { withFileTypes: true })
+      const now = Date.now()
+      let cleanedCount = 0
 
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name.startsWith('job-')) {
-          const dirPath = path.join(this.tempDir, entry.name);
-          const stats = fs.statSync(dirPath);
-          const age = now - stats.mtime.getTime();
+          const dirPath = path.join(this.tempDir, entry.name)
+          const stats = fs.statSync(dirPath)
+          const age = now - stats.mtime.getTime()
 
           if (age > maxAgeMs) {
-            fs.rmSync(dirPath, { recursive: true, force: true });
-            cleanedCount++;
+            fs.rmSync(dirPath, { recursive: true, force: true })
+            cleanedCount++
           }
         }
       }
@@ -335,14 +350,14 @@ export class FrameEncoderService {
         logger.info('Cleaned up old frame encoder directories', {
           cleanedCount,
           maxAgeMs,
-          tempDir: this.tempDir
-        });
+          tempDir: this.tempDir,
+        })
       }
     } catch (error) {
       logger.warn('Failed to cleanup old frame encoder files', {
         error: error.message,
-        tempDir: this.tempDir
-      });
+        tempDir: this.tempDir,
+      })
     }
   }
 }

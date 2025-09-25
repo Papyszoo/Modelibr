@@ -21,15 +21,16 @@ export const detectWebGPU = async (): Promise<WebGPUDetectionResult> => {
     }
 
     const device = await adapter.requestDevice()
-    return { 
-      supported: true, 
-      adapter, 
+    return {
+      supported: true,
+      adapter,
       device,
       features: Array.from(adapter.features),
-      limits: adapter.limits 
+      limits: adapter.limits,
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error'
     return { supported: false, reason: errorMessage }
   }
 }

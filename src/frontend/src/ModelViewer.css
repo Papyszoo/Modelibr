@@ -69,7 +69,8 @@
   height: 100%;
 }
 
-.viewer-loading, .viewer-error {
+.viewer-loading,
+.viewer-error {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -90,8 +91,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .viewer-error h3 {
@@ -180,19 +185,22 @@
   text-align: right;
 }
 
-.feature-list, .controls-list {
+.feature-list,
+.controls-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.feature-list li, .controls-list li {
+.feature-list li,
+.controls-list li {
   padding: 0.5rem 0;
   color: #4a5568;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.feature-list li:last-child, .controls-list li:last-child {
+.feature-list li:last-child,
+.controls-list li:last-child {
   border-bottom: none;
 }
 
@@ -207,17 +215,17 @@
     flex-direction: column;
     text-align: center;
   }
-  
+
   .viewer-info {
     padding: 1rem;
     grid-template-columns: 1fr;
     max-height: none;
   }
-  
+
   .viewer-info-left {
     grid-template-columns: 1fr;
   }
-  
+
   .model-details {
     justify-content: center;
   }
@@ -227,7 +235,7 @@
   .viewer-header h1 {
     font-size: 1.2rem;
   }
-  
+
   .back-button {
     padding: 0.4rem 0.8rem;
     font-size: 0.8rem;

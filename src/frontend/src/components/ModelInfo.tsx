@@ -39,9 +39,15 @@ function ModelInfo({ model }) {
       <div className="info-section">
         <h3>Controls</h3>
         <ul className="controls-list">
-          <li><strong>Mouse:</strong> Rotate view</li>
-          <li><strong>Scroll:</strong> Zoom in/out</li>
-          <li><strong>Right-click + drag:</strong> Pan view</li>
+          <li>
+            <strong>Mouse:</strong> Rotate view
+          </li>
+          <li>
+            <strong>Scroll:</strong> Zoom in/out
+          </li>
+          <li>
+            <strong>Right-click + drag:</strong> Pan view
+          </li>
         </ul>
       </div>
     </>
