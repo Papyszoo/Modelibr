@@ -2,16 +2,21 @@ import ModelList from '../../ModelList'
 import ModelViewer from '../../ModelViewer'
 import TextureList from '../tabs/TextureList'
 import AnimationList from '../tabs/AnimationList'
+import { Tab } from '../../types'
 import './TabContent.css'
 
-function TabContent({ tab }) {
-  const renderContent = () => {
+interface TabContentProps {
+  tab: Tab
+}
+
+function TabContent({ tab }: TabContentProps): JSX.Element {
+  const renderContent = (): JSX.Element => {
     switch (tab.type) {
       case 'modelList':
         return <ModelList isTabContent={true} />
       
-      case 'modelDetails':
-        if (!tab.data) {
+      case 'modelViewer':
+        if (!tab.modelId) {
           return (
             <div className="tab-error">
               <h3>Model data not available</h3>
@@ -19,12 +24,12 @@ function TabContent({ tab }) {
             </div>
           )
         }
-        return <ModelViewer model={tab.data} isTabContent={true} />
+        return <ModelViewer modelId={tab.modelId} isTabContent={true} />
       
-      case 'textureList':
+      case 'texture':
         return <TextureList />
       
-      case 'animationList':
+      case 'animation':
         return <AnimationList />
       
       default:

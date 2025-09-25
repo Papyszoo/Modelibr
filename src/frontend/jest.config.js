@@ -1,10 +1,17 @@
 export default {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
+  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
   transform: {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      useESM: true,
+      tsconfig: {
+        jsx: 'react-jsx',
+      },
+    }],
     '^.+\\.(js|jsx)$': ['babel-jest', {
       presets: [
         ['@babel/preset-env', { targets: { node: 'current' } }],
@@ -12,15 +19,15 @@ export default {
       ]
     }]
   },
-  moduleFileExtensions: ['js', 'jsx'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.(js|jsx)',
-    '<rootDir>/src/**/*.(test|spec).(js|jsx)'
+    '<rootDir>/src/**/__tests__/**/*.(ts|tsx|js|jsx)',
+    '<rootDir>/src/**/*.(test|spec).(ts|tsx|js|jsx)'
   ],
   collectCoverageFrom: [
-    'src/**/*.(js|jsx)',
-    '!src/main.jsx',
-    '!src/setupTests.js',
+    'src/**/*.(ts|tsx|js|jsx)',
+    '!src/main.tsx',
+    '!src/setupTests.ts',
     '!**/node_modules/**'
   ],
   coverageThreshold: {
@@ -33,5 +40,6 @@ export default {
   },
   transformIgnorePatterns: [
     'node_modules/(?!(.*\\.mjs$))'
-  ]
+  ],
+  extensionsToTreatAsEsm: ['.ts', '.tsx']
 }

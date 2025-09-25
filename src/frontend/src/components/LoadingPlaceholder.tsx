@@ -1,6 +1,6 @@
 import { Text } from '@react-three/drei'
 
-function LoadingPlaceholder() {
+function LoadingPlaceholder(): JSX.Element {
   return (
     <Text
       position={[0, 0, 0]}

@@ -12,6 +12,14 @@ Object.defineProperty(global, 'import', {
 })
 
 // Create a global mock for import.meta
+declare global {
+  var importMeta: {
+    env: {
+      VITE_API_BASE_URL: string
+    }
+  }
+}
+
 global.importMeta = {
   env: {
     VITE_API_BASE_URL: 'http://localhost:5009'
