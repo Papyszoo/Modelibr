@@ -12,7 +12,12 @@ public static class ModelsEndpoints
         {
             var result = await queryHandler.Handle(new GetAllModelsQuery(), CancellationToken.None);
             
-            return Results.Ok(result);
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+            
+            return Results.Ok(result.Value.Models);
         })
         .WithName("Get All Models");
 
