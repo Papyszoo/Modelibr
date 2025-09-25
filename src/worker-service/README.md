@@ -18,15 +18,18 @@ A Node.js worker service for background thumbnail generation using three.js. Thi
 The service is configured via environment variables. See `.env.example` for all available options:
 
 ### Core Settings
+
 - `WORKER_ID`: Unique worker identifier (default: `worker-{pid}`)
 - `WORKER_PORT`: Health check server port (default: `3001`)
 - `API_BASE_URL`: Base URL for the main API (default: `http://localhost:5009`)
 
 ### Job Processing
+
 - `POLL_INTERVAL_MS`: How often to poll for jobs in milliseconds (default: `5000`)
 - `MAX_CONCURRENT_JOBS`: Maximum number of jobs to process simultaneously (default: `3`)
 
 ### Thumbnail Rendering
+
 - `RENDER_WIDTH`: Output image width in pixels (default: `256`)
 - `RENDER_HEIGHT`: Output image height in pixels (default: `256`)
 - `RENDER_FORMAT`: Output format: png, jpg, jpeg, webp (default: `png`)
@@ -35,6 +38,7 @@ The service is configured via environment variables. See `.env.example` for all 
 - `ENABLE_ANTIALIASING`: Enable antialiasing (default: `true`)
 
 ### Orbit Animation
+
 - `ORBIT_ENABLED`: Enable orbit frame rendering (default: `true`)
 - `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `15`)
 - `ORBIT_START_ANGLE`: Starting angle in degrees (default: `0`)
@@ -42,6 +46,7 @@ The service is configured via environment variables. See `.env.example` for all 
 - `ORBIT_CAMERA_HEIGHT`: Vertical camera offset from center (default: `0`)
 
 ### Logging
+
 - `LOG_LEVEL`: Logging level: error, warn, info, debug (default: `info`)
 - `LOG_FORMAT`: Log format: json or simple (default: `json`)
 
@@ -55,6 +60,7 @@ The service exposes several endpoints for monitoring:
 - `GET /metrics` - Basic Prometheus-style metrics
 
 ### Health Check Response
+
 ```json
 {
   "status": "healthy",
@@ -81,22 +87,27 @@ The service exposes several endpoints for monitoring:
 ## Development
 
 ### Prerequisites
-- Node.js 18+ 
+
+- Node.js 18+
 - npm or yarn
 
 ### Local Development
+
 1. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 2. **Configure environment**
+
    ```bash
    cp .env.example .env
    # Edit .env with your settings
    ```
 
 3. **Start the service**
+
    ```bash
    npm start
    ```
@@ -107,6 +118,7 @@ The service exposes several endpoints for monitoring:
    ```
 
 ### Testing Health Endpoints
+
 ```bash
 # Basic health check
 curl http://localhost:3001/health
@@ -124,6 +136,7 @@ curl http://localhost:3001/metrics
 ## Deployment
 
 ### Docker
+
 ```bash
 # Build the image
 docker build -t modelibr-thumbnail-worker .
@@ -136,6 +149,7 @@ docker run -p 3001:3001 \
 ```
 
 ### Docker Compose
+
 The service is included in the main `docker-compose.yml` file:
 
 ```bash
@@ -154,11 +168,12 @@ docker compose up -d --scale thumbnail-worker=3
 The worker service integrates with the existing Modelibr architecture:
 
 1. **Job Queue**: Polls the existing `ThumbnailQueue` service via HTTP API
-2. **Job Processing**: Claims jobs with worker ID for safe concurrent processing  
+2. **Job Processing**: Claims jobs with worker ID for safe concurrent processing
 3. **Status Updates**: Reports job completion/failure back to the main API
 4. **File Access**: Downloads model files from the main API for processing
 
 ### API Integration Points
+
 - `POST /api/thumbnail-jobs/dequeue` - Poll for next available job
 - `POST /api/thumbnail-jobs/{id}/complete` - Mark job as completed
 - `POST /api/thumbnail-jobs/{id}/fail` - Mark job as failed
@@ -194,6 +209,7 @@ Structured JSON logging with contextual information:
 ```
 
 Log levels and contexts:
+
 - **Application lifecycle**: startup, shutdown, configuration
 - **Job processing**: job received, processing started/completed/failed
 - **API communication**: polling, health checks, status updates
@@ -212,6 +228,7 @@ This skeleton is ready for the actual three.js rendering implementation. Next st
 7. **Performance Optimization**: Implement caching, resource pooling, and optimization
 
 The current implementation includes:
+
 - **Orbit Frame Rendering Pipeline**: Complete orbit animation system that positions camera at calculated distances around models and renders frames at configurable angles (e.g., every 5–15°)
 - **Configurable Lighting**: Ambient and directional lighting setup matching the frontend Scene component
 - **Memory Management**: Frame data stored in memory with detailed logging and memory usage tracking
@@ -222,17 +239,22 @@ The current implementation includes:
 ## Monitoring
 
 ### Container Health Checks
+
 The Docker container includes a built-in health check that verifies the `/health` endpoint.
 
 ### Metrics
+
 Basic metrics are exposed at `/metrics` endpoint in Prometheus format:
+
 - `worker_uptime_seconds` - Total uptime
 - `worker_active_jobs` - Current active jobs
 - `worker_max_concurrent_jobs` - Maximum concurrent jobs
 - `worker_is_shutting_down` - Shutdown status
 
 ### Logging Integration
+
 Structured logs can be easily integrated with log aggregation systems like:
+
 - ELK Stack (Elasticsearch, Logstash, Kibana)
 - Fluentd
 - Datadog
@@ -243,27 +265,33 @@ Structured logs can be easily integrated with log aggregation systems like:
 ### Common Issues
 
 **Service won't start**
+
 - Check Node.js version (requires 18+)
 - Verify environment configuration
 - Check port availability (default 3001)
 
 **Cannot connect to API**
+
 - Verify `API_BASE_URL` configuration
 - Check network connectivity between containers
 - Ensure main API is running and accessible
 
 **Jobs not processing**
+
 - Check API endpoints are implemented
 - Verify thumbnail job queue has pending jobs
 - Check worker logs for error details
 
 **High memory usage**
+
 - Reduce `MAX_CONCURRENT_JOBS`
 - Monitor three.js scene cleanup (when implemented)
 - Check for memory leaks in job processing
 
 ### Debug Mode
+
 Enable debug logging:
+
 ```bash
 export LOG_LEVEL=debug
 npm start

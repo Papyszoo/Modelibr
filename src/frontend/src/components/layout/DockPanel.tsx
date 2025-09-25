@@ -20,16 +20,16 @@ interface DockPanelProps {
   setOtherActiveTab: (tabId: string) => void
 }
 
-function DockPanel({ 
-  side, 
-  tabs, 
-  setTabs, 
-  activeTab, 
+function DockPanel({
+  side,
+  tabs,
+  setTabs,
+  activeTab,
   setActiveTab,
   otherTabs,
   setOtherTabs,
   otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
-  setOtherActiveTab
+  setOtherActiveTab,
 }: DockPanelProps): JSX.Element {
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
   const menuRef = useRef<Menu>(null)
@@ -39,27 +39,27 @@ function DockPanel({
     {
       label: 'Models List',
       icon: 'pi pi-list',
-      command: () => addTab('modelList', 'Models')
+      command: () => addTab('modelList', 'Models'),
     },
     {
-      label: 'Textures List', 
+      label: 'Textures List',
       icon: 'pi pi-image',
-      command: () => addTab('texture', 'Textures')
+      command: () => addTab('texture', 'Textures'),
     },
     {
       label: 'Animations List',
       icon: 'pi pi-play',
-      command: () => addTab('animation', 'Animations')
-    }
+      command: () => addTab('animation', 'Animations'),
+    },
   ]
 
   const addTab = (type: Tab['type'], title: string): void => {
     const newTab: Tab = {
       id: `${type}-${Date.now()}`,
       type,
-      label: title
+      label: title,
     }
-    
+
     const newTabs = [...tabs, newTab]
     setTabs(newTabs)
     setActiveTab(newTab.id)
@@ -68,7 +68,7 @@ function DockPanel({
   const closeTab = (tabId: string): void => {
     const newTabs = tabs.filter(tab => tab.id !== tabId)
     setTabs(newTabs)
-    
+
     // If the closed tab was active, switch to the first available tab
     if (activeTab === tabId) {
       if (newTabs.length > 0) {
@@ -83,12 +83,12 @@ function DockPanel({
     // Remove from current panel
     const newTabs = tabs.filter(t => t.id !== tab.id)
     setTabs(newTabs)
-    
+
     // Add to other panel
     const newOtherTabs = [...otherTabs, tab]
     setOtherTabs(newOtherTabs)
     setOtherActiveTab(tab.id)
-    
+
     // Update active tab in current panel
     if (activeTab === tab.id) {
       if (newTabs.length > 0) {
@@ -146,7 +146,7 @@ function DockPanel({
           <Button
             icon="pi pi-plus"
             className="p-button-text p-button-rounded dock-add-button"
-            onClick={(event) => menuRef.current?.toggle(event)}
+            onClick={event => menuRef.current?.toggle(event)}
             tooltip="Add new tab"
             tooltipOptions={{ position: side === 'left' ? 'right' : 'left' }}
           />
@@ -160,7 +160,7 @@ function DockPanel({
       </div>
 
       {/* Content Area */}
-      <div 
+      <div
         className="dock-content"
         onDrop={handleDropOnOtherPanel}
         onDragOver={handleDragOver}
@@ -177,7 +177,10 @@ function DockPanel({
           </TabProvider>
         ) : (
           <div className="dock-empty">
-            <i className="pi pi-plus" style={{ fontSize: '3rem', color: '#6b7280' }}></i>
+            <i
+              className="pi pi-plus"
+              style={{ fontSize: '3rem', color: '#6b7280' }}
+            ></i>
             <h3>No tabs open</h3>
             <p>Click the + button to add a new tab</p>
           </div>

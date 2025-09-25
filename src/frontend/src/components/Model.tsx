@@ -20,7 +20,7 @@ function OBJModel({ modelUrl }) {
 
   if (model) {
     // Apply a basic TSL-style material with enhanced properties
-    model.traverse((child) => {
+    model.traverse(child => {
       if (child.isMesh) {
         child.material = new THREE.MeshStandardMaterial({
           color: new THREE.Color(0.7, 0.7, 0.9),
@@ -39,7 +39,7 @@ function OBJModel({ modelUrl }) {
     const size = box.getSize(new THREE.Vector3())
     const maxDim = Math.max(size.x, size.y, size.z)
     const scale = 2 / maxDim
-    
+
     model.position.sub(center.multiplyScalar(scale))
     model.scale.setScalar(scale)
 
@@ -49,7 +49,7 @@ function OBJModel({ modelUrl }) {
       </group>
     )
   }
-  
+
   return <PlaceholderModel />
 }
 
@@ -68,7 +68,7 @@ function GLTFModel({ modelUrl }) {
 
   if (model) {
     // Apply a basic TSL-style material with enhanced properties
-    model.traverse((child) => {
+    model.traverse(child => {
       if (child.isMesh) {
         child.material = new THREE.MeshStandardMaterial({
           color: new THREE.Color(0.7, 0.7, 0.9),
@@ -87,7 +87,7 @@ function GLTFModel({ modelUrl }) {
     const size = box.getSize(new THREE.Vector3())
     const maxDim = Math.max(size.x, size.y, size.z)
     const scale = 2 / maxDim
-    
+
     model.position.sub(center.multiplyScalar(scale))
     model.scale.setScalar(scale)
 
@@ -97,7 +97,7 @@ function GLTFModel({ modelUrl }) {
       </group>
     )
   }
-  
+
   return <PlaceholderModel />
 }
 
@@ -113,9 +113,9 @@ function PlaceholderModel() {
 
   return (
     <Box ref={meshRef} args={[1, 1, 1]}>
-      <meshStandardMaterial 
-        color="#8B5CF6" 
-        metalness={0.5} 
+      <meshStandardMaterial
+        color="#8B5CF6"
+        metalness={0.5}
         roughness={0.2}
         envMapIntensity={1.0}
       />
@@ -127,7 +127,9 @@ function Model({ modelUrl, fileExtension }) {
   return (
     <Suspense fallback={<PlaceholderModel />}>
       {fileExtension === 'obj' && <OBJModel modelUrl={modelUrl} />}
-      {(fileExtension === 'gltf' || fileExtension === 'glb') && <GLTFModel modelUrl={modelUrl} />}
+      {(fileExtension === 'gltf' || fileExtension === 'glb') && (
+        <GLTFModel modelUrl={modelUrl} />
+      )}
       {!['obj', 'gltf', 'glb'].includes(fileExtension) && <PlaceholderModel />}
     </Suspense>
   )

@@ -8,8 +8,8 @@ function SplitterLayout(): JSX.Element {
   // URL state for splitter size (percentage for left panel)
   const [splitterSize, setSplitterSize] = useQueryState('split', {
     defaultValue: '50',
-    parse: (value) => value || '50',
-    serialize: (value) => value
+    parse: value => value || '50',
+    serialize: value => value,
   })
 
   // URL state for left panel tabs
@@ -19,12 +19,14 @@ function SplitterLayout(): JSX.Element {
       if (!value) return [{ id: 'models', type: 'modelList' }]
       try {
         const parsed = JSON.parse(value)
-        return Array.isArray(parsed) ? parsed : [{ id: 'models', type: 'modelList' }]
+        return Array.isArray(parsed)
+          ? parsed
+          : [{ id: 'models', type: 'modelList' }]
       } catch {
         return [{ id: 'models', type: 'modelList' }]
       }
     },
-    serialize: (value) => JSON.stringify(value)
+    serialize: value => JSON.stringify(value),
   })
 
   // URL state for right panel tabs
@@ -39,20 +41,20 @@ function SplitterLayout(): JSX.Element {
         return []
       }
     },
-    serialize: (value) => JSON.stringify(value)
+    serialize: value => JSON.stringify(value),
   })
 
   // URL state for active tabs
   const [activeLeftTab, setActiveLeftTab] = useQueryState('activeLeft', {
     defaultValue: 'models',
-    parse: (value) => value || 'models',
-    serialize: (value) => value
+    parse: value => value || 'models',
+    serialize: value => value,
   })
 
   const [activeRightTab, setActiveRightTab] = useQueryState('activeRight', {
     defaultValue: '',
-    parse: (value) => value || '',
-    serialize: (value) => value
+    parse: value => value || '',
+    serialize: value => value,
   })
 
   const handleSplitterResize = (event: SplitterEvent): void => {
@@ -66,8 +68,8 @@ function SplitterLayout(): JSX.Element {
 
   return (
     <div className="splitter-layout">
-      <Splitter 
-        layout="horizontal" 
+      <Splitter
+        layout="horizontal"
         onResize={handleSplitterResize}
         resizerStyle={{ background: '#e2e8f0', width: '4px' }}
       >

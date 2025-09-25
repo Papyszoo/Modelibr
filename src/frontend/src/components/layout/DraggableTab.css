@@ -98,22 +98,22 @@
     width: 35px;
     height: 35px;
   }
-  
+
   .tab-thumbnail {
     width: 28px;
     height: 28px;
   }
-  
+
   .tab-icon {
     font-size: 1rem;
   }
-  
+
   .tab-close-button {
     width: 14px !important;
     height: 14px !important;
     min-width: 14px !important;
   }
-  
+
   .tab-close-button .p-button-icon {
     font-size: 0.5rem !important;
   }

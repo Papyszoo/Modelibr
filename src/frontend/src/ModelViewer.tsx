@@ -14,7 +14,12 @@ interface ModelViewerProps {
   isTabContent?: boolean
 }
 
-function ModelViewer({ model: propModel, modelId, onBack, isTabContent = false }: ModelViewerProps): JSX.Element {
+function ModelViewer({
+  model: propModel,
+  modelId,
+  onBack,
+  isTabContent = false,
+}: ModelViewerProps): JSX.Element {
   const [error, setError] = useState<string>('')
   const [model, setModel] = useState<Model | null>(propModel || null)
   const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
@@ -65,9 +70,7 @@ function ModelViewer({ model: propModel, modelId, onBack, isTabContent = false }
           <h1>3D Model Viewer</h1>
           <div className="model-details">
             <span className="model-id">Model #{model.id}</span>
-            <span className="model-format">
-              {getModelFileFormat(model)}
-            </span>
+            <span className="model-format">{getModelFileFormat(model)}</span>
           </div>
         </header>
       )}
@@ -76,9 +79,7 @@ function ModelViewer({ model: propModel, modelId, onBack, isTabContent = false }
         <header className="viewer-header-tab">
           <h1>Model #{model.id}</h1>
           <div className="model-info-summary">
-            <span className="model-format">
-              {getModelFileFormat(model)}
-            </span>
+            <span className="model-format">{getModelFileFormat(model)}</span>
             <span className="model-name">
               {model.files?.[0]?.originalFileName || `Model ${model.id}`}
             </span>
@@ -100,10 +101,10 @@ function ModelViewer({ model: propModel, modelId, onBack, isTabContent = false }
             camera={{ position: [3, 3, 3], fov: 60 }}
             shadows
             className="viewer-canvas"
-            gl={{ 
+            gl={{
               antialias: true,
               alpha: true,
-              powerPreference: "high-performance"
+              powerPreference: 'high-performance',
             }}
             dpr={Math.min(window.devicePixelRatio, 2)}
           >
@@ -119,7 +120,7 @@ function ModelViewer({ model: propModel, modelId, onBack, isTabContent = false }
         <div className="viewer-info-right">
           <div className="thumbnail-section">
             <h3>Animated Thumbnail</h3>
-            <ThumbnailDisplay 
+            <ThumbnailDisplay
               modelId={model.id}
               size="large"
               showAnimation={true}

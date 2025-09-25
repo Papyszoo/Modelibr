@@ -21,7 +21,7 @@ const getTabTooltip = (tab: Tab): string => {
   if (tab.label) {
     return tab.label
   }
-  
+
   switch (tab.type) {
     case 'modelList':
       return 'Models List'
@@ -46,14 +46,14 @@ interface DraggableTabProps {
   side: 'left' | 'right'
 }
 
-function DraggableTab({ 
-  tab, 
-  isActive, 
-  onSelect, 
-  onClose, 
-  onDragStart, 
+function DraggableTab({
+  tab,
+  isActive,
+  onSelect,
+  onClose,
+  onDragStart,
   onDragEnd,
-  side: _side // prefix with underscore to indicate intentionally unused
+  side: _side, // prefix with underscore to indicate intentionally unused
 }: DraggableTabProps): JSX.Element {
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'

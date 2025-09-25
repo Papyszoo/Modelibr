@@ -5,10 +5,10 @@ Object.defineProperty(global, 'import', {
   value: {
     meta: {
       env: {
-        VITE_API_BASE_URL: 'http://localhost:5009'
-      }
-    }
-  }
+        VITE_API_BASE_URL: 'http://localhost:5009',
+      },
+    },
+  },
 })
 
 // Create a global mock for import.meta
@@ -22,8 +22,8 @@ declare global {
 
 global.importMeta = {
   env: {
-    VITE_API_BASE_URL: 'http://localhost:5009'
-  }
+    VITE_API_BASE_URL: 'http://localhost:5009',
+  },
 }
 
 // Mock IntersectionObserver

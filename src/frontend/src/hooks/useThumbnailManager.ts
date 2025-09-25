@@ -4,9 +4,9 @@ import ApiClient from '../services/ApiClient'
 
 const THUMBNAIL_STATUS = {
   PENDING: 'Pending',
-  PROCESSING: 'Processing', 
+  PROCESSING: 'Processing',
   READY: 'Ready',
-  FAILED: 'Failed'
+  FAILED: 'Failed',
 }
 
 export function useThumbnailManager(modelId) {
@@ -14,7 +14,7 @@ export function useThumbnailManager(modelId) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
-  
+
   const connectionRef = useRef(null)
   const mountedRef = useRef(true)
 
@@ -31,25 +31,25 @@ export function useThumbnailManager(modelId) {
     try {
       const connection = new HubConnectionBuilder()
         .withUrl(getSignalRUrl(), {
-          withCredentials: false // Adjust based on your CORS setup
+          withCredentials: false, // Adjust based on your CORS setup
         })
         .withAutomaticReconnect()
         .configureLogging(LogLevel.Information)
         .build()
 
       // Handle thumbnail status change events
-      connection.on('ThumbnailStatusChanged', (notification) => {
+      connection.on('ThumbnailStatusChanged', notification => {
         if (!mountedRef.current) return
-        
+
         // Only update if this notification is for our model
         if (notification.ModelId === modelId) {
           console.log('Received thumbnail status update:', notification)
-          
+
           setThumbnailStatus({
             Status: notification.Status,
             FileUrl: notification.ThumbnailUrl,
             // Add other fields as needed
-            ProcessedAt: notification.Timestamp
+            ProcessedAt: notification.Timestamp,
           })
         }
       })
@@ -74,23 +74,22 @@ export function useThumbnailManager(modelId) {
       })
 
       await connection.start()
-      
+
       if (!mountedRef.current) {
         await connection.stop()
         return
       }
-      
+
       connectionRef.current = connection
       setIsConnected(true)
-      
+
       // Join the model group to receive notifications
       await connection.invoke('JoinModelGroup', modelId.toString())
-      
+
       console.log('SignalR connected and joined model group:', modelId)
-      
+
       // Fetch initial thumbnail status
       await fetchThumbnailStatus()
-      
     } catch (err) {
       console.error('SignalR connection failed:', err)
       if (mountedRef.current) {
@@ -106,7 +105,10 @@ export function useThumbnailManager(modelId) {
     if (connectionRef.current) {
       try {
         if (modelId && connectionRef.current.state === 'Connected') {
-          await connectionRef.current.invoke('LeaveModelGroup', modelId.toString())
+          await connectionRef.current.invoke(
+            'LeaveModelGroup',
+            modelId.toString()
+          )
         }
         await connectionRef.current.stop()
       } catch (err) {
@@ -124,14 +126,14 @@ export function useThumbnailManager(modelId) {
     try {
       setError(null)
       const response = await ApiClient.getThumbnailStatus(modelId)
-      
+
       if (!mountedRef.current) return null
-      
+
       setThumbnailStatus(response)
       return response
     } catch (err) {
       if (!mountedRef.current) return null
-      
+
       setError(`Failed to fetch thumbnail status: ${err.message}`)
       return null
     }
@@ -143,12 +145,11 @@ export function useThumbnailManager(modelId) {
     try {
       setIsLoading(true)
       setError(null)
-      
+
       await ApiClient.regenerateThumbnail(modelId)
-      
+
       // Reset status - SignalR will update us with new status
       setThumbnailStatus(null)
-      
     } catch (err) {
       setError(`Failed to regenerate thumbnail: ${err.message}`)
     } finally {
@@ -161,7 +162,7 @@ export function useThumbnailManager(modelId) {
     if (modelId) {
       initializeConnection()
     }
-    
+
     return () => {
       cleanupConnection()
     }
@@ -175,12 +176,15 @@ export function useThumbnailManager(modelId) {
     }
   }, [cleanupConnection])
 
-  const isProcessing = thumbnailStatus?.Status === THUMBNAIL_STATUS.PROCESSING || 
-                      thumbnailStatus?.Status === THUMBNAIL_STATUS.PENDING
+  const isProcessing =
+    thumbnailStatus?.Status === THUMBNAIL_STATUS.PROCESSING ||
+    thumbnailStatus?.Status === THUMBNAIL_STATUS.PENDING
   const isReady = thumbnailStatus?.Status === THUMBNAIL_STATUS.READY
   const isFailed = thumbnailStatus?.Status === THUMBNAIL_STATUS.FAILED
-  const thumbnailUrl = isReady && thumbnailStatus.FileUrl ? 
-                      ApiClient.getThumbnailUrl(modelId) : null
+  const thumbnailUrl =
+    isReady && thumbnailStatus.FileUrl
+      ? ApiClient.getThumbnailUrl(modelId)
+      : null
 
   return {
     thumbnailStatus,
@@ -192,7 +196,7 @@ export function useThumbnailManager(modelId) {
     isReady,
     isFailed,
     regenerateThumbnail,
-    fetchThumbnailStatus
+    fetchThumbnailStatus,
   }
 }
 

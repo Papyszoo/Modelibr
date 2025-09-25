@@ -1,22 +1,21 @@
-import fs from 'fs';
-import path from 'path';
-import { config } from './config.js';
-import { ThumbnailApiService } from './thumbnailApiService.js';
-import logger from './logger.js';
+import path from 'path'
+import { config } from './config.js'
+import { ThumbnailApiService } from './thumbnailApiService.js'
+import logger from './logger.js'
 
 /**
  * Service for managing thumbnail storage via API upload instead of filesystem
  */
 export class ThumbnailStorageService {
   constructor() {
-    this.basePath = config.thumbnailStorage.basePath;
-    this.enabled = config.thumbnailStorage.enabled;
-    this.skipDuplicates = config.thumbnailStorage.skipDuplicates;
-    this.apiService = new ThumbnailApiService();
-    
+    this.basePath = config.thumbnailStorage.basePath
+    this.enabled = config.thumbnailStorage.enabled
+    this.skipDuplicates = config.thumbnailStorage.skipDuplicates
+    this.apiService = new ThumbnailApiService()
+
     // Test API connection on startup
     if (this.enabled) {
-      this.testApiConnection();
+      this.testApiConnection()
     }
   }
 
@@ -25,21 +24,21 @@ export class ThumbnailStorageService {
    */
   async testApiConnection() {
     try {
-      const isConnected = await this.apiService.testConnection();
+      const isConnected = await this.apiService.testConnection()
       if (isConnected) {
-        logger.info('API connection test successful', { 
-          apiBaseUrl: config.apiBaseUrl 
-        });
+        logger.info('API connection test successful', {
+          apiBaseUrl: config.apiBaseUrl,
+        })
       } else {
         logger.warn('API connection test failed, but service will continue', {
-          apiBaseUrl: config.apiBaseUrl
-        });
+          apiBaseUrl: config.apiBaseUrl,
+        })
       }
     } catch (error) {
       logger.error('Error testing API connection', {
         apiBaseUrl: config.apiBaseUrl,
-        error: error.message
-      });
+        error: error.message,
+      })
     }
   }
 
@@ -50,11 +49,11 @@ export class ThumbnailStorageService {
    */
   getHashStorageDirectory(modelHash) {
     if (!this.enabled) {
-      throw new Error('Thumbnail storage is not enabled');
+      throw new Error('Thumbnail storage is not enabled')
     }
-    
+
     // Use the model hash as the directory name for predictable paths
-    return path.join(this.basePath, modelHash);
+    return path.join(this.basePath, modelHash)
   }
 
   /**
@@ -63,13 +62,13 @@ export class ThumbnailStorageService {
    * @returns {Object} Object containing paths for webp and poster files
    */
   getThumbnailPaths(modelHash) {
-    const hashDir = this.getHashStorageDirectory(modelHash);
-    
+    const hashDir = this.getHashStorageDirectory(modelHash)
+
     return {
       webpPath: path.join(hashDir, 'orbit.webp'),
       posterPath: path.join(hashDir, 'poster.jpg'),
-      directory: hashDir
-    };
+      directory: hashDir,
+    }
   }
 
   /**
@@ -81,14 +80,17 @@ export class ThumbnailStorageService {
    */
   async checkThumbnailsExist(modelHash) {
     if (!this.enabled) {
-      return { webpExists: false, posterExists: false, skipRendering: false };
+      return { webpExists: false, posterExists: false, skipRendering: false }
     }
 
     try {
-      logger.debug('Checking thumbnail existence via API (always allowing rendering)', {
-        modelHash,
-        skipDuplicates: this.skipDuplicates
-      });
+      logger.debug(
+        'Checking thumbnail existence via API (always allowing rendering)',
+        {
+          modelHash,
+          skipDuplicates: this.skipDuplicates,
+        }
+      )
 
       // When using API storage, we let the backend handle deduplication
       // Always allow rendering since the API can handle duplicate uploads efficiently
@@ -96,23 +98,23 @@ export class ThumbnailStorageService {
         webpExists: false,
         posterExists: false,
         skipRendering: false, // Always render when using API
-        paths: this.getThumbnailPaths(modelHash)
-      };
+        paths: this.getThumbnailPaths(modelHash),
+      }
 
       logger.debug('Thumbnail existence check completed', {
         modelHash,
-        result
-      });
+        result,
+      })
 
-      return result;
+      return result
     } catch (error) {
       logger.error('Error checking thumbnail existence', {
         modelHash,
-        error: error.message
-      });
-      
+        error: error.message,
+      })
+
       // Return false values on error to allow processing to continue
-      return { webpExists: false, posterExists: false, skipRendering: false };
+      return { webpExists: false, posterExists: false, skipRendering: false }
     }
   }
 
@@ -124,10 +126,15 @@ export class ThumbnailStorageService {
    * @param {number} modelId - The model ID for API upload
    * @returns {Promise<Object>} Object with upload results and metadata
    */
-  async storeThumbnails(modelHash, webpSourcePath, posterSourcePath, modelId = null) {
+  async storeThumbnails(
+    modelHash,
+    webpSourcePath,
+    posterSourcePath,
+    modelId = null
+  ) {
     if (!this.enabled) {
-      logger.warn('Thumbnail storage is disabled, skipping API upload');
-      return { stored: false, webpPath: null, posterPath: null };
+      logger.warn('Thumbnail storage is disabled, skipping API upload')
+      return { stored: false, webpPath: null, posterPath: null }
     }
 
     try {
@@ -135,19 +142,24 @@ export class ThumbnailStorageService {
         modelHash,
         modelId,
         webpSourcePath,
-        posterSourcePath
-      });
+        posterSourcePath,
+      })
 
       // Validate model ID
       if (!modelId) {
-        throw new Error(`Model ID is required for API upload. Hash: ${modelHash}`);
+        throw new Error(
+          `Model ID is required for API upload. Hash: ${modelHash}`
+        )
       }
 
       // Upload thumbnails via API
-      const uploadResult = await this.apiService.uploadMultipleThumbnails(modelId, {
-        webpPath: webpSourcePath,
-        posterPath: posterSourcePath
-      });
+      const uploadResult = await this.apiService.uploadMultipleThumbnails(
+        modelId,
+        {
+          webpPath: webpSourcePath,
+          posterPath: posterSourcePath,
+        }
+      )
 
       const results = {
         stored: uploadResult.allSuccessful,
@@ -156,18 +168,18 @@ export class ThumbnailStorageService {
         webpStored: false,
         posterStored: false,
         uploadResults: uploadResult.uploads,
-        apiResponse: uploadResult
-      };
+        apiResponse: uploadResult,
+      }
 
       // Check individual upload results
       uploadResult.uploads.forEach(upload => {
         if (upload.type === 'webp' && upload.success) {
-          results.webpStored = true;
+          results.webpStored = true
         }
         if (upload.type === 'poster' && upload.success) {
-          results.posterStored = true;
+          results.posterStored = true
         }
-      });
+      })
 
       logger.info('API-based thumbnail storage completed', {
         modelHash,
@@ -176,10 +188,10 @@ export class ThumbnailStorageService {
         webpStored: results.webpStored,
         posterStored: results.posterStored,
         totalUploads: uploadResult.uploads.length,
-        allSuccessful: uploadResult.allSuccessful
-      });
+        allSuccessful: uploadResult.allSuccessful,
+      })
 
-      return results;
+      return results
     } catch (error) {
       logger.error('Failed to store thumbnails via API', {
         modelHash,
@@ -187,9 +199,9 @@ export class ThumbnailStorageService {
         webpSourcePath,
         posterSourcePath,
         error: error.message,
-        stack: error.stack
-      });
-      
+        stack: error.stack,
+      })
+
       // Return failed result but don't throw to allow job to continue
       return {
         stored: false,
@@ -197,8 +209,8 @@ export class ThumbnailStorageService {
         posterPath: null,
         webpStored: false,
         posterStored: false,
-        error: error.message
-      };
+        error: error.message,
+      }
     }
   }
 
@@ -208,8 +220,10 @@ export class ThumbnailStorageService {
    * @returns {Promise<number|null>} Model ID or null if not found
    */
   async getModelIdFromHash(modelHash) {
-    logger.debug('getModelIdFromHash called but no longer needed', { modelHash });
-    return null;
+    logger.debug('getModelIdFromHash called but no longer needed', {
+      modelHash,
+    })
+    return null
   }
 
   /**
@@ -218,11 +232,11 @@ export class ThumbnailStorageService {
    * @returns {Promise<Object>} Metadata about the stored thumbnails
    */
   async getThumbnailMetadata(modelHash) {
-    return { 
-      available: false, 
+    return {
+      available: false,
       message: 'Metadata not available for API-based storage',
-      modelHash 
-    };
+      modelHash,
+    }
   }
 
   /**
@@ -231,7 +245,7 @@ export class ThumbnailStorageService {
    * @returns {Promise<boolean>} Success status
    */
   async cleanupThumbnails(modelHash) {
-    logger.info('Cleanup not required for API-based storage', { modelHash });
-    return true;
+    logger.info('Cleanup not required for API-based storage', { modelHash })
+    return true
   }
 }

@@ -6,7 +6,7 @@ import {
   isThreeJSRenderable,
   isSupportedModelFormat,
   THREEJS_SUPPORTED_FORMATS,
-  ALL_SUPPORTED_FORMATS
+  ALL_SUPPORTED_FORMATS,
 } from '../fileUtils'
 
 describe('fileUtils', () => {
@@ -43,9 +43,7 @@ describe('fileUtils', () => {
   describe('getModelFileFormat', () => {
     it('should return formatted file extension from model object', () => {
       const model = {
-        files: [
-          { originalFileName: 'test.obj' }
-        ]
+        files: [{ originalFileName: 'test.obj' }],
       }
       expect(getModelFileFormat(model)).toBe('OBJ')
     })
@@ -60,8 +58,8 @@ describe('fileUtils', () => {
       const model = {
         files: [
           { originalFileName: 'model.gltf' },
-          { originalFileName: 'texture.jpg' }
-        ]
+          { originalFileName: 'texture.jpg' },
+        ],
       }
       expect(getModelFileFormat(model)).toBe('GLTF')
     })
@@ -154,7 +152,13 @@ describe('fileUtils', () => {
 
     it('should have correct all supported formats', () => {
       expect(ALL_SUPPORTED_FORMATS).toEqual([
-        '.obj', '.fbx', '.dae', '.3ds', '.blend', '.gltf', '.glb'
+        '.obj',
+        '.fbx',
+        '.dae',
+        '.3ds',
+        '.blend',
+        '.gltf',
+        '.glb',
       ])
     })
 
