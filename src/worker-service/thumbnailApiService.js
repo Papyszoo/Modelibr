@@ -214,19 +214,13 @@ export class ThumbnailApiService {
    */
   async testConnection() {
     try {
-      // Simple connectivity test - check if we can establish a TCP connection to the API server
-      const url = new URL(this.apiBaseUrl);
-      const hostname = url.hostname;
-      const port = url.port || (url.protocol === 'https:' ? 443 : 80);
-      
-      // Use a simple HTTP request with a very short timeout just to test connectivity
-      // We don't care about the response content, just that the server is reachable
-      const response = await this.client.get('/', { 
+      // Use the OpenAPI endpoint to test connectivity - it's lightweight and reliable
+      const response = await this.client.get('/openapi/v1.json', { 
         timeout: 3000,
         validateStatus: () => true // Accept any status code, we just want to know if server responds
       });
       
-      return true; // If we get any response, the server is reachable
+      return response.status >= 200 && response.status < 300; // OpenAPI should return 200
     } catch (error) {
       // Only log if it's not a simple connection refused error
       if (!error.code || !['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT'].includes(error.code)) {
