@@ -214,14 +214,21 @@ export class ThumbnailApiService {
    */
   async testConnection() {
     try {
-      // Try to reach a simple endpoint or health check
-      const response = await this.client.get('/health', { timeout: 5000 });
-      return response.status === 200;
-    } catch (error) {
-      logger.warn('API connectivity test failed', {
-        apiBaseUrl: this.apiBaseUrl,
-        error: error.message
+      // Use the OpenAPI endpoint to test connectivity - it's lightweight and reliable
+      const response = await this.client.get('/openapi/v1.json', { 
+        timeout: 3000,
+        validateStatus: () => true // Accept any status code, we just want to know if server responds
       });
+      
+      return response.status >= 200 && response.status < 300; // OpenAPI should return 200
+    } catch (error) {
+      // Only log if it's not a simple connection refused error
+      if (!error.code || !['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT'].includes(error.code)) {
+        logger.warn('API connectivity test failed', {
+          apiBaseUrl: this.apiBaseUrl,
+          error: error.message
+        });
+      }
       return false;
     }
   }
