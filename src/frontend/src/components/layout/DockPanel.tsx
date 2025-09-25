@@ -20,6 +20,7 @@ interface DockPanelProps {
   setOtherActiveTab: (tabId: string) => void
   draggedTab: Tab | null
   setDraggedTab: (tab: Tab | null) => void
+  moveTabBetweenPanels: (tab: Tab, fromSide: 'left' | 'right') => void
 }
 
 function DockPanel({
@@ -34,6 +35,7 @@ function DockPanel({
   setOtherActiveTab,
   draggedTab,
   setDraggedTab,
+  moveTabBetweenPanels,
 }: DockPanelProps): JSX.Element {
   const menuRef = useRef<Menu>(null)
 
@@ -82,26 +84,6 @@ function DockPanel({
     }
   }
 
-  const moveTabToOtherPanel = (tab: Tab): void => {
-    // Remove from current panel
-    const newTabs = tabs.filter(t => t.id !== tab.id)
-    setTabs(newTabs)
-
-    // Add to other panel
-    const newOtherTabs = [...otherTabs, tab]
-    setOtherTabs(newOtherTabs)
-    setOtherActiveTab(tab.id)
-
-    // Update active tab in current panel
-    if (activeTab === tab.id) {
-      if (newTabs.length > 0) {
-        setActiveTab(newTabs[0].id)
-      } else {
-        setActiveTab('')
-      }
-    }
-  }
-
   const handleTabDragStart = (tab: Tab): void => {
     setDraggedTab(tab)
   }
@@ -114,8 +96,9 @@ function DockPanel({
     e.preventDefault()
     // Only process drop if there's a dragged tab and it's not from this panel
     if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
-      moveTabToOtherPanel(draggedTab)
-      setDraggedTab(null)
+      // Determine which panel the dragged tab came from
+      const fromSide = side === 'left' ? 'right' : 'left'
+      moveTabBetweenPanels(draggedTab, fromSide)
     }
   }
 

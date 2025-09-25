@@ -66,6 +66,48 @@ function SplitterLayout(): JSX.Element {
     setSplitterSize(leftSize.toString())
   }
 
+  // Central function to move tabs between panels
+  const moveTabBetweenPanels = (tab: Tab, fromSide: 'left' | 'right'): void => {
+    if (fromSide === 'left') {
+      // Move from left to right
+      const newLeftTabs = leftTabs.filter(t => t.id !== tab.id)
+      const newRightTabs = [...rightTabs, tab]
+      
+      setLeftTabs(newLeftTabs)
+      setRightTabs(newRightTabs)
+      setActiveRightTab(tab.id)
+      
+      // Update active tab in left panel if needed
+      if (activeLeftTab === tab.id) {
+        if (newLeftTabs.length > 0) {
+          setActiveLeftTab(newLeftTabs[0].id)
+        } else {
+          setActiveLeftTab('')
+        }
+      }
+    } else {
+      // Move from right to left
+      const newRightTabs = rightTabs.filter(t => t.id !== tab.id)
+      const newLeftTabs = [...leftTabs, tab]
+      
+      setRightTabs(newRightTabs)
+      setLeftTabs(newLeftTabs)
+      setActiveLeftTab(tab.id)
+      
+      // Update active tab in right panel if needed
+      if (activeRightTab === tab.id) {
+        if (newRightTabs.length > 0) {
+          setActiveRightTab(newRightTabs[0].id)
+        } else {
+          setActiveRightTab('')
+        }
+      }
+    }
+    
+    // Clear drag state
+    setDraggedTab(null)
+  }
+
   // Calculate initial sizes for splitter
   const leftSize = parseInt(splitterSize, 10)
   const rightSize = 100 - leftSize
@@ -90,6 +132,7 @@ function SplitterLayout(): JSX.Element {
             setOtherActiveTab={setActiveRightTab}
             draggedTab={draggedTab}
             setDraggedTab={setDraggedTab}
+            moveTabBetweenPanels={moveTabBetweenPanels}
           />
         </SplitterPanel>
         <SplitterPanel size={rightSize} minSize={20}>
@@ -105,6 +148,7 @@ function SplitterLayout(): JSX.Element {
             setOtherActiveTab={setActiveLeftTab}
             draggedTab={draggedTab}
             setDraggedTab={setDraggedTab}
+            moveTabBetweenPanels={moveTabBetweenPanels}
           />
         </SplitterPanel>
       </Splitter>
