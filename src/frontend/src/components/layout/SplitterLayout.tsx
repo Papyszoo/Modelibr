@@ -1,9 +1,10 @@
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
 import DockPanel from './DockPanel'
+import { Tab, SplitterEvent } from '../../types'
 import './SplitterLayout.css'
 
-function SplitterLayout() {
+function SplitterLayout(): JSX.Element {
   // URL state for splitter size (percentage for left panel)
   const [splitterSize, setSplitterSize] = useQueryState('split', {
     defaultValue: '50',
@@ -13,8 +14,8 @@ function SplitterLayout() {
 
   // URL state for left panel tabs
   const [leftTabs, setLeftTabs] = useQueryState('leftTabs', {
-    defaultValue: [{ id: 'models', type: 'modelList' }],
-    parse: (value) => {
+    defaultValue: [{ id: 'models', type: 'modelList' }] as Tab[],
+    parse: (value): Tab[] => {
       if (!value) return [{ id: 'models', type: 'modelList' }]
       try {
         const parsed = JSON.parse(value)
@@ -28,8 +29,8 @@ function SplitterLayout() {
 
   // URL state for right panel tabs
   const [rightTabs, setRightTabs] = useQueryState('rightTabs', {
-    defaultValue: [],
-    parse: (value) => {
+    defaultValue: [] as Tab[],
+    parse: (value): Tab[] => {
       if (!value) return []
       try {
         const parsed = JSON.parse(value)
@@ -54,7 +55,7 @@ function SplitterLayout() {
     serialize: (value) => value
   })
 
-  const handleSplitterResize = (event) => {
+  const handleSplitterResize = (event: SplitterEvent): void => {
     const leftSize = Math.round(event.sizes[0])
     setSplitterSize(leftSize.toString())
   }

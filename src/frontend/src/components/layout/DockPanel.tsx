@@ -1,10 +1,24 @@
 import { useState, useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Menu } from 'primereact/menu'
+import { MenuItem } from 'primereact/menuitem'
 import TabContent from './TabContent'
 import DraggableTab from './DraggableTab'
-import { TabProvider } from '../../hooks/useTabContext.jsx'
+import { TabProvider } from '../../hooks/useTabContext'
+import { Tab } from '../../types'
 import './DockPanel.css'
+
+interface DockPanelProps {
+  side: 'left' | 'right'
+  tabs: Tab[]
+  setTabs: (tabs: Tab[]) => void
+  activeTab: string
+  setActiveTab: (tabId: string) => void
+  otherTabs: Tab[]
+  setOtherTabs: (tabs: Tab[]) => void
+  otherActiveTab: string
+  setOtherActiveTab: (tabId: string) => void
+}
 
 function DockPanel({ 
   side, 
@@ -14,14 +28,14 @@ function DockPanel({
   setActiveTab,
   otherTabs,
   setOtherTabs,
-  otherActiveTab,
+  otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
   setOtherActiveTab
-}) {
-  const [draggedTab, setDraggedTab] = useState(null)
-  const menuRef = useRef(null)
+}: DockPanelProps): JSX.Element {
+  const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
+  const menuRef = useRef<Menu>(null)
 
   // Menu items for adding new tabs
-  const addMenuItems = [
+  const addMenuItems: MenuItem[] = [
     {
       label: 'Models List',
       icon: 'pi pi-list',
@@ -30,21 +44,20 @@ function DockPanel({
     {
       label: 'Textures List', 
       icon: 'pi pi-image',
-      command: () => addTab('textureList', 'Textures')
+      command: () => addTab('texture', 'Textures')
     },
     {
       label: 'Animations List',
       icon: 'pi pi-play',
-      command: () => addTab('animationList', 'Animations')
+      command: () => addTab('animation', 'Animations')
     }
   ]
 
-  const addTab = (type, title) => {
-    const newTab = {
+  const addTab = (type: Tab['type'], title: string): void => {
+    const newTab: Tab = {
       id: `${type}-${Date.now()}`,
       type,
-      title,
-      data: null
+      label: title
     }
     
     const newTabs = [...tabs, newTab]
@@ -52,7 +65,7 @@ function DockPanel({
     setActiveTab(newTab.id)
   }
 
-  const closeTab = (tabId) => {
+  const closeTab = (tabId: string): void => {
     const newTabs = tabs.filter(tab => tab.id !== tabId)
     setTabs(newTabs)
     
@@ -66,7 +79,7 @@ function DockPanel({
     }
   }
 
-  const moveTabToOtherPanel = (tab) => {
+  const moveTabToOtherPanel = (tab: Tab): void => {
     // Remove from current panel
     const newTabs = tabs.filter(t => t.id !== tab.id)
     setTabs(newTabs)
@@ -86,15 +99,15 @@ function DockPanel({
     }
   }
 
-  const handleTabDragStart = (tab) => {
+  const handleTabDragStart = (tab: Tab): void => {
     setDraggedTab(tab)
   }
 
-  const handleTabDragEnd = () => {
+  const handleTabDragEnd = (): void => {
     setDraggedTab(null)
   }
 
-  const handleDropOnOtherPanel = (e) => {
+  const handleDropOnOtherPanel = (e: React.DragEvent): void => {
     e.preventDefault()
     if (draggedTab) {
       moveTabToOtherPanel(draggedTab)
@@ -102,7 +115,7 @@ function DockPanel({
     }
   }
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent): void => {
     e.preventDefault()
   }
 
