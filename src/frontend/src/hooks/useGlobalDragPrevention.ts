@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 /**
  * Custom hook to prevent the browser's default behavior when files are dragged
  * anywhere on the window (outside of designated drop zones).
- * 
+ *
  * This prevents the common issue where dragging files accidentally opens them
  * in the browser instead of being handled by the application's drag & drop logic.
  */

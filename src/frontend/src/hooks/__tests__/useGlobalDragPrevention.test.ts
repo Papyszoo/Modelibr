@@ -21,8 +21,16 @@ describe('useGlobalDragPrevention', () => {
   it('should add dragover and drop event listeners on mount', () => {
     renderHook(() => useGlobalDragPrevention())
 
-    expect(addEventListenerSpy).toHaveBeenCalledWith('dragover', expect.any(Function), false)
-    expect(addEventListenerSpy).toHaveBeenCalledWith('drop', expect.any(Function), false)
+    expect(addEventListenerSpy).toHaveBeenCalledWith(
+      'dragover',
+      expect.any(Function),
+      false
+    )
+    expect(addEventListenerSpy).toHaveBeenCalledWith(
+      'drop',
+      expect.any(Function),
+      false
+    )
     expect(addEventListenerSpy).toHaveBeenCalledTimes(2)
   })
 
@@ -36,8 +44,16 @@ describe('useGlobalDragPrevention', () => {
     unmount()
 
     // Verify listeners were removed
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('dragover', expect.any(Function), false)
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('drop', expect.any(Function), false)
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      'dragover',
+      expect.any(Function),
+      false
+    )
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      'drop',
+      expect.any(Function),
+      false
+    )
     expect(removeEventListenerSpy).toHaveBeenCalledTimes(2)
   })
 

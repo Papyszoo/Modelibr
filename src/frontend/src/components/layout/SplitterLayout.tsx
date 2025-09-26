@@ -3,6 +3,10 @@ import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
 import DockPanel from './DockPanel'
 import { Tab, SplitterEvent } from '../../types'
+import {
+  parseCompactTabFormat,
+  serializeToCompactFormat,
+} from '../../utils/tabSerialization'
 import './SplitterLayout.css'
 
 function SplitterLayout(): JSX.Element {
@@ -19,33 +23,16 @@ function SplitterLayout(): JSX.Element {
   // URL state for left panel tabs
   const [leftTabs, setLeftTabs] = useQueryState('leftTabs', {
     defaultValue: [{ id: 'models', type: 'modelList' }] as Tab[],
-    parse: (value): Tab[] => {
-      if (!value) return [{ id: 'models', type: 'modelList' }]
-      try {
-        const parsed = JSON.parse(value)
-        return Array.isArray(parsed)
-          ? parsed
-          : [{ id: 'models', type: 'modelList' }]
-      } catch {
-        return [{ id: 'models', type: 'modelList' }]
-      }
-    },
-    serialize: value => JSON.stringify(value),
+    parse: (value): Tab[] =>
+      parseCompactTabFormat(value, [{ id: 'models', type: 'modelList' }]),
+    serialize: serializeToCompactFormat,
   })
 
   // URL state for right panel tabs
   const [rightTabs, setRightTabs] = useQueryState('rightTabs', {
     defaultValue: [] as Tab[],
-    parse: (value): Tab[] => {
-      if (!value) return []
-      try {
-        const parsed = JSON.parse(value)
-        return Array.isArray(parsed) ? parsed : []
-      } catch {
-        return []
-      }
-    },
-    serialize: value => JSON.stringify(value),
+    parse: (value): Tab[] => parseCompactTabFormat(value, []),
+    serialize: serializeToCompactFormat,
   })
 
   // URL state for active tabs
