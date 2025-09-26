@@ -26,6 +26,14 @@ namespace Application.Files
             }
 
             var fullPath = Path.Combine(_pathProvider.UploadRootPath, file.FilePath);
+            
+            // Ensure the directory exists before checking file existence
+            var directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
             if (!System.IO.File.Exists(fullPath))
             {
                 return Result.Failure<GetFileQueryResponse>(new Error("FileNotFoundOnDisk", "File not found on disk"));
