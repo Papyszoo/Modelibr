@@ -125,33 +125,11 @@ public static class ThumbnailEndpoints
                 return Results.NotFound("Thumbnail not ready or not found");
             }
 
-            // Ensure the directory exists with proper permissions before checking file existence
+            // Ensure the directory exists before checking file existence
             var directory = Path.GetDirectoryName(response.ThumbnailPath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
-                
-                // Ensure the directory is accessible by testing write permissions
-                // This handles cases where directory permissions were reset after container recreation
-                try
-                {
-                    var dirInfo = new DirectoryInfo(directory);
-                    if (dirInfo.Exists)
-                    {
-                        // Test write access by attempting to create and delete a temporary file
-                        var testFile = Path.Combine(directory, $".access_test_{Guid.NewGuid():N}");
-                        File.WriteAllText(testFile, "test");
-                        File.Delete(testFile);
-                    }
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return Results.Problem("Cannot access thumbnail directory due to permission issues", statusCode: 403);
-                }
-                catch (IOException)
-                {
-                    return Results.Problem("IO error accessing thumbnail directory", statusCode: 500);
-                }
             }
             
             if (!System.IO.File.Exists(response.ThumbnailPath))
