@@ -2,23 +2,11 @@ import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
 import DockPanel from './DockPanel'
 import { Tab, SplitterEvent } from '../../types'
+import {
+  parseCompactTabFormat,
+  serializeToCompactFormat,
+} from '../../utils/tabSerialization'
 import './SplitterLayout.css'
-
-// Helper function to generate tab labels
-function getTabLabel(type: Tab['type'], modelId?: string): string {
-  switch (type) {
-    case 'modelList':
-      return 'Models'
-    case 'modelViewer':
-      return modelId ? `Model ${modelId}` : 'Model Viewer'
-    case 'texture':
-      return 'Textures'
-    case 'animation':
-      return 'Animations'
-    default:
-      return 'Unknown'
-  }
-}
 
 function SplitterLayout(): JSX.Element {
   // URL state for splitter size (percentage for left panel)
@@ -31,107 +19,16 @@ function SplitterLayout(): JSX.Element {
   // URL state for left panel tabs
   const [leftTabs, setLeftTabs] = useQueryState('leftTabs', {
     defaultValue: [{ id: 'models', type: 'modelList' }] as Tab[],
-    parse: (value): Tab[] => {
-      if (!value) return [{ id: 'models', type: 'modelList' }]
-
-      // Support legacy JSON format for backward compatibility
-      if (value.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(value)
-          return Array.isArray(parsed)
-            ? parsed
-            : [{ id: 'models', type: 'modelList' }]
-        } catch {
-          return [{ id: 'models', type: 'modelList' }]
-        }
-      }
-
-      // Parse compact format: "type" or "type:modelId", separated by commas
-      try {
-        return value.split(',').map((tabSpec, index) => {
-          const [type, modelId] = tabSpec.split(':')
-          const tabType = type as Tab['type']
-
-          // Validate tab type
-          if (
-            !['modelList', 'modelViewer', 'texture', 'animation'].includes(
-              tabType
-            )
-          ) {
-            throw new Error(`Invalid tab type: ${type}`)
-          }
-
-          return {
-            id: modelId
-              ? `model-${modelId}-${Date.now() + index}`
-              : `${tabType}-${Date.now() + index}`,
-            type: tabType,
-            label: getTabLabel(tabType, modelId),
-            modelId: modelId || undefined,
-          }
-        })
-      } catch {
-        return [{ id: 'models', type: 'modelList' }]
-      }
-    },
-    serialize: value => {
-      // Serialize to compact format
-      return value
-        .map(tab => (tab.modelId ? `${tab.type}:${tab.modelId}` : tab.type))
-        .join(',')
-    },
+    parse: (value): Tab[] =>
+      parseCompactTabFormat(value, [{ id: 'models', type: 'modelList' }]),
+    serialize: serializeToCompactFormat,
   })
 
   // URL state for right panel tabs
   const [rightTabs, setRightTabs] = useQueryState('rightTabs', {
     defaultValue: [] as Tab[],
-    parse: (value): Tab[] => {
-      if (!value) return []
-
-      // Support legacy JSON format for backward compatibility
-      if (value.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(value)
-          return Array.isArray(parsed) ? parsed : []
-        } catch {
-          return []
-        }
-      }
-
-      // Parse compact format: "type" or "type:modelId", separated by commas
-      try {
-        return value.split(',').map((tabSpec, index) => {
-          const [type, modelId] = tabSpec.split(':')
-          const tabType = type as Tab['type']
-
-          // Validate tab type
-          if (
-            !['modelList', 'modelViewer', 'texture', 'animation'].includes(
-              tabType
-            )
-          ) {
-            throw new Error(`Invalid tab type: ${type}`)
-          }
-
-          return {
-            id: modelId
-              ? `model-${modelId}-${Date.now() + index}`
-              : `${tabType}-${Date.now() + index}`,
-            type: tabType,
-            label: getTabLabel(tabType, modelId),
-            modelId: modelId || undefined,
-          }
-        })
-      } catch {
-        return []
-      }
-    },
-    serialize: value => {
-      // Serialize to compact format
-      return value
-        .map(tab => (tab.modelId ? `${tab.type}:${tab.modelId}` : tab.type))
-        .join(',')
-    },
+    parse: (value): Tab[] => parseCompactTabFormat(value, []),
+    serialize: serializeToCompactFormat,
   })
 
   // URL state for active tabs

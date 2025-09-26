@@ -1,64 +1,9 @@
 import { Tab } from '../../../types'
-
-// Extract the getTabLabel function for testing
-function getTabLabel(type: Tab['type'], modelId?: string): string {
-  switch (type) {
-    case 'modelList':
-      return 'Models'
-    case 'modelViewer':
-      return modelId ? `Model ${modelId}` : 'Model Viewer'
-    case 'texture':
-      return 'Textures'
-    case 'animation':
-      return 'Animations'
-    default:
-      return 'Unknown'
-  }
-}
-
-// Extract parsing logic for testing
-function parseCompactTabFormat(value: string): Tab[] {
-  if (!value) return []
-  
-  // Support legacy JSON format for backward compatibility
-  if (value.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  
-  // Parse compact format: "type" or "type:modelId", separated by commas
-  try {
-    return value.split(',').map((tabSpec, index) => {
-      const [type, modelId] = tabSpec.split(':')
-      const tabType = type as Tab['type']
-      
-      // Validate tab type
-      if (!['modelList', 'modelViewer', 'texture', 'animation'].includes(tabType)) {
-        throw new Error(`Invalid tab type: ${type}`)
-      }
-      
-      return {
-        id: modelId ? `model-${modelId}-${Date.now() + index}` : `${tabType}-${Date.now() + index}`,
-        type: tabType,
-        label: getTabLabel(tabType, modelId),
-        modelId: modelId || undefined,
-      }
-    })
-  } catch {
-    return []
-  }
-}
-
-// Extract serialization logic for testing
-function serializeToCompactFormat(tabs: Tab[]): string {
-  return tabs.map(tab => 
-    tab.modelId ? `${tab.type}:${tab.modelId}` : tab.type
-  ).join(',')
-}
+import {
+  getTabLabel,
+  parseCompactTabFormat,
+  serializeToCompactFormat,
+} from '../../../utils/tabSerialization'
 
 describe('SplitterLayout URL Serialization', () => {
   describe('getTabLabel', () => {
@@ -109,9 +54,20 @@ describe('SplitterLayout URL Serialization', () => {
       expect(result[1].modelId).toBe('123')
     })
 
-    it('should return empty array for invalid formats', () => {
+    it('should return default value for invalid formats', () => {
+      const customDefault = [
+        { id: 'default', type: 'modelList', label: 'Default' },
+      ] as Tab[]
+      expect(parseCompactTabFormat('invalidType', customDefault)).toEqual(
+        customDefault
+      )
+      expect(
+        parseCompactTabFormat('modelList,invalidType', customDefault)
+      ).toEqual(customDefault)
+      expect(parseCompactTabFormat('', customDefault)).toEqual(customDefault)
+
+      // Default behavior without custom default
       expect(parseCompactTabFormat('invalidType')).toEqual([])
-      expect(parseCompactTabFormat('modelList,invalidType')).toEqual([])
       expect(parseCompactTabFormat('')).toEqual([])
     })
   })
@@ -128,7 +84,12 @@ describe('SplitterLayout URL Serialization', () => {
     it('should serialize tabs with modelId', () => {
       const tabs: Tab[] = [
         { id: 'models', type: 'modelList', label: 'Models' },
-        { id: 'model-123', type: 'modelViewer', label: 'Model 123', modelId: '123' },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Model 123',
+          modelId: '123',
+        },
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList,modelViewer:123')
     })
