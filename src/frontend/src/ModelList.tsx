@@ -95,7 +95,9 @@ function ModelListContent({
       const models = await ApiClient.getModels()
       setModels(models)
     } catch (err) {
-      setError(`Failed to fetch models: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setError(
+        `Failed to fetch models: ${err instanceof Error ? err.message : 'Unknown error'}`
+      )
     } finally {
       setLoading(false)
     }

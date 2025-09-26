@@ -12,7 +12,7 @@ import './SplitterLayout.css'
 function SplitterLayout(): JSX.Element {
   // Global drag state for cross-panel tab dragging
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
-  
+
   // URL state for splitter size (percentage for left panel)
   const [splitterSize, setSplitterSize] = useQueryState('split', {
     defaultValue: '50',
@@ -59,11 +59,11 @@ function SplitterLayout(): JSX.Element {
       // Move from left to right
       const newLeftTabs = leftTabs.filter(t => t.id !== tab.id)
       const newRightTabs = [...rightTabs, tab]
-      
+
       setLeftTabs(newLeftTabs)
       setRightTabs(newRightTabs)
       setActiveRightTab(tab.id)
-      
+
       // Update active tab in left panel if needed
       if (activeLeftTab === tab.id) {
         if (newLeftTabs.length > 0) {
@@ -76,11 +76,11 @@ function SplitterLayout(): JSX.Element {
       // Move from right to left
       const newRightTabs = rightTabs.filter(t => t.id !== tab.id)
       const newLeftTabs = [...leftTabs, tab]
-      
+
       setRightTabs(newRightTabs)
       setLeftTabs(newLeftTabs)
       setActiveLeftTab(tab.id)
-      
+
       // Update active tab in right panel if needed
       if (activeRightTab === tab.id) {
         if (newRightTabs.length > 0) {
@@ -90,7 +90,7 @@ function SplitterLayout(): JSX.Element {
         }
       }
     }
-    
+
     // Clear drag state
     setDraggedTab(null)
   }

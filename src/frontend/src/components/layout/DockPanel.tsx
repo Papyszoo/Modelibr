@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Menu } from 'primereact/menu'
 import { MenuItem } from 'primereact/menuitem'
@@ -29,10 +29,10 @@ function DockPanel({
   setTabs,
   activeTab,
   setActiveTab,
-  otherTabs,
-  setOtherTabs,
+  otherTabs: _otherTabs,
+  setOtherTabs: _setOtherTabs,
   otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
-  setOtherActiveTab,
+  setOtherActiveTab: _setOtherActiveTab,
   draggedTab,
   setDraggedTab,
   moveTabBetweenPanels,
@@ -131,7 +131,7 @@ function DockPanel({
   return (
     <div className={`dock-panel dock-panel-${side}`}>
       {/* Dock/Menu Bar */}
-      <div 
+      <div
         className={`dock-bar dock-bar-${side}`}
         onDrop={handleDropOnOtherPanel}
         onDragOver={handleDragOver}
