@@ -92,17 +92,12 @@ function ModelListContent({
   const fetchModels = async () => {
     try {
       setLoading(true)
-      const result = await ApiClient.getModels()
-
-      if (result.isSuccess) {
-        setModels(result.value?.models || [])
-      } else {
-        setError(
-          `Failed to fetch models: ${result.error?.message || 'Unknown error'}`
-        )
-      }
+      const models = await ApiClient.getModels()
+      setModels(models)
     } catch (err) {
-      setError(`Error fetching models: ${err.message}`)
+      setError(
+        `Failed to fetch models: ${err instanceof Error ? err.message : 'Unknown error'}`
+      )
     } finally {
       setLoading(false)
     }

@@ -24,6 +24,26 @@ export function useThumbnailManagerWithSignalR(modelId) {
     return `${baseUrl}/thumbnailHub`
   }, [])
 
+  // Fetch thumbnail status (for initial load and fallback)
+  const fetchThumbnailStatus = useCallback(async () => {
+    if (!modelId) return null
+
+    try {
+      setError(null)
+      const response = await ApiClient.getThumbnailStatus(modelId)
+
+      if (!mountedRef.current) return null
+
+      setThumbnailStatus(response)
+      return response
+    } catch (err) {
+      if (!mountedRef.current) return null
+
+      setError(`Failed to fetch thumbnail status: ${err.message}`)
+      return null
+    }
+  }, [modelId])
+
   // Initialize SignalR connection
   const initializeConnection = useCallback(async () => {
     if (connectionRef.current || !modelId) return
@@ -98,7 +118,7 @@ export function useThumbnailManagerWithSignalR(modelId) {
         await fetchThumbnailStatus()
       }
     }
-  }, [modelId, getSignalRUrl])
+  }, [modelId, getSignalRUrl, fetchThumbnailStatus])
 
   // Clean up connection
   const cleanupConnection = useCallback(async () => {
@@ -117,26 +137,6 @@ export function useThumbnailManagerWithSignalR(modelId) {
       connectionRef.current = null
     }
     setIsConnected(false)
-  }, [modelId])
-
-  // Fetch thumbnail status (for initial load and fallback)
-  const fetchThumbnailStatus = useCallback(async () => {
-    if (!modelId) return null
-
-    try {
-      setError(null)
-      const response = await ApiClient.getThumbnailStatus(modelId)
-
-      if (!mountedRef.current) return null
-
-      setThumbnailStatus(response)
-      return response
-    } catch (err) {
-      if (!mountedRef.current) return null
-
-      setError(`Failed to fetch thumbnail status: ${err.message}`)
-      return null
-    }
   }, [modelId])
 
   const regenerateThumbnail = useCallback(async () => {
