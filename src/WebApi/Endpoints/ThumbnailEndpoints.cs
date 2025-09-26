@@ -125,6 +125,13 @@ public static class ThumbnailEndpoints
                 return Results.NotFound("Thumbnail not ready or not found");
             }
 
+            // Ensure the directory exists before checking file existence
+            var directory = Path.GetDirectoryName(response.ThumbnailPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
             if (!System.IO.File.Exists(response.ThumbnailPath))
             {
                 return Results.NotFound("Thumbnail file not found on disk");

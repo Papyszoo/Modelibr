@@ -39,15 +39,17 @@ FROM base AS final
 # Allow customizing UID/GID to match host for bind-mounted uploads directory
 ARG APP_UID=1000
 ARG APP_GID=1000
-# Create app user/group and data directories
+# Create app user/group and data directories with full permissions
 RUN groupadd -g $APP_GID app || true && \
     useradd -u $APP_UID -g app -m -d /home/app app || true && \
     mkdir -p /var/lib/modelibr/uploads && \
+    chmod -R 755 /var/lib/modelibr && \
     chown -R app:app /var/lib/modelibr
 # Copy published output
 COPY --from=publish /app/publish .
-# Ensure app files owned by non-root user
-RUN chown -R app:app /app
+# Ensure app files owned by non-root user with proper permissions
+RUN chown -R app:app /app && \
+    chmod -R 755 /app
 ENV UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
 USER app
 ENTRYPOINT ["dotnet", "WebApi.dll"]
