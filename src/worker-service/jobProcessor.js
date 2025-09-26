@@ -33,11 +33,8 @@ export class JobProcessor {
       modelProcessing: config.modelProcessing,
     })
 
-    // Test API connection before starting
-    const isConnected = await this.jobService.testConnection()
-    if (!isConnected) {
-      logger.warn('API connection test failed, but continuing anyway')
-    }
+    // Wait for API to be available with retry logic
+    await this.waitForApiConnection()
 
     // Start periodic cleanup of old temporary files
     this.startPeriodicCleanup()
@@ -79,13 +76,32 @@ export class JobProcessor {
           await this.sleep(config.pollIntervalMs)
         }
       } catch (error) {
-        logger.error('Error in polling loop', {
-          error: error.message,
-          stack: error.stack,
-        })
+        // Check if this is a connection error
+        const isConnectionError = error.code === 'ECONNREFUSED' || 
+                                  error.code === 'ENOTFOUND' || 
+                                  error.code === 'ETIMEDOUT' ||
+                                  error.message.includes('ECONNREFUSED')
+
+        if (isConnectionError) {
+          logger.warn('API connection error in polling loop, will retry', {
+            error: error.message,
+            code: error.code,
+            apiBaseUrl: config.apiBaseUrl,
+          })
+        } else {
+          logger.error('Error in polling loop', {
+            error: error.message,
+            stack: error.stack,
+          })
+        }
 
         // Wait before retrying to avoid tight error loops
-        await this.sleep(Math.min(config.pollIntervalMs * 2, 30000))
+        // Use longer delay for connection errors
+        const delayMs = isConnectionError 
+          ? Math.min(config.pollIntervalMs * 3, 30000)
+          : Math.min(config.pollIntervalMs * 2, 30000)
+        
+        await this.sleep(delayMs)
       }
     }
 
@@ -424,6 +440,43 @@ export class JobProcessor {
       maxConcurrentJobs: config.maxConcurrentJobs,
       workerId: config.workerId,
     }
+  }
+
+  /**
+   * Wait for API connection with retry logic and exponential backoff
+   */  
+  async waitForApiConnection() {
+    const maxAttempts = config.maxRetries || 10
+    let attempt = 1
+    
+    while (attempt <= maxAttempts) {
+      logger.info(`Testing API connection (attempt ${attempt}/${maxAttempts})`, {
+        apiBaseUrl: config.apiBaseUrl
+      })
+      
+      const isConnected = await this.jobService.testConnection()
+      if (isConnected) {
+        logger.info('API connection test successful, starting job processor')
+        return
+      }
+      
+      if (attempt < maxAttempts) {
+        // Exponential backoff: 2s, 4s, 8s, 16s, 30s max
+        const delayMs = Math.min(config.retryDelayMs * Math.pow(2, attempt - 1), 30000)
+        logger.warn(`API connection failed, retrying in ${delayMs}ms`, {
+          attempt,
+          maxAttempts,
+          apiBaseUrl: config.apiBaseUrl
+        })
+        await this.sleep(delayMs)
+      }
+      
+      attempt++
+    }
+    
+    logger.warn(`API connection failed after ${maxAttempts} attempts, continuing anyway`, {
+      apiBaseUrl: config.apiBaseUrl
+    })
   }
 
   /**

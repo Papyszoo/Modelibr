@@ -1,11 +1,11 @@
 #!/bin/bash
-# Test script to verify Docker Compose startup order fix for thumbnail-worker
+# Test script to verify Docker Compose startup resilience fix for thumbnail-worker
 # This addresses the issue where thumbnail-worker failed to connect to webapi during startup
 
 set -e
 
-echo "=== Docker Compose Startup Order Test ==="
-echo "This test verifies that the thumbnail-worker waits for webapi to be healthy before starting"
+echo "=== Docker Compose Worker Resilience Test ==="
+echo "This test verifies that the thumbnail-worker handles API connection failures gracefully"
 echo ""
 
 # Check if .env file exists
@@ -21,8 +21,8 @@ echo "✓ Docker Compose configuration is valid"
 echo ""
 echo "2. Checking service dependencies..."
 echo "   - postgres: Has health check (pg_isready)"
-echo "   - webapi: Depends on postgres (service_healthy) + has health check (/health endpoint)"
-echo "   - thumbnail-worker: Depends on webapi (service_healthy)"
+echo "   - webapi: Depends on postgres (service_healthy)"
+echo "   - thumbnail-worker: Depends on webapi (service_started) but has resilient connection handling"
 
 # Show the dependency chain
 echo ""
@@ -30,23 +30,23 @@ echo "3. Service dependency chain:"
 docker compose config | grep -A3 "depends_on:" | grep -E "(depends_on|condition)" || true
 
 echo ""
-echo "4. Health check configurations:"
-docker compose config | grep -A5 "healthcheck:" | grep -E "(test|interval|timeout|retries|start_period)" || true
-
-echo ""
 echo "=== Fix Summary ==="
-echo "✓ Added /health endpoint to WebApi (returns 'Healthy')"
-echo "✓ Added curl to WebApi Docker image for health checks"
-echo "✓ Configured webapi service with health check in docker-compose.yml"
-echo "✓ Changed thumbnail-worker dependency from 'service_started' to 'service_healthy'"
+echo "✓ Added robust API connection retry logic with exponential backoff during worker startup"
+echo "✓ Enhanced polling loop error handling to distinguish connection errors from other failures"
+echo "✓ Improved connection resilience for Visual Studio debugging scenarios"
+echo "✓ Worker will retry API connection up to 10 times with increasing delays (2s, 4s, 8s...)"
 echo ""
-echo "This ensures thumbnail-worker only starts after webapi is ready to accept connections,"
-echo "preventing the 'connect ECONNREFUSED' error when debugging with Visual Studio."
+echo "The worker now handles the 'connect ECONNREFUSED' error gracefully by:"
+echo "  1. Testing API connection on startup with retry logic"
+echo "  2. Using exponential backoff for initial connection attempts"
+echo "  3. Continuing to retry during polling with appropriate delays"
+echo "  4. Logging connection issues as warnings rather than errors when appropriate"
 echo ""
 echo "To test the full solution:"
 echo "  docker compose up --build"
 echo ""
 echo "The logs should show:"
-echo "  1. postgres starts and becomes healthy"
-echo "  2. webapi starts, initializes, and becomes healthy"
-echo "  3. thumbnail-worker starts and successfully connects to webapi"
+echo "  1. Worker starts and tests API connection"
+echo "  2. If API not ready, worker retries with increasing delays"
+echo "  3. Once connected, worker begins normal job polling"
+echo "  4. Any temporary connection issues are handled gracefully with retries"

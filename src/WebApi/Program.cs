@@ -40,9 +40,6 @@ namespace WebApi
 
             builder.Services.AddOpenApi();
 
-            // Add health checks
-            builder.Services.AddHealthChecks();
-
             builder.Services
                 .AddApplication()
                 .AddInfrastructure(builder.Configuration);
@@ -81,9 +78,6 @@ namespace WebApi
             app.MapFilesEndpoints();
             app.MapThumbnailEndpoints();
             app.MapThumbnailJobEndpoints();
-
-            // Map health check endpoint
-            app.MapHealthChecks("/health");
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");
