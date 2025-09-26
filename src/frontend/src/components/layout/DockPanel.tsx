@@ -100,6 +100,8 @@ function DockPanel({
       const fromSide = side === 'left' ? 'right' : 'left'
       moveTabBetweenPanels(draggedTab, fromSide)
     }
+    // Always remove drag visual feedback after drop attempt
+    e.currentTarget.classList.remove('drag-over')
   }
 
   const handleDragOver = (e: React.DragEvent): void => {
