@@ -21,6 +21,90 @@ export class ThumbnailJobService {
       // Handle self-signed certificates in development/docker environments
       httpsAgent,
     })
+    
+    // Create fallback clients for connection resilience
+    this.fallbackClients = this.createFallbackClients()
+  }
+  
+  /**
+   * Create fallback API clients for different connection scenarios
+   */
+  createFallbackClients() {
+    const baseUrl = config.apiBaseUrl
+    const clients = []
+    
+    // HTTP fallback (for HTTPS -> HTTP scenarios)
+    if (baseUrl.startsWith('https:')) {
+      const httpUrl = baseUrl.replace('https:', 'http:')
+      clients.push({
+        name: 'http_fallback',
+        client: axios.create({
+          baseURL: httpUrl,
+          timeout: 30000,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      })
+    }
+    
+    // HTTPS with relaxed SSL (for development environments)
+    if (baseUrl.startsWith('http:') && process.env.ASPNETCORE_ENVIRONMENT === 'Development') {
+      const httpsUrl = baseUrl.replace('http:', 'https:')
+      clients.push({
+        name: 'https_relaxed_ssl',
+        client: axios.create({
+          baseURL: httpsUrl,
+          timeout: 30000,
+          headers: { 'Content-Type': 'application/json' },
+          httpsAgent: new https.Agent({ rejectUnauthorized: false })
+        })
+      })
+    }
+    
+    return clients
+  }
+
+  /**
+   * Try an API call with fallback clients if the primary fails
+   * @param {Function} apiCall - Function that makes the API call with a client
+   * @returns {Promise<any>} The successful response
+   */
+  async tryWithFallbacks(apiCall) {
+    // Try primary client first
+    try {
+      return await apiCall(this.apiClient, 'primary')
+    } catch (primaryError) {
+      // If primary fails with connection error, try fallbacks
+      const isConnectionError = primaryError.code === 'ECONNREFUSED' || 
+                                primaryError.code === 'ENOTFOUND' || 
+                                primaryError.code === 'ETIMEDOUT' ||
+                                primaryError.message.includes('ECONNREFUSED')
+      
+      if (isConnectionError && this.fallbackClients.length > 0) {
+        logger.debug('Primary API client failed, trying fallbacks', {
+          primaryError: primaryError.message,
+          fallbackCount: this.fallbackClients.length
+        })
+        
+        for (const fallback of this.fallbackClients) {
+          try {
+            const result = await apiCall(fallback.client, fallback.name)
+            logger.info('API call succeeded with fallback client', {
+              fallback: fallback.name,
+              primaryError: primaryError.message
+            })
+            return result
+          } catch (fallbackError) {
+            logger.debug('Fallback client failed', {
+              fallback: fallback.name,
+              error: fallbackError.message
+            })
+          }
+        }
+      }
+      
+      // If all clients failed, throw the original error
+      throw primaryError
+    }
   }
 
   /**
@@ -29,12 +113,11 @@ export class ThumbnailJobService {
    */
   async pollForJob() {
     try {
-      const response = await this.apiClient.post(
-        '/api/thumbnail-jobs/dequeue',
-        {
+      const response = await this.tryWithFallbacks(async (client, clientName) => {
+        return await client.post('/api/thumbnail-jobs/dequeue', {
           workerId: config.workerId,
-        }
-      )
+        })
+      })
 
       if (response.status === 204) {
         // No jobs available
@@ -117,19 +200,107 @@ export class ThumbnailJobService {
   }
 
   /**
-   * Test API connectivity
+   * Test API connectivity with multiple fallback strategies
    * @returns {Promise<boolean>} True if API is reachable
    */
   async testConnection() {
+    const baseUrl = config.apiBaseUrl
+    const attempts = []
+    
+    // Strategy 1: Try the configured endpoint first
     try {
       const response = await this.apiClient.get('/health')
-      return response.status === 200
+      if (response.status === 200) {
+        logger.info('API connection successful', { 
+          baseURL: baseUrl,
+          strategy: 'configured_endpoint'
+        })
+        return true
+      }
     } catch (error) {
-      logger.warn('API health check failed', {
+      attempts.push({
+        strategy: 'configured_endpoint',
+        url: `${baseUrl}/health`,
         error: error.message,
-        baseURL: config.apiBaseUrl,
+        code: error.code
       })
-      return false
+      
+      logger.debug('API connection attempt failed', {
+        strategy: 'configured_endpoint',
+        error: error.message,
+        code: error.code,
+        baseURL: baseUrl
+      })
     }
+    
+    // Strategy 2: If HTTPS failed, try HTTP (common in debugging scenarios)
+    if (baseUrl.startsWith('https:')) {
+      const httpUrl = baseUrl.replace('https:', 'http:')
+      try {
+        const httpClient = axios.create({
+          baseURL: httpUrl,
+          timeout: 30000,
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        const response = await httpClient.get('/health')
+        if (response.status === 200) {
+          logger.info('API connection successful via HTTP fallback', { 
+            baseURL: httpUrl,
+            strategy: 'http_fallback',
+            originalUrl: baseUrl
+          })
+          return true
+        }
+      } catch (error) {
+        attempts.push({
+          strategy: 'http_fallback',
+          url: `${httpUrl}/health`,
+          error: error.message,
+          code: error.code
+        })
+      }
+    }
+    
+    // Strategy 3: If HTTP failed, try HTTPS with relaxed SSL (for development)
+    if (baseUrl.startsWith('http:') && process.env.ASPNETCORE_ENVIRONMENT === 'Development') {
+      const httpsUrl = baseUrl.replace('http:', 'https:')
+      try {
+        const httpsClient = axios.create({
+          baseURL: httpsUrl,
+          timeout: 30000,
+          headers: { 'Content-Type': 'application/json' },
+          httpsAgent: new https.Agent({ 
+            rejectUnauthorized: false // Allow self-signed certs in development
+          })
+        })
+        
+        const response = await httpsClient.get('/health')
+        if (response.status === 200) {
+          logger.info('API connection successful via HTTPS with relaxed SSL', { 
+            baseURL: httpsUrl,
+            strategy: 'https_relaxed_ssl',
+            originalUrl: baseUrl
+          })
+          return true
+        }
+      } catch (error) {
+        attempts.push({
+          strategy: 'https_relaxed_ssl',
+          url: `${httpsUrl}/health`,
+          error: error.message,
+          code: error.code
+        })
+      }
+    }
+    
+    // Log all failed attempts for debugging
+    logger.warn('All API health check strategies failed', {
+      baseURL: baseUrl,
+      attempts: attempts,
+      environment: process.env.ASPNETCORE_ENVIRONMENT
+    })
+    
+    return false
   }
 }

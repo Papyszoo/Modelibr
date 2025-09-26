@@ -58,7 +58,8 @@ services:
             - RENDER_HEIGHT=${RENDER_HEIGHT:-256}
             - RENDER_FORMAT=${RENDER_FORMAT:-png}
             - LOG_LEVEL=${LOG_LEVEL:-info}
-            - NODE_TLS_REJECT_UNAUTHORIZED=1
+            - NODE_TLS_REJECT_UNAUTHORIZED=${NODE_TLS_REJECT_UNAUTHORIZED:-1}
+            - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
         ports:
             - "${WORKER_PORT:-3001}:3001"
         depends_on:
