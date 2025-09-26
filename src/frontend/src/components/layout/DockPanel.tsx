@@ -18,6 +18,9 @@ interface DockPanelProps {
   setOtherTabs: (tabs: Tab[]) => void
   otherActiveTab: string
   setOtherActiveTab: (tabId: string) => void
+  draggedTab: Tab | null
+  setDraggedTab: (tab: Tab | null) => void
+  moveTabBetweenPanels: (tab: Tab, fromSide: 'left' | 'right') => void
 }
 
 function DockPanel({
@@ -30,8 +33,10 @@ function DockPanel({
   setOtherTabs,
   otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
   setOtherActiveTab,
+  draggedTab,
+  setDraggedTab,
+  moveTabBetweenPanels,
 }: DockPanelProps): JSX.Element {
-  const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
   const menuRef = useRef<Menu>(null)
 
   // Menu items for adding new tabs
@@ -79,26 +84,6 @@ function DockPanel({
     }
   }
 
-  const moveTabToOtherPanel = (tab: Tab): void => {
-    // Remove from current panel
-    const newTabs = tabs.filter(t => t.id !== tab.id)
-    setTabs(newTabs)
-
-    // Add to other panel
-    const newOtherTabs = [...otherTabs, tab]
-    setOtherTabs(newOtherTabs)
-    setOtherActiveTab(tab.id)
-
-    // Update active tab in current panel
-    if (activeTab === tab.id) {
-      if (newTabs.length > 0) {
-        setActiveTab(newTabs[0].id)
-      } else {
-        setActiveTab('')
-      }
-    }
-  }
-
   const handleTabDragStart = (tab: Tab): void => {
     setDraggedTab(tab)
   }
@@ -109,14 +94,36 @@ function DockPanel({
 
   const handleDropOnOtherPanel = (e: React.DragEvent): void => {
     e.preventDefault()
-    if (draggedTab) {
-      moveTabToOtherPanel(draggedTab)
-      setDraggedTab(null)
+    // Only process drop if there's a dragged tab and it's not from this panel
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      // Determine which panel the dragged tab came from
+      const fromSide = side === 'left' ? 'right' : 'left'
+      moveTabBetweenPanels(draggedTab, fromSide)
     }
   }
 
   const handleDragOver = (e: React.DragEvent): void => {
     e.preventDefault()
+    // Only allow drop if there's a dragged tab and it's not from this panel
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      e.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Add visual feedback for valid drop zone
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      e.currentTarget.classList.add('drag-over')
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Remove visual feedback - only if we're actually leaving the drop zone
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      e.currentTarget.classList.remove('drag-over')
+    }
   }
 
   const activeTabData = tabs.find(tab => tab.id === activeTab)
@@ -124,7 +131,13 @@ function DockPanel({
   return (
     <div className={`dock-panel dock-panel-${side}`}>
       {/* Dock/Menu Bar */}
-      <div className={`dock-bar dock-bar-${side}`}>
+      <div 
+        className={`dock-bar dock-bar-${side}`}
+        onDrop={handleDropOnOtherPanel}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+      >
         {/* Tab icons */}
         <div className="dock-tabs">
           {tabs.map(tab => (
@@ -164,6 +177,8 @@ function DockPanel({
         className="dock-content"
         onDrop={handleDropOnOtherPanel}
         onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
       >
         {activeTabData ? (
           <TabProvider
