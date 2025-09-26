@@ -58,7 +58,7 @@ namespace Application.Models
         public int Id { get; init; }
         public string OriginalFileName { get; init; } = string.Empty;
         public string MimeType { get; init; } = string.Empty;
-        public FileType FileType { get; init; }
+        public required FileType FileType { get; init; }
         public bool IsRenderable { get; init; }
         public long SizeBytes { get; init; }
     }
