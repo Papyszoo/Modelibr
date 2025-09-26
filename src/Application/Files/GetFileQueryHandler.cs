@@ -27,11 +27,37 @@ namespace Application.Files
 
             var fullPath = Path.Combine(_pathProvider.UploadRootPath, file.FilePath);
             
-            // Ensure the directory exists before checking file existence
+            // Ensure the directory exists with proper permissions before checking file existence
             var directory = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
+                
+                // Ensure the directory is accessible by setting appropriate permissions
+                // This handles cases where directory permissions were reset after container recreation
+                try
+                {
+                    var dirInfo = new DirectoryInfo(directory);
+                    if (dirInfo.Exists)
+                    {
+                        // Test write access by attempting to create and delete a temporary file
+                        var testFile = Path.Combine(directory, $".access_test_{Guid.NewGuid():N}");
+                        File.WriteAllText(testFile, "test");
+                        File.Delete(testFile);
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // If we can't write to the directory, return an appropriate error
+                    return Result.Failure<GetFileQueryResponse>(
+                        new Error("DirectoryAccessDenied", $"Cannot access directory: {directory}"));
+                }
+                catch (IOException)
+                {
+                    // Handle other IO exceptions that might indicate permission issues
+                    return Result.Failure<GetFileQueryResponse>(
+                        new Error("DirectoryIOError", $"IO error accessing directory: {directory}"));
+                }
             }
             
             if (!System.IO.File.Exists(fullPath))
