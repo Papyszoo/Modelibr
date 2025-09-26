@@ -18,7 +18,12 @@ services:
         ports:
             - "${WEBAPI_HTTP_PORT}:8080"
             - "${WEBAPI_HTTPS_PORT}:8081"
-
+        healthcheck:
+            test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
         volumes:
             # Use platform-appropriate secret/cert paths; on macOS $HOME works (APPDATA is Windows-specific)
             - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro
@@ -62,7 +67,8 @@ services:
         ports:
             - "${WORKER_PORT:-3001}:3001"
         depends_on:
-            - webapi
+            webapi:
+                condition: service_healthy
         networks:
             - modelibr
         restart: unless-stopped
