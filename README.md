@@ -12,6 +12,7 @@ A modern 3D model file upload service built with .NET 9.0 and React, featuring h
 - **3D Model Upload & Storage**: Support for popular 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
 - **Hash-based Deduplication**: Intelligent storage system that prevents duplicate files
 - **Interactive 3D Viewer**: Real-time 3D model rendering with Three.js TSL (Three.js Shading Language)
+- **Real-time Thumbnail Processing**: SignalR-based queue system for instant job processing
 - **Clean Architecture**: Well-structured backend following SOLID principles
 - **Responsive Frontend**: Modern React interface with drag-and-drop file uploads
 - **Containerized Deployment**: Full Docker support with multi-service orchestration
@@ -63,6 +64,13 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 - Docker & Docker Compose
 - PostgreSQL 16
 - nginx for production frontend serving
+- SignalR for real-time worker coordination
+
+**Thumbnail Processing:**
+- Node.js worker service with Three.js rendering
+- Real-time queue system with SignalR notifications
+- Automatic fallback to polling mode
+- Multiple worker support with load balancing
 
 ## 🚀 Getting Started
 
@@ -202,6 +210,7 @@ The worker service will be available at http://localhost:3001 (health check)
 | `WEBAPI_HTTP_PORT` | API HTTP port | `8080` |
 | `WEBAPI_HTTPS_PORT` | API HTTPS port | `8081` |
 | `WORKER_PORT` | Thumbnail worker port | `3001` |
+| `USE_SIGNALR_QUEUE` | Enable real-time queue system | `true` |
 | `MAX_CONCURRENT_JOBS` | Worker concurrent jobs | `3` |
 | `RENDER_WIDTH` | Thumbnail width | `256` |
 | `RENDER_HEIGHT` | Thumbnail height | `256` |
