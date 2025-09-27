@@ -26,8 +26,8 @@ public static class DatabaseExtensions
                 return;
             }
             
-            // Ensure database is created only if connection is available
-            await context.Database.EnsureCreatedAsync();
+            // Apply pending migrations to ensure database is up to date
+            await context.Database.MigrateAsync();
             
             logger.LogInformation("Database initialization completed successfully");
         }
