@@ -9,6 +9,7 @@ namespace Infrastructure.Persistence
         public DbSet<Model> Models => Set<Model>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
         public DbSet<Texture> Textures => Set<Texture>();
+        public DbSet<TexturePack> TexturePacks => Set<TexturePack>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
 
@@ -61,6 +62,7 @@ namespace Infrastructure.Persistence
                 entity.Property(t => t.TextureType).IsRequired();
                 entity.Property(t => t.CreatedAt).IsRequired();
                 entity.Property(t => t.UpdatedAt).IsRequired();
+                entity.Property(t => t.TexturePackId).IsRequired(false); // Optional relationship
 
                 // Configure relationship with File
                 entity.HasOne(t => t.File)
@@ -73,6 +75,29 @@ namespace Infrastructure.Persistence
                 
                 // Create composite index for file and texture type to ensure uniqueness
                 entity.HasIndex(t => new { t.FileId, t.TextureType }).IsUnique();
+
+                // Create composite index to ensure unique texture type per texture pack
+                entity.HasIndex(t => new { t.TexturePackId, t.TextureType })
+                    .IsUnique()
+                    .HasFilter("[TexturePackId] IS NOT NULL");
+            });
+
+            // Configure TexturePack entity
+            modelBuilder.Entity<TexturePack>(entity =>
+            {
+                entity.HasKey(tp => tp.Id);
+                entity.Property(tp => tp.Name).IsRequired().HasMaxLength(200);
+                entity.Property(tp => tp.CreatedAt).IsRequired();
+                entity.Property(tp => tp.UpdatedAt).IsRequired();
+
+                // Configure one-to-many relationship with Textures
+                entity.HasMany(tp => tp.Textures)
+                    .WithOne()
+                    .HasForeignKey(t => t.TexturePackId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Create index for efficient querying by name
+                entity.HasIndex(tp => tp.Name);
             });
 
             // Configure Thumbnail entity
