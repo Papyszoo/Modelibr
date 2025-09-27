@@ -22,6 +22,7 @@
   "author": "Modelibr",
   "license": "MIT",
   "dependencies": {
+    "@microsoft/signalr": "^9.0.6",
     "axios": "^1.6.2",
     "canvas": "^2.11.2",
     "dotenv": "^16.3.1",

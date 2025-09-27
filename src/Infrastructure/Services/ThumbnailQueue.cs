@@ -12,13 +12,16 @@ namespace Infrastructure.Services;
 public class ThumbnailQueue : IThumbnailQueue
 {
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
+    private readonly IThumbnailJobQueueNotificationService _queueNotificationService;
     private readonly ILogger<ThumbnailQueue> _logger;
 
     public ThumbnailQueue(
         IThumbnailJobRepository thumbnailJobRepository,
+        IThumbnailJobQueueNotificationService queueNotificationService,
         ILogger<ThumbnailQueue> logger)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
+        _queueNotificationService = queueNotificationService ?? throw new ArgumentNullException(nameof(queueNotificationService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -44,6 +47,9 @@ public class ThumbnailQueue : IThumbnailQueue
         _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} with hash {ModelHash}", 
             createdJob.Id, modelId, modelHash);
 
+        // Send real-time notification to workers that a new job is available
+        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
+
         return createdJob;
     }
 
@@ -66,6 +72,9 @@ public class ThumbnailQueue : IThumbnailQueue
 
         _logger.LogInformation("Worker {WorkerId} claimed thumbnail job {JobId} for model {ModelId} (attempt {AttemptCount})", 
             workerId, job.Id, job.ModelId, job.AttemptCount);
+
+        // Notify other workers about job status change for coordination
+        await _queueNotificationService.NotifyJobStatusChangedAsync(job.Id, job.Status.ToString(), workerId, cancellationToken);
 
         return job;
     }
