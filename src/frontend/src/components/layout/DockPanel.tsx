@@ -52,6 +52,11 @@ function DockPanel({
       command: () => addTab('texture', 'Textures'),
     },
     {
+      label: 'Texture Packs',
+      icon: 'pi pi-folder',
+      command: () => addTab('texturePacks', 'Texture Packs'),
+    },
+    {
       label: 'Animations List',
       icon: 'pi pi-play',
       command: () => addTab('animation', 'Animations'),
