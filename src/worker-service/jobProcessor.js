@@ -136,10 +136,10 @@ export class JobProcessor {
     try {
       jobLogger.info('Starting thumbnail generation')
 
-      // Process the model
-      await this.processModel(job, jobLogger)
+      // Process the model and get thumbnail metadata
+      const thumbnailMetadata = await this.processModel(job, jobLogger)
 
-      await this.jobService.markJobCompleted(job.id)
+      await this.jobService.markJobCompleted(job.id, thumbnailMetadata)
       jobLogger.info('Thumbnail generation completed successfully')
     } catch (error) {
       jobLogger.error('Thumbnail generation failed', {
@@ -191,7 +191,14 @@ export class JobProcessor {
 
         // Update thumbnail metadata if needed (thumbnails exist but job was still created)
         // This can happen in edge cases where job was queued before thumbnails were stored
-        return
+        // For existing thumbnails, we need to provide default metadata since we can't complete without it
+        jobLogger.warn('Thumbnails already exist, providing default metadata for job completion')
+        return {
+          thumbnailPath: existingThumbnails.paths?.webpPath || '/default/path',
+          sizeBytes: 0,
+          width: 256,
+          height: 256,
+        }
       }
 
       // Step 2: Fetch the model file
@@ -297,8 +304,45 @@ export class JobProcessor {
               uploadResults: storageResult.uploadResults?.length || 0,
               allSuccessful: storageResult.apiResponse?.allSuccessful,
             })
+
+            // Extract thumbnail metadata from successful upload for job completion
+            if (storageResult.stored && storageResult.uploadResults?.length > 0) {
+              const successfulUpload = storageResult.uploadResults.find(upload => upload.success && upload.data)
+              if (successfulUpload && successfulUpload.data) {
+                const thumbnailData = successfulUpload.data
+                jobLogger.info('Extracted thumbnail metadata for job completion', {
+                  thumbnailPath: thumbnailData.thumbnailPath,
+                  sizeBytes: thumbnailData.sizeBytes,
+                  width: thumbnailData.width,
+                  height: thumbnailData.height,
+                })
+                
+                return {
+                  thumbnailPath: thumbnailData.thumbnailPath,
+                  sizeBytes: thumbnailData.sizeBytes,
+                  width: thumbnailData.width,
+                  height: thumbnailData.height,
+                }
+              }
+            }
+            
+            // If upload failed or no metadata available, return default metadata
+            jobLogger.warn('Thumbnail upload failed or no metadata available, using default values')
+            return {
+              thumbnailPath: encodingResult.webpPath || encodingResult.posterPath || '/default/path',
+              sizeBytes: 0,
+              width: 256,
+              height: 256,
+            }
           } else {
             jobLogger.info('Persistent thumbnail storage disabled')
+            // Return default metadata when storage is disabled but encoding succeeded
+            return {
+              thumbnailPath: encodingResult.webpPath || encodingResult.posterPath || '/default/path',
+              sizeBytes: 0,
+              width: 256,
+              height: 256,
+            }
           }
 
           // Clean up temporary files if configured
@@ -314,6 +358,13 @@ export class JobProcessor {
           jobLogger.info(
             'Frame encoding disabled, skipping WebP and poster generation'
           )
+          // Return default metadata when encoding is disabled
+          return {
+            thumbnailPath: '/default/path',
+            sizeBytes: 0,
+            width: 256,
+            height: 256,
+          }
         }
       } else {
         // Fall back to simple processing log
@@ -327,6 +378,13 @@ export class JobProcessor {
             normalizedScale: config.modelProcessing.normalizedScale,
           },
         })
+        // Return default metadata when orbit rendering is disabled
+        return {
+          thumbnailPath: '/default/path',
+          sizeBytes: 0,
+          width: 256,
+          height: 256,
+        }
       }
     } catch (error) {
       jobLogger.error('Model processing failed', {
