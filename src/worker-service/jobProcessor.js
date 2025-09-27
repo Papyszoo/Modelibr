@@ -9,7 +9,7 @@ import { config } from './config.js'
 import logger, { withJobContext } from './logger.js'
 
 /**
- * Job processor that handles thumbnail generation
+ * Job processor that handles thumbnail generation using SignalR real-time queue
  */
 export class JobProcessor {
   constructor() {
@@ -22,19 +22,16 @@ export class JobProcessor {
     this.frameEncoder = null // Will be initialized when needed
     this.isShuttingDown = false
     this.activeJobs = new Map()
-    this.useSignalR = config.useSignalRQueue !== false // Default to true, allow opt-out
   }
 
   /**
    * Start the job processing system
    */
   async start() {
-    logger.info('Starting job processor', {
+    logger.info('Starting SignalR-based job processor', {
       workerId: config.workerId,
-      pollInterval: config.pollIntervalMs,
       maxConcurrentJobs: config.maxConcurrentJobs,
       modelProcessing: config.modelProcessing,
-      useSignalR: this.useSignalR,
     })
 
     // Test API connection before starting
@@ -46,11 +43,8 @@ export class JobProcessor {
     // Start periodic cleanup of old temporary files
     this.startPeriodicCleanup()
 
-    if (this.useSignalR) {
-      await this.startSignalRMode()
-    } else {
-      this.startPollingMode()
-    }
+    // Start SignalR-based job processing
+    await this.startSignalRMode()
   }
 
   /**
@@ -67,23 +61,11 @@ export class JobProcessor {
     // Connect to SignalR hub
     const connected = await this.signalrQueueService.start()
     if (!connected) {
-      logger.error(
-        'Failed to connect to SignalR hub, falling back to polling mode'
-      )
-      this.useSignalR = false
-      this.startPollingMode()
-      return
+      logger.error('Failed to connect to SignalR hub')
+      throw new Error('SignalR connection failed')
     }
 
     logger.info('SignalR job processor started successfully')
-  }
-
-  /**
-   * Start polling-based job processing (fallback mode)
-   */
-  startPollingMode() {
-    logger.info('Starting polling-based job processing')
-    this.pollLoop()
   }
 
   /**
@@ -141,53 +123,6 @@ export class JobProcessor {
         stack: error.stack,
       })
     }
-  }
-
-  /**
-   * Main polling loop
-   */
-  async pollLoop() {
-    while (!this.isShuttingDown) {
-      try {
-        // Check if we can accept more jobs
-        if (this.activeJobs.size >= config.maxConcurrentJobs) {
-          logger.debug('Max concurrent jobs reached, waiting', {
-            activeJobs: this.activeJobs.size,
-            maxConcurrentJobs: config.maxConcurrentJobs,
-          })
-          await this.sleep(config.pollIntervalMs)
-          continue
-        }
-
-        // Poll for next job
-        const job = await this.jobService.pollForJob()
-
-        if (job) {
-          logger.info('Received thumbnail job', {
-            jobId: job.id,
-            modelId: job.modelId,
-            modelHash: job.modelHash,
-            attemptCount: job.attemptCount,
-          })
-
-          // Process job asynchronously
-          this.processJobAsync(job)
-        } else {
-          // No jobs available, wait before polling again
-          await this.sleep(config.pollIntervalMs)
-        }
-      } catch (error) {
-        logger.error('Error in polling loop', {
-          error: error.message,
-          stack: error.stack,
-        })
-
-        // Wait before retrying to avoid tight error loops
-        await this.sleep(Math.min(config.pollIntervalMs * 2, 30000))
-      }
-    }
-
-    logger.info('Job processor stopped')
   }
 
   /**
@@ -467,10 +402,8 @@ export class JobProcessor {
     logger.info('Shutting down job processor')
     this.isShuttingDown = true
 
-    // Stop SignalR connection if using it
-    if (this.useSignalR) {
-      await this.signalrQueueService.stop()
-    }
+    // Stop SignalR connection
+    await this.signalrQueueService.stop()
 
     // Stop periodic cleanup
     if (this.cleanupInterval) {
@@ -526,10 +459,7 @@ export class JobProcessor {
       activeJobs: this.activeJobs.size,
       maxConcurrentJobs: config.maxConcurrentJobs,
       workerId: config.workerId,
-      useSignalR: this.useSignalR,
-      signalrConnected: this.useSignalR
-        ? this.signalrQueueService.connected
-        : null,
+      signalrConnected: this.signalrQueueService.connected,
     }
   }
 

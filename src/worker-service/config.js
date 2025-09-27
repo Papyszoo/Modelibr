@@ -8,9 +8,7 @@ export const config = {
   apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:5009',
   rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
 
-  // Queue settings
-  useSignalRQueue: process.env.USE_SIGNALR_QUEUE !== 'false', // Default to true
-  pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS) || 5000, // Fallback for polling mode
+  // Job processing settings
   maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS) || 3,
 
   // Logging
@@ -79,10 +77,6 @@ export const config = {
 // Validate configuration
 export function validateConfig() {
   const errors = []
-
-  if (config.pollIntervalMs < 1000) {
-    errors.push('POLL_INTERVAL_MS must be at least 1000ms')
-  }
 
   if (config.maxConcurrentJobs < 1) {
     errors.push('MAX_CONCURRENT_JOBS must be at least 1')

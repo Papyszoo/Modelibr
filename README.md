@@ -69,7 +69,6 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 **Thumbnail Processing:**
 - Node.js worker service with Three.js rendering
 - Real-time queue system with SignalR notifications
-- Automatic fallback to polling mode
 - Multiple worker support with load balancing
 
 ## 🚀 Getting Started
@@ -210,7 +209,6 @@ The worker service will be available at http://localhost:3001 (health check)
 | `WEBAPI_HTTP_PORT` | API HTTP port | `8080` |
 | `WEBAPI_HTTPS_PORT` | API HTTPS port | `8081` |
 | `WORKER_PORT` | Thumbnail worker port | `3001` |
-| `USE_SIGNALR_QUEUE` | Enable real-time queue system | `true` |
 | `MAX_CONCURRENT_JOBS` | Worker concurrent jobs | `3` |
 | `RENDER_WIDTH` | Thumbnail width | `256` |
 | `RENDER_HEIGHT` | Thumbnail height | `256` |
