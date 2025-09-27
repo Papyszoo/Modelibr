@@ -4,6 +4,7 @@ FROM node:20-bookworm-slim AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg python3 build-essential ca-certificates wget git \
+  && ln -s /usr/bin/python3 /usr/bin/python \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
