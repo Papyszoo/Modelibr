@@ -1,6 +1,7 @@
 import ModelList from '../../ModelList'
 import ModelViewer from '../../ModelViewer'
 import TextureList from '../tabs/TextureList'
+import TexturePackList from '../tabs/TexturePackList'
 import AnimationList from '../tabs/AnimationList'
 import { Tab } from '../../types'
 import './TabContent.css'
@@ -28,6 +29,9 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'texture':
         return <TextureList />
+
+      case 'texturePacks':
+        return <TexturePackList />
 
       case 'animation':
         return <AnimationList />
