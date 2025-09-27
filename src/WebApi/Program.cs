@@ -47,6 +47,7 @@ namespace WebApi
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
+            builder.Services.AddScoped<IThumbnailJobQueueNotificationService, SignalRThumbnailJobQueueNotificationService>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
 
             var app = builder.Build();
@@ -81,6 +82,7 @@ namespace WebApi
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");
+            app.MapHub<ThumbnailJobHub>("/thumbnailJobHub");
 
             app.Run();
         }
