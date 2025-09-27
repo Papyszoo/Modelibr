@@ -8,9 +8,13 @@ export const config = {
   apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:5009',
   rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
 
-  // Job polling settings
-  pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS) || 5000,
+  // Queue settings
+  useSignalRQueue: process.env.USE_SIGNALR_QUEUE !== 'false', // Default to true
+  pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS) || 5000, // Fallback for polling mode
   maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS) || 3,
+
+  // Logging
+  logLevel: process.env.LOG_LEVEL || 'info',
 
   // Thumbnail rendering settings
   rendering: {

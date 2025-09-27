@@ -1,4 +1,5 @@
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Models;
 using Domain.ValueObjects;
 using Infrastructure.Services;
@@ -11,14 +12,16 @@ namespace Infrastructure.Tests.Services;
 public class ThumbnailQueueTests
 {
     private readonly Mock<IThumbnailJobRepository> _mockRepository;
+    private readonly Mock<IThumbnailJobQueueNotificationService> _mockQueueNotificationService;
     private readonly Mock<ILogger<ThumbnailQueue>> _mockLogger;
     private readonly ThumbnailQueue _thumbnailQueue;
 
     public ThumbnailQueueTests()
     {
         _mockRepository = new Mock<IThumbnailJobRepository>();
+        _mockQueueNotificationService = new Mock<IThumbnailJobQueueNotificationService>();
         _mockLogger = new Mock<ILogger<ThumbnailQueue>>();
-        _thumbnailQueue = new ThumbnailQueue(_mockRepository.Object, _mockLogger.Object);
+        _thumbnailQueue = new ThumbnailQueue(_mockRepository.Object, _mockQueueNotificationService.Object, _mockLogger.Object);
     }
 
     [Fact]
@@ -45,6 +48,7 @@ public class ThumbnailQueueTests
 
         _mockRepository.Verify(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -66,6 +70,7 @@ public class ThumbnailQueueTests
 
         _mockRepository.Verify(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -90,6 +95,7 @@ public class ThumbnailQueueTests
 
         _mockRepository.Verify(r => r.GetNextPendingJobAsync(It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.UpdateAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobStatusChangedAsync(job.Id, ThumbnailJobStatus.Processing.ToString(), workerId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
