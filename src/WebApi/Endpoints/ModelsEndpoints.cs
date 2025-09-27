@@ -21,6 +21,19 @@ public static class ModelsEndpoints
         })
         .WithName("Get All Models");
 
+        app.MapGet("/models/{id}", async (int id, IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> queryHandler) =>
+        {
+            var result = await queryHandler.Handle(new GetModelByIdQuery(id), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
+            }
+            
+            return Results.Ok(result.Value.Model);
+        })
+        .WithName("Get Model By Id");
+
         app.MapGet("/models/{id}/file", async (int id, IQueryHandler<GetModelFileQuery, GetModelFileQueryResponse> queryHandler) =>
         {
             var result = await queryHandler.Handle(new GetModelFileQuery(id), CancellationToken.None);

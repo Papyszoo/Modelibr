@@ -75,6 +75,11 @@ class ApiClient {
     return response.data
   }
 
+  async getModelById(modelId: string): Promise<Model> {
+    const response: AxiosResponse<Model> = await this.client.get(`/models/${modelId}`)
+    return response.data
+  }
+
   getModelFileUrl(modelId: string): string {
     return `${this.baseURL}/models/${modelId}/file`
   }
