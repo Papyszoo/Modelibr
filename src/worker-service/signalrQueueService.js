@@ -28,7 +28,7 @@ export class SignalRQueueService {
         .build()
 
       this._setupEventHandlers()
-      
+
       await this.connection.start()
       this.isConnected = true
       this.reconnectAttempts = 0
@@ -89,7 +89,11 @@ export class SignalRQueueService {
   async acknowledgeJob(jobId, workerId) {
     if (this.isConnected && this.connection) {
       try {
-        await this.connection.invoke('AcknowledgeJobProcessing', jobId, workerId)
+        await this.connection.invoke(
+          'AcknowledgeJobProcessing',
+          jobId,
+          workerId
+        )
       } catch (error) {
         logger.warn('Failed to acknowledge job processing', {
           jobId,
@@ -106,7 +110,7 @@ export class SignalRQueueService {
    */
   _setupEventHandlers() {
     // Handle job enqueued notifications
-    this.connection.on('JobEnqueued', (jobNotification) => {
+    this.connection.on('JobEnqueued', jobNotification => {
       logger.debug('Received job enqueued notification', {
         jobId: jobNotification.JobId,
         modelId: jobNotification.ModelId,
@@ -129,7 +133,7 @@ export class SignalRQueueService {
     })
 
     // Handle job status changes (for coordination with other workers)
-    this.connection.on('JobStatusChanged', (statusNotification) => {
+    this.connection.on('JobStatusChanged', statusNotification => {
       logger.debug('Received job status change notification', {
         jobId: statusNotification.JobId,
         status: statusNotification.Status,
@@ -138,7 +142,7 @@ export class SignalRQueueService {
     })
 
     // Handle worker registration confirmation
-    this.connection.on('WorkerRegistered', (confirmation) => {
+    this.connection.on('WorkerRegistered', confirmation => {
       logger.info('Worker registered successfully', {
         workerId: confirmation.WorkerId,
         timestamp: confirmation.Timestamp,
@@ -146,7 +150,7 @@ export class SignalRQueueService {
     })
 
     // Handle worker unregistration confirmation
-    this.connection.on('WorkerUnregistered', (confirmation) => {
+    this.connection.on('WorkerUnregistered', confirmation => {
       logger.info('Worker unregistered successfully', {
         workerId: confirmation.WorkerId,
         timestamp: confirmation.Timestamp,
@@ -154,7 +158,7 @@ export class SignalRQueueService {
     })
 
     // Handle job acknowledgments from other workers
-    this.connection.on('JobAcknowledged', (acknowledgment) => {
+    this.connection.on('JobAcknowledged', acknowledgment => {
       logger.debug('Job acknowledged by worker', {
         jobId: acknowledgment.JobId,
         workerId: acknowledgment.WorkerId,
@@ -163,14 +167,14 @@ export class SignalRQueueService {
     })
 
     // Handle connection events
-    this.connection.onreconnecting((error) => {
+    this.connection.onreconnecting(error => {
       logger.warn('SignalR connection lost, attempting to reconnect', {
         error: error?.message,
       })
       this.isConnected = false
     })
 
-    this.connection.onreconnected((connectionId) => {
+    this.connection.onreconnected(connectionId => {
       logger.info('SignalR connection restored', {
         connectionId,
         workerId: config.workerId,
@@ -179,14 +183,14 @@ export class SignalRQueueService {
       this.reconnectAttempts = 0
 
       // Re-register worker after reconnection
-      this.connection.invoke('RegisterWorker', config.workerId).catch((error) => {
+      this.connection.invoke('RegisterWorker', config.workerId).catch(error => {
         logger.error('Failed to re-register worker after reconnection', {
           error: error.message,
         })
       })
     })
 
-    this.connection.onclose((error) => {
+    this.connection.onclose(error => {
       logger.error('SignalR connection closed', {
         error: error?.message,
         workerId: config.workerId,

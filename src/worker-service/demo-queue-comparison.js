@@ -1,5 +1,4 @@
 import { config } from './config.js'
-import logger from './logger.js'
 
 /**
  * Demonstration script comparing polling vs SignalR queue approaches
@@ -11,24 +10,38 @@ console.log('='.repeat(80))
 
 console.log('\n📊 BEFORE: Polling-Based Queue System')
 console.log('━'.repeat(50))
-console.log('• Worker polls API every 5 seconds: GET /api/thumbnail-jobs/dequeue')
-console.log('• High server load: Constant HTTP requests even when no jobs available')
-console.log('• Delayed processing: Jobs wait up to 5 seconds before being picked up')
+console.log(
+  '• Worker polls API every 5 seconds: GET /api/thumbnail-jobs/dequeue'
+)
+console.log(
+  '• High server load: Constant HTTP requests even when no jobs available'
+)
+console.log(
+  '• Delayed processing: Jobs wait up to 5 seconds before being picked up'
+)
 console.log('• Inefficient scaling: More workers = more polling requests')
 console.log('• Resource waste: Network and CPU cycles consumed by empty polls')
 
 console.log('\n🚀 AFTER: SignalR-Based Real Queue System')
 console.log('━'.repeat(50))
 console.log('• Worker connects to SignalR hub: /thumbnailJobHub')
-console.log('• Real-time notifications: Jobs processed immediately when enqueued')
+console.log(
+  '• Real-time notifications: Jobs processed immediately when enqueued'
+)
 console.log('• Efficient resource usage: No unnecessary HTTP requests')
 console.log('• Better scalability: Workers coordinate through hub messaging')
-console.log('• Graceful fallback: Automatically falls back to polling if SignalR fails')
+console.log(
+  '• Graceful fallback: Automatically falls back to polling if SignalR fails'
+)
 
 console.log('\n⚙️ Configuration Options')
 console.log('━'.repeat(50))
-console.log(`• USE_SIGNALR_QUEUE=${config.useSignalRQueue} (can be set to false for polling)`)
-console.log(`• POLL_INTERVAL_MS=${config.pollIntervalMs} (fallback polling interval)`)
+console.log(
+  `• USE_SIGNALR_QUEUE=${config.useSignalRQueue} (can be set to false for polling)`
+)
+console.log(
+  `• POLL_INTERVAL_MS=${config.pollIntervalMs} (fallback polling interval)`
+)
 console.log(`• API_BASE_URL=${config.apiBaseUrl} (SignalR hub endpoint)`)
 console.log(`• WORKER_ID=${config.workerId} (unique worker identification)`)
 
@@ -63,7 +76,9 @@ console.log('━'.repeat(50))
 console.log('• Clean Architecture: New services follow existing patterns')
 console.log('• Domain Layer: No changes to ThumbnailJob entity')
 console.log('• Application Layer: Added IThumbnailJobQueueNotificationService')
-console.log('• Infrastructure Layer: ThumbnailQueue enhanced with notifications')
+console.log(
+  '• Infrastructure Layer: ThumbnailQueue enhanced with notifications'
+)
 console.log('• WebApi Layer: New ThumbnailJobHub for worker communication')
 console.log('• Worker Service: SignalRQueueService with polling fallback')
 

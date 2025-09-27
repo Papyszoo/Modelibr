@@ -60,14 +60,16 @@ export class JobProcessor {
     logger.info('Starting SignalR-based job processing')
 
     // Set up the job received callback
-    this.signalrQueueService.onJobReceived(async (job) => {
+    this.signalrQueueService.onJobReceived(async job => {
       await this.handleJobNotification(job)
     })
 
     // Connect to SignalR hub
     const connected = await this.signalrQueueService.start()
     if (!connected) {
-      logger.error('Failed to connect to SignalR hub, falling back to polling mode')
+      logger.error(
+        'Failed to connect to SignalR hub, falling back to polling mode'
+      )
       this.useSignalR = false
       this.startPollingMode()
       return
@@ -102,7 +104,7 @@ export class JobProcessor {
 
       // Try to claim the job through the API
       const claimedJob = await this.jobService.pollForJob()
-      
+
       if (claimedJob && claimedJob.id === job.id) {
         logger.info('Successfully claimed job from SignalR notification', {
           jobId: claimedJob.id,
@@ -112,7 +114,10 @@ export class JobProcessor {
         })
 
         // Acknowledge job processing to other workers
-        await this.signalrQueueService.acknowledgeJob(claimedJob.id, config.workerId)
+        await this.signalrQueueService.acknowledgeJob(
+          claimedJob.id,
+          config.workerId
+        )
 
         // Process job asynchronously
         this.processJobAsync(claimedJob)
@@ -522,7 +527,9 @@ export class JobProcessor {
       maxConcurrentJobs: config.maxConcurrentJobs,
       workerId: config.workerId,
       useSignalR: this.useSignalR,
-      signalrConnected: this.useSignalR ? this.signalrQueueService.connected : null,
+      signalrConnected: this.useSignalR
+        ? this.signalrQueueService.connected
+        : null,
     }
   }
 
