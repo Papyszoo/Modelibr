@@ -13,14 +13,8 @@ import {
 } from '../types'
 
 export interface UploadModelResponse {
-  id: string
-  name: string
-  files: Array<{
-    id: string
-    originalFileName: string
-    sizeBytes: number
-    mimeType: string
-  }>
+  id: number
+  alreadyExists: boolean
 }
 
 export interface ThumbnailStatus {
