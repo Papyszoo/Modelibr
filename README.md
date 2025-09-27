@@ -211,11 +211,11 @@ The worker service will be available at http://localhost:3001 (health check)
 | **Web API** | | |
 | `ASPNETCORE_ENVIRONMENT` | ASP.NET Core environment | `Development` |
 | `WEBAPI_HTTP_PORT` | API HTTP port | `8080` |
-| `WEBAPI_HTTPS_PORT` | API HTTPS port | `8081` |
+| `WEBAPI_HTTPS_PORT` | API HTTPS port (local dev only) | `8081` |
 | `UPLOAD_STORAGE_PATH` | Directory for uploaded files | `/var/lib/modelibr/uploads` |
 | **Frontend** | | |
 | `FRONTEND_PORT` | Frontend port mapping | `3000` |
-| `VITE_API_BASE_URL` | Frontend API base URL | `https://localhost:8081` |
+| `VITE_API_BASE_URL` | Frontend API base URL | `http://localhost:8080` |
 | **Database** | | |
 | `POSTGRES_USER` | PostgreSQL username | `modelibr` |
 | `POSTGRES_PASSWORD` | PostgreSQL password | `ChangeThisStrongPassword123!` |
@@ -290,7 +290,7 @@ If you encounter "container webapi is unhealthy" errors:
 
 ### Common Issues
 - **Database connection errors**: Ensure PostgreSQL container is running and healthy
-- **Port conflicts**: Make sure ports 3000, 8080, 8081, 5432, and 3001 are available
+- **Port conflicts**: Make sure ports 3000, 8080, 5432, and 3001 are available (port 8081 only needed for local HTTPS development)
 - **Upload permission errors**: Set `UPLOAD_STORAGE_PATH` to a writable directory
 
 ## 🤝 Contributing
