@@ -415,6 +415,132 @@ public class TexturePackDomainTests
         Assert.Empty(texturePack.DomainEvents);
     }
 
+    #region Model Association Tests
+
+    [Fact]
+    public void AddModel_WithValidModel_AddsSuccessfully()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act
+        texturePack.AddModel(model, updatedAt);
+
+        // Assert
+        Assert.Single(texturePack.Models);
+        Assert.Contains(model, texturePack.Models);
+        Assert.Equal(updatedAt, texturePack.UpdatedAt);
+    }
+
+    [Fact]
+    public void AddModel_WithNullModel_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => texturePack.AddModel(null!, updatedAt));
+    }
+
+    [Fact]
+    public void AddModel_WithExistingModel_DoesNotAddDuplicate()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 1; // Set ID to simulate existing entity
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+        texturePack.AddModel(model, updatedAt);
+
+        // Act
+        texturePack.AddModel(model, updatedAt.AddMinutes(1));
+
+        // Assert
+        Assert.Single(texturePack.Models);
+    }
+
+    [Fact]
+    public void RemoveModel_WithExistingModel_RemovesSuccessfully()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+        texturePack.AddModel(model, updatedAt);
+
+        // Act
+        texturePack.RemoveModel(model, updatedAt.AddMinutes(1));
+
+        // Assert
+        Assert.Empty(texturePack.Models);
+        Assert.Equal(updatedAt.AddMinutes(1), texturePack.UpdatedAt);
+    }
+
+    [Fact]
+    public void RemoveModel_WithNullModel_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => texturePack.RemoveModel(null!, updatedAt));
+    }
+
+    [Fact]
+    public void HasModel_WithExistingModel_ReturnsTrue()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 123;
+        texturePack.AddModel(model, DateTime.UtcNow.AddMinutes(1));
+
+        // Act
+        var hasModel = texturePack.HasModel(123);
+
+        // Assert
+        Assert.True(hasModel);
+    }
+
+    [Fact]
+    public void HasModel_WithNonExistingModel_ReturnsFalse()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+
+        // Act
+        var hasModel = texturePack.HasModel(999);
+
+        // Assert
+        Assert.False(hasModel);
+    }
+
+    [Fact]
+    public void GetModels_ReturnsReadOnlyList()
+    {
+        // Arrange
+        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var model1 = Model.Create("Model 1", DateTime.UtcNow);
+        var model2 = Model.Create("Model 2", DateTime.UtcNow);
+        texturePack.AddModel(model1, DateTime.UtcNow.AddMinutes(1));
+        texturePack.AddModel(model2, DateTime.UtcNow.AddMinutes(2));
+
+        // Act
+        var models = texturePack.GetModels();
+
+        // Assert
+        Assert.Equal(2, models.Count);
+        Assert.Contains(model1, models);
+        Assert.Contains(model2, models);
+        Assert.IsAssignableFrom<IReadOnlyList<Model>>(models);
+    }
+
+    #endregion
+
     private static Texture CreateValidTexture(TextureType textureType)
     {
         var file = CreateValidTextureFile();
