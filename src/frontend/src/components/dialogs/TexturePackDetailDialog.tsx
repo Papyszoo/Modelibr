@@ -8,9 +8,13 @@ import { Column } from 'primereact/column'
 import { Toast } from 'primereact/toast'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { classNames } from 'primereact/utils'
-import ApiClient from '../../services/ApiClient'
 import { TexturePackDto, TextureDto, ModelSummaryDto } from '../../types'
-import { getTextureTypeLabel, getTextureTypeColor, getTextureTypeIcon } from '../../utils/textureTypeUtils'
+import {
+  getTextureTypeLabel,
+  getTextureTypeColor,
+  getTextureTypeIcon,
+} from '../../utils/textureTypeUtils'
+import { useTexturePacks } from '../../hooks/useTexturePacks'
 import AddTextureToPackDialog from './AddTextureToPackDialog'
 import ModelAssociationDialog from './ModelAssociationDialog'
 import './dialogs.css'
@@ -22,15 +26,22 @@ interface TexturePackDetailDialogProps {
   onPackUpdated: () => void
 }
 
-function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }: TexturePackDetailDialogProps) {
+function TexturePackDetailDialog({
+  visible,
+  texturePack,
+  onHide,
+  onPackUpdated,
+}: TexturePackDetailDialogProps) {
   const [currentPack, setCurrentPack] = useState<TexturePackDto>(texturePack)
   const [editedName, setEditedName] = useState(texturePack.name)
   const [editing, setEditing] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [showAddTextureDialog, setShowAddTextureDialog] = useState(false)
-  const [showModelAssociationDialog, setShowModelAssociationDialog] = useState(false)
+  const [showModelAssociationDialog, setShowModelAssociationDialog] =
+    useState(false)
   const [errors, setErrors] = useState<{ name?: string }>({})
   const toast = useRef<Toast>(null)
+  const texturePacksApi = useTexturePacks()
 
   useEffect(() => {
     setCurrentPack(texturePack)
@@ -39,7 +50,7 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
 
   const validateName = (name: string) => {
     const newErrors: { name?: string } = {}
-    
+
     if (!name.trim()) {
       newErrors.name = 'Name is required'
     } else if (name.trim().length < 2) {
@@ -47,7 +58,7 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
     } else if (name.trim().length > 200) {
       newErrors.name = 'Name cannot exceed 200 characters'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -59,15 +70,17 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
 
     try {
       setUpdating(true)
-      await ApiClient.updateTexturePack(currentPack.id, { name: editedName.trim() })
-      
+      await texturePacksApi.updateTexturePack(currentPack.id, {
+        name: editedName.trim(),
+      })
+
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
         detail: 'Texture pack updated successfully',
-        life: 3000
+        life: 3000,
       })
-      
+
       setEditing(false)
       onPackUpdated()
     } catch (error) {
@@ -76,7 +89,7 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to update texture pack',
-        life: 3000
+        life: 3000,
       })
     } finally {
       setUpdating(false)
@@ -96,12 +109,15 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await ApiClient.removeTextureFromPack(currentPack.id, texture.id)
+          await texturePacksApi.removeTextureFromPack(
+            currentPack.id,
+            texture.id
+          )
           toast.current?.show({
             severity: 'success',
             summary: 'Success',
             detail: 'Texture removed from pack',
-            life: 3000
+            life: 3000,
           })
           onPackUpdated()
         } catch (error) {
@@ -110,10 +126,10 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
             severity: 'error',
             summary: 'Error',
             detail: 'Failed to remove texture from pack',
-            life: 3000
+            life: 3000,
           })
         }
-      }
+      },
     })
   }
 
@@ -124,12 +140,15 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await ApiClient.disassociateTexturePackFromModel(currentPack.id, model.id)
+          await texturePacksApi.disassociateTexturePackFromModel(
+            currentPack.id,
+            model.id
+          )
           toast.current?.show({
             severity: 'success',
             summary: 'Success',
             detail: 'Model disassociated from pack',
-            life: 3000
+            life: 3000,
           })
           onPackUpdated()
         } catch (error) {
@@ -138,10 +157,10 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
             severity: 'error',
             summary: 'Error',
             detail: 'Failed to disassociate model from pack',
-            life: 3000
+            life: 3000,
           })
         }
-      }
+      },
     })
   }
 
@@ -185,10 +204,10 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
 
   const dialogFooter = (
     <div>
-      <Button 
-        label="Close" 
-        icon="pi pi-times" 
-        className="p-button-text" 
+      <Button
+        label="Close"
+        icon="pi pi-times"
+        className="p-button-text"
         onClick={onHide}
       />
     </div>
@@ -208,7 +227,7 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
       >
         <Toast ref={toast} />
         <ConfirmDialog />
-        
+
         <div className="pack-overview">
           <div className="pack-info">
             <div className="pack-name-section">
@@ -216,21 +235,21 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
                 <div className="p-inputgroup">
                   <InputText
                     value={editedName}
-                    onChange={(e) => setEditedName(e.target.value)}
+                    onChange={e => setEditedName(e.target.value)}
                     className={classNames({ 'p-invalid': errors.name })}
                     placeholder="Texture pack name"
                     maxLength={200}
                     autoFocus
                   />
-                  <Button 
-                    icon="pi pi-check" 
+                  <Button
+                    icon="pi pi-check"
                     className="p-button-success"
                     onClick={handleUpdateName}
                     loading={updating}
                     disabled={!editedName.trim() || updating}
                   />
-                  <Button 
-                    icon="pi pi-times" 
+                  <Button
+                    icon="pi pi-times"
                     className="p-button-secondary"
                     onClick={handleCancelEdit}
                     disabled={updating}
@@ -239,8 +258,8 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
               ) : (
                 <div className="pack-name-display">
                   <h3>{currentPack.name}</h3>
-                  <Button 
-                    icon="pi pi-pencil" 
+                  <Button
+                    icon="pi pi-pencil"
                     className="p-button-text p-button-sm"
                     onClick={() => setEditing(true)}
                     tooltip="Edit name"
@@ -249,15 +268,17 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
               )}
               {errors.name && <small className="p-error">{errors.name}</small>}
             </div>
-            
+
             <div className="pack-stats">
               <span className="stat-item">
                 <i className="pi pi-image"></i>
-                {currentPack.textureCount} texture{currentPack.textureCount !== 1 ? 's' : ''}
+                {currentPack.textureCount} texture
+                {currentPack.textureCount !== 1 ? 's' : ''}
               </span>
               <span className="stat-item">
                 <i className="pi pi-box"></i>
-                {currentPack.associatedModels.length} model{currentPack.associatedModels.length !== 1 ? 's' : ''}
+                {currentPack.associatedModels.length} model
+                {currentPack.associatedModels.length !== 1 ? 's' : ''}
               </span>
               <span className="stat-item">
                 <i className="pi pi-calendar"></i>
@@ -271,14 +292,14 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
           <TabPanel header="Textures" leftIcon="pi pi-image">
             <div className="tab-header">
               <h4>Textures in Pack</h4>
-              <Button 
-                label="Add Texture" 
-                icon="pi pi-plus" 
+              <Button
+                label="Add Texture"
+                icon="pi pi-plus"
                 onClick={() => setShowAddTextureDialog(true)}
                 size="small"
               />
             </div>
-            
+
             <DataTable
               value={currentPack.textures}
               emptyMessage="No textures in this pack"
@@ -286,27 +307,27 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
               stripedRows
               showGridlines
             >
-              <Column 
-                field="fileName" 
-                header="File Name" 
+              <Column
+                field="fileName"
+                header="File Name"
                 sortable
                 style={{ minWidth: '200px' }}
               />
-              <Column 
-                header="Type" 
+              <Column
+                header="Type"
                 body={textureTypeBodyTemplate}
                 sortable
                 sortField="textureType"
                 style={{ minWidth: '150px' }}
               />
-              <Column 
-                field="createdAt" 
-                header="Added" 
+              <Column
+                field="createdAt"
+                header="Added"
                 body={textureDateBodyTemplate}
                 sortable
                 style={{ minWidth: '120px' }}
               />
-              <Column 
+              <Column
                 body={textureActionsBodyTemplate}
                 header="Actions"
                 style={{ width: '80px' }}
@@ -317,14 +338,14 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
           <TabPanel header="Models" leftIcon="pi pi-box">
             <div className="tab-header">
               <h4>Associated Models</h4>
-              <Button 
-                label="Manage Associations" 
-                icon="pi pi-link" 
+              <Button
+                label="Manage Associations"
+                icon="pi pi-link"
                 onClick={() => setShowModelAssociationDialog(true)}
                 size="small"
               />
             </div>
-            
+
             <DataTable
               value={currentPack.associatedModels}
               emptyMessage="No models associated with this pack"
@@ -332,13 +353,13 @@ function TexturePackDetailDialog({ visible, texturePack, onHide, onPackUpdated }
               stripedRows
               showGridlines
             >
-              <Column 
-                field="name" 
-                header="Model Name" 
+              <Column
+                field="name"
+                header="Model Name"
                 sortable
                 style={{ minWidth: '200px' }}
               />
-              <Column 
+              <Column
                 body={modelActionsBodyTemplate}
                 header="Actions"
                 style={{ width: '80px' }}

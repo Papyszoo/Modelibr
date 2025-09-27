@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import ApiClient from '../../services/ApiClient'
 import { TexturePackDto, TextureDto } from '../../types'
-import { getTextureTypeLabel, getTextureTypeColor, getTextureTypeIcon } from '../../utils/textureTypeUtils'
+import {
+  getTextureTypeLabel,
+  getTextureTypeColor,
+  getTextureTypeIcon,
+} from '../../utils/textureTypeUtils'
+import { useTexturePacks } from '../../hooks/useTexturePacks'
 import CreateTexturePackDialog from '../dialogs/CreateTexturePackDialog'
 import TexturePackDetailDialog from '../dialogs/TexturePackDetailDialog'
 import './TexturePackList.css'
@@ -15,19 +19,21 @@ import './TexturePackList.css'
 function TexturePackList() {
   const [texturePacks, setTexturePacks] = useState<TexturePackDto[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedTexturePack, setSelectedTexturePack] = useState<TexturePackDto | null>(null)
+  const [selectedTexturePack, setSelectedTexturePack] =
+    useState<TexturePackDto | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const toast = useRef<Toast>(null)
+  const texturePacksApi = useTexturePacks()
 
   useEffect(() => {
     loadTexturePacks()
-  }, [])
+  }, [loadTexturePacks])
 
-  const loadTexturePacks = async () => {
+  const loadTexturePacks = useCallback(async () => {
     try {
       setLoading(true)
-      const packs = await ApiClient.getAllTexturePacks()
+      const packs = await texturePacksApi.getAllTexturePacks()
       setTexturePacks(packs)
     } catch (error) {
       console.error('Failed to load texture packs:', error)
@@ -35,21 +41,21 @@ function TexturePackList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load texture packs',
-        life: 3000
+        life: 3000,
       })
     } finally {
       setLoading(false)
     }
-  }
+  }, [texturePacksApi])
 
   const handleCreateTexturePack = async (name: string) => {
     try {
-      await ApiClient.createTexturePack({ name })
+      await texturePacksApi.createTexturePack({ name })
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
         detail: 'Texture pack created successfully',
-        life: 3000
+        life: 3000,
       })
       loadTexturePacks()
       setShowCreateDialog(false)
@@ -59,7 +65,7 @@ function TexturePackList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to create texture pack',
-        life: 3000
+        life: 3000,
       })
     }
   }
@@ -71,12 +77,12 @@ function TexturePackList() {
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await ApiClient.deleteTexturePack(texturePack.id)
+          await texturePacksApi.deleteTexturePack(texturePack.id)
           toast.current?.show({
             severity: 'success',
             summary: 'Success',
             detail: 'Texture pack deleted successfully',
-            life: 3000
+            life: 3000,
           })
           loadTexturePacks()
         } catch (error) {
@@ -85,10 +91,10 @@ function TexturePackList() {
             severity: 'error',
             summary: 'Error',
             detail: 'Failed to delete texture pack',
-            life: 3000
+            life: 3000,
           })
         }
-      }
+      },
     })
   }
 
@@ -122,7 +128,9 @@ function TexturePackList() {
           <span
             key={texture.id}
             className="texture-type-badge"
-            style={{ backgroundColor: getTextureTypeColor(texture.textureType) }}
+            style={{
+              backgroundColor: getTextureTypeColor(texture.textureType),
+            }}
             title={`${getTextureTypeLabel(texture.textureType)} - ${texture.fileName || 'Unknown'}`}
           >
             <i className={`pi ${getTextureTypeIcon(texture.textureType)}`}></i>
@@ -130,7 +138,9 @@ function TexturePackList() {
           </span>
         ))}
         {rowData.textureCount > 4 && (
-          <span className="texture-count-more">+{rowData.textureCount - 4} more</span>
+          <span className="texture-count-more">
+            +{rowData.textureCount - 4} more
+          </span>
         )}
       </div>
     )
@@ -145,7 +155,8 @@ function TexturePackList() {
       <div className="associated-models">
         <span className="model-count">
           <i className="pi pi-box"></i>
-          {rowData.associatedModels.length} model{rowData.associatedModels.length !== 1 ? 's' : ''}
+          {rowData.associatedModels.length} model
+          {rowData.associatedModels.length !== 1 ? 's' : ''}
         </span>
       </div>
     )
@@ -178,7 +189,7 @@ function TexturePackList() {
     <div className="texture-pack-list">
       <Toast ref={toast} />
       <ConfirmDialog />
-      
+
       <header className="texture-pack-list-header">
         <div className="header-content">
           <h1>Texture Packs</h1>
@@ -189,9 +200,9 @@ function TexturePackList() {
             </span>
           </div>
         </div>
-        <Button 
-          label="Create Pack" 
-          icon="pi pi-plus" 
+        <Button
+          label="Create Pack"
+          icon="pi pi-plus"
           onClick={() => setShowCreateDialog(true)}
           className="p-button-primary"
         />
@@ -210,31 +221,31 @@ function TexturePackList() {
           rowsPerPageOptions={[5, 10, 25, 50]}
           className="texture-pack-table"
         >
-          <Column 
-            field="name" 
-            header="Name" 
+          <Column
+            field="name"
+            header="Name"
             body={nameBodyTemplate}
-            sortable 
+            sortable
             style={{ minWidth: '200px' }}
           />
-          <Column 
-            header="Textures" 
+          <Column
+            header="Textures"
             body={texturesBodyTemplate}
             style={{ minWidth: '300px' }}
           />
-          <Column 
-            header="Models" 
+          <Column
+            header="Models"
             body={modelsBodyTemplate}
             style={{ minWidth: '120px' }}
           />
-          <Column 
-            field="updatedAt" 
-            header="Last Updated" 
+          <Column
+            field="updatedAt"
+            header="Last Updated"
             body={dateBodyTemplate}
-            sortable 
+            sortable
             style={{ minWidth: '120px' }}
           />
-          <Column 
+          <Column
             body={actionsBodyTemplate}
             header="Actions"
             style={{ width: '120px' }}

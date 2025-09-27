@@ -10,14 +10,18 @@ interface CreateTexturePackDialogProps {
   onSubmit: (name: string) => Promise<void>
 }
 
-function CreateTexturePackDialog({ visible, onHide, onSubmit }: CreateTexturePackDialogProps) {
+function CreateTexturePackDialog({
+  visible,
+  onHide,
+  onSubmit,
+}: CreateTexturePackDialogProps) {
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ name?: string }>({})
 
   const validateForm = () => {
     const newErrors: { name?: string } = {}
-    
+
     if (!name.trim()) {
       newErrors.name = 'Name is required'
     } else if (name.trim().length < 2) {
@@ -25,7 +29,7 @@ function CreateTexturePackDialog({ visible, onHide, onSubmit }: CreateTexturePac
     } else if (name.trim().length > 200) {
       newErrors.name = 'Name cannot exceed 200 characters'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -34,7 +38,7 @@ function CreateTexturePackDialog({ visible, onHide, onSubmit }: CreateTexturePac
     if (!validateForm()) {
       return
     }
-    
+
     try {
       setSubmitting(true)
       await onSubmit(name.trim())
@@ -56,16 +60,16 @@ function CreateTexturePackDialog({ visible, onHide, onSubmit }: CreateTexturePac
 
   const dialogFooter = (
     <div>
-      <Button 
-        label="Cancel" 
-        icon="pi pi-times" 
-        className="p-button-text" 
+      <Button
+        label="Cancel"
+        icon="pi pi-times"
+        className="p-button-text"
         onClick={handleCancel}
         disabled={submitting}
       />
-      <Button 
-        label="Create" 
-        icon="pi pi-check" 
+      <Button
+        label="Create"
+        icon="pi pi-check"
         onClick={handleSubmit}
         loading={submitting}
         disabled={!name.trim() || submitting}
@@ -91,12 +95,12 @@ function CreateTexturePackDialog({ visible, onHide, onSubmit }: CreateTexturePac
         <InputText
           id="pack-name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={e => setName(e.target.value)}
           className={classNames({ 'p-invalid': errors.name })}
           placeholder="Enter texture pack name"
           maxLength={200}
           autoFocus
-          onKeyDown={(e) => {
+          onKeyDown={e => {
             if (e.key === 'Enter' && name.trim() && !submitting) {
               handleSubmit()
             }

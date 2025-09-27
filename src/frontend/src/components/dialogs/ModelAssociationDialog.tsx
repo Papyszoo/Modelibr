@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
 import { Checkbox } from 'primereact/checkbox'
-import ApiClient from '../../services/ApiClient'
 import { TexturePackDto, Model } from '../../types'
+import { useTexturePacks } from '../../hooks/useTexturePacks'
 import './dialogs.css'
 
 interface ModelAssociationDialogProps {
@@ -22,33 +22,43 @@ interface ModelAssociation {
   originallyAssociated: boolean
 }
 
-function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsChanged }: ModelAssociationDialogProps) {
-  const [modelAssociations, setModelAssociations] = useState<ModelAssociation[]>([])
+function ModelAssociationDialog({
+  visible,
+  texturePack,
+  onHide,
+  onAssociationsChanged,
+}: ModelAssociationDialogProps) {
+  const [modelAssociations, setModelAssociations] = useState<
+    ModelAssociation[]
+  >([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const toast = useRef<Toast>(null)
+  const texturePacksApi = useTexturePacks()
 
   useEffect(() => {
     if (visible) {
       loadModels()
     }
-  }, [visible, texturePack])
+  }, [visible, loadModels])
 
-  const loadModels = async () => {
+  const loadModels = useCallback(async () => {
     try {
       setLoading(true)
-      const allModels = await ApiClient.getModels()
-      
+      const allModels = await texturePacksApi.getModels()
+
       // Get currently associated model IDs
-      const associatedModelIds = new Set(texturePack.associatedModels.map(m => m.id))
-      
+      const associatedModelIds = new Set(
+        texturePack.associatedModels.map(m => m.id)
+      )
+
       // Create association objects
       const associations: ModelAssociation[] = allModels.map(model => ({
         model,
         isAssociated: associatedModelIds.has(parseInt(model.id)),
-        originallyAssociated: associatedModelIds.has(parseInt(model.id))
+        originallyAssociated: associatedModelIds.has(parseInt(model.id)),
       }))
-      
+
       setModelAssociations(associations)
     } catch (error) {
       console.error('Failed to load models:', error)
@@ -56,19 +66,17 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load models',
-        life: 3000
+        life: 3000,
       })
     } finally {
       setLoading(false)
     }
-  }
+  }, [texturePacksApi, texturePack.associatedModels])
 
   const handleToggleAssociation = (modelId: string, isAssociated: boolean) => {
-    setModelAssociations(prev => 
-      prev.map(assoc => 
-        assoc.model.id === modelId 
-          ? { ...assoc, isAssociated }
-          : assoc
+    setModelAssociations(prev =>
+      prev.map(assoc =>
+        assoc.model.id === modelId ? { ...assoc, isAssociated } : assoc
       )
     )
   }
@@ -76,7 +84,7 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
   const getChanges = () => {
     const toAssociate: Model[] = []
     const toDisassociate: Model[] = []
-    
+
     modelAssociations.forEach(assoc => {
       if (assoc.isAssociated && !assoc.originallyAssociated) {
         toAssociate.push(assoc.model)
@@ -84,7 +92,7 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
         toDisassociate.push(assoc.model)
       }
     })
-    
+
     return { toAssociate, toDisassociate }
   }
 
@@ -95,7 +103,7 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
 
   const handleSave = async () => {
     const { toAssociate, toDisassociate } = getChanges()
-    
+
     if (!hasChanges()) {
       onHide()
       return
@@ -103,24 +111,30 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
 
     try {
       setSaving(true)
-      
+
       // Process associations
       for (const model of toAssociate) {
-        await ApiClient.associateTexturePackWithModel(texturePack.id, parseInt(model.id))
+        await texturePacksApi.associateTexturePackWithModel(
+          texturePack.id,
+          parseInt(model.id)
+        )
       }
-      
+
       // Process disassociations
       for (const model of toDisassociate) {
-        await ApiClient.disassociateTexturePackFromModel(texturePack.id, parseInt(model.id))
+        await texturePacksApi.disassociateTexturePackFromModel(
+          texturePack.id,
+          parseInt(model.id)
+        )
       }
-      
+
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
         detail: 'Model associations updated successfully',
-        life: 3000
+        life: 3000,
       })
-      
+
       onAssociationsChanged()
     } catch (error) {
       console.error('Failed to update model associations:', error)
@@ -128,7 +142,7 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to update model associations',
-        life: 3000
+        life: 3000,
       })
     } finally {
       setSaving(false)
@@ -137,10 +151,10 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
 
   const handleCancel = () => {
     // Reset changes
-    setModelAssociations(prev => 
-      prev.map(assoc => ({ 
-        ...assoc, 
-        isAssociated: assoc.originallyAssociated 
+    setModelAssociations(prev =>
+      prev.map(assoc => ({
+        ...assoc,
+        isAssociated: assoc.originallyAssociated,
       }))
     )
     onHide()
@@ -151,7 +165,9 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
       <Checkbox
         inputId={`model-${rowData.model.id}`}
         checked={rowData.isAssociated}
-        onChange={(e) => handleToggleAssociation(rowData.model.id, e.checked || false)}
+        onChange={e =>
+          handleToggleAssociation(rowData.model.id, e.checked || false)
+        }
       />
     )
   }
@@ -162,7 +178,11 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
     } else if (!rowData.isAssociated && rowData.originallyAssociated) {
       return <span className="status-badge status-remove">Will Remove</span>
     } else if (rowData.isAssociated) {
-      return <span className="status-badge status-current">Currently Associated</span>
+      return (
+        <span className="status-badge status-current">
+          Currently Associated
+        </span>
+      )
     }
     return <span className="status-badge status-none">Not Associated</span>
   }
@@ -173,16 +193,16 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
 
   const dialogFooter = (
     <div>
-      <Button 
-        label="Cancel" 
-        icon="pi pi-times" 
-        className="p-button-text" 
+      <Button
+        label="Cancel"
+        icon="pi pi-times"
+        className="p-button-text"
         onClick={handleCancel}
         disabled={saving}
       />
-      <Button 
-        label="Save Changes" 
-        icon="pi pi-check" 
+      <Button
+        label="Save Changes"
+        icon="pi pi-check"
         onClick={handleSave}
         loading={saving}
         disabled={!hasChanges() || saving}
@@ -202,10 +222,10 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
       className="model-association-dialog"
     >
       <Toast ref={toast} />
-      
+
       <div className="association-instructions">
         <p>
-          Select which models should be associated with this texture pack. 
+          Select which models should be associated with this texture pack.
           Associated models can use the textures from this pack for rendering.
         </p>
       </div>
@@ -221,24 +241,24 @@ function ModelAssociationDialog({ visible, texturePack, onHide, onAssociationsCh
         showGridlines
         className="model-association-table"
       >
-        <Column 
+        <Column
           field="isAssociated"
           header="Associate"
           body={associationBodyTemplate}
           style={{ width: '100px', textAlign: 'center' }}
         />
-        <Column 
-          field="model.name" 
-          header="Model Name" 
+        <Column
+          field="model.name"
+          header="Model Name"
           sortable
           style={{ minWidth: '200px' }}
         />
-        <Column 
+        <Column
           header="Files"
           body={fileCountBodyTemplate}
           style={{ minWidth: '100px' }}
         />
-        <Column 
+        <Column
           header="Status"
           body={statusBodyTemplate}
           style={{ minWidth: '150px' }}

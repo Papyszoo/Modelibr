@@ -20,7 +20,7 @@ export enum TextureType {
   Roughness = 5,
   Metallic = 6,
   Diffuse = 7,
-  Specular = 8
+  Specular = 8,
 }
 
 export interface TextureDto {
