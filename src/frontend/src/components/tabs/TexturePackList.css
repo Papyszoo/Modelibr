@@ -1,0 +1,205 @@
+.texture-pack-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+.texture-pack-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.header-content {
+  flex: 1;
+}
+
+.texture-pack-list-header h1 {
+  margin: 0 0 0.5rem 0;
+  color: #1e293b;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.texture-pack-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.stat-item i {
+  color: #94a3b8;
+}
+
+.texture-pack-list-content {
+  flex: 1;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.texture-pack-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.texture-pack-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.empty-badge {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.texture-types-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.texture-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: white;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.texture-type-badge i {
+  font-size: 0.75rem;
+}
+
+.texture-count-more {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-style: italic;
+  margin-left: 0.25rem;
+}
+
+.associated-models {
+  display: flex;
+  align-items: center;
+}
+
+.model-count {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.model-count i {
+  color: #94a3b8;
+}
+
+.text-muted {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.texture-pack-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+}
+
+.texture-pack-actions .p-button {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .texture-pack-list {
+    padding: 0.75rem;
+  }
+
+  .texture-pack-list-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .texture-pack-list-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .texture-types-preview {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .texture-type-badge {
+    font-size: 0.6875rem;
+    padding: 0.0625rem 0.375rem;
+  }
+}
+
+/* Loading and empty states */
+.p-datatable .p-datatable-tbody > tr.p-datatable-emptymessage > td {
+  padding: 3rem;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.p-datatable .p-datatable-loading-overlay {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Table styling improvements */
+.texture-pack-table .p-datatable-thead > tr > th {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  border: none;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.texture-pack-table .p-datatable-tbody > tr {
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.texture-pack-table .p-datatable-tbody > tr:hover {
+  background: #f8fafc;
+}
+
+.texture-pack-table .p-datatable-tbody > tr > td {
+  border: none;
+  padding: 1rem 0.75rem;
+}
+
+/* Frozen column styling */
+.texture-pack-table .p-datatable-frozen-column {
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+}
+
+.texture-pack-table .p-datatable-thead .p-datatable-frozen-column {
+  background: #f1f5f9;
+}
