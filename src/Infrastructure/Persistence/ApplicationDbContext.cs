@@ -85,7 +85,7 @@ namespace Infrastructure.Persistence
                 // Create composite index to ensure unique texture type per texture pack
                 entity.HasIndex(t => new { t.TexturePackId, t.TextureType })
                     .IsUnique()
-                    .HasFilter("[TexturePackId] IS NOT NULL");
+                    .HasFilter("\"TexturePackId\" IS NOT NULL");
             });
 
             // Configure TexturePack entity
