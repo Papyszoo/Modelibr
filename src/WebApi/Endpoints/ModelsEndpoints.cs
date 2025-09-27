@@ -30,6 +30,12 @@ public static class ModelsEndpoints
                 return Results.NotFound(result.Error.Message);
             }
 
+            // Check if file exists on disk before serving it
+            if (!System.IO.File.Exists(result.Value.FilePath))
+            {
+                return Results.NotFound($"Model file for ID {id} not found on disk");
+            }
+
             var fileStream = System.IO.File.OpenRead(result.Value.FilePath);
             var contentType = ContentTypeProvider.GetContentType(result.Value.OriginalFileName);
             
