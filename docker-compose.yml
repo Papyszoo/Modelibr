@@ -11,13 +11,11 @@ services:
         environment:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
-            - ASPNETCORE_HTTPS_PORTS=${WEBAPI_HTTPS_PORT}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
             - ConnectionStrings__Default=Host=postgres;Port=${POSTGRES_PORT};Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
             - DisableHttpsRedirection=true
         ports:
             - "${WEBAPI_HTTP_PORT}:8080"
-            - "${WEBAPI_HTTPS_PORT}:8081"
 
         volumes:
             # Use platform-appropriate secret/cert paths; on macOS $HOME works (APPDATA is Windows-specific)
