@@ -61,11 +61,24 @@ export class ThumbnailJobService {
   /**
    * Mark a job as completed
    * @param {number} jobId - The job ID
+   * @param {Object} thumbnailMetadata - Thumbnail metadata from upload
+   * @param {string} thumbnailMetadata.thumbnailPath - Path to the stored thumbnail
+   * @param {number} thumbnailMetadata.sizeBytes - Size of the thumbnail in bytes
+   * @param {number} thumbnailMetadata.width - Width of the thumbnail
+   * @param {number} thumbnailMetadata.height - Height of the thumbnail
    */
-  async markJobCompleted(jobId) {
+  async markJobCompleted(jobId, thumbnailMetadata) {
     try {
-      await this.apiClient.post(`/api/thumbnail-jobs/${jobId}/complete`)
-      logger.info('Marked job as completed', { jobId })
+      // Provide default values if metadata is not available (backwards compatibility)
+      const requestData = {
+        thumbnailPath: thumbnailMetadata?.thumbnailPath || '/default/path',
+        sizeBytes: thumbnailMetadata?.sizeBytes || 0,
+        width: thumbnailMetadata?.width || 256,
+        height: thumbnailMetadata?.height || 256,
+      }
+      
+      await this.apiClient.post(`/api/thumbnail-jobs/${jobId}/complete`, requestData)
+      logger.info('Marked job as completed', { jobId, thumbnailMetadata: requestData })
     } catch (error) {
       logger.error('Failed to mark job as completed', {
         jobId,
