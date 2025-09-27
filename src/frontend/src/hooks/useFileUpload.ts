@@ -207,7 +207,7 @@ export function useDragAndDrop(onFilesDropped) {
     e.currentTarget.classList.remove('drag-over')
 
     const files = Array.from(e.dataTransfer.files)
-    
+
     // Call the callback in a try-catch to ensure drag state is always cleared
     // even if the callback throws an error
     try {
@@ -218,15 +218,6 @@ export function useDragAndDrop(onFilesDropped) {
       e.currentTarget.classList.remove('drag-over')
       throw error
     }
-  }
-
-  const onDragOver = e => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    // Add drag visual feedback
-    document.body.classList.add('dragging-file')
-    e.currentTarget.classList.add('drag-over')
   }
 
   const onDragEnter = e => {
@@ -246,12 +237,14 @@ export function useDragAndDrop(onFilesDropped) {
     // Handle cases where relatedTarget might be null or outside the document
     const relatedTarget = e.relatedTarget
     const currentTarget = e.currentTarget
-    
+
     // If there's no relatedTarget, or if the relatedTarget is not contained
     // within the currentTarget, then we're leaving the drop zone
-    if (!relatedTarget || 
-        !currentTarget.contains(relatedTarget) ||
-        !document.contains(relatedTarget)) {
+    if (
+      !relatedTarget ||
+      !currentTarget.contains(relatedTarget) ||
+      !document.contains(relatedTarget)
+    ) {
       document.body.classList.remove('dragging-file')
       currentTarget.classList.remove('drag-over')
     }
@@ -259,7 +252,6 @@ export function useDragAndDrop(onFilesDropped) {
 
   return {
     onDrop,
-    onDragOver,
     onDragEnter,
     onDragLeave,
   }
