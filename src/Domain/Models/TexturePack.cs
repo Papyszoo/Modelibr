@@ -1,0 +1,184 @@
+using Domain.ValueObjects;
+
+namespace Domain.Models;
+
+/// <summary>
+/// Represents a collection of textures grouped together as a texture pack.
+/// Enforces business rules such as allowing only one texture per type per pack.
+/// </summary>
+public class TexturePack : AggregateRoot
+{
+    private readonly List<Texture> _textures = new();
+
+    public int Id { get; set; }
+    public string Name { get; private set; } = string.Empty;
+    public DateTime CreatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
+
+    // Navigation property for the collection of textures - EF Core requires this to be settable
+    public ICollection<Texture> Textures
+    {
+        get => _textures;
+        set
+        {
+            _textures.Clear();
+            if (value != null)
+                _textures.AddRange(value);
+        }
+    }
+
+    /// <summary>
+    /// Creates a new TexturePack with the specified name.
+    /// </summary>
+    /// <param name="name">The name of the texture pack</param>
+    /// <param name="createdAt">When the texture pack was created</param>
+    /// <returns>A new TexturePack instance</returns>
+    /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
+    public static TexturePack Create(string name, DateTime createdAt)
+    {
+        ValidateName(name);
+
+        return new TexturePack
+        {
+            Name = name.Trim(),
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+    }
+
+    /// <summary>
+    /// Updates the name of the texture pack.
+    /// </summary>
+    /// <param name="name">The new name</param>
+    /// <param name="updatedAt">When the update occurred</param>
+    /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
+    public void UpdateName(string name, DateTime updatedAt)
+    {
+        ValidateName(name);
+
+        Name = name.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Adds a texture to the pack, enforcing the business rule that only one texture per type is allowed.
+    /// </summary>
+    /// <param name="texture">The texture to add</param>
+    /// <param name="updatedAt">When the texture was added</param>
+    /// <exception cref="ArgumentNullException">Thrown when texture is null</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a texture of the same type already exists</exception>
+    public void AddTexture(Texture texture, DateTime updatedAt)
+    {
+        if (texture == null)
+            throw new ArgumentNullException(nameof(texture), "Texture cannot be null.");
+
+        if (HasTextureOfType(texture.TextureType))
+        {
+            throw new InvalidOperationException(
+                $"A texture of type '{texture.TextureType.GetDescription()}' already exists in this pack. " +
+                "Only one texture per type is allowed per pack.");
+        }
+
+        _textures.Add(texture);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a texture from the pack.
+    /// </summary>
+    /// <param name="texture">The texture to remove</param>
+    /// <param name="updatedAt">When the texture was removed</param>
+    /// <exception cref="ArgumentNullException">Thrown when texture is null</exception>
+    public void RemoveTexture(Texture texture, DateTime updatedAt)
+    {
+        if (texture == null)
+            throw new ArgumentNullException(nameof(texture), "Texture cannot be null.");
+
+        if (_textures.Remove(texture))
+        {
+            UpdatedAt = updatedAt;
+        }
+    }
+
+    /// <summary>
+    /// Removes a texture of the specified type from the pack.
+    /// </summary>
+    /// <param name="textureType">The type of texture to remove</param>
+    /// <param name="updatedAt">When the texture was removed</param>
+    /// <returns>True if a texture was removed, false if no texture of that type was found</returns>
+    public bool RemoveTextureOfType(TextureType textureType, DateTime updatedAt)
+    {
+        var textureToRemove = _textures.FirstOrDefault(t => t.TextureType == textureType);
+        if (textureToRemove != null)
+        {
+            _textures.Remove(textureToRemove);
+            UpdatedAt = updatedAt;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if the pack contains a texture of the specified type.
+    /// </summary>
+    /// <param name="textureType">The texture type to check</param>
+    /// <returns>True if a texture of the specified type exists</returns>
+    public bool HasTextureOfType(TextureType textureType)
+    {
+        return _textures.Any(t => t.TextureType == textureType);
+    }
+
+    /// <summary>
+    /// Gets the texture of the specified type, if it exists.
+    /// </summary>
+    /// <param name="textureType">The texture type to find</param>
+    /// <returns>The texture of the specified type, or null if not found</returns>
+    public Texture? GetTextureOfType(TextureType textureType)
+    {
+        return _textures.FirstOrDefault(t => t.TextureType == textureType);
+    }
+
+    /// <summary>
+    /// Gets all texture types currently in the pack.
+    /// </summary>
+    /// <returns>Read-only list of texture types</returns>
+    public IReadOnlyList<TextureType> GetTextureTypes()
+    {
+        return _textures.Select(t => t.TextureType).ToList().AsReadOnly();
+    }
+
+    /// <summary>
+    /// Gets the number of textures in the pack.
+    /// </summary>
+    /// <returns>The count of textures</returns>
+    public int TextureCount => _textures.Count;
+
+    /// <summary>
+    /// Checks if the texture pack is empty (contains no textures).
+    /// </summary>
+    /// <returns>True if the pack contains no textures</returns>
+    public bool IsEmpty => _textures.Count == 0;
+
+    /// <summary>
+    /// Gets a human-readable description of the texture pack.
+    /// </summary>
+    /// <returns>Description including name and texture count</returns>
+    public string GetDescription()
+    {
+        var textureTypesDescription = _textures.Count > 0
+            ? string.Join(", ", _textures.Select(t => t.TextureType.GetDescription()))
+            : "No textures";
+
+        return $"{Name} ({_textures.Count} textures: {textureTypesDescription})";
+    }
+
+    private static void ValidateName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Texture pack name cannot be null or empty.", nameof(name));
+
+        if (name.Length > 200)
+            throw new ArgumentException("Texture pack name cannot exceed 200 characters.", nameof(name));
+    }
+}
