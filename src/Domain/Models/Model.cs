@@ -5,6 +5,7 @@ namespace Domain.Models
     public class Model : AggregateRoot
     {
         private readonly List<File> _files = new();
+        private readonly List<TexturePack> _texturePacks = new();
 
         public int Id { get; set; }
         public string Name { get; private set; } = string.Empty;
@@ -20,6 +21,18 @@ namespace Domain.Models
                 _files.Clear();
                 if (value != null)
                     _files.AddRange(value);
+            }
+        }
+
+        // Navigation property for many-to-many relationship with TexturePacks - EF Core requires this to be settable
+        public ICollection<TexturePack> TexturePacks 
+        { 
+            get => _texturePacks; 
+            set 
+            {
+                _texturePacks.Clear();
+                if (value != null)
+                    _texturePacks.AddRange(value);
             }
         }
 
@@ -84,6 +97,60 @@ namespace Domain.Models
                 throw new ArgumentNullException(nameof(thumbnail));
 
             Thumbnail = thumbnail;
+        }
+
+        /// <summary>
+        /// Associates a texture pack with this model.
+        /// </summary>
+        /// <param name="texturePack">The texture pack to associate</param>
+        /// <param name="updatedAt">When the association was made</param>
+        /// <exception cref="ArgumentNullException">Thrown when texturePack is null</exception>
+        public void AddTexturePack(TexturePack texturePack, DateTime updatedAt)
+        {
+            if (texturePack == null)
+                throw new ArgumentNullException(nameof(texturePack));
+
+            if (_texturePacks.Any(tp => tp.Id == texturePack.Id))
+                return; // Texture pack already associated
+
+            _texturePacks.Add(texturePack);
+            UpdatedAt = updatedAt;
+        }
+
+        /// <summary>
+        /// Removes a texture pack association from this model.
+        /// </summary>
+        /// <param name="texturePack">The texture pack to remove</param>
+        /// <param name="updatedAt">When the association was removed</param>
+        /// <exception cref="ArgumentNullException">Thrown when texturePack is null</exception>
+        public void RemoveTexturePack(TexturePack texturePack, DateTime updatedAt)
+        {
+            if (texturePack == null)
+                throw new ArgumentNullException(nameof(texturePack));
+
+            if (_texturePacks.Remove(texturePack))
+            {
+                UpdatedAt = updatedAt;
+            }
+        }
+
+        /// <summary>
+        /// Checks if this model has an associated texture pack with the specified ID.
+        /// </summary>
+        /// <param name="texturePackId">The texture pack ID to check</param>
+        /// <returns>True if the texture pack is associated with this model</returns>
+        public bool HasTexturePack(int texturePackId)
+        {
+            return _texturePacks.Any(tp => tp.Id == texturePackId);
+        }
+
+        /// <summary>
+        /// Gets all texture packs associated with this model.
+        /// </summary>
+        /// <returns>Read-only list of associated texture packs</returns>
+        public IReadOnlyList<TexturePack> GetTexturePacks()
+        {
+            return _texturePacks.AsReadOnly();
         }
 
         /// <summary>
