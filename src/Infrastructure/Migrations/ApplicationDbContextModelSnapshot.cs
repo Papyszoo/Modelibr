@@ -123,7 +123,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TexturePackId", "TextureType")
                         .IsUnique()
-                        .HasFilter("[TexturePackId] IS NOT NULL");
+                        .HasFilter("\"TexturePackId\" IS NOT NULL");
 
                     b.ToTable("Textures");
                 });
