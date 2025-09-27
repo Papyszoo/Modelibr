@@ -30,6 +30,7 @@ internal sealed class TexturePackRepository : ITexturePackRepository
         return await _context.TexturePacks
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
+            .Include(tp => tp.Models)
             .OrderBy(tp => tp.Name)
             .ToListAsync(cancellationToken);
     }
@@ -39,6 +40,7 @@ internal sealed class TexturePackRepository : ITexturePackRepository
         return await _context.TexturePacks
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
+            .Include(tp => tp.Models)
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
     }
 
@@ -50,6 +52,7 @@ internal sealed class TexturePackRepository : ITexturePackRepository
         return await _context.TexturePacks
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
+            .Include(tp => tp.Models)
             .FirstOrDefaultAsync(tp => tp.Name == name.Trim(), cancellationToken);
     }
 
