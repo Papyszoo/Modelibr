@@ -21,6 +21,12 @@ namespace Infrastructure.Persistence
                 .WithMany(f => f.Models)
                 .UsingEntity(j => j.ToTable("ModelFiles"));
 
+            // Configure many-to-many relationship between Model and TexturePack
+            modelBuilder.Entity<Model>()
+                .HasMany(m => m.TexturePacks)
+                .WithMany(tp => tp.Models)
+                .UsingEntity(j => j.ToTable("ModelTexturePacks"));
+
             // Configure Model entity
             modelBuilder.Entity<Model>(entity =>
             {

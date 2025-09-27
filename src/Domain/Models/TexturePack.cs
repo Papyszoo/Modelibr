@@ -9,6 +9,7 @@ namespace Domain.Models;
 public class TexturePack : AggregateRoot
 {
     private readonly List<Texture> _textures = new();
+    private readonly List<Model> _models = new();
 
     public int Id { get; set; }
     public string Name { get; private set; } = string.Empty;
@@ -24,6 +25,18 @@ public class TexturePack : AggregateRoot
             _textures.Clear();
             if (value != null)
                 _textures.AddRange(value);
+        }
+    }
+
+    // Navigation property for many-to-many relationship with Models - EF Core requires this to be settable
+    public ICollection<Model> Models
+    {
+        get => _models;
+        set
+        {
+            _models.Clear();
+            if (value != null)
+                _models.AddRange(value);
         }
     }
 
@@ -159,6 +172,60 @@ public class TexturePack : AggregateRoot
     /// </summary>
     /// <returns>True if the pack contains no textures</returns>
     public bool IsEmpty => _textures.Count == 0;
+
+    /// <summary>
+    /// Associates a model with this texture pack.
+    /// </summary>
+    /// <param name="model">The model to associate</param>
+    /// <param name="updatedAt">When the association was made</param>
+    /// <exception cref="ArgumentNullException">Thrown when model is null</exception>
+    public void AddModel(Model model, DateTime updatedAt)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        if (_models.Any(m => m.Id == model.Id))
+            return; // Model already associated
+
+        _models.Add(model);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a model association from this texture pack.
+    /// </summary>
+    /// <param name="model">The model to remove</param>
+    /// <param name="updatedAt">When the association was removed</param>
+    /// <exception cref="ArgumentNullException">Thrown when model is null</exception>
+    public void RemoveModel(Model model, DateTime updatedAt)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        if (_models.Remove(model))
+        {
+            UpdatedAt = updatedAt;
+        }
+    }
+
+    /// <summary>
+    /// Checks if this texture pack is associated with a model with the specified ID.
+    /// </summary>
+    /// <param name="modelId">The model ID to check</param>
+    /// <returns>True if the model is associated with this texture pack</returns>
+    public bool HasModel(int modelId)
+    {
+        return _models.Any(m => m.Id == modelId);
+    }
+
+    /// <summary>
+    /// Gets all models associated with this texture pack.
+    /// </summary>
+    /// <returns>Read-only list of associated models</returns>
+    public IReadOnlyList<Model> GetModels()
+    {
+        return _models.AsReadOnly();
+    }
 
     /// <summary>
     /// Gets a human-readable description of the texture pack.
