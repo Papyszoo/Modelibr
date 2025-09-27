@@ -34,13 +34,8 @@ function ModelViewer({
     try {
       setLoading(true)
       setError('')
-      const models = await ApiClient.getModels()
-      const foundModel = models.find(m => m.id === id)
-      if (foundModel) {
-        setModel(foundModel)
-      } else {
-        setError('Model not found')
-      }
+      const model = await ApiClient.getModelById(id)
+      setModel(model)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model')
     } finally {
