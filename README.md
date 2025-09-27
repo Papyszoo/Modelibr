@@ -9,24 +9,26 @@ A modern 3D model file upload service built with .NET 9.0 and React, featuring h
 
 ## 🌟 Features
 
-- **3D Model Upload & Storage**: Support for popular 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
+- **Unified Upload & Library Interface**: Drag-and-drop 3D model uploads integrated directly into the library view
+- **Multi-Panel Tabbed Workspace**: Modern split-pane interface with configurable tabs for models, textures, and animations  
+- **3D Model Support**: Support for popular 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
 - **Hash-based Deduplication**: Intelligent storage system that prevents duplicate files
 - **Interactive 3D Viewer**: Real-time 3D model rendering with Three.js TSL (Three.js Shading Language)
-- **Real-time Thumbnail Processing**: SignalR-based queue system for instant job processing
-- **Clean Architecture**: Well-structured backend following SOLID principles
-- **Responsive Frontend**: Modern React interface with drag-and-drop file uploads
+- **Real-time Thumbnail Processing**: SignalR-based queue system with Node.js worker service
+- **Clean Architecture**: Well-structured backend following SOLID principles and DDD patterns
+- **Modern React Frontend**: Responsive UI with PrimeReact components and advanced state management
 - **Containerized Deployment**: Full Docker support with multi-service orchestration
 - **Real-time PBR Materials**: Physically based rendering with metalness and roughness controls
 
 ## 📸 Screenshots
 
-### Upload Interface
-![Upload Interface](https://github.com/user-attachments/assets/932ae4e9-ec47-4fa8-83af-a0a3ae7767d2)
-*Clean, intuitive interface for uploading 3D model files with real-time feedback*
+### Modern Split-Pane Interface
+![Modern Interface](https://github.com/user-attachments/assets/b59bb31a-4a80-4b18-8acd-d013d5c18dca)
+*Modern tabbed workspace with integrated 3D model library, drag-and-drop upload, and multi-panel layout*
 
-### Model Library
-![Model Library](https://github.com/user-attachments/assets/f8711488-d1e2-4326-837a-b57eeb9745c6)
-*Browse and manage your uploaded 3D models with easy navigation*
+### Integrated Upload & Library
+![Upload Interface](https://github.com/user-attachments/assets/80a01d2f-17a2-4ce3-aad8-f15dce55ba2d)
+*Unified interface combining model upload via drag-and-drop with library management and tabbed workspace*
 
 ## 🏗️ Architecture
 
@@ -55,10 +57,13 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 - Minimal APIs with endpoint mapping
 
 **Frontend:**
-- React 18+
+- React 18+ with TypeScript
+- Modern split-pane tabbed interface  
 - Three.js with TSL for 3D rendering
+- PrimeReact UI component library
 - Vite for development and build
-- Modern CSS with responsive design
+- Drag-and-drop file upload integration
+- Advanced state management with URL persistence
 
 **Infrastructure:**
 - Docker & Docker Compose
@@ -99,7 +104,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
    ```
 
 4. **Access the application**
-   - Frontend: http://localhost:3000
+   - Frontend: http://localhost:3000 (integrated upload/library interface)
    - API: http://localhost:8080
    - Thumbnail Worker: http://localhost:3001 (health check)
    - PostgreSQL: localhost:5432
@@ -121,7 +126,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
    ```
 
 This will start the complete application stack:
-- Frontend: http://localhost:3000
+- Frontend: http://localhost:3000 (integrated upload/library interface)
 - API: http://localhost:8080
 - Thumbnail Worker: http://localhost:3001 (health check)
 - PostgreSQL: localhost:5432
@@ -203,15 +208,30 @@ The worker service will be available at http://localhost:3001 (health check)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `UPLOAD_STORAGE_PATH` | Directory for uploaded files | `/var/lib/modelibr/uploads` |
+| **Web API** | | |
 | `ASPNETCORE_ENVIRONMENT` | ASP.NET Core environment | `Development` |
-| `FRONTEND_PORT` | Frontend port mapping | `3000` |
 | `WEBAPI_HTTP_PORT` | API HTTP port | `8080` |
 | `WEBAPI_HTTPS_PORT` | API HTTPS port | `8081` |
+| `UPLOAD_STORAGE_PATH` | Directory for uploaded files | `/var/lib/modelibr/uploads` |
+| **Frontend** | | |
+| `FRONTEND_PORT` | Frontend port mapping | `3000` |
+| `VITE_API_BASE_URL` | Frontend API base URL | `https://localhost:8081` |
+| **Database** | | |
+| `POSTGRES_USER` | PostgreSQL username | `modelibr` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | `ChangeThisStrongPassword123!` |
+| `POSTGRES_PORT` | PostgreSQL port | `5432` |
+| **Thumbnail Worker** | | |
 | `WORKER_PORT` | Thumbnail worker port | `3001` |
+| `WORKER_ID` | Worker instance identifier | `worker-1` |
 | `MAX_CONCURRENT_JOBS` | Worker concurrent jobs | `3` |
 | `RENDER_WIDTH` | Thumbnail width | `256` |
 | `RENDER_HEIGHT` | Thumbnail height | `256` |
+| `RENDER_FORMAT` | Thumbnail image format | `png` |
+| `LOG_LEVEL` | Worker logging level | `info` |
+| **Thumbnail Storage** | | |
+| `THUMBNAIL_STORAGE_ENABLED` | Enable thumbnail storage | `true` |
+| `THUMBNAIL_STORAGE_PATH` | Thumbnail storage directory | `/var/lib/modelibr/thumbnails` |
+| `SKIP_DUPLICATE_THUMBNAILS` | Skip existing thumbnails | `true` |
 
 ### Database Configuration
 
