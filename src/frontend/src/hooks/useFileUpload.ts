@@ -55,12 +55,6 @@ export function useFileUpload(options = {}) {
     try {
       const result = await ApiClient.uploadModel(file)
 
-      if (!result.isSuccess) {
-        const error = new Error(result.error?.message || 'Upload failed')
-        error.type = 'UPLOAD_FAILED'
-        throw error
-      }
-
       return result
     } catch (error) {
       if (!error.type) {
