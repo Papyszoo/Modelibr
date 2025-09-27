@@ -72,11 +72,14 @@ namespace Application.Models
             try
             {
                 var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
-                model.AddFile(fileEntity, _dateTimeProvider.UtcNow);
-
+                
+                // Save the model first to get an ID
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
                 
-                // Raise domain event for new model upload
+                // Now add the file to the model (this properly persists the file entity to the database)
+                await _modelRepository.AddFileAsync(savedModel.Id, fileEntity, cancellationToken);
+                
+                // Raise domain event for new model upload after both model and file are persisted
                 savedModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, true);
                 
                 // Publish domain events

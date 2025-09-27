@@ -32,60 +32,112 @@ export class ModelFileService {
   async fetchModelFile(modelId) {
     logger.debug('Fetching model file', { modelId })
 
-    try {
-      // Get file stream from API
-      const response = await this.jobService.getModelFile(modelId)
+    // Retry logic for race condition where file might not be immediately available after upload
+    const maxRetries = 3
+    const retryDelay = 1000 // 1 second
 
-      if (!response || !response.data) {
-        throw new Error('No file data received from API')
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Get file stream from API
+        const response = await this.jobService.getModelFile(modelId)
+
+        if (!response || !response.data) {
+          throw new Error('No file data received from API')
+        }
+
+        return await this.processFileResponse(response, modelId)
+      } catch (error) {
+        logger.warn('Failed to fetch model file', {
+          modelId,
+          attempt,
+          maxRetries,
+          error: error.message,
+        })
+
+        // If it's the last attempt or not a "file not found" error, rethrow
+        if (attempt === maxRetries || !this.isFileNotFoundError(error)) {
+          throw error
+        }
+
+        // Wait before retrying
+        logger.info('Retrying model file fetch after delay', {
+          modelId,
+          attempt,
+          retryDelayMs: retryDelay,
+        })
+        await this.sleep(retryDelay)
       }
-
-      // Extract file information from response headers
-      const contentDisposition = response.headers['content-disposition'] || ''
-      const _contentType =
-        response.headers['content-type'] || 'application/octet-stream'
-
-      // Parse filename from content-disposition header
-      let originalFileName = this.parseFilenameFromHeader(contentDisposition)
-      if (!originalFileName) {
-        originalFileName = `model_${modelId}`
-      }
-
-      // Determine file extension and type
-      const fileExtension = path.extname(originalFileName).toLowerCase()
-      const fileType = this.getFileTypeFromExtension(fileExtension)
-
-      if (!fileType) {
-        throw new Error(`Unsupported file type: ${fileExtension}`)
-      }
-
-      // Create temporary file
-      const tempFileName = `${modelId}_${Date.now()}${fileExtension}`
-      const tempFilePath = path.join(this.tempDir, tempFileName)
-
-      // Write stream to temporary file
-      await this.writeStreamToFile(response.data, tempFilePath)
-
-      logger.info('Model file fetched successfully', {
-        modelId,
-        originalFileName,
-        fileType,
-        tempFilePath,
-        fileSize: fs.statSync(tempFilePath).size,
-      })
-
-      return {
-        filePath: tempFilePath,
-        fileType,
-        originalFileName,
-      }
-    } catch (error) {
-      logger.error('Failed to fetch model file', {
-        modelId,
-        error: error.message,
-      })
-      throw error
     }
+  }
+
+  /**
+   * Process the file response from API
+   * @param {Object} response - API response
+   * @param {number} modelId - Model ID for error context
+   * @returns {Promise<{filePath: string, fileType: string, originalFileName: string}>} File information
+   */
+  async processFileResponse(response, modelId) {
+
+    // Extract file information from response headers
+    const contentDisposition = response.headers['content-disposition'] || ''
+    const _contentType =
+      response.headers['content-type'] || 'application/octet-stream'
+
+    // Parse filename from content-disposition header
+    let originalFileName = this.parseFilenameFromHeader(contentDisposition)
+    if (!originalFileName) {
+      originalFileName = `model_${modelId}`
+    }
+
+    // Determine file extension and type
+    const fileExtension = path.extname(originalFileName).toLowerCase()
+    const fileType = this.getFileTypeFromExtension(fileExtension)
+
+    if (!fileType) {
+      throw new Error(`Unsupported file type: ${fileExtension}`)
+    }
+
+    // Create temporary file
+    const tempFileName = `${modelId}_${Date.now()}${fileExtension}`
+    const tempFilePath = path.join(this.tempDir, tempFileName)
+
+    // Write stream to temporary file
+    await this.writeStreamToFile(response.data, tempFilePath)
+
+    logger.info('Model file fetched successfully', {
+      modelId,
+      originalFileName,
+      fileType,
+      tempFilePath,
+      fileSize: fs.statSync(tempFilePath).size,
+    })
+
+    return {
+      filePath: tempFilePath,
+      fileType,
+      originalFileName,
+    }
+  }
+
+  /**
+   * Check if error is related to file not being found (race condition)
+   * @param {Error} error - The error to check
+   * @returns {boolean} True if it's a file not found error
+   */
+  isFileNotFoundError(error) {
+    const message = error.message.toLowerCase()
+    return message.includes('not found') || 
+           message.includes('404') ||
+           error.response?.status === 404
+  }
+
+  /**
+   * Sleep utility for retry delays
+   * @param {number} ms - Milliseconds to sleep
+   * @returns {Promise<void>}
+   */
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
   }
 
   /**
