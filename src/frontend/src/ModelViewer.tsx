@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfo from './components/ModelInfo'
 import ThumbnailDisplay from './components/ThumbnailDisplay'
 import { getModelFileFormat, Model } from './utils/fileUtils'
 import ApiClient from './services/ApiClient'
+import { Button } from 'primereact/button'
+import { Toast } from 'primereact/toast'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -23,6 +25,7 @@ function ModelViewer({
   const [error, setError] = useState<string>('')
   const [model, setModel] = useState<Model | null>(propModel || null)
   const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
+  const toast = useRef<Toast>(null)
 
   useEffect(() => {
     if (!propModel && modelId) {
@@ -43,6 +46,27 @@ function ModelViewer({
     }
   }
 
+  const handleRegenerateThumbnail = async () => {
+    if (!model) return
+    
+    try {
+      await ApiClient.regenerateThumbnail(model.id.toString())
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Thumbnail Regeneration',
+        detail: `Thumbnail regeneration queued for model #${model.id}`,
+        life: 3000,
+      })
+    } catch (err) {
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: `Failed to regenerate thumbnail: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        life: 5000,
+      })
+    }
+  }
+
   if (loading) {
     return <div className="model-viewer-loading">Loading model...</div>
   }
@@ -57,6 +81,8 @@ function ModelViewer({
 
   return (
     <div className={`model-viewer ${isTabContent ? 'model-viewer-tab' : ''}`}>
+      <Toast ref={toast} />
+      
       {!isTabContent && (
         <header className="viewer-header">
           <button onClick={onBack} className="back-button">
@@ -114,7 +140,16 @@ function ModelViewer({
         </div>
         <div className="viewer-info-right">
           <div className="thumbnail-section">
-            <h3>Animated Thumbnail</h3>
+            <div className="thumbnail-header">
+              <h3>Animated Thumbnail</h3>
+              <Button
+                icon="pi pi-refresh"
+                label="Regenerate"
+                className="p-button-sm p-button-outlined"
+                onClick={handleRegenerateThumbnail}
+                tooltip="Regenerate Thumbnail"
+              />
+            </div>
             <ThumbnailDisplay
               modelId={model.id}
               size="large"
