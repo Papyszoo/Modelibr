@@ -18,14 +18,14 @@ export interface UploadModelResponse {
 }
 
 export interface ThumbnailStatus {
-  id: string
-  modelId: string
-  status: 'Pending' | 'InProgress' | 'Completed' | 'Failed'
-  thumbnailPath?: string
-  errorMessage?: string
-  createdAt: string
-  updatedAt: string
-  processedAt?: string
+  Status: 'Pending' | 'Processing' | 'Ready' | 'Failed'
+  FileUrl?: string
+  SizeBytes?: number
+  Width?: number
+  Height?: number
+  ErrorMessage?: string
+  CreatedAt?: string
+  ProcessedAt?: string
 }
 
 class ApiClient {
@@ -70,7 +70,9 @@ class ApiClient {
   }
 
   async getModelById(modelId: string): Promise<Model> {
-    const response: AxiosResponse<Model> = await this.client.get(`/models/${modelId}`)
+    const response: AxiosResponse<Model> = await this.client.get(
+      `/models/${modelId}`
+    )
     return response.data
   }
 

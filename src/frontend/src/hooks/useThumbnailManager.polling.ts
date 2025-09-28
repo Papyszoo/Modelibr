@@ -128,10 +128,7 @@ export function useThumbnailManager(modelId) {
     thumbnailStatus?.Status === THUMBNAIL_STATUS.PENDING
   const isReady = thumbnailStatus?.Status === THUMBNAIL_STATUS.READY
   const isFailed = thumbnailStatus?.Status === THUMBNAIL_STATUS.FAILED
-  const thumbnailUrl =
-    isReady && thumbnailStatus.FileUrl
-      ? ApiClient.getThumbnailUrl(modelId)
-      : null
+  const thumbnailUrl = isReady ? ApiClient.getThumbnailUrl(modelId) : null
 
   return {
     thumbnailStatus,
