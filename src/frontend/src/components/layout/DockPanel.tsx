@@ -65,7 +65,7 @@ function DockPanel({
 
   const addTab = (type: Tab['type'], title: string): void => {
     const newTab: Tab = {
-      id: `${type}-${Date.now()}`,
+      id: type,
       type,
       label: title,
     }
