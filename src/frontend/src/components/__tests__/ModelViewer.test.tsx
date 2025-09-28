@@ -1,20 +1,39 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { act } from 'react'
+import { create } from '@react-three/test-renderer'
 import ModelViewer from '../../ModelViewer'
 
 // Mock ApiClient with the __mocks__ version
 jest.mock('../../services/ApiClient')
 import ApiClient from '../../services/ApiClient'
 
-// Mock Canvas component to avoid Three.js issues in tests
-jest.mock('@react-three/fiber', () => ({
-  Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="canvas">{children}</div>,
-}))
+// Mock the Canvas component for DOM testing
+jest.mock('@react-three/fiber', () => {
+  const React = require('react')
+  const originalModule = jest.requireActual('@react-three/fiber')
+  
+  const MockCanvas = ({ children, ...props }: any) => {
+    return (
+      <div data-testid="r3f-canvas" data-props={JSON.stringify(props)}>
+        {children}
+      </div>
+    )
+  }
+  
+  return {
+    ...originalModule,
+    Canvas: MockCanvas,
+  }
+})
 
-// Mock Scene component
+// Mock Scene component for regular DOM testing
 jest.mock('../Scene', () => {
   return function MockScene({ model }: { model: any }) {
-    return <div data-testid="scene">Scene for model {model?.id}</div>
+    return (
+      <div data-testid="r3f-scene" data-model-id={model?.id}>
+        Scene for model {model?.id}
+      </div>
+    )
   }
 })
 
@@ -70,7 +89,8 @@ describe('ModelViewer - Tab Switching Issue Fix', () => {
     render(<ModelViewer model={mockModel} isTabContent={true} />)
     
     expect(screen.getByText('Model #123')).toBeInTheDocument()
-    expect(screen.getByTestId('canvas')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-canvas')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-scene')).toBeInTheDocument()
     expect(screen.getByTestId('model-info')).toBeInTheDocument()
   })
 
@@ -249,5 +269,63 @@ describe('ModelViewer - Tab Switching Issue Fix', () => {
     expect(mockGetModelById).toHaveBeenCalledTimes(1)
     
     jest.useRealTimers()
+  })
+
+  // React Three Fiber specific test using test renderer
+  it('should properly render 3D scene with React Three Fiber test renderer', async () => {
+    // Create a proper 3D scene test using the test renderer
+    const renderer = await create(
+      <>
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[10, 10, 5]} intensity={1.0} />
+        <mesh>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="red" />
+        </mesh>
+      </>
+    )
+
+    // Verify the scene contains the expected elements
+    const scene = renderer.scene
+    expect(scene.children).toHaveLength(3) // ambient light, directional light, mesh
+    
+    // Check that we have the lights and mesh in the scene using the test renderer API
+    const ambientLight = scene.children.find((child: any) => child.type === 'AmbientLight')
+    const directionalLight = scene.children.find((child: any) => child.type === 'DirectionalLight')  
+    const mesh = scene.children.find((child: any) => child.type === 'Mesh')
+    
+    expect(ambientLight).toBeDefined()
+    expect(directionalLight).toBeDefined()  
+    expect(mesh).toBeDefined()
+    
+    // Verify that the test instances wrap the correct Three.js types
+    expect(ambientLight.constructor.name).toBe('ReactThreeTestInstance')
+    expect(directionalLight.constructor.name).toBe('ReactThreeTestInstance')
+    expect(mesh.constructor.name).toBe('ReactThreeTestInstance')
+    
+    // Verify the correct Three.js element types are present
+    expect(ambientLight.type).toBe('AmbientLight')
+    expect(directionalLight.type).toBe('DirectionalLight')
+    expect(mesh.type).toBe('Mesh')
+
+    // Cleanup
+    renderer.unmount()
+  })
+
+  it('should verify Canvas props are correctly passed', () => {
+    render(<ModelViewer model={mockModel} isTabContent={true} />)
+    
+    const canvas = screen.getByTestId('r3f-canvas')
+    expect(canvas).toBeInTheDocument()
+    
+    // Verify Canvas props are passed correctly
+    const canvasProps = JSON.parse(canvas.getAttribute('data-props') || '{}')
+    expect(canvasProps.camera).toEqual({ position: [3, 3, 3], fov: 60 })
+    expect(canvasProps.shadows).toBe(true)
+    expect(canvasProps.gl).toEqual({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
+    })
   })
 })
