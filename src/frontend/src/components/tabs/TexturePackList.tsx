@@ -46,7 +46,8 @@ function TexturePackList() {
 
   useEffect(() => {
     loadTexturePacks()
-  }, [loadTexturePacks])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleCreateTexturePack = async (name: string) => {
     try {
