@@ -26,10 +26,6 @@ function TexturePackList() {
   const toast = useRef<Toast>(null)
   const texturePacksApi = useTexturePacks()
 
-  useEffect(() => {
-    loadTexturePacks()
-  }, [loadTexturePacks])
-
   const loadTexturePacks = useCallback(async () => {
     try {
       setLoading(true)
@@ -47,6 +43,11 @@ function TexturePackList() {
       setLoading(false)
     }
   }, [texturePacksApi])
+
+  useEffect(() => {
+    loadTexturePacks()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleCreateTexturePack = async (name: string) => {
     try {
