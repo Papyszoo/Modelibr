@@ -147,6 +147,14 @@
   border: 1px solid #e2e8f0;
 }
 
+.thumbnail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
 .thumbnail-section h3 {
   color: #2d3748;
   margin: 0;
