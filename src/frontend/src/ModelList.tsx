@@ -82,7 +82,7 @@ function ModelListContent({
   })
 
   // Use drag and drop hook
-  const { onDrop, onDragEnter, onDragLeave } =
+  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDragAndDrop(uploadMultipleFiles)
 
   useEffect(() => {
@@ -238,6 +238,7 @@ function ModelListContent({
         <div
           className="empty-state"
           onDrop={onDrop}
+          onDragOver={onDragOver}
           onDragEnter={onDragEnter}
           onDragLeave={onDragLeave}
         >
@@ -254,6 +255,7 @@ function ModelListContent({
         <div
           className="datatable-container"
           onDrop={onDrop}
+          onDragOver={onDragOver}
           onDragEnter={onDragEnter}
           onDragLeave={onDragLeave}
         >
