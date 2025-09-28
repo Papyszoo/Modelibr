@@ -75,12 +75,12 @@ public class CompleteThumbnailJobCommandHandler : ICommandHandler<CompleteThumbn
 
         try
         {
-            // Get or create the thumbnail entity
-            var thumbnail = model.Thumbnail;
+            // Get or create the thumbnail entity - check database first to avoid race conditions
+            var thumbnail = await _thumbnailRepository.GetByModelIdAsync(job.ModelId, cancellationToken);
             if (thumbnail == null)
             {
                 thumbnail = Thumbnail.Create(job.ModelId, now);
-                model.Thumbnail = thumbnail;
+                thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
             }
 
             // Mark thumbnail as ready - this will raise a domain event
