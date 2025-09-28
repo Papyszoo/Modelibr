@@ -11,7 +11,6 @@ import { useFileUpload, useDragAndDrop } from './hooks/useFileUpload'
 import { useTabContext } from './hooks/useTabContext'
 import { TabContextValue } from './contexts/TabContext'
 import { getFileExtension, formatFileSize, Model } from './utils/fileUtils'
-import { useThumbnailManager } from './hooks/useThumbnailManager'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
@@ -114,25 +113,6 @@ function ModelListContent({
     }
   }
 
-  const handleRegenerateThumbnail = async (modelId) => {
-    try {
-      await ApiClient.regenerateThumbnail(modelId.toString())
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Thumbnail Regeneration',
-        detail: `Thumbnail regeneration queued for model #${modelId}`,
-        life: 3000,
-      })
-    } catch (err) {
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: `Failed to regenerate thumbnail: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        life: 5000,
-      })
-    }
-  }
-
   // Template functions for DataTable columns
   const thumbnailBodyTemplate = rowData => {
     return (
@@ -184,20 +164,12 @@ function ModelListContent({
 
   const actionBodyTemplate = rowData => {
     return (
-      <div className="action-buttons" style={{ display: 'flex', gap: '0.25rem' }}>
-        <Button
-          icon="pi pi-eye"
-          className="p-button-text p-button-rounded"
-          onClick={() => handleModelSelect(rowData)}
-          tooltip={isTabContent ? 'Open in New Tab' : 'View Model'}
-        />
-        <Button
-          icon="pi pi-refresh"
-          className="p-button-text p-button-rounded"
-          onClick={() => handleRegenerateThumbnail(rowData.id)}
-          tooltip="Regenerate Thumbnail"
-        />
-      </div>
+      <Button
+        icon="pi pi-eye"
+        className="p-button-text p-button-rounded"
+        onClick={() => handleModelSelect(rowData)}
+        tooltip={isTabContent ? 'Open in New Tab' : 'View Model'}
+      />
     )
   }
 
@@ -338,7 +310,7 @@ function ModelListContent({
             <Column
               header="Actions"
               body={actionBodyTemplate}
-              style={{ width: '120px' }}
+              style={{ width: '80px' }}
             />
           </DataTable>
         </div>
