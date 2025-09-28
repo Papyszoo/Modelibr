@@ -83,6 +83,9 @@ export class ThumbnailJobService {
       logger.error('Failed to mark job as completed', {
         jobId,
         error: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        responseData: error.response?.data,
       })
       throw error
     }
@@ -104,6 +107,9 @@ export class ThumbnailJobService {
         jobId,
         errorMessage,
         error: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        responseData: error.response?.data,
       })
       throw error
     }

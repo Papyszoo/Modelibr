@@ -53,14 +53,20 @@ public class CompleteThumbnailJobCommandHandler : ICommandHandler<CompleteThumbn
 
     public async Task<Result<CompleteThumbnailJobResponse>> Handle(CompleteThumbnailJobCommand command, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Attempting to complete thumbnail job {JobId} with thumbnail path {ThumbnailPath}", 
+            command.JobId, command.ThumbnailPath);
+
         // Get the job
         var job = await _thumbnailJobRepository.GetByIdAsync(command.JobId, cancellationToken);
         if (job == null)
         {
-            _logger.LogWarning("Thumbnail job {JobId} not found", command.JobId);
+            _logger.LogWarning("Thumbnail job {JobId} not found in database", command.JobId);
             return Result.Failure<CompleteThumbnailJobResponse>(
                 new Error("ThumbnailJobNotFound", $"Thumbnail job {command.JobId} not found"));
         }
+
+        _logger.LogInformation("Found thumbnail job {JobId} for model {ModelId} with status {Status}", 
+            command.JobId, job.ModelId, job.Status);
 
         // Get the model
         var model = await _modelRepository.GetByIdAsync(job.ModelId, cancellationToken);
@@ -71,25 +77,37 @@ public class CompleteThumbnailJobCommandHandler : ICommandHandler<CompleteThumbn
                 new Error("ModelNotFound", $"Model {job.ModelId} not found"));
         }
 
+        _logger.LogInformation("Found model {ModelId} for thumbnail job {JobId}", job.ModelId, command.JobId);
+
         var now = _dateTimeProvider.UtcNow;
 
         try
         {
+            _logger.LogInformation("Processing thumbnail completion for job {JobId}: creating/updating thumbnail entity", command.JobId);
+
             // Get or create the thumbnail entity
             var thumbnail = model.Thumbnail;
             if (thumbnail == null)
             {
+                _logger.LogInformation("Creating new thumbnail entity for model {ModelId}", job.ModelId);
                 thumbnail = Thumbnail.Create(job.ModelId, now);
                 model.Thumbnail = thumbnail;
             }
+            else
+            {
+                _logger.LogInformation("Using existing thumbnail entity for model {ModelId}", job.ModelId);
+            }
 
             // Mark thumbnail as ready - this will raise a domain event
+            _logger.LogInformation("Marking thumbnail as ready for job {JobId}", command.JobId);
             thumbnail.MarkAsReady(command.ThumbnailPath, command.SizeBytes, command.Width, command.Height, now);
 
             // Mark the job as completed
+            _logger.LogInformation("Marking job {JobId} as completed in queue", command.JobId);
             await _thumbnailQueue.MarkCompletedAsync(command.JobId, cancellationToken);
 
             // Save changes - the domain event will be dispatched automatically
+            _logger.LogInformation("Saving thumbnail entity changes for job {JobId}", command.JobId);
             await _thumbnailRepository.UpdateAsync(thumbnail, cancellationToken);
 
             _logger.LogInformation("Successfully completed thumbnail job {JobId} for model {ModelId}", 
