@@ -187,13 +187,7 @@ function DockPanel({
       </div>
 
       {/* Content Area */}
-      <div
-        className="dock-content"
-        onDrop={handleDropOnOtherPanel}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-      >
+      <div className="dock-content">
         {activeTabData ? (
           <TabProvider
             side={side}
@@ -205,7 +199,14 @@ function DockPanel({
             <TabContent tab={activeTabData} />
           </TabProvider>
         ) : (
-          <div className="dock-empty" onContextMenu={handleEmptyAreaContextMenu}>
+          <div 
+            className="dock-empty" 
+            onContextMenu={handleEmptyAreaContextMenu}
+            onDrop={handleDropOnOtherPanel}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+          >
             <i
               className="pi pi-plus"
               style={{ fontSize: '3rem', color: '#6b7280' }}
