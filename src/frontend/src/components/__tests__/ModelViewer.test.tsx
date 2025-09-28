@@ -218,7 +218,6 @@ describe('ModelViewer - Tab Switching Issue Fix', () => {
   })
 
   it('should stop auto-retrying after 3 attempts', async () => {
-    jest.useFakeTimers()
     const mockGetModelById = ApiClient.getModelById as jest.MockedFunction<typeof ApiClient.getModelById>
     
     // All calls fail
@@ -231,19 +230,15 @@ describe('ModelViewer - Tab Switching Issue Fix', () => {
       expect(screen.getByText('Network Error: Failed to fetch')).toBeInTheDocument()
     })
     
-    // Fast-forward through multiple retry attempts
-    act(() => {
-      jest.advanceTimersByTime(10000) // Fast forward through all retries
-    })
+    // Wait for all retries to complete (1s + 2s + 4s = 7s total)
+    await new Promise(resolve => setTimeout(resolve, 8000))
     
-    // Should have made multiple retry attempts
-    expect(mockGetModelById).toHaveBeenCalledTimes(4) // initial + 3 retries
+    // Should have made exactly 4 calls total (initial + 3 retries)
+    expect(mockGetModelById).toHaveBeenCalledTimes(4)
     
-    // Should still show error 
+    // Should still show error state
     expect(screen.getByText('Network Error: Failed to fetch')).toBeInTheDocument()
-    
-    jest.useRealTimers()
-  })
+  }, 12000) // Increase timeout to accommodate retries
 
   it('should not retry for non-network errors', async () => {
     jest.useFakeTimers()

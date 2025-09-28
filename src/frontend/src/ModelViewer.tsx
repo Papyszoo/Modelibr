@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfo from './components/ModelInfo'
@@ -24,6 +24,7 @@ function ModelViewer({
   const [model, setModel] = useState<Model | null>(propModel || null)
   const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
   const [retryCount, setRetryCount] = useState<number>(0)
+  const retryCountRef = useRef<number>(0) // Track retry count synchronously
 
   useEffect(() => {
     if (!propModel && modelId) {
@@ -55,22 +56,27 @@ function ModelViewer({
       if (!isRetry) {
         setError('')
         setRetryCount(0)
+        retryCountRef.current = 0
       }
       const model = await ApiClient.getModelById(id)
       setModel(model)
       setError('')
       setRetryCount(0)
+      retryCountRef.current = 0
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load model'
       setError(errorMessage)
       
       // Auto-retry up to 3 times for network-related errors
-      if (retryCount < 3 && (
+      const currentRetryCount = retryCountRef.current
+      const nextRetryCount = currentRetryCount + 1
+      
+      if (nextRetryCount <= 3 && (
         errorMessage.includes('timeout') || 
         errorMessage.includes('Network Error') ||
         errorMessage.includes('Failed to fetch')
       )) {
-        const nextRetryCount = retryCount + 1
+        retryCountRef.current = nextRetryCount
         setRetryCount(nextRetryCount)
         
         // Exponential backoff: 1s, 2s, 4s
