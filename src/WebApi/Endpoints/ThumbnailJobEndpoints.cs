@@ -67,6 +67,30 @@ public static class ThumbnailJobEndpoints
         .WithName("Complete Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
+        app.MapPost("/api/thumbnail-jobs/{jobId:int}/fail", async (
+            int jobId,
+            [FromBody] FailJobRequest request,
+            ICommandHandler<FailThumbnailJobCommand, FailThumbnailJobResponse> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(new FailThumbnailJobCommand(
+                jobId,
+                request.ErrorMessage), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(result.Error.Message);
+            }
+
+            return Results.Ok(new
+            {
+                JobId = result.Value.JobId,
+                Status = result.Value.Status,
+                Message = "Thumbnail job marked as failed successfully"
+            });
+        })
+        .WithName("Fail Thumbnail Job")
+        .WithTags("ThumbnailJobs");
+
         // Test endpoint to simulate thumbnail completion for testing SignalR
         app.MapPost("/api/test/thumbnail-complete/{modelId:int}", async (
             int modelId,
@@ -102,6 +126,11 @@ public record DequeueRequest(string WorkerId);
 /// Request model for completing thumbnail jobs.
 /// </summary>
 public record CompleteJobRequest(string ThumbnailPath, long SizeBytes, int Width, int Height);
+
+/// <summary>
+/// Request model for marking thumbnail jobs as failed.
+/// </summary>
+public record FailJobRequest(string ErrorMessage);
 
 /// <summary>
 /// Request model for testing thumbnail completion.
