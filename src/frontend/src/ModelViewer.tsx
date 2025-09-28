@@ -23,6 +23,7 @@ function ModelViewer({
   const [error, setError] = useState<string>('')
   const [model, setModel] = useState<Model | null>(propModel || null)
   const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
+  const [retryCount, setRetryCount] = useState<number>(0)
 
   useEffect(() => {
     if (!propModel && modelId) {
@@ -30,14 +31,52 @@ function ModelViewer({
     }
   }, [propModel, modelId])
 
-  const fetchModel = async (id: string): Promise<void> => {
+  // Handle page visibility changes - retry loading when tab becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Only retry if we have an error, no model data, and a modelId to fetch
+      if (!document.hidden && error && !model && modelId && !loading) {
+        console.log('Tab became visible, retrying model fetch...')
+        fetchModel(modelId)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [error, model, modelId, loading])
+
+  const fetchModel = async (id: string, isRetry: boolean = false): Promise<void> => {
     try {
       setLoading(true)
-      setError('')
+      if (!isRetry) {
+        setError('')
+        setRetryCount(0)
+      }
       const model = await ApiClient.getModelById(id)
       setModel(model)
+      setError('')
+      setRetryCount(0)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load model')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load model'
+      setError(errorMessage)
+      
+      // Auto-retry up to 3 times for network-related errors
+      if (retryCount < 3 && (
+        errorMessage.includes('timeout') || 
+        errorMessage.includes('Network Error') ||
+        errorMessage.includes('Failed to fetch')
+      )) {
+        const nextRetryCount = retryCount + 1
+        setRetryCount(nextRetryCount)
+        
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, nextRetryCount - 1) * 1000
+        setTimeout(() => {
+          fetchModel(id, true)
+        }, delay)
+      }
     } finally {
       setLoading(false)
     }
@@ -47,8 +86,25 @@ function ModelViewer({
     return <div className="model-viewer-loading">Loading model...</div>
   }
 
-  if (error) {
-    return <div className="model-viewer-error">Error: {error}</div>
+  if (error && !model) {
+    return (
+      <div className="model-viewer-error">
+        <h3>Failed to load model</h3>
+        <p>{error}</p>
+        {retryCount > 0 && (
+          <p className="retry-info">
+            Retrying... (attempt {retryCount}/3)
+          </p>
+        )}
+        <button 
+          onClick={() => modelId && fetchModel(modelId)} 
+          className="retry-button"
+          disabled={loading}
+        >
+          {loading ? 'Retrying...' : 'Retry'}
+        </button>
+      </div>
+    )
   }
 
   if (!model) {
@@ -83,29 +139,19 @@ function ModelViewer({
       )}
 
       <div className="viewer-container">
-        {error ? (
-          <div className="viewer-error">
-            <h3>Failed to load model</h3>
-            <p>{error}</p>
-            <button onClick={() => setError('')} className="retry-button">
-              Retry
-            </button>
-          </div>
-        ) : (
-          <Canvas
-            camera={{ position: [3, 3, 3], fov: 60 }}
-            shadows
-            className="viewer-canvas"
-            gl={{
-              antialias: true,
-              alpha: true,
-              powerPreference: 'high-performance',
-            }}
-            dpr={Math.min(window.devicePixelRatio, 2)}
-          >
-            <Scene model={model} />
-          </Canvas>
-        )}
+        <Canvas
+          camera={{ position: [3, 3, 3], fov: 60 }}
+          shadows
+          className="viewer-canvas"
+          gl={{
+            antialias: true,
+            alpha: true,
+            powerPreference: 'high-performance',
+          }}
+          dpr={Math.min(window.devicePixelRatio, 2)}
+        >
+          <Scene model={model} />
+        </Canvas>
       </div>
 
       <div className="viewer-info">

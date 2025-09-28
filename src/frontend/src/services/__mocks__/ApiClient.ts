@@ -1,6 +1,7 @@
 export default {
   uploadModel: jest.fn(),
   getModels: jest.fn(),
+  getModelById: jest.fn(),
   getModelFileUrl: jest.fn(
     modelId => `http://localhost:5009/models/${modelId}/file`
   ),
