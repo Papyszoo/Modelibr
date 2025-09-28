@@ -30,9 +30,10 @@ function TexturePackList() {
     try {
       setLoading(true)
       const packs = await texturePacksApi.getAllTexturePacks()
-      setTexturePacks(packs)
+      setTexturePacks(packs || [])
     } catch (error) {
       console.error('Failed to load texture packs:', error)
+      setTexturePacks([]) // Ensure texturePacks is always an array
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
@@ -119,7 +120,7 @@ function TexturePackList() {
   }
 
   const texturesBodyTemplate = (rowData: TexturePackDto) => {
-    if (rowData.isEmpty) {
+    if (rowData.isEmpty || !rowData.textures) {
       return <span className="text-muted">No textures</span>
     }
 
@@ -148,7 +149,7 @@ function TexturePackList() {
   }
 
   const modelsBodyTemplate = (rowData: TexturePackDto) => {
-    if (rowData.associatedModels.length === 0) {
+    if (!rowData.associatedModels || rowData.associatedModels.length === 0) {
       return <span className="text-muted">No models</span>
     }
 
