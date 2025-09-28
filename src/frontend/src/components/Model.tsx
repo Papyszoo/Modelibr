@@ -4,6 +4,7 @@ import { Box } from '@react-three/drei'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import * as THREE from 'three'
+import LoadingPlaceholder from './LoadingPlaceholder'
 
 // Separate components for each model type to avoid conditional hooks
 function OBJModel({ modelUrl }) {
@@ -50,7 +51,7 @@ function OBJModel({ modelUrl }) {
     )
   }
 
-  return <PlaceholderModel />
+  return <LoadingPlaceholder />
 }
 
 function GLTFModel({ modelUrl }) {
@@ -98,7 +99,7 @@ function GLTFModel({ modelUrl }) {
     )
   }
 
-  return <PlaceholderModel />
+  return <LoadingPlaceholder />
 }
 
 function PlaceholderModel() {
@@ -125,7 +126,7 @@ function PlaceholderModel() {
 
 function Model({ modelUrl, fileExtension }) {
   return (
-    <Suspense fallback={<PlaceholderModel />}>
+    <Suspense fallback={<LoadingPlaceholder />}>
       {fileExtension === 'obj' && <OBJModel modelUrl={modelUrl} />}
       {(fileExtension === 'gltf' || fileExtension === 'glb') && (
         <GLTFModel modelUrl={modelUrl} />
