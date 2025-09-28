@@ -48,8 +48,8 @@ export function parseCompactTabFormat(
 
       return {
         id: modelId
-          ? `model-${modelId}-${Date.now() + index}`
-          : `${tabType}-${Date.now() + index}`,
+          ? `model-${modelId}`
+          : tabType,
         type: tabType,
         label: getTabLabel(tabType, modelId),
         modelId: modelId || undefined,
