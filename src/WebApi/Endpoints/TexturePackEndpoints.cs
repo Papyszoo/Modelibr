@@ -69,7 +69,7 @@ public static class TexturePackEndpoints
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
 
-        return Results.Ok(result.Value.TexturePacks);
+        return Results.Ok(result.Value);
     }
 
     private static async Task<IResult> GetTexturePackById(
