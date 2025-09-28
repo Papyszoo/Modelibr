@@ -266,45 +266,49 @@ describe('ModelViewer - Tab Switching Issue Fix', () => {
     jest.useRealTimers()
   })
 
-  // React Three Fiber specific test using test renderer
-  it('should properly render 3D scene with React Three Fiber test renderer', async () => {
-    // Create a proper 3D scene test using the test renderer
-    const renderer = await create(
-      <>
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[10, 10, 5]} intensity={1.0} />
-        <mesh>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="red" />
-        </mesh>
-      </>
-    )
-
-    // Verify the scene contains the expected elements
-    const scene = renderer.scene
-    expect(scene.children).toHaveLength(3) // ambient light, directional light, mesh
+  it('should maintain model visibility when switching browser tabs', async () => {
+    // Render ModelViewer with a model prop (no API call needed)
+    render(<ModelViewer model={mockModel} isTabContent={true} />)
     
-    // Check that we have the lights and mesh in the scene using the test renderer API
-    const ambientLight = scene.children.find((child: any) => child.type === 'AmbientLight')
-    const directionalLight = scene.children.find((child: any) => child.type === 'DirectionalLight')  
-    const mesh = scene.children.find((child: any) => child.type === 'Mesh')
+    // Verify model is initially displayed
+    expect(screen.getByText('Model #123')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-canvas')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-scene')).toBeInTheDocument()
     
-    expect(ambientLight).toBeDefined()
-    expect(directionalLight).toBeDefined()  
-    expect(mesh).toBeDefined()
+    // Simulate tab becomes hidden (user switches to another tab)
+    Object.defineProperty(document, 'hidden', {
+      writable: true,
+      value: true
+    })
     
-    // Verify that the test instances wrap the correct Three.js types
-    expect(ambientLight.constructor.name).toBe('ReactThreeTestInstance')
-    expect(directionalLight.constructor.name).toBe('ReactThreeTestInstance')
-    expect(mesh.constructor.name).toBe('ReactThreeTestInstance')
+    // Dispatch visibility change event
+    const visibilityChangeEvent = new Event('visibilitychange')
+    document.dispatchEvent(visibilityChangeEvent)
     
-    // Verify the correct Three.js element types are present
-    expect(ambientLight.type).toBe('AmbientLight')
-    expect(directionalLight.type).toBe('DirectionalLight')
-    expect(mesh.type).toBe('Mesh')
-
-    // Cleanup
-    renderer.unmount()
+    // Model should still be visible (no refetch should happen since model is already loaded)
+    expect(screen.getByText('Model #123')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-canvas')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-scene')).toBeInTheDocument()
+    
+    // Simulate tab becomes visible again (user returns to this tab)
+    Object.defineProperty(document, 'hidden', {
+      writable: true,
+      value: false
+    })
+    
+    // Dispatch visibility change event
+    document.dispatchEvent(visibilityChangeEvent)
+    
+    // Model should still be visible and properly displayed
+    expect(screen.getByText('Model #123')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-canvas')).toBeInTheDocument()
+    expect(screen.getByTestId('r3f-scene')).toBeInTheDocument()
+    
+    // Verify Canvas is configured correctly for proper model display
+    const canvas = screen.getByTestId('r3f-canvas')
+    const canvasProps = JSON.parse(canvas.getAttribute('data-props') || '{}')
+    expect(canvasProps.camera).toEqual({ position: [3, 3, 3], fov: 60 })
+    expect(canvasProps.shadows).toBe(true)
   })
 
   it('should verify Canvas props are correctly passed', () => {
