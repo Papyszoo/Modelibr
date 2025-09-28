@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { Button } from 'primereact/button'
+import { ContextMenu } from 'primereact/contextmenu'
 import { Menu } from 'primereact/menu'
 import { MenuItem } from 'primereact/menuitem'
 import TabContent from './TabContent'
@@ -38,6 +39,7 @@ function DockPanel({
   moveTabBetweenPanels,
 }: DockPanelProps): JSX.Element {
   const menuRef = useRef<Menu>(null)
+  const contextMenuRef = useRef<ContextMenu>(null)
 
   // Menu items for adding new tabs
   const addMenuItems: MenuItem[] = [
@@ -135,6 +137,11 @@ function DockPanel({
 
   const activeTabData = tabs.find(tab => tab.id === activeTab)
 
+  const handleEmptyAreaContextMenu = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    contextMenuRef.current?.show(e)
+  }
+
   return (
     <div className={`dock-panel dock-panel-${side}`}>
       {/* Dock/Menu Bar */}
@@ -198,13 +205,18 @@ function DockPanel({
             <TabContent tab={activeTabData} />
           </TabProvider>
         ) : (
-          <div className="dock-empty">
+          <div className="dock-empty" onContextMenu={handleEmptyAreaContextMenu}>
             <i
               className="pi pi-plus"
               style={{ fontSize: '3rem', color: '#6b7280' }}
             ></i>
             <h3>No tabs open</h3>
             <p>Click the + button to add a new tab</p>
+            <ContextMenu
+              model={addMenuItems}
+              ref={contextMenuRef}
+              className="dock-add-menu"
+            />
           </div>
         )}
       </div>
