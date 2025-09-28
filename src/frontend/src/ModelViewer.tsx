@@ -31,14 +31,16 @@ function ModelViewer({
     }
   }, [propModel, modelId])
 
-  // Handle page visibility changes - retry loading when tab becomes visible again
+  // Handle page visibility changes - ensure proper rendering when tab becomes visible again
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // Only retry if we have an error, no model data, and a modelId to fetch
+      // Only refetch if we actually have an error and no model data
       if (!document.hidden && error && !model && modelId && !loading) {
         console.log('Tab became visible, retrying model fetch...')
         fetchModel(modelId)
       }
+      // For successful model loads, @react-three/fiber Canvas will handle proper re-rendering
+      // and the Model component already handles centering and scaling automatically
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
