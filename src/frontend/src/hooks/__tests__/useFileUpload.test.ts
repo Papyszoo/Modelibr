@@ -92,6 +92,9 @@ describe('useDragAndDrop', () => {
       preventDefault: jest.fn(),
       stopPropagation: jest.fn(),
       currentTarget: document.createElement('div'),
+      dataTransfer: {
+        types: ['Files'], // This is required for files to be detected
+      },
     }
     handlers.onDragEnter(mockDragEnterEvent)
 
@@ -122,6 +125,9 @@ describe('useDragAndDrop', () => {
       preventDefault: jest.fn(),
       stopPropagation: jest.fn(),
       currentTarget: document.createElement('div'),
+      dataTransfer: {
+        types: ['Files'], // This is required for files to be detected
+      },
     }
     handlers.onDragEnter(mockDragEnterEvent)
 
@@ -137,7 +143,7 @@ describe('useDragAndDrop', () => {
     handlers.onDrop(mockDropEvent)
 
     expect(document.body.classList.contains('dragging-file')).toBe(false)
-    expect(onFilesDropped).toHaveBeenCalledWith([])
+    expect(onFilesDropped).not.toHaveBeenCalled() // No files, so callback not called
   })
 
   it('should clear drag state even when callback throws an error', () => {
@@ -151,6 +157,9 @@ describe('useDragAndDrop', () => {
       preventDefault: jest.fn(),
       stopPropagation: jest.fn(),
       currentTarget: document.createElement('div'),
+      dataTransfer: {
+        types: ['Files'], // This is required for files to be detected
+      },
     }
     handlers.onDragEnter(mockDragEnterEvent)
 
@@ -187,6 +196,9 @@ describe('useDragAndDrop', () => {
       preventDefault: jest.fn(),
       stopPropagation: jest.fn(),
       currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'], // This is required for files to be detected
+      },
     }
     handlers.onDragEnter(mockDragEnterEvent)
 
@@ -218,6 +230,9 @@ describe('useDragAndDrop', () => {
       preventDefault: jest.fn(),
       stopPropagation: jest.fn(),
       currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'], // This is required for files to be detected
+      },
     }
     handlers.onDragEnter(mockDragEnterEvent)
 
@@ -241,5 +256,37 @@ describe('useDragAndDrop', () => {
 
     // Clean up
     document.body.removeChild(mockElement)
+  })
+
+  it('should not add drag styles for non-file drags (like tab drags)', () => {
+    const onFilesDropped = jest.fn()
+    const handlers = useDragAndDrop(onFilesDropped)
+
+    // Simulate drag enter with a tab drag (text/plain type, no Files)
+    const mockDragEnterEvent = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: document.createElement('div'),
+      dataTransfer: {
+        types: ['text/plain'], // Tab drags typically use text/plain
+      },
+    }
+    handlers.onDragEnter(mockDragEnterEvent)
+
+    // Should not add any drag styles for non-file drags
+    expect(document.body.classList.contains('dragging-file')).toBe(false)
+    expect(mockDragEnterEvent.currentTarget.classList.contains('drag-over')).toBe(false)
+
+    // Drop should also not call the callback for non-file drags
+    const mockDropEvent = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockDragEnterEvent.currentTarget,
+      dataTransfer: { files: [] }, // No files
+    }
+    handlers.onDrop(mockDropEvent)
+
+    expect(onFilesDropped).not.toHaveBeenCalled()
+    expect(document.body.classList.contains('dragging-file')).toBe(false)
   })
 })

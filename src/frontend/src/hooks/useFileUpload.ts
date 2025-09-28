@@ -206,17 +206,20 @@ export function useDragAndDrop(onFilesDropped) {
     document.body.classList.remove('dragging-file')
     e.currentTarget.classList.remove('drag-over')
 
-    const files = Array.from(e.dataTransfer.files)
+    // Only process files if they are actually present
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files)
 
-    // Call the callback in a try-catch to ensure drag state is always cleared
-    // even if the callback throws an error
-    try {
-      onFilesDropped(files)
-    } catch (error) {
-      // Ensure drag state is cleared even if callback fails
-      document.body.classList.remove('dragging-file')
-      e.currentTarget.classList.remove('drag-over')
-      throw error
+      // Call the callback in a try-catch to ensure drag state is always cleared
+      // even if the callback throws an error
+      try {
+        onFilesDropped(files)
+      } catch (error) {
+        // Ensure drag state is cleared even if callback fails
+        document.body.classList.remove('dragging-file')
+        e.currentTarget.classList.remove('drag-over')
+        throw error
+      }
     }
   }
 
@@ -224,9 +227,12 @@ export function useDragAndDrop(onFilesDropped) {
     e.preventDefault()
     e.stopPropagation()
 
-    // Add drag visual feedback
-    document.body.classList.add('dragging-file')
-    e.currentTarget.classList.add('drag-over')
+    // Only add drag visual feedback if files are being dragged
+    // This prevents tab drags from interfering with the UI
+    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+      document.body.classList.add('dragging-file')
+      e.currentTarget.classList.add('drag-over')
+    }
   }
 
   const onDragLeave = e => {
@@ -245,13 +251,21 @@ export function useDragAndDrop(onFilesDropped) {
       !currentTarget.contains(relatedTarget) ||
       !document.contains(relatedTarget)
     ) {
+      // Only remove drag styles if they were added (for file drags)
       document.body.classList.remove('dragging-file')
       currentTarget.classList.remove('drag-over')
     }
   }
 
+  const onDragOver = e => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Don't add any visual feedback here - it's handled in onDragEnter
+  }
+
   return {
     onDrop,
+    onDragOver,
     onDragEnter,
     onDragLeave,
   }
