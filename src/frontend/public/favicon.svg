@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="cubeGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E5C8A;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cubeGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5BA0F2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#357ABD;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cubeGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#357ABD;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E3A52;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 3D Cube representing 3D models -->
+  <!-- Top face -->
+  <polygon points="8,12 16,6 24,12 16,18" fill="url(#cubeGradient1)" stroke="#2E5C8A" stroke-width="0.5"/>
+  
+  <!-- Left face -->
+  <polygon points="8,12 16,18 16,26 8,20" fill="url(#cubeGradient2)" stroke="#357ABD" stroke-width="0.5"/>
+  
+  <!-- Right face -->
+  <polygon points="16,18 24,12 24,20 16,26" fill="url(#cubeGradient3)" stroke="#1E3A52" stroke-width="0.5"/>
+</svg>
