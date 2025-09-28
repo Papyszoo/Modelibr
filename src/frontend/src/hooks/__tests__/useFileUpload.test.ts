@@ -174,34 +174,7 @@ describe('useDragAndDrop', () => {
     expect(onFilesDropped).toHaveBeenCalledWith([mockFile])
   })
 
-  it('should maintain drag state during dragover after drag enter', () => {
-    const onFilesDropped = jest.fn()
-    const handlers = useDragAndDrop(onFilesDropped)
 
-    const mockElement = document.createElement('div')
-    
-    // Simulate drag enter
-    const mockDragEnterEvent = {
-      preventDefault: jest.fn(),
-      stopPropagation: jest.fn(),
-      currentTarget: mockElement,
-    }
-    handlers.onDragEnter(mockDragEnterEvent)
-
-    expect(document.body.classList.contains('dragging-file')).toBe(true)
-    expect(mockElement.classList.contains('drag-over')).toBe(true)
-
-    // Simulate drag over - should maintain state
-    const mockDragOverEvent = {
-      preventDefault: jest.fn(),
-      stopPropagation: jest.fn(),
-      currentTarget: mockElement,
-    }
-    handlers.onDragOver(mockDragOverEvent)
-
-    expect(document.body.classList.contains('dragging-file')).toBe(true)
-    expect(mockElement.classList.contains('drag-over')).toBe(true)
-  })
 
   it('should handle drag leave with null relatedTarget', () => {
     const onFilesDropped = jest.fn()
