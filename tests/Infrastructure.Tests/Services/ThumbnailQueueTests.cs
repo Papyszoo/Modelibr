@@ -217,6 +217,26 @@ public class ThumbnailQueueTests
     }
 
     [Fact]
+    public async Task RetryJobAsync_WithValidJob_ShouldNotifyWorkersOfAvailableJob()
+    {
+        // Arrange
+        var jobId = 1;
+        var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        var job = ThumbnailJob.Create(1, modelHash, DateTime.UtcNow);
+        job.TryClaim("worker-1", DateTime.UtcNow);
+        job.MarkAsFailed("Error", DateTime.UtcNow);
+
+        _mockRepository.Setup(r => r.GetByIdAsync(jobId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(job);
+
+        // Act
+        await _thumbnailQueue.RetryJobAsync(jobId);
+
+        // Assert - Verify that workers are notified of the available job
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task CleanupExpiredLocksAsync_WithExpiredJobs_ShouldResetThem()
     {
         // Arrange

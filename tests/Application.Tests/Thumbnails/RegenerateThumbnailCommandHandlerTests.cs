@@ -111,6 +111,51 @@ public class RegenerateThumbnailCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenModelHasExistingJob_RetriesExistingJob()
+    {
+        // Arrange
+        var command = new RegenerateThumbnailCommand(1);
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        var file = Domain.Models.File.Create(
+            "test.obj", 
+            "stored-file.obj",
+            "/path/to/file", 
+            "model/obj", 
+            FileType.Obj, 
+            1024, 
+            "sha256hash",
+            DateTime.UtcNow);
+        
+        model.AddFile(file, DateTime.UtcNow);
+        
+        var thumbnail = Thumbnail.Create(1, DateTime.UtcNow);
+        model.Thumbnail = thumbnail;
+
+        var existingJob = ThumbnailJob.Create(1, "sha256hash", DateTime.UtcNow);
+        var currentTime = DateTime.UtcNow;
+        
+        _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(model);
+        _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(currentTime);
+        _mockThumbnailQueue.Setup(x => x.GetJobByModelHashAsync("sha256hash", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingJob);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.ModelId);
+        
+        // Verify thumbnail was reset
+        _mockThumbnailRepository.Verify(x => x.UpdateAsync(thumbnail, It.IsAny<CancellationToken>()), Times.Once);
+        
+        // Verify existing job was retried (not a new job enqueued)
+        _mockThumbnailQueue.Verify(x => x.RetryJobAsync(existingJob.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_WhenModelHasNoThumbnail_CreatesNewThumbnailAndEnqueuesJob()
     {
         // Arrange

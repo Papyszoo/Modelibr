@@ -134,6 +134,9 @@ public class ThumbnailQueue : IThumbnailQueue
 
         _logger.LogInformation("Reset thumbnail job {JobId} for manual retry for model {ModelId}", 
             jobId, job.ModelId);
+
+        // Send real-time notification to workers that a job is available for processing
+        await _queueNotificationService.NotifyJobEnqueuedAsync(job, cancellationToken);
     }
 
     public async Task<ThumbnailJob?> GetJobAsync(int jobId, CancellationToken cancellationToken = default)
