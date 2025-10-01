@@ -42,7 +42,7 @@ export default function PackHeader({
     try {
       await onNameUpdate(editedName.trim())
       setEditing(false)
-    } catch (error) {
+    } catch {
       // Error handling is done in parent component
     }
   }

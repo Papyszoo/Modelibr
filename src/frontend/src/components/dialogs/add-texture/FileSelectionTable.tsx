@@ -66,8 +66,8 @@ export default function FileSelectionTable({
         />
       </DataTable>
       <small className="p-text-secondary">
-        Select an image file to use as a texture. Only image files from
-        uploaded models are shown.
+        Select an image file to use as a texture. Only image files from uploaded
+        models are shown.
       </small>
     </div>
   )

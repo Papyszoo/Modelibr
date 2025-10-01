@@ -48,7 +48,7 @@ function ModelViewer({
 
   const handleRegenerateThumbnail = async () => {
     if (!model) return
-    
+
     try {
       await ApiClient.regenerateThumbnail(model.id.toString())
       toast.current?.show({
@@ -82,7 +82,7 @@ function ModelViewer({
   return (
     <div className={`model-viewer ${isTabContent ? 'model-viewer-tab' : ''}`}>
       <Toast ref={toast} />
-      
+
       {!isTabContent && (
         <header className="viewer-header">
           <button onClick={onBack} className="back-button">

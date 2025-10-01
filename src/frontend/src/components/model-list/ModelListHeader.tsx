@@ -37,8 +37,8 @@ export default function ModelListHeader({
       </div>
       <h1>3D Model Library</h1>
       <p>
-        Drag and drop 3D model files onto the table to upload, or select a
-        model to view in 3D
+        Drag and drop 3D model files onto the table to upload, or select a model
+        to view in 3D
       </p>
     </header>
   )
