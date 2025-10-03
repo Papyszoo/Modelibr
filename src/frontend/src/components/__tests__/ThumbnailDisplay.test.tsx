@@ -87,7 +87,10 @@ describe('ThumbnailDisplay', () => {
 
     const image = screen.getByRole('img')
     expect(image).toBeInTheDocument()
-    expect(image).toHaveAttribute('src', 'http://localhost:5009/models/1/thumbnail/file')
+    expect(image).toHaveAttribute(
+      'src',
+      'http://localhost:5009/models/1/thumbnail/file'
+    )
     expect(image).toHaveAttribute('alt', 'Thumbnail for model 1')
   })
 
@@ -105,7 +108,9 @@ describe('ThumbnailDisplay', () => {
 
     render(<ThumbnailDisplay modelId={1} />)
 
-    expect(screen.getByLabelText('Thumbnail failed to generate')).toBeInTheDocument()
+    expect(
+      screen.getByLabelText('Thumbnail failed to generate')
+    ).toBeInTheDocument()
     expect(screen.getByText('Generation failed')).toBeInTheDocument()
   })
 })

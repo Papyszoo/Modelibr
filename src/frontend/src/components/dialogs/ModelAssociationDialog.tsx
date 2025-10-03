@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
-import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { DataTable } from 'primereact/datatable'
-import { Column } from 'primereact/column'
-import { Checkbox } from 'primereact/checkbox'
 import { TexturePackDto, Model } from '../../types'
 import { useTexturePacks } from '../../hooks/useTexturePacks'
+import AssociationInstructions from './model-association/AssociationInstructions'
+import ModelAssociationTable, {
+  ModelAssociation,
+} from './model-association/ModelAssociationTable'
+import ChangesSummary from './model-association/ChangesSummary'
+import ModelAssociationFooter from './model-association/ModelAssociationFooter'
 import './dialogs.css'
 
 interface ModelAssociationDialogProps {
@@ -14,12 +16,6 @@ interface ModelAssociationDialogProps {
   texturePack: TexturePackDto
   onHide: () => void
   onAssociationsChanged: () => void
-}
-
-interface ModelAssociation {
-  model: Model
-  isAssociated: boolean
-  originallyAssociated: boolean
 }
 
 function ModelAssociationDialog({
@@ -160,62 +156,19 @@ function ModelAssociationDialog({
     onHide()
   }
 
-  const associationBodyTemplate = (rowData: ModelAssociation) => {
-    return (
-      <Checkbox
-        inputId={`model-${rowData.model.id}`}
-        checked={rowData.isAssociated}
-        onChange={e =>
-          handleToggleAssociation(rowData.model.id, e.checked || false)
-        }
-      />
-    )
-  }
-
-  const statusBodyTemplate = (rowData: ModelAssociation) => {
-    if (rowData.isAssociated && !rowData.originallyAssociated) {
-      return <span className="status-badge status-new">Will Associate</span>
-    } else if (!rowData.isAssociated && rowData.originallyAssociated) {
-      return <span className="status-badge status-remove">Will Remove</span>
-    } else if (rowData.isAssociated) {
-      return (
-        <span className="status-badge status-current">
-          Currently Associated
-        </span>
-      )
-    }
-    return <span className="status-badge status-none">Not Associated</span>
-  }
-
-  const fileCountBodyTemplate = (rowData: ModelAssociation) => {
-    return `${rowData.model.files.length} file${rowData.model.files.length !== 1 ? 's' : ''}`
-  }
-
-  const dialogFooter = (
-    <div>
-      <Button
-        label="Cancel"
-        icon="pi pi-times"
-        className="p-button-text"
-        onClick={handleCancel}
-        disabled={saving}
-      />
-      <Button
-        label="Save Changes"
-        icon="pi pi-check"
-        onClick={handleSave}
-        loading={saving}
-        disabled={!hasChanges() || saving}
-      />
-    </div>
-  )
-
   return (
     <Dialog
       header={`Manage Model Associations - "${texturePack.name}"`}
       visible={visible}
       onHide={handleCancel}
-      footer={dialogFooter}
+      footer={
+        <ModelAssociationFooter
+          onCancel={handleCancel}
+          onSave={handleSave}
+          saving={saving}
+          hasChanges={hasChanges()}
+        />
+      }
       modal
       maximizable
       style={{ width: '80vw', maxWidth: '1000px', height: '70vh' }}
@@ -223,62 +176,15 @@ function ModelAssociationDialog({
     >
       <Toast ref={toast} />
 
-      <div className="association-instructions">
-        <p>
-          Select which models should be associated with this texture pack.
-          Associated models can use the textures from this pack for rendering.
-        </p>
-      </div>
+      <AssociationInstructions />
 
-      <DataTable
-        value={modelAssociations}
+      <ModelAssociationTable
+        modelAssociations={modelAssociations}
         loading={loading}
-        emptyMessage="No models available"
-        paginator
-        rows={15}
-        responsiveLayout="scroll"
-        stripedRows
-        showGridlines
-        className="model-association-table"
-      >
-        <Column
-          field="isAssociated"
-          header="Associate"
-          body={associationBodyTemplate}
-          style={{ width: '100px', textAlign: 'center' }}
-        />
-        <Column
-          field="model.name"
-          header="Model Name"
-          sortable
-          style={{ minWidth: '200px' }}
-        />
-        <Column
-          header="Files"
-          body={fileCountBodyTemplate}
-          style={{ minWidth: '100px' }}
-        />
-        <Column
-          header="Status"
-          body={statusBodyTemplate}
-          style={{ minWidth: '150px' }}
-        />
-      </DataTable>
+        onToggleAssociation={handleToggleAssociation}
+      />
 
-      {hasChanges() && (
-        <div className="changes-summary">
-          <div className="p-message p-message-info">
-            <div className="p-message-wrapper">
-              <div className="p-message-icon">
-                <i className="pi pi-info-circle"></i>
-              </div>
-              <div className="p-message-text">
-                You have unsaved changes. Click "Save Changes" to apply them.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ChangesSummary hasChanges={hasChanges()} />
     </Dialog>
   )
 }

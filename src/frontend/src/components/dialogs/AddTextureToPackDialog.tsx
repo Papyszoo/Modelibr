@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
-import { Dropdown } from 'primereact/dropdown'
-import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { DataTable } from 'primereact/datatable'
-import { Column } from 'primereact/column'
 import { TexturePackDto, TextureType, Model } from '../../types'
 import { getTextureTypeOptions } from '../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../hooks/useTexturePacks'
+import TextureTypeDropdown from './add-texture/TextureTypeDropdown'
+import FileSelectionTable, {
+  FileOption,
+} from './add-texture/FileSelectionTable'
+import NoTextureTypesWarning from './add-texture/NoTextureTypesWarning'
+import AddTextureFooter from './add-texture/AddTextureFooter'
 import './dialogs.css'
 
 interface AddTextureToPackDialogProps {
@@ -15,13 +17,6 @@ interface AddTextureToPackDialogProps {
   texturePack: TexturePackDto
   onHide: () => void
   onTextureAdded: () => void
-}
-
-interface FileOption {
-  id: number
-  name: string
-  mimeType: string
-  sizeBytes: number
 }
 
 function AddTextureToPackDialog({
@@ -132,54 +127,19 @@ function AddTextureToPackDialog({
     onHide()
   }
 
-  const textureTypeOptionTemplate = (option: {
-    label: string
-    value: TextureType
-    color: string
-    icon: string
-  }) => {
-    return (
-      <div className="texture-type-option">
-        <span
-          className="texture-type-badge"
-          style={{ backgroundColor: option.color }}
-        >
-          <i className={`pi ${option.icon}`}></i>
-          {option.label}
-        </span>
-      </div>
-    )
-  }
-
-  const fileSizeBodyTemplate = (rowData: FileOption) => {
-    return `${(rowData.sizeBytes / 1024).toFixed(1)} KB`
-  }
-
-  const dialogFooter = (
-    <div>
-      <Button
-        label="Cancel"
-        icon="pi pi-times"
-        className="p-button-text"
-        onClick={handleCancel}
-        disabled={submitting}
-      />
-      <Button
-        label="Add Texture"
-        icon="pi pi-plus"
-        onClick={handleSubmit}
-        loading={submitting}
-        disabled={!selectedFileId || !selectedTextureType || submitting}
-      />
-    </div>
-  )
-
   return (
     <Dialog
       header={`Add Texture to "${texturePack.name}"`}
       visible={visible}
       onHide={handleCancel}
-      footer={dialogFooter}
+      footer={
+        <AddTextureFooter
+          onCancel={handleCancel}
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          canSubmit={!!selectedFileId && !!selectedTextureType}
+        />
+      }
       modal
       className="p-fluid"
       style={{ width: '70vw', maxWidth: '800px' }}
@@ -188,93 +148,20 @@ function AddTextureToPackDialog({
       <Toast ref={toast} />
 
       <div className="add-texture-form">
-        <div className="p-field">
-          <label htmlFor="texture-type" className="p-text-bold">
-            Texture Type <span className="p-error">*</span>
-          </label>
-          <Dropdown
-            id="texture-type"
-            value={selectedTextureType}
-            options={availableTextureTypes}
-            onChange={e => setSelectedTextureType(e.value)}
-            placeholder="Select texture type"
-            itemTemplate={textureTypeOptionTemplate}
-            valueTemplate={
-              selectedTextureType
-                ? textureTypeOptionTemplate(
-                    textureTypeOptions.find(
-                      opt => opt.value === selectedTextureType
-                    )!
-                  )
-                : undefined
-            }
-            emptyMessage="All texture types are already used in this pack"
-          />
-          <small className="p-text-secondary">
-            Each texture pack can only have one texture of each type
-          </small>
-        </div>
+        <TextureTypeDropdown
+          options={availableTextureTypes}
+          value={selectedTextureType}
+          onChange={setSelectedTextureType}
+        />
 
-        <div className="p-field">
-          <label htmlFor="file-select" className="p-text-bold">
-            Select File <span className="p-error">*</span>
-          </label>
-          <DataTable
-            value={availableFiles}
-            loading={loading}
-            selectionMode="single"
-            selection={
-              availableFiles.find(f => f.id === selectedFileId) || null
-            }
-            onSelectionChange={e => setSelectedFileId(e.value?.id || null)}
-            emptyMessage="No image files available"
-            paginator
-            rows={10}
-            responsiveLayout="scroll"
-            stripedRows
-            showGridlines
-            className="file-selection-table"
-          >
-            <Column selectionMode="single" style={{ width: '3rem' }} />
-            <Column
-              field="name"
-              header="File Name"
-              sortable
-              style={{ minWidth: '200px' }}
-            />
-            <Column
-              field="mimeType"
-              header="Type"
-              sortable
-              style={{ minWidth: '120px' }}
-            />
-            <Column
-              field="sizeBytes"
-              header="Size"
-              body={fileSizeBodyTemplate}
-              sortable
-              style={{ minWidth: '100px' }}
-            />
-          </DataTable>
-          <small className="p-text-secondary">
-            Select an image file to use as a texture. Only image files from
-            uploaded models are shown.
-          </small>
-        </div>
+        <FileSelectionTable
+          files={availableFiles}
+          loading={loading}
+          selectedFileId={selectedFileId}
+          onFileSelect={setSelectedFileId}
+        />
 
-        {availableTextureTypes.length === 0 && (
-          <div className="p-message p-message-warn">
-            <div className="p-message-wrapper">
-              <div className="p-message-icon">
-                <i className="pi pi-exclamation-triangle"></i>
-              </div>
-              <div className="p-message-text">
-                This texture pack already contains all supported texture types.
-                Remove existing textures to add different ones.
-              </div>
-            </div>
-          </div>
-        )}
+        <NoTextureTypesWarning visible={availableTextureTypes.length === 0} />
       </div>
     </Dialog>
   )

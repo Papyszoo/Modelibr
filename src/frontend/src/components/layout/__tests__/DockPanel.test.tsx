@@ -5,25 +5,35 @@ import { Tab } from '../../../types'
 
 // Mock PrimeReact components
 jest.mock('primereact/button', () => ({
-  Button: ({ children, ...props }: any) => (
+  Button: ({ children, ...props }: React.PropsWithChildren<unknown>) => (
     <button {...props}>{children}</button>
   ),
 }))
 
 jest.mock('primereact/contextmenu', () => ({
-  ContextMenu: React.forwardRef(({ children, ...props }: any, ref: any) => (
-    <div {...props} ref={ref}>
-      {children}
-    </div>
-  )),
+  ContextMenu: React.forwardRef(
+    (
+      { children, ...props }: React.PropsWithChildren<unknown>,
+      ref: React.Ref<HTMLDivElement>
+    ) => (
+      <div {...props} ref={ref}>
+        {children}
+      </div>
+    )
+  ),
 }))
 
 jest.mock('primereact/menu', () => ({
-  Menu: React.forwardRef(({ children, ...props }: any, ref: any) => (
-    <div {...props} ref={ref}>
-      {children}
-    </div>
-  )),
+  Menu: React.forwardRef(
+    (
+      { children, ...props }: React.PropsWithChildren<unknown>,
+      ref: React.Ref<HTMLDivElement>
+    ) => (
+      <div {...props} ref={ref}>
+        {children}
+      </div>
+    )
+  ),
 }))
 
 // Mock TabContent and DraggableTab components
@@ -67,9 +77,11 @@ describe('DockPanel', () => {
 
   it('should render empty dock panel when no tabs are open', () => {
     render(<DockPanel {...mockProps} />)
-    
+
     expect(screen.getByText('No tabs open')).toBeInTheDocument()
-    expect(screen.getByText('Click the + button to add a new tab')).toBeInTheDocument()
+    expect(
+      screen.getByText('Click the + button to add a new tab')
+    ).toBeInTheDocument()
   })
 
   it('should render active tab content when tabs are present', () => {
@@ -83,7 +95,7 @@ describe('DockPanel', () => {
     }
 
     render(<DockPanel {...propsWithTabs} />)
-    
+
     expect(screen.getByTestId('tab-content')).toBeInTheDocument()
     expect(screen.getByText('Test Tab Content')).toBeInTheDocument()
   })
@@ -99,11 +111,11 @@ describe('DockPanel', () => {
     }
 
     const { container } = render(<DockPanel {...propsWithTabs} />)
-    
+
     // Find dock-content element - it should not have drag handlers when active tab is present
     const dockContent = container.querySelector('.dock-content')
     expect(dockContent).toBeInTheDocument()
-    
+
     // The key test: dock content should contain tab content, not empty dock area
     expect(screen.getByTestId('tab-content')).toBeInTheDocument()
     expect(screen.queryByText('No tabs open')).not.toBeInTheDocument()
@@ -111,11 +123,11 @@ describe('DockPanel', () => {
 
   it('should show empty dock area with drag handlers when no tabs are open', () => {
     const { container } = render(<DockPanel {...mockProps} />)
-    
+
     // Find dock-empty element within dock-content
     const dockEmpty = container.querySelector('.dock-empty')
     expect(dockEmpty).toBeInTheDocument()
-    
+
     // The key test: empty dock area should be present
     expect(screen.getByText('No tabs open')).toBeInTheDocument()
     expect(screen.queryByTestId('tab-content')).not.toBeInTheDocument()

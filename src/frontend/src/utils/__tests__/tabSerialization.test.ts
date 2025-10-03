@@ -45,7 +45,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     it('should generate deterministic IDs for same input', () => {
       const result1 = parseCompactTabFormat('modelList,texture')
       const result2 = parseCompactTabFormat('modelList,texture')
-      
+
       expect(result1[0].id).toBe(result2[0].id)
       expect(result1[1].id).toBe(result2[1].id)
     })
@@ -53,7 +53,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     it('should generate deterministic IDs for tabs with modelId', () => {
       const result1 = parseCompactTabFormat('modelViewer:123')
       const result2 = parseCompactTabFormat('modelViewer:123')
-      
+
       expect(result1[0].id).toBe(result2[0].id)
     })
 
