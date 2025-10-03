@@ -254,6 +254,9 @@
 .model-viewer-tab {
   background: #f8fafc;
   color: #374151;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .viewer-header-tab {
@@ -298,11 +301,59 @@
   margin: 1rem;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* Full height for tab mode - fill available space */
+  flex: 1;
+  position: relative;
 }
 
 .model-viewer-tab .viewer-info {
+  /* Hide the old viewer-info in tab mode since we use sidebar */
+  display: none;
+}
+
+/* Floating control buttons in 3D view */
+.viewer-controls {
+  position: absolute;
+  top: 1rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.viewer-controls-left {
+  left: 1rem;
+}
+
+.viewer-controls-right {
+  right: 1rem;
+}
+
+.viewer-control-btn {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Sidebar styling */
+.model-viewer-sidebar {
   background: white;
-  margin: 0 1rem 1rem 1rem;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.model-viewer-sidebar .sidebar-section {
+  padding: 1rem;
+}
+
+.model-viewer-sidebar .sidebar-section h2 {
+  color: #1e293b;
+  font-size: 1.25rem;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.model-viewer-sidebar .thumbnail-section {
+  margin-top: 0;
+}
+
+.model-viewer-sidebar .info-section {
+  margin-bottom: 1.5rem;
 }
