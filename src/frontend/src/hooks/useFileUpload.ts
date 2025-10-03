@@ -207,7 +207,11 @@ export function useDragAndDrop(onFilesDropped) {
     e.currentTarget.classList.remove('drag-over')
 
     // Only process files if they are actually present
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (
+      e.dataTransfer &&
+      e.dataTransfer.files &&
+      e.dataTransfer.files.length > 0
+    ) {
       const files = Array.from(e.dataTransfer.files)
 
       // Call the callback in a try-catch to ensure drag state is always cleared
@@ -229,7 +233,11 @@ export function useDragAndDrop(onFilesDropped) {
 
     // Only add drag visual feedback if files are being dragged
     // This prevents tab drags from interfering with the UI
-    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+    if (
+      e.dataTransfer &&
+      e.dataTransfer.types &&
+      e.dataTransfer.types.includes('Files')
+    ) {
       document.body.classList.add('dragging-file')
       e.currentTarget.classList.add('drag-over')
     }

@@ -18,7 +18,8 @@ describe('useThumbnailManager', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockApiClient.getThumbnailUrl.mockImplementation(
-      (modelId: string) => `http://localhost:5009/models/${modelId}/thumbnail/file`
+      (modelId: string) =>
+        `http://localhost:5009/models/${modelId}/thumbnail/file`
     )
   })
 
@@ -40,7 +41,9 @@ describe('useThumbnailManager', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     expect(result.current.isReady).toBe(true)
-    expect(result.current.thumbnailUrl).toBe('http://localhost:5009/models/123/thumbnail/file')
+    expect(result.current.thumbnailUrl).toBe(
+      'http://localhost:5009/models/123/thumbnail/file'
+    )
     expect(mockApiClient.getThumbnailUrl).toHaveBeenCalledWith('123')
   })
 
@@ -85,7 +88,9 @@ describe('useThumbnailManager', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     expect(result.current.isReady).toBe(true)
-    expect(result.current.thumbnailUrl).toBe('http://localhost:5009/models/123/thumbnail/file')
+    expect(result.current.thumbnailUrl).toBe(
+      'http://localhost:5009/models/123/thumbnail/file'
+    )
     expect(mockApiClient.getThumbnailUrl).toHaveBeenCalledWith('123')
   })
 })

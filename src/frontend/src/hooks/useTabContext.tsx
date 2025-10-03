@@ -77,9 +77,10 @@ export const TabProvider = ({
 
     // Create new tab
     const newTab: Tab = {
-      id: type === 'modelViewer' && (data as { id?: string })?.id
-        ? `model-${(data as { id?: string }).id}`
-        : type,
+      id:
+        type === 'modelViewer' && (data as { id?: string })?.id
+          ? `model-${(data as { id?: string }).id}`
+          : type,
       type,
       label: title,
       modelId:

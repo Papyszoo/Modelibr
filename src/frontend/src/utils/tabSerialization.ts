@@ -35,7 +35,7 @@ export function parseCompactTabFormat(
 
   // Parse compact format: "type" or "type:modelId", separated by commas
   try {
-    return value.split(',').map((tabSpec, index) => {
+    return value.split(',').map(tabSpec => {
       const [type, modelId] = tabSpec.split(':')
       const tabType = type as Tab['type']
 
@@ -47,9 +47,7 @@ export function parseCompactTabFormat(
       }
 
       return {
-        id: modelId
-          ? `model-${modelId}`
-          : tabType,
+        id: modelId ? `model-${modelId}` : tabType,
         type: tabType,
         label: getTabLabel(tabType, modelId),
         modelId: modelId || undefined,

@@ -1,12 +1,7 @@
-import { useRef } from 'react'
-import { Button } from 'primereact/button'
-import { ContextMenu } from 'primereact/contextmenu'
-import { Menu } from 'primereact/menu'
-import { MenuItem } from 'primereact/menuitem'
-import TabContent from './TabContent'
-import DraggableTab from './DraggableTab'
-import { TabProvider } from '../../hooks/useTabContext'
 import { Tab } from '../../types'
+import DockBar from './dock-panel/DockBar'
+import DockEmptyState from './dock-panel/DockEmptyState'
+import DockContentArea from './dock-panel/DockContentArea'
 import './DockPanel.css'
 
 interface DockPanelProps {
@@ -38,33 +33,6 @@ function DockPanel({
   setDraggedTab,
   moveTabBetweenPanels,
 }: DockPanelProps): JSX.Element {
-  const menuRef = useRef<Menu>(null)
-  const contextMenuRef = useRef<ContextMenu>(null)
-
-  // Menu items for adding new tabs
-  const addMenuItems: MenuItem[] = [
-    {
-      label: 'Models List',
-      icon: 'pi pi-list',
-      command: () => addTab('modelList', 'Models'),
-    },
-    {
-      label: 'Textures List',
-      icon: 'pi pi-image',
-      command: () => addTab('texture', 'Textures'),
-    },
-    {
-      label: 'Texture Packs',
-      icon: 'pi pi-folder',
-      command: () => addTab('texturePacks', 'Texture Packs'),
-    },
-    {
-      label: 'Animations List',
-      icon: 'pi pi-play',
-      command: () => addTab('animation', 'Animations'),
-    },
-  ]
-
   const addTab = (type: Tab['type'], title: string): void => {
     const newTab: Tab = {
       id: type,
@@ -137,88 +105,43 @@ function DockPanel({
 
   const activeTabData = tabs.find(tab => tab.id === activeTab)
 
-  const handleEmptyAreaContextMenu = (e: React.MouseEvent): void => {
-    e.preventDefault()
-    contextMenuRef.current?.show(e)
-  }
-
   return (
     <div className={`dock-panel dock-panel-${side}`}>
       {/* Dock/Menu Bar */}
-      <div
-        className={`dock-bar dock-bar-${side}`}
+      <DockBar
+        side={side}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabSelect={setActiveTab}
+        onTabClose={closeTab}
+        onTabDragStart={handleTabDragStart}
+        onTabDragEnd={handleTabDragEnd}
+        onAddTab={addTab}
         onDrop={handleDropOnOtherPanel}
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
-      >
-        {/* Tab icons */}
-        <div className="dock-tabs">
-          {tabs.map(tab => (
-            <DraggableTab
-              key={tab.id}
-              tab={tab}
-              isActive={tab.id === activeTab}
-              onSelect={() => setActiveTab(tab.id)}
-              onClose={() => closeTab(tab.id)}
-              onDragStart={handleTabDragStart}
-              onDragEnd={handleTabDragEnd}
-              side={side}
-            />
-          ))}
-        </div>
-
-        {/* Add tab button */}
-        <div className="dock-add">
-          <Button
-            icon="pi pi-plus"
-            className="p-button-text p-button-rounded dock-add-button"
-            onClick={event => menuRef.current?.toggle(event)}
-            tooltip="Add new tab"
-            tooltipOptions={{ position: side === 'left' ? 'right' : 'left' }}
-          />
-          <Menu
-            model={addMenuItems}
-            popup
-            ref={menuRef}
-            className="dock-add-menu"
-          />
-        </div>
-      </div>
+      />
 
       {/* Content Area */}
       <div className="dock-content">
         {activeTabData ? (
-          <TabProvider
+          <DockContentArea
             side={side}
             tabs={tabs}
             setTabs={setTabs}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
-          >
-            <TabContent tab={activeTabData} />
-          </TabProvider>
+            activeTabData={activeTabData}
+          />
         ) : (
-          <div 
-            className="dock-empty" 
-            onContextMenu={handleEmptyAreaContextMenu}
+          <DockEmptyState
+            onAddTab={addTab}
             onDrop={handleDropOnOtherPanel}
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
-          >
-            <i
-              className="pi pi-plus"
-              style={{ fontSize: '3rem', color: '#6b7280' }}
-            ></i>
-            <h3>No tabs open</h3>
-            <p>Click the + button to add a new tab</p>
-            <ContextMenu
-              model={addMenuItems}
-              ref={contextMenuRef}
-              className="dock-add-menu"
-            />
-          </div>
+          />
         )}
       </div>
     </div>
