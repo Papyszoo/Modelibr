@@ -2,6 +2,11 @@
 
 This directory contains comprehensive documentation for all frontend components, hooks, utilities, and services used in the Modelibr application.
 
+## Quick Links
+
+- **[Getting Started Guide](./GETTING_STARTED.md)** - Setup, core concepts, and common tasks
+- **[Architecture Overview](./ARCHITECTURE.md)** - Design patterns, state management, and best practices
+
 ## Table of Contents
 
 - [Hooks](#hooks)
