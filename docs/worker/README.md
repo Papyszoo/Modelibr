@@ -186,3 +186,4 @@ When modifying the worker service:
 - Graceful shutdown
 
 See [../worker-api-integration.md](../worker-api-integration.md) for recent API integration changes.
+
