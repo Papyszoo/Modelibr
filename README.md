@@ -64,6 +64,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 - Vite for development and build
 - Drag-and-drop file upload integration
 - Advanced state management with URL persistence
+- Storybook for component documentation and development
 
 **Infrastructure:**
 - Docker & Docker Compose
@@ -170,6 +171,13 @@ The API will be available at http://localhost:5009
 
 The frontend will be available at http://localhost:3000
 
+3. **View component documentation (Storybook)**
+   ```bash
+   npm run storybook
+   ```
+
+Storybook will be available at http://localhost:6006 with interactive component examples.
+
 ##### Thumbnail Worker (Node.js)
 
 1. **Install dependencies**
@@ -259,6 +267,53 @@ curl http://localhost:8080/models
 curl http://localhost:8080/files/1 -o downloaded-model.obj
 ```
 
+## 📚 Component Documentation (Storybook)
+
+The frontend includes Storybook for interactive component documentation and development. Storybook provides:
+
+- **Interactive component examples**: View and interact with UI components in isolation
+- **Props documentation**: See available props and their types with live editing
+- **Multiple component states**: Explore different states and variations of components
+- **Development playground**: Test components without running the full application
+
+### Available Stories
+
+- **Components/LoadingPlaceholder**: 3D loading indicator component
+- **Components/ModelInfo**: Model information display with TSL rendering features
+- **Components/ThumbnailDisplay**: Thumbnail display states (ready, processing, failed, placeholder)
+- **Components/Model List/EmptyState**: Empty state for model library
+- **Components/Model List/ErrorState**: Error handling states
+
+### Screenshots
+
+**ModelInfo Component Documentation**
+![Storybook ModelInfo](https://github.com/user-attachments/assets/c191f88b-9b39-45c0-bfa9-8f8d34efe1ed)
+*Interactive documentation showing ModelInfo component with controls for different model types*
+
+**ErrorState Component Examples**
+![Storybook ErrorState](https://github.com/user-attachments/assets/e2b4a2e0-f66d-4ea9-8e96-ec2bd3e0106d)
+*Error state component with different error scenarios and interactive controls*
+
+### Running Storybook
+
+```bash
+cd src/frontend
+npm run storybook
+```
+
+Access Storybook at http://localhost:6006
+
+### Building Storybook
+
+To build a static version of Storybook for deployment:
+
+```bash
+cd src/frontend
+npm run build-storybook
+```
+
+The static files will be generated in `src/frontend/storybook-static/`
+
 ## 🏃‍♂️ Development Workflow
 
 1. **Make changes** to the codebase
@@ -311,6 +366,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) for React integration
 - [ASP.NET Core](https://docs.microsoft.com/en-us/aspnet/core/) for the robust backend framework
 - [Entity Framework Core](https://docs.microsoft.com/en-us/ef/core/) for data access
+- [Storybook](https://storybook.js.org/) for component documentation and development
 
 ---
 
