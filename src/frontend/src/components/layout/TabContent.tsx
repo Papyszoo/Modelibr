@@ -4,6 +4,7 @@ import TextureList from '../tabs/TextureList'
 import TexturePackList from '../tabs/TexturePackList'
 import AnimationList from '../tabs/AnimationList'
 import { Tab } from '../../types'
+import { useTabContext } from '../../hooks/useTabContext'
 import './TabContent.css'
 
 interface TabContentProps {
@@ -11,6 +12,8 @@ interface TabContentProps {
 }
 
 function TabContent({ tab }: TabContentProps): JSX.Element {
+  const { side } = useTabContext()
+
   const renderContent = (): JSX.Element => {
     switch (tab.type) {
       case 'modelList':
@@ -25,7 +28,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return <ModelViewer modelId={tab.modelId} isTabContent={true} />
+        return <ModelViewer modelId={tab.modelId} side={side} />
 
       case 'texture':
         return <TextureList />
