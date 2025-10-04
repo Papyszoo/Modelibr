@@ -52,67 +52,35 @@ function ThumbnailDisplay({
     }
   }
 
-  const renderLoadingSpinner = () => (
-    <div className="thumbnail-loading" aria-label="Loading thumbnail">
-      <div className="thumbnail-spinner" />
-      <span className="thumbnail-status-text">
-        {thumbnailStatus?.Status === THUMBNAIL_STATUS.PROCESSING
-          ? 'Generating thumbnail...'
-          : 'Preparing thumbnail...'}
-      </span>
-    </div>
-  )
-
-  const renderErrorState = () => (
-    <div className="thumbnail-error" aria-label="Thumbnail failed to generate">
-      <i className="pi pi-exclamation-triangle" aria-hidden="true" />
-      <span className="thumbnail-status-text">
-        {error ||
-          thumbnailStatus?.ErrorMessage ||
-          'Thumbnail generation failed'}
-      </span>
-      {showControls && (
-        <button
-          className="thumbnail-retry-btn"
-          onClick={handleRegenerateClick}
-          disabled={isLoading}
-          aria-label="Regenerate thumbnail"
-        >
-          <i className="pi pi-refresh" aria-hidden="true" />
-          Retry
-        </button>
-      )}
-    </div>
-  )
-
-  const renderPlaceholder = () => (
-    <div className="thumbnail-placeholder" aria-label="No thumbnail available">
-      <i className="pi pi-image" aria-hidden="true" />
-    </div>
-  )
-
-  const renderThumbnailImage = () => {
-    if (!thumbnailUrl || imageError) {
-      return renderPlaceholder()
+  const renderContent = () => {
+    // Show loading state for processing/pending
+    if (isProcessing) {
+      return (
+        <div className="thumbnail-loading" aria-label="Loading thumbnail">
+          <div className="thumbnail-spinner" />
+          <span className="thumbnail-status-text">
+            {thumbnailStatus?.Status === THUMBNAIL_STATUS.PROCESSING
+              ? 'Generating thumbnail...'
+              : 'Preparing thumbnail...'}
+          </span>
+        </div>
+      )
     }
 
-    // For static display, show poster frame by default
-    // For animated display or on hover, show the animated version
-    const imageUrl = showAnimated ? thumbnailUrl : thumbnailUrl
-
-    return (
-      <div className="thumbnail-image-container">
-        <img
-          src={imageUrl}
-          alt={alt}
-          className="thumbnail-image"
-          onError={handleImageError}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          loading="lazy"
-        />
-        {showControls && isFailed && (
-          <div className="thumbnail-overlay">
+    // Show error state for failed thumbnails
+    if (isFailed) {
+      return (
+        <div
+          className="thumbnail-error"
+          aria-label="Thumbnail failed to generate"
+        >
+          <i className="pi pi-exclamation-triangle" aria-hidden="true" />
+          <span className="thumbnail-status-text">
+            {error ||
+              thumbnailStatus?.ErrorMessage ||
+              'Thumbnail generation failed'}
+          </span>
+          {showControls && (
             <button
               className="thumbnail-retry-btn"
               onClick={handleRegenerateClick}
@@ -120,9 +88,51 @@ function ThumbnailDisplay({
               aria-label="Regenerate thumbnail"
             >
               <i className="pi pi-refresh" aria-hidden="true" />
+              Retry
             </button>
-          </div>
-        )}
+          )}
+        </div>
+      )
+    }
+
+    // Show thumbnail image when ready
+    if (isReady && thumbnailUrl && !imageError) {
+      const imageUrl = showAnimated ? thumbnailUrl : thumbnailUrl
+
+      return (
+        <div className="thumbnail-image-container">
+          <img
+            src={imageUrl}
+            alt={alt}
+            className="thumbnail-image"
+            onError={handleImageError}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            loading="lazy"
+          />
+          {showControls && (
+            <div className="thumbnail-overlay">
+              <button
+                className="thumbnail-retry-btn"
+                onClick={handleRegenerateClick}
+                disabled={isLoading}
+                aria-label="Regenerate thumbnail"
+              >
+                <i className="pi pi-refresh" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Default: show placeholder
+    return (
+      <div
+        className="thumbnail-placeholder"
+        aria-label="No thumbnail available"
+      >
+        <i className="pi pi-image" aria-hidden="true" />
       </div>
     )
   }
@@ -141,14 +151,7 @@ function ThumbnailDisplay({
   const combinedClassName =
     `thumbnail-display ${getSizeClass()} ${className}`.trim()
 
-  return (
-    <div className={combinedClassName}>
-      {isProcessing && renderLoadingSpinner()}
-      {isFailed && renderErrorState()}
-      {isReady && renderThumbnailImage()}
-      {!thumbnailStatus && !isLoading && renderPlaceholder()}
-    </div>
-  )
+  return <div className={combinedClassName}>{renderContent()}</div>
 }
 
 export default ThumbnailDisplay
