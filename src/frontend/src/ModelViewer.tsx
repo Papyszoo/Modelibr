@@ -32,7 +32,7 @@ function ModelViewer({
   const toast = useRef<Toast>(null)
 
   // Determine which side for sidebar positioning
-  const sidebarPosition = side === 'left' ? 'right' : 'left'
+  const sidebarPosition = side ?? 'left'
   const buttonPosition = side === 'left' ? 'right' : 'left'
 
   useEffect(() => {

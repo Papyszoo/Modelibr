@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { JSX, Suspense } from 'react'
 import { OrbitControls } from '@react-three/drei'
 import Model from './Model'
 import LoadingPlaceholder from './LoadingPlaceholder'
