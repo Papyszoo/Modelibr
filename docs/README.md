@@ -2,6 +2,20 @@
 
 This directory contains documentation and sample files for the Modelibr project.
 
+## Documentation
+
+### [Worker Service Documentation](worker/)
+Comprehensive documentation for the thumbnail worker service:
+- **[Overview & Architecture](worker/index.md)** - Service architecture, technology stack, and processing pipeline
+- **[Files & Responsibilities](worker/files-and-responsibilities.md)** - Detailed documentation of all source files
+- **[Service Communication](worker/service-communication.md)** - SignalR and HTTP API integration
+- **[Configuration](worker/configuration.md)** - Complete environment variable reference
+- **[Deployment](worker/deployment.md)** - Docker, Kubernetes, and production deployment guides
+- **[Troubleshooting](worker/troubleshooting.md)** - Common issues and solutions
+
+### [Worker API Integration](worker-api-integration.md)
+Documentation on the API-based thumbnail storage approach that eliminates filesystem permission issues.
+
 ## Sample Files
 
 ### sample-cube.obj
