@@ -5,11 +5,17 @@ Welcome to the Modelibr Backend API documentation. This API provides comprehensi
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [API Endpoints](#api-endpoints)
-3. [Common Response Formats](#common-response-formats)
-4. [Error Handling](#error-handling)
-5. [File Type Support](#file-type-support)
-6. [Validation Rules](#validation-rules)
+2. [Quick Links](#quick-links)
+3. [API Endpoints](#api-endpoints)
+4. [Common Response Formats](#common-response-formats)
+5. [Error Handling](#error-handling)
+6. [File Type Support](#file-type-support)
+7. [Validation Rules](#validation-rules)
+
+## Quick Links
+
+- **[API Overview](./API_OVERVIEW.md)** - Complete endpoint summary table
+- **[Quick Reference](./QUICK_REFERENCE.md)** - Quick reference guide with examples
 
 ## Overview
 
