@@ -17,6 +17,18 @@ The backend documentation includes:
 - Real-time updates with SignalR
 - Worker API for background jobs
 
+### Worker Service
+- **[Worker Service Documentation](worker/)** - Comprehensive worker service documentation
+- **[Worker API Integration](worker-api-integration.md)** - API-based thumbnail storage approach
+
+The worker service documentation includes:
+- **[Overview & Architecture](worker/index.md)** - Service architecture, technology stack, and processing pipeline
+- **[Files & Responsibilities](worker/files-and-responsibilities.md)** - Detailed documentation of all source files
+- **[Service Communication](worker/service-communication.md)** - SignalR and HTTP API integration
+- **[Configuration](worker/configuration.md)** - Complete environment variable reference
+- **[Deployment](worker/deployment.md)** - Docker, Kubernetes, and production deployment guides
+- **[Troubleshooting](worker/troubleshooting.md)** - Common issues and solutions
+
 ## Sample Files
 
 ### sample-cube.obj
