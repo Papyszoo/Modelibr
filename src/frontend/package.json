@@ -13,7 +13,9 @@
     "preview": "vite preview",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@microsoft/signalr": "^8.0.11",
@@ -53,6 +55,10 @@
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.4",
     "typescript": "^5.9.2",
-    "vite": "^7.1.6"
+    "vite": "^7.1.6",
+    "storybook": "^9.1.10",
+    "@storybook/react-vite": "^9.1.10",
+    "@storybook/addon-docs": "^9.1.10",
+    "@storybook/addon-onboarding": "^9.1.10"
   }
 }
