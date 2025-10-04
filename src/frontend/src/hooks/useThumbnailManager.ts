@@ -69,7 +69,7 @@ export function useThumbnailManager(modelId) {
           setThumbnailStatus({
             Status: notification.Status,
             FileUrl: notification.ThumbnailUrl,
-            // Add other fields as needed
+            ErrorMessage: notification.ErrorMessage,
             ProcessedAt: notification.Timestamp,
           })
         }
@@ -110,16 +110,30 @@ export function useThumbnailManager(modelId) {
       console.log('SignalR connected and joined model group:', modelId)
 
       // Fetch initial thumbnail status
-      await fetchThumbnailStatus()
+      try {
+        const response = await ApiClient.getThumbnailStatus(modelId)
+        if (mountedRef.current) {
+          setThumbnailStatus(response)
+        }
+      } catch (err) {
+        console.error('Failed to fetch initial thumbnail status:', err)
+      }
     } catch (err) {
       console.error('SignalR connection failed:', err)
       if (mountedRef.current) {
         setError(`Failed to connect to real-time updates: ${err.message}`)
         // Fall back to initial fetch
-        await fetchThumbnailStatus()
+        try {
+          const response = await ApiClient.getThumbnailStatus(modelId)
+          if (mountedRef.current) {
+            setThumbnailStatus(response)
+          }
+        } catch (fetchErr) {
+          console.error('Fallback fetch also failed:', fetchErr)
+        }
       }
     }
-  }, [modelId, getSignalRUrl, fetchThumbnailStatus])
+  }, [modelId, getSignalRUrl])
 
   // Clean up connection
   const cleanupConnection = useCallback(async () => {
@@ -149,21 +163,17 @@ export function useThumbnailManager(modelId) {
 
       await ApiClient.regenerateThumbnail(modelId)
 
-      // Update status to Pending - SignalR will update us with new status
-      setThumbnailStatus(prev => prev ? { ...prev, Status: 'Pending' } : { Status: 'Pending' })
-      
-      // Fetch the updated status after a brief delay to confirm
-      setTimeout(() => {
-        if (mountedRef.current) {
-          fetchThumbnailStatus()
-        }
-      }, 500)
+      // Update status to Pending - SignalR will update us with the actual status
+      setThumbnailStatus(prev => ({ 
+        ...prev,
+        Status: 'Pending'
+      }))
     } catch (err) {
       setError(`Failed to regenerate thumbnail: ${err.message}`)
     } finally {
       setIsLoading(false)
     }
-  }, [modelId, fetchThumbnailStatus])
+  }, [modelId])
 
   // Initialize connection when modelId changes
   useEffect(() => {
@@ -174,15 +184,15 @@ export function useThumbnailManager(modelId) {
     return () => {
       cleanupConnection()
     }
-  }, [modelId, initializeConnection, cleanupConnection])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelId])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       mountedRef.current = false
-      cleanupConnection()
     }
-  }, [cleanupConnection])
+  }, [])
 
   const isProcessing =
     thumbnailStatus?.Status === THUMBNAIL_STATUS.PROCESSING ||
