@@ -2,19 +2,32 @@
 
 This directory contains documentation and sample files for the Modelibr project.
 
-## Documentation
+## API Documentation
 
-### [Worker Service Documentation](worker/)
-Comprehensive documentation for the thumbnail worker service:
+### Backend API
+- **[Backend API Documentation](./backend/README.md)** - Complete REST API reference
+- **[Quick Reference](./backend/QUICK_REFERENCE.md)** - Quick API reference guide
+
+The backend documentation includes:
+- All API endpoints with detailed descriptions
+- Request/response examples in cURL, JavaScript, and Python
+- Authentication and authorization details
+- Error handling and status codes
+- File type support and validation rules
+- Real-time updates with SignalR
+- Worker API for background jobs
+
+### Worker Service
+- **[Worker Service Documentation](worker/)** - Comprehensive worker service documentation
+- **[Worker API Integration](worker-api-integration.md)** - API-based thumbnail storage approach
+
+The worker service documentation includes:
 - **[Overview & Architecture](worker/index.md)** - Service architecture, technology stack, and processing pipeline
 - **[Files & Responsibilities](worker/files-and-responsibilities.md)** - Detailed documentation of all source files
 - **[Service Communication](worker/service-communication.md)** - SignalR and HTTP API integration
 - **[Configuration](worker/configuration.md)** - Complete environment variable reference
 - **[Deployment](worker/deployment.md)** - Docker, Kubernetes, and production deployment guides
 - **[Troubleshooting](worker/troubleshooting.md)** - Common issues and solutions
-
-### [Worker API Integration](worker-api-integration.md)
-Documentation on the API-based thumbnail storage approach that eliminates filesystem permission issues.
 
 ## Sample Files
 
