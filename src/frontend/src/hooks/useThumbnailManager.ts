@@ -164,9 +164,9 @@ export function useThumbnailManager(modelId) {
       await ApiClient.regenerateThumbnail(modelId)
 
       // Update status to Pending - SignalR will update us with the actual status
-      setThumbnailStatus(prev => ({ 
+      setThumbnailStatus(prev => ({
         ...prev,
-        Status: 'Pending'
+        Status: 'Pending',
       }))
     } catch (err) {
       setError(`Failed to regenerate thumbnail: ${err.message}`)

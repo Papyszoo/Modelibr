@@ -70,10 +70,15 @@ function ThumbnailDisplay({
     // Show error state for failed thumbnails
     if (isFailed) {
       return (
-        <div className="thumbnail-error" aria-label="Thumbnail failed to generate">
+        <div
+          className="thumbnail-error"
+          aria-label="Thumbnail failed to generate"
+        >
           <i className="pi pi-exclamation-triangle" aria-hidden="true" />
           <span className="thumbnail-status-text">
-            {error || thumbnailStatus?.ErrorMessage || 'Thumbnail generation failed'}
+            {error ||
+              thumbnailStatus?.ErrorMessage ||
+              'Thumbnail generation failed'}
           </span>
           {showControls && (
             <button
@@ -123,7 +128,10 @@ function ThumbnailDisplay({
 
     // Default: show placeholder
     return (
-      <div className="thumbnail-placeholder" aria-label="No thumbnail available">
+      <div
+        className="thumbnail-placeholder"
+        aria-label="No thumbnail available"
+      >
         <i className="pi pi-image" aria-hidden="true" />
       </div>
     )
@@ -143,11 +151,7 @@ function ThumbnailDisplay({
   const combinedClassName =
     `thumbnail-display ${getSizeClass()} ${className}`.trim()
 
-  return (
-    <div className={combinedClassName}>
-      {renderContent()}
-    </div>
-  )
+  return <div className={combinedClassName}>{renderContent()}</div>
 }
 
 export default ThumbnailDisplay
