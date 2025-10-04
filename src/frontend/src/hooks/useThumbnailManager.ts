@@ -181,7 +181,13 @@ export function useThumbnailManager(modelId) {
     thumbnailStatus?.Status === THUMBNAIL_STATUS.PENDING
   const isReady = thumbnailStatus?.Status === THUMBNAIL_STATUS.READY
   const isFailed = thumbnailStatus?.Status === THUMBNAIL_STATUS.FAILED
-  const thumbnailUrl = isReady ? ApiClient.getThumbnailUrl(modelId) : null
+
+  // Prefer FileUrl from response, fall back to constructing URL if not available
+  const thumbnailUrl = isReady
+    ? thumbnailStatus?.FileUrl
+      ? `${ApiClient.getBaseURL()}${thumbnailStatus.FileUrl}`
+      : ApiClient.getThumbnailUrl(modelId)
+    : null
 
   return {
     thumbnailStatus,

@@ -2,10 +2,32 @@ import { renderHook } from '@testing-library/react'
 import { useThumbnailManager } from '../useThumbnailManager'
 import ApiClient from '../../services/ApiClient'
 
+// Mock SignalR
+jest.mock('@microsoft/signalr', () => ({
+  HubConnectionBuilder: jest.fn().mockImplementation(() => ({
+    withUrl: jest.fn().mockReturnThis(),
+    withAutomaticReconnect: jest.fn().mockReturnThis(),
+    configureLogging: jest.fn().mockReturnThis(),
+    build: jest.fn().mockReturnValue({
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      on: jest.fn(),
+      invoke: jest.fn().mockResolvedValue(undefined),
+      onclose: jest.fn(),
+      onreconnected: jest.fn(),
+      state: 'Connected',
+    }),
+  })),
+  LogLevel: {
+    Information: 'Information',
+  },
+}))
+
 // Mock ApiClient
 jest.mock('../../services/ApiClient', () => ({
   __esModule: true,
   default: {
+    getBaseURL: jest.fn(() => 'http://localhost:5009'),
     getThumbnailStatus: jest.fn(),
     getThumbnailUrl: jest.fn(),
     regenerateThumbnail: jest.fn(),
@@ -41,10 +63,11 @@ describe('useThumbnailManager', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     expect(result.current.isReady).toBe(true)
+    // Should use FileUrl from response, not call getThumbnailUrl
     expect(result.current.thumbnailUrl).toBe(
       'http://localhost:5009/models/123/thumbnail/file'
     )
-    expect(mockApiClient.getThumbnailUrl).toHaveBeenCalledWith('123')
+    expect(mockApiClient.getThumbnailUrl).not.toHaveBeenCalled()
   })
 
   it('does not generate thumbnail URL when status is not Ready', async () => {
