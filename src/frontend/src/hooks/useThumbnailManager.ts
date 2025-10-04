@@ -34,6 +34,7 @@ export function useThumbnailManager(modelId) {
 
       if (!mountedRef.current) return null
 
+      // Always update thumbnailStatus with the fetched data
       setThumbnailStatus(response)
       return response
     } catch (err) {
@@ -148,14 +149,21 @@ export function useThumbnailManager(modelId) {
 
       await ApiClient.regenerateThumbnail(modelId)
 
-      // Reset status - SignalR will update us with new status
-      setThumbnailStatus(null)
+      // Update status to Pending - SignalR will update us with new status
+      setThumbnailStatus(prev => prev ? { ...prev, Status: 'Pending' } : { Status: 'Pending' })
+      
+      // Fetch the updated status after a brief delay to confirm
+      setTimeout(() => {
+        if (mountedRef.current) {
+          fetchThumbnailStatus()
+        }
+      }, 500)
     } catch (err) {
       setError(`Failed to regenerate thumbnail: ${err.message}`)
     } finally {
       setIsLoading(false)
     }
-  }, [modelId])
+  }, [modelId, fetchThumbnailStatus])
 
   // Initialize connection when modelId changes
   useEffect(() => {
