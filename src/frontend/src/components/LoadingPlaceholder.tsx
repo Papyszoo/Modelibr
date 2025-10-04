@@ -1,4 +1,5 @@
 import { Text } from '@react-three/drei'
+import { JSX } from 'react'
 
 function LoadingPlaceholder(): JSX.Element {
   return (

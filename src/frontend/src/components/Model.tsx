@@ -7,8 +7,8 @@ import * as THREE from 'three'
 import LoadingPlaceholder from './LoadingPlaceholder'
 
 // Separate components for each model type to avoid conditional hooks
-function OBJModel({ modelUrl }) {
-  const meshRef = useRef()
+function OBJModel({ modelUrl }: { modelUrl: string }) {
+  const meshRef = useRef<THREE.Group>(null)
 
   // Rotate the model slowly
   useFrame(() => {
@@ -54,8 +54,8 @@ function OBJModel({ modelUrl }) {
   return <LoadingPlaceholder />
 }
 
-function GLTFModel({ modelUrl }) {
-  const meshRef = useRef()
+function GLTFModel({ modelUrl }: { modelUrl: string }) {
+  const meshRef = useRef<THREE.Group>(null)
 
   // Rotate the model slowly
   useFrame(() => {
