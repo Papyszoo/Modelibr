@@ -111,7 +111,7 @@ function ModelViewer({
         <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
           <Button
             icon="pi pi-info-circle"
-            className="p-button-rounded p-button-text viewer-control-btn"
+            className="p-button-rounded viewer-control-btn"
             onClick={() => openSidebar('info')}
             tooltip="Model Information"
             tooltipOptions={{
@@ -120,7 +120,7 @@ function ModelViewer({
           />
           <Button
             icon="pi pi-image"
-            className="p-button-rounded p-button-text viewer-control-btn"
+            className="p-button-rounded viewer-control-btn"
             onClick={() => openSidebar('thumbnail')}
             tooltip="Thumbnail Details"
             tooltipOptions={{

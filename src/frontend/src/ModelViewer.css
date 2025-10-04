@@ -325,16 +325,22 @@
 }
 
 .viewer-control-btn {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-  background: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  background: white !important;
   color: #3b82f6 !important;
   width: 3rem !important;
   height: 3rem !important;
+  border: none !important;
 }
 
 .viewer-control-btn:hover {
-  background: white !important;
-  transform: scale(1.05);
+  background: #f0f9ff !important;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.viewer-control-btn .pi {
+  font-size: 1.25rem !important;
 }
 
 /* Sidebar styling */
