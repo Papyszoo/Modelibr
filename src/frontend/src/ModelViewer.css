@@ -306,11 +306,6 @@
   position: relative;
 }
 
-.model-viewer-tab .viewer-info {
-  /* Hide the old viewer-info in tab mode since we use sidebar */
-  display: none;
-}
-
 /* Floating control buttons in 3D view */
 .viewer-controls {
   position: absolute;
@@ -331,6 +326,15 @@
 
 .viewer-control-btn {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #3b82f6 !important;
+  width: 3rem !important;
+  height: 3rem !important;
+}
+
+.viewer-control-btn:hover {
+  background: white !important;
+  transform: scale(1.05);
 }
 
 /* Sidebar styling */

@@ -28,9 +28,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return (
-          <ModelViewer modelId={tab.modelId} isTabContent={true} side={side} />
-        )
+        return <ModelViewer modelId={tab.modelId} side={side} />
 
       case 'texture':
         return <TextureList />

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
-import ModelInfo from './components/ModelInfo'
-import ThumbnailDisplay from './components/ThumbnailDisplay'
+import ModelInfoSidebar from './components/ModelInfoSidebar'
+import ThumbnailSidebar from './components/ThumbnailSidebar'
 import { getModelFileFormat, Model } from './utils/fileUtils'
 import ApiClient from './services/ApiClient'
 import { Button } from 'primereact/button'
@@ -10,35 +10,30 @@ import { Toast } from 'primereact/toast'
 import { Sidebar } from 'primereact/sidebar'
 import './ModelViewer.css'
 
+type SidebarContentType = 'info' | 'thumbnail'
+
 interface ModelViewerProps {
   model?: Model
   modelId?: string
-  onBack?: () => void
-  isTabContent?: boolean
   side?: 'left' | 'right'
 }
 
 function ModelViewer({
   model: propModel,
   modelId,
-  onBack,
-  isTabContent = false,
-  side,
+  side = 'left',
 }: ModelViewerProps): JSX.Element {
   const [error, setError] = useState<string>('')
   const [model, setModel] = useState<Model | null>(propModel || null)
   const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(false)
-  const [sidebarContent, setSidebarContent] = useState<'info' | 'thumbnail'>(
-    'info'
-  )
+  const [sidebarContent, setSidebarContent] =
+    useState<SidebarContentType>('info')
   const toast = useRef<Toast>(null)
 
   // Determine which side for sidebar positioning
-  // If side prop is provided, use it; otherwise default to 'left'
-  const tabSide = side || 'left'
-  const sidebarPosition = tabSide === 'left' ? 'right' : 'left'
-  const buttonPosition = tabSide === 'left' ? 'right' : 'left'
+  const sidebarPosition = side === 'left' ? 'right' : 'left'
+  const buttonPosition = side === 'left' ? 'right' : 'left'
 
   useEffect(() => {
     if (!propModel && modelId) {
@@ -80,7 +75,7 @@ function ModelViewer({
     }
   }
 
-  const openSidebar = (content: 'info' | 'thumbnail') => {
+  const openSidebar = (content: SidebarContentType) => {
     setSidebarContent(content)
     setSidebarVisible(true)
   }
@@ -98,58 +93,41 @@ function ModelViewer({
   }
 
   return (
-    <div className={`model-viewer ${isTabContent ? 'model-viewer-tab' : ''}`}>
+    <div className="model-viewer model-viewer-tab">
       <Toast ref={toast} />
 
-      {!isTabContent && (
-        <header className="viewer-header">
-          <button onClick={onBack} className="back-button">
-            ← Back to Models
-          </button>
-          <h1>3D Model Viewer</h1>
-          <div className="model-details">
-            <span className="model-id">Model #{model.id}</span>
-            <span className="model-format">{getModelFileFormat(model)}</span>
-          </div>
-        </header>
-      )}
-
-      {isTabContent && (
-        <header className="viewer-header-tab">
-          <h1>Model #{model.id}</h1>
-          <div className="model-info-summary">
-            <span className="model-format">{getModelFileFormat(model)}</span>
-            <span className="model-name">
-              {model.files?.[0]?.originalFileName || `Model ${model.id}`}
-            </span>
-          </div>
-        </header>
-      )}
+      <header className="viewer-header-tab">
+        <h1>Model #{model.id}</h1>
+        <div className="model-info-summary">
+          <span className="model-format">{getModelFileFormat(model)}</span>
+          <span className="model-name">
+            {model.files?.[0]?.originalFileName || `Model ${model.id}`}
+          </span>
+        </div>
+      </header>
 
       <div className="viewer-container">
-        {/* Floating action buttons for sidebar controls - only in tab mode */}
-        {isTabContent && (
-          <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
-            <Button
-              icon="pi pi-info-circle"
-              className="p-button-rounded p-button-info viewer-control-btn"
-              onClick={() => openSidebar('info')}
-              tooltip="Model Information"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
-            <Button
-              icon="pi pi-image"
-              className="p-button-rounded p-button-secondary viewer-control-btn"
-              onClick={() => openSidebar('thumbnail')}
-              tooltip="Thumbnail Details"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
-          </div>
-        )}
+        {/* Floating action buttons for sidebar controls */}
+        <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
+          <Button
+            icon="pi pi-info-circle"
+            className="p-button-rounded p-button-text viewer-control-btn"
+            onClick={() => openSidebar('info')}
+            tooltip="Model Information"
+            tooltipOptions={{
+              position: buttonPosition === 'left' ? 'right' : 'left',
+            }}
+          />
+          <Button
+            icon="pi pi-image"
+            className="p-button-rounded p-button-text viewer-control-btn"
+            onClick={() => openSidebar('thumbnail')}
+            tooltip="Thumbnail Details"
+            tooltipOptions={{
+              position: buttonPosition === 'left' ? 'right' : 'left',
+            }}
+          />
+        </div>
 
         {error ? (
           <div className="viewer-error">
@@ -176,77 +154,22 @@ function ModelViewer({
         )}
       </div>
 
-      {/* Sidebar for tab mode */}
-      {isTabContent && (
-        <Sidebar
-          visible={sidebarVisible}
-          position={sidebarPosition}
-          onHide={() => setSidebarVisible(false)}
-          className="model-viewer-sidebar"
-          style={{ width: '400px' }}
-        >
-          {sidebarContent === 'info' && (
-            <div className="sidebar-section">
-              <h2>Model Information</h2>
-              <ModelInfo model={model} />
-            </div>
-          )}
-          {sidebarContent === 'thumbnail' && (
-            <div className="sidebar-section">
-              <h2>Thumbnail Details</h2>
-              <div className="thumbnail-section">
-                <div className="thumbnail-header">
-                  <h3>Animated Thumbnail</h3>
-                  <Button
-                    icon="pi pi-refresh"
-                    label="Regenerate"
-                    className="p-button-sm p-button-outlined"
-                    onClick={handleRegenerateThumbnail}
-                    tooltip="Regenerate Thumbnail"
-                  />
-                </div>
-                <ThumbnailDisplay
-                  modelId={model.id}
-                  size="large"
-                  showAnimation={true}
-                  showControls={true}
-                  alt={`Animated thumbnail for ${model.files?.[0]?.originalFileName || `model ${model.id}`}`}
-                />
-              </div>
-            </div>
-          )}
-        </Sidebar>
-      )}
-
-      {/* Original layout for non-tab mode */}
-      {!isTabContent && (
-        <div className="viewer-info">
-          <div className="viewer-info-left">
-            <ModelInfo model={model} />
-          </div>
-          <div className="viewer-info-right">
-            <div className="thumbnail-section">
-              <div className="thumbnail-header">
-                <h3>Animated Thumbnail</h3>
-                <Button
-                  icon="pi pi-refresh"
-                  label="Regenerate"
-                  className="p-button-sm p-button-outlined"
-                  onClick={handleRegenerateThumbnail}
-                  tooltip="Regenerate Thumbnail"
-                />
-              </div>
-              <ThumbnailDisplay
-                modelId={model.id}
-                size="large"
-                showAnimation={true}
-                showControls={true}
-                alt={`Animated thumbnail for ${model.files?.[0]?.originalFileName || `model ${model.id}`}`}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Sidebar */}
+      <Sidebar
+        visible={sidebarVisible}
+        position={sidebarPosition}
+        onHide={() => setSidebarVisible(false)}
+        className="model-viewer-sidebar"
+        style={{ width: '400px' }}
+      >
+        {sidebarContent === 'info' && <ModelInfoSidebar model={model} />}
+        {sidebarContent === 'thumbnail' && (
+          <ThumbnailSidebar
+            model={model}
+            onRegenerate={handleRegenerateThumbnail}
+          />
+        )}
+      </Sidebar>
     </div>
   )
 }
