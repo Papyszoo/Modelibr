@@ -439,16 +439,6 @@ export class JobProcessor {
             )
             throw new Error(errorMsg)
           }
-
-          // Clean up temporary files if configured
-          if (config.encoding.cleanupTempFiles) {
-            await this.frameEncoder.cleanupEncodingResult(encodingResult)
-            jobLogger.info('Temporary encoding files cleaned up')
-          } else {
-            jobLogger.info('Temporary encoding files preserved', {
-              workingDir: encodingResult.workingDir,
-            })
-          }
         } else {
           const errorMsg =
             'Frame encoding is disabled - cannot generate thumbnails'

@@ -20,11 +20,13 @@ This test validates that the WebGL rendering fix is working correctly.
 ## Usage
 
 ### Run the test:
+
 ```bash
 xvfb-run -a -s "-screen 0 1280x1024x24" node test-webgl-context.js
 ```
 
 ### Expected output:
+
 ```
 Testing WebGL context creation...
 ✓ headless-gl context created successfully
@@ -42,17 +44,20 @@ Note: Shader warnings about WebGL 1.0 features are expected and can be ignored.
 ## Troubleshooting
 
 ### Error: "headless-gl context is null"
+
 - **Cause**: xvfb is not running or gl package isn't properly compiled
-- **Fix**: 
+- **Fix**:
   1. Make sure xvfb is installed: `apt-get install xvfb`
   2. Rebuild gl package: `npm rebuild gl`
   3. Run with xvfb: `xvfb-run -a -s "-screen 0 1280x1024x24" node test-webgl-context.js`
 
 ### Error: "Cannot find module 'gl'"
+
 - **Cause**: Dependencies not installed
 - **Fix**: Run `npm install`
 
 ### Shader warnings
+
 - **Message**: "ERROR: 0:2: 'version' : #version directive must occur before anything else"
 - **Cause**: WebGL 1 vs WebGL 2 shader differences
 - **Impact**: None - rendering still works correctly
@@ -72,6 +77,7 @@ Note: Shader warnings about WebGL 1.0 features are expected and can be ignored.
 ## Integration with worker service
 
 The same approach is used in `orbitFrameRenderer.js`:
+
 - headless-gl provides the WebGL context
 - webgl2-polyfill.js adds WebGL 2 compatibility
 - xvfb provides the virtual display (in Docker)
@@ -85,6 +91,7 @@ The same approach is used in `orbitFrameRenderer.js`:
 - Total test time: < 100ms
 
 The production worker renders:
+
 - 24 frames per model
 - 256x256 resolution
 - ~6ms per frame
