@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, JSX } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfoSidebar from './components/ModelInfoSidebar'
