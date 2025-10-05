@@ -77,7 +77,6 @@ export class ModelFileService {
    * @returns {Promise<{filePath: string, fileType: string, originalFileName: string}>} File information
    */
   async processFileResponse(response, modelId) {
-
     // Extract file information from response headers
     const contentDisposition = response.headers['content-disposition'] || ''
     const _contentType =
@@ -126,9 +125,11 @@ export class ModelFileService {
    */
   isFileNotFoundError(error) {
     const message = error.message.toLowerCase()
-    return message.includes('not found') || 
-           message.includes('404') ||
-           error.response?.status === 404
+    return (
+      message.includes('not found') ||
+      message.includes('404') ||
+      error.response?.status === 404
+    )
   }
 
   /**

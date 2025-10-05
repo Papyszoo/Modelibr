@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 import { createCanvas } from 'canvas'
+import createGl from 'gl'
 import { config } from './config.js'
 import logger from './logger.js'
+import { polyfillWebGL2 } from './webgl2-polyfill.js'
 
 /**
  * Service for rendering orbit animation frames using three.js
@@ -29,32 +31,72 @@ export class OrbitFrameRenderer {
       1000 // far plane
     )
 
-    // Create canvas for headless rendering
-    const canvas = createCanvas(
-      config.rendering.outputWidth,
-      config.rendering.outputHeight
-    )
-    
+    // Create WebGL context using headless-gl
+    const width = config.rendering.outputWidth
+    const height = config.rendering.outputHeight
+    let glContext = createGl(width, height, {
+      preserveDrawingBuffer: true,
+      antialias: config.rendering.enableAntialiasing,
+      alpha: true,
+    })
+
+    // Verify context was created
+    if (!glContext) {
+      throw new Error(
+        'Failed to create WebGL context with headless-gl. ' +
+          'Ensure the worker is running with xvfb-run and Mesa libraries are installed.'
+      )
+    }
+
+    // Add WebGL 2 API polyfill for THREE.js r180 compatibility
+    glContext = polyfillWebGL2(glContext)
+    logger.debug('WebGL 1 context created with WebGL 2 polyfill')
+
+    // Create canvas for compatibility (some THREE.js features expect it)
+    const canvas = createCanvas(width, height)
+
+    // Attach the WebGL context to the canvas
+    // Return the same context for both webgl and webgl2 requests
+    canvas.getContext = type => {
+      if (
+        type === 'webgl2' ||
+        type === 'webgl' ||
+        type === 'experimental-webgl'
+      ) {
+        return glContext
+      }
+      return null
+    }
+
     // Add DOM-like event methods that THREE.js expects
-    // node-canvas doesn't have these, so we add no-op implementations
     canvas.addEventListener = canvas.addEventListener || (() => {})
     canvas.removeEventListener = canvas.removeEventListener || (() => {})
-    
-    // Create WebGL renderer using the canvas
+
+    // Add width/height properties that THREE.js expects
+    canvas.width = width
+    canvas.height = height
+
+    // Add style object that THREE.js setSize might use
+    canvas.style = canvas.style || {}
+
+    // Create WebGL renderer using the canvas with WebGL context
     this.renderer = new THREE.WebGLRenderer({
       canvas: canvas,
       antialias: config.rendering.enableAntialiasing,
       alpha: true,
       preserveDrawingBuffer: true, // Required for reading pixels
     })
-    
+
     this.renderer.setSize(
       config.rendering.outputWidth,
       config.rendering.outputHeight
     )
-    
+
     // Set background color
-    const bgColor = parseInt(config.rendering.backgroundColor.replace('#', ''), 16)
+    const bgColor = parseInt(
+      config.rendering.backgroundColor.replace('#', ''),
+      16
+    )
     this.renderer.setClearColor(bgColor, 1)
 
     // Setup lighting to match frontend Scene.jsx
@@ -224,7 +266,7 @@ export class OrbitFrameRenderer {
     const width = config.rendering.outputWidth
     const height = config.rendering.outputHeight
     const pixels = new Uint8Array(width * height * 4) // RGBA
-    
+
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
 
     // Flip pixels vertically (WebGL has origin at bottom-left, we need top-left)

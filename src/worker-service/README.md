@@ -189,6 +189,7 @@ The worker service integrates with the existing Modelibr architecture:
 The worker service logs detailed events to the database for complete audit trail:
 
 **Event Types Logged:**
+
 - `JobStarted` - Thumbnail generation initiated
 - `ModelDownloadStarted` / `ModelDownloaded` - Model file download progress
 - `ModelLoadingStarted` / `ModelLoaded` - 3D model loading and parsing
@@ -199,6 +200,7 @@ The worker service logs detailed events to the database for complete audit trail
 - `JobFailed` - Job failure with error details
 
 Each event includes:
+
 - Event type and message
 - Timestamp
 - Optional metadata (JSON)
