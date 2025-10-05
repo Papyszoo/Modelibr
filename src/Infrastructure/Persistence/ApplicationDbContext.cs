@@ -12,6 +12,7 @@ namespace Infrastructure.Persistence
         public DbSet<TexturePack> TexturePacks => Set<TexturePack>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
+        public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -146,6 +147,27 @@ namespace Infrastructure.Persistence
                 entity.HasOne(tj => tj.Model)
                     .WithMany()
                     .HasForeignKey(tj => tj.ModelId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure ThumbnailJobEvent entity
+            modelBuilder.Entity<ThumbnailJobEvent>(entity =>
+            {
+                entity.HasKey(tje => tje.Id);
+                entity.Property(tje => tje.ThumbnailJobId).IsRequired();
+                entity.Property(tje => tje.EventType).IsRequired().HasMaxLength(100);
+                entity.Property(tje => tje.Message).IsRequired().HasMaxLength(1000);
+                entity.Property(tje => tje.Metadata).HasMaxLength(4000);
+                entity.Property(tje => tje.ErrorMessage).HasMaxLength(2000);
+                entity.Property(tje => tje.OccurredAt).IsRequired();
+
+                // Create index for efficient querying by job and time
+                entity.HasIndex(tje => new { tje.ThumbnailJobId, tje.OccurredAt });
+
+                // Configure relationship with ThumbnailJob
+                entity.HasOne(tje => tje.ThumbnailJob)
+                    .WithMany()
+                    .HasForeignKey(tje => tje.ThumbnailJobId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
