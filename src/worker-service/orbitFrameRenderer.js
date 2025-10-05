@@ -76,6 +76,9 @@ export class OrbitFrameRenderer {
     canvas.width = width
     canvas.height = height
 
+    // Add style object that THREE.js setSize might use
+    canvas.style = canvas.style || {}
+
     // Create WebGL renderer using the canvas with WebGL context
     this.renderer = new THREE.WebGLRenderer({
       canvas: canvas,
