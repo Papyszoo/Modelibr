@@ -29,11 +29,7 @@ export default function ModelsDataTable({
   // Template functions for DataTable columns
   const thumbnailBodyTemplate = (rowData: Model) => {
     return (
-      <ThumbnailDisplay
-        modelId={rowData.id}
-        size="small"
-        alt={`Thumbnail for ${rowData.files?.[0]?.originalFileName || `model ${rowData.id}`}`}
-      />
+      <ThumbnailDisplay modelId={rowData.id} />
     )
   }
 

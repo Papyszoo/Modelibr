@@ -25,13 +25,7 @@ function ThumbnailSidebar({
             tooltip="Regenerate Thumbnail"
           />
         </div>
-        <ThumbnailDisplay
-          modelId={model.id}
-          size="large"
-          showAnimation={true}
-          showControls={true}
-          alt={`Animated thumbnail for ${model.files?.[0]?.originalFileName || `model ${model.id}`}`}
-        />
+        <ThumbnailDisplay modelId={model.id} />
       </div>
     </div>
   )
