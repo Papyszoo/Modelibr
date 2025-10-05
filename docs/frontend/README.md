@@ -30,7 +30,6 @@ The Modelibr frontend is built with React, TypeScript, and Three.js. It follows 
 Custom React hooks that encapsulate reusable stateful logic.
 
 - [useFileUpload](./hooks/useFileUpload.md) - File upload handling with validation and progress tracking
-- [useThumbnailManager](./hooks/useThumbnailManager.md) - Thumbnail generation and status management with SignalR
 - [useTabContext](./hooks/useTabContext.md) - Tab management within the dock panel system
 - [useTexturePacks](./hooks/useTexturePacks.md) - Texture pack CRUD operations
 - [useGlobalDragPrevention](./hooks/useGlobalDragPrevention.md) - Global drag and drop prevention
