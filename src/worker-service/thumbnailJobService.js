@@ -76,9 +76,15 @@ export class ThumbnailJobService {
         width: thumbnailMetadata?.width || 256,
         height: thumbnailMetadata?.height || 256,
       }
-      
-      await this.apiClient.post(`/api/thumbnail-jobs/${jobId}/complete`, requestData)
-      logger.info('Marked job as completed', { jobId, thumbnailMetadata: requestData })
+
+      await this.apiClient.post(
+        `/api/thumbnail-jobs/${jobId}/complete`,
+        requestData
+      )
+      logger.info('Marked job as completed', {
+        jobId,
+        thumbnailMetadata: requestData,
+      })
     } catch (error) {
       logger.error('Failed to mark job as completed', {
         jobId,

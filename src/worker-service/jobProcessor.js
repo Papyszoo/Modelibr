@@ -137,18 +137,22 @@ export class JobProcessor {
 
     try {
       jobLogger.info('Starting thumbnail generation')
-      
+
       // Log job started event
-      await this.jobEventService.logJobStarted(job.id, job.modelId, job.modelHash)
+      await this.jobEventService.logJobStarted(
+        job.id,
+        job.modelId,
+        job.modelHash
+      )
 
       // Process the model and get thumbnail metadata
       const thumbnailMetadata = await this.processModel(job, jobLogger)
 
       await this.jobService.markJobCompleted(job.id, thumbnailMetadata)
-      
+
       // Log job completed event
       await this.jobEventService.logJobCompleted(job.id, thumbnailMetadata)
-      
+
       jobLogger.info('Thumbnail generation completed successfully')
     } catch (error) {
       jobLogger.error('Thumbnail generation failed', {
@@ -157,7 +161,11 @@ export class JobProcessor {
       })
 
       // Log job failed event
-      await this.jobEventService.logJobFailed(job.id, error.message, error.stack)
+      await this.jobEventService.logJobFailed(
+        job.id,
+        error.message,
+        error.stack
+      )
 
       try {
         await this.jobService.markJobFailed(job.id, error.message)
@@ -204,7 +212,9 @@ export class JobProcessor {
         // Update thumbnail metadata if needed (thumbnails exist but job was still created)
         // This can happen in edge cases where job was queued before thumbnails were stored
         // For existing thumbnails, we need to provide default metadata since we can't complete without it
-        jobLogger.warn('Thumbnails already exist, providing default metadata for job completion')
+        jobLogger.warn(
+          'Thumbnails already exist, providing default metadata for job completion'
+        )
         return {
           thumbnailPath: existingThumbnails.paths?.webpPath || '/default/path',
           sizeBytes: 0,
@@ -216,7 +226,7 @@ export class JobProcessor {
       // Step 2: Fetch the model file
       jobLogger.info('Fetching model file from API')
       await this.jobEventService.logModelDownloadStarted(job.id, job.modelId)
-      
+
       const fileInfo = await this.modelFileService.fetchModelFile(job.modelId)
       tempFilePath = fileInfo.filePath
 
@@ -225,18 +235,21 @@ export class JobProcessor {
         fileType: fileInfo.fileType,
         filePath: fileInfo.filePath,
       })
-      
+
       await this.jobEventService.logModelDownloaded(
-        job.id, 
-        job.modelId, 
-        fileInfo.fileType, 
+        job.id,
+        job.modelId,
+        fileInfo.fileType,
         fileInfo.filePath
       )
 
       // Step 3: Load and normalize the model
       jobLogger.info('Loading and normalizing model')
-      await this.jobEventService.logModelLoadingStarted(job.id, fileInfo.fileType)
-      
+      await this.jobEventService.logModelLoadingStarted(
+        job.id,
+        fileInfo.fileType
+      )
+
       const model = await this.modelLoaderService.loadModel(
         fileInfo.filePath,
         fileInfo.fileType
@@ -247,8 +260,12 @@ export class JobProcessor {
         polygonCount,
         fileType: fileInfo.fileType,
       })
-      
-      await this.jobEventService.logModelLoaded(job.id, polygonCount, fileInfo.fileType)
+
+      await this.jobEventService.logModelLoaded(
+        job.id,
+        polygonCount,
+        fileInfo.fileType
+      )
 
       // Step 4: Generate orbit frames using three.js renderer
       if (config.orbit.enabled) {
@@ -262,14 +279,18 @@ export class JobProcessor {
         // Calculate frame count for logging
         const angleRange = config.orbit.endAngle - config.orbit.startAngle
         const frameCount = Math.ceil(angleRange / config.orbit.angleStep)
-        
-        await this.jobEventService.logFrameRenderingStarted(job.id, frameCount, {
-          outputWidth: config.rendering.outputWidth,
-          outputHeight: config.rendering.outputHeight,
-          orbitAngleStep: config.orbit.angleStep,
-          orbitStartAngle: config.orbit.startAngle,
-          orbitEndAngle: config.orbit.endAngle,
-        })
+
+        await this.jobEventService.logFrameRenderingStarted(
+          job.id,
+          frameCount,
+          {
+            outputWidth: config.rendering.outputWidth,
+            outputHeight: config.rendering.outputHeight,
+            orbitAngleStep: config.orbit.angleStep,
+            orbitStartAngle: config.orbit.startAngle,
+            orbitEndAngle: config.orbit.endAngle,
+          }
+        )
 
         // Render orbit frames
         const frames = await this.orbitRenderer.renderOrbitFrames(
@@ -294,11 +315,11 @@ export class JobProcessor {
             normalizedScale: config.modelProcessing.normalizedScale,
           },
         })
-        
+
         const renderTime = Date.now() - Date.now() // Approximate
         await this.jobEventService.logFrameRenderingCompleted(
-          job.id, 
-          frames.length, 
+          job.id,
+          frames.length,
           renderTime
         )
 
@@ -330,7 +351,7 @@ export class JobProcessor {
             encodeTimeMs: encodingResult.encodeTimeMs,
             frameCount: encodingResult.frameCount,
           })
-          
+
           await this.jobEventService.logEncodingCompleted(
             job.id,
             encodingResult.webpPath,
@@ -341,7 +362,10 @@ export class JobProcessor {
           // Step 6: Store thumbnails via API upload
           if (this.thumbnailStorage.enabled) {
             jobLogger.info('Uploading thumbnails to API')
-            await this.jobEventService.logThumbnailUploadStarted(job.id, job.modelHash)
+            await this.jobEventService.logThumbnailUploadStarted(
+              job.id,
+              job.modelHash
+            )
 
             const storageResult = await this.thumbnailStorage.storeThumbnails(
               job.modelHash,
@@ -357,24 +381,32 @@ export class JobProcessor {
               uploadResults: storageResult.uploadResults?.length || 0,
               allSuccessful: storageResult.apiResponse?.allSuccessful,
             })
-            
+
             await this.jobEventService.logThumbnailUploadCompleted(
-              job.id, 
+              job.id,
               storageResult.uploadResults
             )
 
             // Extract thumbnail metadata from successful upload for job completion
-            if (storageResult.stored && storageResult.uploadResults?.length > 0) {
-              const successfulUpload = storageResult.uploadResults.find(upload => upload.success && upload.data)
+            if (
+              storageResult.stored &&
+              storageResult.uploadResults?.length > 0
+            ) {
+              const successfulUpload = storageResult.uploadResults.find(
+                upload => upload.success && upload.data
+              )
               if (successfulUpload && successfulUpload.data) {
                 const thumbnailData = successfulUpload.data
-                jobLogger.info('Extracted thumbnail metadata for job completion', {
-                  thumbnailPath: thumbnailData.thumbnailPath,
-                  sizeBytes: thumbnailData.sizeBytes,
-                  width: thumbnailData.width,
-                  height: thumbnailData.height,
-                })
-                
+                jobLogger.info(
+                  'Extracted thumbnail metadata for job completion',
+                  {
+                    thumbnailPath: thumbnailData.thumbnailPath,
+                    sizeBytes: thumbnailData.sizeBytes,
+                    width: thumbnailData.width,
+                    height: thumbnailData.height,
+                  }
+                )
+
                 return {
                   thumbnailPath: thumbnailData.thumbnailPath,
                   sizeBytes: thumbnailData.sizeBytes,
@@ -383,16 +415,28 @@ export class JobProcessor {
                 }
               }
             }
-            
+
             // If upload failed, throw error instead of returning default metadata
-            const errorMsg = 'Thumbnail upload failed - no valid thumbnail data available'
+            const errorMsg =
+              'Thumbnail upload failed - no valid thumbnail data available'
             jobLogger.error(errorMsg)
-            await this.jobEventService.logError(job.id, 'ThumbnailUploadFailed', errorMsg, new Error(errorMsg))
+            await this.jobEventService.logError(
+              job.id,
+              'ThumbnailUploadFailed',
+              errorMsg,
+              new Error(errorMsg)
+            )
             throw new Error(errorMsg)
           } else {
-            const errorMsg = 'Persistent thumbnail storage is disabled - cannot complete job'
+            const errorMsg =
+              'Persistent thumbnail storage is disabled - cannot complete job'
             jobLogger.error(errorMsg)
-            await this.jobEventService.logError(job.id, 'StorageDisabled', errorMsg, new Error(errorMsg))
+            await this.jobEventService.logError(
+              job.id,
+              'StorageDisabled',
+              errorMsg,
+              new Error(errorMsg)
+            )
             throw new Error(errorMsg)
           }
 
@@ -406,15 +450,27 @@ export class JobProcessor {
             })
           }
         } else {
-          const errorMsg = 'Frame encoding is disabled - cannot generate thumbnails'
+          const errorMsg =
+            'Frame encoding is disabled - cannot generate thumbnails'
           jobLogger.error(errorMsg)
-          await this.jobEventService.logError(job.id, 'EncodingDisabled', errorMsg, new Error(errorMsg))
+          await this.jobEventService.logError(
+            job.id,
+            'EncodingDisabled',
+            errorMsg,
+            new Error(errorMsg)
+          )
           throw new Error(errorMsg)
         }
       } else {
-        const errorMsg = 'Orbit rendering is disabled - cannot generate thumbnails'
+        const errorMsg =
+          'Orbit rendering is disabled - cannot generate thumbnails'
         jobLogger.error(errorMsg)
-        await this.jobEventService.logError(job.id, 'RenderingDisabled', errorMsg, new Error(errorMsg))
+        await this.jobEventService.logError(
+          job.id,
+          'RenderingDisabled',
+          errorMsg,
+          new Error(errorMsg)
+        )
         throw new Error(errorMsg)
       }
     } catch (error) {
