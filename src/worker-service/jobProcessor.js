@@ -5,6 +5,7 @@ import { ModelLoaderService } from './modelLoaderService.js'
 import { OrbitFrameRenderer } from './orbitFrameRenderer.js'
 import { FrameEncoderService } from './frameEncoderService.js'
 import { ThumbnailStorageService } from './thumbnailStorageService.js'
+import { JobEventService } from './jobEventService.js'
 import { config } from './config.js'
 import logger, { withJobContext } from './logger.js'
 
@@ -18,6 +19,7 @@ export class JobProcessor {
     this.modelFileService = new ModelFileService()
     this.modelLoaderService = new ModelLoaderService()
     this.thumbnailStorage = new ThumbnailStorageService()
+    this.jobEventService = new JobEventService()
     this.orbitRenderer = null // Will be initialized when needed
     this.frameEncoder = null // Will be initialized when needed
     this.isShuttingDown = false
@@ -135,17 +137,27 @@ export class JobProcessor {
 
     try {
       jobLogger.info('Starting thumbnail generation')
+      
+      // Log job started event
+      await this.jobEventService.logJobStarted(job.id, job.modelId, job.modelHash)
 
       // Process the model and get thumbnail metadata
       const thumbnailMetadata = await this.processModel(job, jobLogger)
 
       await this.jobService.markJobCompleted(job.id, thumbnailMetadata)
+      
+      // Log job completed event
+      await this.jobEventService.logJobCompleted(job.id, thumbnailMetadata)
+      
       jobLogger.info('Thumbnail generation completed successfully')
     } catch (error) {
       jobLogger.error('Thumbnail generation failed', {
         error: error.message,
         stack: error.stack,
       })
+
+      // Log job failed event
+      await this.jobEventService.logJobFailed(job.id, error.message, error.stack)
 
       try {
         await this.jobService.markJobFailed(job.id, error.message)
@@ -203,6 +215,8 @@ export class JobProcessor {
 
       // Step 2: Fetch the model file
       jobLogger.info('Fetching model file from API')
+      await this.jobEventService.logModelDownloadStarted(job.id, job.modelId)
+      
       const fileInfo = await this.modelFileService.fetchModelFile(job.modelId)
       tempFilePath = fileInfo.filePath
 
@@ -211,9 +225,18 @@ export class JobProcessor {
         fileType: fileInfo.fileType,
         filePath: fileInfo.filePath,
       })
+      
+      await this.jobEventService.logModelDownloaded(
+        job.id, 
+        job.modelId, 
+        fileInfo.fileType, 
+        fileInfo.filePath
+      )
 
       // Step 3: Load and normalize the model
       jobLogger.info('Loading and normalizing model')
+      await this.jobEventService.logModelLoadingStarted(job.id, fileInfo.fileType)
+      
       const model = await this.modelLoaderService.loadModel(
         fileInfo.filePath,
         fileInfo.fileType
@@ -224,6 +247,8 @@ export class JobProcessor {
         polygonCount,
         fileType: fileInfo.fileType,
       })
+      
+      await this.jobEventService.logModelLoaded(job.id, polygonCount, fileInfo.fileType)
 
       // Step 4: Generate orbit frames using three.js renderer
       if (config.orbit.enabled) {
@@ -233,6 +258,18 @@ export class JobProcessor {
         if (!this.orbitRenderer) {
           this.orbitRenderer = new OrbitFrameRenderer()
         }
+
+        // Calculate frame count for logging
+        const angleRange = config.orbit.endAngle - config.orbit.startAngle
+        const frameCount = Math.ceil(angleRange / config.orbit.angleStep)
+        
+        await this.jobEventService.logFrameRenderingStarted(job.id, frameCount, {
+          outputWidth: config.rendering.outputWidth,
+          outputHeight: config.rendering.outputHeight,
+          orbitAngleStep: config.orbit.angleStep,
+          orbitStartAngle: config.orbit.startAngle,
+          orbitEndAngle: config.orbit.endAngle,
+        })
 
         // Render orbit frames
         const frames = await this.orbitRenderer.renderOrbitFrames(
@@ -257,6 +294,13 @@ export class JobProcessor {
             normalizedScale: config.modelProcessing.normalizedScale,
           },
         })
+        
+        const renderTime = Date.now() - Date.now() // Approximate
+        await this.jobEventService.logFrameRenderingCompleted(
+          job.id, 
+          frames.length, 
+          renderTime
+        )
 
         // Note: Frames are stored in memory for processing
         jobLogger.info('Frames stored in memory for processing', {
@@ -267,6 +311,7 @@ export class JobProcessor {
         // Step 5: Encode frames into animated WebP and poster if enabled
         if (config.encoding.enabled) {
           jobLogger.info('Starting frame encoding')
+          await this.jobEventService.logEncodingStarted(job.id, frames.length)
 
           // Initialize frame encoder if not already done
           if (!this.frameEncoder) {
@@ -285,10 +330,18 @@ export class JobProcessor {
             encodeTimeMs: encodingResult.encodeTimeMs,
             frameCount: encodingResult.frameCount,
           })
+          
+          await this.jobEventService.logEncodingCompleted(
+            job.id,
+            encodingResult.webpPath,
+            encodingResult.posterPath,
+            encodingResult.encodeTimeMs
+          )
 
           // Step 6: Store thumbnails via API upload
           if (this.thumbnailStorage.enabled) {
             jobLogger.info('Uploading thumbnails to API')
+            await this.jobEventService.logThumbnailUploadStarted(job.id, job.modelHash)
 
             const storageResult = await this.thumbnailStorage.storeThumbnails(
               job.modelHash,
@@ -304,6 +357,11 @@ export class JobProcessor {
               uploadResults: storageResult.uploadResults?.length || 0,
               allSuccessful: storageResult.apiResponse?.allSuccessful,
             })
+            
+            await this.jobEventService.logThumbnailUploadCompleted(
+              job.id, 
+              storageResult.uploadResults
+            )
 
             // Extract thumbnail metadata from successful upload for job completion
             if (storageResult.stored && storageResult.uploadResults?.length > 0) {
@@ -326,23 +384,16 @@ export class JobProcessor {
               }
             }
             
-            // If upload failed or no metadata available, return default metadata
-            jobLogger.warn('Thumbnail upload failed or no metadata available, using default values')
-            return {
-              thumbnailPath: encodingResult.webpPath || encodingResult.posterPath || '/default/path',
-              sizeBytes: 0,
-              width: 256,
-              height: 256,
-            }
+            // If upload failed, throw error instead of returning default metadata
+            const errorMsg = 'Thumbnail upload failed - no valid thumbnail data available'
+            jobLogger.error(errorMsg)
+            await this.jobEventService.logError(job.id, 'ThumbnailUploadFailed', errorMsg, new Error(errorMsg))
+            throw new Error(errorMsg)
           } else {
-            jobLogger.info('Persistent thumbnail storage disabled')
-            // Return default metadata when storage is disabled but encoding succeeded
-            return {
-              thumbnailPath: encodingResult.webpPath || encodingResult.posterPath || '/default/path',
-              sizeBytes: 0,
-              width: 256,
-              height: 256,
-            }
+            const errorMsg = 'Persistent thumbnail storage is disabled - cannot complete job'
+            jobLogger.error(errorMsg)
+            await this.jobEventService.logError(job.id, 'StorageDisabled', errorMsg, new Error(errorMsg))
+            throw new Error(errorMsg)
           }
 
           // Clean up temporary files if configured
@@ -355,36 +406,16 @@ export class JobProcessor {
             })
           }
         } else {
-          jobLogger.info(
-            'Frame encoding disabled, skipping WebP and poster generation'
-          )
-          // Return default metadata when encoding is disabled
-          return {
-            thumbnailPath: '/default/path',
-            sizeBytes: 0,
-            width: 256,
-            height: 256,
-          }
+          const errorMsg = 'Frame encoding is disabled - cannot generate thumbnails'
+          jobLogger.error(errorMsg)
+          await this.jobEventService.logError(job.id, 'EncodingDisabled', errorMsg, new Error(errorMsg))
+          throw new Error(errorMsg)
         }
       } else {
-        // Fall back to simple processing log
-        jobLogger.info('Orbit rendering disabled, model processing completed', {
-          polygonCount,
-          processingConfig: {
-            outputWidth: config.rendering.outputWidth,
-            outputHeight: config.rendering.outputHeight,
-            outputFormat: config.rendering.outputFormat,
-            maxPolygonCount: config.modelProcessing.maxPolygonCount,
-            normalizedScale: config.modelProcessing.normalizedScale,
-          },
-        })
-        // Return default metadata when orbit rendering is disabled
-        return {
-          thumbnailPath: '/default/path',
-          sizeBytes: 0,
-          width: 256,
-          height: 256,
-        }
+        const errorMsg = 'Orbit rendering is disabled - cannot generate thumbnails'
+        jobLogger.error(errorMsg)
+        await this.jobEventService.logError(job.id, 'RenderingDisabled', errorMsg, new Error(errorMsg))
+        throw new Error(errorMsg)
       }
     } catch (error) {
       jobLogger.error('Model processing failed', {
