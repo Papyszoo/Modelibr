@@ -35,6 +35,11 @@ export class OrbitFrameRenderer {
       config.rendering.outputHeight
     )
     
+    // Add DOM-like event methods that THREE.js expects
+    // node-canvas doesn't have these, so we add no-op implementations
+    canvas.addEventListener = canvas.addEventListener || (() => {})
+    canvas.removeEventListener = canvas.removeEventListener || (() => {})
+    
     // Create WebGL renderer using the canvas
     this.renderer = new THREE.WebGLRenderer({
       canvas: canvas,
