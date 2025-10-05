@@ -114,25 +114,23 @@ export class FrameEncoderService {
       const fileName = `frame_${String(i).padStart(4, '0')}.png`
       const filePath = path.join(workingDir, fileName)
 
-      // For the simulated implementation, create a placeholder PNG
-      // In a real implementation, this would use the actual pixel data from frame.pixels
-      if (frame.simulated) {
-        // Create a simple colored image as placeholder
-        const buffer = await this.createPlaceholderImage(
-          frame.width,
-          frame.height,
-          frame.angle
-        )
-        fs.writeFileSync(filePath, buffer)
+      // Check if frame has actual pixel data
+      if (frame.pixels && frame.pixels.length > 0) {
+        // Convert RGBA buffer to PNG using Sharp
+        await sharp(frame.pixels, {
+          raw: {
+            width: frame.width,
+            height: frame.height,
+            channels: 4, // RGBA
+          },
+        })
+          .png()
+          .toFile(filePath)
       } else {
-        // Real implementation would convert frame.pixels (RGBA buffer) to PNG
-        // For now, create placeholder
-        const buffer = await this.createPlaceholderImage(
-          frame.width,
-          frame.height,
-          frame.angle
+        // If no pixel data, fail with error instead of creating placeholder
+        throw new Error(
+          `Frame ${i} has no pixel data - cannot generate thumbnail without actual rendering`
         )
-        fs.writeFileSync(filePath, buffer)
       }
 
       pngFiles.push(filePath)
@@ -147,38 +145,6 @@ export class FrameEncoderService {
     }
 
     return pngFiles
-  }
-
-  /**
-   * Create a placeholder image for simulated frames
-   * @param {number} width - Image width
-   * @param {number} height - Image height
-   * @param {number} angle - Rotation angle for visual variation
-   * @returns {Promise<Buffer>} PNG image buffer
-   */
-  async createPlaceholderImage(width, height, angle) {
-    // Create a gradient image with angle-based color variation
-    const hue = Math.floor((angle / 360) * 360) // Convert angle to hue
-    const color = `hsl(${hue}, 70%, 50%)`
-
-    // Create a simple gradient image using Sharp
-    const svg = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="grad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#444444;stop-opacity:1" />
-          </radialGradient>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grad)" />
-        <text x="50%" y="50%" text-anchor="middle" dy="0.3em" 
-              font-family="Arial" font-size="16" fill="white">
-          Frame ${Math.floor(angle)}°
-        </text>
-      </svg>
-    `
-
-    return await sharp(Buffer.from(svg)).png().toBuffer()
   }
 
   /**

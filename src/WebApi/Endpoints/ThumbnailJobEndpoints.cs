@@ -67,6 +67,32 @@ public static class ThumbnailJobEndpoints
         .WithName("Complete Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
+        app.MapPost("/api/thumbnail-jobs/{jobId:int}/events", async (
+            int jobId,
+            [FromBody] LogJobEventRequest request,
+            ICommandHandler<LogThumbnailJobEventCommand, LogThumbnailJobEventResponse> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(new LogThumbnailJobEventCommand(
+                jobId,
+                request.EventType,
+                request.Message,
+                request.Metadata,
+                request.ErrorMessage), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(result.Error.Message);
+            }
+
+            return Results.Ok(new
+            {
+                EventId = result.Value.EventId,
+                Message = "Event logged successfully"
+            });
+        })
+        .WithName("Log Thumbnail Job Event")
+        .WithTags("ThumbnailJobs");
+
         // Test endpoint to simulate thumbnail completion for testing SignalR
         app.MapPost("/api/test/thumbnail-complete/{modelId:int}", async (
             int modelId,
@@ -102,6 +128,11 @@ public record DequeueRequest(string WorkerId);
 /// Request model for completing thumbnail jobs.
 /// </summary>
 public record CompleteJobRequest(string ThumbnailPath, long SizeBytes, int Width, int Height);
+
+/// <summary>
+/// Request model for logging thumbnail job events.
+/// </summary>
+public record LogJobEventRequest(string EventType, string Message, string? Metadata = null, string? ErrorMessage = null);
 
 /// <summary>
 /// Request model for testing thumbnail completion.
