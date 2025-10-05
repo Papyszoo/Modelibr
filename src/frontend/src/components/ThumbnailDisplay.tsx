@@ -31,7 +31,6 @@ function ThumbnailDisplay({ modelId }: ThumbnailDisplayProps) {
           setImgSrc(null)
         }
       }
-      console.log(thumbnailDetails)
       if (thumbnailDetails?.status === 'Ready') {
         fetchImg()
       }

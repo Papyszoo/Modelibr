@@ -10,7 +10,6 @@ This documentation covers the complete Modelibr frontend application - a React-b
 All custom React hooks with full API documentation, usage examples, and parameter descriptions:
 
 - **[useFileUpload](./hooks/useFileUpload.md)** - File upload with validation and progress
-- **[useThumbnailManager](./hooks/useThumbnailManager.md)** - Real-time thumbnail management with SignalR
 - **[useTabContext](./hooks/useTabContext.md)** - Tab management within dock panels
 - **[useTexturePacks](./hooks/useTexturePacks.md)** - Texture pack CRUD operations
 - **[useGlobalDragPrevention](./hooks/useGlobalDragPrevention.md)** - Global drag and drop prevention
@@ -127,9 +126,8 @@ Each document includes:
 
 **Implementing Thumbnails:**
 ```
-1. Read: hooks/useThumbnailManager.md
-2. Review: components/ThumbnailDisplay.md
-3. Check: services/ApiClient.md (for endpoints)
+1. Review: components/ThumbnailDisplay.md
+2. Check: services/ApiClient.md (for endpoints)
 ```
 
 ### For Code Review
@@ -176,9 +174,19 @@ const models = await ApiClient.getModels()
 const result = await ApiClient.uploadModel(file)
 ```
 
-**Real-time Updates:**
+**Direct API Usage:**
 ```typescript
-const { thumbnailUrl, isReady } = useThumbnailManager(modelId)
+// Simple, focused component - fetches thumbnail directly
+const [thumbnail, setThumbnail] = useState(null)
+useEffect(() => {
+  ApiClient.getThumbnailStatus(modelId).then(status => {
+    if (status.status === 'Ready') {
+      ApiClient.getThumbnailFile(modelId).then(blob => {
+        setThumbnail(URL.createObjectURL(blob))
+      })
+    }
+  })
+}, [modelId])
 ```
 
 ## Component Dependency Graph
@@ -192,8 +200,7 @@ App
       │         ├── ModelList
       │         │    ├── useFileUpload
       │         │    ├── ModelsDataTable
-      │         │    └── ThumbnailDisplay
-      │         │         └── useThumbnailManager
+      │         │    └── ThumbnailDisplay (simple, direct API usage)
       │         └── ModelViewer
       │              └── Scene
       │                   └── Model
@@ -209,7 +216,6 @@ App
 | TypeScript | Type Safety | All `.md` files show types |
 | Three.js | 3D Graphics | [Scene](./components/Scene.md), [Model](./components/Model.md) |
 | PrimeReact | UI Components | [ModelsDataTable](./components/ModelsDataTable.md) |
-| SignalR | Real-time | [useThumbnailManager](./hooks/useThumbnailManager.md) |
 | nuqs | URL State | [tabSerialization](./utils/tabSerialization.md) |
 | Axios | HTTP Client | [ApiClient](./services/ApiClient.md) |
 

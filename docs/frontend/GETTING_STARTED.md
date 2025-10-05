@@ -108,8 +108,17 @@ const { uploadFile, uploading } = useFileUpload({
   onSuccess: () => fetchModels()
 })
 
-// Thumbnail management
-const { thumbnailUrl, isReady } = useThumbnailManager(modelId)
+// Direct API usage for simple operations
+const [thumbnail, setThumbnail] = useState(null)
+useEffect(() => {
+  ApiClient.getThumbnailStatus(modelId).then(status => {
+    if (status.status === 'Ready') {
+      ApiClient.getThumbnailFile(modelId).then(blob => {
+        setThumbnail(URL.createObjectURL(blob))
+      })
+    }
+  })
+}, [modelId])
 
 // Tab operations
 const { openModelDetailsTab } = useTabContext()
@@ -290,19 +299,39 @@ const { onDrop, onDragOver, onDragEnter, onDragLeave } =
 </div>
 ```
 
-## Real-time Updates
+## Direct API Usage
 
-### Thumbnail Status with SignalR
+### Fetching Thumbnail Status
 
 ```typescript
-const {
-  thumbnailStatus,
-  thumbnailUrl,
-  isConnected,
-  isProcessing,
-  isReady,
-  regenerateThumbnail,
-} = useThumbnailManager(modelId)
+const [thumbnailDetails, setThumbnailDetails] = useState(null)
+const [imgSrc, setImgSrc] = useState(null)
+
+useEffect(() => {
+  const fetchThumbnailDetails = async () => {
+    const details = await ApiClient.getThumbnailStatus(modelId)
+    setThumbnailDetails(details)
+  }
+  fetchThumbnailDetails()
+}, [modelId])
+
+useEffect(() => {
+  const fetchImg = async () => {
+    try {
+      const blob = await ApiClient.getThumbnailFile(modelId)
+      const url = URL.createObjectURL(blob)
+      setImgSrc(url)
+    } catch (error) {
+      setImgSrc(null)
+    }
+  }
+  if (thumbnailDetails?.status === 'Ready') {
+    fetchImg()
+  }
+  return () => {
+    if (imgSrc) URL.revokeObjectURL(imgSrc)
+  }
+}, [modelId, thumbnailDetails])
 
 // Status updates automatically via SignalR
 if (isReady) {

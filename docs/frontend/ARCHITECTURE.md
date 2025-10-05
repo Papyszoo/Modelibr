@@ -87,8 +87,17 @@ All stateful logic is encapsulated in custom hooks:
 // File upload logic
 const { uploading, uploadFile } = useFileUpload()
 
-// Thumbnail management
-const { thumbnailUrl, isReady } = useThumbnailManager(modelId)
+// Direct API calls for simple operations
+const [thumbnail, setThumbnail] = useState(null)
+useEffect(() => {
+  ApiClient.getThumbnailStatus(modelId).then(status => {
+    if (status.status === 'Ready') {
+      ApiClient.getThumbnailFile(modelId).then(blob => {
+        setThumbnail(URL.createObjectURL(blob))
+      })
+    }
+  })
+}, [modelId])
 
 // Tab operations
 const { openTab, openModelDetailsTab } = useTabContext()
