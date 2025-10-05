@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createCanvas } from 'canvas'
+import gl from 'gl'
 import { config } from './config.js'
 import logger from './logger.js'
 
@@ -29,20 +30,38 @@ export class OrbitFrameRenderer {
       1000 // far plane
     )
 
-    // Create canvas for headless rendering
-    const canvas = createCanvas(
-      config.rendering.outputWidth,
-      config.rendering.outputHeight
-    )
+    // Create WebGL context using headless-gl
+    const width = config.rendering.outputWidth
+    const height = config.rendering.outputHeight
+    const glContext = gl(width, height, {
+      preserveDrawingBuffer: true,
+      antialias: config.rendering.enableAntialiasing,
+      alpha: true,
+    })
+    
+    // Create canvas for compatibility (some THREE.js features expect it)
+    const canvas = createCanvas(width, height)
+    
+    // Attach the WebGL context to the canvas
+    canvas.getContext = (type) => {
+      if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+        return glContext
+      }
+      return null
+    }
     
     // Add DOM-like event methods that THREE.js expects
-    // node-canvas doesn't have these, so we add no-op implementations
     canvas.addEventListener = canvas.addEventListener || (() => {})
     canvas.removeEventListener = canvas.removeEventListener || (() => {})
     
-    // Create WebGL renderer using the canvas
+    // Add width/height properties that THREE.js expects
+    canvas.width = width
+    canvas.height = height
+    
+    // Create WebGL renderer using the canvas with WebGL context
     this.renderer = new THREE.WebGLRenderer({
       canvas: canvas,
+      context: glContext,
       antialias: config.rendering.enableAntialiasing,
       alpha: true,
       preserveDrawingBuffer: true, // Required for reading pixels
