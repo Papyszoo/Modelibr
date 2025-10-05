@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { createCanvas } from 'canvas'
 import { config } from './config.js'
 import logger from './logger.js'
 
@@ -15,7 +16,6 @@ export class OrbitFrameRenderer {
 
   /**
    * Initialize the three.js renderer and scene
-   * For now, this is a simplified implementation that focuses on the orbit logic
    */
   setupRenderer() {
     // Create scene
@@ -29,10 +29,33 @@ export class OrbitFrameRenderer {
       1000 // far plane
     )
 
+    // Create canvas for headless rendering
+    const canvas = createCanvas(
+      config.rendering.outputWidth,
+      config.rendering.outputHeight
+    )
+    
+    // Create WebGL renderer using the canvas
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: canvas,
+      antialias: config.rendering.enableAntialiasing,
+      alpha: true,
+      preserveDrawingBuffer: true, // Required for reading pixels
+    })
+    
+    this.renderer.setSize(
+      config.rendering.outputWidth,
+      config.rendering.outputHeight
+    )
+    
+    // Set background color
+    const bgColor = parseInt(config.rendering.backgroundColor.replace('#', ''), 16)
+    this.renderer.setClearColor(bgColor, 1)
+
     // Setup lighting to match frontend Scene.jsx
     this.setupLighting()
 
-    logger.debug('OrbitFrameRenderer initialized (simplified mode)', {
+    logger.debug('OrbitFrameRenderer initialized with WebGL rendering', {
       renderSize: `${config.rendering.outputWidth}x${config.rendering.outputHeight}`,
       backgroundColor: config.rendering.backgroundColor,
       antialiasing: config.rendering.enableAntialiasing,
@@ -188,18 +211,39 @@ export class OrbitFrameRenderer {
     // Look at center of scene
     this.camera.lookAt(0, 0, 0)
 
-    // For this implementation, we simulate rendering by creating frame metadata
-    // In a full implementation, this would render the scene and capture pixel data
-    const frameSize =
-      config.rendering.outputWidth * config.rendering.outputHeight * 4 // RGBA bytes
+    // Render the scene
+    this.renderer.render(this.scene, this.camera)
 
-    // Create simulated frame data object (stored in memory, not encoded to file)
+    // Read pixel data from the renderer
+    const gl = this.renderer.getContext()
+    const width = config.rendering.outputWidth
+    const height = config.rendering.outputHeight
+    const pixels = new Uint8Array(width * height * 4) // RGBA
+    
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+
+    // Flip pixels vertically (WebGL has origin at bottom-left, we need top-left)
+    const flippedPixels = new Uint8Array(width * height * 4)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcIdx = ((height - 1 - y) * width + x) * 4
+        const dstIdx = (y * width + x) * 4
+        flippedPixels[dstIdx] = pixels[srcIdx]
+        flippedPixels[dstIdx + 1] = pixels[srcIdx + 1]
+        flippedPixels[dstIdx + 2] = pixels[srcIdx + 2]
+        flippedPixels[dstIdx + 3] = pixels[srcIdx + 3]
+      }
+    }
+
+    const frameSize = width * height * 4 // RGBA bytes
+
+    // Create frame data object with actual pixel data
     const frameData = {
       index: frameIndex,
       angle: angle,
-      width: config.rendering.outputWidth,
-      height: config.rendering.outputHeight,
-      pixels: null, // Would contain actual pixel data in full implementation
+      width: width,
+      height: height,
+      pixels: Buffer.from(flippedPixels), // Convert to Buffer for easier handling
       size: frameSize,
       timestamp: Date.now(),
       cameraPosition: {
@@ -207,15 +251,14 @@ export class OrbitFrameRenderer {
         y: this.camera.position.y,
         z: this.camera.position.z,
       },
-      // Simulated rendering state
-      simulated: true,
+      simulated: false, // Actual rendering, not simulated
       renderSettings: {
         backgroundColor: config.rendering.backgroundColor,
         antialiasing: config.rendering.enableAntialiasing,
       },
     }
 
-    logger.debug('Frame rendered (simulated)', {
+    logger.debug('Frame rendered (actual)', {
       frameIndex,
       angle,
       dataSize: frameSize,
@@ -275,6 +318,11 @@ export class OrbitFrameRenderer {
    * Clean up resources
    */
   dispose() {
+    if (this.renderer) {
+      this.renderer.dispose()
+      this.renderer = null
+    }
+
     if (this.scene) {
       // Clean up scene objects
       while (this.scene.children.length > 0) {
