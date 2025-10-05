@@ -50,9 +50,10 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
   - Processing state
   - Failed state
   - Placeholder state
-  - Small/Medium/Large sizes
-  - With controls
-- **Note**: Demo component with mocked states
+- **Features**: 
+  - Uses actual ThumbnailDisplay component
+  - Mocks ApiClient for different states using decorators
+  - Demonstrates simple, focused component design
 
 #### 4. EmptyState.stories.tsx
 - **Location**: `src/components/model-list/EmptyState.stories.tsx`

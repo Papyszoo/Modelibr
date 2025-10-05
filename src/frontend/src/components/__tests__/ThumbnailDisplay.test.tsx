@@ -1,116 +1,66 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import ThumbnailDisplay from '../ThumbnailDisplay'
+import ApiClient from '../../services/ApiClient'
 
-// Mock the useThumbnailManager hook
-jest.mock('../../hooks/useThumbnailManager', () => ({
-  useThumbnailManager: jest.fn(),
-  THUMBNAIL_STATUS: {
-    PENDING: 'Pending',
-    PROCESSING: 'Processing',
-    READY: 'Ready',
-    FAILED: 'Failed',
+// Mock ApiClient
+jest.mock('../../services/ApiClient', () => ({
+  __esModule: true,
+  default: {
+    getThumbnailStatus: jest.fn(),
+    getThumbnailFile: jest.fn(),
   },
 }))
 
-const { useThumbnailManager } = require('../../hooks/useThumbnailManager')
+const mockApiClient = ApiClient as jest.Mocked<typeof ApiClient>
 
 describe('ThumbnailDisplay', () => {
   beforeEach(() => {
-    useThumbnailManager.mockReset()
+    jest.clearAllMocks()
+    global.URL.createObjectURL = jest.fn(() => 'blob:mock-url')
+    global.URL.revokeObjectURL = jest.fn()
   })
 
-  it('renders loading state when processing', () => {
-    useThumbnailManager.mockReturnValue({
-      thumbnailStatus: { Status: 'Processing' },
-      thumbnailUrl: null,
-      isLoading: false,
-      error: null,
-      isProcessing: true,
-      isReady: false,
-      isFailed: false,
-      regenerateThumbnail: jest.fn(),
+  it('renders placeholder when thumbnail is not ready', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({
+      status: 'Processing',
+    } as any)
+
+    render(<ThumbnailDisplay modelId="1" />)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
     })
-
-    render(<ThumbnailDisplay modelId={1} />)
-
-    expect(screen.getByLabelText('Loading thumbnail')).toBeInTheDocument()
-    expect(screen.getByText('Generating thumbnail...')).toBeInTheDocument()
   })
 
-  it('renders placeholder when no thumbnail status', () => {
-    useThumbnailManager.mockReturnValue({
-      thumbnailStatus: null,
-      thumbnailUrl: null,
-      isLoading: false,
-      error: null,
-      isProcessing: false,
-      isReady: false,
-      isFailed: false,
-      regenerateThumbnail: jest.fn(),
+  it('renders thumbnail image when ready', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({
+      status: 'Ready',
+    } as any)
+    
+    const mockBlob = new Blob(['test'], { type: 'image/webp' })
+    mockApiClient.getThumbnailFile.mockResolvedValue(mockBlob)
+
+    render(<ThumbnailDisplay modelId="1" />)
+
+    await waitFor(() => {
+      const image = screen.getByRole('img')
+      expect(image).toBeInTheDocument()
+      expect(image).toHaveAttribute('alt', 'Model Thumbnail')
     })
-
-    render(<ThumbnailDisplay modelId={1} />)
-
-    expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
   })
 
-  it('applies correct size classes', () => {
-    useThumbnailManager.mockReturnValue({
-      thumbnailStatus: null,
-      thumbnailUrl: null,
-      isLoading: false,
-      error: null,
-      isProcessing: false,
-      isReady: false,
-      isFailed: false,
-      regenerateThumbnail: jest.fn(),
+  it('renders placeholder when thumbnail fetch fails', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({
+      status: 'Ready',
+    } as any)
+    
+    mockApiClient.getThumbnailFile.mockRejectedValue(new Error('Fetch failed'))
+
+    render(<ThumbnailDisplay modelId="1" />)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
     })
-
-    const { container } = render(<ThumbnailDisplay modelId={1} size="small" />)
-    expect(container.firstChild).toHaveClass('thumbnail-small')
-  })
-
-  it('renders thumbnail image when ready', () => {
-    useThumbnailManager.mockReturnValue({
-      thumbnailStatus: { Status: 'Ready' },
-      thumbnailUrl: 'http://localhost:5009/models/1/thumbnail/file',
-      isLoading: false,
-      error: null,
-      isProcessing: false,
-      isReady: true,
-      isFailed: false,
-      regenerateThumbnail: jest.fn(),
-    })
-
-    render(<ThumbnailDisplay modelId={1} />)
-
-    const image = screen.getByRole('img')
-    expect(image).toBeInTheDocument()
-    expect(image).toHaveAttribute(
-      'src',
-      'http://localhost:5009/models/1/thumbnail/file'
-    )
-    expect(image).toHaveAttribute('alt', 'Thumbnail for model 1')
-  })
-
-  it('renders error state when failed', () => {
-    useThumbnailManager.mockReturnValue({
-      thumbnailStatus: { Status: 'Failed', ErrorMessage: 'Generation failed' },
-      thumbnailUrl: null,
-      isLoading: false,
-      error: null,
-      isProcessing: false,
-      isReady: false,
-      isFailed: true,
-      regenerateThumbnail: jest.fn(),
-    })
-
-    render(<ThumbnailDisplay modelId={1} />)
-
-    expect(
-      screen.getByLabelText('Thumbnail failed to generate')
-    ).toBeInTheDocument()
-    expect(screen.getByText('Generation failed')).toBeInTheDocument()
   })
 })

@@ -614,3 +614,270 @@ Update both files when changes affect:
 **Example of good separation:**
 - README.md: "Install .NET 9.0 SDK" (with link)
 - copilot-instructions.md: "Install .NET 9.0 SDK - REQUIRED (the project targets net9.0): curl command, export PATH, verification steps"
+
+## Frontend Development Guidelines
+
+### Philosophy: Simplicity and Focus
+
+The frontend application follows a principle of **simplicity and single responsibility**. Each component should do one thing well, without unnecessary complexity, error handling fallbacks, or feature bloat.
+
+**Key Principles:**
+1. **Keep it simple** - Components should be easy to understand and maintain
+2. **Single responsibility** - Each component does one thing
+3. **No over-engineering** - Avoid unnecessary abstractions and complexity
+4. **Direct API usage** - Fetch data directly when needed, don't over-abstract
+5. **Minimal state management** - Use local state unless global state is truly needed
+
+### Component Simplification Examples
+
+#### Example: ThumbnailDisplay (Simplified in commit c31705e)
+
+**Before (Complex):**
+- Custom `useThumbnailManager` hook with SignalR real-time updates
+- Multiple props: size, showAnimation, showControls, onError, alt
+- Complex state management with loading/error/ready states
+- Fallback mechanisms for SignalR failures
+- Animation state with hover detection
+
+**After (Simple):**
+```typescript
+interface ThumbnailDisplayProps {
+  modelId: string
+  className?: string
+}
+
+function ThumbnailDisplay({ modelId }: ThumbnailDisplayProps) {
+  const [thumbnailDetails, setThumbnailDetails] = useState<ThumbnailStatus | null>(null)
+  const [imgSrc, setImgSrc] = useState<string | null>(null)
+
+  // Fetch status
+  useEffect(() => {
+    const fetchThumbnailDetails = async () => {
+      const details = await ApiClient.getThumbnailStatus(modelId)
+      setThumbnailDetails(details)
+    }
+    fetchThumbnailDetails()
+  }, [modelId])
+
+  // Fetch image when ready
+  useEffect(() => {
+    const fetchImg = async () => {
+      try {
+        const blob = await ApiClient.getThumbnailFile(modelId)
+        const url = URL.createObjectURL(blob)
+        setImgSrc(url)
+      } catch (error) {
+        setImgSrc(null)
+      }
+    }
+    if (thumbnailDetails?.status === 'Ready') {
+      fetchImg()
+    }
+    return () => {
+      if (imgSrc) URL.revokeObjectURL(imgSrc)
+    }
+  }, [modelId, thumbnailDetails])
+
+  // Show image or placeholder
+  if (thumbnailDetails?.status === 'Ready' && imgSrc) {
+    return <div className="thumbnail-image-container">
+      <img src={imgSrc} alt="Model Thumbnail" className="thumbnail-image" loading="lazy" />
+    </div>
+  }
+  return <div className="thumbnail-placeholder" aria-label="No thumbnail available">
+    <i className="pi pi-image" aria-hidden="true" />
+  </div>
+}
+```
+
+**What was removed:**
+- Custom hook abstraction (useThumbnailManager)
+- SignalR real-time updates (will be handled separately if needed)
+- Size variants (styling should be handled via CSS/className)
+- Animation on hover (unnecessary complexity)
+- Error callbacks (component handles errors internally)
+- Complex state flags (isLoading, isProcessing, isFailed, etc.)
+
+**Benefits:**
+- 70 lines vs 200+ lines with hook
+- Easy to understand and debug
+- Direct API calls - clear data flow
+- Self-contained - no external hook dependencies
+- Works perfectly in both ModelList and ThumbnailSidebar
+
+### Guidelines for New Components
+
+When creating or refactoring frontend components:
+
+1. **Start Simple**
+   - Begin with the minimal implementation
+   - Add complexity only when absolutely necessary
+   - Question every feature: "Do we really need this?"
+
+2. **Avoid Premature Abstraction**
+   - Don't create custom hooks unless the logic is reused in 3+ places
+   - Use inline API calls unless abstraction provides clear value
+   - Prefer duplication over wrong abstraction
+
+3. **Props Design**
+   - Minimal required props only
+   - Optional props should have clear use cases
+   - Remove props that aren't actually used
+   - Don't add props "just in case" - YAGNI (You Aren't Gonna Need It)
+
+4. **State Management**
+   - Use local state (`useState`) by default
+   - Only lift state up when multiple components need it
+   - Avoid global state unless truly global
+   - Don't create complex state machines for simple UIs
+
+5. **Error Handling**
+   - Handle errors internally when possible
+   - Don't expose error callbacks unless the parent truly needs them
+   - Show simple error states in the UI
+   - Don't create elaborate error recovery mechanisms unless required
+
+6. **Real-Time Updates**
+   - Don't add SignalR/WebSocket unless real-time is critical
+   - Polling or manual refresh is often sufficient
+   - Real-time features can be added later in dedicated components
+   - Keep real-time logic separate from display logic
+
+### Testing Simplified Components
+
+When testing simple components:
+- Mock only external dependencies (API calls)
+- Test actual component behavior, not implementation details
+- Focus on user-visible outcomes
+- Remove tests for removed features/complexity
+
+Example test pattern:
+```typescript
+describe('ThumbnailDisplay', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    global.URL.createObjectURL = jest.fn(() => 'blob:mock-url')
+    global.URL.revokeObjectURL = jest.fn()
+  })
+
+  it('renders placeholder when thumbnail is not ready', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({ status: 'Processing' })
+    render(<ThumbnailDisplay modelId="1" />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
+    })
+  })
+
+  it('renders thumbnail image when ready', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({ status: 'Ready' })
+    mockApiClient.getThumbnailFile.mockResolvedValue(new Blob(['test']))
+    render(<ThumbnailDisplay modelId="1" />)
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeInTheDocument()
+    })
+  })
+})
+```
+
+### Storybook for Simple Components
+
+When creating Storybook stories for simple components:
+- Use the actual component, not a demo/mock version
+- Mock dependencies with decorators
+- Keep stories minimal and focused
+- Use different prop values to demonstrate behavior
+
+Example:
+```typescript
+export default {
+  title: 'Components/ThumbnailDisplay',
+  component: ThumbnailDisplay,
+  decorators: [(Story, context) => {
+    const modelId = context.args.modelId || '1'
+    mockApiClient.getThumbnailStatus = jest.fn().mockResolvedValue({
+      status: modelId === 'processing' ? 'Processing' : 'Ready',
+    })
+    return <Story />
+  }],
+}
+
+export const Ready: Story = { args: { modelId: '1' } }
+export const Processing: Story = { args: { modelId: 'processing' } }
+```
+
+### Documentation for Simple Components
+
+Keep documentation concise and accurate:
+- Document actual props, not aspirational ones
+- Show real usage examples
+- Remove outdated features from docs
+- Focus on what the component does, not what it could do
+
+### When to Break Down Components
+
+Break a component into smaller pieces when:
+1. It handles multiple unrelated concerns (violates single responsibility)
+2. It exceeds ~150 lines of actual logic (excluding types/styles)
+3. Logic can be clearly separated into independent pieces
+4. You find yourself writing complex conditional rendering
+
+**Example - When to split:**
+- A component that fetches data AND displays it AND handles real-time updates → Split into DataFetcher + Display + RealtimeUpdater
+- A form with validation, submission, and real-time preview → Split into Form + Validator + Submitter + Preview
+
+### Frontend Structure
+
+```
+src/frontend/src/
+├── components/           # UI components
+│   ├── Component.tsx    # Keep simple, focused
+│   ├── __tests__/       # Test actual behavior
+│   └── *.stories.tsx    # Storybook stories
+├── hooks/               # Only create when reused 3+ times
+├── services/            # API clients, utilities
+│   └── ApiClient.ts     # Central API service
+├── utils/               # Pure functions, helpers
+└── contexts/            # Global state (use sparingly)
+```
+
+### Common Anti-Patterns to Avoid
+
+❌ **Don't do this:**
+```typescript
+// Over-abstracted hook for single use
+const useThumbnail = (modelId) => {
+  // 100 lines of complex logic
+  // SignalR, polling, caching, retry logic
+  // Only used in one component
+}
+
+// Too many props "just in case"
+<ThumbnailDisplay
+  modelId={id}
+  size="large"
+  variant="square"
+  showAnimation={true}
+  onHover={...}
+  onLoad={...}
+  onError={...}
+  enableRetry={true}
+  retryAttempts={3}
+/>
+```
+
+✅ **Do this instead:**
+```typescript
+// Simple, direct implementation
+function ThumbnailDisplay({ modelId }: { modelId: string }) {
+  const [thumbnail, setThumbnail] = useState(null)
+  
+  useEffect(() => {
+    ApiClient.getThumbnail(modelId).then(setThumbnail)
+  }, [modelId])
+  
+  return thumbnail ? <img src={thumbnail} /> : <Placeholder />
+}
+
+// Minimal props
+<ThumbnailDisplay modelId={id} />
+```

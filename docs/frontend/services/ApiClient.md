@@ -529,6 +529,6 @@ function getModelUrls(model: Model) {
 ## Related
 
 - [useFileUpload](../hooks/useFileUpload.md) - Uses upload methods
-- [useThumbnailManager](../hooks/useThumbnailManager.md) - Uses thumbnail methods
+- [ThumbnailDisplay](../components/ThumbnailDisplay.md) - Uses thumbnail methods directly
 - [useTexturePacks](../hooks/useTexturePacks.md) - Uses texture pack methods
 - [Model](../components/Model.md) - Uses file URLs
