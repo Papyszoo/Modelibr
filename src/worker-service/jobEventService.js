@@ -25,7 +25,13 @@ export class JobEventService {
    * @param {string|null} errorMessage - Optional error message
    * @returns {Promise<Object>} API response
    */
-  async logEvent(jobId, eventType, message, metadata = null, errorMessage = null) {
+  async logEvent(
+    jobId,
+    eventType,
+    message,
+    metadata = null,
+    errorMessage = null
+  ) {
     try {
       const response = await this.apiClient.post(
         `/api/thumbnail-jobs/${jobId}/events`,
