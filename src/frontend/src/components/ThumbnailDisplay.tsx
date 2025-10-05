@@ -1,132 +1,61 @@
-import { useState } from 'react'
-import {
-  useThumbnailManager,
-  THUMBNAIL_STATUS,
-} from '../hooks/useThumbnailManager'
+import { useEffect, useState } from 'react'
 import './ThumbnailDisplay.css'
+import ApiClient, { ThumbnailStatus } from '../services/ApiClient'
 
-function ThumbnailDisplay({
-  modelId,
-  size = 'medium',
-  showAnimation = false,
-  className = '',
-  onError = null,
-  showControls = false,
-  alt = `Thumbnail for model ${modelId}`,
-}) {
-  const [imageError, setImageError] = useState(false)
-  const [showAnimated, setShowAnimated] = useState(showAnimation)
+interface ThumbnailDisplayProps {
+  modelId: string
+  className?: string
+}
 
-  const {
-    thumbnailStatus,
-    thumbnailUrl,
-    isLoading,
-    error,
-    isProcessing,
-    isReady,
-    isFailed,
-    regenerateThumbnail,
-  } = useThumbnailManager(modelId)
-
-  const handleImageError = () => {
-    setImageError(true)
-    if (onError) {
-      onError(new Error('Failed to load thumbnail image'))
-    }
-  }
-
-  const handleRegenerateClick = async () => {
-    setImageError(false)
-    await regenerateThumbnail()
-  }
-
-  const handleMouseEnter = () => {
-    if (isReady && !showAnimation) {
-      setShowAnimated(true)
-    }
-  }
-
-  const handleMouseLeave = () => {
-    if (!showAnimation) {
-      setShowAnimated(false)
-    }
-  }
-
+function ThumbnailDisplay({ modelId }: ThumbnailDisplayProps) {
   const renderContent = () => {
-    // Show loading state for processing/pending
-    if (isProcessing) {
-      return (
-        <div className="thumbnail-loading" aria-label="Loading thumbnail">
-          <div className="thumbnail-spinner" />
-          <span className="thumbnail-status-text">
-            {thumbnailStatus?.Status === THUMBNAIL_STATUS.PROCESSING
-              ? 'Generating thumbnail...'
-              : 'Preparing thumbnail...'}
-          </span>
-        </div>
-      )
-    }
+    const [thumbnailDetails, setThumbnailDetails] =
+      useState<ThumbnailStatus | null>(null)
+    const [imgSrc, setImgSrc] = useState<string | null>(null)
 
-    // Show error state for failed thumbnails
-    if (isFailed) {
-      return (
-        <div
-          className="thumbnail-error"
-          aria-label="Thumbnail failed to generate"
-        >
-          <i className="pi pi-exclamation-triangle" aria-hidden="true" />
-          <span className="thumbnail-status-text">
-            {error ||
-              thumbnailStatus?.ErrorMessage ||
-              'Thumbnail generation failed'}
-          </span>
-          {showControls && (
-            <button
-              className="thumbnail-retry-btn"
-              onClick={handleRegenerateClick}
-              disabled={isLoading}
-              aria-label="Regenerate thumbnail"
-            >
-              <i className="pi pi-refresh" aria-hidden="true" />
-              Retry
-            </button>
-          )}
-        </div>
-      )
-    }
+    useEffect(() => {
+      const fetchThumbnailDetails = async () => {
+        const details = await ApiClient.getThumbnailStatus(modelId)
+        setThumbnailDetails(details)
+      }
+      fetchThumbnailDetails()
+    }, [modelId])
+
+    useEffect(() => {
+      const fetchImg = async () => {
+        try {
+          const blob = await ApiClient.getThumbnailFile(modelId)
+          const url = URL.createObjectURL(blob)
+          setImgSrc(url)
+        } catch (error) {
+          setImgSrc(null)
+        }
+      }
+      console.log(thumbnailDetails)
+      if (thumbnailDetails?.status === 'Ready') {
+        fetchImg()
+      }
+      // Cleanup the object URL when component unmounts or modelId changes
+      return () => {
+        if (imgSrc) {
+          URL.revokeObjectURL(imgSrc)
+        }
+      }
+    }, [modelId, thumbnailDetails])
 
     // Show thumbnail image when ready
-    if (isReady && thumbnailUrl && !imageError) {
-      const imageUrl = showAnimated ? thumbnailUrl : thumbnailUrl
-
+    if (thumbnailDetails?.status === 'Ready' && imgSrc) {
       return (
         <div className="thumbnail-image-container">
           <img
-            src={imageUrl}
-            alt={alt}
+            src={imgSrc}
+            alt="Model Thumbnail"
             className="thumbnail-image"
-            onError={handleImageError}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
             loading="lazy"
           />
-          {showControls && (
-            <div className="thumbnail-overlay">
-              <button
-                className="thumbnail-retry-btn"
-                onClick={handleRegenerateClick}
-                disabled={isLoading}
-                aria-label="Regenerate thumbnail"
-              >
-                <i className="pi pi-refresh" aria-hidden="true" />
-              </button>
-            </div>
-          )}
         </div>
       )
     }
-
-    // Default: show placeholder
     return (
       <div
         className="thumbnail-placeholder"
@@ -136,22 +65,7 @@ function ThumbnailDisplay({
       </div>
     )
   }
-
-  const getSizeClass = () => {
-    switch (size) {
-      case 'small':
-        return 'thumbnail-small'
-      case 'large':
-        return 'thumbnail-large'
-      default:
-        return 'thumbnail-medium'
-    }
-  }
-
-  const combinedClassName =
-    `thumbnail-display ${getSizeClass()} ${className}`.trim()
-
-  return <div className={combinedClassName}>{renderContent()}</div>
+  return <>{renderContent()}</>
 }
 
 export default ThumbnailDisplay

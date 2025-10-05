@@ -18,14 +18,14 @@ export interface UploadModelResponse {
 }
 
 export interface ThumbnailStatus {
-  Status: 'Pending' | 'Processing' | 'Ready' | 'Failed'
-  FileUrl?: string
-  SizeBytes?: number
-  Width?: number
-  Height?: number
-  ErrorMessage?: string
-  CreatedAt?: string
-  ProcessedAt?: string
+  status: 'Pending' | 'Processing' | 'Ready' | 'Failed'
+  fileUrl?: string
+  sizeBytes?: number
+  width?: number
+  height?: number
+  errorMessage?: string
+  createdAt?: string
+  processedAt?: string
 }
 
 class ApiClient {
@@ -94,6 +94,14 @@ class ApiClient {
 
   getThumbnailUrl(modelId: string): string {
     return `${this.baseURL}/models/${modelId}/thumbnail/file`
+  }
+
+  async getThumbnailFile(modelId: string): Promise<Blob> {
+    const response: AxiosResponse<Blob> = await this.client.get(
+      `/models/${modelId}/thumbnail/file`,
+      { responseType: 'blob' }
+    )
+    return response.data
   }
 
   async regenerateThumbnail(modelId: string): Promise<void> {
