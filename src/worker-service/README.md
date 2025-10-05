@@ -4,12 +4,15 @@ A Node.js worker service for background thumbnail generation using three.js. Thi
 
 ## Features
 
-- **Job Polling**: Continuously polls the main API for thumbnail generation jobs
+- **SignalR Real-time Queue**: Real-time job notifications via SignalR for instant processing
+- **Actual 3D Rendering**: Uses three.js WebGL renderer with node-canvas for headless rendering
+- **Orbit Animation**: Generates rotating orbit frames around the 3D model
+- **Event Logging**: Comprehensive event logging to database for full audit trail
 - **Configuration Management**: Comprehensive configuration system with environment variable support
 - **Health Monitoring**: Built-in health check endpoints for monitoring and container orchestration
 - **Graceful Shutdown**: Proper cleanup and graceful shutdown handling
 - **Structured Logging**: JSON-formatted structured logging with context
-- **Error Handling**: Robust error handling with retry logic and dead letter queue support
+- **Error Handling**: Robust error handling - jobs fail properly without placeholder fallbacks
 - **Concurrency Control**: Configurable maximum concurrent job processing
 - **Docker Support**: Containerized deployment with Docker and Docker Compose
 
@@ -177,15 +180,40 @@ The worker service integrates with the existing Modelibr architecture:
 - `POST /api/thumbnail-jobs/dequeue` - Poll for next available job
 - `POST /api/thumbnail-jobs/{id}/complete` - Mark job as completed
 - `POST /api/thumbnail-jobs/{id}/fail` - Mark job as failed
+- `POST /api/thumbnail-jobs/{id}/events` - Log detailed job events for audit trail
 - `GET /models/{id}/file` - Download model file for processing
 - `GET /health` - API health check
+
+## Event Logging
+
+The worker service logs detailed events to the database for complete audit trail:
+
+**Event Types Logged:**
+- `JobStarted` - Thumbnail generation initiated
+- `ModelDownloadStarted` / `ModelDownloaded` - Model file download progress
+- `ModelLoadingStarted` / `ModelLoaded` - 3D model loading and parsing
+- `FrameRenderingStarted` / `FrameRenderingCompleted` - Orbit frame rendering
+- `EncodingStarted` / `EncodingCompleted` - WebP/JPEG encoding
+- `ThumbnailUploadStarted` / `ThumbnailUploadCompleted` - File upload to storage
+- `JobCompleted` - Successful completion
+- `JobFailed` - Job failure with error details
+
+Each event includes:
+- Event type and message
+- Timestamp
+- Optional metadata (JSON)
+- Optional error message
+
+Query events via database to track job progress and debug failures.
 
 ## Error Handling
 
 The service includes comprehensive error handling:
 
+- **No Placeholder Fallbacks**: Jobs fail properly if rendering cannot be completed
 - **API Connection Failures**: Continues polling with exponential backoff
-- **Job Processing Errors**: Reports failures back to API with error details
+- **Job Processing Errors**: Reports failures back to API with detailed error information
+- **Event Logging**: All errors are logged as events to database for debugging
 - **Graceful Shutdown**: Waits for active jobs to complete (with timeout)
 - **Uncaught Exceptions**: Logs and triggers graceful shutdown
 - **Configuration Validation**: Validates all configuration on startup
