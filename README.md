@@ -341,13 +341,12 @@ If you encounter "container webapi is unhealthy" errors:
 
 1. **Verify health endpoint**: Test manually with `curl http://localhost:8080/health`
 2. **Check logs**: Use `docker compose logs webapi` to see startup issues
-3. **Alternative health check**: See [docs/docker-health-check-fix.md](docs/docker-health-check-fix.md) for details
 
 ### Common Issues
 - **Database connection errors**: Ensure PostgreSQL container is running and healthy
 - **Port conflicts**: Make sure ports 3000, 8080, 5432, and 3001 are available (port 8081 only needed for local HTTPS development)
 - **Upload permission errors**: Set `UPLOAD_STORAGE_PATH` to a writable directory
-- **Thumbnail worker "no such file" error**: If you see `exec /app/docker-entrypoint.sh: no such file or directory`, this was caused by Windows line endings. **The issue is now fixed** - simply rebuild the container with `docker compose build thumbnail-worker`. The Dockerfile automatically converts line endings. See [docs/worker/entrypoint-line-endings-fix.md](docs/worker/entrypoint-line-endings-fix.md) for details
+- **Thumbnail worker "no such file" error**: If you see `exec /app/docker-entrypoint.sh: no such file or directory`, this was caused by Windows line endings. **The issue is now fixed** - simply rebuild the container with `docker compose build thumbnail-worker`. The Dockerfile automatically converts line endings. See [docs/WORKER.md](docs/WORKER.md#troubleshooting) for details
 
 ## 🤝 Contributing
 

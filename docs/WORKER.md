@@ -145,6 +145,8 @@ npm run format      # Format with Prettier
 
 ## Troubleshooting
 
+**For comprehensive troubleshooting, see [worker/troubleshooting.md](worker/troubleshooting.md)** which includes detailed diagnostics for all issues below and more.
+
 ### Container Won't Start
 
 **"exec /app/docker-entrypoint.sh: no such file or directory"**
