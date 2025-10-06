@@ -4,8 +4,8 @@ import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
 import { TexturePackDto } from '../../types'
 import { useTexturePacks } from '../../hooks/useTexturePacks'
+import { useTabContext } from '../../hooks/useTabContext'
 import CreateTexturePackDialog from '../dialogs/CreateTexturePackDialog'
-import TexturePackDetailDialog from '../dialogs/TexturePackDetailDialog'
 import TexturePackListHeader from './texture-pack-list/TexturePackListHeader'
 import TexturePackTable from './texture-pack-list/TexturePackTable'
 import './TexturePackList.css'
@@ -13,12 +13,10 @@ import './TexturePackList.css'
 function TexturePackList() {
   const [texturePacks, setTexturePacks] = useState<TexturePackDto[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedTexturePack, setSelectedTexturePack] =
-    useState<TexturePackDto | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [showDetailDialog, setShowDetailDialog] = useState(false)
   const toast = useRef<Toast>(null)
   const texturePacksApi = useTexturePacks()
+  const { openTexturePackDetailsTab } = useTabContext()
 
   const loadTexturePacks = useCallback(async () => {
     try {
@@ -95,13 +93,7 @@ function TexturePackList() {
   }
 
   const handleViewDetails = (texturePack: TexturePackDto) => {
-    setSelectedTexturePack(texturePack)
-    setShowDetailDialog(true)
-  }
-
-  const handlePackUpdated = () => {
-    loadTexturePacks()
-    setShowDetailDialog(false)
+    openTexturePackDetailsTab(texturePack)
   }
 
   return (
@@ -126,15 +118,6 @@ function TexturePackList() {
           visible={showCreateDialog}
           onHide={() => setShowCreateDialog(false)}
           onSubmit={handleCreateTexturePack}
-        />
-      )}
-
-      {showDetailDialog && selectedTexturePack && (
-        <TexturePackDetailDialog
-          visible={showDetailDialog}
-          texturePack={selectedTexturePack}
-          onHide={() => setShowDetailDialog(false)}
-          onPackUpdated={handlePackUpdated}
         />
       )}
     </div>
