@@ -342,10 +342,14 @@ MAX_CONCURRENT_JOBS=5  # Default: 3
 **Common Errors and Solutions**:
 
 #### "Failed to create WebGL context with headless-gl"
-**Cause**: Xvfb not ready or not started correctly
+**Cause**: Missing Mesa OpenGL libraries, or Xvfb not ready
 
 **Solutions**:
 ```bash
+# First, rebuild with latest image that includes required Mesa libraries
+docker compose build thumbnail-worker
+docker compose up -d thumbnail-worker
+
 # Check if Xvfb is running
 docker compose exec thumbnail-worker sh -c 'pidof Xvfb'
 
@@ -358,12 +362,15 @@ docker compose exec thumbnail-worker sh -c 'ls -la /tmp/.X11-unix/X99'
 # Test WebGL context creation
 docker compose exec thumbnail-worker node test-webgl-simple.js
 
-# Restart with latest image that includes Xvfb startup fix
-docker compose build thumbnail-worker
-docker compose up -d thumbnail-worker
+# Verify Mesa libraries are installed
+docker compose exec thumbnail-worker dpkg -l | grep -E 'libgl1|mesa'
 ```
 
-**Note**: This issue was fixed in the docker-entrypoint.sh script with proper Xvfb wait logic. See [xvfb-startup-fix.md](xvfb-startup-fix.md) for details.
+**Note**: This issue requires two fixes:
+1. Mesa OpenGL runtime libraries (`libgl1` and `mesa-utils`) must be installed in the runtime Docker image
+2. Xvfb must be properly started and ready before the application starts (fixed in docker-entrypoint.sh)
+
+See [xvfb-startup-fix.md](xvfb-startup-fix.md) for Xvfb startup timing details.
 
 #### "Failed to load model: Invalid file format"
 **Cause**: Unsupported or corrupt model file
