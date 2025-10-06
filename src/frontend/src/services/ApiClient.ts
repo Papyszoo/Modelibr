@@ -63,6 +63,20 @@ class ApiClient {
     return response.data
   }
 
+  async uploadFile(file: File): Promise<{ fileId: number; alreadyExists: boolean }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response: AxiosResponse<{ fileId: number; alreadyExists: boolean }> =
+      await this.client.post('/files', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+    return response.data
+  }
+
   async getModels(): Promise<Model[]> {
     const response: AxiosResponse<Model[]> = await this.client.get('/models')
     return response.data
