@@ -349,6 +349,36 @@ If you encounter "container webapi is unhealthy" errors:
 - **Upload permission errors**: Set `UPLOAD_STORAGE_PATH` to a writable directory
 - **Thumbnail worker "no such file" error**: If you see `exec /app/docker-entrypoint.sh: no such file or directory`, this was caused by Windows line endings. **The issue is now fixed** - simply rebuild the container with `docker compose build thumbnail-worker`. The Dockerfile automatically converts line endings. See [docs/worker/entrypoint-line-endings-fix.md](docs/worker/entrypoint-line-endings-fix.md) for details
 
+### ⚠️ Thumbnail Generation Issues (WebGL Context Errors)
+
+If you're experiencing thumbnail generation failures with errors like:
+```
+error: Model processing failed {
+  "metadata": {
+    "error": "Failed to create WebGL context with headless-gl..."
+  }
+}
+```
+
+**Solution**: The fixes are already implemented in the code. You need to **rebuild the Docker image**:
+
+```bash
+# Stop containers
+docker compose down
+
+# Rebuild thumbnail-worker (force rebuild without cache)
+docker compose build --no-cache thumbnail-worker
+
+# Start services
+docker compose up -d
+```
+
+**Complete verification steps**: See [docs/worker/VERIFICATION.md](docs/worker/VERIFICATION.md) for:
+- Step-by-step verification guide
+- How to test WebGL context creation
+- Troubleshooting Xvfb and Mesa library issues
+- Success indicators and diagnostic commands
+
 ## 🤝 Contributing
 
 1. Fork the repository

@@ -65,6 +65,14 @@ Common issues and solutions:
 - Debugging tools and techniques
 - Error message reference
 
+### [Verification Guide](VERIFICATION.md)
+**If you're experiencing WebGL/thumbnail generation issues**, start here:
+- Step-by-step verification of all fixes
+- How to rebuild Docker image to get latest fixes
+- Test WebGL context creation
+- Troubleshoot Xvfb and Mesa library issues
+- Success indicators and diagnostic commands
+
 ## Quick Links
 
 ### Getting Started
@@ -82,6 +90,7 @@ Common issues and solutions:
 - **[Kubernetes](deployment.md#kubernetes-deployment)**: Deploy to K8s
 - **[Monitoring](deployment.md#monitoring)**: Set up observability
 - **[Troubleshooting](troubleshooting.md)**: Fix common issues
+- **[WebGL Verification](VERIFICATION.md)**: Fix thumbnail generation errors
 
 ### Related Documentation
 - **[Worker Service README](../../src/worker-service/README.md)**: Quick reference in source code
