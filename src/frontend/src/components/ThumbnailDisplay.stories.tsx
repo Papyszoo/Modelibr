@@ -22,19 +22,26 @@ const meta = {
     (Story, context) => {
       // Mock different thumbnail states for different modelIds
       const modelId = context.args.modelId || '1'
-      
+
       mockApiClient.getThumbnailStatus = jest.fn().mockResolvedValue({
-        status: modelId === 'processing' ? 'Processing' : 
-                modelId === 'failed' ? 'Failed' : 
-                modelId === 'placeholder' ? 'Pending' : 'Ready',
+        status:
+          modelId === 'processing'
+            ? 'Processing'
+            : modelId === 'failed'
+              ? 'Failed'
+              : modelId === 'placeholder'
+                ? 'Pending'
+                : 'Ready',
       })
-      
+
       mockApiClient.getThumbnailFile = jest.fn().mockImplementation(() => {
         if (modelId === 'failed') {
           return Promise.reject(new Error('Failed to fetch'))
         }
         // Return a placeholder image blob
-        return Promise.resolve(new Blob(['mock image data'], { type: 'image/webp' }))
+        return Promise.resolve(
+          new Blob(['mock image data'], { type: 'image/webp' })
+        )
       })
 
       return <Story />
@@ -68,4 +75,3 @@ export const Placeholder: Story = {
     modelId: 'placeholder',
   },
 }
-

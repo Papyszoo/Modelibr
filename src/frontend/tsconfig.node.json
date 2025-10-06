@@ -7,5 +7,10 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.js", "jest.config.js", "eslint.config.js"]
+  "include": [
+    "vite.config.js",
+    "jest.config.js",
+    "eslint.config.js",
+    ".storybook/**/*"
+  ]
 }

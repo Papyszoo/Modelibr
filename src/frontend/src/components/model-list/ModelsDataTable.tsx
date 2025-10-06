@@ -28,9 +28,7 @@ export default function ModelsDataTable({
 
   // Template functions for DataTable columns
   const thumbnailBodyTemplate = (rowData: Model) => {
-    return (
-      <ThumbnailDisplay modelId={rowData.id} />
-    )
+    return <ThumbnailDisplay modelId={rowData.id} />
   }
 
   const idBodyTemplate = (rowData: Model) => {

@@ -19,18 +19,18 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {
   args: {
     visible: true,
-    onDrop: (e) => {
+    onDrop: e => {
       e.preventDefault()
       console.log('Drop event:', e)
     },
-    onDragOver: (e) => {
+    onDragOver: e => {
       e.preventDefault()
     },
-    onDragEnter: (e) => {
+    onDragEnter: e => {
       e.preventDefault()
       console.log('Drag enter')
     },
-    onDragLeave: (e) => {
+    onDragLeave: e => {
       e.preventDefault()
       console.log('Drag leave')
     },
