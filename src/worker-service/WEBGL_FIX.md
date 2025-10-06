@@ -44,22 +44,31 @@ Created `webgl2-polyfill.js` that adds WebGL 2 API methods to the WebGL 1 contex
 
 The polyfill provides no-op implementations for features not critical to basic rendering.
 
-### 3. xvfb Virtual Display
+### 3. xvfb Virtual Display and Mesa Libraries
 
 Updated the Dockerfile to:
 
-- Install xvfb, xauth, and Mesa libraries
-- Run the worker service with `xvfb-run` to provide a virtual display
+- Install xvfb, xauth, and Mesa OpenGL libraries
+- Run the worker service with proper Xvfb initialization via docker-entrypoint.sh
+- Provide the necessary OpenGL runtime implementation for headless rendering
 
 ```dockerfile
-# Install dependencies
-RUN apt-get install -y libxi-dev libglu1-mesa-dev libglew-dev xvfb xauth
-
-# Run with xvfb
-CMD ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24", "npm", "start"]
+# Runtime dependencies (from Dockerfile)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxi6 libglu1-mesa libglew2.2 libgl1 mesa-utils xvfb xauth \
+  && rm -rf /var/lib/apt/lists/*
 ```
 
-**Note**: `xauth` is required by the `xvfb-run` wrapper script for X11 authentication. When using `--no-install-recommends` with apt-get, `xauth` must be explicitly installed as it's only a recommended dependency of `xvfb`.
+**Critical packages for WebGL context creation:**
+- `xvfb` - X Virtual Framebuffer for headless display
+- `xauth` - X11 authentication (required by xvfb-run wrapper)
+- `libgl1` - Mesa OpenGL runtime library (provides OpenGL implementation)
+- `mesa-utils` - Mesa utilities (required by headless-gl for context creation)
+- `libglu1-mesa` - Mesa GLU library
+- `libglew2.2` - OpenGL Extension Wrangler
+- `libxi6` - X11 Input extension library
+
+**Note**: Both `libgl1` and `mesa-utils` are essential. Without these packages, the headless-gl `createGl()` function will return `null` even when Xvfb is running correctly, as it cannot initialize the OpenGL context.
 
 ## Testing
 
