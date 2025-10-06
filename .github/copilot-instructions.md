@@ -584,44 +584,66 @@ cp .env.example .env
 
 ## Documentation Maintenance
 
-### Keeping Documentation Clean and Synchronized
+### Documentation Structure
 
-**ALWAYS update both README.md and .github/copilot-instructions.md when making relevant changes.** These files serve different purposes but must stay synchronized to avoid confusion and redundancy.
+The project maintains a **simplified, consolidated documentation structure**:
 
-#### File Responsibilities
-- **README.md**: User-facing documentation, getting started guides, feature descriptions, high-level architecture overview
-- **.github/copilot-instructions.md**: Developer-focused technical instructions, build details, troubleshooting, environment setup
+**Essential Documentation:**
+- **README.md** - User-facing: Features, screenshots, quick start, basic usage
+- **.github/copilot-instructions.md** - Developer-focused: Build details, architecture, troubleshooting
+- **docs/BACKEND_API.md** - Complete backend API reference
+- **docs/FRONTEND.md** - Frontend development guide
+- **docs/WORKER.md** - Thumbnail worker service guide
+
+**Detailed Documentation:**
+- **docs/backend/endpoints/** - Individual endpoint documentation
+- **docs/frontend/** - Component, hook, service, and utility documentation  
+- **docs/worker/troubleshooting.md** - Comprehensive troubleshooting guide
+
+### Guidelines for Documentation Updates
+
+**IMPORTANT: Keep documentation minimal and focused. Do NOT create new documentation files for every bug fix or change.**
 
 #### When to Update Documentation
-Update both files when changes affect:
-- Prerequisites or setup requirements (e.g., .NET version, Node.js version)
+Update existing docs when changes affect:
+- Prerequisites or setup requirements
 - Build or test procedures
 - Environment variables or configuration
 - Docker setup or deployment
-- Project structure or architecture
-- Development workflow or debugging procedures
+- Core architecture patterns
+- Development workflow
 
-#### Guidelines for Updates
-- **Remove redundancy**: Avoid duplicating the same information in both files
-- **Keep content focused**: README.md should be accessible to new users; copilot-instructions.md should be comprehensive for developers
-- **Maintain consistency**: Use the same versions, commands, and terminology across both files
-- **Update examples**: Ensure code examples, URLs, and commands are current and working
-- **Validate changes**: Test any instructions you add to ensure they work correctly
+#### How to Document Fixes
+**Do NOT create separate fix documentation files.** Instead:
+1. **For worker issues:** Add to troubleshooting section in `docs/WORKER.md` or `docs/worker/troubleshooting.md`
+2. **For backend issues:** Update relevant section in `docs/BACKEND_API.md`
+3. **For frontend issues:** Update relevant section in `docs/FRONTEND.md`
+4. **For Docker issues:** Update Troubleshooting section in `README.md`
 
-#### Content Separation Guidelines
-- **README.md should contain**: Features, screenshots, high-level getting started, basic Docker commands, contribution guidelines
-- **copilot-instructions.md should contain**: Detailed build instructions with timings, troubleshooting steps, environment variable details, development tips
+#### Content Separation
+- **README.md**: High-level, user-friendly, features and quick start
+- **copilot-instructions.md**: Detailed build/test commands, architecture patterns, essential developer info
+- **docs/*.md**: Comprehensive guides for each major component
+- **docs/*/**: Detailed reference documentation (endpoints, components, etc.)
 
-**Example of good separation:**
-- README.md: "Install .NET 9.0 SDK" (with link)
-- copilot-instructions.md: "Install .NET 9.0 SDK - REQUIRED (the project targets net9.0): curl command, export PATH, verification steps"
+### Example of Good Documentation Organization
 
-#### File Organization
-**NEVER place documentation files in the root directory.** Always organize documentation in appropriate subdirectories:
-- **Technical documentation**: `docs/` directory with appropriate subdirectories (e.g., `docs/worker/`, `docs/backend/`, `docs/frontend/`)
-- **Component-specific docs**: Place near the component they document
-- **Troubleshooting guides**: `docs/worker/troubleshooting.md` or similar location-specific files
-- **Fix documentation**: `docs/[component]/[descriptive-name]-fix.md` (e.g., `docs/worker/container-no-logs-fix.md`)
+❌ **Don't do this:**
+```
+docs/worker/container-no-logs-fix.md
+docs/worker/entrypoint-line-endings-fix.md
+docs/worker/mesa-libraries-fix.md
+docs/worker/xvfb-startup-fix.md
+docs/worker/thumbnail-fix-summary.md
+```
+
+✅ **Do this instead:**
+```
+docs/WORKER.md (includes common troubleshooting)
+docs/worker/troubleshooting.md (comprehensive guide)
+```
+
+All fixes are consolidated into the troubleshooting section with clear headings.
 
 ## Frontend Development Guidelines
 
