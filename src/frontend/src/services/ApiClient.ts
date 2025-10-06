@@ -3,7 +3,6 @@ import { Model } from '../utils/fileUtils'
 import {
   TexturePackDto,
   GetAllTexturePacksResponse,
-  GetTexturePackByIdResponse,
   CreateTexturePackRequest,
   CreateTexturePackResponse,
   UpdateTexturePackRequest,
@@ -119,9 +118,9 @@ class ApiClient {
   }
 
   async getTexturePackById(id: number): Promise<TexturePackDto> {
-    const response: AxiosResponse<GetTexturePackByIdResponse> =
+    const response: AxiosResponse<TexturePackDto> =
       await this.client.get(`/texture-packs/${id}`)
-    return response.data.texturePack
+    return response.data
   }
 
   async createTexturePack(
