@@ -2,12 +2,18 @@
 
 # Build stage - produces dist/
 FROM node:20-alpine AS build
+
+# Install and update CA certificates for SSL
+RUN apk add --no-cache ca-certificates && \
+    update-ca-certificates
+
 WORKDIR /app
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 COPY package*.json ./
-# Configure npm with longer timeouts and retries to handle network issues
-RUN npm config set fetch-timeout 300000 && \
+# Configure npm with longer timeouts and retries, and set CA bundle for SSL
+RUN npm config set cafile /etc/ssl/certs/ca-certificates.crt && \
+    npm config set fetch-timeout 300000 && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
