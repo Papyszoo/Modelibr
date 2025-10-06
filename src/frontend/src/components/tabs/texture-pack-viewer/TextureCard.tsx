@@ -2,16 +2,18 @@ import { useState, useRef } from 'react'
 import { Card } from 'primereact/card'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { TextureType, TextureDto } from '../../../types'
+import { TextureType, TextureDto, ModelSummaryDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../../hooks/useTexturePacks'
 import { useDragAndDrop } from '../../../hooks/useFileUpload'
+import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
 
 interface TextureCardProps {
   textureType: TextureType
   texture: TextureDto | null
   packId: number
+  associatedModels: ModelSummaryDto[]
   onTextureUpdated: () => void
 }
 
@@ -19,6 +21,7 @@ function TextureCard({
   textureType,
   texture,
   packId,
+  associatedModels,
   onTextureUpdated,
 }: TextureCardProps) {
   const [uploading, setUploading] = useState(false)
@@ -44,28 +47,29 @@ function TextureCard({
       return
     }
 
+    // Check if pack has associated models
+    if (associatedModels.length === 0) {
+      toast.current?.show({
+        severity: 'error',
+        summary: 'No Associated Models',
+        detail:
+          'Please associate at least one model with this texture pack before uploading textures',
+        life: 5000,
+      })
+      return
+    }
+
     try {
       setUploading(true)
 
-      // First upload the file to get a fileId
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const uploadResponse = await fetch('/api/uploadModel', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file')
-      }
-
-      const uploadResult = await uploadResponse.json()
-      const fileId = uploadResult.files[0].id
+      // Upload the file to the first associated model
+      const modelId = associatedModels[0].id
+      const uploadResult = await ApiClient.uploadFileToModel(modelId, file)
+      const fileId = uploadResult.fileId
 
       // Then add it to the pack
       await texturePacksApi.addTextureToPackEndpoint(packId, {
-        fileId: parseInt(fileId),
+        fileId: fileId,
         textureType,
       })
 

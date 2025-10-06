@@ -133,6 +133,7 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
                   textureType={textureType}
                   texture={texture}
                   packId={texturePack.id}
+                  associatedModels={texturePack.associatedModels}
                   onTextureUpdated={loadTexturePack}
                 />
               )
