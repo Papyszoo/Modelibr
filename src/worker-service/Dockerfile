@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg python3 ca-certificates dos2unix \
     libcairo2 libpango-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
     libvips42 \
-    libxi6 libglu1-mesa libglew2.2 xvfb xauth \
+    libxi6 libglu1-mesa libglew2.2 libgl1 mesa-utils xvfb xauth \
   && ln -s /usr/bin/python3 /usr/bin/python \
   && rm -rf /var/lib/apt/lists/*
 
