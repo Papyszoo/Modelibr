@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev \
     libvips-dev \
     libxi-dev libglu1-mesa-dev libglew-dev pkg-config xvfb xauth \
+  && update-ca-certificates \
   && ln -s /usr/bin/python3 /usr/bin/python \
   && rm -rf /var/lib/apt/lists/*
 
@@ -17,7 +18,9 @@ COPY package*.json ./
 
 # Install dependencies
 # Configure npm with longer timeouts and retries to handle network issues
-RUN npm config set fetch-timeout 300000 && \
+# Explicitly set CA file for SSL certificate verification
+RUN npm config set cafile /etc/ssl/certs/ca-certificates.crt && \
+    npm config set fetch-timeout 300000 && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
