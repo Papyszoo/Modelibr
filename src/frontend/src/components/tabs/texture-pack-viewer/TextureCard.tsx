@@ -6,6 +6,7 @@ import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../../hooks/useTexturePacks'
 import { useDragAndDrop } from '../../../hooks/useFileUpload'
+import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
 
 interface TextureCardProps {
@@ -47,25 +48,13 @@ function TextureCard({
     try {
       setUploading(true)
 
-      // First upload the file to get a fileId
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const uploadResponse = await fetch('/api/uploadModel', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file')
-      }
-
-      const uploadResult = await uploadResponse.json()
-      const fileId = uploadResult.files[0].id
+      // Upload the file using the dedicated files endpoint
+      const uploadResult = await ApiClient.uploadFile(file)
+      const fileId = uploadResult.fileId
 
       // Then add it to the pack
       await texturePacksApi.addTextureToPackEndpoint(packId, {
-        fileId: parseInt(fileId),
+        fileId: fileId,
         textureType,
       })
 
