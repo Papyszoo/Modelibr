@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { Card } from 'primereact/card'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { TextureType, TextureDto, ModelSummaryDto } from '../../../types'
+import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../../hooks/useTexturePacks'
 import { useDragAndDrop } from '../../../hooks/useFileUpload'
@@ -13,7 +13,6 @@ interface TextureCardProps {
   textureType: TextureType
   texture: TextureDto | null
   packId: number
-  associatedModels: ModelSummaryDto[]
   onTextureUpdated: () => void
 }
 
@@ -21,7 +20,6 @@ function TextureCard({
   textureType,
   texture,
   packId,
-  associatedModels,
   onTextureUpdated,
 }: TextureCardProps) {
   const [uploading, setUploading] = useState(false)
@@ -47,24 +45,11 @@ function TextureCard({
       return
     }
 
-    // Check if pack has associated models
-    if (associatedModels.length === 0) {
-      toast.current?.show({
-        severity: 'error',
-        summary: 'No Associated Models',
-        detail:
-          'Please associate at least one model with this texture pack before uploading textures',
-        life: 5000,
-      })
-      return
-    }
-
     try {
       setUploading(true)
 
-      // Upload the file to the first associated model
-      const modelId = associatedModels[0].id
-      const uploadResult = await ApiClient.uploadFileToModel(modelId, file)
+      // Upload the file using the dedicated files endpoint
+      const uploadResult = await ApiClient.uploadFile(file)
       const fileId = uploadResult.fileId
 
       // Then add it to the pack
