@@ -38,11 +38,6 @@ Always reference these instructions first and fallback to search or bash command
   - **REQUIRED**: Create `.env` file from `.env.example` before running docker-compose
   - `cp .env.example .env` -- copy environment configuration
   - Environment variables in `.env.example` contain all required parameters
-  - **REQUIRED for Node.js services**: Install dependencies locally before Docker build
-    - Frontend: `cd src/frontend && npm install && cd ../..`
-    - Worker: `cd src/worker-service && npm install && cd ../..`
-    - This is needed due to npm registry SSL issues in Docker (documented in `docs/worker/container-no-logs-fix.md`)
-    - The `.dockerignore` files allow copying pre-installed `node_modules` into Docker images
 
 ## Validation
 - ALWAYS manually test the Web API after changes by running `dotnet run` and verifying it starts successfully

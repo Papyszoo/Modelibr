@@ -99,23 +99,12 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
    # Edit .env file with your settings
    ```
 
-3. **Prepare service dependencies**
-   ```bash
-   # Install frontend dependencies
-   cd src/frontend && npm install && cd ../..
-   
-   # Install worker service dependencies
-   cd src/worker-service && npm install && cd ../..
-   ```
-   
-   > **Note**: These steps are required due to npm registry SSL issues in Docker. Dependencies must be installed locally before building Docker images.
-
-4. **Start the application**
+3. **Start the application**
    ```bash
    docker compose up -d
    ```
 
-5. **Access the application**
+4. **Access the application**
    - Frontend: http://localhost:3000 (integrated upload/library interface)
    - API: http://localhost:8080
    - Thumbnail Worker: http://localhost:3001 (health check)
@@ -132,18 +121,7 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
    cp .env.example .env
    ```
 
-2. **Prepare service dependencies**
-   ```bash
-   # Install frontend dependencies
-   cd src/frontend && npm install && cd ../..
-   
-   # Install worker service dependencies
-   cd src/worker-service && npm install && cd ../..
-   ```
-   
-   > **Note**: Service dependencies require local npm install due to Docker build limitations with npm registry SSL certificates.
-
-3. **Start all services**
+2. **Start all services**
    ```bash
    docker compose up -d
    ```
