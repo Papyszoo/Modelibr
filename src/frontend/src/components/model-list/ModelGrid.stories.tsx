@@ -110,7 +110,6 @@ export const Default: Story = {
   args: {
     models: mockModels,
     onModelSelect: (model: Model) => console.log('Selected model:', model),
-    isTabContent: false,
     onDrop: (e: React.DragEvent) => console.log('Drop:', e),
     onDragOver: (e: React.DragEvent) => e.preventDefault(),
     onDragEnter: (e: React.DragEvent) => console.log('Drag enter:', e),
@@ -121,7 +120,6 @@ export const Default: Story = {
 export const TabContent: Story = {
   args: {
     ...Default.args,
-    isTabContent: true,
   },
 }
 

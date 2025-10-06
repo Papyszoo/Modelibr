@@ -145,7 +145,6 @@ function ModelListContent({
         <ModelGrid
           models={models}
           onModelSelect={handleModelSelect}
-          isTabContent={isTabContent}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragEnter={onDragEnter}

@@ -6,7 +6,6 @@ import { Model } from '../../utils/fileUtils'
 interface ModelGridProps {
   models: Model[]
   onModelSelect: (model: Model) => void
-  isTabContent: boolean
   onDrop: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void

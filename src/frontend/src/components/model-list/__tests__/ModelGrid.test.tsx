@@ -84,7 +84,6 @@ describe('ModelGrid', () => {
       <ModelGrid
         models={mockModels}
         onModelSelect={mockOnModelSelect}
-        isTabContent={false}
         onDrop={mockOnDrop}
         onDragOver={mockOnDragOver}
         onDragEnter={mockOnDragEnter}
@@ -92,9 +91,7 @@ describe('ModelGrid', () => {
       />
     )
 
-    expect(
-      screen.getByPlaceholderText('Search models...')
-    ).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search models...')).toBeInTheDocument()
     expect(screen.getByText('Filters (Coming Soon)')).toBeInTheDocument()
   })
 
@@ -103,7 +100,6 @@ describe('ModelGrid', () => {
       <ModelGrid
         models={mockModels}
         onModelSelect={mockOnModelSelect}
-        isTabContent={false}
         onDrop={mockOnDrop}
         onDragOver={mockOnDragOver}
         onDragEnter={mockOnDragEnter}
@@ -121,7 +117,6 @@ describe('ModelGrid', () => {
       <ModelGrid
         models={mockModels}
         onModelSelect={mockOnModelSelect}
-        isTabContent={false}
         onDrop={mockOnDrop}
         onDragOver={mockOnDragOver}
         onDragEnter={mockOnDragEnter}
@@ -142,7 +137,6 @@ describe('ModelGrid', () => {
       <ModelGrid
         models={mockModels}
         onModelSelect={mockOnModelSelect}
-        isTabContent={false}
         onDrop={mockOnDrop}
         onDragOver={mockOnDragOver}
         onDragEnter={mockOnDragEnter}
@@ -163,7 +157,6 @@ describe('ModelGrid', () => {
       <ModelGrid
         models={mockModels}
         onModelSelect={mockOnModelSelect}
-        isTabContent={false}
         onDrop={mockOnDrop}
         onDragOver={mockOnDragOver}
         onDragEnter={mockOnDragEnter}
@@ -183,7 +176,6 @@ describe('ModelGrid', () => {
       <ModelGrid
         models={mockModels}
         onModelSelect={mockOnModelSelect}
-        isTabContent={false}
         onDrop={mockOnDrop}
         onDragOver={mockOnDragOver}
         onDragEnter={mockOnDragEnter}
@@ -216,7 +208,6 @@ describe('ModelGrid', () => {
       <ModelGrid
         models={mockModels}
         onModelSelect={mockOnModelSelect}
-        isTabContent={false}
         onDrop={mockOnDrop}
         onDragOver={mockOnDragOver}
         onDragEnter={mockOnDragEnter}
