@@ -1,0 +1,16 @@
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+COPY package*.json ./
+ENV NODE_ENV=production
+
+RUN npm ci --omit=dev && ls -la node_modules/dotenv
+
+COPY . .
+RUN ls -la node_modules/dotenv
+
+RUN useradd -u 1001 worker && chown -R worker:worker /app
+USER worker
+RUN ls -la node_modules/dotenv
+
+CMD ["npm", "start"]
