@@ -341,6 +341,30 @@ MAX_CONCURRENT_JOBS=5  # Default: 3
 
 **Common Errors and Solutions**:
 
+#### "Failed to create WebGL context with headless-gl"
+**Cause**: Xvfb not ready or not started correctly
+
+**Solutions**:
+```bash
+# Check if Xvfb is running
+docker compose exec thumbnail-worker sh -c 'pidof Xvfb'
+
+# Verify DISPLAY is set
+docker compose exec thumbnail-worker sh -c 'echo $DISPLAY'
+
+# Check Xvfb socket exists
+docker compose exec thumbnail-worker sh -c 'ls -la /tmp/.X11-unix/X99'
+
+# Test WebGL context creation
+docker compose exec thumbnail-worker node test-webgl-simple.js
+
+# Restart with latest image that includes Xvfb startup fix
+docker compose build thumbnail-worker
+docker compose up -d thumbnail-worker
+```
+
+**Note**: This issue was fixed in the docker-entrypoint.sh script with proper Xvfb wait logic. See [xvfb-startup-fix.md](xvfb-startup-fix.md) for details.
+
 #### "Failed to load model: Invalid file format"
 **Cause**: Unsupported or corrupt model file
 
