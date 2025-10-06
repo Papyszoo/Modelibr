@@ -33,7 +33,8 @@ logs/
 .eslintcache
 
 # Dependency directories
-node_modules/
+# NOTE: node_modules is commented out to allow copying into Docker
+# node_modules/
 jspm_packages/
 
 # Output of 'npm pack'
