@@ -2,7 +2,13 @@
 
 export interface Tab {
   id: string
-  type: 'modelList' | 'modelViewer' | 'texture' | 'animation' | 'texturePacks' | 'texturePackViewer'
+  type:
+    | 'modelList'
+    | 'modelViewer'
+    | 'texture'
+    | 'animation'
+    | 'texturePacks'
+    | 'texturePackViewer'
   label?: string
   modelId?: string
   packId?: string

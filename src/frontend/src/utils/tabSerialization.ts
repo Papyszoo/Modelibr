@@ -1,7 +1,11 @@
 import { Tab } from '../types'
 
 // Helper function to generate tab labels
-export function getTabLabel(type: Tab['type'], modelId?: string, packId?: string): string {
+export function getTabLabel(
+  type: Tab['type'],
+  modelId?: string,
+  packId?: string
+): string {
   switch (type) {
     case 'modelList':
       return 'Models'
@@ -45,7 +49,14 @@ export function parseCompactTabFormat(
 
       // Validate tab type
       if (
-        !['modelList', 'modelViewer', 'texture', 'animation', 'texturePacks', 'texturePackViewer'].includes(tabType)
+        ![
+          'modelList',
+          'modelViewer',
+          'texture',
+          'animation',
+          'texturePacks',
+          'texturePackViewer',
+        ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${type}`)
       }
