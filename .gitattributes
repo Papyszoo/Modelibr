@@ -1,0 +1,7 @@
+# Ensure shell scripts always use LF line endings, even on Windows
+# This prevents "exec: no such file or directory" errors in Docker containers
+*.sh text eol=lf
+
+# Ensure Dockerfile-related files use LF endings
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
