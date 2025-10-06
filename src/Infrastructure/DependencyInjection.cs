@@ -29,6 +29,7 @@ namespace Infrastructure
 
             services.AddScoped<IModelRepository, ModelRepository>();
             services.AddScoped<IFileRepository, FileRepository>();
+            services.AddScoped<IFilePersistence, FilePersistence>();
             services.AddScoped<IThumbnailRepository, ThumbnailRepository>();
             services.AddScoped<IThumbnailJobRepository, ThumbnailJobRepository>();
             services.AddScoped<IThumbnailJobEventRepository, ThumbnailJobEventRepository>();

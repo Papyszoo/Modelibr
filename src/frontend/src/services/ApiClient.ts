@@ -63,15 +63,12 @@ class ApiClient {
     return response.data
   }
 
-  async uploadFileToModel(
-    modelId: number,
-    file: File
-  ): Promise<{ fileId: number; alreadyLinked: boolean }> {
+  async uploadFile(file: File): Promise<{ fileId: number; alreadyExists: boolean }> {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response: AxiosResponse<{ fileId: number; alreadyLinked: boolean }> =
-      await this.client.post(`/models/${modelId}/files`, formData, {
+    const response: AxiosResponse<{ fileId: number; alreadyExists: boolean }> =
+      await this.client.post('/files', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
