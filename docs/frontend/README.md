@@ -55,7 +55,7 @@ Custom React hooks that encapsulate reusable stateful logic.
 ### Model List Components
 
 - [ModelList](./components/ModelList.md) - Model list with upload functionality
-- [ModelsDataTable](./components/ModelsDataTable.md) - PrimeReact data table for models
+- [ModelGrid](./components/ModelGrid.md) - Grid layout for displaying model cards
 - [ModelListHeader](./components/ModelListHeader.md) - Model list header with actions
 - [EmptyState](./components/EmptyState.md) - Empty state with drag and drop
 - [ErrorState](./components/ErrorState.md) - Error state display

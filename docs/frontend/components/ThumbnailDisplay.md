@@ -94,5 +94,5 @@ The component handles three states automatically:
 ## Related
 
 - [ThumbnailSidebar](./ThumbnailSidebar.md) - Sidebar with thumbnail display and regenerate button
-- [ModelsDataTable](./ModelsDataTable.md) - Uses thumbnails in table
+- [ModelGrid](./ModelGrid.md) - Uses thumbnails in grid cards
 - [ApiClient](../services/ApiClient.md) - Provides thumbnail API methods

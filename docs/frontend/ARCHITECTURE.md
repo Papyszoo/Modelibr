@@ -113,7 +113,7 @@ Components are composed from smaller, reusable pieces:
   <UploadProgress />
   <LoadingState />
   <ErrorState />
-  <ModelsDataTable />
+  <ModelGrid />
 </ModelList>
 ```
 
@@ -138,12 +138,21 @@ function ModelListContent({ tabContext }) {
   const [models, setModels] = useState([])
   // ... business logic
   
-  return <ModelsDataTable models={models} />
+  return <ModelGrid models={models} />
 }
 
 // Presenter: UI
-function ModelsDataTable({ models }) {
-  return <DataTable value={models} />
+function ModelGrid({ models }) {
+  return (
+    <div className="model-grid">
+      {models.map(model => (
+        <div key={model.id} className="model-card">
+          <ThumbnailDisplay modelId={model.id} />
+          <span>{model.name}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 ```
 
@@ -247,18 +256,18 @@ const TexturePackList = lazy(() => import('./components/tabs/TexturePackList'))
 ### 2. Memoization
 
 ```typescript
-const MemoizedDataTable = memo(ModelsDataTable)
+const MemoizedGrid = memo(ModelGrid)
 ```
 
-### 3. Virtual Scrolling
+### 3. Grid Optimization
 
-PrimeReact DataTable with pagination:
+Responsive CSS Grid for model cards:
 ```typescript
-<DataTable 
-  paginator 
-  rows={10}
-  lazy={true}
-/>
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
 ```
 
 ### 4. Efficient Re-renders

@@ -446,5 +446,5 @@ function ModelViewer({ model }: { model: Model }) {
 
 - [useFileUpload](../hooks/useFileUpload.md) - Uses validation functions
 - [Model](../components/Model.md) - Uses format detection
-- [ModelsDataTable](../components/ModelsDataTable.md) - Uses file formatting
+- [ModelGrid](../components/ModelGrid.md) - Uses file formatting
 - [ApiClient](../services/ApiClient.md) - Handles file uploads

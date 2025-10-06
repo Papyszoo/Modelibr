@@ -230,12 +230,11 @@ Fetch Updated Models
 />
 ```
 
-### ModelsDataTable
+### ModelGrid
 ```typescript
-<ModelsDataTable
+<ModelGrid
   models={models}
   onModelSelect={handleModelSelect}
-  isTabContent={isTabContent}
   onDrop={onDrop}
   onDragOver={onDragOver}
   onDragEnter={onDragEnter}
@@ -377,7 +376,7 @@ useEffect(() => {
 
 ## Related
 
-- [ModelsDataTable](./ModelsDataTable.md) - Data table component
+- [ModelGrid](./ModelGrid.md) - Grid component for displaying models
 - [ModelListHeader](./ModelListHeader.md) - Header component
 - [EmptyState](./EmptyState.md) - Empty state
 - [LoadingState](./LoadingState.md) - Loading indicator

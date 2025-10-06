@@ -28,7 +28,7 @@ Major UI components with props, examples, and usage patterns:
 
 **Model List Components:**
 - **[ModelList](./components/ModelList.md)** - Main model list with upload
-- **[ModelsDataTable](./components/ModelsDataTable.md)** - PrimeReact data table
+- **[ModelGrid](./components/ModelGrid.md)** - Grid layout for model cards
 - **[ModelInfo](./components/ModelInfo.md)** - Model metadata display
 - **[ThumbnailDisplay](./components/ThumbnailDisplay.md)** - Thumbnail with real-time status
 
@@ -106,7 +106,7 @@ Each document includes:
 **Adding File Upload:**
 ```
 1. Read: hooks/useFileUpload.md
-2. Review: components/ModelsDataTable.md (for drag-drop)
+2. Review: components/ModelGrid.md (for drag-drop)
 3. Check: utils/fileUtils.md (for validation)
 ```
 
@@ -199,7 +199,7 @@ App
       │    └── DockContentArea
       │         ├── ModelList
       │         │    ├── useFileUpload
-      │         │    ├── ModelsDataTable
+      │         │    ├── ModelGrid
       │         │    └── ThumbnailDisplay (simple, direct API usage)
       │         └── ModelViewer
       │              └── Scene
@@ -215,7 +215,7 @@ App
 | React 18 | UI Framework | [Getting Started](./GETTING_STARTED.md) |
 | TypeScript | Type Safety | All `.md` files show types |
 | Three.js | 3D Graphics | [Scene](./components/Scene.md), [Model](./components/Model.md) |
-| PrimeReact | UI Components | [ModelsDataTable](./components/ModelsDataTable.md) |
+| PrimeReact | UI Components | [ModelGrid](./components/ModelGrid.md) |
 | nuqs | URL State | [tabSerialization](./utils/tabSerialization.md) |
 | Axios | HTTP Client | [ApiClient](./services/ApiClient.md) |
 

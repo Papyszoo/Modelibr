@@ -228,6 +228,6 @@ These classes are automatically removed when the drag operation ends.
 
 ## Related
 
-- [ModelsDataTable](../components/ModelsDataTable.md) - Uses drag and drop for file uploads
+- [ModelGrid](../components/ModelGrid.md) - Uses drag and drop for file uploads
 - [EmptyState](../components/EmptyState.md) - Uses drag and drop in empty state
 - [fileUtils](../utils/fileUtils.md) - File validation utilities

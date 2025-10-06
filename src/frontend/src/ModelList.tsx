@@ -11,7 +11,7 @@ import UploadProgress from './components/model-list/UploadProgress'
 import LoadingState from './components/model-list/LoadingState'
 import ErrorState from './components/model-list/ErrorState'
 import EmptyState from './components/model-list/EmptyState'
-import ModelsDataTable from './components/model-list/ModelsDataTable'
+import ModelGrid from './components/model-list/ModelGrid'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
@@ -142,10 +142,9 @@ function ModelListContent({
       />
 
       {!loading && !error && models.length > 0 && (
-        <ModelsDataTable
+        <ModelGrid
           models={models}
           onModelSelect={handleModelSelect}
-          isTabContent={isTabContent}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragEnter={onDragEnter}

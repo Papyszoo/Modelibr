@@ -256,4 +256,4 @@ function SomePage() {
 - [useDragAndDrop](./useFileUpload.md#usedraganddrop) - Drop zone creation
 - [useFileUpload](./useFileUpload.md) - File upload handling
 - [EmptyState](../components/EmptyState.md) - Uses drop zones
-- [ModelsDataTable](../components/ModelsDataTable.md) - Uses drop zones
+- [ModelGrid](../components/ModelGrid.md) - Uses drop zones
