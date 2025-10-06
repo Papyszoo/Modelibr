@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { TabView, TabPanel } from 'primereact/tabview'
-import { Button } from 'primereact/button'
 import { TexturePackDto, TextureType } from '../../types'
 import { useTexturePacks } from '../../hooks/useTexturePacks'
 import { getAllTextureTypes } from '../../utils/textureTypeUtils'
@@ -22,7 +21,8 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [updating, setUpdating] = useState(false)
-  const [showModelAssociationDialog, setShowModelAssociationDialog] = useState(false)
+  const [showModelAssociationDialog, setShowModelAssociationDialog] =
+    useState(false)
   const texturePacksApi = useTexturePacks()
 
   const loadTexturePack = async () => {
@@ -32,7 +32,9 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
       const pack = await texturePacksApi.getTexturePackById(parseInt(packId))
       setTexturePack(pack)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load texture pack')
+      setError(
+        err instanceof Error ? err.message : 'Failed to load texture pack'
+      )
     } finally {
       setLoading(false)
     }
@@ -82,7 +84,9 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   }
 
   if (loading) {
-    return <div className="texture-pack-viewer-loading">Loading texture pack...</div>
+    return (
+      <div className="texture-pack-viewer-loading">Loading texture pack...</div>
+    )
   }
 
   if (error) {
@@ -90,7 +94,9 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   }
 
   if (!texturePack) {
-    return <div className="texture-pack-viewer-error">Texture pack not found</div>
+    return (
+      <div className="texture-pack-viewer-error">Texture pack not found</div>
+    )
   }
 
   // Get all texture types for cards
@@ -99,7 +105,7 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   return (
     <div className="texture-pack-viewer">
       <ConfirmDialog />
-      
+
       <header className="pack-viewer-header">
         <div className="pack-overview">
           <div className="pack-info">
@@ -117,9 +123,9 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
         <TabPanel header="Textures" leftIcon="pi pi-image">
           <div className="texture-cards-grid">
             {allTextureTypes.map((textureType: TextureType) => {
-              const texture = texturePack.textures.find(
-                t => t.textureType === textureType
-              ) || null
+              const texture =
+                texturePack.textures.find(t => t.textureType === textureType) ||
+                null
 
               return (
                 <TextureCard
