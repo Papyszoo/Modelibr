@@ -1,13 +1,13 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import ffmpeg from 'fluent-ffmpeg'
 import sharp from 'sharp'
 import { config } from './config.js'
 import logger from './logger.js'
 
 /**
- * Service for encoding orbit frames into animated WebP and poster images
+ * Service for encoding orbit frames into static WebP thumbnail and poster images
+ * Simplified version using sharp only (no ffmpeg dependency)
  */
 export class FrameEncoderService {
   constructor() {
@@ -28,7 +28,8 @@ export class FrameEncoderService {
   }
 
   /**
-   * Encode orbit frames into animated WebP and poster image
+   * Encode orbit frames into static WebP thumbnail and poster image
+   * Uses the middle frame as the representative image
    * @param {Array} frames - Array of rendered frame data
    * @param {Object} jobLogger - Logger with job context
    * @returns {Promise<Object>} Encoding result with file paths and metadata
@@ -42,216 +43,136 @@ export class FrameEncoderService {
       // Create job-specific working directory
       fs.mkdirSync(workingDir, { recursive: true })
 
-      jobLogger.info('Starting frame encoding', {
+      jobLogger.info('Starting frame encoding (static WebP)', {
         frameCount: frames.length,
         workingDir,
         targetFormat: 'webp',
       })
 
-      // Step 1: Convert frames to temporary PNG files
-      const pngFiles = await this.framesToPNG(frames, workingDir, jobLogger)
+      if (frames.length === 0) {
+        throw new Error('No frames to encode')
+      }
 
-      // Step 2: Create animated WebP from PNG sequence
-      const webpPath = await this.createAnimatedWebP(
-        pngFiles,
+      // Select middle frame as representative image
+      const middleFrameIndex = Math.floor(frames.length / 2)
+      const representativeFrame = frames[middleFrameIndex]
+
+      jobLogger.info('Using middle frame for thumbnail', {
+        frameIndex: middleFrameIndex,
+        totalFrames: frames.length,
+        angle: representativeFrame.angle,
+      })
+
+      // Step 1: Create WebP thumbnail from representative frame
+      const webpPath = await this.createStaticWebP(
+        representativeFrame,
         workingDir,
         jobLogger
       )
 
-      // Step 3: Extract poster frame (first frame as JPG)
+      // Step 2: Create poster frame (JPG) from same frame
       const posterPath = await this.createPosterFrame(
-        pngFiles[0],
+        representativeFrame,
         workingDir,
         jobLogger
       )
 
       const encodeTime = Date.now() - startTime
 
-      jobLogger.info('Frame encoding completed successfully', {
-        encodeTimeMs: encodeTime,
+      jobLogger.info('Frame encoding completed', {
         webpPath,
         posterPath,
-        frameCount: frames.length,
+        encodeTimeMs: encodeTime,
+        representativeFrameIndex: middleFrameIndex,
       })
 
       return {
         webpPath,
         posterPath,
-        tempFiles: pngFiles,
-        workingDir,
-        encodeTimeMs: encodeTime,
         frameCount: frames.length,
+        representativeFrameIndex: middleFrameIndex,
+        encodeTimeMs: encodeTime,
       }
     } catch (error) {
       jobLogger.error('Frame encoding failed', {
         error: error.message,
-        frameCount: frames.length,
-        workingDir,
+        stack: error.stack,
+      })
+      throw error
+    } finally {
+      // Cleanup will be done by periodic cleanup task
+    }
+  }
+
+  /**
+   * Create static WebP from a single frame using Sharp
+   * @param {Object} frame - Frame data with pixels buffer
+   * @param {string} workingDir - Working directory
+   * @param {Object} jobLogger - Logger with job context
+   * @returns {Promise<string>} Path to created WebP file
+   */
+  async createStaticWebP(frame, workingDir, jobLogger) {
+    const webpPath = path.join(workingDir, 'thumbnail.webp')
+    const quality = config.encoding?.webpQuality || 75
+
+    jobLogger.info('Creating static WebP thumbnail', {
+      quality,
+      width: frame.width,
+      height: frame.height,
+      outputPath: webpPath,
+    })
+
+    try {
+      // Frame pixels are already PNG data from Puppeteer's canvas.toDataURL
+      // So we can directly process them
+      await sharp(frame.pixels).webp({ quality }).toFile(webpPath)
+
+      const stats = fs.statSync(webpPath)
+      jobLogger.info('WebP thumbnail created successfully', {
+        sizeBytes: stats.size,
+        sizeMB: (stats.size / 1024 / 1024).toFixed(2),
       })
 
-      // Clean up on error
-      await this.cleanupDirectory(workingDir)
+      return webpPath
+    } catch (error) {
+      jobLogger.error('Failed to create WebP thumbnail', {
+        error: error.message,
+      })
       throw error
     }
   }
 
   /**
-   * Convert frame data to PNG files
-   * @param {Array} frames - Array of frame data
-   * @param {string} workingDir - Working directory for temp files
-   * @param {Object} jobLogger - Logger with job context
-   * @returns {Promise<Array>} Array of PNG file paths
-   */
-  async framesToPNG(frames, workingDir, jobLogger) {
-    const pngFiles = []
-
-    jobLogger.info('Converting frames to PNG files', {
-      frameCount: frames.length,
-    })
-
-    for (let i = 0; i < frames.length; i++) {
-      const frame = frames[i]
-      const fileName = `frame_${String(i).padStart(4, '0')}.png`
-      const filePath = path.join(workingDir, fileName)
-
-      // Check if frame has actual pixel data
-      if (frame.pixels && frame.pixels.length > 0) {
-        // Convert RGBA buffer to PNG using Sharp
-        await sharp(frame.pixels, {
-          raw: {
-            width: frame.width,
-            height: frame.height,
-            channels: 4, // RGBA
-          },
-        })
-          .png()
-          .toFile(filePath)
-      } else {
-        // If no pixel data, fail with error instead of creating placeholder
-        throw new Error(
-          `Frame ${i} has no pixel data - cannot generate thumbnail without actual rendering`
-        )
-      }
-
-      pngFiles.push(filePath)
-
-      // Log progress every 10 frames
-      if ((i + 1) % 10 === 0 || i === frames.length - 1) {
-        jobLogger.debug('PNG conversion progress', {
-          framesCompleted: i + 1,
-          totalFrames: frames.length,
-        })
-      }
-    }
-
-    return pngFiles
-  }
-
-  /**
-   * Create animated WebP from PNG sequence using FFmpeg
-   * @param {Array} pngFiles - Array of PNG file paths
+   * Create poster frame (JPG) from a single frame
+   * @param {Object} frame - Frame data with pixels buffer
    * @param {string} workingDir - Working directory
    * @param {Object} jobLogger - Logger with job context
-   * @returns {Promise<string>} Path to created WebP file
+   * @returns {Promise<string>} Path to created JPG file
    */
-  async createAnimatedWebP(pngFiles, workingDir, jobLogger) {
-    const webpPath = path.join(workingDir, 'animation.webp')
-    const framerate = config.encoding?.framerate || 10 // frames per second
-    const quality = config.encoding?.webpQuality || 75 // WebP quality
-
-    jobLogger.info('Creating animated WebP', {
-      inputFrames: pngFiles.length,
-      framerate,
-      quality,
-      outputPath: webpPath,
-    })
-
-    return new Promise((resolve, reject) => {
-      // Create input file list for FFmpeg
-      const inputPattern = path.join(workingDir, 'frame_%04d.png')
-
-      ffmpeg()
-        .input(inputPattern)
-        .inputFPS(framerate)
-        .outputOptions([
-          '-c:v libwebp',
-          '-lossless 0',
-          `-quality ${quality}`,
-          '-method 6', // Better compression
-          '-loop 0', // Infinite loop
-          '-preset photo',
-        ])
-        .output(webpPath)
-        .on('start', commandLine => {
-          jobLogger.debug('FFmpeg command started', { commandLine })
-        })
-        .on('progress', progress => {
-          if (progress.percent) {
-            jobLogger.debug('WebP encoding progress', {
-              percent: Math.round(progress.percent),
-              fps: progress.currentFps,
-              frames: progress.frames,
-            })
-          }
-        })
-        .on('end', () => {
-          jobLogger.info('Animated WebP created successfully', {
-            outputPath: webpPath,
-            sizeBytes: fs.existsSync(webpPath) ? fs.statSync(webpPath).size : 0,
-          })
-          resolve(webpPath)
-        })
-        .on('error', error => {
-          jobLogger.error('WebP encoding failed', {
-            error: error.message,
-            inputPattern,
-            outputPath: webpPath,
-          })
-          reject(error)
-        })
-        .run()
-    })
-  }
-
-  /**
-   * Create poster frame (first frame as JPG)
-   * @param {string} firstPngPath - Path to first PNG frame
-   * @param {string} workingDir - Working directory
-   * @param {Object} jobLogger - Logger with job context
-   * @returns {Promise<string>} Path to created poster JPG
-   */
-  async createPosterFrame(firstPngPath, workingDir, jobLogger) {
+  async createPosterFrame(frame, workingDir, jobLogger) {
     const posterPath = path.join(workingDir, 'poster.jpg')
-    const quality = config.encoding?.jpegQuality || 85 // JPEG quality
+    const quality = config.encoding?.jpegQuality || 85
 
-    jobLogger.info('Creating poster frame', {
-      inputPath: firstPngPath,
-      outputPath: posterPath,
+    jobLogger.info('Creating poster frame (JPEG)', {
       quality,
+      width: frame.width,
+      height: frame.height,
+      outputPath: posterPath,
     })
 
     try {
-      await sharp(firstPngPath)
-        .jpeg({
-          quality: quality,
-          progressive: true,
-          mozjpeg: true,
-        })
-        .toFile(posterPath)
+      await sharp(frame.pixels).jpeg({ quality }).toFile(posterPath)
 
-      const posterSize = fs.statSync(posterPath).size
-
+      const stats = fs.statSync(posterPath)
       jobLogger.info('Poster frame created successfully', {
-        outputPath: posterPath,
-        sizeBytes: posterSize,
+        sizeBytes: stats.size,
+        sizeMB: (stats.size / 1024 / 1024).toFixed(2),
       })
 
       return posterPath
     } catch (error) {
-      jobLogger.error('Poster frame creation failed', {
+      jobLogger.error('Failed to create poster frame', {
         error: error.message,
-        inputPath: firstPngPath,
-        outputPath: posterPath,
       })
       throw error
     }

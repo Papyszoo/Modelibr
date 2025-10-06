@@ -12,8 +12,8 @@ try {
   // Try to create a WebGL context
   const width = 256
   const height = 256
-  logger.info('Attempting to create GL context...',  { width, height })
-  
+  logger.info('Attempting to create GL context...', { width, height })
+
   const glContext = createGl(width, height, {
     preserveDrawingBuffer: true,
     antialias: true,
@@ -21,7 +21,9 @@ try {
   })
 
   if (!glContext) {
-    logger.error('Failed to create WebGL context - createGl returned null/undefined')
+    logger.error(
+      'Failed to create WebGL context - createGl returned null/undefined'
+    )
     process.exit(1)
   }
 

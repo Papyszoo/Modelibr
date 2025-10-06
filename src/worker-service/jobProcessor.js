@@ -292,9 +292,7 @@ export class JobProcessor {
         )
 
         // Render orbit frames
-        const frames = await this.puppeteerRenderer.renderOrbitFrames(
-          jobLogger
-        )
+        const frames = await this.puppeteerRenderer.renderOrbitFrames(jobLogger)
 
         // Log memory statistics
         const memoryStats = this.puppeteerRenderer.getMemoryStats(frames)

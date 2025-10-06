@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+// Note: 'window' is used within page.evaluate() calls which run in browser context
 import puppeteer from 'puppeteer'
 import { config } from './config.js'
 import logger from './logger.js'
@@ -35,9 +37,9 @@ export class PuppeteerRenderer {
           '--disable-software-rasterizer',
           '--disable-extensions',
           '--disable-web-security', // Allow loading models from data URLs
-          '--disable-features=IsolateOrigins,site-per-process'
+          '--disable-features=IsolateOrigins,site-per-process',
         ],
-        dumpio: config.logLevel === 'debug'
+        dumpio: config.logLevel === 'debug',
       })
 
       this.page = await this.browser.newPage()
@@ -46,7 +48,7 @@ export class PuppeteerRenderer {
       await this.page.setViewport({
         width: config.rendering.outputWidth,
         height: config.rendering.outputHeight,
-        deviceScaleFactor: 1
+        deviceScaleFactor: 1,
       })
 
       // Load the rendering template
@@ -58,7 +60,7 @@ export class PuppeteerRenderer {
 
       // Wait for Three.js to be loaded
       await this.page.waitForFunction(() => window.THREE !== undefined, {
-        timeout: 10000
+        timeout: 10000,
       })
 
       // Initialize the renderer in the page
@@ -78,20 +80,22 @@ export class PuppeteerRenderer {
 
       if (!initialized) {
         const error = await this.page.evaluate(() => window.modelRenderer.error)
-        throw new Error(`Failed to initialize renderer: ${error || 'Unknown error'}`)
+        throw new Error(
+          `Failed to initialize renderer: ${error || 'Unknown error'}`
+        )
       }
 
       logger.info('Puppeteer renderer initialized successfully', {
         width: config.rendering.outputWidth,
         height: config.rendering.outputHeight,
-        backgroundColor: config.rendering.backgroundColor
+        backgroundColor: config.rendering.backgroundColor,
       })
 
       return true
     } catch (error) {
       logger.error('Failed to initialize Puppeteer renderer', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       })
       await this.dispose()
       throw error
@@ -123,7 +127,7 @@ export class PuppeteerRenderer {
         async (modelData, type) => {
           try {
             const model = await window.loadModelFromData(modelData, type)
-            
+
             // Normalize and add to scene
             const normInfo = window.normalizeModel(model, 2.0)
             window.modelRenderer.model = model
@@ -137,13 +141,13 @@ export class PuppeteerRenderer {
               success: true,
               polygonCount,
               modelSize: normInfo.size,
-              maxDimension: normInfo.maxDimension
+              maxDimension: normInfo.maxDimension,
             }
           } catch (error) {
             console.error('Model loading error:', error)
             return {
               success: false,
-              error: error.message
+              error: error.message,
             }
           }
         },
@@ -157,7 +161,7 @@ export class PuppeteerRenderer {
 
       logger.info('Model loaded successfully in browser', {
         polygonCount: result.polygonCount,
-        maxDimension: result.maxDimension
+        maxDimension: result.maxDimension,
       })
 
       return result.polygonCount
@@ -165,7 +169,7 @@ export class PuppeteerRenderer {
       logger.error('Failed to load model', {
         error: error.message,
         filePath,
-        fileType
+        fileType,
       })
       throw error
     }
@@ -186,7 +190,9 @@ export class PuppeteerRenderer {
 
     try {
       // Check if model is loaded
-      const isReady = await this.page.evaluate(() => window.modelRenderer.isReady)
+      const isReady = await this.page.evaluate(
+        () => window.modelRenderer.isReady
+      )
       if (!isReady) {
         throw new Error('No model loaded')
       }
@@ -204,7 +210,7 @@ export class PuppeteerRenderer {
         endAngle: config.orbit.endAngle,
         frameCount: frameCount,
         cameraDistance: cameraDistance,
-        cameraHeight: config.orbit.cameraHeight
+        cameraHeight: config.orbit.cameraHeight,
       })
 
       // Render frames at each orbit angle
@@ -221,7 +227,7 @@ export class PuppeteerRenderer {
             totalFrames: frameCount,
             currentAngle: angle,
             memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-            memoryTotalMB: Math.round(memoryUsage.heapTotal / 1024 / 1024)
+            memoryTotalMB: Math.round(memoryUsage.heapTotal / 1024 / 1024),
           })
         }
       }
@@ -233,14 +239,14 @@ export class PuppeteerRenderer {
         averageTimePerFrameMs: Math.round(renderTime / frames.length),
         totalDataSizeKB: Math.round(
           frames.reduce((sum, f) => sum + f.size, 0) / 1024
-        )
+        ),
       })
 
       return frames
     } catch (error) {
       jobLogger.error('Orbit frame rendering failed', {
         error: error.message,
-        framesCompleted: frames.length
+        framesCompleted: frames.length,
       })
       throw error
     }
@@ -264,7 +270,7 @@ export class PuppeteerRenderer {
         try {
           window.positionCamera(ang, dist, height)
           const rendered = window.renderScene()
-          
+
           if (!rendered) {
             return { success: false, error: 'Rendering failed' }
           }
@@ -280,8 +286,8 @@ export class PuppeteerRenderer {
             cameraPosition: {
               x: window.modelRenderer.camera.position.x,
               y: window.modelRenderer.camera.position.y,
-              z: window.modelRenderer.camera.position.z
-            }
+              z: window.modelRenderer.camera.position.z,
+            },
           }
         } catch (error) {
           console.error('Render error:', error)
@@ -313,15 +319,15 @@ export class PuppeteerRenderer {
       simulated: false,
       renderSettings: {
         backgroundColor: config.rendering.backgroundColor,
-        antialiasing: config.rendering.enableAntialiasing
-      }
+        antialiasing: config.rendering.enableAntialiasing,
+      },
     }
 
     logger.debug('Frame rendered with Puppeteer', {
       frameIndex,
       angle,
       dataSize: buffer.length,
-      cameraPos: result.cameraPosition
+      cameraPos: result.cameraPosition,
     })
 
     return frameData
@@ -353,7 +359,7 @@ export class PuppeteerRenderer {
 
     logger.debug('Camera distance calculated', {
       baseDistance: config.rendering.cameraDistance,
-      calculatedDistance: distance
+      calculatedDistance: distance,
     })
 
     return distance
@@ -373,7 +379,7 @@ export class PuppeteerRenderer {
       totalSizeBytes: totalBytes,
       totalSizeMB: Math.round((totalBytes / 1024 / 1024) * 100) / 100,
       averageFrameSizeKB: Math.round((averageFrameSize / 1024) * 100) / 100,
-      processMemoryUsage: process.memoryUsage()
+      processMemoryUsage: process.memoryUsage(),
     }
   }
 
@@ -386,7 +392,7 @@ export class PuppeteerRenderer {
     const mimeTypes = {
       obj: 'text/plain',
       gltf: 'model/gltf+json',
-      glb: 'model/gltf-binary'
+      glb: 'model/gltf-binary',
     }
     return mimeTypes[fileType.toLowerCase()] || 'application/octet-stream'
   }
@@ -411,7 +417,7 @@ export class PuppeteerRenderer {
       logger.debug('Puppeteer renderer disposed')
     } catch (error) {
       logger.error('Error disposing Puppeteer renderer', {
-        error: error.message
+        error: error.message,
       })
     }
   }
