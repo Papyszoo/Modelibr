@@ -1,6 +1,6 @@
 import { useContext, ReactNode } from 'react'
 import TabContext, { TabContextValue } from '../contexts/TabContext'
-import { Tab } from '../types'
+import { Tab, TexturePackDto } from '../types'
 import { Model } from '../utils/fileUtils'
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -54,6 +54,31 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openTexturePackDetailsTab = (texturePack: TexturePackDto): void => {
+    // Check if tab already exists
+    const existingTab = tabs.find(
+      tab => tab.type === 'texturePackViewer' && tab.packId === texturePack.id.toString()
+    )
+
+    if (existingTab) {
+      // Switch to existing tab
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    // Create new tab
+    const newTab: Tab = {
+      id: `pack-${texturePack.id}`,
+      type: 'texturePackViewer',
+      label: texturePack.name || `Pack ${texturePack.id}`,
+      packId: texturePack.id.toString(),
+    }
+
+    const newTabs = [...tabs, newTab]
+    setTabs(newTabs)
+    setActiveTab(newTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -65,9 +90,12 @@ export const TabProvider = ({
         tab.type === type &&
         (type === 'modelList' ||
           type === 'texture' ||
+          type === 'texturePacks' ||
           type === 'animation' ||
           (type === 'modelViewer' &&
-            tab.modelId === (data as { id?: string })?.id))
+            tab.modelId === (data as { id?: string })?.id) ||
+          (type === 'texturePackViewer' &&
+            tab.packId === (data as { id?: string })?.id))
     )
 
     if (existingTab) {
@@ -80,11 +108,15 @@ export const TabProvider = ({
       id:
         type === 'modelViewer' && (data as { id?: string })?.id
           ? `model-${(data as { id?: string }).id}`
-          : type,
+          : type === 'texturePackViewer' && (data as { id?: string })?.id
+            ? `pack-${(data as { id?: string }).id}`
+            : type,
       type,
       label: title,
       modelId:
         type === 'modelViewer' ? (data as { id?: string })?.id : undefined,
+      packId:
+        type === 'texturePackViewer' ? (data as { id?: string })?.id : undefined,
     }
 
     const newTabs = [...tabs, newTab]
@@ -99,6 +131,7 @@ export const TabProvider = ({
     activeTab,
     setActiveTab,
     openModelDetailsTab,
+    openTexturePackDetailsTab,
     openTab,
   }
 

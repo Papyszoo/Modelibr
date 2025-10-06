@@ -1,0 +1,71 @@
+.texture-pack-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+}
+
+.texture-pack-viewer-loading,
+.texture-pack-viewer-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 1.125rem;
+  color: #64748b;
+}
+
+.texture-pack-viewer-error {
+  color: #ef4444;
+}
+
+.pack-viewer-header {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pack-overview {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.pack-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pack-viewer-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pack-viewer-tabs .p-tabview-panels {
+  flex: 1;
+  overflow: auto;
+  padding: 1.5rem;
+}
+
+.texture-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  padding: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+  .texture-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (min-width: 1536px) {
+  .texture-cards-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
