@@ -26,9 +26,10 @@ This prevented 3D model thumbnail generation from working.
 
 ### 3. Updated Docker Configuration
 
-- **Added packages**: `libxi-dev`, `libglu1-mesa-dev`, `libglew-dev`, `xvfb`
+- **Added packages**: `libxi-dev`, `libglu1-mesa-dev`, `libglew-dev`, `xvfb`, `xauth`
 - **Changed CMD**: Now runs with `xvfb-run -a -s "-screen 0 1280x1024x24" npm start`
 - **Purpose**: Provides virtual display for OpenGL to function
+- **Note**: `xauth` is explicitly required when using `--no-install-recommends` as it's only a recommended dependency of `xvfb`
 
 ### 4. Enhanced Canvas Object
 
@@ -42,7 +43,7 @@ This prevented 3D model thumbnail generation from working.
 | File                    | Changes                                      |
 | ----------------------- | -------------------------------------------- |
 | `package.json`          | Added `gl@8.1.6` dependency                  |
-| `Dockerfile`            | Added xvfb and Mesa libraries, changed CMD   |
+| `Dockerfile`            | Added xvfb, xauth and Mesa libraries, changed CMD |
 | `orbitFrameRenderer.js` | Integrated headless-gl with WebGL 2 polyfill |
 | `webgl2-polyfill.js`    | New file - WebGL 2 API compatibility layer   |
 | `WEBGL_FIX.md`          | Documentation of the fix                     |
