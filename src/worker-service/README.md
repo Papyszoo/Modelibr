@@ -1,12 +1,14 @@
 # Modelibr Thumbnail Worker Service
 
-A Node.js worker service for background thumbnail generation using three.js. This service polls the main API for thumbnail generation jobs and processes them asynchronously.
+A Node.js worker service for background thumbnail generation using Puppeteer and three.js. This service uses real-time SignalR notifications to receive thumbnail generation jobs and processes them asynchronously using headless Chrome.
 
 ## Features
 
 - **SignalR Real-time Queue**: Real-time job notifications via SignalR for instant processing
-- **Actual 3D Rendering**: Uses three.js WebGL renderer with node-canvas for headless rendering
+- **Puppeteer-based Rendering**: Uses Puppeteer with headless Chrome to render 3D models in a real browser environment
+- **Three.js Integration**: Loads models from CDN and renders them with proper lighting and materials
 - **Orbit Animation**: Generates rotating orbit frames around the 3D model
+- **Static WebP Thumbnails**: Creates optimized WebP thumbnails from representative frames
 - **Event Logging**: Comprehensive event logging to database for full audit trail
 - **Configuration Management**: Comprehensive configuration system with environment variable support
 - **Health Monitoring**: Built-in health check endpoints for monitoring and container orchestration
@@ -15,6 +17,7 @@ A Node.js worker service for background thumbnail generation using three.js. Thi
 - **Error Handling**: Robust error handling - jobs fail properly without placeholder fallbacks
 - **Concurrency Control**: Configurable maximum concurrent job processing
 - **Docker Support**: Containerized deployment with Docker and Docker Compose
+- **Lightweight**: Uses Debian Slim base image with only necessary dependencies
 
 ## Configuration
 
@@ -166,14 +169,35 @@ docker compose logs thumbnail-worker
 docker compose up -d --scale thumbnail-worker=3
 ```
 
-## Architecture Integration
+## Architecture
 
-The worker service integrates with the existing Modelibr architecture:
+### Rendering Pipeline
 
-1. **Job Queue**: Polls the existing `ThumbnailQueue` service via HTTP API
-2. **Job Processing**: Claims jobs with worker ID for safe concurrent processing
-3. **Status Updates**: Reports job completion/failure back to the main API
-4. **File Access**: Downloads model files from the main API for processing
+1. **Job Notification**: SignalR hub notifies worker of new thumbnail job
+2. **Model Download**: Worker fetches 3D model file from API
+3. **Browser Initialization**: Puppeteer launches headless Chrome with render template
+4. **Model Loading**: Three.js loads model from data URL in browser context
+5. **Orbit Rendering**: Camera orbits around model, rendering frames at each angle
+6. **Thumbnail Generation**: Representative frame is converted to WebP and JPEG
+7. **Storage Upload**: Thumbnails uploaded to API storage
+8. **Job Completion**: Worker reports success/failure back to API
+
+### Technology Stack
+
+- **Puppeteer**: Headless Chrome automation for browser-based rendering
+- **Three.js**: 3D graphics library (loaded from CDN in browser)
+- **Sharp**: Image processing for WebP/JPEG conversion
+- **SignalR**: Real-time job queue notifications
+- **Express**: Health check HTTP server
+- **Winston**: Structured logging
+
+### Browser-based Rendering
+
+The worker uses a browser-based rendering approach:
+- HTML template with Three.js from CDN
+- No need for native WebGL bindings (gl, canvas modules)
+- True browser environment for maximum compatibility
+- Simpler Docker image without Mesa/X11 dependencies
 
 ### API Integration Points
 
