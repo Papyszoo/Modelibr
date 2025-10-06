@@ -1,4 +1,11 @@
 # Dockerfile for the thumbnail worker service
+#
+# PREREQUISITES: This build requires node_modules to be installed locally first.
+# Run this command before building:
+#   cd src/worker-service && npm install
+#
+# Then build with docker compose:
+#   docker compose build thumbnail-worker
 
 FROM node:20-bookworm-slim AS base
 
@@ -12,8 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy package files and install dependencies
-# Note: Remove node_modules from .dockerignore to copy pre-installed dependencies
+# Copy package files and pre-installed node_modules from build context
+# NOTE: If you get a "node_modules: not found" error, run 'npm install' locally first
 COPY package*.json ./
 COPY node_modules ./node_modules
 
