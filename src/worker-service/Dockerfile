@@ -11,10 +11,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Copy package files and install dependencies
+# Note: Remove node_modules from .dockerignore to copy pre-installed dependencies
 COPY package*.json ./
+COPY node_modules ./node_modules
+
+# Set NODE_ENV
 ENV NODE_ENV=production
 
-RUN npm ci --omit=dev && npm cache clean --force
+# Copy application code
 COPY . .
 
 RUN useradd -u 1001 worker && chown -R worker:worker /app
@@ -24,4 +30,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24", "npm", "start"]
+CMD ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24", "node", "index.js"]
