@@ -48,16 +48,18 @@ The polyfill provides no-op implementations for features not critical to basic r
 
 Updated the Dockerfile to:
 
-- Install xvfb and Mesa libraries
+- Install xvfb, xauth, and Mesa libraries
 - Run the worker service with `xvfb-run` to provide a virtual display
 
 ```dockerfile
 # Install dependencies
-RUN apt-get install -y libxi-dev libglu1-mesa-dev libglew-dev xvfb
+RUN apt-get install -y libxi-dev libglu1-mesa-dev libglew-dev xvfb xauth
 
 # Run with xvfb
 CMD ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24", "npm", "start"]
 ```
+
+**Note**: `xauth` is required by the `xvfb-run` wrapper script for X11 authentication. When using `--no-install-recommends` with apt-get, `xauth` must be explicitly installed as it's only a recommended dependency of `xvfb`.
 
 ## Testing
 
