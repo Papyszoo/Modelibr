@@ -530,7 +530,7 @@ Use semantic HTML and ARIA labels:
 Use memo and callbacks wisely:
 
 ```typescript
-const MemoizedTable = memo(ModelsDataTable)
+const MemoizedGrid = memo(ModelGrid)
 
 const handleClick = useCallback(() => {
   // ...
