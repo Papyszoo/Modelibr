@@ -1,8 +1,7 @@
 import { ThumbnailJobService } from './thumbnailJobService.js'
 import { SignalRQueueService } from './signalrQueueService.js'
 import { ModelFileService } from './modelFileService.js'
-import { ModelLoaderService } from './modelLoaderService.js'
-import { OrbitFrameRenderer } from './orbitFrameRenderer.js'
+import { PuppeteerRenderer } from './puppeteerRenderer.js'
 import { FrameEncoderService } from './frameEncoderService.js'
 import { ThumbnailStorageService } from './thumbnailStorageService.js'
 import { JobEventService } from './jobEventService.js'
@@ -17,10 +16,9 @@ export class JobProcessor {
     this.jobService = new ThumbnailJobService()
     this.signalrQueueService = new SignalRQueueService()
     this.modelFileService = new ModelFileService()
-    this.modelLoaderService = new ModelLoaderService()
     this.thumbnailStorage = new ThumbnailStorageService()
     this.jobEventService = new JobEventService()
-    this.orbitRenderer = null // Will be initialized when needed
+    this.puppeteerRenderer = null // Will be initialized when needed
     this.frameEncoder = null // Will be initialized when needed
     this.isShuttingDown = false
     this.activeJobs = new Map()
@@ -243,20 +241,26 @@ export class JobProcessor {
         fileInfo.filePath
       )
 
-      // Step 3: Load and normalize the model
-      jobLogger.info('Loading and normalizing model')
+      // Step 3: Initialize Puppeteer renderer and load model
+      jobLogger.info('Initializing Puppeteer renderer and loading model')
       await this.jobEventService.logModelLoadingStarted(
         job.id,
         fileInfo.fileType
       )
 
-      const model = await this.modelLoaderService.loadModel(
+      // Initialize Puppeteer renderer if not already done
+      if (!this.puppeteerRenderer) {
+        this.puppeteerRenderer = new PuppeteerRenderer()
+        await this.puppeteerRenderer.initialize()
+      }
+
+      // Load model in browser
+      const polygonCount = await this.puppeteerRenderer.loadModel(
         fileInfo.filePath,
         fileInfo.fileType
       )
 
-      const polygonCount = this.modelLoaderService.countPolygons(model)
-      jobLogger.info('Model loaded and normalized successfully', {
+      jobLogger.info('Model loaded successfully in browser', {
         polygonCount,
         fileType: fileInfo.fileType,
       })
@@ -267,14 +271,9 @@ export class JobProcessor {
         fileInfo.fileType
       )
 
-      // Step 4: Generate orbit frames using three.js renderer
+      // Step 4: Generate orbit frames using Puppeteer renderer
       if (config.orbit.enabled) {
-        jobLogger.info('Starting orbit frame rendering')
-
-        // Initialize orbit renderer if not already done
-        if (!this.orbitRenderer) {
-          this.orbitRenderer = new OrbitFrameRenderer()
-        }
+        jobLogger.info('Starting orbit frame rendering with Puppeteer')
 
         // Calculate frame count for logging
         const angleRange = config.orbit.endAngle - config.orbit.startAngle
@@ -293,13 +292,12 @@ export class JobProcessor {
         )
 
         // Render orbit frames
-        const frames = await this.orbitRenderer.renderOrbitFrames(
-          model,
+        const frames = await this.puppeteerRenderer.renderOrbitFrames(
           jobLogger
         )
 
         // Log memory statistics
-        const memoryStats = this.orbitRenderer.getMemoryStats(frames)
+        const memoryStats = this.puppeteerRenderer.getMemoryStats(frames)
         jobLogger.info('Orbit frame rendering completed successfully', {
           polygonCount,
           ...memoryStats,
@@ -546,10 +544,10 @@ export class JobProcessor {
       this.cleanupInterval = null
     }
 
-    // Dispose of orbit renderer resources
-    if (this.orbitRenderer) {
-      this.orbitRenderer.dispose()
-      this.orbitRenderer = null
+    // Dispose of Puppeteer renderer resources
+    if (this.puppeteerRenderer) {
+      await this.puppeteerRenderer.dispose()
+      this.puppeteerRenderer = null
     }
 
     // Clean up frame encoder resources

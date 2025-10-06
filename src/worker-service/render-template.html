@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Renderer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+        // Global state for external control
+        window.modelRenderer = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            model: null,
+            isReady: false,
+            error: null
+        };
+
+        // Initialize scene
+        function initScene(width, height, backgroundColor) {
+            const container = document.getElementById('canvas-container');
+            
+            // Create scene
+            const scene = new THREE.Scene();
+            const bgColor = new THREE.Color(backgroundColor || '#f0f0f0');
+            scene.background = bgColor;
+
+            // Create camera
+            const camera = new THREE.PerspectiveCamera(
+                60, // field of view
+                width / height, // aspect ratio
+                0.1, // near plane
+                1000 // far plane
+            );
+
+            // Create renderer with WebGL or WebGPU
+            let renderer;
+            try {
+                // Try WebGPU first if available
+                if (navigator.gpu) {
+                    console.log('WebGPU available, but using WebGL for compatibility');
+                }
+                // Use WebGL renderer for maximum compatibility
+                renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    alpha: true,
+                    preserveDrawingBuffer: true
+                });
+            } catch (error) {
+                console.error('Failed to create renderer:', error);
+                window.modelRenderer.error = error.message;
+                return false;
+            }
+
+            renderer.setSize(width, height);
+            renderer.setClearColor(bgColor, 1);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            container.appendChild(renderer.domElement);
+
+            // Setup lighting (matching frontend Scene.tsx)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(10, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            const pointLight = new THREE.PointLight(0xffffff, 0.5);
+            pointLight.position.set(-10, -10, -10);
+            scene.add(pointLight);
+
+            const spotLight = new THREE.SpotLight(0xffffff, 0.8);
+            spotLight.position.set(0, 10, 0);
+            spotLight.angle = 0.3;
+            spotLight.penumbra = 1;
+            spotLight.castShadow = true;
+            scene.add(spotLight);
+
+            // Ground plane
+            const groundGeometry = new THREE.PlaneGeometry(10, 10);
+            const groundMaterial = new THREE.MeshStandardMaterial({
+                color: 0xf0f0f0,
+                metalness: 0.0,
+                roughness: 0.8
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            window.modelRenderer.scene = scene;
+            window.modelRenderer.camera = camera;
+            window.modelRenderer.renderer = renderer;
+
+            return true;
+        }
+
+        // Load model from data URL or URL
+        async function loadModel(modelData, fileType) {
+            return new Promise((resolve, reject) => {
+                let loader;
+                
+                if (fileType === 'gltf' || fileType === 'glb') {
+                    loader = new GLTFLoader();
+                } else if (fileType === 'obj') {
+                    loader = new OBJLoader();
+                } else {
+                    reject(new Error(`Unsupported file type: ${fileType}`));
+                    return;
+                }
+
+                loader.load(
+                    modelData,
+                    (result) => {
+                        let model;
+                        if (fileType === 'gltf' || fileType === 'glb') {
+                            model = result.scene;
+                        } else {
+                            model = result;
+                        }
+                        resolve(model);
+                    },
+                    undefined,
+                    (error) => {
+                        reject(error);
+                    }
+                );
+            });
+        }
+
+        // Normalize model to center and fit in view
+        function normalizeModel(model, scale = 2.0) {
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            
+            // Center the model
+            model.position.x = -center.x;
+            model.position.y = -center.y;
+            model.position.z = -center.z;
+
+            // Scale to fit
+            const maxDimension = Math.max(size.x, size.y, size.z);
+            if (maxDimension > 0) {
+                const scaleFactor = scale / maxDimension;
+                model.scale.setScalar(scaleFactor);
+            }
+
+            return {
+                center,
+                size,
+                maxDimension
+            };
+        }
+
+        // Position camera for rendering
+        function positionCamera(angle, distance, height = 0) {
+            const radians = (angle * Math.PI) / 180;
+            window.modelRenderer.camera.position.x = Math.cos(radians) * distance;
+            window.modelRenderer.camera.position.z = Math.sin(radians) * distance;
+            window.modelRenderer.camera.position.y = height;
+            window.modelRenderer.camera.lookAt(0, 0, 0);
+        }
+
+        // Render the scene
+        function renderScene() {
+            if (!window.modelRenderer.renderer || !window.modelRenderer.scene || !window.modelRenderer.camera) {
+                return false;
+            }
+            window.modelRenderer.renderer.render(window.modelRenderer.scene, window.modelRenderer.camera);
+            return true;
+        }
+
+        // Get canvas as data URL
+        function getCanvasDataURL() {
+            if (!window.modelRenderer.renderer) {
+                return null;
+            }
+            return window.modelRenderer.renderer.domElement.toDataURL('image/png');
+        }
+
+        // Count polygons in model
+        function countPolygons(model) {
+            let count = 0;
+            model.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    if (child.geometry.index !== null) {
+                        count += child.geometry.index.count / 3;
+                    } else if (child.geometry.attributes.position) {
+                        count += child.geometry.attributes.position.count / 3;
+                    }
+                }
+            });
+            return Math.floor(count);
+        }
+
+        // Expose API for Puppeteer
+        window.initRenderer = initScene;
+        window.loadModelFromData = loadModel;
+        window.normalizeModel = normalizeModel;
+        window.positionCamera = positionCamera;
+        window.renderScene = renderScene;
+        window.getCanvasDataURL = getCanvasDataURL;
+        window.countPolygons = countPolygons;
+
+        console.log('3D Renderer initialized and ready');
+    </script>
+</body>
+</html>
