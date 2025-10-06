@@ -2,11 +2,20 @@
 
 # Build stage - produces dist/
 FROM node:20-alpine AS build
+
 WORKDIR /app
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 COPY package*.json ./
-RUN npm ci
+# Configure npm with longer timeouts and retries, and disable strict SSL for allowlist proxy
+# The allowlist proxy uses a self-signed certificate
+# Use NODE_TLS_REJECT_UNAUTHORIZED for node-gyp during native module builds
+RUN npm config set strict-ssl false && \
+    npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci
 COPY . .
 # Adjust if your build script name differs
 RUN npm run build
