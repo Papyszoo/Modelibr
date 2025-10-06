@@ -57,7 +57,9 @@ export const TabProvider = ({
   const openTexturePackDetailsTab = (texturePack: TexturePackDto): void => {
     // Check if tab already exists
     const existingTab = tabs.find(
-      tab => tab.type === 'texturePackViewer' && tab.packId === texturePack.id.toString()
+      tab =>
+        tab.type === 'texturePackViewer' &&
+        tab.packId === texturePack.id.toString()
     )
 
     if (existingTab) {
@@ -116,7 +118,9 @@ export const TabProvider = ({
       modelId:
         type === 'modelViewer' ? (data as { id?: string })?.id : undefined,
       packId:
-        type === 'texturePackViewer' ? (data as { id?: string })?.id : undefined,
+        type === 'texturePackViewer'
+          ? (data as { id?: string })?.id
+          : undefined,
     }
 
     const newTabs = [...tabs, newTab]

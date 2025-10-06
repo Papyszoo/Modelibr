@@ -29,7 +29,9 @@ describe('ThumbnailDisplay', () => {
     render(<ThumbnailDisplay modelId="1" />)
 
     await waitFor(() => {
-      expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
+      expect(
+        screen.getByLabelText('No thumbnail available')
+      ).toBeInTheDocument()
     })
   })
 
@@ -37,7 +39,7 @@ describe('ThumbnailDisplay', () => {
     mockApiClient.getThumbnailStatus.mockResolvedValue({
       status: 'Ready',
     } as any)
-    
+
     const mockBlob = new Blob(['test'], { type: 'image/webp' })
     mockApiClient.getThumbnailFile.mockResolvedValue(mockBlob)
 
@@ -54,13 +56,15 @@ describe('ThumbnailDisplay', () => {
     mockApiClient.getThumbnailStatus.mockResolvedValue({
       status: 'Ready',
     } as any)
-    
+
     mockApiClient.getThumbnailFile.mockRejectedValue(new Error('Fetch failed'))
 
     render(<ThumbnailDisplay modelId="1" />)
 
     await waitFor(() => {
-      expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
+      expect(
+        screen.getByLabelText('No thumbnail available')
+      ).toBeInTheDocument()
     })
   })
 })

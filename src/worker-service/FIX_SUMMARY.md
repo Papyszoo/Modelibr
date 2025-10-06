@@ -40,14 +40,14 @@ This prevented 3D model thumbnail generation from working.
 
 ## Files Modified
 
-| File                    | Changes                                      |
-| ----------------------- | -------------------------------------------- |
-| `package.json`          | Added `gl@8.1.6` dependency                  |
+| File                    | Changes                                           |
+| ----------------------- | ------------------------------------------------- |
+| `package.json`          | Added `gl@8.1.6` dependency                       |
 | `Dockerfile`            | Added xvfb, xauth and Mesa libraries, changed CMD |
-| `orbitFrameRenderer.js` | Integrated headless-gl with WebGL 2 polyfill |
-| `webgl2-polyfill.js`    | New file - WebGL 2 API compatibility layer   |
-| `WEBGL_FIX.md`          | Documentation of the fix                     |
-| `test-webgl-context.js` | Validation test script                       |
+| `orbitFrameRenderer.js` | Integrated headless-gl with WebGL 2 polyfill      |
+| `webgl2-polyfill.js`    | New file - WebGL 2 API compatibility layer        |
+| `WEBGL_FIX.md`          | Documentation of the fix                          |
+| `test-webgl-context.js` | Validation test script                            |
 
 ## Test Results
 
