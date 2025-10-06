@@ -1,12 +1,19 @@
 # Dockerfile for containerizing the React frontend application
+#
+# PREREQUISITES: Due to npm registry issues in Docker, node_modules should be
+# pre-installed locally for faster and more reliable builds:
+#   cd src/frontend && npm install
 
 # Build stage - produces dist/
 FROM node:20-alpine AS build
 WORKDIR /app
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
+# Copy package files and pre-installed node_modules
 COPY package*.json ./
-RUN npm ci
+COPY node_modules/ ./node_modules/
+
 COPY . .
 # Adjust if your build script name differs
 RUN npm run build
