@@ -32,7 +32,7 @@ function TextureCard({
     if (files.length === 0) return
 
     const file = files[0]
-    
+
     // Validate it's an image
     if (!file.type.startsWith('image/')) {
       toast.current?.show({
@@ -152,7 +152,10 @@ function TextureCard({
 
   const cardTitle = (
     <div className="texture-card-title">
-      <i className={`pi ${typeInfo.icon}`} style={{ color: typeInfo.color }}></i>
+      <i
+        className={`pi ${typeInfo.icon}`}
+        style={{ color: typeInfo.color }}
+      ></i>
       <span>{typeInfo.label}</span>
     </div>
   )
@@ -180,7 +183,10 @@ function TextureCard({
         <div className="texture-card-content">
           {uploading ? (
             <div className="texture-card-loading">
-              <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }}></i>
+              <i
+                className="pi pi-spin pi-spinner"
+                style={{ fontSize: '2rem' }}
+              ></i>
               <p>Uploading...</p>
             </div>
           ) : texture ? (
@@ -210,7 +216,10 @@ function TextureCard({
             </div>
           ) : (
             <div className="texture-card-empty" onClick={handleCardClick}>
-              <i className="pi pi-cloud-upload" style={{ fontSize: '3rem', color: '#94a3b8' }}></i>
+              <i
+                className="pi pi-cloud-upload"
+                style={{ fontSize: '3rem', color: '#94a3b8' }}
+              ></i>
               <p className="drop-text">Drop image here or click to browse</p>
               <p className="texture-description">{typeInfo.description}</p>
             </div>
