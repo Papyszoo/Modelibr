@@ -615,6 +615,13 @@ Update both files when changes affect:
 - README.md: "Install .NET 9.0 SDK" (with link)
 - copilot-instructions.md: "Install .NET 9.0 SDK - REQUIRED (the project targets net9.0): curl command, export PATH, verification steps"
 
+#### File Organization
+**NEVER place documentation files in the root directory.** Always organize documentation in appropriate subdirectories:
+- **Technical documentation**: `docs/` directory with appropriate subdirectories (e.g., `docs/worker/`, `docs/backend/`, `docs/frontend/`)
+- **Component-specific docs**: Place near the component they document
+- **Troubleshooting guides**: `docs/worker/troubleshooting.md` or similar location-specific files
+- **Fix documentation**: `docs/[component]/[descriptive-name]-fix.md` (e.g., `docs/worker/container-no-logs-fix.md`)
+
 ## Frontend Development Guidelines
 
 ### Philosophy: Simplicity and Focus
