@@ -55,6 +55,12 @@ COPY package*.json ./
 # Copy application code
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x docker-entrypoint.sh
+
+# Create X11 socket directory for Xvfb
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+
 RUN useradd -u 1001 worker && chown -R worker:worker /app
 USER worker
 
@@ -62,4 +68,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24", "node", "index.js"]
+# Use custom entrypoint to properly handle xvfb-run arguments
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
