@@ -47,14 +47,33 @@ Dockerfile text eol=lf
 ```
 
 ### How This Fixes the Problem
-1. **Git enforces LF endings**: All `.sh` files will checkout with LF endings, regardless of platform or `core.autocrlf` setting
-2. **Cross-platform consistency**: Windows developers will have LF endings in their working directory
-3. **Docker build safety**: The `COPY . .` command always copies files with correct line endings
-4. **Future-proof**: Any new shell scripts added to the repository will automatically have LF endings
+1. **`.gitattributes`**: Enforces LF endings in Git for all new checkouts
+2. **`dos2unix` in Dockerfile**: Converts CRLF to LF during Docker build as a safety net
+3. **No manual intervention required**: Users can simply rebuild the Docker image
+4. **Future-proof**: Any new shell scripts will automatically have correct line endings
+
+## For Existing Checkouts
+
+**Good news**: You don't need to do anything special! The `dos2unix` step in the Dockerfile will automatically fix line endings during the Docker build.
+
+Simply rebuild the thumbnail-worker image:
+```bash
+docker compose build thumbnail-worker
+```
+
+**Optional**: If you want to fix line endings in your local checkout (recommended for contributors):
+```bash
+# Pull the latest changes (including .gitattributes)
+git pull
+
+# Remove all files from Git index and restore with correct line endings
+git rm --cached -r .
+git reset --hard HEAD
+```
 
 ## Verification
 
-### Verify Attributes Are Applied
+### Verify Attributes Are Applied (Optional)
 ```bash
 git check-attr -a src/worker-service/docker-entrypoint.sh
 ```
@@ -65,7 +84,7 @@ src/worker-service/docker-entrypoint.sh: text: set
 src/worker-service/docker-entrypoint.sh: eol: lf
 ```
 
-### Verify Line Endings
+### Verify Line Endings in Working Tree (Optional)
 ```bash
 # Check file format
 file src/worker-service/docker-entrypoint.sh
@@ -91,22 +110,38 @@ docker run --rm thumbnail-worker
 # info: Health server started
 ```
 
+## Solution Approach (Defense in Depth)
+
+The fix uses a **two-layer defense** strategy:
+
+### Layer 1: `.gitattributes` (Preventive)
+Enforces LF line endings in Git, preventing the problem for new checkouts.
+
+### Layer 2: `dos2unix` in Dockerfile (Safety Net)
+Converts line endings during Docker build, protecting against existing checkouts with CRLF.
+
+This dual approach ensures the container works even if:
+- Users have existing checkouts from before `.gitattributes` was added
+- The `git add --renormalize .` command wasn't run
+- Files were checked out with Windows line endings
+
 ## Alternative Solutions Considered
 
 1. **Fix core.autocrlf on Windows**: Requires all Windows developers to change their Git config - not scalable
-2. **dos2unix in Dockerfile**: Adds complexity and doesn't fix the root cause - files should be correct in Git
+2. **`.gitattributes` only**: Doesn't help users with existing checkouts that already have CRLF
 3. **Normalize line endings manually**: Error-prone and requires remembering to do it for every shell script
 4. **Use .editorconfig**: Doesn't affect Git checkout behavior, only editor behavior
 
 ## Files Changed
-- `.gitattributes` - New file enforcing LF line endings for shell scripts and Dockerfiles
+- `.gitattributes` - Enforces LF line endings for shell scripts and Dockerfiles in Git
+- `src/worker-service/Dockerfile` - Added `dos2unix` package and conversion step for entrypoint script
 
 ## Prevention
-With the `.gitattributes` file in place:
-- ✅ Shell scripts will always have LF endings when checked out
-- ✅ Docker builds will always copy scripts with correct line endings
-- ✅ The "exec: no such file or directory" error cannot occur due to line endings
-- ✅ Works consistently across Windows, macOS, and Linux
+With both fixes in place:
+- ✅ **New checkouts**: `.gitattributes` ensures correct line endings from Git
+- ✅ **Existing checkouts**: `dos2unix` in Dockerfile fixes line endings during build
+- ✅ **Docker builds**: Always produce working containers regardless of host OS
+- ✅ **Cross-platform**: Works consistently across Windows, macOS, and Linux
 
 ## Related Issues
 - This fix complements PR #207 which introduced the `docker-entrypoint.sh` script

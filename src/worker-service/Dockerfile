@@ -34,7 +34,7 @@ FROM node:20-bookworm-slim AS runtime
 
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg python3 ca-certificates \
+    ffmpeg python3 ca-certificates dos2unix \
     libcairo2 libpango-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
     libvips42 \
     libxi6 libglu1-mesa libglew2.2 xvfb xauth \
@@ -55,8 +55,9 @@ COPY package*.json ./
 # Copy application code
 COPY . .
 
+# Fix line endings in entrypoint script (handles cases where .gitattributes wasn't applied in existing checkouts)
 # Make entrypoint script executable
-RUN chmod +x docker-entrypoint.sh
+RUN dos2unix docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 # Create X11 socket directory for Xvfb
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix

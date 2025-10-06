@@ -567,7 +567,7 @@ cp .env.example .env
 - Permission denied on upload directory: Set `UPLOAD_STORAGE_PATH` to writable location like `/tmp/modelibr/uploads`
 - .NET version errors: Ensure .NET 9.0 SDK is installed and in PATH
 - Missing packages: Run `dotnet restore Modelibr.sln` to restore all dependencies
-- Thumbnail worker "exec: no such file" error: Caused by Windows line endings (CRLF) in shell scripts. The repository has a `.gitattributes` file that enforces Unix line endings (LF) for all `.sh` files. If you encounter this error, clone fresh or run `git add --renormalize .` to fix existing checkouts. See `docs/worker/entrypoint-line-endings-fix.md` for details.
+- Thumbnail worker "exec: no such file" error: This issue is **now fixed** with a dual-layer solution (`.gitattributes` + `dos2unix` in Dockerfile). Simply rebuild the container with `docker compose build thumbnail-worker` and it will work regardless of line endings in your local checkout. The Dockerfile automatically converts line endings during build. See `docs/worker/entrypoint-line-endings-fix.md` for details.
 
 ### Important: Database Configuration
 - **NEVER modify `src/Infrastructure/DependencyInjection.cs` to use in-memory database** - The application is designed to work with PostgreSQL via Docker Compose
