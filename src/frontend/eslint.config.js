@@ -67,30 +67,14 @@ export default defineConfig([
       'no-restricted-imports': 'off',
     },
   },
-  // Configuration for test files
-  {
-    files: [
-      '**/*.test.{js,jsx,ts,tsx}',
-      '**/__tests__/**/*.{js,jsx,ts,tsx}',
-      '**/setupTests.{js,ts}',
-      '**/__mocks__/**/*.{js,jsx,ts,tsx}',
-    ],
-    languageOptions: {
-      globals: {
-        ...globals.jest,
-        ...globals.node,
-      },
-    },
-    rules: {
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      '@typescript-eslint/no-require-imports': 'off', // Allow require() in tests
-      'no-restricted-imports': 'off', // Allow direct imports in tests
-    },
-  },
-  // Architectural boundary rules for components
+  // Architectural boundary rules for components (must come before test file exemptions)
   {
     files: ['**/components/**/*.{js,jsx,ts,tsx}'],
+    ignores: [
+      '**/*.test.{js,jsx,ts,tsx}',
+      '**/__tests__/**/*.{js,jsx,ts,tsx}',
+      '**/*.stories.{js,jsx,ts,tsx}',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -109,6 +93,7 @@ export default defineConfig([
   // Architectural boundary rules for utils
   {
     files: ['**/utils/**/*.{js,jsx,ts,tsx}'],
+    ignores: ['**/*.test.{js,jsx,ts,tsx}', '**/__tests__/**/*.{js,jsx,ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -136,6 +121,7 @@ export default defineConfig([
   // Architectural boundary rules for services
   {
     files: ['**/services/**/*.{js,jsx,ts,tsx}'],
+    ignores: ['**/*.test.{js,jsx,ts,tsx}', '**/__tests__/**/*.{js,jsx,ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -158,6 +144,30 @@ export default defineConfig([
           ],
         },
       ],
+    },
+  },
+  // Configuration for test files and Storybook (must come after architectural rules)
+  {
+    files: [
+      '**/*.test.{js,jsx,ts,tsx}',
+      '**/__tests__/**/*.{js,jsx,ts,tsx}',
+      '**/setupTests.{js,ts}',
+      '**/__mocks__/**/*.{js,jsx,ts,tsx}',
+      '**/*.stories.{js,jsx,ts,tsx}',
+      '**/.storybook/**/*.{js,jsx,ts,tsx}',
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-require-imports': 'off', // Allow require() in tests
+      '@typescript-eslint/no-explicit-any': 'off', // Allow any in tests/stories
+      'no-restricted-imports': 'off', // Allow direct imports in tests
     },
   },
 ])

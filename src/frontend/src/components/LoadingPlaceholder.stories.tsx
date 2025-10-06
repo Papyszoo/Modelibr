@@ -10,7 +10,7 @@ const meta = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '100vw', height: '100vh', background: '#242424' }}>
         <Canvas camera={{ position: [0, 0, 5], fov: 60 }}>
           <ambientLight intensity={0.5} />
