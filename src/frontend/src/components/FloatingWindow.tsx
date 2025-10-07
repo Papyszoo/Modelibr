@@ -45,9 +45,31 @@ function FloatingWindow({
   // Reset position when side changes
   useEffect(() => {
     const newPosition =
-      side === 'left' ? { x: 20, y: 80 } : { x: window.innerWidth - 370, y: 80 }
+      side === 'left' ? { x: 80, y: 80 } : { x: window.innerWidth - 370, y: 80 }
     setPosition(newPosition)
   }, [side])
+
+  // Reposition window if it ends up on wrong panel after splitter resize
+  useEffect(() => {
+    const windowElement = windowRef.current
+    const windowElementWidth = windowElement?.offsetWidth || 350
+
+    // Check if window is on wrong side
+    if (side === 'left' && position.x >= leftPanelWidth) {
+      // Window is on right panel but should be on left
+      setPosition({ x: 80, y: position.y })
+    } else if (
+      side === 'right' &&
+      position.x + windowElementWidth <= leftPanelWidth
+    ) {
+      // Window is on left panel but should be on right
+      const newX = Math.max(
+        leftPanelWidth,
+        window.innerWidth - windowElementWidth - 20
+      )
+      setPosition({ x: newX, y: position.y })
+    }
+  }, [leftPanelWidth, side, position.x, position.y])
 
   // Set this window as active when it becomes visible or is clicked
   useEffect(() => {
@@ -90,10 +112,12 @@ function FloatingWindow({
         )
 
         // Restrict dragging based on actual panel widths from zustand store
+        // Account for 60px tab bar on the left
+        const TAB_BAR_WIDTH = 60
         if (side === 'left') {
-          // Keep on left panel
+          // Keep on left panel - starts at tab bar (60px) and ends at panel width
           newX = Math.max(
-            0,
+            TAB_BAR_WIDTH,
             Math.min(newX, leftPanelWidth - windowElementWidth)
           )
         } else {
