@@ -9,6 +9,7 @@ export interface Tab {
     | 'animation'
     | 'texturePacks'
     | 'texturePackViewer'
+    | 'settings'
   label?: string
   modelId?: string
   packId?: string
