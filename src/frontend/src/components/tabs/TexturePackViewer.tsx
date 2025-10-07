@@ -8,6 +8,7 @@ import PackStats from '../dialogs/texture-pack-detail/PackStats'
 import ModelsTable from '../dialogs/texture-pack-detail/ModelsTable'
 import TextureCard from './texture-pack-viewer/TextureCard'
 import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
+import TexturePreviewPanel from './texture-pack-viewer/TexturePreviewPanel'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { ModelSummaryDto } from '../../types'
 import './TexturePackViewer.css'
@@ -23,6 +24,7 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   const [updating, setUpdating] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
+  const [activeTabIndex, setActiveTabIndex] = useState(0)
   const texturePacksApi = useTexturePacks()
 
   const loadTexturePack = async () => {
@@ -119,7 +121,11 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
         </div>
       </header>
 
-      <TabView className="pack-viewer-tabs">
+      <TabView
+        className="pack-viewer-tabs"
+        activeIndex={activeTabIndex}
+        onTabChange={e => setActiveTabIndex(e.index)}
+      >
         <TabPanel header="Textures" leftIcon="pi pi-image">
           <div className="texture-cards-grid">
             {allTextureTypes.map((textureType: TextureType) => {
@@ -147,6 +153,12 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
             onManageAssociations={() => setShowModelAssociationDialog(true)}
           />
         </TabPanel>
+
+        {texturePack.textureCount > 0 && (
+          <TabPanel header="Preview" leftIcon="pi pi-eye">
+            <TexturePreviewPanel texturePack={texturePack} />
+          </TabPanel>
+        )}
       </TabView>
 
       {showModelAssociationDialog && (
