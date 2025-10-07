@@ -1,0 +1,59 @@
+.geometry-selector {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 2rem;
+  border: 2px solid #e5e7eb;
+}
+
+.geometry-selector-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 1rem 0;
+}
+
+.geometry-selector-title .pi {
+  color: #3b82f6;
+  font-size: 1.25rem;
+}
+
+.geometry-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.geometry-btn {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.geometry-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.geometry-btn .pi {
+  font-size: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .geometry-buttons {
+    flex-direction: column;
+  }
+  
+  .geometry-btn {
+    width: 100%;
+  }
+}
