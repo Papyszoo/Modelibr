@@ -24,12 +24,21 @@ function SplitterLayout(): JSX.Element {
     serialize: value => value,
   })
 
-  // Update store when splitter size changes
+  // Update store when splitter size changes or window resizes
   useEffect(() => {
-    const leftPercentage = parseFloat(splitterSize)
-    const totalWidth = window.innerWidth
-    setLeftPanelWidth((totalWidth * leftPercentage) / 100)
-    setRightPanelWidth((totalWidth * (100 - leftPercentage)) / 100)
+    const updatePanelSizes = () => {
+      const leftPercentage = parseFloat(splitterSize)
+      const totalWidth = window.innerWidth
+      setLeftPanelWidth((totalWidth * leftPercentage) / 100)
+      setRightPanelWidth((totalWidth * (100 - leftPercentage)) / 100)
+    }
+
+    updatePanelSizes()
+    window.addEventListener('resize', updatePanelSizes)
+
+    return () => {
+      window.removeEventListener('resize', updatePanelSizes)
+    }
   }, [splitterSize, setLeftPanelWidth, setRightPanelWidth])
 
   // URL state for left panel tabs

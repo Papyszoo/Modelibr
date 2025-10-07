@@ -78,9 +78,16 @@ function FloatingWindow({
       const handleMove = (e: MouseEvent) => {
         const windowElement = windowRef.current
         const windowElementWidth = windowElement?.offsetWidth || 350
+        const windowElementHeight = windowElement?.offsetHeight || 300
 
         let newX = e.clientX - dragStart.x
-        const newY = Math.max(0, e.clientY - dragStart.y)
+        let newY = e.clientY - dragStart.y
+
+        // Restrict Y position to keep window on screen (top and bottom)
+        newY = Math.max(
+          0,
+          Math.min(newY, window.innerHeight - windowElementHeight)
+        )
 
         // Restrict dragging based on actual panel widths from zustand store
         if (side === 'left') {

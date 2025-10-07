@@ -67,7 +67,6 @@
   flex: 1;
   overflow: auto;
   padding: 1rem;
-  min-height: 200px;
   max-height: calc(80vh - 48px);
 }
 

@@ -25,6 +25,11 @@
   font-size: 0.875rem;
 }
 
+.hierarchy-tree-component .p-tree {
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
 .hierarchy-tree-component .p-tree-container {
   padding: 0;
 }
