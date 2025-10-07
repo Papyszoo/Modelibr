@@ -8,6 +8,10 @@ import PackStats from '../dialogs/texture-pack-detail/PackStats'
 import ModelsTable from '../dialogs/texture-pack-detail/ModelsTable'
 import TextureCard from './texture-pack-viewer/TextureCard'
 import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
+import GeometrySelector, {
+  GeometryType,
+} from './texture-pack-viewer/GeometrySelector'
+import TexturePreviewDialog from './texture-pack-viewer/TexturePreviewDialog'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { ModelSummaryDto } from '../../types'
 import './TexturePackViewer.css'
@@ -23,6 +27,8 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   const [updating, setUpdating] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
+  const [selectedGeometry, setSelectedGeometry] = useState<GeometryType>('box')
   const texturePacksApi = useTexturePacks()
 
   const loadTexturePack = async () => {
@@ -83,6 +89,11 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
     })
   }
 
+  const handleGeometrySelect = (geometry: GeometryType) => {
+    setSelectedGeometry(geometry)
+    setShowPreviewDialog(true)
+  }
+
   if (loading) {
     return (
       <div className="texture-pack-viewer-loading">Loading texture pack...</div>
@@ -138,6 +149,10 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
               )
             })}
           </div>
+
+          {texturePack.textureCount > 0 && (
+            <GeometrySelector onGeometrySelect={handleGeometrySelect} />
+          )}
         </TabPanel>
 
         <TabPanel header="Models" leftIcon="pi pi-box">
@@ -158,6 +173,15 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
             setShowModelAssociationDialog(false)
             loadTexturePack()
           }}
+        />
+      )}
+
+      {showPreviewDialog && texturePack && (
+        <TexturePreviewDialog
+          visible={showPreviewDialog}
+          geometryType={selectedGeometry}
+          texturePack={texturePack}
+          onHide={() => setShowPreviewDialog(false)}
         />
       )}
     </div>
