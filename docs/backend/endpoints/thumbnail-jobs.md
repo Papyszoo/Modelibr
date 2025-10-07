@@ -357,40 +357,18 @@ await completeJob(15, {
 
 ## Fail Thumbnail Job
 
-Marks a thumbnail job as failed with an error message. Called by workers when thumbnail generation fails.
+Marks a thumbnail job as failed. Called by workers when thumbnail generation fails.
 
-### Endpoint
+**Endpoint**: `POST /api/thumbnail-jobs/{jobId}/fail`
 
-```
-POST /api/thumbnail-jobs/{jobId}/fail
-```
-
-### Path Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| jobId | integer | The job ID to mark as failed |
-
-### Request
-
-**Content-Type**: `application/json`
-
+**Request**:
 ```json
 {
-  "errorMessage": "Failed to launch the browser process: chrome_crashpad_handler error"
+  "errorMessage": "Error description (max 1000 chars)"
 }
 ```
 
-#### Request Fields
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| errorMessage | string | Yes | Error message describing why the job failed (max 1000 characters) |
-
-### Success Response
-
-**Status Code**: `200 OK`
-
+**Response** (200 OK):
 ```json
 {
   "modelId": 42,
@@ -399,117 +377,7 @@ POST /api/thumbnail-jobs/{jobId}/fail
 }
 ```
 
-#### Response Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| modelId | integer | ID of the model |
-| status | string | Thumbnail status ("Failed") |
-| message | string | Success message |
-
-### Process Flow
-
-1. **Job Validation**: Verifies job exists
-2. **Thumbnail Update**: Updates thumbnail record with error message and failed status
-3. **Retry Logic**: Queue automatically handles retry logic based on attempt count
-4. **Status Change**: Updates job status to failed or queues for retry
-5. **Notification**: Sends real-time notification via SignalR to connected clients
-6. **Worker Release**: Frees worker to process next job
-
-### Error Responses
-
-#### Job Not Found
-
-**Status Code**: `400 Bad Request`
-
-**Response Body**: Plain text error message
-
-```
-Thumbnail job with ID 999 was not found.
-```
-
-#### Invalid Error Message
-
-**Status Code**: `400 Bad Request`
-
-**Response Body**: Plain text error message
-
-```
-Error message cannot be null or empty.
-```
-
-### Example Request (cURL)
-
-```bash
-curl -X POST http://localhost:5009/api/thumbnail-jobs/15/fail \
-  -H "Content-Type: application/json" \
-  -d '{
-    "errorMessage": "Failed to launch the browser process: chrome_crashpad_handler error"
-  }'
-```
-
-### Example Request (JavaScript)
-
-```javascript
-async function failJob(jobId, errorMessage) {
-  const response = await fetch(`http://localhost:5009/api/thumbnail-jobs/${jobId}/fail`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ errorMessage })
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to mark job as failed: ${error}`);
-  }
-
-  const result = await response.json();
-  console.log(`Job ${jobId} marked as failed for model ${result.modelId}`);
-  return result;
-}
-
-// Usage
-try {
-  await processJob(job);
-} catch (error) {
-  await failJob(job.id, error.message);
-  console.error(`Job ${job.id} failed:`, error.message);
-}
-```
-
-### Error Handling in Worker
-
-Workers should call this endpoint when:
-
-1. **Rendering Errors**: Browser/renderer failures (e.g., Chrome crashpad errors)
-2. **Model Loading Errors**: Unsupported formats or corrupt files
-3. **Resource Errors**: Out of memory, disk space issues
-4. **Timeout Errors**: Processing exceeds time limits
-5. **Network Errors**: Failed to download model or upload thumbnail
-
-```javascript
-async function processJob(job) {
-  try {
-    // Download model
-    const modelFile = await downloadModel(job.modelId);
-    
-    // Generate thumbnail
-    const thumbnail = await generateThumbnail(modelFile);
-    
-    // Upload thumbnail
-    const uploaded = await uploadThumbnail(thumbnail);
-    
-    // Mark as complete
-    await completeJob(job.id, uploaded);
-  } catch (error) {
-    // Mark as failed with error message
-    await failJob(job.id, error.message);
-    throw error; // Re-throw for worker logging
-  }
-}
-```
+Updates thumbnail status, handles retry logic, and triggers SignalR notifications.
 
 ---
 
