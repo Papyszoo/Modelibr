@@ -63,7 +63,9 @@ class ApiClient {
     return response.data
   }
 
-  async uploadFile(file: File): Promise<{ fileId: number; alreadyExists: boolean }> {
+  async uploadFile(
+    file: File
+  ): Promise<{ fileId: number; alreadyExists: boolean }> {
     const formData = new FormData()
     formData.append('file', file)
 
@@ -132,8 +134,9 @@ class ApiClient {
   }
 
   async getTexturePackById(id: number): Promise<TexturePackDto> {
-    const response: AxiosResponse<TexturePackDto> =
-      await this.client.get(`/texture-packs/${id}`)
+    const response: AxiosResponse<TexturePackDto> = await this.client.get(
+      `/texture-packs/${id}`
+    )
     return response.data
   }
 
