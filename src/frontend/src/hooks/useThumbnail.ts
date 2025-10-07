@@ -38,7 +38,7 @@ export function useThumbnail(modelId: string) {
         URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [modelId, thumbnailDetails])
+  }, [modelId, thumbnailDetails?.status])
 
   return { thumbnailDetails, imgSrc }
 }
