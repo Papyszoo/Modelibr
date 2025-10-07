@@ -1,6 +1,6 @@
 import { Suspense, useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { Stage, OrbitControls } from '@react-three/drei'
 import { useControls } from 'leva'
 import { GeometryType } from './GeometrySelector'
 import { TexturePackDto } from '../../../types'
@@ -176,46 +176,21 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
           }}
           dpr={Math.min(window.devicePixelRatio, 2)}
         >
-          {/* Lighting setup */}
-          <ambientLight intensity={0.4} />
-          <directionalLight
-            position={[10, 10, 5]}
-            intensity={1.0}
-            castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
-          />
-          <pointLight position={[-10, -10, -10]} intensity={0.5} />
-          <spotLight
-            position={[0, 10, 0]}
-            angle={0.3}
-            penumbra={1}
-            intensity={0.8}
-            castShadow
-          />
-
-          {/* Textured Geometry */}
-          <Suspense fallback={<LoadingPlaceholder />}>
-            <TexturedGeometry
-              geometryType={controls.type}
-              texturePack={texturePack}
-              geometryParams={controls}
-            />
-          </Suspense>
-
-          {/* Ground plane */}
-          <mesh
-            rotation={[-Math.PI / 2, 0, 0]}
-            position={[0, -2, 0]}
-            receiveShadow
+          {/* Stage provides automatic lighting, shadows, and camera positioning */}
+          <Stage
+            intensity={0.5}
+            environment="city"
+            shadows={{ type: 'accumulative', bias: -0.001 }}
+            adjustCamera={1.5}
           >
-            <planeGeometry args={[10, 10]} />
-            <meshStandardMaterial
-              color="#f0f0f0"
-              metalness={0.0}
-              roughness={0.8}
-            />
-          </mesh>
+            <Suspense fallback={<LoadingPlaceholder />}>
+              <TexturedGeometry
+                geometryType={controls.type}
+                texturePack={texturePack}
+                geometryParams={controls}
+              />
+            </Suspense>
+          </Stage>
 
           {/* Controls */}
           <OrbitControls

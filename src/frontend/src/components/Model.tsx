@@ -38,16 +38,7 @@ function OBJModel({ modelUrl }: { modelUrl: string }) {
         }
       })
 
-      // Center and scale the model - only once
-      const box = new THREE.Box3().setFromObject(model)
-      const center = box.getCenter(new THREE.Vector3())
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
-
-      model.position.sub(center.multiplyScalar(scale))
-      model.scale.setScalar(scale)
-
+      // Stage component handles centering and scaling automatically
       scaledRef.current = true
     }
   }, [model])
@@ -101,16 +92,7 @@ function GLTFModel({ modelUrl }: { modelUrl: string }) {
         }
       })
 
-      // Center and scale the model - only once
-      const box = new THREE.Box3().setFromObject(model)
-      const center = box.getCenter(new THREE.Vector3())
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
-
-      model.position.sub(center.multiplyScalar(scale))
-      model.scale.setScalar(scale)
-
+      // Stage component handles centering and scaling automatically
       scaledRef.current = true
     }
   }, [model])
