@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
 import DockPanel from './DockPanel'
@@ -7,11 +7,15 @@ import {
   parseCompactTabFormat,
   serializeToCompactFormat,
 } from '../../utils/tabSerialization'
+import { usePanelStore } from '../../stores/panelStore'
 import './SplitterLayout.css'
 
 function SplitterLayout(): JSX.Element {
   // Global drag state for cross-panel tab dragging
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
+
+  // Zustand store for panel sizes
+  const { setLeftPanelWidth, setRightPanelWidth } = usePanelStore()
 
   // URL state for splitter size (percentage for left panel)
   const [splitterSize, setSplitterSize] = useQueryState('split', {
@@ -19,6 +23,23 @@ function SplitterLayout(): JSX.Element {
     parse: value => value || '50',
     serialize: value => value,
   })
+
+  // Update store when splitter size changes or window resizes
+  useEffect(() => {
+    const updatePanelSizes = () => {
+      const leftPercentage = parseFloat(splitterSize)
+      const totalWidth = window.innerWidth
+      setLeftPanelWidth((totalWidth * leftPercentage) / 100)
+      setRightPanelWidth((totalWidth * (100 - leftPercentage)) / 100)
+    }
+
+    updatePanelSizes()
+    window.addEventListener('resize', updatePanelSizes)
+
+    return () => {
+      window.removeEventListener('resize', updatePanelSizes)
+    }
+  }, [splitterSize, setLeftPanelWidth, setRightPanelWidth])
 
   // URL state for left panel tabs
   const [leftTabs, setLeftTabs] = useQueryState('leftTabs', {
@@ -51,6 +72,13 @@ function SplitterLayout(): JSX.Element {
   const handleSplitterResize = (event: SplitterEvent): void => {
     const leftSize = Math.round(event.sizes[0])
     setSplitterSize(leftSize.toString())
+  }
+
+  const handleSplitterResizeEnd = (event: SplitterEvent): void => {
+    const leftSize = Math.round(event.sizes[0])
+    const totalWidth = window.innerWidth
+    setLeftPanelWidth((totalWidth * leftSize) / 100)
+    setRightPanelWidth((totalWidth * (100 - leftSize)) / 100)
   }
 
   // Central function to move tabs between panels
@@ -104,6 +132,7 @@ function SplitterLayout(): JSX.Element {
       <Splitter
         layout="horizontal"
         onResize={handleSplitterResize}
+        onResizeEnd={handleSplitterResizeEnd}
         resizerStyle={{ background: '#e2e8f0', width: '4px' }}
       >
         <SplitterPanel size={leftSize} minSize={20}>
