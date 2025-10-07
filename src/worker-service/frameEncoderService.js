@@ -156,7 +156,10 @@ export class FrameEncoderService {
       // Create animated WebP from frames
       const img = new webpmux.Image()
       
-      // Convert to animation first - this initializes the animation structure
+      // Initialize the library - required before any operations
+      await img.initLib()
+      
+      // Convert to animation - this initializes the animation structure
       img.convertToAnim()
       
       // Add frames to the animation
