@@ -25,8 +25,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+                "three": "./node_modules/three/build/three.module.js",
+                "three/addons/": "./node_modules/three/examples/jsm/"
             }
         }
     </script>
@@ -42,11 +42,12 @@
             renderer: null,
             model: null,
             isReady: false,
-            error: null
+            error: null,
+            useWebGPU: false
         };
 
-        // Initialize scene
-        function initScene(width, height, backgroundColor) {
+        // Initialize scene with WebGPU or WebGL
+        async function initScene(width, height, backgroundColor) {
             const container = document.getElementById('canvas-container');
             
             // Create scene
@@ -62,19 +63,41 @@
                 1000 // far plane
             );
 
-            // Create renderer with WebGL or WebGPU
+            // Create renderer with WebGPU or WebGL
             let renderer;
             try {
                 // Try WebGPU first if available
                 if (navigator.gpu) {
-                    console.log('WebGPU available, but using WebGL for compatibility');
+                    try {
+                        console.log('WebGPU available, attempting to use WebGPU renderer');
+                        
+                        // Import WebGPU renderer dynamically
+                        const { WebGPURenderer } = await import('three/addons/renderers/webgpu/WebGPURenderer.js');
+                        
+                        renderer = new WebGPURenderer({
+                            antialias: true,
+                            alpha: true
+                        });
+                        
+                        await renderer.init();
+                        window.modelRenderer.useWebGPU = true;
+                        console.log('WebGPU renderer initialized successfully');
+                    } catch (webgpuError) {
+                        console.warn('WebGPU initialization failed, falling back to WebGL:', webgpuError);
+                        renderer = null;
+                    }
                 }
-                // Use WebGL renderer for maximum compatibility
-                renderer = new THREE.WebGLRenderer({
-                    antialias: true,
-                    alpha: true,
-                    preserveDrawingBuffer: true
-                });
+                
+                // Fallback to WebGL if WebGPU not available or failed
+                if (!renderer) {
+                    console.log('Using WebGL renderer');
+                    renderer = new THREE.WebGLRenderer({
+                        antialias: true,
+                        alpha: true,
+                        preserveDrawingBuffer: true
+                    });
+                    window.modelRenderer.useWebGPU = false;
+                }
             } catch (error) {
                 console.error('Failed to create renderer:', error);
                 window.modelRenderer.error = error.message;
@@ -83,8 +106,12 @@
 
             renderer.setSize(width, height);
             renderer.setClearColor(bgColor, 1);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            // Shadow mapping (WebGL specific)
+            if (!window.modelRenderer.useWebGPU && renderer.shadowMap) {
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            }
             
             container.appendChild(renderer.domElement);
 
@@ -198,11 +225,17 @@
         }
 
         // Render the scene
-        function renderScene() {
+        async function renderScene() {
             if (!window.modelRenderer.renderer || !window.modelRenderer.scene || !window.modelRenderer.camera) {
                 return false;
             }
-            window.modelRenderer.renderer.render(window.modelRenderer.scene, window.modelRenderer.camera);
+            
+            // WebGPU renderer uses async render
+            if (window.modelRenderer.useWebGPU) {
+                await window.modelRenderer.renderer.render(window.modelRenderer.scene, window.modelRenderer.camera);
+            } else {
+                window.modelRenderer.renderer.render(window.modelRenderer.scene, window.modelRenderer.camera);
+            }
             return true;
         }
 

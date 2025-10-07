@@ -5,8 +5,6 @@
  */
 
 import { PuppeteerRenderer } from './puppeteerRenderer.js'
-import { config } from './config.js'
-import logger from './logger.js'
 import fs from 'fs'
 import path from 'path'
 
@@ -18,12 +16,8 @@ async function testRenderer() {
 
     // Test 1: Initialize renderer
     console.log('Test 1: Initializing Puppeteer renderer...')
-    console.log(
-      'Note: This test requires Chrome/Chromium to be installed.'
-    )
-    console.log(
-      'Set PUPPETEER_EXECUTABLE_PATH env var to specify location.\n'
-    )
+    console.log('Note: This test requires Chrome/Chromium to be installed.')
+    console.log('Set PUPPETEER_EXECUTABLE_PATH env var to specify location.\n')
 
     renderer = new PuppeteerRenderer()
     await renderer.initialize()
@@ -45,9 +39,7 @@ async function testRenderer() {
     // Test 4: Get memory stats for empty frames array
     console.log('Test 4: Testing memory stats...')
     const stats = renderer.getMemoryStats([])
-    console.log(
-      `✓ Memory stats: ${JSON.stringify(stats, null, 2)}\n`
-    )
+    console.log(`✓ Memory stats: ${JSON.stringify(stats, null, 2)}\n`)
 
     console.log('=== All tests passed! ===')
     process.exit(0)
