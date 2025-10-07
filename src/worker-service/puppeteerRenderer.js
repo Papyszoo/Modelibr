@@ -46,11 +46,19 @@ export class PuppeteerRenderer {
           '--disable-features=IsolateOrigins,site-per-process',
           '--disable-crash-reporter', // Disable crash reporter to prevent crashpad_handler errors
           '--disable-breakpad', // Disable Breakpad crash reporter (legacy name)
+          '--disable-crashpad', // Explicitly disable Crashpad crash handler (modern Chrome versions)
+          '--no-crash-upload', // Prevent crash upload attempts
           '--disable-client-side-phishing-detection', // Reduce crash reporter dependencies
           '--disable-component-extensions-with-background-pages', // Reduce extensions that might trigger crash reporter
           '--crash-dumps-dir=/tmp', // Provide crash dump directory if crash reporter still initializes
         ],
         dumpio: config.logLevel === 'debug',
+        // Set environment variables to completely disable crash reporting
+        env: {
+          ...process.env,
+          CHROME_CRASHPAD_PIPE_NAME: '', // Disable crashpad pipe
+          BREAKPAD_DISABLE: '1', // Legacy Breakpad disable
+        },
       }
 
       // Add executable path if provided
