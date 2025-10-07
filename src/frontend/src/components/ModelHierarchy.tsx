@@ -30,7 +30,9 @@ function convertToTreeNode(node: HierarchyNode): TreeNode {
 }
 
 function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [selectedKeys, setSelectedKeys] = useState<{ [key: string]: boolean }>(
+    {}
+  )
 
   if (!hierarchy) {
     return (
@@ -41,6 +43,7 @@ function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
   }
 
   const treeData = [convertToTreeNode(hierarchy)]
+  const selectedKey = Object.keys(selectedKeys)[0] || null
   const selectedNode = selectedKey ? findNodeById(hierarchy, selectedKey) : null
 
   return (
@@ -49,10 +52,9 @@ function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
         <Tree
           value={treeData}
           selectionMode="single"
-          selectionKeys={selectedKey ? { [selectedKey]: true } : {}}
+          selectionKeys={selectedKeys}
           onSelectionChange={e => {
-            const key = Object.keys(e.value || {})[0] || null
-            setSelectedKey(key)
+            setSelectedKeys(e.value || {})
           }}
           className="hierarchy-tree-component"
         />
