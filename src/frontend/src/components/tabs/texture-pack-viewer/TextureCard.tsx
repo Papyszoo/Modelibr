@@ -2,10 +2,12 @@ import { useState, useRef } from 'react'
 import { Card } from 'primereact/card'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
+import { Dialog } from 'primereact/dialog'
 import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../../hooks/useTexturePacks'
 import { useDragAndDrop } from '../../../hooks/useFileUpload'
+// eslint-disable-next-line no-restricted-imports -- ApiClient needed for file operations
 import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
 
@@ -24,6 +26,7 @@ function TextureCard({
 }: TextureCardProps) {
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [showInfoDialog, setShowInfoDialog] = useState(false)
   const toast = useRef<Toast>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const texturePacksApi = useTexturePacks()
@@ -132,6 +135,21 @@ function TextureCard({
     fileInputRef.current?.click()
   }
 
+  const handleReplaceClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    fileInputRef.current?.click()
+  }
+
+  const handleInfoClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowInfoDialog(true)
+  }
+
+  const handleRemoveClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    handleRemoveTexture()
+  }
+
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     handleFileUpload(files)
@@ -179,28 +197,43 @@ function TextureCard({
               <p>Uploading...</p>
             </div>
           ) : texture ? (
-            <div className="texture-card-preview">
-              <div className="texture-info">
-                <p className="texture-filename">{texture.fileName}</p>
-                <p className="texture-date">
-                  Added: {new Date(texture.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="texture-actions">
-                <Button
-                  icon="pi pi-upload"
-                  label="Replace"
-                  className="p-button-sm"
-                  onClick={handleCardClick}
-                  disabled={uploading}
-                />
-                <Button
-                  icon="pi pi-trash"
-                  label="Remove"
-                  className="p-button-sm p-button-danger"
-                  onClick={handleRemoveTexture}
-                  disabled={uploading}
-                />
+            <div className="texture-card-with-preview">
+              <img
+                src={ApiClient.getFileUrl(texture.fileId.toString())}
+                alt={texture.fileName || typeInfo.label}
+                className="texture-preview-image"
+              />
+              <div className="texture-card-overlay">
+                <div className="texture-overlay-top">
+                  <Button
+                    icon="pi pi-info-circle"
+                    className="p-button-rounded p-button-text texture-icon-btn"
+                    onClick={handleInfoClick}
+                    disabled={uploading}
+                    aria-label="Texture info"
+                  />
+                  <Button
+                    icon="pi pi-trash"
+                    className="p-button-rounded p-button-text p-button-danger texture-icon-btn"
+                    onClick={handleRemoveClick}
+                    disabled={uploading}
+                    aria-label="Remove texture"
+                  />
+                </div>
+                <div className="texture-overlay-center">
+                  <Button
+                    icon="pi pi-upload"
+                    className="p-button-rounded p-button-lg texture-upload-btn"
+                    onClick={handleReplaceClick}
+                    disabled={uploading}
+                    aria-label="Replace texture"
+                  />
+                </div>
+                <div className="texture-overlay-bottom">
+                  <span className="texture-overlay-filename">
+                    {texture.fileName}
+                  </span>
+                </div>
               </div>
             </div>
           ) : (
@@ -215,6 +248,35 @@ function TextureCard({
           )}
         </div>
       </Card>
+
+      {texture && (
+        <Dialog
+          header="Texture Information"
+          visible={showInfoDialog}
+          onHide={() => setShowInfoDialog(false)}
+          style={{ width: '400px' }}
+          modal
+        >
+          <div className="texture-info-dialog">
+            <div className="texture-info-row">
+              <strong>Type:</strong>
+              <span>{typeInfo.label}</span>
+            </div>
+            <div className="texture-info-row">
+              <strong>File Name:</strong>
+              <span>{texture.fileName}</span>
+            </div>
+            <div className="texture-info-row">
+              <strong>File ID:</strong>
+              <span>{texture.fileId}</span>
+            </div>
+            <div className="texture-info-row">
+              <strong>Added:</strong>
+              <span>{new Date(texture.createdAt).toLocaleString()}</span>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </>
   )
 }
