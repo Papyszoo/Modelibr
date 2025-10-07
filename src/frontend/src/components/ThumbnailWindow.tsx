@@ -24,6 +24,7 @@ function ThumbnailWindow({
       onClose={onClose}
       title="Thumbnail Details"
       side={side}
+      windowId="thumbnail"
     >
       {model ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

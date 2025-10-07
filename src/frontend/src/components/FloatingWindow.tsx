@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, ReactNode } from 'react'
+import { usePanelStore } from '../stores/panelStore'
 import './FloatingWindow.css'
 
 interface FloatingWindowProps {
@@ -7,6 +8,7 @@ interface FloatingWindowProps {
   title: string
   side?: 'left' | 'right'
   children: ReactNode
+  windowId: string
 }
 
 function FloatingWindow({
@@ -15,8 +17,12 @@ function FloatingWindow({
   title,
   side = 'left',
   children,
+  windowId,
 }: FloatingWindowProps) {
   const [collapsed, setCollapsed] = useState(false)
+
+  // Get panel sizes and active window from store
+  const { leftPanelWidth, activeWindowId, setActiveWindow } = usePanelStore()
 
   // Position based on side
   const initialPosition =
@@ -25,6 +31,10 @@ function FloatingWindow({
   const [dragging, setDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const windowRef = useRef<HTMLDivElement>(null)
+
+  // Calculate z-index based on whether this window is active
+  const isActive = activeWindowId === windowId
+  const zIndex = isActive ? 1001 : 1000
 
   useEffect(() => {
     if (!visible) {
@@ -39,9 +49,17 @@ function FloatingWindow({
     setPosition(newPosition)
   }, [side])
 
+  // Set this window as active when it becomes visible or is clicked
+  useEffect(() => {
+    if (visible) {
+      setActiveWindow(windowId)
+    }
+  }, [visible, windowId, setActiveWindow])
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.floating-window-header')) {
       setDragging(true)
+      setActiveWindow(windowId) // Set as active when dragging starts
       setDragStart({
         x: e.clientX - position.x,
         y: e.clientY - position.y,
@@ -49,28 +67,34 @@ function FloatingWindow({
     }
   }
 
+  const handleWindowClick = () => {
+    if (!isActive) {
+      setActiveWindow(windowId)
+    }
+  }
+
   useEffect(() => {
     if (dragging) {
       const handleMove = (e: MouseEvent) => {
-        const windowWidth = window.innerWidth
         const windowElement = windowRef.current
         const windowElementWidth = windowElement?.offsetWidth || 350
 
         let newX = e.clientX - dragStart.x
         const newY = Math.max(0, e.clientY - dragStart.y)
 
-        // Restrict dragging to the correct side
+        // Restrict dragging based on actual panel widths from zustand store
         if (side === 'left') {
-          // Keep on left half
+          // Keep on left panel
           newX = Math.max(
             0,
-            Math.min(newX, windowWidth / 2 - windowElementWidth)
+            Math.min(newX, leftPanelWidth - windowElementWidth)
           )
         } else {
-          // Keep on right half
+          // Keep on right panel
+          const rightPanelStart = leftPanelWidth
           newX = Math.max(
-            windowWidth / 2,
-            Math.min(newX, windowWidth - windowElementWidth)
+            rightPanelStart,
+            Math.min(newX, window.innerWidth - windowElementWidth)
           )
         }
 
@@ -91,7 +115,7 @@ function FloatingWindow({
         document.removeEventListener('mouseup', handleUp)
       }
     }
-  }, [dragging, dragStart, side])
+  }, [dragging, dragStart, side, leftPanelWidth])
 
   if (!visible) return null
 
@@ -102,8 +126,10 @@ function FloatingWindow({
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
+        zIndex,
       }}
       onMouseDown={handleMouseDown}
+      onClick={handleWindowClick}
     >
       <div className="floating-window-header">
         <span className="floating-window-title">{title}</span>

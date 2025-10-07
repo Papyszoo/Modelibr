@@ -21,6 +21,7 @@ function ModelInfoWindow({
       onClose={onClose}
       title="Model Information"
       side={side}
+      windowId="info"
     >
       {model ? (
         <ModelInfo model={model} />

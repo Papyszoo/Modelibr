@@ -23,6 +23,7 @@ function ModelHierarchyWindow({
       onClose={onClose}
       title="Model Hierarchy"
       side={side}
+      windowId="hierarchy"
     >
       <ModelHierarchy hierarchy={hierarchy} />
     </FloatingWindow>

@@ -57,24 +57,21 @@ function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
             // PrimeReact Tree returns the value as either an object or the key itself
             // Normalize it to always be an object
             const value = e.value
-            if (typeof value === 'string') {
+
+            // Check if clicking on already selected node to deselect
+            const clickedKey =
+              typeof value === 'string' ? value : Object.keys(value || {})[0]
+            if (clickedKey && selectedKeys[clickedKey]) {
+              // Deselect if already selected
+              setSelectedKeys({})
+            } else if (typeof value === 'string') {
               setSelectedKeys({ [value]: true })
             } else {
               setSelectedKeys(value || {})
             }
           }}
           className="hierarchy-tree-component"
-          togglerTemplate={<span />}
         />
-        {selectedNode && (
-          <button
-            className="hierarchy-clear-selection"
-            onClick={() => setSelectedKeys({})}
-            title="Clear selection"
-          >
-            <i className="pi pi-times" /> Clear Selection
-          </button>
-        )}
       </div>
 
       {selectedNode && (

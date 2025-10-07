@@ -1,7 +1,6 @@
 .model-hierarchy {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
   height: 100%;
   overflow: hidden;
 }
@@ -18,37 +17,7 @@
 .hierarchy-tree {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 0.5rem;
   background: white;
-  position: relative;
-}
-
-.hierarchy-clear-selection {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  transition: all 0.2s;
-}
-
-.hierarchy-clear-selection:hover {
-  background: #f1f5f9;
-  color: #475569;
-  border-color: #cbd5e1;
 }
 
 .hierarchy-tree-component {
