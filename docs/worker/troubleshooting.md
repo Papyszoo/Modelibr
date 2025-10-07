@@ -341,6 +341,56 @@ MAX_CONCURRENT_JOBS=5  # Default: 3
 
 **Common Errors and Solutions**:
 
+#### "Waiting failed: 10000ms exceeded" or "TimeoutError" during Puppeteer initialization
+
+**Cause**: This timeout occurs when Puppeteer waits for `window.THREE` but it's never exposed from the ES6 module, or when WebGL context creation fails.
+
+**Root Causes**:
+1. Three.js imported as ES6 module but not exposed on `window` object
+2. Chrome launched with flags that prevent WebGL context creation (`--disable-gpu`, `--disable-software-rasterizer`)
+
+**Solution**: This issue has been fixed in the latest version:
+
+1. **Three.js exposure (render-template.html)**:
+   ```javascript
+   // THREE is now explicitly exposed on window
+   window.THREE = THREE;
+   window.initRenderer = initScene;
+   // ... other functions
+   ```
+
+2. **Chrome WebGL flags (puppeteerRenderer.js)**:
+   ```javascript
+   // Use ANGLE with SwiftShader for software rendering in headless mode
+   '--use-gl=angle',
+   '--use-angle=swiftshader',
+   '--enable-webgl',
+   // REMOVED: --disable-gpu, --disable-software-rasterizer
+   ```
+
+**Verification**:
+```bash
+# Test Puppeteer initialization
+cd src/worker-service
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium node test-puppeteer.js
+
+# Should output:
+# ✓ Renderer initialized successfully
+# ✓ Render template exists
+# ✓ Camera distance calculated
+# ✓ Memory stats
+```
+
+**Docker verification**:
+```bash
+# Rebuild worker with latest changes
+docker compose build thumbnail-worker
+docker compose up -d thumbnail-worker
+
+# Check logs for successful initialization
+docker compose logs thumbnail-worker | grep "Puppeteer renderer initialized successfully"
+```
+
 #### "Failed to create WebGL context with headless-gl"
 **Cause**: Missing Mesa OpenGL libraries, or Xvfb not ready
 
