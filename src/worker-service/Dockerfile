@@ -11,11 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and .npmrc
+COPY package*.json .npmrc ./
 
 # Install dependencies with proper SSL configuration
 # The allowlist proxy uses a self-signed certificate, so we need to disable strict SSL
+# Also, .npmrc tells Puppeteer to skip Chromium download
 RUN npm config set strict-ssl false && \
     npm config set fetch-timeout 300000 && \
     npm config set fetch-retries 5 && \
