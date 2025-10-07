@@ -271,24 +271,37 @@ Log levels and contexts:
 
 ## Future Development
 
-This skeleton is ready for the actual three.js rendering implementation. Next steps:
+The worker has been rewritten to use Puppeteer for rendering:
 
-1. **Model Loading**: ✅ Implemented loaders for supported 3D formats (.obj, .fbx, .gltf, etc.)
-2. **Three.js Rendering**: ✅ Set up scene, camera, lights, and renderer
-3. **Orbit Frame Generation**: ✅ Implemented orbit camera animation with configurable angles
-4. **Memory Management**: ✅ Frames stored in memory with logging and statistics
-5. **Thumbnail Generation**: Capture rendered frames as images (pending full WebGL setup)
-6. **Output Storage**: Save thumbnails to storage and update job status
-7. **Performance Optimization**: Implement caching, resource pooling, and optimization
+### Current Implementation ✅
 
-The current implementation includes:
+1. **Puppeteer-based Rendering**: Uses headless Chrome with Three.js loaded from CDN
+2. **Browser Environment**: True browser rendering for maximum compatibility
+3. **Model Loading**: Supports OBJ, GLTF, and GLB formats via data URLs
+4. **Orbit Frames**: Camera orbits around model at configurable angles
+5. **Static Thumbnails**: Generates WebP and JPEG from representative frame
+6. **Lightweight Docker**: Debian Slim base with Chromium (no heavy Mesa/X11 deps)
+7. **Memory Management**: Efficient frame handling with Sharp for image processing
 
-- **Orbit Frame Rendering Pipeline**: Complete orbit animation system that positions camera at calculated distances around models and renders frames at configurable angles (e.g., every 5–15°)
-- **Configurable Lighting**: Ambient and directional lighting setup matching the frontend Scene component
-- **Memory Management**: Frame data stored in memory with detailed logging and memory usage tracking
-- **Frame Collection**: Rendered frames collected and stored without file encoding as requested
+### Architecture Benefits
 
-**Current Status**: Orbit frame rendering pipeline is implemented and functional. The system can render frames for each orbit angle with consistent lighting and controllable memory usage.
+- **Simpler Stack**: No native WebGL bindings (gl, canvas modules)
+- **Better Compatibility**: Real browser environment matches frontend
+- **Lighter Image**: ~400MB vs ~800MB with old Mesa/X11 stack
+- **Easier Debugging**: Can run Puppeteer in non-headless mode for troubleshooting
+- **CDN-based Three.js**: No need to bundle Three.js, loaded fresh from CDN
+
+### Testing
+
+```bash
+# Test locally (requires Chrome/Chromium installed)
+cd src/worker-service
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium node test-puppeteer.js
+
+# Test in Docker
+docker compose build thumbnail-worker
+docker compose up thumbnail-worker
+```
 
 ## Monitoring
 
