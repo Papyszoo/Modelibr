@@ -14,12 +14,8 @@ function SplitterLayout(): JSX.Element {
   // Global drag state for cross-panel tab dragging
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
 
-  // URL state for splitter size (percentage for left panel)
-  const [splitterSize, setSplitterSize] = useQueryState('split', {
-    defaultValue: '50',
-    parse: value => value || '50',
-    serialize: value => value,
-  })
+  // Local state for splitter size (percentage for left panel)
+  const [splitterSize, setSplitterSize] = useState<number>(50)
 
   // URL state for left panel tabs
   const [leftTabs, setLeftTabs] = useQueryState('leftTabs', {
@@ -51,7 +47,7 @@ function SplitterLayout(): JSX.Element {
 
   const handleSplitterResize = (event: SplitterEvent): void => {
     const leftSize = Math.round(event.sizes[0])
-    setSplitterSize(leftSize.toString())
+    setSplitterSize(leftSize)
   }
 
   // Central function to move tabs between panels
@@ -97,7 +93,7 @@ function SplitterLayout(): JSX.Element {
   }
 
   // Calculate initial sizes for splitter
-  const leftSize = parseInt(splitterSize, 10)
+  const leftSize = splitterSize
   const rightSize = 100 - leftSize
 
   // Determine which arrow buttons to show
@@ -109,55 +105,25 @@ function SplitterLayout(): JSX.Element {
   const handleToggleLeft = (): void => {
     if (isAtLeftEdge) {
       // Return to center
-      setSplitterSize('50')
+      setSplitterSize(50)
     } else {
       // Move to left edge (right panel takes full width)
-      setSplitterSize('1')
+      setSplitterSize(1)
     }
   }
 
   const handleToggleRight = (): void => {
     if (isAtRightEdge) {
       // Return to center
-      setSplitterSize('50')
+      setSplitterSize(50)
     } else {
       // Move to right edge (left panel takes full width)
-      setSplitterSize('99')
+      setSplitterSize(99)
     }
   }
 
   return (
     <div className="splitter-layout">
-      <div className="splitter-controls">
-        {(isAtCenter || isAtLeftEdge) && (
-          <Button
-            icon="pi pi-chevron-left"
-            onClick={handleToggleLeft}
-            className="splitter-toggle-button"
-            rounded
-            text
-            aria-label={
-              isAtLeftEdge ? 'Return to center' : 'Expand right panel'
-            }
-            tooltip={isAtLeftEdge ? 'Return to center' : 'Expand right panel'}
-            tooltipOptions={{ position: 'bottom' }}
-          />
-        )}
-        {(isAtCenter || isAtRightEdge) && (
-          <Button
-            icon="pi pi-chevron-right"
-            onClick={handleToggleRight}
-            className="splitter-toggle-button"
-            rounded
-            text
-            aria-label={
-              isAtRightEdge ? 'Return to center' : 'Expand left panel'
-            }
-            tooltip={isAtRightEdge ? 'Return to center' : 'Expand left panel'}
-            tooltipOptions={{ position: 'bottom' }}
-          />
-        )}
-      </div>
       <Splitter
         layout="horizontal"
         onResize={handleSplitterResize}
@@ -196,6 +162,32 @@ function SplitterLayout(): JSX.Element {
           />
         </SplitterPanel>
       </Splitter>
+      <div className="splitter-controls">
+        {(isAtCenter || isAtRightEdge) && (
+          <Button
+            icon="pi pi-chevron-left"
+            onClick={handleToggleLeft}
+            className="splitter-toggle-button"
+            size="small"
+            text
+            aria-label={
+              isAtRightEdge ? 'Return to center' : 'Expand left panel'
+            }
+          />
+        )}
+        {(isAtCenter || isAtLeftEdge) && (
+          <Button
+            icon="pi pi-chevron-right"
+            onClick={handleToggleRight}
+            className="splitter-toggle-button"
+            size="small"
+            text
+            aria-label={
+              isAtLeftEdge ? 'Return to center' : 'Expand right panel'
+            }
+          />
+        )}
+      </div>
     </div>
   )
 }

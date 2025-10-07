@@ -2,25 +2,29 @@
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  position: relative;
 }
 
-/* Splitter controls container */
+/* Splitter controls container - positioned over the splitter handle */
 .splitter-controls {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  z-index: 100;
+  gap: 0.25rem;
+  z-index: 1000;
+  pointer-events: none;
 }
 
 .splitter-toggle-button {
+  pointer-events: all;
   color: #64748b !important;
   transition: all 0.2s ease;
+  font-size: 0.875rem !important;
+  width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
 }
 
 .splitter-toggle-button:hover {
@@ -29,7 +33,7 @@
 }
 
 .splitter-layout .p-splitter {
-  flex: 1;
+  height: 100%;
   border: none;
 }
 
