@@ -67,4 +67,31 @@ describe('ThumbnailDisplay', () => {
       ).toBeInTheDocument()
     })
   })
+
+  it('does not continuously fetch thumbnail file when displayed', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({
+      status: 'Ready',
+    } as any)
+
+    const mockBlob = new Blob(['test'], { type: 'image/webp' })
+    mockApiClient.getThumbnailFile.mockResolvedValue(mockBlob)
+
+    render(<ThumbnailDisplay modelId="1" />)
+
+    // Wait for the image to be rendered
+    await waitFor(() => {
+      const image = screen.getByRole('img')
+      expect(image).toBeInTheDocument()
+    })
+
+    // Verify getThumbnailFile was called exactly once
+    expect(mockApiClient.getThumbnailFile).toHaveBeenCalledTimes(1)
+    expect(mockApiClient.getThumbnailFile).toHaveBeenCalledWith('1')
+
+    // Wait a bit more to ensure no additional calls are made
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify it's still only called once (no infinite loop)
+    expect(mockApiClient.getThumbnailFile).toHaveBeenCalledTimes(1)
+  })
 })

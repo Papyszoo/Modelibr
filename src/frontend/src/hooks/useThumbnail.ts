@@ -15,25 +15,30 @@ export function useThumbnail(modelId: string) {
   }, [modelId])
 
   useEffect(() => {
+    let objectUrl: string | null = null
+
     const fetchImg = async () => {
       try {
         const blob = await ApiClient.getThumbnailFile(modelId)
         const url = URL.createObjectURL(blob)
+        objectUrl = url
         setImgSrc(url)
       } catch {
         setImgSrc(null)
       }
     }
+
     if (thumbnailDetails?.status === 'Ready') {
       fetchImg()
     }
+
     // Cleanup the object URL when component unmounts or modelId changes
     return () => {
-      if (imgSrc) {
-        URL.revokeObjectURL(imgSrc)
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [modelId, thumbnailDetails, imgSrc])
+  }, [modelId, thumbnailDetails])
 
   return { thumbnailDetails, imgSrc }
 }
