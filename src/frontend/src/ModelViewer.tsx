@@ -3,6 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfoSidebar from './components/ModelInfoSidebar'
 import ThumbnailSidebar from './components/ThumbnailSidebar'
+import ModelHierarchySidebar from './components/ModelHierarchySidebar'
+import { ModelProvider } from './contexts/ModelContext'
 import { getModelFileFormat, Model } from './utils/fileUtils'
 import ApiClient from './services/ApiClient'
 import { Button } from 'primereact/button'
@@ -10,7 +12,7 @@ import { Toast } from 'primereact/toast'
 import { Sidebar } from 'primereact/sidebar'
 import './ModelViewer.css'
 
-type SidebarContentType = 'info' | 'thumbnail'
+type SidebarContentType = 'info' | 'thumbnail' | 'hierarchy'
 
 interface ModelViewerProps {
   model?: Model
@@ -106,70 +108,82 @@ function ModelViewer({
         </div>
       </header>
 
-      <div className="viewer-container">
-        {/* Floating action buttons for sidebar controls */}
-        <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
-          <Button
-            icon="pi pi-info-circle"
-            className="p-button-rounded viewer-control-btn"
-            onClick={() => openSidebar('info')}
-            tooltip="Model Information"
-            tooltipOptions={{
-              position: buttonPosition === 'left' ? 'right' : 'left',
-            }}
-          />
-          <Button
-            icon="pi pi-image"
-            className="p-button-rounded viewer-control-btn"
-            onClick={() => openSidebar('thumbnail')}
-            tooltip="Thumbnail Details"
-            tooltipOptions={{
-              position: buttonPosition === 'left' ? 'right' : 'left',
-            }}
-          />
+      <ModelProvider>
+        <div className="viewer-container">
+          {/* Floating action buttons for sidebar controls */}
+          <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
+            <Button
+              icon="pi pi-info-circle"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() => openSidebar('info')}
+              tooltip="Model Information"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
+            <Button
+              icon="pi pi-sitemap"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() => openSidebar('hierarchy')}
+              tooltip="Model Hierarchy"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
+            <Button
+              icon="pi pi-image"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() => openSidebar('thumbnail')}
+              tooltip="Thumbnail Details"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
+          </div>
+
+          {error ? (
+            <div className="viewer-error">
+              <h3>Failed to load model</h3>
+              <p>{error}</p>
+              <button onClick={() => setError('')} className="retry-button">
+                Retry
+              </button>
+            </div>
+          ) : (
+            <Canvas
+              camera={{ position: [3, 3, 3], fov: 60 }}
+              shadows
+              className="viewer-canvas"
+              gl={{
+                antialias: true,
+                alpha: true,
+                powerPreference: 'high-performance',
+              }}
+              dpr={Math.min(window.devicePixelRatio, 2)}
+            >
+              <Scene model={model} />
+            </Canvas>
+          )}
         </div>
 
-        {error ? (
-          <div className="viewer-error">
-            <h3>Failed to load model</h3>
-            <p>{error}</p>
-            <button onClick={() => setError('')} className="retry-button">
-              Retry
-            </button>
-          </div>
-        ) : (
-          <Canvas
-            camera={{ position: [3, 3, 3], fov: 60 }}
-            shadows
-            className="viewer-canvas"
-            gl={{
-              antialias: true,
-              alpha: true,
-              powerPreference: 'high-performance',
-            }}
-            dpr={Math.min(window.devicePixelRatio, 2)}
-          >
-            <Scene model={model} />
-          </Canvas>
-        )}
-      </div>
-
-      {/* Sidebar */}
-      <Sidebar
-        visible={sidebarVisible}
-        position={sidebarPosition}
-        onHide={() => setSidebarVisible(false)}
-        className="model-viewer-sidebar"
-        style={{ width: '400px' }}
-      >
-        {sidebarContent === 'info' && <ModelInfoSidebar model={model} />}
-        {sidebarContent === 'thumbnail' && (
-          <ThumbnailSidebar
-            model={model}
-            onRegenerate={handleRegenerateThumbnail}
-          />
-        )}
-      </Sidebar>
+        {/* Sidebar */}
+        <Sidebar
+          visible={sidebarVisible}
+          position={sidebarPosition}
+          onHide={() => setSidebarVisible(false)}
+          className="model-viewer-sidebar"
+          style={{ width: '400px' }}
+        >
+          {sidebarContent === 'info' && <ModelInfoSidebar model={model} />}
+          {sidebarContent === 'hierarchy' && <ModelHierarchySidebar />}
+          {sidebarContent === 'thumbnail' && (
+            <ThumbnailSidebar
+              model={model}
+              onRegenerate={handleRegenerateThumbnail}
+            />
+          )}
+        </Sidebar>
+      </ModelProvider>
     </div>
   )
 }
