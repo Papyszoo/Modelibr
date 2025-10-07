@@ -94,4 +94,41 @@ describe('ThumbnailDisplay', () => {
     // Verify it's still only called once (no infinite loop)
     expect(mockApiClient.getThumbnailFile).toHaveBeenCalledTimes(1)
   })
+
+  it('does not refetch when thumbnail details object changes but status stays Ready', async () => {
+    // First response with Ready status
+    mockApiClient.getThumbnailStatus.mockResolvedValueOnce({
+      status: 'Ready',
+      fileUrl: '/models/1/thumbnail/file',
+    } as any)
+
+    const mockBlob = new Blob(['test'], { type: 'image/webp' })
+    mockApiClient.getThumbnailFile.mockResolvedValue(mockBlob)
+
+    const { rerender } = render(<ThumbnailDisplay modelId="1" />)
+
+    // Wait for initial render
+    await waitFor(() => {
+      const image = screen.getByRole('img')
+      expect(image).toBeInTheDocument()
+    })
+
+    // Verify initial fetch
+    expect(mockApiClient.getThumbnailFile).toHaveBeenCalledTimes(1)
+
+    // Simulate a new thumbnailDetails object with same status (e.g., from SignalR update)
+    mockApiClient.getThumbnailStatus.mockResolvedValueOnce({
+      status: 'Ready',
+      fileUrl: '/models/1/thumbnail/file',
+      updatedAt: new Date().toISOString(), // Different timestamp
+    } as any)
+
+    // Force a re-render
+    rerender(<ThumbnailDisplay modelId="1" />)
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Should still be called only once - status didn't change
+    expect(mockApiClient.getThumbnailFile).toHaveBeenCalledTimes(1)
+  })
 })
