@@ -36,6 +36,8 @@ export class PuppeteerRenderer {
       const launchOptions = {
         headless: true,
         args: [
+          // Sandbox flags - required in Docker/CI environments even with proper user setup
+          // See: https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
@@ -44,13 +46,14 @@ export class PuppeteerRenderer {
           '--disable-extensions',
           '--disable-web-security', // Allow loading models from data URLs
           '--disable-features=IsolateOrigins,site-per-process',
-          '--disable-crash-reporter', // Disable crash reporter to prevent crashpad_handler errors
-          '--disable-breakpad', // Disable Breakpad crash reporter (legacy name)
-          '--disable-crashpad', // Explicitly disable Crashpad crash handler (modern Chrome versions)
-          '--no-crash-upload', // Prevent crash upload attempts
-          '--disable-client-side-phishing-detection', // Reduce crash reporter dependencies
-          '--disable-component-extensions-with-background-pages', // Reduce extensions that might trigger crash reporter
-          '--crash-dumps-dir=/tmp', // Provide crash dump directory if crash reporter still initializes
+          // Crash reporter flags - disable to prevent crashpad_handler errors
+          '--disable-crash-reporter',
+          '--disable-breakpad',
+          '--disable-crashpad',
+          '--no-crash-upload',
+          '--disable-client-side-phishing-detection',
+          '--disable-component-extensions-with-background-pages',
+          '--crash-dumps-dir=/tmp',
         ],
         dumpio: config.logLevel === 'debug',
         // Set environment variables to completely disable crash reporting
