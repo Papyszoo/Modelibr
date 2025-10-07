@@ -1,27 +1,22 @@
-# Dockerfile for the thumbnail worker service
+# Dockerfile for the thumbnail worker service using Puppeteer
 
 # Build stage - install dependencies
 FROM node:20-bookworm-slim AS builder
 
 # Install build dependencies and CA certificates
-# Need python and build tools for native modules (canvas, gl, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget git \
-    python3 build-essential \
-    libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev \
-    libxi-dev libglu1-mesa-dev libglew-dev pkg-config \
-    mesa-common-dev libgl1-mesa-dev \
   && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and .npmrc
+COPY package*.json .npmrc ./
 
 # Install dependencies with proper SSL configuration
 # The allowlist proxy uses a self-signed certificate, so we need to disable strict SSL
-# Also set environment variables for node-gyp to disable strict SSL
+# Also, .npmrc tells Puppeteer to skip Chromium download
 RUN npm config set strict-ssl false && \
     npm config set fetch-timeout 300000 && \
     npm config set fetch-retries 5 && \
@@ -32,19 +27,43 @@ RUN npm config set strict-ssl false && \
 # Runtime stage - only copy what's needed
 FROM node:20-bookworm-slim AS runtime
 
-# Install runtime dependencies only
+# Install runtime dependencies for Puppeteer
+# Puppeteer requires these dependencies for headless Chrome
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg python3 ca-certificates dos2unix \
-    libcairo2 libpango-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
-    libvips42 \
-    libxi6 libglu1-mesa libglew2.2 libgl1 mesa-utils xvfb xauth \
-  && ln -s /usr/bin/python3 /usr/bin/python \
+    ca-certificates \
+    wget \
+    gnupg \
+    # Dependencies for Chromium
+    chromium \
+    chromium-driver \
+    fonts-liberation \
+    libappindicator3-1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    libxshmfence1 \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Set NODE_ENV
 ENV NODE_ENV=production
+
+# Tell Puppeteer to use the system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Copy node_modules from builder stage
 COPY --from=builder /app/node_modules ./node_modules
@@ -55,13 +74,6 @@ COPY package*.json ./
 # Copy application code
 COPY . .
 
-# Fix line endings in entrypoint script (handles cases where .gitattributes wasn't applied in existing checkouts)
-# Make entrypoint script executable
-RUN dos2unix docker-entrypoint.sh && chmod +x docker-entrypoint.sh
-
-# Create X11 socket directory for Xvfb
-RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
-
 RUN useradd -u 1001 worker && chown -R worker:worker /app
 USER worker
 
@@ -69,5 +81,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-# Use custom entrypoint to properly handle xvfb-run arguments
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Start the application directly
+CMD ["node", "index.js"]
