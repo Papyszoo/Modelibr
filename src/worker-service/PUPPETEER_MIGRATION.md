@@ -198,6 +198,12 @@ puppeteer_skip_download=true
 2. Environment variable is set: `docker compose exec thumbnail-worker env | grep PUPPETEER`
 3. Render template exists: `docker compose exec thumbnail-worker ls -la render-template.html`
 
+### Crashpad Handler Error
+
+**Error**: `chrome_crashpad_handler: --database is required`
+
+**Solution**: This error has been fixed by adding `--disable-crash-reporter` flag to Chrome launch options. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
+
 ### SignalR Connection Issues
 
 This is expected if the API is not running. The worker will:
