@@ -7,7 +7,6 @@ import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../../hooks/useTexturePacks'
 import { useDragAndDrop } from '../../../hooks/useFileUpload'
-import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
 
 interface TextureCardProps {
@@ -51,7 +50,21 @@ function TextureCard({
       setUploading(true)
 
       // Upload the file using the dedicated files endpoint
-      const uploadResult = await ApiClient.uploadFile(file)
+      const baseURL =
+        import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadResponse = await fetch(`${baseURL}/files`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file')
+      }
+
+      const uploadResult = await uploadResponse.json()
       const fileId = uploadResult.fileId
 
       // Then add it to the pack
@@ -166,6 +179,13 @@ function TextureCard({
     </div>
   )
 
+  // Construct file URL
+  const getFileUrl = (fileId: number) => {
+    const baseURL =
+      import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+    return `${baseURL}/files/${fileId}`
+  }
+
   return (
     <>
       <Toast ref={toast} />
@@ -197,8 +217,8 @@ function TextureCard({
             </div>
           ) : texture ? (
             <div className="texture-card-with-preview">
-              <img 
-                src={ApiClient.getFileUrl(texture.fileId.toString())} 
+              <img
+                src={getFileUrl(texture.fileId)}
                 alt={texture.fileName || typeInfo.label}
                 className="texture-preview-image"
               />
@@ -229,7 +249,9 @@ function TextureCard({
                   />
                 </div>
                 <div className="texture-overlay-bottom">
-                  <span className="texture-overlay-filename">{texture.fileName}</span>
+                  <span className="texture-overlay-filename">
+                    {texture.fileName}
+                  </span>
                 </div>
               </div>
             </div>
