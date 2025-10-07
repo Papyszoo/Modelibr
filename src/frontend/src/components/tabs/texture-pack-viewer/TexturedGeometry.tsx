@@ -7,22 +7,39 @@ import { TexturePackDto, TextureType } from '../../../types'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 
+interface GeometryParams {
+  type: GeometryType
+  scale: number
+  rotationSpeed: number
+  wireframe: boolean
+  cubeSize?: number
+  sphereRadius?: number
+  sphereSegments?: number
+  cylinderRadius?: number
+  cylinderHeight?: number
+  torusRadius?: number
+  torusTube?: number
+}
+
 interface TexturedGeometryProps {
   geometryType: GeometryType
   texturePack: TexturePackDto
+  geometryParams?: GeometryParams
 }
 
 function TexturedGeometry({
   geometryType,
   texturePack,
+  geometryParams = {},
 }: TexturedGeometryProps) {
   const meshRef = useRef<THREE.Mesh>(null)
 
-  // Rotate the geometry
+  // Rotate the geometry with configurable speed
   useFrame(() => {
     if (meshRef.current) {
-      meshRef.current.rotation.y += 0.01
-      meshRef.current.rotation.x += 0.005
+      const rotationSpeed = geometryParams.rotationSpeed || 0.01
+      meshRef.current.rotation.y += rotationSpeed
+      meshRef.current.rotation.x += rotationSpeed * 0.5
     }
   })
 
@@ -91,21 +108,37 @@ function TexturedGeometry({
     }
   })
 
-  // Create geometry based on type
+  // Create geometry based on type with configurable parameters
   const geometry = useMemo(() => {
+    const scale = geometryParams.scale || 1
     switch (geometryType) {
-      case 'box':
-        return <boxGeometry args={[2, 2, 2]} />
-      case 'sphere':
-        return <sphereGeometry args={[1.2, 64, 64]} />
-      case 'cylinder':
-        return <cylinderGeometry args={[1, 1, 2, 64]} />
-      case 'torus':
-        return <torusGeometry args={[1, 0.4, 32, 64]} />
+      case 'box': {
+        const size = geometryParams.cubeSize || 2
+        return <boxGeometry args={[size * scale, size * scale, size * scale]} />
+      }
+      case 'sphere': {
+        const radius = geometryParams.sphereRadius || 1.2
+        const segments = geometryParams.sphereSegments || 64
+        return <sphereGeometry args={[radius * scale, segments, segments]} />
+      }
+      case 'cylinder': {
+        const radius = geometryParams.cylinderRadius || 1
+        const height = geometryParams.cylinderHeight || 2
+        return (
+          <cylinderGeometry
+            args={[radius * scale, radius * scale, height * scale, 64]}
+          />
+        )
+      }
+      case 'torus': {
+        const radius = geometryParams.torusRadius || 1
+        const tube = geometryParams.torusTube || 0.4
+        return <torusGeometry args={[radius * scale, tube * scale, 32, 64]} />
+      }
       default:
         return <boxGeometry args={[2, 2, 2]} />
     }
-  }, [geometryType])
+  }, [geometryType, geometryParams])
 
   // Extract loaded textures, handling the dummy case
   const hasTextures = Object.keys(textureUrlsObject).length > 0
@@ -142,6 +175,7 @@ function TexturedGeometry({
         roughness={textures.roughnessMap ? 1 : 0.5}
         metalness={textures.metalnessMap ? 1 : 0.3}
         color={textures.map ? undefined : '#ffffff'}
+        wireframe={geometryParams.wireframe || false}
       />
     </mesh>
   )

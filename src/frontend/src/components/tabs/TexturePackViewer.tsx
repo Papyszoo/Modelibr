@@ -8,9 +8,6 @@ import PackStats from '../dialogs/texture-pack-detail/PackStats'
 import ModelsTable from '../dialogs/texture-pack-detail/ModelsTable'
 import TextureCard from './texture-pack-viewer/TextureCard'
 import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
-import GeometrySelector, {
-  GeometryType,
-} from './texture-pack-viewer/GeometrySelector'
 import TexturePreviewPanel from './texture-pack-viewer/TexturePreviewPanel'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { ModelSummaryDto } from '../../types'
@@ -27,7 +24,6 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   const [updating, setUpdating] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
-  const [selectedGeometry, setSelectedGeometry] = useState<GeometryType>('box')
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const texturePacksApi = useTexturePacks()
 
@@ -89,11 +85,6 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
     })
   }
 
-  const handleGeometrySelect = (geometry: GeometryType) => {
-    setSelectedGeometry(geometry)
-    setActiveTabIndex(2) // Switch to preview tab (index 2)
-  }
-
   if (loading) {
     return (
       <div className="texture-pack-viewer-loading">Loading texture pack...</div>
@@ -153,10 +144,6 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
               )
             })}
           </div>
-
-          {texturePack.textureCount > 0 && (
-            <GeometrySelector onGeometrySelect={handleGeometrySelect} />
-          )}
         </TabPanel>
 
         <TabPanel header="Models" leftIcon="pi pi-box">
@@ -169,10 +156,7 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
 
         {texturePack.textureCount > 0 && (
           <TabPanel header="Preview" leftIcon="pi pi-eye">
-            <TexturePreviewPanel
-              geometryType={selectedGeometry}
-              texturePack={texturePack}
-            />
+            <TexturePreviewPanel texturePack={texturePack} />
           </TabPanel>
         )}
       </TabView>

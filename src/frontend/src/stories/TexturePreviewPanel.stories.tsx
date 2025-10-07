@@ -47,30 +47,8 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const CubePreview: Story = {
+export const Default: Story = {
   args: {
-    geometryType: 'box',
-    texturePack: mockTexturePack,
-  },
-}
-
-export const SpherePreview: Story = {
-  args: {
-    geometryType: 'sphere',
-    texturePack: mockTexturePack,
-  },
-}
-
-export const CylinderPreview: Story = {
-  args: {
-    geometryType: 'cylinder',
-    texturePack: mockTexturePack,
-  },
-}
-
-export const TorusPreview: Story = {
-  args: {
-    geometryType: 'torus',
     texturePack: mockTexturePack,
   },
 }
