@@ -377,12 +377,16 @@ See [xvfb-startup-fix.md](xvfb-startup-fix.md) for Xvfb startup timing details.
 
 **Solution**: This issue has been fixed by adding multiple Chrome launch flags to completely disable the crash reporting system. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
 
-Chrome flags added:
+Chrome flags and environment variables added:
 - `--disable-crash-reporter` - Main crash reporter disable flag
 - `--disable-breakpad` - Disable legacy Breakpad crash reporter
+- `--disable-crashpad` - Explicitly disable Crashpad crash handler (for modern Chrome versions)
+- `--no-crash-upload` - Prevent crash upload attempts
 - `--disable-client-side-phishing-detection` - Reduce crash reporter dependencies
 - `--disable-component-extensions-with-background-pages` - Reduce extensions that might trigger crash reporter
 - `--crash-dumps-dir=/tmp` - Provide crash dump directory as fallback if crash reporter still tries to initialize
+- `CHROME_CRASHPAD_PIPE_NAME=''` - Environment variable to disable crashpad pipe
+- `BREAKPAD_DISABLE=1` - Environment variable to disable legacy Breakpad
 
 If you encounter this error:
 ```bash
