@@ -41,8 +41,10 @@ export class PuppeteerRenderer {
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-software-rasterizer',
+          // WebGL/GPU flags - enable WebGL with software rendering for headless mode
+          '--use-gl=angle', // Use ANGLE for WebGL compatibility
+          '--use-angle=swiftshader', // Use SwiftShader for software rendering
+          '--enable-webgl', // Explicitly enable WebGL
           '--disable-extensions',
           '--disable-web-security', // Allow loading models from data URLs
           '--disable-features=IsolateOrigins,site-per-process',
