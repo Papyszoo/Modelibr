@@ -602,7 +602,10 @@ The project maintains a **simplified, consolidated documentation structure**:
 
 ### Guidelines for Documentation Updates
 
-**IMPORTANT: Keep documentation minimal and focused. Do NOT create new documentation files for every bug fix or change.**
+**CRITICAL RULES:**
+1. **NEVER create new documentation files in the root folder** - The root folder should only contain README.md and CODE_QUALITY.md
+2. **NEVER create separate fix/summary documentation files** - Add to existing documentation only
+3. **Keep documentation minimal and focused** - Essential information for humans with short attention spans only
 
 #### When to Update Documentation
 Update existing docs when changes affect:
@@ -630,6 +633,12 @@ Update existing docs when changes affect:
 
 ❌ **Don't do this:**
 ```
+# Creating files in root folder
+CRASHPAD_FIX_SUMMARY.md
+THUMBNAIL_FIX.md
+DOCKER_SETUP.md
+
+# Creating separate fix documentation
 docs/worker/container-no-logs-fix.md
 docs/worker/entrypoint-line-endings-fix.md
 docs/worker/mesa-libraries-fix.md
@@ -639,6 +648,8 @@ docs/worker/thumbnail-fix-summary.md
 
 ✅ **Do this instead:**
 ```
+# Keep root folder clean - only README.md and CODE_QUALITY.md
+# Consolidate all fixes into existing documentation
 docs/WORKER.md (includes common troubleshooting)
 docs/worker/troubleshooting.md (comprehensive guide)
 ```
