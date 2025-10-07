@@ -22,7 +22,8 @@ RUN npm config set strict-ssl false && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
-    NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
+    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || \
+    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
 
 # Runtime stage - only copy what's needed
 FROM node:20-bookworm-slim AS runtime
