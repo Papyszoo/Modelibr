@@ -1,26 +1,21 @@
 import { Suspense } from 'react'
-import { Dialog } from 'primereact/dialog'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { GeometryType } from './GeometrySelector'
 import { TexturePackDto } from '../../../types'
 import TexturedGeometry from './TexturedGeometry'
 import LoadingPlaceholder from '../../LoadingPlaceholder'
-import './TexturePreviewDialog.css'
+import './TexturePreviewPanel.css'
 
-interface TexturePreviewDialogProps {
-  visible: boolean
+interface TexturePreviewPanelProps {
   geometryType: GeometryType
   texturePack: TexturePackDto
-  onHide: () => void
 }
 
-function TexturePreviewDialog({
-  visible,
+function TexturePreviewPanel({
   geometryType,
   texturePack,
-  onHide,
-}: TexturePreviewDialogProps) {
+}: TexturePreviewPanelProps) {
   const geometryNames = {
     box: 'Cube',
     sphere: 'Sphere',
@@ -29,16 +24,16 @@ function TexturePreviewDialog({
   }
 
   return (
-    <Dialog
-      header={`Preview: ${texturePack.name} on ${geometryNames[geometryType]}`}
-      visible={visible}
-      onHide={onHide}
-      modal
-      className="texture-preview-dialog"
-      style={{ width: '80vw', maxWidth: '1200px', height: '80vh' }}
-      maximizable
-    >
-      <div className="texture-preview-container">
+    <div className="texture-preview-panel">
+      <div className="preview-header">
+        <h3 className="preview-title">{geometryNames[geometryType]} Preview</h3>
+        <div className="preview-info">
+          <span className="info-label">Textures Applied:</span>
+          <span className="info-value">{texturePack.textureCount}</span>
+        </div>
+      </div>
+
+      <div className="preview-canvas-container">
         <Canvas
           camera={{ position: [4, 3, 4], fov: 50 }}
           shadows
@@ -99,20 +94,14 @@ function TexturePreviewDialog({
             minDistance={2}
           />
         </Canvas>
-
-        <div className="texture-preview-info">
-          <div className="texture-preview-stats">
-            <span className="stat-label">Textures Applied:</span>
-            <span className="stat-value">{texturePack.textureCount}</span>
-          </div>
-          <p className="texture-preview-hint">
-            <i className="pi pi-info-circle"></i>
-            Use mouse to rotate, zoom, and pan the view
-          </p>
-        </div>
       </div>
-    </Dialog>
+
+      <div className="preview-hint">
+        <i className="pi pi-info-circle"></i>
+        Use mouse to rotate, zoom, and pan the view
+      </div>
+    </div>
   )
 }
 
-export default TexturePreviewDialog
+export default TexturePreviewPanel

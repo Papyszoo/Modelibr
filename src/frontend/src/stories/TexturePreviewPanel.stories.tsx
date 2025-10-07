@@ -1,7 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { useState } from 'react'
-import TexturePreviewDialog from '../components/tabs/texture-pack-viewer/TexturePreviewDialog'
-import { Button } from 'primereact/button'
+import TexturePreviewPanel from '../components/tabs/texture-pack-viewer/TexturePreviewPanel'
 import { TexturePackDto, TextureType } from '../types'
 
 const mockTexturePack: TexturePackDto = {
@@ -38,53 +36,41 @@ const mockTexturePack: TexturePackDto = {
 }
 
 const meta = {
-  title: 'Components/TexturePreviewDialog',
-  component: TexturePreviewDialog,
+  title: 'Components/TexturePreviewPanel',
+  component: TexturePreviewPanel,
   parameters: {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof TexturePreviewDialog>
+} satisfies Meta<typeof TexturePreviewPanel>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
-// Wrapper component to handle the dialog state
-function TexturePreviewWrapper({
-  geometryType,
-}: {
-  geometryType: 'box' | 'sphere' | 'cylinder' | 'torus'
-}) {
-  const [visible, setVisible] = useState(false)
-
-  return (
-    <>
-      <Button
-        label={`Preview on ${geometryType}`}
-        onClick={() => setVisible(true)}
-      />
-      <TexturePreviewDialog
-        visible={visible}
-        geometryType={geometryType}
-        texturePack={mockTexturePack}
-        onHide={() => setVisible(false)}
-      />
-    </>
-  )
-}
-
 export const CubePreview: Story = {
-  render: () => <TexturePreviewWrapper geometryType="box" />,
+  args: {
+    geometryType: 'box',
+    texturePack: mockTexturePack,
+  },
 }
 
 export const SpherePreview: Story = {
-  render: () => <TexturePreviewWrapper geometryType="sphere" />,
+  args: {
+    geometryType: 'sphere',
+    texturePack: mockTexturePack,
+  },
 }
 
 export const CylinderPreview: Story = {
-  render: () => <TexturePreviewWrapper geometryType="cylinder" />,
+  args: {
+    geometryType: 'cylinder',
+    texturePack: mockTexturePack,
+  },
 }
 
 export const TorusPreview: Story = {
-  render: () => <TexturePreviewWrapper geometryType="torus" />,
+  args: {
+    geometryType: 'torus',
+    texturePack: mockTexturePack,
+  },
 }

@@ -15,7 +15,7 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
   args: {
-    onGeometrySelect: (geometry) => {
+    onGeometrySelect: geometry => {
       console.log('Selected geometry:', geometry)
       alert(`Selected: ${geometry}`)
     },

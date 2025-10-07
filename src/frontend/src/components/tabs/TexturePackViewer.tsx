@@ -11,7 +11,7 @@ import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
 import GeometrySelector, {
   GeometryType,
 } from './texture-pack-viewer/GeometrySelector'
-import TexturePreviewDialog from './texture-pack-viewer/TexturePreviewDialog'
+import TexturePreviewPanel from './texture-pack-viewer/TexturePreviewPanel'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { ModelSummaryDto } from '../../types'
 import './TexturePackViewer.css'
@@ -27,8 +27,8 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   const [updating, setUpdating] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
-  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [selectedGeometry, setSelectedGeometry] = useState<GeometryType>('box')
+  const [activeTabIndex, setActiveTabIndex] = useState(0)
   const texturePacksApi = useTexturePacks()
 
   const loadTexturePack = async () => {
@@ -91,7 +91,7 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
 
   const handleGeometrySelect = (geometry: GeometryType) => {
     setSelectedGeometry(geometry)
-    setShowPreviewDialog(true)
+    setActiveTabIndex(2) // Switch to preview tab (index 2)
   }
 
   if (loading) {
@@ -130,7 +130,11 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
         </div>
       </header>
 
-      <TabView className="pack-viewer-tabs">
+      <TabView
+        className="pack-viewer-tabs"
+        activeIndex={activeTabIndex}
+        onTabChange={e => setActiveTabIndex(e.index)}
+      >
         <TabPanel header="Textures" leftIcon="pi pi-image">
           <div className="texture-cards-grid">
             {allTextureTypes.map((textureType: TextureType) => {
@@ -162,6 +166,15 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
             onManageAssociations={() => setShowModelAssociationDialog(true)}
           />
         </TabPanel>
+
+        {texturePack.textureCount > 0 && (
+          <TabPanel header="Preview" leftIcon="pi pi-eye">
+            <TexturePreviewPanel
+              geometryType={selectedGeometry}
+              texturePack={texturePack}
+            />
+          </TabPanel>
+        )}
       </TabView>
 
       {showModelAssociationDialog && (
@@ -173,15 +186,6 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
             setShowModelAssociationDialog(false)
             loadTexturePack()
           }}
-        />
-      )}
-
-      {showPreviewDialog && texturePack && (
-        <TexturePreviewDialog
-          visible={showPreviewDialog}
-          geometryType={selectedGeometry}
-          texturePack={texturePack}
-          onHide={() => setShowPreviewDialog(false)}
         />
       )}
     </div>

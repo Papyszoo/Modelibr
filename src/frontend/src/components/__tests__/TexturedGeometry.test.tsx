@@ -6,7 +6,7 @@ import { TexturePackDto, TextureType } from '../../types'
 // Mock ApiClient
 jest.mock('../../services/ApiClient', () => ({
   default: {
-    getFileUrl: jest.fn((id) => `http://localhost/files/${id}`),
+    getFileUrl: jest.fn(id => `http://localhost/files/${id}`),
   },
 }))
 
