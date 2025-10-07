@@ -23,9 +23,6 @@
 .hierarchy-tree-component {
   border: none !important;
   font-size: 0.875rem;
-}
-
-.hierarchy-tree-component .p-tree {
   padding: 0 !important;
   border-radius: 0 !important;
 }

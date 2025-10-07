@@ -74,6 +74,13 @@ function SplitterLayout(): JSX.Element {
     setSplitterSize(leftSize.toString())
   }
 
+  const handleSplitterResizeEnd = (event: SplitterEvent): void => {
+    const leftSize = Math.round(event.sizes[0])
+    const totalWidth = window.innerWidth
+    setLeftPanelWidth((totalWidth * leftSize) / 100)
+    setRightPanelWidth((totalWidth * (100 - leftSize)) / 100)
+  }
+
   // Central function to move tabs between panels
   const moveTabBetweenPanels = (tab: Tab, fromSide: 'left' | 'right'): void => {
     if (fromSide === 'left') {
@@ -125,6 +132,7 @@ function SplitterLayout(): JSX.Element {
       <Splitter
         layout="horizontal"
         onResize={handleSplitterResize}
+        onResizeEnd={handleSplitterResizeEnd}
         resizerStyle={{ background: '#e2e8f0', width: '4px' }}
       >
         <SplitterPanel size={leftSize} minSize={20}>
