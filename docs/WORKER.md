@@ -71,7 +71,7 @@ RENDER_FORMAT=png
 ```bash
 # Orbit Animation
 ENABLE_ORBIT_ANIMATION=true
-ORBIT_ANGLE_STEP=15          # 360/15 = 24 frames
+ORBIT_ANGLE_STEP=12          # 360/12 = 30 frames
 CAMERA_HEIGHT_MULTIPLIER=0.75
 
 # Encoding
@@ -399,9 +399,9 @@ open docs/signalr-test.html
 ### Technology Stack
 
 - **Runtime** - Node.js 18+ with Express for health endpoints
-- **3D Rendering** - Three.js with node-canvas for server-side rendering
-- **Image Processing** - Sharp for poster generation
-- **Video Encoding** - FFmpeg (fluent-ffmpeg) for animated WebP
+- **3D Rendering** - Puppeteer with Three.js for browser-based rendering
+- **Image Processing** - Sharp for frame processing and poster generation
+- **Animation Encoding** - node-webpmux for animated WebP creation
 - **Communication** - @microsoft/signalr for real-time notifications, axios for REST
 - **Logging** - Winston with structured JSON logging
 
@@ -421,7 +421,7 @@ open docs/signalr-test.html
 
 **frameRenderer.js** - Renders orbit animation frames with Three.js scene
 
-**frameEncoder.js** - Encodes frames to animated WebP and poster with FFmpeg/Sharp
+**frameEncoder.js** - Encodes frames to animated WebP and poster with Sharp/node-webpmux
 
 **thumbnailStorageService.js** - Uploads generated thumbnails to backend API
 
@@ -459,10 +459,10 @@ open docs/signalr-test.html
 | `CAMERA_DISTANCE_MULTIPLIER` | `2.5` | Camera distance from model |
 | **Orbit Animation** | | |
 | `ENABLE_ORBIT_ANIMATION` | `true` | Generate orbit animation |
-| `ORBIT_ANGLE_STEP` | `15` | Degrees per frame (360/step = frames) |
+| `ORBIT_ANGLE_STEP` | `12` | Degrees per frame (360/step = ~30 frames) |
 | `CAMERA_HEIGHT_MULTIPLIER` | `0.75` | Camera height relative to distance |
 | **Encoding** | | |
-| `ENABLE_FRAME_ENCODING` | `true` | Encode to WebP |
+| `ENABLE_FRAME_ENCODING` | `true` | Encode to animated WebP |
 | `ENCODING_FRAMERATE` | `10` | Animation framerate (fps) |
 | `WEBP_QUALITY` | `75` | WebP quality (0-100) |
 | `JPEG_QUALITY` | `85` | JPEG quality for poster (0-100) |

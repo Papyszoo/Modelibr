@@ -2,12 +2,13 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import sharp from 'sharp'
+import webpmux from 'node-webpmux'
 import { config } from './config.js'
 import logger from './logger.js'
 
 /**
- * Service for encoding orbit frames into static WebP thumbnail and poster images
- * Simplified version using sharp only (no ffmpeg dependency)
+ * Service for encoding orbit frames into animated WebP thumbnail and poster images
+ * Uses sharp for image processing and node-webpmux for animation creation
  */
 export class FrameEncoderService {
   constructor() {
@@ -28,8 +29,8 @@ export class FrameEncoderService {
   }
 
   /**
-   * Encode orbit frames into static WebP thumbnail and poster image
-   * Uses the middle frame as the representative image
+   * Encode orbit frames into animated WebP thumbnail and poster image
+   * Creates a looping animation from all frames
    * @param {Array} frames - Array of rendered frame data
    * @param {Object} jobLogger - Logger with job context
    * @returns {Promise<Object>} Encoding result with file paths and metadata
@@ -43,34 +44,27 @@ export class FrameEncoderService {
       // Create job-specific working directory
       fs.mkdirSync(workingDir, { recursive: true })
 
-      jobLogger.info('Starting frame encoding (static WebP)', {
+      jobLogger.info('Starting frame encoding (animated WebP)', {
         frameCount: frames.length,
         workingDir,
-        targetFormat: 'webp',
+        targetFormat: 'animated-webp',
+        framerate: config.encoding.framerate,
       })
 
       if (frames.length === 0) {
         throw new Error('No frames to encode')
       }
 
-      // Select middle frame as representative image
-      const middleFrameIndex = Math.floor(frames.length / 2)
-      const representativeFrame = frames[middleFrameIndex]
-
-      jobLogger.info('Using middle frame for thumbnail', {
-        frameIndex: middleFrameIndex,
-        totalFrames: frames.length,
-        angle: representativeFrame.angle,
-      })
-
-      // Step 1: Create WebP thumbnail from representative frame
-      const webpPath = await this.createStaticWebP(
-        representativeFrame,
+      // Step 1: Create animated WebP from all frames
+      const webpPath = await this.createAnimatedWebP(
+        frames,
         workingDir,
         jobLogger
       )
 
-      // Step 2: Create poster frame (JPG) from same frame
+      // Step 2: Create poster frame (JPG) from middle frame for fallback/preview
+      const middleFrameIndex = Math.floor(frames.length / 2)
+      const representativeFrame = frames[middleFrameIndex]
       const posterPath = await this.createPosterFrame(
         representativeFrame,
         workingDir,
@@ -83,7 +77,8 @@ export class FrameEncoderService {
         webpPath,
         posterPath,
         encodeTimeMs: encodeTime,
-        representativeFrameIndex: middleFrameIndex,
+        frameCount: frames.length,
+        isAnimated: true,
       })
 
       return {
@@ -92,6 +87,7 @@ export class FrameEncoderService {
         frameCount: frames.length,
         representativeFrameIndex: middleFrameIndex,
         encodeTimeMs: encodeTime,
+        isAnimated: true,
       }
     } catch (error) {
       jobLogger.error('Frame encoding failed', {
@@ -105,38 +101,81 @@ export class FrameEncoderService {
   }
 
   /**
-   * Create static WebP from a single frame using Sharp
-   * @param {Object} frame - Frame data with pixels buffer
+   * Create animated WebP from multiple frames using node-webpmux
+   * @param {Array} frames - Array of frame data with pixels buffers
    * @param {string} workingDir - Working directory
    * @param {Object} jobLogger - Logger with job context
-   * @returns {Promise<string>} Path to created WebP file
+   * @returns {Promise<string>} Path to created animated WebP file
    */
-  async createStaticWebP(frame, workingDir, jobLogger) {
+  async createAnimatedWebP(frames, workingDir, jobLogger) {
     const webpPath = path.join(workingDir, 'thumbnail.webp')
     const quality = config.encoding?.webpQuality || 75
+    const framerate = config.encoding?.framerate || 10
+    const frameDuration = Math.round(1000 / framerate) // Duration in ms per frame
 
-    jobLogger.info('Creating static WebP thumbnail', {
+    jobLogger.info('Creating animated WebP thumbnail', {
       quality,
-      width: frame.width,
-      height: frame.height,
+      framerate,
+      frameDuration,
+      frameCount: frames.length,
+      width: frames[0].width,
+      height: frames[0].height,
       outputPath: webpPath,
     })
 
     try {
-      // Frame pixels are already PNG data from Puppeteer's canvas.toDataURL
-      // So we can directly process them
-      await sharp(frame.pixels).webp({ quality }).toFile(webpPath)
+      // Create frames array for the animation
+      const webpFrames = []
+
+      // Convert each frame to WebP and add to frames array
+      for (let i = 0; i < frames.length; i++) {
+        const frame = frames[i]
+
+        // Convert PNG buffer to WebP buffer using sharp
+        const webpBuffer = await sharp(frame.pixels)
+          .webp({ quality })
+          .toBuffer()
+
+        // Generate frame with delay
+        const webpFrame = await webpmux.Image.generateFrame({
+          buffer: webpBuffer,
+          delay: frameDuration,
+        })
+
+        webpFrames.push(webpFrame)
+
+        // Log progress for large animations
+        if (frames.length > 20 && (i + 1) % 10 === 0) {
+          jobLogger.info('Animation encoding progress', {
+            framesProcessed: i + 1,
+            totalFrames: frames.length,
+          })
+        }
+      }
+
+      // Save animated WebP directly using static method with frames option
+      // This creates an animation with infinite loop by default
+      await webpmux.Image.save(webpPath, {
+        frames: webpFrames,
+        width: frames[0].width,
+        height: frames[0].height,
+        bgColor: [255, 255, 255, 255], // White background (RGBA)
+        loops: 0, // 0 = infinite loop
+      })
 
       const stats = fs.statSync(webpPath)
-      jobLogger.info('WebP thumbnail created successfully', {
+      jobLogger.info('Animated WebP thumbnail created successfully', {
         sizeBytes: stats.size,
         sizeMB: (stats.size / 1024 / 1024).toFixed(2),
+        frameCount: frames.length,
+        frameDuration,
       })
 
       return webpPath
     } catch (error) {
-      jobLogger.error('Failed to create WebP thumbnail', {
+      jobLogger.error('Failed to create animated WebP thumbnail', {
         error: error.message,
+        stack: error.stack,
       })
       throw error
     }
