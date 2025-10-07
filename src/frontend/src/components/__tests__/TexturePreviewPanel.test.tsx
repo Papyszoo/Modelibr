@@ -13,6 +13,7 @@ jest.mock('../../services/ApiClient', () => ({
 jest.mock('@react-three/drei', () => ({
   useTexture: jest.fn(() => ({})),
   OrbitControls: () => null,
+  Stage: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 // Mock leva
