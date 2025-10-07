@@ -1,18 +1,15 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
-import ModelInfoSidebar from './components/ModelInfoSidebar'
-import ThumbnailSidebar from './components/ThumbnailSidebar'
+import ModelInfoWindow from './components/ModelInfoWindow'
+import ThumbnailWindow from './components/ThumbnailWindow'
 import ModelHierarchyWindow from './components/ModelHierarchyWindow'
 import { ModelProvider } from './contexts/ModelContext'
 import { getModelFileFormat, Model } from './utils/fileUtils'
 import ApiClient from './services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { Sidebar } from 'primereact/sidebar'
 import './ModelViewer.css'
-
-type SidebarContentType = 'info' | 'thumbnail'
 
 interface ModelViewerProps {
   model?: Model
@@ -28,15 +25,14 @@ function ModelViewer({
   const [error, setError] = useState<string>('')
   const [model, setModel] = useState<Model | null>(propModel || null)
   const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
-  const [sidebarVisible, setSidebarVisible] = useState<boolean>(false)
-  const [sidebarContent, setSidebarContent] =
-    useState<SidebarContentType>('info')
+  const [infoWindowVisible, setInfoWindowVisible] = useState<boolean>(false)
+  const [thumbnailWindowVisible, setThumbnailWindowVisible] =
+    useState<boolean>(false)
   const [hierarchyWindowVisible, setHierarchyWindowVisible] =
     useState<boolean>(false)
   const toast = useRef<Toast>(null)
 
-  // Determine which side for sidebar positioning
-  const sidebarPosition = side ?? 'left'
+  // Determine which side for button positioning
   const buttonPosition = side === 'left' ? 'right' : 'left'
 
   useEffect(() => {
@@ -79,11 +75,6 @@ function ModelViewer({
     }
   }
 
-  const openSidebar = (content: SidebarContentType) => {
-    setSidebarContent(content)
-    setSidebarVisible(true)
-  }
-
   if (loading) {
     return <div className="model-viewer-loading">Loading model...</div>
   }
@@ -117,7 +108,7 @@ function ModelViewer({
             <Button
               icon="pi pi-info-circle"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => openSidebar('info')}
+              onClick={() => setInfoWindowVisible(!infoWindowVisible)}
               tooltip="Model Information"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -135,7 +126,7 @@ function ModelViewer({
             <Button
               icon="pi pi-image"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => openSidebar('thumbnail')}
+              onClick={() => setThumbnailWindowVisible(!thumbnailWindowVisible)}
               tooltip="Thumbnail Details"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -168,27 +159,24 @@ function ModelViewer({
           )}
         </div>
 
-        {/* Sidebar */}
-        <Sidebar
-          visible={sidebarVisible}
-          position={sidebarPosition}
-          onHide={() => setSidebarVisible(false)}
-          className="model-viewer-sidebar"
-          style={{ width: '400px' }}
-        >
-          {sidebarContent === 'info' && <ModelInfoSidebar model={model} />}
-          {sidebarContent === 'thumbnail' && (
-            <ThumbnailSidebar
-              model={model}
-              onRegenerate={handleRegenerateThumbnail}
-            />
-          )}
-        </Sidebar>
-
-        {/* Floating Hierarchy Window */}
+        {/* Floating Windows */}
+        <ModelInfoWindow
+          visible={infoWindowVisible}
+          onClose={() => setInfoWindowVisible(false)}
+          side={side}
+          model={model}
+        />
+        <ThumbnailWindow
+          visible={thumbnailWindowVisible}
+          onClose={() => setThumbnailWindowVisible(false)}
+          side={side}
+          model={model}
+          onRegenerate={handleRegenerateThumbnail}
+        />
         <ModelHierarchyWindow
           visible={hierarchyWindowVisible}
           onClose={() => setHierarchyWindowVisible(false)}
+          side={side}
         />
       </ModelProvider>
     </div>

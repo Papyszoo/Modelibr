@@ -11,7 +11,13 @@ const meta = {
   decorators: [
     Story => (
       <ModelProvider>
-        <div style={{ position: 'relative', height: '100vh', background: '#f0f0f0' }}>
+        <div
+          style={{
+            position: 'relative',
+            height: '100vh',
+            background: '#f0f0f0',
+          }}
+        >
           <Story />
         </div>
       </ModelProvider>
@@ -32,7 +38,10 @@ function DemoWrapper() {
         icon="pi pi-sitemap"
         onClick={() => setVisible(!visible)}
       />
-      <ModelHierarchyWindow visible={visible} onClose={() => setVisible(false)} />
+      <ModelHierarchyWindow
+        visible={visible}
+        onClose={() => setVisible(false)}
+      />
     </div>
   )
 }

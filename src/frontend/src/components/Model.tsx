@@ -11,6 +11,7 @@ import { useModelObject } from '../hooks/useModelObject'
 function OBJModel({ modelUrl }: { modelUrl: string }) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
+  const scaledRef = useRef(false)
 
   // Rotate the model slowly
   useFrame(() => {
@@ -22,6 +23,36 @@ function OBJModel({ modelUrl }: { modelUrl: string }) {
   const model = useLoader(OBJLoader, modelUrl)
 
   useEffect(() => {
+    if (model && !scaledRef.current) {
+      // Apply a basic TSL-style material with enhanced properties
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(0.7, 0.7, 0.9),
+            metalness: 0.3,
+            roughness: 0.4,
+            envMapIntensity: 1.0,
+          })
+          child.castShadow = true
+          child.receiveShadow = true
+        }
+      })
+
+      // Center and scale the model - only once
+      const box = new THREE.Box3().setFromObject(model)
+      const center = box.getCenter(new THREE.Vector3())
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const scale = 2 / maxDim
+
+      model.position.sub(center.multiplyScalar(scale))
+      model.scale.setScalar(scale)
+
+      scaledRef.current = true
+    }
+  }, [model])
+
+  useEffect(() => {
     if (model) {
       setModelObject(model)
     }
@@ -29,30 +60,6 @@ function OBJModel({ modelUrl }: { modelUrl: string }) {
   }, [model, setModelObject])
 
   if (model) {
-    // Apply a basic TSL-style material with enhanced properties
-    model.traverse(child => {
-      if (child.isMesh) {
-        child.material = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0.7, 0.7, 0.9),
-          metalness: 0.3,
-          roughness: 0.4,
-          envMapIntensity: 1.0,
-        })
-        child.castShadow = true
-        child.receiveShadow = true
-      }
-    })
-
-    // Center and scale the model
-    const box = new THREE.Box3().setFromObject(model)
-    const center = box.getCenter(new THREE.Vector3())
-    const size = box.getSize(new THREE.Vector3())
-    const maxDim = Math.max(size.x, size.y, size.z)
-    const scale = 2 / maxDim
-
-    model.position.sub(center.multiplyScalar(scale))
-    model.scale.setScalar(scale)
-
     return (
       <group ref={meshRef}>
         <primitive object={model} />
@@ -66,6 +73,7 @@ function OBJModel({ modelUrl }: { modelUrl: string }) {
 function GLTFModel({ modelUrl }: { modelUrl: string }) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
+  const scaledRef = useRef(false)
 
   // Rotate the model slowly
   useFrame(() => {
@@ -78,6 +86,36 @@ function GLTFModel({ modelUrl }: { modelUrl: string }) {
   const model = gltf?.scene
 
   useEffect(() => {
+    if (model && !scaledRef.current) {
+      // Apply a basic TSL-style material with enhanced properties
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(0.7, 0.7, 0.9),
+            metalness: 0.3,
+            roughness: 0.4,
+            envMapIntensity: 1.0,
+          })
+          child.castShadow = true
+          child.receiveShadow = true
+        }
+      })
+
+      // Center and scale the model - only once
+      const box = new THREE.Box3().setFromObject(model)
+      const center = box.getCenter(new THREE.Vector3())
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const scale = 2 / maxDim
+
+      model.position.sub(center.multiplyScalar(scale))
+      model.scale.setScalar(scale)
+
+      scaledRef.current = true
+    }
+  }, [model])
+
+  useEffect(() => {
     if (model) {
       setModelObject(model)
     }
@@ -85,30 +123,6 @@ function GLTFModel({ modelUrl }: { modelUrl: string }) {
   }, [model, setModelObject])
 
   if (model) {
-    // Apply a basic TSL-style material with enhanced properties
-    model.traverse(child => {
-      if (child.isMesh) {
-        child.material = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0.7, 0.7, 0.9),
-          metalness: 0.3,
-          roughness: 0.4,
-          envMapIntensity: 1.0,
-        })
-        child.castShadow = true
-        child.receiveShadow = true
-      }
-    })
-
-    // Center and scale the model
-    const box = new THREE.Box3().setFromObject(model)
-    const center = box.getCenter(new THREE.Vector3())
-    const size = box.getSize(new THREE.Vector3())
-    const maxDim = Math.max(size.x, size.y, size.z)
-    const scale = 2 / maxDim
-
-    model.position.sub(center.multiplyScalar(scale))
-    model.scale.setScalar(scale)
-
     return (
       <group ref={meshRef}>
         <primitive object={model} />

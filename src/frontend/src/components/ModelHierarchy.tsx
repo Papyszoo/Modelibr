@@ -64,7 +64,17 @@ function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
             }
           }}
           className="hierarchy-tree-component"
+          togglerTemplate={<span />}
         />
+        {selectedNode && (
+          <button
+            className="hierarchy-clear-selection"
+            onClick={() => setSelectedKeys({})}
+            title="Clear selection"
+          >
+            <i className="pi pi-times" /> Clear Selection
+          </button>
+        )}
       </div>
 
       {selectedNode && (
