@@ -124,10 +124,10 @@ export class FrameEncoderService {
     })
 
     try {
-      // Create a new animated WebP image
-      const img = new webpmux.Image()
+      // Create frames array for the animation
+      const webpFrames = []
 
-      // Convert each frame to WebP and add to animation
+      // Convert each frame to WebP and add to frames array
       for (let i = 0; i < frames.length; i++) {
         const frame = frames[i]
 
@@ -136,8 +136,13 @@ export class FrameEncoderService {
           .webp({ quality })
           .toBuffer()
 
-        // Set frame with duration
-        await img.setFrame(i + 1, webpBuffer, frameDuration)
+        // Generate frame with delay
+        const webpFrame = await webpmux.Image.generateFrame({
+          buffer: webpBuffer,
+          delay: frameDuration,
+        })
+
+        webpFrames.push(webpFrame)
 
         // Log progress for large animations
         if (frames.length > 20 && (i + 1) % 10 === 0) {
@@ -148,14 +153,15 @@ export class FrameEncoderService {
         }
       }
 
-      // Set animation parameters for infinite loop
-      await img.setAnim({
-        bgColor: 0xffffffff, // White background
+      // Save animated WebP directly using static method with frames option
+      // This creates an animation with infinite loop by default
+      await webpmux.Image.save(webpPath, {
+        frames: webpFrames,
+        width: frames[0].width,
+        height: frames[0].height,
+        bgColor: [255, 255, 255, 255], // White background (RGBA)
         loops: 0, // 0 = infinite loop
       })
-
-      // Save the animated WebP
-      await img.save(webpPath)
 
       const stats = fs.statSync(webpPath)
       jobLogger.info('Animated WebP thumbnail created successfully', {
