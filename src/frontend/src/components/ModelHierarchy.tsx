@@ -54,7 +54,14 @@ function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
           selectionMode="single"
           selectionKeys={selectedKeys}
           onSelectionChange={e => {
-            setSelectedKeys(e.value || {})
+            // PrimeReact Tree returns the value as either an object or the key itself
+            // Normalize it to always be an object
+            const value = e.value
+            if (typeof value === 'string') {
+              setSelectedKeys({ [value]: true })
+            } else {
+              setSelectedKeys(value || {})
+            }
           }}
           className="hierarchy-tree-component"
         />
