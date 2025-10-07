@@ -28,7 +28,8 @@
     "primereact": "^10.9.7",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.3",
