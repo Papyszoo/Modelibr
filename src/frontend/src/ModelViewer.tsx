@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import ModelInfoSidebar from './components/ModelInfoSidebar'
 import ThumbnailSidebar from './components/ThumbnailSidebar'
-import ModelHierarchySidebar from './components/ModelHierarchySidebar'
+import ModelHierarchyWindow from './components/ModelHierarchyWindow'
 import { ModelProvider } from './contexts/ModelContext'
 import { getModelFileFormat, Model } from './utils/fileUtils'
 import ApiClient from './services/ApiClient'
@@ -12,7 +12,7 @@ import { Toast } from 'primereact/toast'
 import { Sidebar } from 'primereact/sidebar'
 import './ModelViewer.css'
 
-type SidebarContentType = 'info' | 'thumbnail' | 'hierarchy'
+type SidebarContentType = 'info' | 'thumbnail'
 
 interface ModelViewerProps {
   model?: Model
@@ -31,6 +31,8 @@ function ModelViewer({
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(false)
   const [sidebarContent, setSidebarContent] =
     useState<SidebarContentType>('info')
+  const [hierarchyWindowVisible, setHierarchyWindowVisible] =
+    useState<boolean>(false)
   const toast = useRef<Toast>(null)
 
   // Determine which side for sidebar positioning
@@ -124,7 +126,7 @@ function ModelViewer({
             <Button
               icon="pi pi-sitemap"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => openSidebar('hierarchy')}
+              onClick={() => setHierarchyWindowVisible(!hierarchyWindowVisible)}
               tooltip="Model Hierarchy"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -175,7 +177,6 @@ function ModelViewer({
           style={{ width: '400px' }}
         >
           {sidebarContent === 'info' && <ModelInfoSidebar model={model} />}
-          {sidebarContent === 'hierarchy' && <ModelHierarchySidebar />}
           {sidebarContent === 'thumbnail' && (
             <ThumbnailSidebar
               model={model}
@@ -183,6 +184,12 @@ function ModelViewer({
             />
           )}
         </Sidebar>
+
+        {/* Floating Hierarchy Window */}
+        <ModelHierarchyWindow
+          visible={hierarchyWindowVisible}
+          onClose={() => setHierarchyWindowVisible(false)}
+        />
       </ModelProvider>
     </div>
   )
