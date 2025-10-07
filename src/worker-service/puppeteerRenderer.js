@@ -78,11 +78,11 @@ export class PuppeteerRenderer {
         timeout: 10000,
       })
 
-      // Initialize the renderer in the page
+      // Initialize the renderer in the page (async for WebGPU support)
       const initialized = await this.page.evaluate(
-        (width, height, bgColor) => {
+        async (width, height, bgColor) => {
           try {
-            return window.initRenderer(width, height, bgColor)
+            return await window.initRenderer(width, height, bgColor)
           } catch (error) {
             console.error('Failed to initialize renderer:', error)
             return false
@@ -279,12 +279,12 @@ export class PuppeteerRenderer {
       throw new Error('Renderer not initialized')
     }
 
-    // Position camera and render in browser
+    // Position camera and render in browser (async for WebGPU support)
     const result = await this.page.evaluate(
-      (ang, dist, height) => {
+      async (ang, dist, height) => {
         try {
           window.positionCamera(ang, dist, height)
-          const rendered = window.renderScene()
+          const rendered = await window.renderScene()
 
           if (!rendered) {
             return { success: false, error: 'Rendering failed' }
