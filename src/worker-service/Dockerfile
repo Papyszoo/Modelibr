@@ -30,6 +30,7 @@ FROM node:20-bookworm-slim AS runtime
 
 # Install runtime dependencies for Puppeteer
 # Puppeteer requires these dependencies for headless Chrome
+# Based on https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
@@ -51,8 +52,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 \
     libx11-xcb1 \
     libxcomposite1 \
+    libxcursor1 \
     libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
     libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
     xdg-utils \
     libxshmfence1 \
   && rm -rf /var/lib/apt/lists/*
@@ -75,7 +83,13 @@ COPY package*.json ./
 # Copy application code
 COPY . .
 
-RUN useradd -u 1001 worker && chown -R worker:worker /app
+# Add user to audio,video groups so we don't need --no-sandbox (Puppeteer best practice)
+# Create Downloads directory as recommended by Puppeteer docs
+RUN groupadd -r worker && useradd -r -g worker -G audio,video worker \
+    && mkdir -p /home/worker/Downloads /app \
+    && chown -R worker:worker /home/worker \
+    && chown -R worker:worker /app
+
 USER worker
 
 EXPOSE 3001
