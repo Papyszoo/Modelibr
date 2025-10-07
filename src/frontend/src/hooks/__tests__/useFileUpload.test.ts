@@ -82,6 +82,76 @@ describe('useFileUpload', () => {
       expect(result.current.uploading).toBe(false)
       expect(result.current.uploadProgress).toBe(0)
     })
+
+    it('should round progress to 2 decimal places', async () => {
+      mockIsSupportedModelFormat.mockReturnValue(true)
+      mockIsThreeJSRenderable.mockReturnValue(true)
+      mockApiClient.uploadModel.mockResolvedValue({
+        id: 1,
+        alreadyExists: false,
+      })
+
+      const mockFiles = [
+        new File(['content1'], 'test1.obj', {
+          type: 'application/octet-stream',
+        }),
+        new File(['content2'], 'test2.obj', {
+          type: 'application/octet-stream',
+        }),
+        new File(['content3'], 'test3.obj', {
+          type: 'application/octet-stream',
+        }),
+      ]
+
+      const { result } = renderHook(() => useFileUpload())
+
+      await act(async () => {
+        // Upload 3 files, each should update progress to 33.33, 66.67, 100
+        await result.current.uploadMultipleFiles(mockFiles)
+      })
+
+      // Progress should have been set to values with max 2 decimal places
+      // Final progress should be 0 (reset in finally block)
+      expect(result.current.uploadProgress).toBe(0)
+    })
+
+    it('should call onSuccess once after all uploads complete', async () => {
+      mockIsSupportedModelFormat.mockReturnValue(true)
+      mockIsThreeJSRenderable.mockReturnValue(true)
+      mockApiClient.uploadModel
+        .mockResolvedValueOnce({ id: 1, alreadyExists: false })
+        .mockResolvedValueOnce({ id: 2, alreadyExists: false })
+
+      const onSuccess = jest.fn()
+      const mockFiles = [
+        new File(['content1'], 'test1.obj', {
+          type: 'application/octet-stream',
+        }),
+        new File(['content2'], 'test2.obj', {
+          type: 'application/octet-stream',
+        }),
+      ]
+
+      const { result } = renderHook(() => useFileUpload({ onSuccess }))
+
+      await act(async () => {
+        await result.current.uploadMultipleFiles(mockFiles)
+      })
+
+      // onSuccess should be called once with null file and results object
+      expect(onSuccess).toHaveBeenCalledTimes(1)
+      expect(onSuccess).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          succeeded: expect.arrayContaining([
+            expect.objectContaining({ file: mockFiles[0] }),
+            expect.objectContaining({ file: mockFiles[1] }),
+          ]),
+          failed: [],
+          total: 2,
+        })
+      )
+    })
   })
 })
 
