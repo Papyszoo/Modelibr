@@ -153,15 +153,19 @@ export class FrameEncoderService {
         }
       }
 
-      // Save animated WebP directly using static method with frames option
-      // This creates an animation with infinite loop by default
-      await webpmux.Image.save(webpPath, {
-        frames: webpFrames,
-        width: frames[0].width,
-        height: frames[0].height,
-        bgColor: [255, 255, 255, 255], // White background (RGBA)
-        loops: 0, // 0 = infinite loop
-      })
+      // Create animated WebP from frames
+      const img = new webpmux.Image()
+      img.frames = webpFrames
+      
+      // Convert to animation - this is critical for creating an animated WebP
+      img.convertToAnim()
+      
+      // Set animation properties
+      img.anim.bgColor = [255, 255, 255, 255] // White background (RGBA)
+      img.anim.loops = 0 // 0 = infinite loop
+      
+      // Save the animated WebP
+      await img.save(webpPath)
 
       const stats = fs.statSync(webpPath)
       jobLogger.info('Animated WebP thumbnail created successfully', {
