@@ -14,6 +14,10 @@ public static class ContentTypeProvider
             ".blend" => "application/octet-stream",
             ".gltf" => "application/json",
             ".glb" => "application/octet-stream",
+            ".webp" => "image/webp",
+            ".png" => "image/png",
+            ".jpg" => "image/jpeg",
+            ".jpeg" => "image/jpeg",
             _ => "application/octet-stream"
         };
     }
