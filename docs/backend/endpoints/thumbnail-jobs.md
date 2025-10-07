@@ -355,6 +355,32 @@ await completeJob(15, {
 
 ---
 
+## Fail Thumbnail Job
+
+Marks a thumbnail job as failed. Called by workers when thumbnail generation fails.
+
+**Endpoint**: `POST /api/thumbnail-jobs/{jobId}/fail`
+
+**Request**:
+```json
+{
+  "errorMessage": "Error description (max 1000 chars)"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "modelId": 42,
+  "status": "Failed",
+  "message": "Thumbnail job marked as failed"
+}
+```
+
+Updates thumbnail status, handles retry logic, and triggers SignalR notifications.
+
+---
+
 ## Test Thumbnail Complete Notification
 
 A testing endpoint to simulate thumbnail completion and test SignalR real-time notifications. This is useful for frontend development and integration testing.

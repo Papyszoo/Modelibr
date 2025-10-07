@@ -375,7 +375,14 @@ See [xvfb-startup-fix.md](xvfb-startup-fix.md) for Xvfb startup timing details.
 #### "chrome_crashpad_handler: --database is required"
 **Cause**: Chromium crash reporter trying to start without a database directory (Puppeteer-based rendering)
 
-**Solution**: This issue has been fixed by adding `--disable-crash-reporter` flag to Chrome launch arguments. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
+**Solution**: This issue has been fixed by adding multiple Chrome launch flags to completely disable the crash reporting system. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
+
+Chrome flags added:
+- `--disable-crash-reporter` - Main crash reporter disable flag
+- `--disable-breakpad` - Disable legacy Breakpad crash reporter
+- `--disable-client-side-phishing-detection` - Reduce crash reporter dependencies
+- `--disable-component-extensions-with-background-pages` - Reduce extensions that might trigger crash reporter
+- `--crash-dumps-dir=/tmp` - Provide crash dump directory as fallback if crash reporter still tries to initialize
 
 If you encounter this error:
 ```bash
@@ -384,7 +391,7 @@ docker compose build thumbnail-worker
 docker compose up -d thumbnail-worker
 ```
 
-The fix is already included in `src/worker-service/puppeteerRenderer.js` with the `--disable-crash-reporter` flag.
+The fix is already included in `src/worker-service/puppeteerRenderer.js` with comprehensive Chrome launch flags.
 
 #### "Failed to load model: Invalid file format"
 **Cause**: Unsupported or corrupt model file
