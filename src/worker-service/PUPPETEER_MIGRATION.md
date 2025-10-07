@@ -202,7 +202,14 @@ puppeteer_skip_download=true
 
 **Error**: `chrome_crashpad_handler: --database is required`
 
-**Solution**: This error has been fixed by adding `--disable-crash-reporter` flag to Chrome launch options. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
+**Solution**: This error has been fixed by adding comprehensive Chrome launch flags to completely disable the crash reporting system. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
+
+Chrome flags added:
+- `--disable-crash-reporter` - Main crash reporter disable flag
+- `--disable-breakpad` - Disable legacy Breakpad crash reporter
+- `--disable-client-side-phishing-detection` - Reduce crash reporter dependencies
+- `--disable-component-extensions-with-background-pages` - Reduce extensions that might trigger crash reporter
+- `--crash-dumps-dir=/tmp` - Provide crash dump directory as fallback
 
 ### SignalR Connection Issues
 
