@@ -4,6 +4,7 @@ using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using WebApi.Files;
+using WebApi.Services;
 
 namespace WebApi.Endpoints;
 
@@ -138,7 +139,7 @@ public static class ThumbnailEndpoints
             }
 
             var fileStream = System.IO.File.OpenRead(response.ThumbnailPath);
-            var contentType = "image/png"; // Assuming PNG format for thumbnails
+            var contentType = ContentTypeProvider.GetContentType(response.ThumbnailPath);
             
             // Add cache headers for thumbnail files
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
