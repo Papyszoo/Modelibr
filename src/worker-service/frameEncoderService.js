@@ -155,10 +155,14 @@ export class FrameEncoderService {
 
       // Create animated WebP from frames
       const img = new webpmux.Image()
-      img.frames = webpFrames
       
-      // Convert to animation - this is critical for creating an animated WebP
+      // Convert to animation first - this initializes the animation structure
       img.convertToAnim()
+      
+      // Add frames to the animation
+      for (const frame of webpFrames) {
+        img.frames.push(frame)
+      }
       
       // Set animation properties
       img.anim.bgColor = [255, 255, 255, 255] // White background (RGBA)
