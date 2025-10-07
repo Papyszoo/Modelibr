@@ -7,6 +7,8 @@ import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../../hooks/useTexturePacks'
 import { useDragAndDrop } from '../../../hooks/useFileUpload'
+// eslint-disable-next-line no-restricted-imports -- ApiClient needed for file operations
+import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
 
 interface TextureCardProps {
@@ -50,21 +52,7 @@ function TextureCard({
       setUploading(true)
 
       // Upload the file using the dedicated files endpoint
-      const baseURL =
-        import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const uploadResponse = await fetch(`${baseURL}/files`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file')
-      }
-
-      const uploadResult = await uploadResponse.json()
+      const uploadResult = await ApiClient.uploadFile(file)
       const fileId = uploadResult.fileId
 
       // Then add it to the pack
@@ -179,13 +167,6 @@ function TextureCard({
     </div>
   )
 
-  // Construct file URL
-  const getFileUrl = (fileId: number) => {
-    const baseURL =
-      import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
-    return `${baseURL}/files/${fileId}`
-  }
-
   return (
     <>
       <Toast ref={toast} />
@@ -218,7 +199,7 @@ function TextureCard({
           ) : texture ? (
             <div className="texture-card-with-preview">
               <img
-                src={getFileUrl(texture.fileId)}
+                src={ApiClient.getFileUrl(texture.fileId.toString())}
                 alt={texture.fileName || typeInfo.label}
                 className="texture-preview-image"
               />
