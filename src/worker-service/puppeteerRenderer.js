@@ -45,6 +45,10 @@ export class PuppeteerRenderer {
           '--disable-web-security', // Allow loading models from data URLs
           '--disable-features=IsolateOrigins,site-per-process',
           '--disable-crash-reporter', // Disable crash reporter to prevent crashpad_handler errors
+          '--disable-breakpad', // Disable Breakpad crash reporter (legacy name)
+          '--disable-client-side-phishing-detection', // Reduce crash reporter dependencies
+          '--disable-component-extensions-with-background-pages', // Reduce extensions that might trigger crash reporter
+          '--crash-dumps-dir=/tmp', // Provide crash dump directory if crash reporter still initializes
         ],
         dumpio: config.logLevel === 'debug',
       }
