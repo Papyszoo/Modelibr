@@ -372,6 +372,20 @@ docker compose exec thumbnail-worker dpkg -l | grep -E 'libgl1|mesa'
 
 See [xvfb-startup-fix.md](xvfb-startup-fix.md) for Xvfb startup timing details.
 
+#### "chrome_crashpad_handler: --database is required"
+**Cause**: Chromium crash reporter trying to start without a database directory (Puppeteer-based rendering)
+
+**Solution**: This issue has been fixed by adding `--disable-crash-reporter` flag to Chrome launch arguments. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
+
+If you encounter this error:
+```bash
+# Rebuild the worker container to get the latest fix
+docker compose build thumbnail-worker
+docker compose up -d thumbnail-worker
+```
+
+The fix is already included in `src/worker-service/puppeteerRenderer.js` with the `--disable-crash-reporter` flag.
+
 #### "Failed to load model: Invalid file format"
 **Cause**: Unsupported or corrupt model file
 
