@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
+import { Button } from 'primereact/button'
 import { useQueryState } from 'nuqs'
 import DockPanel from './DockPanel'
 import { Tab, SplitterEvent } from '../../types'
@@ -99,14 +100,70 @@ function SplitterLayout(): JSX.Element {
   const leftSize = parseInt(splitterSize, 10)
   const rightSize = 100 - leftSize
 
+  // Determine which arrow buttons to show
+  const isAtLeftEdge = leftSize <= 1
+  const isAtRightEdge = leftSize >= 99
+  const isAtCenter = !isAtLeftEdge && !isAtRightEdge
+
+  // Handler to toggle splitter position
+  const handleToggleLeft = (): void => {
+    if (isAtLeftEdge) {
+      // Return to center
+      setSplitterSize('50')
+    } else {
+      // Move to left edge (right panel takes full width)
+      setSplitterSize('1')
+    }
+  }
+
+  const handleToggleRight = (): void => {
+    if (isAtRightEdge) {
+      // Return to center
+      setSplitterSize('50')
+    } else {
+      // Move to right edge (left panel takes full width)
+      setSplitterSize('99')
+    }
+  }
+
   return (
     <div className="splitter-layout">
+      <div className="splitter-controls">
+        {(isAtCenter || isAtLeftEdge) && (
+          <Button
+            icon="pi pi-chevron-left"
+            onClick={handleToggleLeft}
+            className="splitter-toggle-button"
+            rounded
+            text
+            aria-label={
+              isAtLeftEdge ? 'Return to center' : 'Expand right panel'
+            }
+            tooltip={isAtLeftEdge ? 'Return to center' : 'Expand right panel'}
+            tooltipOptions={{ position: 'bottom' }}
+          />
+        )}
+        {(isAtCenter || isAtRightEdge) && (
+          <Button
+            icon="pi pi-chevron-right"
+            onClick={handleToggleRight}
+            className="splitter-toggle-button"
+            rounded
+            text
+            aria-label={
+              isAtRightEdge ? 'Return to center' : 'Expand left panel'
+            }
+            tooltip={isAtRightEdge ? 'Return to center' : 'Expand left panel'}
+            tooltipOptions={{ position: 'bottom' }}
+          />
+        )}
+      </div>
       <Splitter
         layout="horizontal"
         onResize={handleSplitterResize}
         resizerStyle={{ background: '#e2e8f0', width: '4px' }}
       >
-        <SplitterPanel size={leftSize} minSize={20}>
+        <SplitterPanel size={leftSize} minSize={1}>
           <DockPanel
             side="left"
             tabs={leftTabs}
@@ -122,7 +179,7 @@ function SplitterLayout(): JSX.Element {
             moveTabBetweenPanels={moveTabBetweenPanels}
           />
         </SplitterPanel>
-        <SplitterPanel size={rightSize} minSize={20}>
+        <SplitterPanel size={rightSize} minSize={1}>
           <DockPanel
             side="right"
             tabs={rightTabs}

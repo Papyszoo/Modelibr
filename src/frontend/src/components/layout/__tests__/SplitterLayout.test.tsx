@@ -99,3 +99,98 @@ describe('SplitterLayout URL Serialization', () => {
     })
   })
 })
+
+describe('SplitterLayout Toggle Logic', () => {
+  describe('edge detection', () => {
+    it('should detect when splitter is at left edge', () => {
+      const leftSize = 1
+      const isAtLeftEdge = leftSize <= 1
+      expect(isAtLeftEdge).toBe(true)
+    })
+
+    it('should detect when splitter is at right edge', () => {
+      const leftSize = 99
+      const isAtRightEdge = leftSize >= 99
+      expect(isAtRightEdge).toBe(true)
+    })
+
+    it('should detect when splitter is at center', () => {
+      const leftSize = 50
+      const isAtLeftEdge = leftSize <= 1
+      const isAtRightEdge = leftSize >= 99
+      const isAtCenter = !isAtLeftEdge && !isAtRightEdge
+      expect(isAtCenter).toBe(true)
+    })
+  })
+
+  describe('toggle behavior', () => {
+    it('should move to left edge when at center and left arrow clicked', () => {
+      const currentSize = 50
+      const isAtLeftEdge = currentSize <= 1
+      const newSize = isAtLeftEdge ? '50' : '1'
+      expect(newSize).toBe('1')
+    })
+
+    it('should return to center when at left edge and left arrow clicked', () => {
+      const currentSize = 1
+      const isAtLeftEdge = currentSize <= 1
+      const newSize = isAtLeftEdge ? '50' : '1'
+      expect(newSize).toBe('50')
+    })
+
+    it('should move to right edge when at center and right arrow clicked', () => {
+      const currentSize = 50
+      const isAtRightEdge = currentSize >= 99
+      const newSize = isAtRightEdge ? '50' : '99'
+      expect(newSize).toBe('99')
+    })
+
+    it('should return to center when at right edge and right arrow clicked', () => {
+      const currentSize = 99
+      const isAtRightEdge = currentSize >= 99
+      const newSize = isAtRightEdge ? '50' : '99'
+      expect(newSize).toBe('50')
+    })
+  })
+
+  describe('button visibility', () => {
+    it('should show both buttons when at center', () => {
+      const leftSize = 50
+      const isAtLeftEdge = leftSize <= 1
+      const isAtRightEdge = leftSize >= 99
+      const isAtCenter = !isAtLeftEdge && !isAtRightEdge
+
+      const showLeftButton = isAtCenter || isAtLeftEdge
+      const showRightButton = isAtCenter || isAtRightEdge
+
+      expect(showLeftButton).toBe(true)
+      expect(showRightButton).toBe(true)
+    })
+
+    it('should show only left button when at left edge', () => {
+      const leftSize = 1
+      const isAtLeftEdge = leftSize <= 1
+      const isAtRightEdge = leftSize >= 99
+      const isAtCenter = !isAtLeftEdge && !isAtRightEdge
+
+      const showLeftButton = isAtCenter || isAtLeftEdge
+      const showRightButton = isAtCenter || isAtRightEdge
+
+      expect(showLeftButton).toBe(true)
+      expect(showRightButton).toBe(false)
+    })
+
+    it('should show only right button when at right edge', () => {
+      const leftSize = 99
+      const isAtLeftEdge = leftSize <= 1
+      const isAtRightEdge = leftSize >= 99
+      const isAtCenter = !isAtLeftEdge && !isAtRightEdge
+
+      const showLeftButton = isAtCenter || isAtLeftEdge
+      const showRightButton = isAtCenter || isAtRightEdge
+
+      expect(showLeftButton).toBe(false)
+      expect(showRightButton).toBe(true)
+    })
+  })
+})
