@@ -373,25 +373,37 @@ docker compose exec thumbnail-worker dpkg -l | grep -E 'libgl1|mesa'
 See [xvfb-startup-fix.md](xvfb-startup-fix.md) for Xvfb startup timing details.
 
 #### "chrome_crashpad_handler: --database is required"
-**Cause**: Chromium crash reporter trying to start without a database directory (Puppeteer-based rendering)
+**Cause**: Chrome crash reporter trying to start without proper configuration. This can be a symptom of sandbox or dependency issues.
 
-**Solution**: This issue has been fixed by adding multiple Chrome launch flags to completely disable the crash reporting system. The crash reporter is not needed in headless mode and can cause issues in containerized environments.
+**Solution**: This issue has been fixed using Puppeteer best practices:
 
-Chrome flags added:
-- `--disable-crash-reporter` - Main crash reporter disable flag
-- `--disable-breakpad` - Disable legacy Breakpad crash reporter
-- `--disable-client-side-phishing-detection` - Reduce crash reporter dependencies
-- `--disable-component-extensions-with-background-pages` - Reduce extensions that might trigger crash reporter
-- `--crash-dumps-dir=/tmp` - Provide crash dump directory as fallback if crash reporter still tries to initialize
+1. **Proper User Setup (Dockerfile):**
+   - Added user to `audio,video` groups (Puppeteer recommendation)
+   - Created `/home/worker/Downloads` directory (required by Puppeteer)
+   - Installed all required dependencies per Puppeteer documentation
 
-If you encounter this error:
+2. **Complete Dependency List:**
+   Required packages added based on [Puppeteer troubleshooting guide](https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux):
+   - `libxss1`, `libxtst6`, `libxext6`, `libxfixes3`, `libxi6`, `libxcursor1`, `libxrender1`
+   - Plus existing: `libgbm1`, `libatk-bridge2.0-0`, `libatk1.0-0`, `libcups2`, `libdbus-1-3`, etc.
+
+3. **Chrome Launch Flags:**
+   - `--no-sandbox` - Required in Docker/CI environments (Puppeteer docs)
+   - `--disable-crash-reporter`, `--disable-crashpad` - Disable crash reporter
+   - `--no-crash-upload` - Prevent crash upload attempts
+   - Environment variables: `CHROME_CRASHPAD_PIPE_NAME=''`, `BREAKPAD_DISABLE=1`
+
+**To apply this fix**:
 ```bash
-# Rebuild the worker container to get the latest fix
+# Rebuild the worker container to get the latest dependencies and user setup
 docker compose build thumbnail-worker
 docker compose up -d thumbnail-worker
+
+# Verify the worker is running without errors
+docker compose logs thumbnail-worker --tail=50
 ```
 
-The fix is already included in `src/worker-service/puppeteerRenderer.js` with comprehensive Chrome launch flags.
+**Reference**: [Puppeteer Docker Guide](https://pptr.dev/troubleshooting#running-puppeteer-in-docker)
 
 #### "Failed to load model: Invalid file format"
 **Cause**: Unsupported or corrupt model file
