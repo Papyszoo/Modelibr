@@ -172,15 +172,9 @@ export class FrameEncoderService {
       img.anim.bgColor = [255, 255, 255, 255] // White background (RGBA)
       img.anim.loops = 0 // 0 = infinite loop
       
-      // Replace first frame and add remaining frames with proper timing
-      for (let i = 0; i < webpFrames.length; i++) {
-        if (i === 0) {
-          // Replace the first frame that was loaded
-          await img.replaceFrame(1, webpFrames[i])
-        } else {
-          // Add additional frames by setting them
-          await img.setFrame(i + 1, webpFrames[i])
-        }
+      // Add all frames (the first frame from load is replaced by pushing all frames)
+      for (const frame of webpFrames) {
+        img.frames.push(frame)
       }
       
       // Save the animated WebP
