@@ -26,8 +26,14 @@ export class PuppeteerRenderer {
     logger.info('Initializing Puppeteer renderer')
 
     try {
-      // Launch browser with appropriate flags
-      this.browser = await puppeteer.launch({
+      // Determine executable path - use env var or try to find chrome/chromium
+      const executablePath =
+        process.env.PUPPETEER_EXECUTABLE_PATH ||
+        process.env.CHROME_PATH ||
+        process.env.CHROMIUM_PATH ||
+        undefined // Let Puppeteer auto-detect if not specified
+
+      const launchOptions = {
         headless: true,
         args: [
           '--no-sandbox',
@@ -40,7 +46,16 @@ export class PuppeteerRenderer {
           '--disable-features=IsolateOrigins,site-per-process',
         ],
         dumpio: config.logLevel === 'debug',
-      })
+      }
+
+      // Add executable path if provided
+      if (executablePath) {
+        launchOptions.executablePath = executablePath
+        logger.debug('Using custom Chrome/Chromium path', { executablePath })
+      }
+
+      // Launch browser with appropriate flags
+      this.browser = await puppeteer.launch(launchOptions)
 
       this.page = await this.browser.newPage()
 
