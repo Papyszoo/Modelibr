@@ -44,8 +44,11 @@ function FloatingWindow({
 
   // Reset position when side changes
   useEffect(() => {
+    const TAB_BAR_WIDTH = 60
     const newPosition =
-      side === 'left' ? { x: 80, y: 80 } : { x: window.innerWidth - 370, y: 80 }
+      side === 'left'
+        ? { x: 80, y: 80 }
+        : { x: window.innerWidth - 370 - TAB_BAR_WIDTH, y: 80 }
     setPosition(newPosition)
   }, [side])
 
@@ -53,6 +56,7 @@ function FloatingWindow({
   useEffect(() => {
     const windowElement = windowRef.current
     const windowElementWidth = windowElement?.offsetWidth || 350
+    const TAB_BAR_WIDTH = 60
 
     // Check if window is on wrong side
     if (side === 'left' && position.x >= leftPanelWidth) {
@@ -65,7 +69,7 @@ function FloatingWindow({
       // Window is on left panel but should be on right
       const newX = Math.max(
         leftPanelWidth,
-        window.innerWidth - windowElementWidth - 20
+        window.innerWidth - windowElementWidth - TAB_BAR_WIDTH - 20
       )
       setPosition({ x: newX, y: position.y })
     }
@@ -112,7 +116,7 @@ function FloatingWindow({
         )
 
         // Restrict dragging based on actual panel widths from zustand store
-        // Account for 60px tab bar on the left
+        // Account for 60px tab bar on both left and right panels
         const TAB_BAR_WIDTH = 60
         if (side === 'left') {
           // Keep on left panel - starts at tab bar (60px) and ends at panel width
@@ -121,11 +125,14 @@ function FloatingWindow({
             Math.min(newX, leftPanelWidth - windowElementWidth)
           )
         } else {
-          // Keep on right panel
+          // Keep on right panel - starts at panel boundary and ends before tab bar
           const rightPanelStart = leftPanelWidth
           newX = Math.max(
             rightPanelStart,
-            Math.min(newX, window.innerWidth - windowElementWidth)
+            Math.min(
+              newX,
+              window.innerWidth - windowElementWidth - TAB_BAR_WIDTH
+            )
           )
         }
 
