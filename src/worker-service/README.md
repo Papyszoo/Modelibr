@@ -8,7 +8,7 @@ A Node.js worker service for background thumbnail generation using Puppeteer and
 - **Puppeteer-based Rendering**: Uses Puppeteer with headless Chrome to render 3D models in a real browser environment
 - **Three.js Integration**: Loads models from CDN and renders them with proper lighting and materials
 - **Orbit Animation**: Generates rotating orbit frames around the 3D model
-- **Static WebP Thumbnails**: Creates optimized WebP thumbnails from representative frames
+- **Animated WebP Thumbnails**: Creates looping animated WebP thumbnails from orbit frames (~30 frames)
 - **Event Logging**: Comprehensive event logging to database for full audit trail
 - **Configuration Management**: Comprehensive configuration system with environment variable support
 - **Health Monitoring**: Built-in health check endpoints for monitoring and container orchestration
@@ -46,7 +46,7 @@ The service is configured via environment variables. See `.env.example` for all 
 ### Orbit Animation
 
 - `ORBIT_ENABLED`: Enable orbit frame rendering (default: `true`)
-- `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `15`)
+- `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `12`, resulting in ~30 frames for full 360° rotation)
 - `ORBIT_START_ANGLE`: Starting angle in degrees (default: `0`)
 - `ORBIT_END_ANGLE`: Ending angle in degrees (default: `360`)
 - `ORBIT_CAMERA_HEIGHT`: Vertical camera offset from center (default: `0`)

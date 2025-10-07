@@ -27,7 +27,7 @@ export const config = {
 
   // Orbit animation settings
   orbit: {
-    angleStep: parseFloat(process.env.ORBIT_ANGLE_STEP) || 15, // degrees between each frame
+    angleStep: parseFloat(process.env.ORBIT_ANGLE_STEP) || 12, // degrees between each frame (360/12 = 30 frames)
     startAngle: parseFloat(process.env.ORBIT_START_ANGLE) || 0, // starting angle in degrees
     endAngle: parseFloat(process.env.ORBIT_END_ANGLE) || 360, // ending angle in degrees
     cameraHeight: parseFloat(process.env.ORBIT_CAMERA_HEIGHT) || 0, // vertical offset from center
