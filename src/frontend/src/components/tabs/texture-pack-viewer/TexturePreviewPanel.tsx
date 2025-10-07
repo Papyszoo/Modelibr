@@ -21,6 +21,10 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
   }
 
   // Use state to track the current geometry type
+  // Note: This fixes a circular dependency issue where we previously tried to
+  // reference `controls.type` inside the useControls hook definition itself.
+  // By using useState and useEffect, we properly separate the control state
+  // from the geometry-specific parameter hooks.
   const [currentGeometryType, setCurrentGeometryType] =
     useState<GeometryType>('box')
 
