@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { useControls } from 'leva'
@@ -20,8 +20,12 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
     torus: 'Torus',
   }
 
-  // Leva controls for geometry selection and parameters
-  const controls = useControls('Geometry', {
+  // Use state to track the current geometry type
+  const [currentGeometryType, setCurrentGeometryType] =
+    useState<GeometryType>('box')
+
+  // Base controls - always present
+  const baseControls = useControls('Geometry', {
     type: {
       value: 'box' as GeometryType,
       options: {
@@ -32,7 +36,6 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
       },
       label: 'Geometry Type',
     },
-    // Geometry-specific parameters
     scale: {
       value: 1,
       min: 0.5,
@@ -51,8 +54,17 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
       value: false,
       label: 'Wireframe',
     },
-    // Cube specific
-    ...(controls?.type === 'box' && {
+  })
+
+  // Update current geometry type when base controls change
+  useEffect(() => {
+    setCurrentGeometryType(baseControls.type)
+  }, [baseControls.type])
+
+  // Geometry-specific controls based on current type
+  const cubeControls = useControls(
+    'Cube Parameters',
+    {
       cubeSize: {
         value: 2,
         min: 0.5,
@@ -60,9 +72,13 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
         step: 0.1,
         label: 'Cube Size',
       },
-    }),
-    // Sphere specific
-    ...(controls?.type === 'sphere' && {
+    },
+    { collapsed: currentGeometryType !== 'box' }
+  )
+
+  const sphereControls = useControls(
+    'Sphere Parameters',
+    {
       sphereRadius: {
         value: 1.2,
         min: 0.5,
@@ -77,9 +93,13 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
         step: 8,
         label: 'Sphere Segments',
       },
-    }),
-    // Cylinder specific
-    ...(controls?.type === 'cylinder' && {
+    },
+    { collapsed: currentGeometryType !== 'sphere' }
+  )
+
+  const cylinderControls = useControls(
+    'Cylinder Parameters',
+    {
       cylinderRadius: {
         value: 1,
         min: 0.3,
@@ -94,9 +114,13 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
         step: 0.1,
         label: 'Cylinder Height',
       },
-    }),
-    // Torus specific
-    ...(controls?.type === 'torus' && {
+    },
+    { collapsed: currentGeometryType !== 'cylinder' }
+  )
+
+  const torusControls = useControls(
+    'Torus Parameters',
+    {
       torusRadius: {
         value: 1,
         min: 0.5,
@@ -111,8 +135,18 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
         step: 0.05,
         label: 'Tube Thickness',
       },
-    }),
-  })
+    },
+    { collapsed: currentGeometryType !== 'torus' }
+  )
+
+  // Combine all controls into a single object
+  const controls = {
+    ...baseControls,
+    ...cubeControls,
+    ...sphereControls,
+    ...cylinderControls,
+    ...torusControls,
+  }
 
   return (
     <div className="texture-preview-panel">
