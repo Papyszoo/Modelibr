@@ -8,7 +8,7 @@ A Node.js worker service for background thumbnail generation using Puppeteer and
 - **Puppeteer-based Rendering**: Uses Puppeteer with headless Chrome to render 3D models in a real browser environment
 - **Three.js Integration**: Loads models from CDN and renders them with proper lighting and materials
 - **Orbit Animation**: Generates rotating orbit frames around the 3D model
-- **Static WebP Thumbnails**: Creates optimized WebP thumbnails from representative frames
+- **Animated WebP Thumbnails**: Creates looping animated WebP thumbnails from orbit frames (~30 frames)
 - **Event Logging**: Comprehensive event logging to database for full audit trail
 - **Configuration Management**: Comprehensive configuration system with environment variable support
 - **Health Monitoring**: Built-in health check endpoints for monitoring and container orchestration
@@ -46,7 +46,7 @@ The service is configured via environment variables. See `.env.example` for all 
 ### Orbit Animation
 
 - `ORBIT_ENABLED`: Enable orbit frame rendering (default: `true`)
-- `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `15`)
+- `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `12`, resulting in ~30 frames for full 360° rotation)
 - `ORBIT_START_ANGLE`: Starting angle in degrees (default: `0`)
 - `ORBIT_END_ANGLE`: Ending angle in degrees (default: `360`)
 - `ORBIT_CAMERA_HEIGHT`: Vertical camera offset from center (default: `0`)
@@ -177,8 +177,8 @@ docker compose up -d --scale thumbnail-worker=3
 2. **Model Download**: Worker fetches 3D model file from API
 3. **Browser Initialization**: Puppeteer launches headless Chrome with render template
 4. **Model Loading**: Three.js loads model from data URL in browser context
-5. **Orbit Rendering**: Camera orbits around model, rendering frames at each angle
-6. **Thumbnail Generation**: Representative frame is converted to WebP and JPEG
+5. **Orbit Rendering**: Camera orbits around model, rendering ~30 frames at each angle
+6. **Animation Generation**: Frames are encoded into looping animated WebP + poster JPEG
 7. **Storage Upload**: Thumbnails uploaded to API storage
 8. **Job Completion**: Worker reports success/failure back to API
 
@@ -186,7 +186,8 @@ docker compose up -d --scale thumbnail-worker=3
 
 - **Puppeteer**: Headless Chrome automation for browser-based rendering
 - **Three.js**: 3D graphics library (loaded from CDN in browser)
-- **Sharp**: Image processing for WebP/JPEG conversion
+- **Sharp**: Image processing for frame conversion
+- **node-webpmux**: Animated WebP creation from multiple frames
 - **SignalR**: Real-time job queue notifications
 - **Express**: Health check HTTP server
 - **Winston**: Structured logging
@@ -278,8 +279,8 @@ The worker has been rewritten to use Puppeteer for rendering:
 1. **Puppeteer-based Rendering**: Uses headless Chrome with Three.js loaded from CDN
 2. **Browser Environment**: True browser rendering for maximum compatibility
 3. **Model Loading**: Supports OBJ, GLTF, and GLB formats via data URLs
-4. **Orbit Frames**: Camera orbits around model at configurable angles
-5. **Static Thumbnails**: Generates WebP and JPEG from representative frame
+4. **Orbit Frames**: Camera orbits around model at configurable angles (~30 frames)
+5. **Animated Thumbnails**: Generates looping animated WebP and poster JPEG
 6. **Lightweight Docker**: Debian Slim base with Chromium (no heavy Mesa/X11 deps)
 7. **Memory Management**: Efficient frame handling with Sharp for image processing
 
