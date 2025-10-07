@@ -331,7 +331,7 @@ useEffect(() => {
   return () => {
     if (imgSrc) URL.revokeObjectURL(imgSrc)
   }
-}, [modelId, thumbnailDetails])
+}, [modelId, thumbnailDetails?.status])
 
 // Status updates automatically via SignalR
 if (isReady) {
