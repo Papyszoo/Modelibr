@@ -114,7 +114,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.addTextureToPack(packId, request)
+        return await ApiClient.addTextureToPackEndpoint(packId, request)
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to add texture to pack'
@@ -152,7 +152,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.associateWithModel(packId, modelId)
+        await ApiClient.associateTexturePackWithModel(packId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -172,7 +172,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.disassociateFromModel(packId, modelId)
+        await ApiClient.disassociateTexturePackFromModel(packId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
