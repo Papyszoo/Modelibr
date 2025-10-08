@@ -210,9 +210,12 @@
 
         // Position camera for rendering with automatic distance calculation
         // This matches the Stage component behavior from frontend
-        function positionCamera(angle, distance = null, height = null) {
-            // Calculate optimal distance if not provided
-            if (distance === null && window.modelRenderer.model) {
+        function positionCamera(angle) {
+            let distance = 5; // Default fallback distance
+            let height = 0;   // Default fallback height
+            
+            // Calculate optimal distance if model is available
+            if (window.modelRenderer.model) {
                 const box = new THREE.Box3().setFromObject(window.modelRenderer.model);
                 const size = box.getSize(new THREE.Vector3());
                 const maxDimension = Math.max(size.x, size.y, size.z);
@@ -222,12 +225,8 @@
                 const fov = window.modelRenderer.camera.fov * (Math.PI / 180);
                 const cameraDistance = maxDimension / (2 * Math.tan(fov / 2));
                 distance = cameraDistance * 1.5; // Add 50% margin for better framing
-            }
-            
-            // Use a slight elevation if not specified (matches typical Stage setup)
-            if (height === null && window.modelRenderer.model) {
-                const box = new THREE.Box3().setFromObject(window.modelRenderer.model);
-                const size = box.getSize(new THREE.Vector3());
+                
+                // Use a slight elevation (matches typical Stage setup)
                 height = size.y * 0.15; // Slight elevation above center
             }
             
@@ -235,7 +234,7 @@
             const radians = (angle * Math.PI) / 180;
             window.modelRenderer.camera.position.x = Math.cos(radians) * distance;
             window.modelRenderer.camera.position.z = Math.sin(radians) * distance;
-            window.modelRenderer.camera.position.y = height || 0;
+            window.modelRenderer.camera.position.y = height;
             window.modelRenderer.camera.lookAt(0, 0, 0);
             
             return distance; // Return calculated distance for logging

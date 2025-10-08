@@ -245,8 +245,7 @@ export class PuppeteerRenderer {
       // Render frames at each orbit angle
       for (let i = 0; i < frameCount; i++) {
         const angle = config.orbit.startAngle + i * config.orbit.angleStep
-        // Pass null for distance to use automatic calculation
-        const frameData = await this.renderFrame(angle, null, i)
+        const frameData = await this.renderFrame(angle, i)
         frames.push(frameData)
 
         // Log progress every 10 frames or at the end
@@ -286,22 +285,21 @@ export class PuppeteerRenderer {
   /**
    * Render a single frame at a specific angle
    * @param {number} angle - Camera angle in degrees
-   * @param {number} distance - Camera distance from center (can be null for auto-calculation)
    * @param {number} frameIndex - Frame index for logging
    * @returns {Promise<Object>} Frame data object
    */
-  async renderFrame(angle, distance, frameIndex) {
+  async renderFrame(angle, frameIndex) {
     if (!this.page) {
       throw new Error('Renderer not initialized')
     }
 
     // Position camera and render in browser (async for WebGPU support)
-    // Pass null for distance and height to use automatic calculation based on model size
+    // positionCamera now automatically calculates distance and height based on model size
     const result = await this.page.evaluate(
-      async (ang, dist, height) => {
+      async (ang) => {
         try {
           // positionCamera now handles automatic distance/height calculation
-          const calculatedDistance = window.positionCamera(ang, dist, height)
+          const calculatedDistance = window.positionCamera(ang)
           const rendered = await window.renderScene()
 
           if (!rendered) {
@@ -328,9 +326,7 @@ export class PuppeteerRenderer {
           return { success: false, error: error.message }
         }
       },
-      angle,
-      null, // Let positionCamera calculate distance automatically
-      null  // Let positionCamera calculate height automatically
+      angle
     )
 
     if (!result.success) {
