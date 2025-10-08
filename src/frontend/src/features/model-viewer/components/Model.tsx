@@ -29,6 +29,11 @@ function OBJModel({
   const model = useLoader(OBJLoader, modelUrl)
 
   useEffect(() => {
+    // Reset scaled flag when modelUrl changes
+    scaledRef.current = false
+  }, [modelUrl])
+
+  useEffect(() => {
     if (model && !scaledRef.current) {
       // Apply a basic TSL-style material with enhanced properties
       model.traverse(child => {
@@ -104,6 +109,11 @@ function GLTFModel({
 
   const gltf = useLoader(GLTFLoader, modelUrl)
   const model = gltf?.scene
+
+  useEffect(() => {
+    // Reset scaled flag when modelUrl changes
+    scaledRef.current = false
+  }, [modelUrl])
 
   useEffect(() => {
     if (model && !scaledRef.current) {

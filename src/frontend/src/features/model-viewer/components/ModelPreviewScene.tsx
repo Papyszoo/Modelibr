@@ -52,6 +52,7 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
       >
         <Suspense fallback={<LoadingPlaceholder />}>
           <Model
+            key={modelUrl}
             modelUrl={modelUrl}
             fileExtension={fileExtension}
             rotationSpeed={modelRotationSpeed}
@@ -61,6 +62,7 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
 
       {/* Orbit controls for interaction */}
       <OrbitControls
+        key={`orbit-${modelUrl}`}
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
