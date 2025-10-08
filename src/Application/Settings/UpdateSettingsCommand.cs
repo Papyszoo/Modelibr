@@ -8,7 +8,8 @@ public record UpdateSettingsCommand(
     int ThumbnailFrameCount,
     double ThumbnailCameraVerticalAngle,
     int ThumbnailWidth,
-    int ThumbnailHeight
+    int ThumbnailHeight,
+    bool GenerateThumbnailOnUpload
 ) : ICommand<UpdateSettingsResponse>;
 
 public record UpdateSettingsResponse(
@@ -18,5 +19,6 @@ public record UpdateSettingsResponse(
     double ThumbnailCameraVerticalAngle,
     int ThumbnailWidth,
     int ThumbnailHeight,
+    bool GenerateThumbnailOnUpload,
     DateTime UpdatedAt
 );

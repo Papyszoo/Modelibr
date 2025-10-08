@@ -32,7 +32,8 @@ public static class SettingsEndpoints
                 request.ThumbnailFrameCount,
                 request.ThumbnailCameraVerticalAngle,
                 request.ThumbnailWidth,
-                request.ThumbnailHeight
+                request.ThumbnailHeight,
+                request.GenerateThumbnailOnUpload
             );
 
             var result = await commandHandler.Handle(command, CancellationToken.None);
@@ -55,5 +56,6 @@ public record UpdateSettingsRequest(
     int ThumbnailFrameCount,
     double ThumbnailCameraVerticalAngle,
     int ThumbnailWidth,
-    int ThumbnailHeight
+    int ThumbnailHeight,
+    bool GenerateThumbnailOnUpload
 );

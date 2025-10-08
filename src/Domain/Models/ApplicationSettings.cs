@@ -16,6 +16,7 @@ public class ApplicationSettings : AggregateRoot
     public double ThumbnailCameraVerticalAngle { get; private set; }
     public int ThumbnailWidth { get; private set; }
     public int ThumbnailHeight { get; private set; }
+    public bool GenerateThumbnailOnUpload { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
@@ -36,6 +37,7 @@ public class ApplicationSettings : AggregateRoot
             ThumbnailCameraVerticalAngle = 0.75, // Default camera height multiplier
             ThumbnailWidth = 256,
             ThumbnailHeight = 256,
+            GenerateThumbnailOnUpload = true, // Generate thumbnails by default
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -62,6 +64,7 @@ public class ApplicationSettings : AggregateRoot
         double cameraVerticalAngle,
         int width,
         int height,
+        bool generateOnUpload,
         DateTime updatedAt)
     {
         ValidateFrameCount(frameCount);
@@ -72,6 +75,7 @@ public class ApplicationSettings : AggregateRoot
         ThumbnailCameraVerticalAngle = cameraVerticalAngle;
         ThumbnailWidth = width;
         ThumbnailHeight = height;
+        GenerateThumbnailOnUpload = generateOnUpload;
         UpdatedAt = updatedAt;
     }
 

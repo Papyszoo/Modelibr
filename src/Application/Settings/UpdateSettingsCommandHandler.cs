@@ -44,6 +44,7 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
                 command.ThumbnailCameraVerticalAngle,
                 command.ThumbnailWidth,
                 command.ThumbnailHeight,
+                command.GenerateThumbnailOnUpload,
                 now);
 
             var updatedSettings = await _settingsRepository.SaveAsync(settings, cancellationToken);
@@ -55,6 +56,7 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
                 updatedSettings.ThumbnailCameraVerticalAngle,
                 updatedSettings.ThumbnailWidth,
                 updatedSettings.ThumbnailHeight,
+                updatedSettings.GenerateThumbnailOnUpload,
                 updatedSettings.UpdatedAt
             ));
         }

@@ -881,6 +881,61 @@ src/frontend/src/
 └── contexts/            # Global state (use sparingly)
 ```
 
+### API Integration Guidelines
+
+**ALWAYS use the existing ApiClient for API calls:**
+- Import and instantiate `ApiClient` from `src/services/ApiClient.ts`
+- Use `apiClient.getBaseURL()` to get the configured base URL
+- Never hardcode API URLs like `http://localhost:5009` or `https://localhost:8081`
+- The ApiClient reads the base URL from environment variables (`VITE_API_BASE_URL`)
+
+**Example:**
+```typescript
+import ApiClient from '../../services/ApiClient'
+
+const apiClient = new ApiClient()
+
+// Correct - uses configured base URL
+const response = await fetch(`${apiClient.getBaseURL()}/settings`)
+
+// Wrong - hardcoded URL
+const response = await fetch('http://localhost:5009/settings')
+```
+
+### URL State Management for Tabs
+
+**All tab-based components must preserve their state in the URL:**
+- Use `nuqs` library's `useQueryState` hook for URL state
+- Tab type, active tab, and tab-specific data should be in URL parameters
+- This ensures tabs persist across page refreshes
+- Follow the pattern in `SplitterLayout.tsx` for managing tab state
+
+**When adding a new tab type:**
+1. Add the tab type to the `Tab['type']` union in `src/types/index.ts`
+2. Update `TabContent.tsx` to handle the new tab type
+3. Add icon mapping in `DraggableTab.tsx` `getTabIcon()` function
+4. Add tooltip text in `DraggableTab.tsx` `getTabTooltip()` function
+5. Ensure any tab-specific state is stored in URL query parameters
+
+**Example - Settings tab:**
+```typescript
+// types/index.ts
+export interface Tab {
+  id: string
+  type: 'modelList' | 'modelViewer' | 'texture' | 'settings' | ...
+  label?: string
+}
+
+// DraggableTab.tsx
+const getTabIcon = (tabType: Tab['type']): string => {
+  switch (tabType) {
+    case 'settings':
+      return 'pi pi-cog'
+    // ...
+  }
+}
+```
+
 ### Common Anti-Patterns to Avoid
 
 ❌ **Don't do this:**

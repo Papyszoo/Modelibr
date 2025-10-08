@@ -36,6 +36,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             settings.ThumbnailCameraVerticalAngle,
             settings.ThumbnailWidth,
             settings.ThumbnailHeight,
+            settings.GenerateThumbnailOnUpload,
             settings.CreatedAt,
             settings.UpdatedAt
         );

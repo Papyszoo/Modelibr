@@ -1,10 +1,10 @@
 .settings-container {
   padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
   background: #1e1e1e;
   color: #e0e0e0;
   min-height: 100%;
+  box-sizing: border-box;
 }
 
 .settings-title {
@@ -140,4 +140,23 @@
 
 .settings-button-secondary:hover:not(:disabled) {
   background: #4a4a4a;
+}
+
+.settings-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #ccc;
+}
+
+.settings-checkbox-label input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.settings-checkbox-label span {
+  user-select: none;
 }

@@ -11,6 +11,7 @@ public record GetSettingsQueryResponse(
     double ThumbnailCameraVerticalAngle,
     int ThumbnailWidth,
     int ThumbnailHeight,
+    bool GenerateThumbnailOnUpload,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

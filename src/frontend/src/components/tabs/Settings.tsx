@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { Accordion, AccordionTab } from 'primereact/accordion'
+import ApiClient from '../../services/ApiClient'
 import './Settings.css'
 
 interface SettingsData {
@@ -8,7 +10,10 @@ interface SettingsData {
   thumbnailCameraVerticalAngle: number
   thumbnailWidth: number
   thumbnailHeight: number
+  generateThumbnailOnUpload: boolean
 }
+
+const apiClient = new ApiClient()
 
 function Settings(): JSX.Element {
   const [settings, setSettings] = useState<SettingsData | null>(null)
@@ -24,6 +29,7 @@ function Settings(): JSX.Element {
   const [thumbnailCameraAngle, setThumbnailCameraAngle] = useState<number>(0.75)
   const [thumbnailWidth, setThumbnailWidth] = useState<number>(256)
   const [thumbnailHeight, setThumbnailHeight] = useState<number>(256)
+  const [generateThumbnailOnUpload, setGenerateThumbnailOnUpload] = useState<boolean>(true)
 
   useEffect(() => {
     fetchSettings()
@@ -33,7 +39,7 @@ function Settings(): JSX.Element {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch('http://localhost:5009/settings')
+      const response = await fetch(`${apiClient.getBaseURL()}/settings`)
       if (!response.ok) {
         throw new Error('Failed to load settings')
       }
@@ -47,6 +53,7 @@ function Settings(): JSX.Element {
       setThumbnailCameraAngle(data.thumbnailCameraVerticalAngle)
       setThumbnailWidth(data.thumbnailWidth)
       setThumbnailHeight(data.thumbnailHeight)
+      setGenerateThumbnailOnUpload(data.generateThumbnailOnUpload ?? true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -67,10 +74,11 @@ function Settings(): JSX.Element {
       thumbnailCameraVerticalAngle: thumbnailCameraAngle,
       thumbnailWidth,
       thumbnailHeight,
+      generateThumbnailOnUpload,
     }
 
     try {
-      const response = await fetch('http://localhost:5009/settings', {
+      const response = await fetch(`${apiClient.getBaseURL()}/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -123,98 +131,109 @@ function Settings(): JSX.Element {
       )}
 
       <form onSubmit={handleSave} className="settings-form">
-        <section className="settings-section">
-          <h3>File Upload Settings</h3>
-          
-          <div className="settings-field">
-            <label htmlFor="maxFileSize">Maximum File Size (MB)</label>
-            <input
-              id="maxFileSize"
-              type="number"
-              min="1"
-              max="10240"
-              value={maxFileSizeMB}
-              onChange={(e) => setMaxFileSizeMB(parseInt(e.target.value))}
-              disabled={isSaving}
-            />
-            <span className="settings-help">Maximum size for 3D model files (1-10240 MB)</span>
-          </div>
+        <Accordion multiple>
+          <AccordionTab header="File Upload Settings">
+            <div className="settings-field">
+              <label htmlFor="maxFileSize">Maximum File Size (MB)</label>
+              <input
+                id="maxFileSize"
+                type="number"
+                min="1"
+                max="10240"
+                value={maxFileSizeMB}
+                onChange={(e) => setMaxFileSizeMB(parseInt(e.target.value))}
+                disabled={isSaving}
+              />
+              <span className="settings-help">Maximum size for 3D model files (1-10240 MB)</span>
+            </div>
 
-          <div className="settings-field">
-            <label htmlFor="maxThumbnailSize">Maximum Thumbnail Size (MB)</label>
-            <input
-              id="maxThumbnailSize"
-              type="number"
-              min="1"
-              max="100"
-              value={maxThumbnailSizeMB}
-              onChange={(e) => setMaxThumbnailSizeMB(parseInt(e.target.value))}
-              disabled={isSaving}
-            />
-            <span className="settings-help">Maximum size for thumbnail images (1-100 MB)</span>
-          </div>
-        </section>
+            <div className="settings-field">
+              <label htmlFor="maxThumbnailSize">Maximum Thumbnail Size (MB)</label>
+              <input
+                id="maxThumbnailSize"
+                type="number"
+                min="1"
+                max="100"
+                value={maxThumbnailSizeMB}
+                onChange={(e) => setMaxThumbnailSizeMB(parseInt(e.target.value))}
+                disabled={isSaving}
+              />
+              <span className="settings-help">Maximum size for thumbnail images (1-100 MB)</span>
+            </div>
+          </AccordionTab>
 
-        <section className="settings-section">
-          <h3>Thumbnail Generation Settings</h3>
-          
-          <div className="settings-field">
-            <label htmlFor="frameCount">Frame Count</label>
-            <input
-              id="frameCount"
-              type="number"
-              min="1"
-              max="360"
-              value={thumbnailFrameCount}
-              onChange={(e) => setThumbnailFrameCount(parseInt(e.target.value))}
-              disabled={isSaving}
-            />
-            <span className="settings-help">Number of frames in thumbnail animation (1-360)</span>
-          </div>
+          <AccordionTab header="Thumbnail Generation Settings">
+            <div className="settings-field">
+              <label className="settings-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={generateThumbnailOnUpload}
+                  onChange={(e) => setGenerateThumbnailOnUpload(e.target.checked)}
+                  disabled={isSaving}
+                />
+                <span>Generate thumbnail on model upload</span>
+              </label>
+              <span className="settings-help">Automatically generate thumbnails when uploading new models</span>
+            </div>
 
-          <div className="settings-field">
-            <label htmlFor="cameraAngle">Camera Vertical Angle</label>
-            <input
-              id="cameraAngle"
-              type="number"
-              min="0"
-              max="2"
-              step="0.1"
-              value={thumbnailCameraAngle}
-              onChange={(e) => setThumbnailCameraAngle(parseFloat(e.target.value))}
-              disabled={isSaving}
-            />
-            <span className="settings-help">Camera height multiplier (0-2)</span>
-          </div>
+            <div className="settings-field">
+              <label htmlFor="frameCount">Frame Count</label>
+              <input
+                id="frameCount"
+                type="number"
+                min="1"
+                max="360"
+                value={thumbnailFrameCount}
+                onChange={(e) => setThumbnailFrameCount(parseInt(e.target.value))}
+                disabled={isSaving}
+              />
+              <span className="settings-help">Number of frames in thumbnail animation (1-360)</span>
+            </div>
 
-          <div className="settings-field">
-            <label htmlFor="thumbnailWidth">Thumbnail Width (px)</label>
-            <input
-              id="thumbnailWidth"
-              type="number"
-              min="64"
-              max="2048"
-              value={thumbnailWidth}
-              onChange={(e) => setThumbnailWidth(parseInt(e.target.value))}
-              disabled={isSaving}
-            />
-            <span className="settings-help">Width in pixels (64-2048)</span>
-          </div>
+            <div className="settings-field">
+              <label htmlFor="cameraAngle">Camera Vertical Angle</label>
+              <input
+                id="cameraAngle"
+                type="number"
+                min="0"
+                max="2"
+                step="0.1"
+                value={thumbnailCameraAngle}
+                onChange={(e) => setThumbnailCameraAngle(parseFloat(e.target.value))}
+                disabled={isSaving}
+              />
+              <span className="settings-help">Camera height multiplier (0-2)</span>
+            </div>
 
-          <div className="settings-field">
-            <label htmlFor="thumbnailHeight">Thumbnail Height (px)</label>
-            <input
-              id="thumbnailHeight"
-              type="number"
-              min="64"
-              max="2048"
-              value={thumbnailHeight}
-              onChange={(e) => setThumbnailHeight(parseInt(e.target.value))}
-              disabled={isSaving}
-            />
-            <span className="settings-help">Height in pixels (64-2048)</span>
-          </div>
-        </section>
+            <div className="settings-field">
+              <label htmlFor="thumbnailWidth">Thumbnail Width (px)</label>
+              <input
+                id="thumbnailWidth"
+                type="number"
+                min="64"
+                max="2048"
+                value={thumbnailWidth}
+                onChange={(e) => setThumbnailWidth(parseInt(e.target.value))}
+                disabled={isSaving}
+              />
+              <span className="settings-help">Width in pixels (64-2048)</span>
+            </div>
+
+            <div className="settings-field">
+              <label htmlFor="thumbnailHeight">Thumbnail Height (px)</label>
+              <input
+                id="thumbnailHeight"
+                type="number"
+                min="64"
+                max="2048"
+                value={thumbnailHeight}
+                onChange={(e) => setThumbnailHeight(parseInt(e.target.value))}
+                disabled={isSaving}
+              />
+              <span className="settings-help">Height in pixels (64-2048)</span>
+            </div>
+          </AccordionTab>
+        </Accordion>
 
         <div className="settings-actions">
           <button
