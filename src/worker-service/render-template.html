@@ -220,11 +220,10 @@
                 const size = box.getSize(new THREE.Vector3());
                 const maxDimension = Math.max(size.x, size.y, size.z);
                 
-                // Calculate distance based on FOV to fit model in view
-                // This ensures the model is properly framed regardless of size
-                const fov = window.modelRenderer.camera.fov * (Math.PI / 180);
-                const cameraDistance = maxDimension / (2 * Math.tan(fov / 2));
-                distance = cameraDistance * 1.5; // Add 50% margin for better framing
+                // Calculate distance using a conservative approach
+                // Use base distance scaled by model size (similar to original implementation)
+                const baseDistance = 5;
+                distance = baseDistance * Math.max(maxDimension / 2, 1);
                 
                 // Use a slight elevation (matches typical Stage setup)
                 height = size.y * 0.15; // Slight elevation above center
