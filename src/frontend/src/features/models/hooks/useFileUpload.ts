@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import ApiClient from '../services/ApiClient'
-import { isSupportedModelFormat, isThreeJSRenderable } from '../utils/fileUtils'
+import { modelsApi } from '../api/modelsApi'
+import { isSupportedModelFormat, isThreeJSRenderable } from '../../../utils/fileUtils'
 
 /**
  * Custom hook for handling file uploads with validation and progress tracking
@@ -53,7 +53,7 @@ export function useFileUpload(options = {}) {
     }
 
     try {
-      const result = await ApiClient.uploadModel(file)
+      const result = await modelsApi.uploadModel(file)
 
       return result
     } catch (error) {

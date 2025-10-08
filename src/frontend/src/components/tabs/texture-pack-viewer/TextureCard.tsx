@@ -6,7 +6,7 @@ import { Dialog } from 'primereact/dialog'
 import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../../../hooks/useTexturePacks'
-import { useDragAndDrop } from '../../../hooks/useFileUpload'
+import { useDragAndDrop } from '../../../features/models'
 // eslint-disable-next-line no-restricted-imports -- ApiClient needed for file operations
 import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
