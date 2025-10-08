@@ -196,25 +196,39 @@ useFrame(() => {
 
 Rotation speed: 0.002 radians per frame (~0.11°/frame at 60fps)
 
-## Auto-Centering
+## Auto-Centering and Floor Alignment
 
-Models are automatically centered to the origin:
+Models are automatically positioned so they're centered in X and Z axes, with their bottom at the floor level (y=0):
 
 ```typescript
+// Scale the model first
 const box = new THREE.Box3().setFromObject(model)
-const center = box.getCenter(new THREE.Vector3())
-model.position.sub(center)
+const size = box.getSize(new THREE.Vector3())
+const maxDim = Math.max(size.x, size.y, size.z)
+const scale = 2 / maxDim
+model.scale.setScalar(scale)
+
+// Recalculate bounding box after scaling
+const scaledBox = new THREE.Box3().setFromObject(model)
+const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
+
+// Position model centered in X and Z, bottom at floor
+model.position.x = -scaledCenter.x
+model.position.z = -scaledCenter.z
+model.position.y = -scaledBox.min.y
 ```
+
+This ensures models are always fully visible above the floor, regardless of where their origin point is located.
 
 ## Auto-Scaling
 
-Models are scaled to fit within a 3-unit bounding box:
+Models are scaled to fit within a 2-unit bounding box:
 
 ```typescript
 const size = box.getSize(new THREE.Vector3())
 const maxDim = Math.max(size.x, size.y, size.z)
-const scale = 3 / maxDim
-model.scale.set(scale, scale, scale)
+const scale = 2 / maxDim
+model.scale.setScalar(scale)
 ```
 
 ## Material Properties
