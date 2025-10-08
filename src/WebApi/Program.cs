@@ -1,6 +1,7 @@
 using Application;
 using Infrastructure;
 using Infrastructure.Extensions;
+using Infrastructure.Services;
 using WebApi.Endpoints;
 using WebApi.Infrastructure;
 using WebApi.Services;
@@ -47,7 +48,8 @@ namespace WebApi
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
-            builder.Services.AddScoped<IThumbnailJobQueueNotificationService, SignalRThumbnailJobQueueNotificationService>();
+            // Use NoOp notification service for polling-based queue (instead of SignalR push notifications)
+            builder.Services.AddScoped<IThumbnailJobQueueNotificationService, NoOpThumbnailJobQueueNotificationService>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
 
             var app = builder.Build();
