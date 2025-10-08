@@ -77,10 +77,12 @@ public static class ThumbnailEndpoints
             IFormFile file,
             [FromForm] int? width,
             [FromForm] int? height,
-            ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> commandHandler) =>
+            ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> commandHandler,
+            Application.Settings.ISettingsService settingsService) =>
         {
+            var settings = await settingsService.GetSettingsAsync(CancellationToken.None);
             // Validate file
-            var validationResult = ValidateThumbnailFile(file);
+            var validationResult = ValidateThumbnailFile(file, settings.MaxThumbnailSizeBytes);
             if (!validationResult.IsSuccess)
             {
                 return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
@@ -155,16 +157,17 @@ public static class ThumbnailEndpoints
         .WithTags("Thumbnails");
     }
 
-    private static Result ValidateThumbnailFile(IFormFile file)
+    private static Result ValidateThumbnailFile(IFormFile file, long maxThumbnailSizeBytes)
     {
         if (file == null || file.Length <= 0)
         {
             return Result.Failure(new Error("InvalidThumbnailFile", "Thumbnail file is empty or invalid."));
         }
 
-        if (file.Length > 10_485_760) // 10MB
+        if (file.Length > maxThumbnailSizeBytes)
         {
-            return Result.Failure(new Error("ThumbnailFileTooLarge", "Thumbnail file size cannot exceed 10MB."));
+            var maxSizeMB = maxThumbnailSizeBytes / 1_048_576;
+            return Result.Failure(new Error("ThumbnailFileTooLarge", $"Thumbnail file size cannot exceed {maxSizeMB}MB."));
         }
 
         // Validate content type

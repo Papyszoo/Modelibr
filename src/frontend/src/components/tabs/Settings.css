@@ -1,0 +1,221 @@
+.settings-container {
+  padding: 2rem;
+  width: 100%;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-title {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: #fff;
+  border-bottom: 2px solid #3a3a3a;
+  padding-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.settings-loading {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+  color: #999;
+}
+
+.settings-error {
+  background: #5e2323;
+  border: 1px solid #8b3a3a;
+  color: #ffb3b3;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.settings-success {
+  background: #1e4620;
+  border: 1px solid #2e6f31;
+  color: #b3ffb6;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  flex: 1;
+  overflow: hidden;
+}
+
+.settings-form-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.settings-section {
+  background: #252525;
+  padding: 1.5rem;
+  border-radius: 6px;
+  border: 1px solid #3a3a3a;
+}
+
+.settings-section h3 {
+  font-size: 1.3rem;
+  margin-bottom: 1.5rem;
+  color: #fff;
+}
+
+.settings-field {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-field:last-child {
+  margin-bottom: 0;
+}
+
+.settings-field label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #ccc;
+}
+
+.settings-field input {
+  background: #1e1e1e;
+  border: 1px solid #4a4a4a;
+  color: #e0e0e0;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.settings-field input:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.settings-field input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-help {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.25rem;
+}
+
+.settings-default {
+  font-size: 0.85rem;
+  color: #6c9bd1;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid #3a3a3a;
+  flex-shrink: 0;
+  background: #1e1e1e;
+}
+
+.settings-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.settings-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-button-primary {
+  background: #007acc;
+  color: white;
+}
+
+.settings-button-primary:hover:not(:disabled) {
+  background: #005a9e;
+}
+
+.settings-button-secondary {
+  background: #3a3a3a;
+  color: #e0e0e0;
+}
+
+.settings-button-secondary:hover:not(:disabled) {
+  background: #4a4a4a;
+}
+
+.settings-section {
+  margin-bottom: 1rem;
+}
+
+.settings-section-header {
+  background: #252525;
+  padding: 1rem 1.5rem;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 500;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.settings-section-header:hover {
+  background: #2a2a2a;
+}
+
+.settings-section-header span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-section-content {
+  background: #252525;
+  padding: 1.5rem;
+  border: 1px solid #3a3a3a;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+}
+
+.settings-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #ccc;
+}
+
+.settings-checkbox-label input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.settings-checkbox-label span {
+  user-select: none;
+}

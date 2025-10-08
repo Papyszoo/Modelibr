@@ -35,9 +35,11 @@ public static class FilesEndpoints
     private static async Task<IResult> UploadFile(
         IFormFile file, 
         ICommandHandler<UploadFileCommand, UploadFileCommandResponse> commandHandler,
+        Application.Settings.ISettingsService settingsService,
         CancellationToken cancellationToken)
     {
-        var validationResult = ValidateFile(file);
+        var settings = await settingsService.GetSettingsAsync(cancellationToken);
+        var validationResult = ValidateFile(file, settings.MaxFileSizeBytes);
         if (!validationResult.IsSuccess)
         {
             return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
@@ -53,16 +55,17 @@ public static class FilesEndpoints
         return Results.Ok(result.Value);
     }
 
-    private static Result ValidateFile(IFormFile file)
+    private static Result ValidateFile(IFormFile file, long maxFileSizeBytes)
     {
         if (file.Length <= 0)
         {
             return Result.Failure(new Error("InvalidFile", "File is empty or invalid."));
         }
 
-        if (file.Length > 1_073_741_824) // 1GB
+        if (file.Length > maxFileSizeBytes)
         {
-            return Result.Failure(new Error("FileTooLarge", "File size cannot exceed 1GB."));
+            var maxSizeMB = maxFileSizeBytes / 1_048_576;
+            return Result.Failure(new Error("FileTooLarge", $"File size cannot exceed {maxSizeMB}MB."));
         }
 
         return Result.Success();

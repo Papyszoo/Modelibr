@@ -13,6 +13,7 @@ namespace Infrastructure.Persistence
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
+        public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -169,6 +170,20 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(tje => tje.ThumbnailJobId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure ApplicationSettings entity
+            modelBuilder.Entity<ApplicationSettings>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.MaxFileSizeBytes).IsRequired();
+                entity.Property(s => s.MaxThumbnailSizeBytes).IsRequired();
+                entity.Property(s => s.ThumbnailFrameCount).IsRequired();
+                entity.Property(s => s.ThumbnailCameraVerticalAngle).IsRequired();
+                entity.Property(s => s.ThumbnailWidth).IsRequired();
+                entity.Property(s => s.ThumbnailHeight).IsRequired();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
             });
 
             base.OnModelCreating(modelBuilder);

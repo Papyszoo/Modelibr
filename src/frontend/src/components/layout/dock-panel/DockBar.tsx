@@ -58,6 +58,14 @@ export default function DockBar({
       icon: 'pi pi-play',
       command: () => onAddTab('animation', 'Animations'),
     },
+    {
+      separator: true,
+    },
+    {
+      label: 'Settings',
+      icon: 'pi pi-cog',
+      command: () => onAddTab('settings', 'Settings'),
+    },
   ]
 
   return (

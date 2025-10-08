@@ -14,6 +14,8 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-image'
     case 'animation':
       return 'pi pi-play'
+    case 'settings':
+      return 'pi pi-cog'
     default:
       return 'pi pi-file'
   }
@@ -33,6 +35,8 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Textures List'
     case 'animation':
       return 'Animations List'
+    case 'settings':
+      return 'Settings'
     default:
       return 'Unknown Tab'
   }

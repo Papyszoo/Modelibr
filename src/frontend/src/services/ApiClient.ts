@@ -190,6 +190,44 @@ class ApiClient {
   ): Promise<void> {
     await this.client.delete(`/texture-packs/${packId}/models/${modelId}`)
   }
+
+  // Settings API
+  async getSettings(): Promise<{
+    maxFileSizeBytes: number
+    maxThumbnailSizeBytes: number
+    thumbnailFrameCount: number
+    thumbnailCameraVerticalAngle: number
+    thumbnailWidth: number
+    thumbnailHeight: number
+    generateThumbnailOnUpload: boolean
+    createdAt: string
+    updatedAt: string
+  }> {
+    const response = await this.client.get('/settings')
+    return response.data
+  }
+
+  async updateSettings(settings: {
+    maxFileSizeBytes: number
+    maxThumbnailSizeBytes: number
+    thumbnailFrameCount: number
+    thumbnailCameraVerticalAngle: number
+    thumbnailWidth: number
+    thumbnailHeight: number
+    generateThumbnailOnUpload: boolean
+  }): Promise<{
+    maxFileSizeBytes: number
+    maxThumbnailSizeBytes: number
+    thumbnailFrameCount: number
+    thumbnailCameraVerticalAngle: number
+    thumbnailWidth: number
+    thumbnailHeight: number
+    generateThumbnailOnUpload: boolean
+    updatedAt: string
+  }> {
+    const response = await this.client.put('/settings', settings)
+    return response.data
+  }
 }
 
 export default new ApiClient()
