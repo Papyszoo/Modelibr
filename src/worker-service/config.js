@@ -10,6 +10,7 @@ export const config = {
 
   // Job processing settings
   maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS) || 3,
+  pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS) || 5000,
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
@@ -80,6 +81,10 @@ export function validateConfig() {
 
   if (config.maxConcurrentJobs < 1) {
     errors.push('MAX_CONCURRENT_JOBS must be at least 1')
+  }
+
+  if (config.pollIntervalMs < 1000) {
+    errors.push('POLL_INTERVAL_MS must be at least 1000 milliseconds')
   }
 
   if (
