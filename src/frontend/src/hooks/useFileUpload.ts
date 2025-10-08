@@ -100,10 +100,6 @@ export function useFileUpload(options = {}) {
               detail: `${file.name} uploaded successfully`,
             })
           }
-
-          if (onSuccess) {
-            onSuccess(file, result)
-          }
         } catch (error) {
           results.failed.push({ file, error })
 
@@ -133,7 +129,15 @@ export function useFileUpload(options = {}) {
           }
         }
 
-        setUploadProgress(((i + 1) / fileArray.length) * 100)
+        // Round progress to 2 decimal places
+        const progress =
+          Math.round(((i + 1) / fileArray.length) * 100 * 100) / 100
+        setUploadProgress(progress)
+      }
+
+      // Call onSuccess once after all uploads complete (if any succeeded)
+      if (onSuccess && results.succeeded.length > 0) {
+        onSuccess(null, results)
       }
 
       return results
