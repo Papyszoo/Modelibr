@@ -42,7 +42,7 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
 
 #### 2. ModelInfo.stories.tsx
 
-- **Location**: `src/components/ModelInfo.stories.tsx`
+- **Location**: `src/features/model-viewer/components/ModelInfo.stories.tsx`
 - **Stories**:
   - Default (OBJ model)
   - GLTF Model
@@ -51,7 +51,7 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
 
 #### 3. ThumbnailDisplay.stories.tsx
 
-- **Location**: `src/components/ThumbnailDisplay.stories.tsx`
+- **Location**: `src/features/thumbnail/components/ThumbnailDisplay.stories.tsx`
 - **Stories**:
   - Ready state
   - Processing state
@@ -64,7 +64,7 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
 
 #### 4. EmptyState.stories.tsx
 
-- **Location**: `src/components/model-list/EmptyState.stories.tsx`
+- **Location**: `src/features/models/components/EmptyState.stories.tsx`
 - **Stories**:
   - Default (visible)
   - Hidden
@@ -72,7 +72,7 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
 
 #### 5. ErrorState.stories.tsx
 
-- **Location**: `src/components/model-list/ErrorState.stories.tsx`
+- **Location**: `src/features/models/components/ErrorState.stories.tsx`
 - **Stories**:
   - Default (Network Error)
   - Database Error
@@ -132,7 +132,6 @@ Output: `src/frontend/storybook-static/`
 ### Screenshots Included
 
 - ModelInfo component documentation: https://github.com/user-attachments/assets/c191f88b-9b39-45c0-bfa9-8f8d34efe1ed
-- ErrorState component examples: https://github.com/user-attachments/assets/e2b4a2e0-f66d-4ea9-8e96-ec2bd3e0106d
 
 ## .gitignore Updates
 
