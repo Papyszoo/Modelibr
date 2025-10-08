@@ -1,5 +1,4 @@
 import { ThumbnailJobService } from './thumbnailJobService.js'
-import { SignalRQueueService } from './signalrQueueService.js'
 import { ModelFileService } from './modelFileService.js'
 import { PuppeteerRenderer } from './puppeteerRenderer.js'
 import { FrameEncoderService } from './frameEncoderService.js'
@@ -9,12 +8,11 @@ import { config } from './config.js'
 import logger, { withJobContext } from './logger.js'
 
 /**
- * Job processor that handles thumbnail generation using SignalR real-time queue
+ * Job processor that handles thumbnail generation using polling-based queue
  */
 export class JobProcessor {
   constructor() {
     this.jobService = new ThumbnailJobService()
-    this.signalrQueueService = new SignalRQueueService()
     this.modelFileService = new ModelFileService()
     this.thumbnailStorage = new ThumbnailStorageService()
     this.jobEventService = new JobEventService()
@@ -22,15 +20,17 @@ export class JobProcessor {
     this.frameEncoder = null // Will be initialized when needed
     this.isShuttingDown = false
     this.activeJobs = new Map()
+    this.pollingInterval = null
   }
 
   /**
    * Start the job processing system
    */
   async start() {
-    logger.info('Starting SignalR-based job processor', {
+    logger.info('Starting polling-based job processor', {
       workerId: config.workerId,
       maxConcurrentJobs: config.maxConcurrentJobs,
+      pollIntervalMs: config.pollIntervalMs,
       modelProcessing: config.modelProcessing,
     })
 
@@ -43,82 +43,80 @@ export class JobProcessor {
     // Start periodic cleanup of old temporary files
     this.startPeriodicCleanup()
 
-    // Start SignalR-based job processing
-    await this.startSignalRMode()
+    // Start polling-based job processing
+    await this.startPollingMode()
   }
 
   /**
-   * Start SignalR-based job processing (real-time queue)
+   * Start polling-based job processing
    */
-  async startSignalRMode() {
-    logger.info('Starting SignalR-based job processing')
-
-    // Set up the job received callback
-    this.signalrQueueService.onJobReceived(async job => {
-      await this.handleJobNotification(job)
+  async startPollingMode() {
+    logger.info('Starting polling-based job processing', {
+      pollIntervalMs: config.pollIntervalMs,
+      maxConcurrentJobs: config.maxConcurrentJobs,
     })
 
-    // Connect to SignalR hub
-    const connected = await this.signalrQueueService.start()
-    if (!connected) {
-      logger.error('Failed to connect to SignalR hub')
-      throw new Error('SignalR connection failed')
-    }
+    // Start the polling loop
+    this.startPollingLoop()
 
-    logger.info('SignalR job processor started successfully')
+    logger.info('Polling job processor started successfully')
   }
 
   /**
-   * Handle a job notification from SignalR
-   * @param {Object} job - The job notification
+   * Start the polling loop to check for new jobs
    */
-  async handleJobNotification(job) {
+  startPollingLoop() {
+    // Poll immediately on start
+    this.pollForJobs()
+
+    // Then poll at regular intervals
+    this.pollingInterval = setInterval(() => {
+      if (!this.isShuttingDown) {
+        this.pollForJobs()
+      }
+    }, config.pollIntervalMs)
+
+    logger.debug('Polling loop started', { pollIntervalMs: config.pollIntervalMs })
+  }
+
+  /**
+   * Poll for available jobs and process them
+   */
+  async pollForJobs() {
     try {
       // Check if we can accept more jobs
       if (this.activeJobs.size >= config.maxConcurrentJobs) {
-        logger.debug('Max concurrent jobs reached, ignoring job notification', {
-          jobId: job.id,
+        logger.debug('Max concurrent jobs reached, skipping poll', {
           activeJobs: this.activeJobs.size,
           maxConcurrentJobs: config.maxConcurrentJobs,
         })
         return
       }
 
-      // Try to claim the job through the API
-      const claimedJob = await this.jobService.pollForJob()
+      // Calculate how many jobs we can accept
+      const availableSlots = config.maxConcurrentJobs - this.activeJobs.size
 
-      if (claimedJob && claimedJob.id === job.id) {
-        logger.info('Successfully claimed job from SignalR notification', {
-          jobId: claimedJob.id,
-          modelId: claimedJob.modelId,
-          modelHash: claimedJob.modelHash,
-          attemptCount: claimedJob.attemptCount,
-        })
+      // Poll for jobs to fill available slots
+      for (let i = 0; i < availableSlots; i++) {
+        const job = await this.jobService.pollForJob()
 
-        // Acknowledge job processing to other workers
-        await this.signalrQueueService.acknowledgeJob(
-          claimedJob.id,
-          config.workerId
-        )
+        if (job) {
+          logger.info('Successfully claimed job from poll', {
+            jobId: job.id,
+            modelId: job.modelId,
+            modelHash: job.modelHash,
+            attemptCount: job.attemptCount,
+          })
 
-        // Process job asynchronously
-        this.processJobAsync(claimedJob)
-      } else if (claimedJob) {
-        logger.debug('Claimed a different job than notified', {
-          notifiedJobId: job.id,
-          claimedJobId: claimedJob.id,
-        })
-
-        // Still process the claimed job
-        this.processJobAsync(claimedJob)
-      } else {
-        logger.debug('Job was already claimed by another worker', {
-          jobId: job.id,
-        })
+          // Process job asynchronously
+          this.processJobAsync(job)
+        } else {
+          // No more jobs available, stop polling for this iteration
+          break
+        }
       }
     } catch (error) {
-      logger.error('Error handling job notification', {
-        jobId: job.id,
+      logger.error('Error polling for jobs', {
         error: error.message,
         stack: error.stack,
       })
@@ -533,8 +531,12 @@ export class JobProcessor {
     logger.info('Shutting down job processor')
     this.isShuttingDown = true
 
-    // Stop SignalR connection
-    await this.signalrQueueService.stop()
+    // Stop polling interval
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval)
+      this.pollingInterval = null
+      logger.info('Stopped polling interval')
+    }
 
     // Stop periodic cleanup
     if (this.cleanupInterval) {
@@ -590,7 +592,7 @@ export class JobProcessor {
       activeJobs: this.activeJobs.size,
       maxConcurrentJobs: config.maxConcurrentJobs,
       workerId: config.workerId,
-      signalrConnected: this.signalrQueueService.connected,
+      pollingEnabled: this.pollingInterval !== null,
     }
   }
 

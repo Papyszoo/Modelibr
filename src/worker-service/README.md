@@ -1,10 +1,10 @@
 # Modelibr Thumbnail Worker Service
 
-A Node.js worker service for background thumbnail generation using Puppeteer and three.js. This service uses real-time SignalR notifications to receive thumbnail generation jobs and processes them asynchronously using headless Chrome.
+A Node.js worker service for background thumbnail generation using Puppeteer and three.js. This service uses a polling-based queue to retrieve thumbnail generation jobs and processes them asynchronously using headless Chrome.
 
 ## Features
 
-- **SignalR Real-time Queue**: Real-time job notifications via SignalR for instant processing
+- **Polling-based Queue**: Reliable job queue with configurable polling interval for sequential processing
 - **Puppeteer-based Rendering**: Uses Puppeteer with headless Chrome to render 3D models in a real browser environment
 - **Three.js Integration**: Loads models from CDN and renders them with proper lighting and materials
 - **Orbit Animation**: Generates rotating orbit frames around the 3D model
