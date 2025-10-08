@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
-import { TexturePackDto, Model } from '../../types'
-import { useTexturePacks } from '../../hooks/useTexturePacks'
-import AssociationInstructions from './model-association/AssociationInstructions'
+import { TexturePackDto, Model } from '../../../types'
+import { useTexturePacks } from '../hooks/useTexturePacks'
+import AssociationInstructions from './AssociationInstructions'
 import ModelAssociationTable, {
   ModelAssociation,
-} from './model-association/ModelAssociationTable'
-import ChangesSummary from './model-association/ChangesSummary'
-import ModelAssociationFooter from './model-association/ModelAssociationFooter'
+} from './ModelAssociationTable'
+import ChangesSummary from './ChangesSummary'
+import ModelAssociationFooter from './ModelAssociationFooter'
 import './dialogs.css'
 
 interface ModelAssociationDialogProps {

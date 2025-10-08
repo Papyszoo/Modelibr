@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import ApiClient from '../services/ApiClient'
+import { texturePacksApi } from '../api/texturePacksApi'
 import {
   TexturePackDto,
   CreateTexturePackRequest,
@@ -9,7 +9,7 @@ import {
   AddTextureToPackRequest,
   AddTextureToPackResponse,
   Model,
-} from '../types'
+} from '../../../../types'
 
 export function useTexturePacks() {
   const [loading, setLoading] = useState(false)
@@ -21,7 +21,7 @@ export function useTexturePacks() {
     try {
       setLoading(true)
       setError(null)
-      return await ApiClient.getAllTexturePacks()
+      return await texturePacksApi.getAllTexturePacks()
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load texture packs'
@@ -37,7 +37,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.getTexturePackById(id)
+        return await texturePacksApi.getTexturePackById(id)
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to load texture pack'
@@ -57,7 +57,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.createTexturePack(request)
+        return await texturePacksApi.createTexturePack(request)
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to create texture pack'
@@ -78,7 +78,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.updateTexturePack(id, request)
+        return await texturePacksApi.updateTexturePack(id, request)
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to update texture pack'
@@ -95,7 +95,7 @@ export function useTexturePacks() {
     try {
       setLoading(true)
       setError(null)
-      await ApiClient.deleteTexturePack(id)
+      await texturePacksApi.deleteTexturePack(id)
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to delete texture pack'
@@ -114,7 +114,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.addTextureToPackEndpoint(packId, request)
+        return await texturePacksApi.addTextureToPackEndpoint(packId, request)
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to add texture to pack'
@@ -132,7 +132,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.removeTextureFromPack(packId, textureId)
+        await texturePacksApi.removeTextureFromPack(packId, textureId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -152,7 +152,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.associateTexturePackWithModel(packId, modelId)
+        await texturePacksApi.associateTexturePackWithModel(packId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -172,7 +172,7 @@ export function useTexturePacks() {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.disassociateTexturePackFromModel(packId, modelId)
+        await texturePacksApi.disassociateTexturePackFromModel(packId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -191,7 +191,7 @@ export function useTexturePacks() {
     try {
       setLoading(true)
       setError(null)
-      return await ApiClient.getModels()
+      return await texturePacksApi.getModels()
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load models'
