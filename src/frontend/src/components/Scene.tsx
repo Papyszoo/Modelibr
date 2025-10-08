@@ -36,6 +36,7 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
   const orbitSpeed = settings?.orbitSpeed ?? 1
   const zoomSpeed = settings?.zoomSpeed ?? 1
   const panSpeed = settings?.panSpeed ?? 1
+  const modelRotationSpeed = settings?.modelRotationSpeed ?? 0.002
   const showShadows = settings?.showShadows ?? true
 
   return (
@@ -44,11 +45,17 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
       <Stage
         intensity={0.5}
         environment="city"
-        shadows={showShadows ? { type: 'accumulative', bias: -0.001 } : false}
+        shadows={
+          showShadows ? { type: 'contact', opacity: 0.4, blur: 2 } : false
+        }
         adjustCamera={false}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
-          <Model modelUrl={modelUrl} fileExtension={fileExtension} />
+          <Model
+            modelUrl={modelUrl}
+            fileExtension={fileExtension}
+            rotationSpeed={modelRotationSpeed}
+          />
         </Suspense>
       </Stage>
 

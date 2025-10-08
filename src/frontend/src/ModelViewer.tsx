@@ -38,6 +38,7 @@ function ModelViewer({
     orbitSpeed: 1,
     zoomSpeed: 1,
     panSpeed: 1,
+    modelRotationSpeed: 0.002,
     showShadows: true,
   })
   const toast = useRef<Toast>(null)
