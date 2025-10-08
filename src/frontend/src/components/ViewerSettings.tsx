@@ -1,10 +1,12 @@
 import { Slider } from 'primereact/slider'
+import { InputSwitch } from 'primereact/inputswitch'
 import './ViewerSettings.css'
 
 export interface ViewerSettingsType {
   orbitSpeed: number
   zoomSpeed: number
   panSpeed: number
+  showShadows: boolean
 }
 
 interface ViewerSettingsProps {
@@ -13,7 +15,10 @@ interface ViewerSettingsProps {
 }
 
 function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
-  const handleChange = (key: keyof ViewerSettingsType, value: number) => {
+  const handleChange = (
+    key: keyof ViewerSettingsType,
+    value: number | boolean
+  ) => {
     onSettingsChange({
       ...settings,
       [key]: value,
@@ -65,6 +70,16 @@ function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
             step={0.1}
           />
           <span className="setting-value">{settings.panSpeed.toFixed(1)}x</span>
+        </div>
+      </div>
+
+      <div className="setting-item">
+        <label>Show Shadows</label>
+        <div className="setting-control">
+          <InputSwitch
+            checked={settings.showShadows}
+            onChange={e => handleChange('showShadows', e.value as boolean)}
+          />
         </div>
       </div>
     </div>
