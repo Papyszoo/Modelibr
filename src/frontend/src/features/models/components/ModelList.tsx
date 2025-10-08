@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import './ModelList.css'
-import ApiClient from './services/ApiClient'
+import { modelsApi } from '../api/modelsApi'
 import { Toast } from 'primereact/toast'
-import { useFileUpload, useDragAndDrop } from './hooks/useFileUpload'
-import { useTabContext } from './hooks/useTabContext'
-import { TabContextValue } from './contexts/TabContext'
-import { Model } from './utils/fileUtils'
-import ModelListHeader from './components/model-list/ModelListHeader'
-import UploadProgress from './components/model-list/UploadProgress'
-import LoadingState from './components/model-list/LoadingState'
-import ErrorState from './components/model-list/ErrorState'
-import EmptyState from './components/model-list/EmptyState'
-import ModelGrid from './components/model-list/ModelGrid'
+import { useFileUpload, useDragAndDrop } from '../hooks/useFileUpload'
+import { useTabContext } from '../../../hooks/useTabContext'
+import { TabContextValue } from '../../../contexts/TabContext'
+import { Model } from '../../../utils/fileUtils'
+import ModelListHeader from './ModelListHeader'
+import UploadProgress from './UploadProgress'
+import LoadingState from './LoadingState'
+import ErrorState from './ErrorState'
+import EmptyState from './EmptyState'
+import ModelGrid from './ModelGrid'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
@@ -92,7 +92,7 @@ function ModelListContent({
   const fetchModels = async () => {
     try {
       setLoading(true)
-      const models = await ApiClient.getModels()
+      const models = await modelsApi.getModels()
       setModels(models)
     } catch (err) {
       setError(

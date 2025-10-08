@@ -1,4 +1,4 @@
-import ModelList from '../../ModelList'
+import { ModelList } from '../../features/models'
 import ModelViewer from '../../ModelViewer'
 import TextureList from '../tabs/TextureList'
 import TexturePackList from '../tabs/TexturePackList'

@@ -2,21 +2,21 @@ import { renderHook, act } from '@testing-library/react'
 import { useFileUpload, useDragAndDrop } from '../useFileUpload'
 
 // Mock ApiClient
-jest.mock('../../services/ApiClient', () => ({
+jest.mock('../../../../services/ApiClient', () => ({
   uploadModel: jest.fn(),
 }))
 
 // Mock fileUtils
-jest.mock('../../utils/fileUtils', () => ({
+jest.mock('../../../../utils/fileUtils', () => ({
   isSupportedModelFormat: jest.fn(),
   isThreeJSRenderable: jest.fn(),
 }))
 
-import ApiClient from '../../services/ApiClient'
+import ApiClient from '../../../../services/ApiClient'
 import {
   isSupportedModelFormat,
   isThreeJSRenderable,
-} from '../../utils/fileUtils'
+} from '../../../../utils/fileUtils'
 
 const mockApiClient = ApiClient as jest.Mocked<typeof ApiClient>
 const mockIsSupportedModelFormat =

@@ -1,11 +1,11 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import ModelGrid from '../ModelGrid'
-import { Model } from '../../../utils/fileUtils'
-import ApiClient from '../../../services/ApiClient'
+import { Model } from '../../../../utils/fileUtils'
+import ApiClient from '../../../../services/ApiClient'
 
 // Mock ApiClient for ThumbnailDisplay component
-jest.mock('../../../services/ApiClient', () => ({
+jest.mock('../../../../services/ApiClient', () => ({
   __esModule: true,
   default: {
     getThumbnailStatus: jest.fn(),
