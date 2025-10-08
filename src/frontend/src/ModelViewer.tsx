@@ -35,11 +35,9 @@ function ModelViewer({
   const [settingsWindowVisible, setSettingsWindowVisible] =
     useState<boolean>(false)
   const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
-    cameraDistance: 2.5,
     orbitSpeed: 1,
     zoomSpeed: 1,
     panSpeed: 1,
-    lockCamera: false,
   })
   const toast = useRef<Toast>(null)
 

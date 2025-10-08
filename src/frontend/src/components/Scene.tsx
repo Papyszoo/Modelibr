@@ -33,21 +33,18 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
   const modelUrl = ApiClient.getFileUrl(renderableFile.id)
 
   // Default settings if not provided
-  const cameraDistance = settings?.cameraDistance ?? 2.5
   const orbitSpeed = settings?.orbitSpeed ?? 1
   const zoomSpeed = settings?.zoomSpeed ?? 1
   const panSpeed = settings?.panSpeed ?? 1
-  const lockCamera = settings?.lockCamera ?? false
 
   return (
     <>
-      {/* Stage provides automatic lighting, shadows, and camera positioning */}
+      {/* Stage provides automatic lighting, shadows, and environment */}
       <Stage
-        key={lockCamera ? 'locked' : 'unlocked'}
         intensity={0.5}
         environment="city"
         shadows={{ type: 'accumulative', bias: -0.001 }}
-        adjustCamera={lockCamera ? false : cameraDistance}
+        adjustCamera={false}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
           <Model modelUrl={modelUrl} fileExtension={fileExtension} />
