@@ -190,23 +190,27 @@
             });
         }
 
-        // Normalize model to center and fit in view
+        // Normalize model to center and fit in view, with bottom aligned to floor
         function normalizeModel(model, scale = 2.0) {
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             
-            // Center the model
-            model.position.x = -center.x;
-            model.position.y = -center.y;
-            model.position.z = -center.z;
-
             // Scale to fit
             const maxDimension = Math.max(size.x, size.y, size.z);
             if (maxDimension > 0) {
                 const scaleFactor = scale / maxDimension;
                 model.scale.setScalar(scaleFactor);
             }
+
+            // Recalculate bounding box after scaling
+            const scaledBox = new THREE.Box3().setFromObject(model);
+            const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+
+            // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
+            model.position.x = -scaledCenter.x;
+            model.position.z = -scaledCenter.z;
+            model.position.y = -scaledBox.min.y;
 
             return {
                 center,

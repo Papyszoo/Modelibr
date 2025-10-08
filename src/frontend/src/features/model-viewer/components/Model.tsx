@@ -44,15 +44,23 @@ function OBJModel({
         }
       })
 
-      // Center and scale the model to consistent size
+      // Calculate bounding box and scale the model to consistent size
       const box = new THREE.Box3().setFromObject(model)
-      const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
       const maxDim = Math.max(size.x, size.y, size.z)
       const scale = 2 / maxDim
 
-      model.position.sub(center.multiplyScalar(scale))
+      // Scale the model first
       model.scale.setScalar(scale)
+
+      // Recalculate bounding box after scaling
+      const scaledBox = new THREE.Box3().setFromObject(model)
+      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
+
+      // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
+      model.position.x = -scaledCenter.x
+      model.position.z = -scaledCenter.z
+      model.position.y = -scaledBox.min.y
 
       scaledRef.current = true
     }
@@ -113,15 +121,23 @@ function GLTFModel({
         }
       })
 
-      // Center and scale the model to consistent size
+      // Calculate bounding box and scale the model to consistent size
       const box = new THREE.Box3().setFromObject(model)
-      const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
       const maxDim = Math.max(size.x, size.y, size.z)
       const scale = 2 / maxDim
 
-      model.position.sub(center.multiplyScalar(scale))
+      // Scale the model first
       model.scale.setScalar(scale)
+
+      // Recalculate bounding box after scaling
+      const scaledBox = new THREE.Box3().setFromObject(model)
+      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
+
+      // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
+      model.position.x = -scaledCenter.x
+      model.position.z = -scaledCenter.z
+      model.position.y = -scaledBox.min.y
 
       scaledRef.current = true
     }
