@@ -142,6 +142,41 @@
   background: #4a4a4a;
 }
 
+.settings-section {
+  margin-bottom: 1rem;
+}
+
+.settings-section-header {
+  background: #252525;
+  padding: 1rem 1.5rem;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 500;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.settings-section-header:hover {
+  background: #2a2a2a;
+}
+
+.settings-section-header span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-section-content {
+  background: #252525;
+  padding: 1.5rem;
+  border: 1px solid #3a3a3a;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+}
+
 .settings-checkbox-label {
   display: flex;
   align-items: center;

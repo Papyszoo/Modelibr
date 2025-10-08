@@ -884,21 +884,37 @@ src/frontend/src/
 ### API Integration Guidelines
 
 **ALWAYS use the existing ApiClient for API calls:**
-- Import and instantiate `ApiClient` from `src/services/ApiClient.ts`
-- Use `apiClient.getBaseURL()` to get the configured base URL
-- Never hardcode API URLs like `http://localhost:5009` or `https://localhost:8081`
-- The ApiClient reads the base URL from environment variables (`VITE_API_BASE_URL`)
+- ApiClient is a singleton exported from `src/services/ApiClient.ts`
+- Import the default export: `import apiClient from '../../services/ApiClient'`
+- All API endpoints should be defined as methods in ApiClient
+- ApiClient handles base URL configuration and axios instance
+- Never use fetch() directly or hardcode URLs like `http://localhost:5009`
 
-**Example:**
+**Adding new API endpoints:**
+1. Define the method in ApiClient class with proper TypeScript types
+2. Use `this.client.get/post/put/delete` for HTTP calls
+3. Return typed responses
+
+**Example - Correct Usage:**
 ```typescript
-import ApiClient from '../../services/ApiClient'
+// In ApiClient.ts - define the endpoint
+async getSettings(): Promise<SettingsResponse> {
+  const response = await this.client.get('/settings')
+  return response.data
+}
 
-const apiClient = new ApiClient()
+// In component - use the method
+import apiClient from '../../services/ApiClient'
 
-// Correct - uses configured base URL
+const settings = await apiClient.getSettings()
+```
+
+**Wrong - Don't do this:**
+```typescript
+// Never use fetch with constructed URLs
 const response = await fetch(`${apiClient.getBaseURL()}/settings`)
 
-// Wrong - hardcoded URL
+// Never hardcode URLs
 const response = await fetch('http://localhost:5009/settings')
 ```
 
