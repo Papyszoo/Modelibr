@@ -3,8 +3,11 @@
   width: 100%;
   background: #1e1e1e;
   color: #e0e0e0;
-  min-height: 100%;
+  height: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .settings-title {
@@ -13,6 +16,7 @@
   color: #fff;
   border-bottom: 2px solid #3a3a3a;
   padding-bottom: 0.5rem;
+  flex-shrink: 0;
 }
 
 .settings-loading {
@@ -29,6 +33,7 @@
   padding: 1rem;
   margin-bottom: 1.5rem;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .settings-success {
@@ -38,12 +43,22 @@
   padding: 1rem;
   margin-bottom: 1.5rem;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .settings-form {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  flex: 1;
+  overflow: hidden;
+}
+
+.settings-form-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .settings-section {
@@ -102,12 +117,21 @@
   margin-top: 0.25rem;
 }
 
+.settings-default {
+  font-size: 0.85rem;
+  color: #6c9bd1;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
 .settings-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
   padding-top: 1rem;
   border-top: 1px solid #3a3a3a;
+  flex-shrink: 0;
+  background: #1e1e1e;
 }
 
 .settings-button {
