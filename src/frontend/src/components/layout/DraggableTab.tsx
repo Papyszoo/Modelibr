@@ -88,7 +88,7 @@ function DraggableTab({
     >
       {/* Tab content - always show icon for now */}
       <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
-      
+
       {/* Close button in top right corner */}
       <button
         className="tab-close-btn"

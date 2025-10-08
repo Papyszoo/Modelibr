@@ -55,9 +55,9 @@ describe('DraggableTab', () => {
 
     const closeButton = screen.getByLabelText('Close tab')
     expect(closeButton).toBeInTheDocument()
-    
+
     fireEvent.click(closeButton)
-    
+
     expect(defaultProps.onClose).toHaveBeenCalledTimes(1)
     expect(defaultProps.onSelect).not.toHaveBeenCalled() // Should not trigger select
   })

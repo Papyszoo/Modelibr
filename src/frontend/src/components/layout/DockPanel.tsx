@@ -40,7 +40,7 @@ function DockPanel({
   const addTab = (type: Tab['type'], title: string): void => {
     // Check if tab already exists on this side
     const existingTab = tabs.find(tab => tab.type === type)
-    
+
     if (existingTab) {
       // Make existing tab active instead of adding duplicate
       setActiveTab(existingTab.id)
@@ -61,7 +61,7 @@ function DockPanel({
   const reopenTab = (tab: Tab): void => {
     // Check if tab already exists on this side
     const existingTab = tabs.find(t => t.id === tab.id || t.type === tab.type)
-    
+
     if (existingTab) {
       // Make existing tab active instead of adding duplicate
       setActiveTab(existingTab.id)
@@ -71,7 +71,7 @@ function DockPanel({
       setTabs(newTabs)
       setActiveTab(tab.id)
     }
-    
+
     // Remove from recently closed
     setRecentlyClosedTabs(prev => prev.filter(t => t.id !== tab.id))
   }
