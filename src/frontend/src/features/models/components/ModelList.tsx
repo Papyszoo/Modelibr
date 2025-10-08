@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import './ModelList.css'
-import { modelsApi } from '../api/modelsApi'
+import ApiClient from '../../../services/ApiClient'
 import { Toast } from 'primereact/toast'
 import { useFileUpload, useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useTabContext } from '../../../hooks/useTabContext'
@@ -92,7 +92,7 @@ function ModelListContent({
   const fetchModels = async () => {
     try {
       setLoading(true)
-      const models = await modelsApi.getModels()
+      const models = await ApiClient.getModels()
       setModels(models)
     } catch (err) {
       setError(

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { modelsApi } from '../../features/models/api/modelsApi'
+import ApiClient, { UploadModelResponse } from '../../services/ApiClient'
 import { isSupportedModelFormat, isThreeJSRenderable } from '../../utils/fileUtils'
 
 /**
@@ -53,7 +53,7 @@ export function useFileUpload(options = {}) {
     }
 
     try {
-      const result = await modelsApi.uploadModel(file)
+      const result = await ApiClient.uploadModel(file)
 
       return result
     } catch (error) {
