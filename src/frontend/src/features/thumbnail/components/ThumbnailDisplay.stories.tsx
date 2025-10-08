@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import ThumbnailDisplay from './ThumbnailDisplay'
-import ApiClient from '../services/ApiClient'
+import ApiClient from '../../../services/ApiClient'
 
 // Mock ApiClient for Storybook
 const mockApiClient = ApiClient as any

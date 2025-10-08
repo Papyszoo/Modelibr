@@ -1,10 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import ThumbnailDisplay from '../ThumbnailDisplay'
-import ApiClient from '../../services/ApiClient'
+import ApiClient from '../../../../services/ApiClient'
 
 // Mock ApiClient
-jest.mock('../../services/ApiClient', () => ({
+jest.mock('../../../../services/ApiClient', () => ({
   __esModule: true,
   default: {
     getThumbnailStatus: jest.fn(),
