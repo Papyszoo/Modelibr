@@ -1,5 +1,5 @@
 import { useContext } from 'react'
-import { ModelContext } from '../contexts/ModelContext'
+import { ModelContext } from '../../../contexts/ModelContext'
 
 export function useModelObject() {
   const context = useContext(ModelContext)

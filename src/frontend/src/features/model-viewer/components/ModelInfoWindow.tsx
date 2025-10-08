@@ -1,6 +1,6 @@
 import ModelInfo from './ModelInfo'
-import FloatingWindow from './FloatingWindow'
-import { Model } from '../utils/fileUtils'
+import FloatingWindow from '../../../components/FloatingWindow'
+import { Model } from '../../../utils/fileUtils'
 
 interface ModelInfoWindowProps {
   visible: boolean

@@ -1,4 +1,4 @@
-import { getModelFileFormat } from '../utils/fileUtils'
+import { getModelFileFormat } from '../../../utils/fileUtils'
 
 function ModelInfo({ model }) {
   return (

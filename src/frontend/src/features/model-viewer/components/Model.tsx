@@ -4,7 +4,7 @@ import { Box } from '@react-three/drei'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import * as THREE from 'three'
-import LoadingPlaceholder from './LoadingPlaceholder'
+import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 import { useModelObject } from '../hooks/useModelObject'
 
 // Separate components for each model type to avoid conditional hooks
