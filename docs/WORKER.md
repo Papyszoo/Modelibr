@@ -1,6 +1,6 @@
 # Thumbnail Worker Service
 
-Node.js microservice for generating 3D model thumbnails and animated previews. Operates independently from the .NET Web API, communicating via REST API and SignalR.
+Node.js microservice for generating 3D model thumbnails and animated previews. Operates independently from the .NET Web API, communicating via REST API using a polling-based queue system.
 
 ## Quick Start
 
@@ -22,21 +22,21 @@ Health check: `curl http://localhost:3001/health`
 
 ## Key Features
 
-- **Real-time processing** - SignalR notifications for instant job pickup
+- **Polling-based queue** - Reliable job processing with configurable polling interval
 - **3D format support** - OBJ, FBX, GLTF, GLB and more via Three.js loaders
 - **Orbit animations** - Smooth 360° rotation at configurable angles
 - **WebP encoding** - Animated WebP with configurable quality/framerate
 - **API-based storage** - Uploads to backend, avoiding filesystem permission issues
 - **Hash deduplication** - Backend handles duplicate detection
-- **Multiple workers** - Supports concurrent instances with load balancing
+- **Multiple workers** - Supports concurrent instances with distributed job claiming
 - **Health monitoring** - HTTP endpoints for container orchestration
 
 ## How It Works
 
 ```
-1. Upload → Backend creates job and sends SignalR notification
-2. Worker → Receives notification via SignalR
-3. Worker → Claims job via POST /api/thumbnail-jobs/dequeue
+1. Upload → Backend creates thumbnail job in queue
+2. Worker → Polls for available jobs via POST /api/thumbnail-jobs/dequeue
+3. Worker → Claims job (database ensures atomic claiming)
 4. Worker → Downloads model file from API
 5. Worker → Loads and normalizes 3D model with Three.js
 6. Worker → Generates orbit animation frames (360°)
@@ -188,7 +188,7 @@ Expected logs:
 info: Starting Modelibr Thumbnail Worker Service
 info: Configuration validated successfully
 info: Health server started
-info: Starting SignalR-based job processor
+info: Starting polling-based job processor
 ```
 
 ### Connection Issues
@@ -217,17 +217,21 @@ API_BASE_URL=http://webapi:8080
 API_BASE_URL=http://host.docker.internal:5009
 ```
 
-**SignalR Connection Failed**
+**No Jobs Being Processed**
+
+Check polling configuration:
+```bash
+# Verify polling interval (in milliseconds)
+POLL_INTERVAL_MS=5000  # Poll every 5 seconds
+
+# Check worker is polling
+docker compose logs thumbnail-worker | grep "polling"
+```
 
 Enable debug logging:
 ```bash
 LOG_LEVEL=debug
 ```
-
-Verify SignalR hub endpoint:
-```bash
-curl http://localhost:5009/hubs/thumbnail-jobs
-# Should return connection upgrade message or 404
 ```
 
 ### Processing Failures
@@ -402,16 +406,16 @@ open docs/signalr-test.html
 - **3D Rendering** - Puppeteer with Three.js for browser-based rendering
 - **Image Processing** - Sharp for frame processing and poster generation
 - **Animation Encoding** - node-webpmux for animated WebP creation
-- **Communication** - @microsoft/signalr for real-time notifications, axios for REST
+- **Communication** - axios for REST API communication and job polling
 - **Logging** - Winston with structured JSON logging
 
 ### Core Components
 
-**index.js** - Main application entry, starts SignalR processor and health server
+**index.js** - Main application entry, starts polling processor and health server
 
 **config.js** - Centralized configuration from environment variables with validation
 
-**signalrQueueService.js** - SignalR connection management and job notifications
+**jobProcessor.js** - Polling-based job processor with concurrent job management
 
 **thumbnailJobService.js** - Job acquisition, status updates, and result reporting via HTTP
 
