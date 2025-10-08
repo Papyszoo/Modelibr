@@ -35,8 +35,11 @@ function OBJModel({
 
   useEffect(() => {
     if (model && !scaledRef.current) {
+      // Clone the model to prevent scene conflicts when same model is used in multiple panels
+      const clonedModel = model.clone()
+
       // Apply a basic TSL-style material with enhanced properties
-      model.traverse(child => {
+      clonedModel.traverse(child => {
         if (child.isMesh) {
           child.material = new THREE.MeshStandardMaterial({
             color: new THREE.Color(0.7, 0.7, 0.9),
@@ -50,22 +53,30 @@ function OBJModel({
       })
 
       // Calculate bounding box and scale the model to consistent size
-      const box = new THREE.Box3().setFromObject(model)
+      const box = new THREE.Box3().setFromObject(clonedModel)
       const size = box.getSize(new THREE.Vector3())
       const maxDim = Math.max(size.x, size.y, size.z)
       const scale = 2 / maxDim
 
       // Scale the model first
-      model.scale.setScalar(scale)
+      clonedModel.scale.setScalar(scale)
 
       // Recalculate bounding box after scaling
-      const scaledBox = new THREE.Box3().setFromObject(model)
+      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
       const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
 
       // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      model.position.x = -scaledCenter.x
-      model.position.z = -scaledCenter.z
-      model.position.y = -scaledBox.min.y
+      clonedModel.position.x = -scaledCenter.x
+      clonedModel.position.z = -scaledCenter.z
+      clonedModel.position.y = -scaledBox.min.y
+
+      // Store the cloned model in the ref
+      if (meshRef.current) {
+        // Clear previous children
+        meshRef.current.clear()
+        // Add cloned model
+        meshRef.current.add(clonedModel)
+      }
 
       scaledRef.current = true
     }
@@ -78,15 +89,11 @@ function OBJModel({
     return () => setModelObject(null)
   }, [model, setModelObject])
 
-  if (model) {
-    return (
-      <group ref={meshRef}>
-        <primitive object={model} />
-      </group>
-    )
-  }
-
-  return <LoadingPlaceholder />
+  return (
+    <group ref={meshRef}>
+      {/* Model is added via useEffect to support cloning */}
+    </group>
+  )
 }
 
 function GLTFModel({
@@ -117,8 +124,11 @@ function GLTFModel({
 
   useEffect(() => {
     if (model && !scaledRef.current) {
+      // Clone the model to prevent scene conflicts when same model is used in multiple panels
+      const clonedModel = model.clone()
+
       // Apply a basic TSL-style material with enhanced properties
-      model.traverse(child => {
+      clonedModel.traverse(child => {
         if (child.isMesh) {
           child.material = new THREE.MeshStandardMaterial({
             color: new THREE.Color(0.7, 0.7, 0.9),
@@ -132,22 +142,30 @@ function GLTFModel({
       })
 
       // Calculate bounding box and scale the model to consistent size
-      const box = new THREE.Box3().setFromObject(model)
+      const box = new THREE.Box3().setFromObject(clonedModel)
       const size = box.getSize(new THREE.Vector3())
       const maxDim = Math.max(size.x, size.y, size.z)
       const scale = 2 / maxDim
 
       // Scale the model first
-      model.scale.setScalar(scale)
+      clonedModel.scale.setScalar(scale)
 
       // Recalculate bounding box after scaling
-      const scaledBox = new THREE.Box3().setFromObject(model)
+      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
       const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
 
       // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      model.position.x = -scaledCenter.x
-      model.position.z = -scaledCenter.z
-      model.position.y = -scaledBox.min.y
+      clonedModel.position.x = -scaledCenter.x
+      clonedModel.position.z = -scaledCenter.z
+      clonedModel.position.y = -scaledBox.min.y
+
+      // Store the cloned model in the ref
+      if (meshRef.current) {
+        // Clear previous children
+        meshRef.current.clear()
+        // Add cloned model
+        meshRef.current.add(clonedModel)
+      }
 
       scaledRef.current = true
     }
@@ -160,15 +178,11 @@ function GLTFModel({
     return () => setModelObject(null)
   }, [model, setModelObject])
 
-  if (model) {
-    return (
-      <group ref={meshRef}>
-        <primitive object={model} />
-      </group>
-    )
-  }
-
-  return <LoadingPlaceholder />
+  return (
+    <group ref={meshRef}>
+      {/* Model is added via useEffect to support cloning */}
+    </group>
+  )
 }
 
 function PlaceholderModel({ rotationSpeed }: { rotationSpeed: number }) {

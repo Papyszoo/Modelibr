@@ -43,6 +43,7 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
     <>
       {/* Stage provides automatic lighting, shadows, and environment */}
       <Stage
+        key={`stage-${modelUrl}`}
         intensity={0.5}
         environment="city"
         shadows={
