@@ -5,7 +5,7 @@ import { useControls } from 'leva'
 import { GeometryType } from './GeometrySelector'
 import { TexturePackDto } from '../../../types'
 import TexturedGeometry from './TexturedGeometry'
-import LoadingPlaceholder from '../../LoadingPlaceholder'
+import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 import './TexturePreviewPanel.css'
 
 interface TexturePreviewPanelProps {

@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
-import { TexturePackDto, TextureType, Model } from '../../types'
-import { getTextureTypeOptions } from '../../utils/textureTypeUtils'
-import { useTexturePacks } from '../../hooks/useTexturePacks'
-import TextureTypeDropdown from './add-texture/TextureTypeDropdown'
+import { TexturePackDto, TextureType, Model } from '../../../types'
+import { getTextureTypeOptions } from '../../../utils/textureTypeUtils'
+import { useTexturePacks } from '../hooks/useTexturePacks'
+import TextureTypeDropdown from './TextureTypeDropdown'
 import FileSelectionTable, {
   FileOption,
-} from './add-texture/FileSelectionTable'
-import NoTextureTypesWarning from './add-texture/NoTextureTypesWarning'
-import AddTextureFooter from './add-texture/AddTextureFooter'
+} from './FileSelectionTable'
+import NoTextureTypesWarning from './NoTextureTypesWarning'
+import AddTextureFooter from './AddTextureFooter'
 import './dialogs.css'
 
 interface AddTextureToPackDialogProps {
