@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+// eslint-disable-next-line no-restricted-imports -- Settings component needs direct API access for system configuration
 import apiClient from '../../services/ApiClient'
 import './Settings.css'
 
@@ -13,7 +14,7 @@ interface SettingsData {
 }
 
 function Settings(): JSX.Element {
-  const [settings, setSettings] = useState<SettingsData | null>(null)
+  const [_settings, setSettings] = useState<SettingsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +30,8 @@ function Settings(): JSX.Element {
   const [thumbnailCameraAngle, setThumbnailCameraAngle] = useState<number>(0.75)
   const [thumbnailWidth, setThumbnailWidth] = useState<number>(256)
   const [thumbnailHeight, setThumbnailHeight] = useState<number>(256)
-  const [generateThumbnailOnUpload, setGenerateThumbnailOnUpload] = useState<boolean>(true)
+  const [generateThumbnailOnUpload, setGenerateThumbnailOnUpload] =
+    useState<boolean>(true)
 
   useEffect(() => {
     fetchSettings()
@@ -41,7 +43,7 @@ function Settings(): JSX.Element {
     try {
       const data = await apiClient.getSettings()
       setSettings(data)
-      
+
       // Update form state with fetched values
       setMaxFileSizeMB(Math.round(data.maxFileSizeBytes / 1_048_576))
       setMaxThumbnailSizeMB(Math.round(data.maxThumbnailSizeBytes / 1_048_576))
@@ -77,7 +79,7 @@ function Settings(): JSX.Element {
       const data = await apiClient.updateSettings(updatedSettings)
       setSettings(data)
       setSuccessMessage('Settings saved successfully!')
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
@@ -106,19 +108,30 @@ function Settings(): JSX.Element {
       )}
 
       {successMessage && (
-        <div className="settings-success">
-          {successMessage}
-        </div>
+        <div className="settings-success">{successMessage}</div>
       )}
 
       <form onSubmit={handleSave} className="settings-form">
         <div className="settings-form-content">
           <div className="settings-section">
-            <div 
-              className="settings-section-header" 
-              onClick={() => setActiveIndex(prev => Array.isArray(prev) ? (prev.includes(0) ? prev.filter(i => i !== 0) : [...prev, 0]) : [0])}
+            <div
+              className="settings-section-header"
+              onClick={() =>
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(0)
+                      ? prev.filter(i => i !== 0)
+                      : [...prev, 0]
+                    : [0]
+                )
+              }
             >
-              <span>{Array.isArray(activeIndex) && activeIndex.includes(0) ? '▼' : '▶'} File Upload Settings</span>
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(0)
+                  ? '▼'
+                  : '▶'}{' '}
+                File Upload Settings
+              </span>
             </div>
             {Array.isArray(activeIndex) && activeIndex.includes(0) && (
               <div className="settings-section-content">
@@ -130,25 +143,35 @@ function Settings(): JSX.Element {
                     min="1"
                     max="10240"
                     value={maxFileSizeMB}
-                    onChange={(e) => setMaxFileSizeMB(parseInt(e.target.value))}
+                    onChange={e => setMaxFileSizeMB(parseInt(e.target.value))}
                     disabled={isSaving}
                   />
-                  <span className="settings-help">Maximum size for 3D model files (1-10240 MB)</span>
-                  <span className="settings-default">Default: 1024 MB (1 GB)</span>
+                  <span className="settings-help">
+                    Maximum size for 3D model files (1-10240 MB)
+                  </span>
+                  <span className="settings-default">
+                    Default: 1024 MB (1 GB)
+                  </span>
                 </div>
 
                 <div className="settings-field">
-                  <label htmlFor="maxThumbnailSize">Maximum Thumbnail Size (MB)</label>
+                  <label htmlFor="maxThumbnailSize">
+                    Maximum Thumbnail Size (MB)
+                  </label>
                   <input
                     id="maxThumbnailSize"
                     type="number"
                     min="1"
                     max="100"
                     value={maxThumbnailSizeMB}
-                    onChange={(e) => setMaxThumbnailSizeMB(parseInt(e.target.value))}
+                    onChange={e =>
+                      setMaxThumbnailSizeMB(parseInt(e.target.value))
+                    }
                     disabled={isSaving}
                   />
-                  <span className="settings-help">Maximum size for thumbnail images (1-100 MB)</span>
+                  <span className="settings-help">
+                    Maximum size for thumbnail images (1-100 MB)
+                  </span>
                   <span className="settings-default">Default: 10 MB</span>
                 </div>
               </div>
@@ -156,11 +179,24 @@ function Settings(): JSX.Element {
           </div>
 
           <div className="settings-section">
-            <div 
+            <div
               className="settings-section-header"
-              onClick={() => setActiveIndex(prev => Array.isArray(prev) ? (prev.includes(1) ? prev.filter(i => i !== 1) : [...prev, 1]) : [1])}
+              onClick={() =>
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(1)
+                      ? prev.filter(i => i !== 1)
+                      : [...prev, 1]
+                    : [1]
+                )
+              }
             >
-              <span>{Array.isArray(activeIndex) && activeIndex.includes(1) ? '▼' : '▶'} Thumbnail Generation Settings</span>
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(1)
+                  ? '▼'
+                  : '▶'}{' '}
+                Thumbnail Generation Settings
+              </span>
             </div>
             {Array.isArray(activeIndex) && activeIndex.includes(1) && (
               <div className="settings-section-content">
@@ -169,12 +205,16 @@ function Settings(): JSX.Element {
                     <input
                       type="checkbox"
                       checked={generateThumbnailOnUpload}
-                      onChange={(e) => setGenerateThumbnailOnUpload(e.target.checked)}
+                      onChange={e =>
+                        setGenerateThumbnailOnUpload(e.target.checked)
+                      }
                       disabled={isSaving}
                     />
                     <span>Generate thumbnail on model upload</span>
                   </label>
-                  <span className="settings-help">Automatically generate thumbnails when uploading new models</span>
+                  <span className="settings-help">
+                    Automatically generate thumbnails when uploading new models
+                  </span>
                   <span className="settings-default">Default: Yes</span>
                 </div>
 
@@ -186,10 +226,14 @@ function Settings(): JSX.Element {
                     min="1"
                     max="360"
                     value={thumbnailFrameCount}
-                    onChange={(e) => setThumbnailFrameCount(parseInt(e.target.value))}
+                    onChange={e =>
+                      setThumbnailFrameCount(parseInt(e.target.value))
+                    }
                     disabled={isSaving}
                   />
-                  <span className="settings-help">Number of frames in thumbnail animation (1-360)</span>
+                  <span className="settings-help">
+                    Number of frames in thumbnail animation (1-360)
+                  </span>
                   <span className="settings-default">Default: 30 frames</span>
                 </div>
 
@@ -202,10 +246,14 @@ function Settings(): JSX.Element {
                     max="2"
                     step="0.1"
                     value={thumbnailCameraAngle}
-                    onChange={(e) => setThumbnailCameraAngle(parseFloat(e.target.value))}
+                    onChange={e =>
+                      setThumbnailCameraAngle(parseFloat(e.target.value))
+                    }
                     disabled={isSaving}
                   />
-                  <span className="settings-help">Camera height multiplier (0-2)</span>
+                  <span className="settings-help">
+                    Camera height multiplier (0-2)
+                  </span>
                   <span className="settings-default">Default: 0.75</span>
                 </div>
 
@@ -217,10 +265,12 @@ function Settings(): JSX.Element {
                     min="64"
                     max="2048"
                     value={thumbnailWidth}
-                    onChange={(e) => setThumbnailWidth(parseInt(e.target.value))}
+                    onChange={e => setThumbnailWidth(parseInt(e.target.value))}
                     disabled={isSaving}
                   />
-                  <span className="settings-help">Width in pixels (64-2048)</span>
+                  <span className="settings-help">
+                    Width in pixels (64-2048)
+                  </span>
                   <span className="settings-default">Default: 256 px</span>
                 </div>
 
@@ -232,10 +282,12 @@ function Settings(): JSX.Element {
                     min="64"
                     max="2048"
                     value={thumbnailHeight}
-                    onChange={(e) => setThumbnailHeight(parseInt(e.target.value))}
+                    onChange={e => setThumbnailHeight(parseInt(e.target.value))}
                     disabled={isSaving}
                   />
-                  <span className="settings-help">Height in pixels (64-2048)</span>
+                  <span className="settings-help">
+                    Height in pixels (64-2048)
+                  </span>
                   <span className="settings-default">Default: 256 px</span>
                 </div>
               </div>

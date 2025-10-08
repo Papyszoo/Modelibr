@@ -5,9 +5,7 @@ import { TexturePackDto, TextureType, Model } from '../../../types'
 import { getTextureTypeOptions } from '../../../utils/textureTypeUtils'
 import { useTexturePacks } from '../hooks/useTexturePacks'
 import TextureTypeDropdown from './TextureTypeDropdown'
-import FileSelectionTable, {
-  FileOption,
-} from './FileSelectionTable'
+import FileSelectionTable, { FileOption } from './FileSelectionTable'
 import NoTextureTypesWarning from './NoTextureTypesWarning'
 import AddTextureFooter from './AddTextureFooter'
 import './dialogs.css'

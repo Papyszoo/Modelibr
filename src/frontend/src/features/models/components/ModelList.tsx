@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import './ModelList.css'
+// eslint-disable-next-line no-restricted-imports -- ModelList needs direct API access for fetching models
 import ApiClient from '../../../services/ApiClient'
 import { Toast } from 'primereact/toast'
-import { useFileUpload, useDragAndDrop } from '../../../shared/hooks/useFileUpload'
+import {
+  useFileUpload,
+  useDragAndDrop,
+} from '../../../shared/hooks/useFileUpload'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { TabContextValue } from '../../../contexts/TabContext'
 import { Model } from '../../../utils/fileUtils'
