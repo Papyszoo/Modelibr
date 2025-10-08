@@ -14,7 +14,7 @@ A modern 3D model file upload service built with .NET 9.0 and React, featuring h
 - **3D Model Support**: Support for popular 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
 - **Hash-based Deduplication**: Intelligent storage system that prevents duplicate files
 - **Interactive 3D Viewer**: Real-time 3D model rendering with Three.js TSL (Three.js Shading Language)
-- **Real-time Thumbnail Processing**: SignalR-based queue system with Node.js worker service
+- **Reliable Thumbnail Processing**: Polling-based queue system with Node.js worker service for sequential processing
 - **Clean Architecture**: Well-structured backend following SOLID principles and DDD patterns
 - **Modern React Frontend**: Responsive UI with PrimeReact components and advanced state management
 - **Containerized Deployment**: Full Docker support with multi-service orchestration
@@ -76,12 +76,11 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 - Docker & Docker Compose
 - PostgreSQL 16
 - nginx for production frontend serving
-- SignalR for real-time worker coordination
 
 **Thumbnail Processing:**
 - Node.js worker service with Three.js rendering
-- Real-time queue system with SignalR notifications
-- Multiple worker support with load balancing
+- Polling-based queue system for reliable sequential processing
+- Multiple worker support with distributed job claiming
 
 ## 🚀 Getting Started
 
