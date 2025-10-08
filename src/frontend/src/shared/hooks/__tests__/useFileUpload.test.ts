@@ -3,7 +3,10 @@ import { useFileUpload, useDragAndDrop } from '../useFileUpload'
 
 // Mock ApiClient
 jest.mock('../../../services/ApiClient', () => ({
-  uploadModel: jest.fn(),
+  __esModule: true,
+  default: {
+    uploadModel: jest.fn(),
+  },
 }))
 
 // Mock fileUtils

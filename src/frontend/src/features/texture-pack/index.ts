@@ -6,4 +6,3 @@ export { default as TexturePackDetailDialog } from './dialogs/TexturePackDetailD
 export { default as AddTextureToPackDialog } from './dialogs/AddTextureToPackDialog'
 export { default as ModelAssociationDialog } from './dialogs/ModelAssociationDialog'
 export { useTexturePacks } from './hooks/useTexturePacks'
-export { texturePacksApi } from './api/texturePacksApi'

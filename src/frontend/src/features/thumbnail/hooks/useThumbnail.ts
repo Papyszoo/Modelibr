@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ThumbnailStatus } from '../../../services/ApiClient'
-import { thumbnailApi } from '../api/thumbnailApi'
+import ApiClient, { ThumbnailStatus } from '../../../services/ApiClient'
 
 export function useThumbnail(modelId: string) {
   const [thumbnailDetails, setThumbnailDetails] =
@@ -9,12 +8,12 @@ export function useThumbnail(modelId: string) {
 
   useEffect(() => {
     const fetchThumbnailDetails = async () => {
-      const details = await thumbnailApi.getThumbnailStatus(modelId)
+      const details = await ApiClient.getThumbnailStatus(modelId)
       setThumbnailDetails(details)
 
       // Use direct URL to leverage browser caching instead of fetching blob
       if (details?.status === 'Ready') {
-        setImgSrc(thumbnailApi.getThumbnailUrl(modelId))
+        setImgSrc(ApiClient.getThumbnailUrl(modelId))
       } else {
         setImgSrc(null)
       }
