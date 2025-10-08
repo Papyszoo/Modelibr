@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { modelsApi } from '../api/modelsApi'
-import { isSupportedModelFormat, isThreeJSRenderable } from '../../../utils/fileUtils'
+import { modelsApi } from '../../features/models/api/modelsApi'
+import { isSupportedModelFormat, isThreeJSRenderable } from '../../utils/fileUtils'
 
 /**
  * Custom hook for handling file uploads with validation and progress tracking

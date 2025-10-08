@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import { Canvas } from '@react-three/fiber'
-import Scene from './components/Scene'
-import ModelInfoWindow from './components/ModelInfoWindow'
-import ThumbnailWindow from './components/ThumbnailWindow'
-import ModelHierarchyWindow from './components/ModelHierarchyWindow'
-import ViewerSettingsWindow from './components/ViewerSettingsWindow'
-import { ViewerSettingsType } from './components/ViewerSettings'
-import { ModelProvider } from './contexts/ModelContext'
-import { getModelFileFormat, Model } from './utils/fileUtils'
-import ApiClient from './services/ApiClient'
+import ModelPreviewScene from './ModelPreviewScene'
+import ModelInfoWindow from './ModelInfoWindow'
+import ThumbnailWindow from './ThumbnailWindow'
+import ModelHierarchyWindow from './ModelHierarchyWindow'
+import ViewerSettingsWindow from './ViewerSettingsWindow'
+import { ViewerSettingsType } from './ViewerSettings'
+import { ModelProvider } from '../../../contexts/ModelContext'
+import { getModelFileFormat, Model } from '../../../utils/fileUtils'
+import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import './ModelViewer.css'
@@ -173,7 +173,7 @@ function ModelViewer({
               }}
               dpr={Math.min(window.devicePixelRatio, 2)}
             >
-              <Scene model={model} settings={viewerSettings} />
+              <ModelPreviewScene model={model} settings={viewerSettings} />
             </Canvas>
           )}
         </div>

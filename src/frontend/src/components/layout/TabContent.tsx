@@ -1,5 +1,5 @@
 import { ModelList } from '../../features/models'
-import ModelViewer from '../../ModelViewer'
+import { ModelViewer } from '../../features/model-viewer'
 import TextureList from '../tabs/TextureList'
 import { TexturePackList, TexturePackViewer } from '../../features/texture-pack'
 import AnimationList from '../tabs/AnimationList'

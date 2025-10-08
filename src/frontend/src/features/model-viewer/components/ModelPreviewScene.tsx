@@ -1,10 +1,10 @@
 import { JSX, Suspense } from 'react'
 import { Stage, OrbitControls } from '@react-three/drei'
 import Model from './Model'
-import LoadingPlaceholder from './LoadingPlaceholder'
+import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 // eslint-disable-next-line no-restricted-imports
-import ApiClient from '../services/ApiClient'
-import { Model as ModelType } from '../utils/fileUtils'
+import ApiClient from '../../../services/ApiClient'
+import { Model as ModelType } from '../../../utils/fileUtils'
 import { ViewerSettingsType } from './ViewerSettings'
 
 interface SceneProps {
