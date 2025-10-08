@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import ApiClient from '../../services/ApiClient'
+import apiClient from '../../services/ApiClient'
 import './Settings.css'
 
 interface SettingsData {
@@ -11,8 +11,6 @@ interface SettingsData {
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
 }
-
-const apiClient = new ApiClient()
 
 function Settings(): JSX.Element {
   const [settings, setSettings] = useState<SettingsData | null>(null)
