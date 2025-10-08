@@ -282,17 +282,13 @@ The frontend includes Storybook for interactive component documentation and deve
 - **Components/ModelInfo**: Model information display with TSL rendering features
 - **Components/ThumbnailDisplay**: Thumbnail display states (ready, processing, failed, placeholder)
 - **Components/Model List/EmptyState**: Empty state for model library
-- **Components/Model List/ErrorState**: Error handling states
+- **Components/Model List/ErrorState**: Error handling component for testing different error scenarios
 
 ### Screenshots
 
 **ModelInfo Component Documentation**
 ![Storybook ModelInfo](https://github.com/user-attachments/assets/c191f88b-9b39-45c0-bfa9-8f8d34efe1ed)
-*Interactive documentation showing ModelInfo component with controls for different model types*
-
-**ErrorState Component Examples**
-![Storybook ErrorState](https://github.com/user-attachments/assets/e2b4a2e0-f66d-4ea9-8e96-ec2bd3e0106d)
-*Error state component with different error scenarios and interactive controls*
+*Interactive documentation showing ModelInfo component with controls for different model types (OBJ, FBX, GLTF)*
 
 ### Running Storybook
 
