@@ -1,4 +1,4 @@
-import ThumbnailDisplay from './ThumbnailDisplay'
+import { ThumbnailDisplay } from '../features/thumbnail'
 import FloatingWindow from './FloatingWindow'
 import { Model } from '../utils/fileUtils'
 import { Button } from 'primereact/button'

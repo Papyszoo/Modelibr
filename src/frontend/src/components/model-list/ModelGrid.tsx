@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import './ModelGrid.css'
-import ThumbnailDisplay from '../ThumbnailDisplay'
+import { ThumbnailDisplay } from '../../features/thumbnail'
 import { Model } from '../../utils/fileUtils'
 
 interface ModelGridProps {
