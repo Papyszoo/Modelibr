@@ -8,6 +8,7 @@ import ViewerSettingsWindow from './ViewerSettingsWindow'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
 import { getModelFileFormat, Model } from '../../../utils/fileUtils'
+// eslint-disable-next-line no-restricted-imports -- ModelViewer needs direct API access for fetching model data
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'

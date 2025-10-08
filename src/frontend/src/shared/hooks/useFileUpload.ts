@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import ApiClient, { UploadModelResponse } from '../../services/ApiClient'
-import { isSupportedModelFormat, isThreeJSRenderable } from '../../utils/fileUtils'
+import ApiClient from '../../services/ApiClient'
+import {
+  isSupportedModelFormat,
+  isThreeJSRenderable,
+} from '../../utils/fileUtils'
 
 /**
  * Custom hook for handling file uploads with validation and progress tracking
