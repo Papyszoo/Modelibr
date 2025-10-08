@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Tab } from '../../types'
 import DockBar from './dock-panel/DockBar'
 import DockEmptyState from './dock-panel/DockEmptyState'
@@ -33,7 +34,19 @@ function DockPanel({
   setDraggedTab,
   moveTabBetweenPanels,
 }: DockPanelProps): JSX.Element {
+  // Track recently closed tabs (max 5)
+  const [recentlyClosedTabs, setRecentlyClosedTabs] = useState<Tab[]>([])
+
   const addTab = (type: Tab['type'], title: string): void => {
+    // Check if tab already exists on this side
+    const existingTab = tabs.find(tab => tab.type === type)
+    
+    if (existingTab) {
+      // Make existing tab active instead of adding duplicate
+      setActiveTab(existingTab.id)
+      return
+    }
+
     const newTab: Tab = {
       id: type,
       type,
@@ -45,9 +58,36 @@ function DockPanel({
     setActiveTab(newTab.id)
   }
 
+  const reopenTab = (tab: Tab): void => {
+    // Check if tab already exists on this side
+    const existingTab = tabs.find(t => t.id === tab.id || t.type === tab.type)
+    
+    if (existingTab) {
+      // Make existing tab active instead of adding duplicate
+      setActiveTab(existingTab.id)
+    } else {
+      // Add the tab back
+      const newTabs = [...tabs, tab]
+      setTabs(newTabs)
+      setActiveTab(tab.id)
+    }
+    
+    // Remove from recently closed
+    setRecentlyClosedTabs(prev => prev.filter(t => t.id !== tab.id))
+  }
+
   const closeTab = (tabId: string): void => {
+    const closedTab = tabs.find(tab => tab.id === tabId)
     const newTabs = tabs.filter(tab => tab.id !== tabId)
     setTabs(newTabs)
+
+    // Add to recently closed tabs (max 5)
+    if (closedTab) {
+      setRecentlyClosedTabs(prev => {
+        const updated = [closedTab, ...prev.filter(t => t.id !== closedTab.id)]
+        return updated.slice(0, 5) // Keep only last 5
+      })
+    }
 
     // If the closed tab was active, switch to the first available tab
     if (activeTab === tabId) {
@@ -117,6 +157,8 @@ function DockPanel({
         onTabDragStart={handleTabDragStart}
         onTabDragEnd={handleTabDragEnd}
         onAddTab={addTab}
+        recentlyClosedTabs={recentlyClosedTabs}
+        onReopenTab={reopenTab}
         onDrop={handleDropOnOtherPanel}
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}

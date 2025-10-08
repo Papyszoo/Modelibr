@@ -14,6 +14,8 @@ interface DockBarProps {
   onTabDragStart: (tab: Tab) => void
   onTabDragEnd: () => void
   onAddTab: (type: Tab['type'], title: string) => void
+  recentlyClosedTabs: Tab[]
+  onReopenTab: (tab: Tab) => void
   onDrop: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
@@ -29,6 +31,8 @@ export default function DockBar({
   onTabDragStart,
   onTabDragEnd,
   onAddTab,
+  recentlyClosedTabs,
+  onReopenTab,
   onDrop,
   onDragOver,
   onDragEnter,
@@ -68,6 +72,20 @@ export default function DockBar({
     },
   ]
 
+  // Add recently closed tabs to menu if any exist
+  if (recentlyClosedTabs.length > 0) {
+    addMenuItems.push(
+      {
+        separator: true,
+      },
+      ...recentlyClosedTabs.map(tab => ({
+        label: `Reopen: ${tab.label || tab.type}`,
+        icon: 'pi pi-history',
+        command: () => onReopenTab(tab),
+      }))
+    )
+  }
+
   return (
     <div
       className={`dock-bar dock-bar-${side}`}
@@ -98,7 +116,6 @@ export default function DockBar({
           icon="pi pi-plus"
           className="p-button-text p-button-rounded dock-add-button"
           onClick={e => menuRef.current?.toggle(e)}
-          tooltip="Add new tab"
         />
         <Menu
           model={addMenuItems}
