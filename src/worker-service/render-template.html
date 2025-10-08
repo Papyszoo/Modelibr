@@ -266,6 +266,38 @@
             return Math.floor(count);
         }
 
+        // Clear the scene by removing the previous model
+        function clearScene() {
+            if (window.modelRenderer.model && window.modelRenderer.scene) {
+                // Remove the model from the scene
+                window.modelRenderer.scene.remove(window.modelRenderer.model);
+                
+                // Dispose of geometries and materials to free memory
+                window.modelRenderer.model.traverse((child) => {
+                    if (child.isMesh) {
+                        if (child.geometry) {
+                            child.geometry.dispose();
+                        }
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(material => material.dispose());
+                            } else {
+                                child.material.dispose();
+                            }
+                        }
+                    }
+                });
+                
+                // Clear the model reference
+                window.modelRenderer.model = null;
+                window.modelRenderer.isReady = false;
+                
+                console.log('Scene cleared successfully');
+                return true;
+            }
+            return false;
+        }
+
         // Expose THREE and API for Puppeteer
         window.THREE = THREE;
         window.initRenderer = initScene;
@@ -275,6 +307,7 @@
         window.renderScene = renderScene;
         window.getCanvasDataURL = getCanvasDataURL;
         window.countPolygons = countPolygons;
+        window.clearScene = clearScene;
 
         console.log('3D Renderer initialized and ready');
     </script>

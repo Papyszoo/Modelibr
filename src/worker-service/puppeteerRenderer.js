@@ -149,6 +149,18 @@ export class PuppeteerRenderer {
     logger.debug('Loading model in browser', { filePath, fileType })
 
     try {
+      // Clear any previously loaded model from the scene
+      const cleared = await this.page.evaluate(() => {
+        if (typeof window.clearScene === 'function') {
+          return window.clearScene()
+        }
+        return false
+      })
+
+      if (cleared) {
+        logger.debug('Previous model cleared from scene')
+      }
+
       // Read the file and convert to data URL
       const fileBuffer = fs.readFileSync(filePath)
       const base64Data = fileBuffer.toString('base64')
