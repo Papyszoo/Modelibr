@@ -1,16 +1,18 @@
 import { JSX, Suspense } from 'react'
-import { OrbitControls } from '@react-three/drei'
+import { Stage, OrbitControls } from '@react-three/drei'
 import Model from './Model'
 import LoadingPlaceholder from './LoadingPlaceholder'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../services/ApiClient'
 import { Model as ModelType } from '../utils/fileUtils'
+import { ViewerSettingsType } from './ViewerSettings'
 
 interface SceneProps {
   model: ModelType
+  settings?: ViewerSettingsType
 }
 
-function Scene({ model }: SceneProps): JSX.Element {
+function Scene({ model, settings }: SceneProps): JSX.Element {
   // Find the first renderable file
   const renderableFile =
     model.files?.find(f => f.isRenderable) || model.files?.[0]
@@ -30,44 +32,43 @@ function Scene({ model }: SceneProps): JSX.Element {
     .toLowerCase()
   const modelUrl = ApiClient.getFileUrl(renderableFile.id)
 
+  // Default settings if not provided
+  const orbitSpeed = settings?.orbitSpeed ?? 1
+  const zoomSpeed = settings?.zoomSpeed ?? 1
+  const panSpeed = settings?.panSpeed ?? 1
+  const modelRotationSpeed = settings?.modelRotationSpeed ?? 0.002
+  const showShadows = settings?.showShadows ?? true
+
   return (
     <>
-      {/* Enhanced lighting setup for TSL-style rendering */}
-      <ambientLight intensity={0.3} />
-      <directionalLight
-        position={[10, 10, 5]}
-        intensity={1.0}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-      />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} />
-      <spotLight
-        position={[0, 10, 0]}
-        angle={0.3}
-        penumbra={1}
-        intensity={0.8}
-        castShadow
-      />
-
-      {/* Model with TSL-inspired shading */}
-      <Suspense fallback={<LoadingPlaceholder />}>
-        <Model modelUrl={modelUrl} fileExtension={fileExtension} />
-      </Suspense>
-
-      {/* Ground plane with receiving shadows */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow>
-        <planeGeometry args={[10, 10]} />
-        <meshStandardMaterial color="#f0f0f0" metalness={0.0} roughness={0.8} />
-      </mesh>
+      {/* Stage provides automatic lighting, shadows, and environment */}
+      <Stage
+        intensity={0.5}
+        environment="city"
+        shadows={
+          showShadows ? { type: 'contact', opacity: 0.4, blur: 2 } : false
+        }
+        adjustCamera={false}
+      >
+        <Suspense fallback={<LoadingPlaceholder />}>
+          <Model
+            modelUrl={modelUrl}
+            fileExtension={fileExtension}
+            rotationSpeed={modelRotationSpeed}
+          />
+        </Suspense>
+      </Stage>
 
       {/* Orbit controls for interaction */}
       <OrbitControls
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
-        maxDistance={10}
-        minDistance={0.5}
+        maxDistance={50}
+        minDistance={0.1}
+        rotateSpeed={orbitSpeed}
+        zoomSpeed={zoomSpeed}
+        panSpeed={panSpeed}
       />
     </>
   )

@@ -1,15 +1,15 @@
 # Scene
 
-Three.js scene component with lighting, controls, and 3D model rendering.
+Three.js scene component using Stage from @react-three/drei for automatic lighting and camera setup.
 
 ## Purpose
 
 Provides the 3D scene setup for model viewing:
-- Enhanced lighting with TSL-style rendering
-- Shadow mapping
+- Automatic lighting using Stage component from @react-three/drei
+- Environment mapping for realistic reflections
+- Shadow mapping with accumulative shadows
 - Orbit controls for interaction
-- Ground plane with shadows
-- Model rendering
+- Automatic camera positioning and model centering
 
 ## Import
 
@@ -25,20 +25,25 @@ import Scene from '../components/Scene'
 
 ## Features
 
-### Lighting Setup
+### Stage Component
 
-- **Ambient Light**: Soft overall illumination (intensity: 0.3)
-- **Directional Light**: Main light source with shadows (intensity: 1.0)
-- **Spot Light**: Focused lighting (intensity: 0.8)
-- **Point Light**: Fill light from behind (intensity: 0.5)
+The scene uses the `Stage` component from `@react-three/drei` which provides:
+- **Automatic Lighting**: Preset lighting configuration optimized for model display
+- **Environment Mapping**: HDR environment map for realistic reflections (`city` preset)
+- **Shadow System**: Accumulative shadow mapping for high-quality shadows
+- **Camera Auto-fit**: Automatically adjusts camera to fit the model in view
 
-### Shadow Mapping
-
-High-quality shadow configuration:
-- Shadow map size: 2048x2048
-- Soft shadows with penumbra
-- Ground plane receives shadows
-- Models cast shadows
+Stage configuration:
+```typescript
+<Stage
+  intensity={0.5}
+  environment="city"
+  shadows={{ type: 'accumulative', bias: -0.001 }}
+  adjustCamera={1.2}
+>
+  {/* Model content */}
+</Stage>
+```
 
 ### Orbit Controls
 
@@ -109,48 +114,14 @@ function CustomCameraViewer({ model }) {
 
 ## Lighting Configuration
 
-### Ambient Light
+The scene uses the `Stage` component from `@react-three/drei` which provides automatic lighting setup. Stage handles:
 
-```typescript
-<ambientLight intensity={0.3} />
-```
-Provides base illumination for the entire scene.
+- Preset lighting optimized for 3D model display
+- Environment map for realistic reflections and ambient light
+- Configurable intensity (set to 0.5 for balanced lighting)
+- Shadow system with accumulative shadows
 
-### Directional Light
-
-```typescript
-<directionalLight
-  position={[10, 10, 5]}
-  intensity={1.0}
-  castShadow
-  shadow-mapSize-width={2048}
-  shadow-mapSize-height={2048}
-/>
-```
-Main light source with high-quality shadows.
-
-### Spot Light
-
-```typescript
-<spotLight
-  position={[0, 10, 0]}
-  angle={0.3}
-  penumbra={1}
-  intensity={0.8}
-  castShadow
-/>
-```
-Focused overhead light with soft edges.
-
-### Point Light
-
-```typescript
-<pointLight 
-  position={[-10, -10, -10]} 
-  intensity={0.5} 
-/>
-```
-Fill light from below and behind.
+This eliminates the need for manual light setup and provides consistent, high-quality lighting across all models.
 
 ## Model Selection
 
@@ -168,25 +139,12 @@ Priority:
 
 ## Ground Plane
 
-```typescript
-<mesh 
-  rotation={[-Math.PI / 2, 0, 0]} 
-  position={[0, -2, 0]} 
-  receiveShadow
->
-  <planeGeometry args={[10, 10]} />
-  <meshStandardMaterial 
-    color="#f0f0f0" 
-    metalness={0.0} 
-    roughness={0.8} 
-  />
-</mesh>
-```
+The Stage component handles the environment and ground automatically. No manual ground plane is needed as Stage provides:
+- Automatic floor shadows
+- Environment reflection on the floor
+- Proper shadow catching surface
 
-- Size: 10x10 units
-- Position: 2 units below origin
-- Receives shadows from models
-- Light gray matte finish
+This simplifies the scene setup and provides better visual results.
 
 ## Orbit Controls
 
@@ -264,9 +222,10 @@ new THREE.MeshStandardMaterial({
 ## Performance Considerations
 
 - **Suspense**: Models load asynchronously
-- **Shadow Quality**: High resolution (2048x2048) but optimized
-- **Lighting**: Balanced number of lights for performance
-- **LOD**: Large models are automatically scaled to fit
+- **Stage Component**: Optimized lighting and shadow system
+- **Automatic Scaling**: Stage automatically scales and centers models
+- **Environment Caching**: Environment maps are cached for performance
+- **Shadow Accumulation**: High-quality shadows without performance penalty
 
 ## Complete Example
 
@@ -316,5 +275,6 @@ export default ModelViewer
 - [Model](./Model.md) - 3D model loader component
 - [LoadingPlaceholder](./LoadingPlaceholder.md) - Loading indicator
 - [ModelViewer](./ModelViewer.md) - Parent viewer component
+- [Stage](https://github.com/pmndrs/drei#stage) - drei Stage component
 - [OrbitControls](https://github.com/pmndrs/drei#controls) - drei controls
 - [ApiClient](../services/ApiClient.md) - File URL generation

@@ -8,15 +8,21 @@ import LoadingPlaceholder from './LoadingPlaceholder'
 import { useModelObject } from '../hooks/useModelObject'
 
 // Separate components for each model type to avoid conditional hooks
-function OBJModel({ modelUrl }: { modelUrl: string }) {
+function OBJModel({
+  modelUrl,
+  rotationSpeed,
+}: {
+  modelUrl: string
+  rotationSpeed: number
+}) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
 
-  // Rotate the model slowly
+  // Rotate the model with configurable speed
   useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += 0.002
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
     }
   })
 
@@ -38,7 +44,7 @@ function OBJModel({ modelUrl }: { modelUrl: string }) {
         }
       })
 
-      // Center and scale the model - only once
+      // Center and scale the model to consistent size
       const box = new THREE.Box3().setFromObject(model)
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
@@ -70,15 +76,21 @@ function OBJModel({ modelUrl }: { modelUrl: string }) {
   return <LoadingPlaceholder />
 }
 
-function GLTFModel({ modelUrl }: { modelUrl: string }) {
+function GLTFModel({
+  modelUrl,
+  rotationSpeed,
+}: {
+  modelUrl: string
+  rotationSpeed: number
+}) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
 
-  // Rotate the model slowly
+  // Rotate the model with configurable speed
   useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += 0.002
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
     }
   })
 
@@ -101,7 +113,7 @@ function GLTFModel({ modelUrl }: { modelUrl: string }) {
         }
       })
 
-      // Center and scale the model - only once
+      // Center and scale the model to consistent size
       const box = new THREE.Box3().setFromObject(model)
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
@@ -133,13 +145,13 @@ function GLTFModel({ modelUrl }: { modelUrl: string }) {
   return <LoadingPlaceholder />
 }
 
-function PlaceholderModel() {
+function PlaceholderModel({ rotationSpeed }: { rotationSpeed: number }) {
   const meshRef = useRef()
 
-  // Rotate the model slowly
+  // Rotate the model with configurable speed
   useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += 0.002
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
     }
   })
 
@@ -155,14 +167,18 @@ function PlaceholderModel() {
   )
 }
 
-function Model({ modelUrl, fileExtension }) {
+function Model({ modelUrl, fileExtension, rotationSpeed = 0.002 }) {
   return (
     <Suspense fallback={<LoadingPlaceholder />}>
-      {fileExtension === 'obj' && <OBJModel modelUrl={modelUrl} />}
-      {(fileExtension === 'gltf' || fileExtension === 'glb') && (
-        <GLTFModel modelUrl={modelUrl} />
+      {fileExtension === 'obj' && (
+        <OBJModel modelUrl={modelUrl} rotationSpeed={rotationSpeed} />
       )}
-      {!['obj', 'gltf', 'glb'].includes(fileExtension) && <PlaceholderModel />}
+      {(fileExtension === 'gltf' || fileExtension === 'glb') && (
+        <GLTFModel modelUrl={modelUrl} rotationSpeed={rotationSpeed} />
+      )}
+      {!['obj', 'gltf', 'glb'].includes(fileExtension) && (
+        <PlaceholderModel rotationSpeed={rotationSpeed} />
+      )}
     </Suspense>
   )
 }
