@@ -22,13 +22,19 @@ A modern 3D model file upload service built with .NET 9.0 and React, featuring h
 
 ## 📸 Screenshots
 
-### Modern Split-Pane Interface
-![Modern Interface](https://github.com/user-attachments/assets/b59bb31a-4a80-4b18-8acd-d013d5c18dca)
-*Modern tabbed workspace with integrated 3D model library, drag-and-drop upload, and multi-panel layout*
+> **📝 Note**: Screenshots are being updated. The previous screenshots showed error states from running the frontend without a backend. New screenshots showing the working application with uploaded models will be added soon.
+> 
+> To generate new screenshots:
+> 1. Run `docker compose up -d` 
+> 2. Access http://localhost:3000
+> 3. Upload a 3D model file (OBJ, FBX, GLTF, etc.)
+> 4. Take screenshots showing the working interface
 
-### Integrated Upload & Library
-![Upload Interface](https://github.com/user-attachments/assets/80a01d2f-17a2-4ce3-aad8-f15dce55ba2d)
-*Unified interface combining model upload via drag-and-drop with library management and tabbed workspace*
+<!-- TODO: Add screenshots of:
+- Modern Split-Pane Interface: Modern tabbed workspace with integrated 3D model library, drag-and-drop upload, and multi-panel layout
+- Integrated Upload & Library: Unified interface combining model upload via drag-and-drop with library management and tabbed workspace  
+- 3D Model Viewer: Interactive 3D viewer showing a loaded model with PBR materials
+-->
 
 ## 🏗️ Architecture
 
