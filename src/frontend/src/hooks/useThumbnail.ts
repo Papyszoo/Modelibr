@@ -10,35 +10,16 @@ export function useThumbnail(modelId: string) {
     const fetchThumbnailDetails = async () => {
       const details = await ApiClient.getThumbnailStatus(modelId)
       setThumbnailDetails(details)
-    }
-    fetchThumbnailDetails()
-  }, [modelId])
 
-  useEffect(() => {
-    let objectUrl: string | null = null
-
-    const fetchImg = async () => {
-      try {
-        const blob = await ApiClient.getThumbnailFile(modelId)
-        const url = URL.createObjectURL(blob)
-        objectUrl = url
-        setImgSrc(url)
-      } catch {
+      // Use direct URL to leverage browser caching instead of fetching blob
+      if (details?.status === 'Ready') {
+        setImgSrc(ApiClient.getThumbnailUrl(modelId))
+      } else {
         setImgSrc(null)
       }
     }
-
-    if (thumbnailDetails?.status === 'Ready') {
-      fetchImg()
-    }
-
-    // Cleanup the object URL when component unmounts or modelId changes
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
-      }
-    }
-  }, [modelId, thumbnailDetails?.status])
+    fetchThumbnailDetails()
+  }, [modelId])
 
   return { thumbnailDetails, imgSrc }
 }
