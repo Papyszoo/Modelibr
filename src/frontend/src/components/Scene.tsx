@@ -5,12 +5,14 @@ import LoadingPlaceholder from './LoadingPlaceholder'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../services/ApiClient'
 import { Model as ModelType } from '../utils/fileUtils'
+import { ViewerSettingsType } from './ViewerSettings'
 
 interface SceneProps {
   model: ModelType
+  settings?: ViewerSettingsType
 }
 
-function Scene({ model }: SceneProps): JSX.Element {
+function Scene({ model, settings }: SceneProps): JSX.Element {
   // Find the first renderable file
   const renderableFile =
     model.files?.find(f => f.isRenderable) || model.files?.[0]
@@ -30,6 +32,12 @@ function Scene({ model }: SceneProps): JSX.Element {
     .toLowerCase()
   const modelUrl = ApiClient.getFileUrl(renderableFile.id)
 
+  // Default settings if not provided
+  const cameraDistance = settings?.cameraDistance ?? 2.5
+  const orbitSpeed = settings?.orbitSpeed ?? 1
+  const zoomSpeed = settings?.zoomSpeed ?? 1
+  const panSpeed = settings?.panSpeed ?? 1
+
   return (
     <>
       {/* Stage provides automatic lighting, shadows, and camera positioning */}
@@ -37,7 +45,7 @@ function Scene({ model }: SceneProps): JSX.Element {
         intensity={0.5}
         environment="city"
         shadows={{ type: 'accumulative', bias: -0.001 }}
-        adjustCamera={1.2}
+        adjustCamera={cameraDistance}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
           <Model modelUrl={modelUrl} fileExtension={fileExtension} />
@@ -49,8 +57,11 @@ function Scene({ model }: SceneProps): JSX.Element {
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
-        maxDistance={10}
-        minDistance={0.5}
+        maxDistance={50}
+        minDistance={0.1}
+        rotateSpeed={orbitSpeed}
+        zoomSpeed={zoomSpeed}
+        panSpeed={panSpeed}
       />
     </>
   )

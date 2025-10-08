@@ -181,7 +181,7 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
             intensity={0.5}
             environment="city"
             shadows={{ type: 'accumulative', bias: -0.001 }}
-            adjustCamera={1.5}
+            adjustCamera={2.5}
           >
             <Suspense fallback={<LoadingPlaceholder />}>
               <TexturedGeometry
@@ -197,8 +197,8 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
-            maxDistance={15}
-            minDistance={2}
+            maxDistance={50}
+            minDistance={0.1}
           />
         </Canvas>
       </div>
