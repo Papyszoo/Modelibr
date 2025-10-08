@@ -145,8 +145,6 @@ npm run format      # Format with Prettier
 
 ## Troubleshooting
 
-**For comprehensive troubleshooting, see [worker/troubleshooting.md](worker/troubleshooting.md)** which includes detailed diagnostics for all issues below and more.
-
 ### Container Won't Start
 
 **"exec /app/docker-entrypoint.sh: no such file or directory"**
@@ -259,9 +257,9 @@ docker compose exec thumbnail-worker dpkg -l | grep -E 'libgl1|mesa'
 
 Check supported formats: `.obj`, `.fbx`, `.gltf`, `.glb`
 
-Test with sample file:
+Test with a simple .obj file:
 ```bash
-curl -F "file=@docs/sample-cube.obj" http://localhost:5009/models
+curl -F "file=@test-model.obj" http://localhost:5009/models
 ```
 
 **"Frame encoding failed"**
@@ -390,8 +388,8 @@ watch -n 5 'curl -s http://localhost:3001/status | jq ".worker,.system.memory"'
 # Test API connectivity
 node test-api-service.js
 
-# Test SignalR (browser)
-open docs/signalr-test.html
+# Test SignalR (use browser developer tools)
+# Connect to ws://localhost:5009/hubs/thumbnail-jobs
 ```
 
 ## Architecture
@@ -529,5 +527,5 @@ Include:
 ## Related Documentation
 
 - Worker README: `src/worker-service/README.md` - Quick reference
-- Backend API Integration: `docs/worker-api-integration.md` - API details
+- Backend API: `docs/BACKEND_API.md` - API reference
 - Project README: `README.md` - Full application setup

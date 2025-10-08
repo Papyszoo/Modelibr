@@ -453,7 +453,7 @@ if (import.meta.env.DEV) {
 - Check file format is supported
 - Verify API is running
 - Check browser console for errors
-- Test with `docs/sample-cube.obj`
+- Test with a simple .obj file
 
 **Thumbnails not showing**
 - Check thumbnail status: `ApiClient.getThumbnailStatus()`
@@ -464,22 +464,6 @@ if (import.meta.env.DEV) {
 - Clear `node_modules` and reinstall: `rm -rf node_modules && npm install`
 - Check TypeScript errors: `npm run type-check`
 - Verify all imports are correct
-
-## Documentation
-
-### Component Documentation
-Detailed component docs in `docs/frontend/components/`:
-- DockPanel, ModelList, Scene, ThumbnailDisplay, etc.
-
-### Hooks Documentation
-Hook docs in `docs/frontend/hooks/`:
-- useFileUpload, useTabContext, useTexturePacks, etc.
-
-### Architecture
-See `docs/frontend/ARCHITECTURE.md` for design patterns and best practices
-
-### Getting Started Guide
-See `docs/frontend/GETTING_STARTED.md` for comprehensive setup and examples
 
 ## Related Documentation
 
