@@ -7,6 +7,8 @@ A Node.js worker service for background thumbnail generation using Puppeteer and
 - **SignalR Real-time Queue**: Real-time job notifications via SignalR for instant processing
 - **Puppeteer-based Rendering**: Uses Puppeteer with headless Chrome to render 3D models in a real browser environment
 - **Three.js Integration**: Loads models from CDN and renders them with proper lighting and materials
+- **Frontend Scene Alignment**: Rendering setup matches frontend Stage component from React Three Drei for consistent previews
+- **Automatic Camera Positioning**: Smart camera distance calculation based on model size ensures optimal framing
 - **Orbit Animation**: Generates rotating orbit frames around the 3D model
 - **Animated WebP Thumbnails**: Creates looping animated WebP thumbnails from orbit frames (~30 frames)
 - **Event Logging**: Comprehensive event logging to database for full audit trail
@@ -40,7 +42,7 @@ The service is configured via environment variables. See `.env.example` for all 
 - `RENDER_HEIGHT`: Output image height in pixels (default: `256`)
 - `RENDER_FORMAT`: Output format: png, jpg, jpeg, webp (default: `png`)
 - `RENDER_BACKGROUND`: Background color (default: `#f0f0f0`)
-- `CAMERA_DISTANCE`: Camera distance from model (default: `5`)
+- `CAMERA_DISTANCE`: Base camera distance from model, used as fallback (default: `5`) - **Note: Camera distance is now calculated automatically based on model size**
 - `ENABLE_ANTIALIASING`: Enable antialiasing (default: `true`)
 
 ### Orbit Animation
@@ -49,7 +51,7 @@ The service is configured via environment variables. See `.env.example` for all 
 - `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `12`, resulting in ~30 frames for full 360° rotation)
 - `ORBIT_START_ANGLE`: Starting angle in degrees (default: `0`)
 - `ORBIT_END_ANGLE`: Ending angle in degrees (default: `360`)
-- `ORBIT_CAMERA_HEIGHT`: Vertical camera offset from center (default: `0`)
+- `ORBIT_CAMERA_HEIGHT`: Vertical camera offset from center, used as fallback (default: `0`) - **Note: Camera height is now calculated automatically (15% of model height)**
 
 ### Logging
 
