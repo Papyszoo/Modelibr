@@ -586,29 +586,26 @@ cp .env.example .env
 
 ### Documentation Structure
 
-The project maintains a **simplified, consolidated documentation structure**:
+The project maintains a **minimal documentation structure**:
 
-**Essential Documentation:**
+**Essential Documentation (ONLY):**
 - **README.md** - User-facing: Features, screenshots, quick start, basic usage
 - **.github/copilot-instructions.md** - Developer-focused: Build details, architecture, troubleshooting
-- **docs/BACKEND_API.md** - Complete backend API reference
-- **docs/FRONTEND.md** - Frontend development guide
-- **docs/WORKER.md** - Thumbnail worker service guide
-
-**Detailed Documentation:**
-- **docs/backend/endpoints/** - Individual endpoint documentation
-- **docs/frontend/** - Component, hook, service, and utility documentation  
-- **docs/worker/troubleshooting.md** - Comprehensive troubleshooting guide
+- **docs/BACKEND_API.md** - Backend API reference (minimal, essential information only)
+- **docs/FRONTEND.md** - Frontend development guide (minimal, essential information only)
+- **docs/WORKER.md** - Thumbnail worker service guide (minimal, essential information only)
 
 ### Guidelines for Documentation Updates
 
 **CRITICAL RULES:**
-1. **NEVER create new documentation files in the root folder** - The root folder should only contain README.md and CODE_QUALITY.md
-2. **NEVER create separate fix/summary documentation files** - Add to existing documentation only
-3. **Keep documentation minimal and focused** - Essential information for humans with short attention spans only
+1. **NEVER create new documentation files** - Use only the 5 files listed above
+2. **NEVER create files in the root folder** - Root folder should only contain README.md
+3. **NEVER create subdirectories in docs/** - Keep docs folder flat with only 3 files
+4. **Keep documentation MINIMAL** - Only essential information that developers absolutely need
+5. **Update existing documentation only** - Never create separate fix/summary/detail files
 
 #### When to Update Documentation
-Update existing docs when changes affect:
+Update existing docs **only** when changes affect:
 - Prerequisites or setup requirements
 - Build or test procedures
 - Environment variables or configuration
@@ -618,43 +615,46 @@ Update existing docs when changes affect:
 
 #### How to Document Fixes
 **Do NOT create separate fix documentation files.** Instead:
-1. **For worker issues:** Add to troubleshooting section in `docs/WORKER.md` or `docs/worker/troubleshooting.md`
+1. **For worker issues:** Add to troubleshooting section in `docs/WORKER.md`
 2. **For backend issues:** Update relevant section in `docs/BACKEND_API.md`
 3. **For frontend issues:** Update relevant section in `docs/FRONTEND.md`
 4. **For Docker issues:** Update Troubleshooting section in `README.md`
+5. **For architecture/build issues:** Update `.github/copilot-instructions.md`
 
 #### Content Separation
 - **README.md**: High-level, user-friendly, features and quick start
 - **copilot-instructions.md**: Detailed build/test commands, architecture patterns, essential developer info
-- **docs/*.md**: Comprehensive guides for each major component
-- **docs/*/**: Detailed reference documentation (endpoints, components, etc.)
+- **docs/BACKEND_API.md**: Backend API endpoints and usage (minimal)
+- **docs/FRONTEND.md**: Frontend development essentials (minimal)
+- **docs/WORKER.md**: Worker service essentials (minimal)
 
 ### Example of Good Documentation Organization
 
 ❌ **Don't do this:**
 ```
 # Creating files in root folder
+CODE_QUALITY.md
+test-thumbnail-api.sh
 CRASHPAD_FIX_SUMMARY.md
-THUMBNAIL_FIX.md
-DOCKER_SETUP.md
 
-# Creating separate fix documentation
-docs/worker/container-no-logs-fix.md
-docs/worker/entrypoint-line-endings-fix.md
-docs/worker/mesa-libraries-fix.md
-docs/worker/xvfb-startup-fix.md
-docs/worker/thumbnail-fix-summary.md
+# Creating subdirectories or detailed docs
+docs/README.md
+docs/backend/endpoints/models.md
+docs/frontend/components/ModelList.md
+docs/worker/troubleshooting.md
+docs/worker-api-integration.md
 ```
 
 ✅ **Do this instead:**
 ```
-# Keep root folder clean - only README.md and CODE_QUALITY.md
-# Consolidate all fixes into existing documentation
-docs/WORKER.md (includes common troubleshooting)
-docs/worker/troubleshooting.md (comprehensive guide)
+# Keep root folder clean - only README.md
+# Keep docs folder flat - only 3 essential files
+docs/BACKEND_API.md (all backend info, minimal)
+docs/FRONTEND.md (all frontend info, minimal)
+docs/WORKER.md (all worker info, minimal)
 ```
 
-All fixes are consolidated into the troubleshooting section with clear headings.
+All documentation is consolidated and minimal.
 
 ## Frontend Development Guidelines
 

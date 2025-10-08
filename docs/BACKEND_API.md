@@ -153,16 +153,9 @@ Texture types: `Albedo`, `Normal`, `Metallic`, `Roughness`, `AmbientOcclusion`, 
 curl -X POST http://localhost:5009/texture-packs/1/models/5
 ```
 
-## Detailed Endpoint Documentation
+## Endpoint Details
 
-See `docs/backend/endpoints/` for detailed documentation of each endpoint:
-
-- **[models.md](backend/endpoints/models.md)** - Model upload and management
-- **[files.md](backend/endpoints/files.md)** - File download
-- **[thumbnails.md](backend/endpoints/thumbnails.md)** - Thumbnail operations
-- **[texture-packs.md](backend/endpoints/texture-packs.md)** - Texture pack CRUD
-- **[thumbnail-jobs.md](backend/endpoints/thumbnail-jobs.md)** - Worker job API
-- **[models-query.md](backend/endpoints/models-query.md)** - Advanced queries
+See the Quick Reference section above for all available endpoints. Each endpoint follows RESTful conventions with consistent error handling and response formats.
 
 ## Architecture Overview
 
@@ -337,8 +330,8 @@ dotnet test tests/WebApi.Tests
 
 ### Manual Testing
 ```bash
-# Upload test model
-curl -X POST -F "file=@docs/sample-cube.obj" http://localhost:5009/models
+# Upload test model (create your own test .obj file)
+curl -X POST -F "file=@test-model.obj" http://localhost:5009/models
 
 # Verify upload
 curl http://localhost:5009/models
@@ -411,4 +404,3 @@ Response:
 - **Clean Architecture Guide:** See `.github/copilot-instructions.md` for detailed DDD/Clean Architecture patterns
 - **Project README:** `README.md` for full application setup
 - **Worker Service:** `docs/WORKER.md` for thumbnail worker documentation
-- **Worker API Integration:** `docs/worker-api-integration.md` for worker-specific API details

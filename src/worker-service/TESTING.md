@@ -84,7 +84,7 @@ docker compose logs thumbnail-worker --tail=50
 3. Restart the container: `docker compose up -d thumbnail-worker`
 4. Run the crashpad test: `docker compose exec thumbnail-worker node test-crashpad-fix.js`
 
-See [docs/worker/troubleshooting.md](../../docs/worker/troubleshooting.md#chrome_crashpad_handler---database-is-required) for detailed information.
+See [Worker documentation](../../docs/WORKER.md) for more information.
 
 ### "Failed to launch the browser process"
 **Cause**: Chrome/Chromium not installed or not found
@@ -125,6 +125,6 @@ Add these tests to your CI/CD pipeline:
 
 ## Related Documentation
 
-- [Worker Service Troubleshooting](../../docs/worker/troubleshooting.md)
+- [Worker Service Documentation](../../docs/WORKER.md)
 - [Puppeteer Migration Guide](./PUPPETEER_MIGRATION.md)
 - [WebGL Fix Documentation](./WEBGL_FIX.md)
