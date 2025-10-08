@@ -211,7 +211,7 @@
   color: #ccc;
 }
 
-.settings-checkbox-label input[type="checkbox"] {
+.settings-checkbox-label input[type='checkbox'] {
   width: auto;
   cursor: pointer;
 }
