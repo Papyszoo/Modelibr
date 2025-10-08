@@ -230,6 +230,9 @@ export class PuppeteerRenderer {
         throw new Error('No model loaded')
       }
 
+      // Calculate optimal camera distance
+      const cameraDistance = await this.calculateOptimalCameraDistance()
+
       // Calculate frame count
       const angleRange = config.orbit.endAngle - config.orbit.startAngle
       const frameCount = Math.ceil(angleRange / config.orbit.angleStep)
@@ -239,13 +242,14 @@ export class PuppeteerRenderer {
         startAngle: config.orbit.startAngle,
         endAngle: config.orbit.endAngle,
         frameCount: frameCount,
-        note: 'Camera distance calculated automatically based on model size',
+        cameraDistance: cameraDistance,
+        cameraHeight: config.orbit.cameraHeight,
       })
 
       // Render frames at each orbit angle
       for (let i = 0; i < frameCount; i++) {
         const angle = config.orbit.startAngle + i * config.orbit.angleStep
-        const frameData = await this.renderFrame(angle, i)
+        const frameData = await this.renderFrame(angle, cameraDistance, i)
         frames.push(frameData)
 
         // Log progress every 10 frames or at the end
@@ -255,7 +259,6 @@ export class PuppeteerRenderer {
             framesCompleted: i + 1,
             totalFrames: frameCount,
             currentAngle: angle,
-            cameraDistance: frameData.cameraDistance,
             memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
             memoryTotalMB: Math.round(memoryUsage.heapTotal / 1024 / 1024),
           })
@@ -285,21 +288,20 @@ export class PuppeteerRenderer {
   /**
    * Render a single frame at a specific angle
    * @param {number} angle - Camera angle in degrees
+   * @param {number} distance - Camera distance from center
    * @param {number} frameIndex - Frame index for logging
    * @returns {Promise<Object>} Frame data object
    */
-  async renderFrame(angle, frameIndex) {
+  async renderFrame(angle, distance, frameIndex) {
     if (!this.page) {
       throw new Error('Renderer not initialized')
     }
 
     // Position camera and render in browser (async for WebGPU support)
-    // positionCamera now automatically calculates distance and height based on model size
     const result = await this.page.evaluate(
-      async (ang) => {
+      async (ang, dist, height) => {
         try {
-          // positionCamera now handles automatic distance/height calculation
-          const calculatedDistance = window.positionCamera(ang)
+          window.positionCamera(ang, dist, height)
           const rendered = await window.renderScene()
 
           if (!rendered) {
@@ -314,7 +316,6 @@ export class PuppeteerRenderer {
           return {
             success: true,
             dataUrl,
-            calculatedDistance,
             cameraPosition: {
               x: window.modelRenderer.camera.position.x,
               y: window.modelRenderer.camera.position.y,
@@ -326,7 +327,9 @@ export class PuppeteerRenderer {
           return { success: false, error: error.message }
         }
       },
-      angle
+      angle,
+      distance,
+      config.orbit.cameraHeight
     )
 
     if (!result.success) {
@@ -346,7 +349,6 @@ export class PuppeteerRenderer {
       size: buffer.length,
       timestamp: Date.now(),
       cameraPosition: result.cameraPosition,
-      cameraDistance: result.calculatedDistance,
       simulated: false,
       renderSettings: {
         backgroundColor: config.rendering.backgroundColor,
@@ -359,7 +361,6 @@ export class PuppeteerRenderer {
       angle,
       dataSize: buffer.length,
       cameraPos: result.cameraPosition,
-      cameraDistance: result.calculatedDistance,
     })
 
     return frameData
