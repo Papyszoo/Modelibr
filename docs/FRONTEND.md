@@ -155,20 +155,39 @@ function MyComponent() {
 
 ### Display 3D Model
 
+The app uses the `Stage` component from `@react-three/drei` for automatic scene setup with lighting, shadows, and camera positioning:
+
 ```typescript
 import { Canvas } from '@react-three/fiber'
+import { Stage, OrbitControls } from '@react-three/drei'
 import { Suspense } from 'react'
 import { Scene } from './components/Scene'
 
 function ModelViewer({ model }) {
   return (
-    <Canvas>
+    <Canvas shadows>
       <Suspense fallback={<LoadingPlaceholder />}>
-        <Scene model={model} />
+        <Stage
+          intensity={0.5}
+          environment="city"
+          shadows={{ type: 'accumulative', bias: -0.001 }}
+          adjustCamera={1.2}
+        >
+          <Scene model={model} />
+        </Stage>
+        <OrbitControls />
       </Suspense>
     </Canvas>
   )
 }
+```
+
+**Stage Component Benefits:**
+- Automatic lighting with HDR environment maps
+- High-quality accumulative shadows
+- Automatic camera positioning to fit models
+- Model centering and scaling handled automatically
+- No manual light setup required
 ```
 
 ### Manage Tabs
@@ -221,7 +240,7 @@ if (status.status === 'Ready') {
 ### 3D Rendering
 - **Three.js** - 3D rendering engine with TSL (Three.js Shading Language)
 - **React Three Fiber** - React renderer for Three.js
-- **React Three Drei** - Useful helpers for R3F
+- **React Three Drei** - Useful helpers for R3F (includes Stage component for automatic scene setup)
 
 ### UI Components
 - **PrimeReact** - UI component library
@@ -353,6 +372,7 @@ import 'primereact/resources/themes/lara-light-blue/theme.css'
 
 ### 3D Rendering
 - Always wrap Three.js components in `<Suspense>`
+- Use Stage component from drei for automatic scene setup (lighting, shadows, camera)
 - Dispose of geometries and materials on unmount
 - Use `<LoadingPlaceholder>` for loading states
 - Optimize for performance (avoid re-renders)

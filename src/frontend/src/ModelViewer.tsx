@@ -4,6 +4,8 @@ import Scene from './components/Scene'
 import ModelInfoWindow from './components/ModelInfoWindow'
 import ThumbnailWindow from './components/ThumbnailWindow'
 import ModelHierarchyWindow from './components/ModelHierarchyWindow'
+import ViewerSettingsWindow from './components/ViewerSettingsWindow'
+import { ViewerSettingsType } from './components/ViewerSettings'
 import { ModelProvider } from './contexts/ModelContext'
 import { getModelFileFormat, Model } from './utils/fileUtils'
 import ApiClient from './services/ApiClient'
@@ -30,6 +32,15 @@ function ModelViewer({
     useState<boolean>(false)
   const [hierarchyWindowVisible, setHierarchyWindowVisible] =
     useState<boolean>(false)
+  const [settingsWindowVisible, setSettingsWindowVisible] =
+    useState<boolean>(false)
+  const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
+    orbitSpeed: 1,
+    zoomSpeed: 1,
+    panSpeed: 1,
+    modelRotationSpeed: 0.002,
+    showShadows: true,
+  })
   const toast = useRef<Toast>(null)
 
   // Determine which side for button positioning
@@ -106,6 +117,15 @@ function ModelViewer({
           {/* Floating action buttons for sidebar controls */}
           <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
             <Button
+              icon="pi pi-cog"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() => setSettingsWindowVisible(!settingsWindowVisible)}
+              tooltip="Viewer Settings"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
+            <Button
               icon="pi pi-info-circle"
               className="p-button-rounded viewer-control-btn"
               onClick={() => setInfoWindowVisible(!infoWindowVisible)}
@@ -154,12 +174,19 @@ function ModelViewer({
               }}
               dpr={Math.min(window.devicePixelRatio, 2)}
             >
-              <Scene model={model} />
+              <Scene model={model} settings={viewerSettings} />
             </Canvas>
           )}
         </div>
 
         {/* Floating Windows */}
+        <ViewerSettingsWindow
+          visible={settingsWindowVisible}
+          onClose={() => setSettingsWindowVisible(false)}
+          side={side}
+          settings={viewerSettings}
+          onSettingsChange={setViewerSettings}
+        />
         <ModelInfoWindow
           visible={infoWindowVisible}
           onClose={() => setInfoWindowVisible(false)}
