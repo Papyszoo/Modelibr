@@ -37,15 +37,17 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
   const orbitSpeed = settings?.orbitSpeed ?? 1
   const zoomSpeed = settings?.zoomSpeed ?? 1
   const panSpeed = settings?.panSpeed ?? 1
+  const lockCamera = settings?.lockCamera ?? false
 
   return (
     <>
       {/* Stage provides automatic lighting, shadows, and camera positioning */}
       <Stage
+        key={lockCamera ? 'locked' : 'unlocked'}
         intensity={0.5}
         environment="city"
         shadows={{ type: 'accumulative', bias: -0.001 }}
-        adjustCamera={cameraDistance}
+        adjustCamera={lockCamera ? false : cameraDistance}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
           <Model modelUrl={modelUrl} fileExtension={fileExtension} />

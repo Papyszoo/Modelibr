@@ -39,6 +39,7 @@ function ModelViewer({
     orbitSpeed: 1,
     zoomSpeed: 1,
     panSpeed: 1,
+    lockCamera: false,
   })
   const toast = useRef<Toast>(null)
 

@@ -1,4 +1,5 @@
 import { Slider } from 'primereact/slider'
+import { InputSwitch } from 'primereact/inputswitch'
 import './ViewerSettings.css'
 
 export interface ViewerSettingsType {
@@ -6,6 +7,7 @@ export interface ViewerSettingsType {
   orbitSpeed: number
   zoomSpeed: number
   panSpeed: number
+  lockCamera: boolean
 }
 
 interface ViewerSettingsProps {
@@ -82,6 +84,19 @@ function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
             step={0.1}
           />
           <span className="setting-value">{settings.panSpeed.toFixed(1)}x</span>
+        </div>
+      </div>
+
+      <div className="setting-item">
+        <label>Lock Camera Position</label>
+        <div className="setting-control">
+          <InputSwitch
+            checked={settings.lockCamera}
+            onChange={e => handleChange('lockCamera', e.value ? 1 : 0)}
+          />
+          <span className="setting-description">
+            Prevent camera from auto-adjusting when windows open/close
+          </span>
         </div>
       </div>
 

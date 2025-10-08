@@ -32,6 +32,12 @@
   color: #64748b;
 }
 
+.setting-description {
+  font-size: 0.813rem;
+  color: #64748b;
+  font-style: italic;
+}
+
 .settings-hint {
   margin-top: 1.5rem;
   padding: 0.75rem;
