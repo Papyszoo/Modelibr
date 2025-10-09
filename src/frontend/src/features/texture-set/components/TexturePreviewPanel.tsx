@@ -4,9 +4,9 @@ import { Stage, OrbitControls } from '@react-three/drei'
 import { TextureSetDto } from '../../../types'
 import TexturedGeometry from './TexturedGeometry'
 import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
-import PreviewInfoWindow from './PreviewInfoWindow'
-import PreviewSettingsWindow from './PreviewSettingsWindow'
-import { PreviewSettingsType } from './PreviewSettings'
+import FloatingWindow from '../../../components/FloatingWindow'
+import PreviewInfo from './PreviewInfo'
+import PreviewSettings, { PreviewSettingsType } from './PreviewSettings'
 import { Button } from 'primereact/button'
 import './TexturePreviewPanel.css'
 
@@ -107,20 +107,30 @@ function TexturePreviewPanel({ textureSet }: TexturePreviewPanelProps) {
       </div>
 
       {/* Floating Windows */}
-      <PreviewSettingsWindow
+      <FloatingWindow
         visible={settingsWindowVisible}
         onClose={() => setSettingsWindowVisible(false)}
+        title="Preview Settings"
         side="left"
-        settings={previewSettings}
-        onSettingsChange={setPreviewSettings}
-      />
-      <PreviewInfoWindow
+        windowId="preview-settings"
+      >
+        <PreviewSettings
+          settings={previewSettings}
+          onSettingsChange={setPreviewSettings}
+        />
+      </FloatingWindow>
+      <FloatingWindow
         visible={infoWindowVisible}
         onClose={() => setInfoWindowVisible(false)}
+        title="Preview Information"
         side="left"
-        textureSet={textureSet}
-        geometryType={previewSettings.type}
-      />
+        windowId="preview-info"
+      >
+        <PreviewInfo
+          textureSet={textureSet}
+          geometryType={previewSettings.type}
+        />
+      </FloatingWindow>
     </div>
   )
 }
