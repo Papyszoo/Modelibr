@@ -102,15 +102,15 @@ function TextureSetList() {
       <ConfirmDialog />
 
       <TextureSetListHeader
-        packCount={textureSets.length}
-        onCreatePack={() => setShowCreateDialog(true)}
+        setCount={textureSets.length}
+        onCreateSet={() => setShowCreateDialog(true)}
       />
 
       <TextureSetTable
         textureSets={textureSets}
         loading={loading}
         onViewDetails={handleViewDetails}
-        onDeletePack={handleDeleteTextureSet}
+        onDeleteSet={handleDeleteTextureSet}
       />
 
       {showCreateDialog && (

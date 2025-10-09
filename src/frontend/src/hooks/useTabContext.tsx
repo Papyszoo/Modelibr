@@ -59,7 +59,7 @@ export const TabProvider = ({
     const existingTab = tabs.find(
       tab =>
         tab.type === 'textureSetViewer' &&
-        tab.packId === textureSet.id.toString()
+        tab.setId === textureSet.id.toString()
     )
 
     if (existingTab) {
@@ -70,10 +70,10 @@ export const TabProvider = ({
 
     // Create new tab
     const newTab: Tab = {
-      id: `pack-${textureSet.id}`,
+      id: `set-${textureSet.id}`,
       type: 'textureSetViewer',
-      label: textureSet.name || `Pack ${textureSet.id}`,
-      packId: textureSet.id.toString(),
+      label: textureSet.name || `Set ${textureSet.id}`,
+      setId: textureSet.id.toString(),
     }
 
     const newTabs = [...tabs, newTab]
@@ -97,7 +97,7 @@ export const TabProvider = ({
           (type === 'modelViewer' &&
             tab.modelId === (data as { id?: string })?.id) ||
           (type === 'textureSetViewer' &&
-            tab.packId === (data as { id?: string })?.id))
+            tab.setId === (data as { id?: string })?.id))
     )
 
     if (existingTab) {
@@ -111,13 +111,13 @@ export const TabProvider = ({
         type === 'modelViewer' && (data as { id?: string })?.id
           ? `model-${(data as { id?: string }).id}`
           : type === 'textureSetViewer' && (data as { id?: string })?.id
-            ? `pack-${(data as { id?: string }).id}`
+            ? `set-${(data as { id?: string }).id}`
             : type,
       type,
       label: title,
       modelId:
         type === 'modelViewer' ? (data as { id?: string })?.id : undefined,
-      packId:
+      setId:
         type === 'textureSetViewer'
           ? (data as { id?: string })?.id
           : undefined,

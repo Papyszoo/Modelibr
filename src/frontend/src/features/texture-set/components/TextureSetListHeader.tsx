@@ -1,13 +1,13 @@
 import { Button } from 'primereact/button'
 
 interface TextureSetListHeaderProps {
-  packCount: number
-  onCreatePack: () => void
+  setCount: number
+  onCreateSet: () => void
 }
 
 export default function TextureSetListHeader({
-  packCount,
-  onCreatePack,
+  setCount,
+  onCreateSet,
 }: TextureSetListHeaderProps) {
   return (
     <header className="texture-set-list-header">
@@ -16,14 +16,14 @@ export default function TextureSetListHeader({
         <div className="texture-set-stats">
           <span className="stat-item">
             <i className="pi pi-folder"></i>
-            {packCount} pack{packCount !== 1 ? 's' : ''}
+            {setCount} set{setCount !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
       <Button
-        label="Create Pack"
+        label="Create Set"
         icon="pi pi-plus"
-        onClick={onCreatePack}
+        onClick={onCreateSet}
         className="p-button-primary"
       />
     </header>
