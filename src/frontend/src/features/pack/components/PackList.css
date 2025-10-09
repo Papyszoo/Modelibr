@@ -1,0 +1,17 @@
+.pack-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+.pack-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pack-list-header h2 {
+  margin: 0;
+}

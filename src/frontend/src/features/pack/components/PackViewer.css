@@ -1,0 +1,48 @@
+.pack-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1rem;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.pack-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.pack-header h2 {
+  margin: 0 0 0.5rem 0;
+}
+
+.pack-description {
+  color: var(--text-color-secondary);
+  margin: 0;
+}
+
+.pack-stats {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.pack-stats span {
+  padding: 0.5rem 1rem;
+  background: var(--surface-100);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.pack-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pack-section {
+  flex: 1;
+}

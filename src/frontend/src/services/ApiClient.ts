@@ -9,6 +9,11 @@ import {
   UpdateTextureSetResponse,
   AddTextureToSetRequest,
   AddTextureToSetResponse,
+  PackDto,
+  GetAllPacksResponse,
+  CreatePackRequest,
+  CreatePackResponse,
+  UpdatePackRequest,
 } from '../types'
 
 export interface UploadModelResponse {
@@ -241,6 +246,66 @@ class ApiClient {
       description,
     })
     return response.data
+  }
+
+  // Pack API methods
+  async getAllPacks(): Promise<PackDto[]> {
+    const response = await this.client.get<GetAllPacksResponse>('/packs')
+    return response.data.packs
+  }
+
+  async getPackById(id: number): Promise<PackDto> {
+    const response = await this.client.get<PackDto>(`/packs/${id}`)
+    return response.data
+  }
+
+  async createPack(
+    request: CreatePackRequest
+  ): Promise<CreatePackResponse> {
+    const response = await this.client.post<CreatePackResponse>(
+      '/packs',
+      request
+    )
+    return response.data
+  }
+
+  async updatePack(
+    id: number,
+    request: UpdatePackRequest
+  ): Promise<void> {
+    await this.client.put(`/packs/${id}`, request)
+  }
+
+  async deletePack(id: number): Promise<void> {
+    await this.client.delete(`/packs/${id}`)
+  }
+
+  async addModelToPack(packId: number, modelId: number): Promise<void> {
+    await this.client.post(`/packs/${packId}/models/${modelId}`)
+  }
+
+  async removeModelFromPack(packId: number, modelId: number): Promise<void> {
+    await this.client.delete(`/packs/${packId}/models/${modelId}`)
+  }
+
+  async addTextureSetToPack(packId: number, textureSetId: number): Promise<void> {
+    await this.client.post(`/packs/${packId}/texture-sets/${textureSetId}`)
+  }
+
+  async removeTextureSetFromPack(packId: number, textureSetId: number): Promise<void> {
+    await this.client.delete(`/packs/${packId}/texture-sets/${textureSetId}`)
+  }
+
+  async getModelsByPack(packId: number): Promise<Model[]> {
+    const response = await this.client.get<Model[]>(`/models?packId=${packId}`)
+    return response.data
+  }
+
+  async getTextureSetsByPack(packId: number): Promise<TextureSetDto[]> {
+    const response = await this.client.get<GetAllTextureSetsResponse>(
+      `/texture-sets?packId=${packId}`
+    )
+    return response.data.textureSets
   }
 }
 

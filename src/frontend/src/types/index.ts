@@ -9,10 +9,12 @@ export interface Tab {
     | 'animation'
     | 'textureSets'
     | 'textureSetViewer'
+    | 'packViewer'
     | 'settings'
   label?: string
   modelId?: string
   setId?: string
+  packId?: string
 }
 
 export interface SplitterEvent {
@@ -44,6 +46,11 @@ export interface ModelSummaryDto {
   name: string
 }
 
+export interface PackSummaryDto {
+  id: number
+  name: string
+}
+
 export interface TextureSetDto {
   id: number
   name: string
@@ -53,6 +60,7 @@ export interface TextureSetDto {
   isEmpty: boolean
   textures: TextureDto[]
   associatedModels: ModelSummaryDto[]
+  packs?: PackSummaryDto[]
 }
 
 // API Request/Response types
@@ -96,4 +104,48 @@ export interface AddTextureToSetResponse {
 export interface ApiError {
   error: string
   message: string
+}
+
+// Pack related types
+export interface PackModelDto {
+  id: number
+  name: string
+}
+
+export interface PackTextureSetDto {
+  id: number
+  name: string
+}
+
+export interface PackDto {
+  id: number
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+  modelCount: number
+  textureSetCount: number
+  isEmpty: boolean
+  models: PackModelDto[]
+  textureSets: PackTextureSetDto[]
+}
+
+export interface GetAllPacksResponse {
+  packs: PackDto[]
+}
+
+export interface CreatePackRequest {
+  name: string
+  description?: string
+}
+
+export interface CreatePackResponse {
+  id: number
+  name: string
+  description?: string
+}
+
+export interface UpdatePackRequest {
+  name: string
+  description?: string
 }
