@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Button } from 'primereact/button'
-import { Menu } from 'primereact/menu'
+import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import DraggableTab from '../DraggableTab'
 import { Tab } from '../../../types'
@@ -38,7 +38,7 @@ export default function DockBar({
   onDragEnter,
   onDragLeave,
 }: DockBarProps) {
-  const menuRef = useRef<Menu>(null)
+  const menuRef = useRef<ContextMenu>(null)
 
   // Menu items for adding new tabs
   const addMenuItems: MenuItem[] = [
@@ -86,6 +86,11 @@ export default function DockBar({
     )
   }
 
+  const handleBarContextMenu = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    menuRef.current?.show(e)
+  }
+
   return (
     <div
       className={`dock-bar dock-bar-${side}`}
@@ -93,6 +98,7 @@ export default function DockBar({
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
+      onContextMenu={handleBarContextMenu}
     >
       {/* Tab icons */}
       <div className="dock-tabs">
@@ -115,11 +121,10 @@ export default function DockBar({
         <Button
           icon="pi pi-plus"
           className="p-button-text p-button-rounded dock-add-button"
-          onClick={e => menuRef.current?.toggle(e)}
+          onClick={e => menuRef.current?.show(e)}
         />
-        <Menu
+        <ContextMenu
           model={addMenuItems}
-          popup
           ref={menuRef}
           className="dock-add-menu"
         />

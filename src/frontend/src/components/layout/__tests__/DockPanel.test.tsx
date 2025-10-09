@@ -23,19 +23,6 @@ jest.mock('primereact/contextmenu', () => ({
   ),
 }))
 
-jest.mock('primereact/menu', () => ({
-  Menu: React.forwardRef(
-    (
-      { children, ...props }: React.PropsWithChildren<unknown>,
-      ref: React.Ref<HTMLDivElement>
-    ) => (
-      <div {...props} ref={ref}>
-        {children}
-      </div>
-    )
-  ),
-}))
-
 // Mock TabContent and DraggableTab components
 jest.mock('../TabContent', () => {
   return function MockTabContent({ tab }: { tab: Tab }) {
