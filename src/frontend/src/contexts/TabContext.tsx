@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import { Tab, TexturePackDto } from '../types'
+import { Tab, TextureSetDto } from '../types'
 import { Model } from '../utils/fileUtils'
 
 export interface TabContextValue {
@@ -9,7 +9,7 @@ export interface TabContextValue {
   activeTab: string
   setActiveTab: (tabId: string) => void
   openModelDetailsTab: (model: Model) => void
-  openTexturePackDetailsTab: (texturePack: TexturePackDto) => void
+  openTextureSetDetailsTab: (textureSet: TextureSetDto) => void
   openTab: (type: Tab['type'], title: string, data?: unknown) => void
 }
 

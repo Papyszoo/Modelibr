@@ -1,19 +1,19 @@
 import { Button } from 'primereact/button'
 
-interface TexturePackListHeaderProps {
+interface TextureSetListHeaderProps {
   packCount: number
   onCreatePack: () => void
 }
 
-export default function TexturePackListHeader({
+export default function TextureSetListHeader({
   packCount,
   onCreatePack,
-}: TexturePackListHeaderProps) {
+}: TextureSetListHeaderProps) {
   return (
-    <header className="texture-pack-list-header">
+    <header className="texture-set-list-header">
       <div className="header-content">
-        <h1>Texture Packs</h1>
-        <div className="texture-pack-stats">
+        <h1>Texture Sets</h1>
+        <div className="texture-set-stats">
           <span className="stat-item">
             <i className="pi pi-folder"></i>
             {packCount} pack{packCount !== 1 ? 's' : ''}

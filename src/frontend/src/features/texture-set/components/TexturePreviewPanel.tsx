@@ -3,16 +3,16 @@ import { Canvas } from '@react-three/fiber'
 import { Stage, OrbitControls } from '@react-three/drei'
 import { useControls } from 'leva'
 import { GeometryType } from './GeometrySelector'
-import { TexturePackDto } from '../../../types'
+import { TextureSetDto } from '../../../types'
 import TexturedGeometry from './TexturedGeometry'
 import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 import './TexturePreviewPanel.css'
 
 interface TexturePreviewPanelProps {
-  texturePack: TexturePackDto
+  textureSet: TextureSetDto
 }
 
-function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
+function TexturePreviewPanel({ textureSet }: TexturePreviewPanelProps) {
   const geometryNames = {
     box: 'Cube',
     sphere: 'Sphere',
@@ -160,7 +160,7 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
         </h3>
         <div className="preview-info">
           <span className="info-label">Textures Applied:</span>
-          <span className="info-value">{texturePack.textureCount}</span>
+          <span className="info-value">{textureSet.textureCount}</span>
         </div>
       </div>
 
@@ -186,7 +186,7 @@ function TexturePreviewPanel({ texturePack }: TexturePreviewPanelProps) {
             <Suspense fallback={<LoadingPlaceholder />}>
               <TexturedGeometry
                 geometryType={controls.type}
-                texturePack={texturePack}
+                textureSet={textureSet}
                 geometryParams={controls}
               />
             </Suspense>

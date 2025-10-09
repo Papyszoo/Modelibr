@@ -1,14 +1,14 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios'
 import { Model } from '../utils/fileUtils'
 import {
-  TexturePackDto,
-  GetAllTexturePacksResponse,
-  CreateTexturePackRequest,
-  CreateTexturePackResponse,
-  UpdateTexturePackRequest,
-  UpdateTexturePackResponse,
-  AddTextureToPackRequest,
-  AddTextureToPackResponse,
+  TextureSetDto,
+  GetAllTextureSetsResponse,
+  CreateTextureSetRequest,
+  CreateTextureSetResponse,
+  UpdateTextureSetRequest,
+  UpdateTextureSetResponse,
+  AddTextureToSetRequest,
+  AddTextureToSetResponse,
 } from '../types'
 
 export interface UploadModelResponse {
@@ -126,69 +126,69 @@ class ApiClient {
     return response.data
   }
 
-  // TexturePack methods
-  async getAllTexturePacks(): Promise<TexturePackDto[]> {
-    const response: AxiosResponse<GetAllTexturePacksResponse> =
-      await this.client.get('/texture-packs')
-    return response.data.texturePacks
+  // TextureSet methods
+  async getAllTextureSets(): Promise<TextureSetDto[]> {
+    const response: AxiosResponse<GetAllTextureSetsResponse> =
+      await this.client.get('/texture-sets')
+    return response.data.textureSets
   }
 
-  async getTexturePackById(id: number): Promise<TexturePackDto> {
-    const response: AxiosResponse<TexturePackDto> = await this.client.get(
-      `/texture-packs/${id}`
+  async getTextureSetById(id: number): Promise<TextureSetDto> {
+    const response: AxiosResponse<TextureSetDto> = await this.client.get(
+      `/texture-sets/${id}`
     )
     return response.data
   }
 
-  async createTexturePack(
-    request: CreateTexturePackRequest
-  ): Promise<CreateTexturePackResponse> {
-    const response: AxiosResponse<CreateTexturePackResponse> =
-      await this.client.post('/texture-packs', request)
+  async createTextureSet(
+    request: CreateTextureSetRequest
+  ): Promise<CreateTextureSetResponse> {
+    const response: AxiosResponse<CreateTextureSetResponse> =
+      await this.client.post('/texture-sets', request)
     return response.data
   }
 
-  async updateTexturePack(
+  async updateTextureSet(
     id: number,
-    request: UpdateTexturePackRequest
-  ): Promise<UpdateTexturePackResponse> {
-    const response: AxiosResponse<UpdateTexturePackResponse> =
-      await this.client.put(`/texture-packs/${id}`, request)
+    request: UpdateTextureSetRequest
+  ): Promise<UpdateTextureSetResponse> {
+    const response: AxiosResponse<UpdateTextureSetResponse> =
+      await this.client.put(`/texture-sets/${id}`, request)
     return response.data
   }
 
-  async deleteTexturePack(id: number): Promise<void> {
-    await this.client.delete(`/texture-packs/${id}`)
+  async deleteTextureSet(id: number): Promise<void> {
+    await this.client.delete(`/texture-sets/${id}`)
   }
 
-  async addTextureToPackEndpoint(
-    packId: number,
-    request: AddTextureToPackRequest
-  ): Promise<AddTextureToPackResponse> {
-    const response: AxiosResponse<AddTextureToPackResponse> =
-      await this.client.post(`/texture-packs/${packId}/textures`, request)
+  async addTextureToSetEndpoint(
+    setId: number,
+    request: AddTextureToSetRequest
+  ): Promise<AddTextureToSetResponse> {
+    const response: AxiosResponse<AddTextureToSetResponse> =
+      await this.client.post(`/texture-sets/${setId}/textures`, request)
     return response.data
   }
 
-  async removeTextureFromPack(
-    packId: number,
+  async removeTextureFromSet(
+    setId: number,
     textureId: number
   ): Promise<void> {
-    await this.client.delete(`/texture-packs/${packId}/textures/${textureId}`)
+    await this.client.delete(`/texture-sets/${setId}/textures/${textureId}`)
   }
 
-  async associateTexturePackWithModel(
-    packId: number,
+  async associateTextureSetWithModel(
+    setId: number,
     modelId: number
   ): Promise<void> {
-    await this.client.post(`/texture-packs/${packId}/models/${modelId}`)
+    await this.client.post(`/texture-sets/${setId}/models/${modelId}`)
   }
 
-  async disassociateTexturePackFromModel(
-    packId: number,
+  async disassociateTextureSetFromModel(
+    setId: number,
     modelId: number
   ): Promise<void> {
-    await this.client.delete(`/texture-packs/${packId}/models/${modelId}`)
+    await this.client.delete(`/texture-sets/${setId}/models/${modelId}`)
   }
 
   // Settings API

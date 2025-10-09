@@ -5,7 +5,7 @@ import { Toast } from 'primereact/toast'
 import { Dialog } from 'primereact/dialog'
 import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
-import { useTexturePacks } from '../hooks/useTexturePacks'
+import { useTextureSets } from '../hooks/useTextureSets'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 // eslint-disable-next-line no-restricted-imports -- ApiClient needed for file operations
 import ApiClient from '../../../services/ApiClient'
@@ -29,7 +29,7 @@ function TextureCard({
   const [showInfoDialog, setShowInfoDialog] = useState(false)
   const toast = useRef<Toast>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const texturePacksApi = useTexturePacks()
+  const textureSetsApi = useTextureSets()
   const typeInfo = getTextureTypeInfo(textureType)
 
   const handleFileUpload = async (files: File[]) => {
@@ -56,7 +56,7 @@ function TextureCard({
       const fileId = uploadResult.fileId
 
       // Then add it to the pack
-      await texturePacksApi.addTextureToPackEndpoint(packId, {
+      await textureSetsApi.addTextureToPackEndpoint(packId, {
         fileId: fileId,
         textureType,
       })
@@ -108,7 +108,7 @@ function TextureCard({
 
     try {
       setUploading(true)
-      await texturePacksApi.removeTextureFromPack(packId, texture.id)
+      await textureSetsApi.removeTextureFromPack(packId, texture.id)
 
       toast.current?.show({
         severity: 'success',

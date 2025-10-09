@@ -48,7 +48,7 @@ export default function TextureTypeDropdown({
         valueTemplate={textureTypeOptionTemplate}
       />
       <small className="p-text-secondary">
-        Each texture pack can contain only one texture of each type.
+        Each texture set can contain only one texture of each type.
       </small>
     </div>
   )

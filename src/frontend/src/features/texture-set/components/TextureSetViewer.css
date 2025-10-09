@@ -1,12 +1,12 @@
-.texture-pack-viewer {
+.texture-set-viewer {
   height: 100%;
   display: flex;
   flex-direction: column;
   background: #f8fafc;
 }
 
-.texture-pack-viewer-loading,
-.texture-pack-viewer-error {
+.texture-set-viewer-loading,
+.texture-set-viewer-error {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,7 +15,7 @@
   color: #64748b;
 }
 
-.texture-pack-viewer-error {
+.texture-set-viewer-error {
   color: #ef4444;
 }
 

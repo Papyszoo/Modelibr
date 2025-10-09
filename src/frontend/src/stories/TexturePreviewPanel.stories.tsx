@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import TexturePreviewPanel from '../components/tabs/texture-pack-viewer/TexturePreviewPanel'
-import { TexturePackDto, TextureType } from '../types'
+import TexturePreviewPanel from '../components/tabs/texture-set-viewer/TexturePreviewPanel'
+import { TextureSetDto, TextureType } from '../types'
 
-const mockTexturePack: TexturePackDto = {
+const mockTextureSet: TextureSetDto = {
   id: 1,
   name: 'Wood Material Pack',
   createdAt: new Date().toISOString(),
@@ -49,6 +49,6 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
   args: {
-    texturePack: mockTexturePack,
+    textureSet: mockTextureSet,
   },
 }

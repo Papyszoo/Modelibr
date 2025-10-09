@@ -35,19 +35,19 @@
 | `POST` | `/models/{id}/thumbnail/upload` | Upload custom thumbnail |
 | `GET` | `/models/{id}/thumbnail/file` | Download thumbnail image |
 
-### Texture Packs (9 endpoints)
+### Texture Sets (9 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/texture-packs` | List all texture packs |
-| `GET` | `/texture-packs/{id}` | Get texture pack details |
-| `POST` | `/texture-packs` | Create new texture pack |
-| `PUT` | `/texture-packs/{id}` | Update texture pack |
-| `DELETE` | `/texture-packs/{id}` | Delete texture pack |
-| `POST` | `/texture-packs/{id}/textures` | Add texture to pack |
-| `DELETE` | `/texture-packs/{packId}/textures/{textureId}` | Remove texture from pack |
-| `POST` | `/texture-packs/{packId}/models/{modelId}` | Associate pack with model |
-| `DELETE` | `/texture-packs/{packId}/models/{modelId}` | Disassociate pack from model |
+| `GET` | `/texture-sets` | List all texture sets |
+| `GET` | `/texture-sets/{id}` | Get texture set details |
+| `POST` | `/texture-sets` | Create new texture set |
+| `PUT` | `/texture-sets/{id}` | Update texture set |
+| `DELETE` | `/texture-sets/{id}` | Delete texture set |
+| `POST` | `/texture-sets/{id}/textures` | Add texture to pack |
+| `DELETE` | `/texture-sets/{packId}/textures/{textureId}` | Remove texture from pack |
+| `POST` | `/texture-sets/{packId}/models/{modelId}` | Associate pack with model |
+| `DELETE` | `/texture-sets/{packId}/models/{modelId}` | Disassociate pack from model |
 
 ### Worker API - Thumbnail Jobs (3 endpoints)
 
@@ -126,9 +126,9 @@ curl http://localhost:5009/models/1/thumbnail/file -o thumbnail.webp
 curl -X POST http://localhost:5009/models/1/thumbnail/regenerate
 ```
 
-### Create Texture Pack
+### Create Texture Set
 ```bash
-curl -X POST http://localhost:5009/texture-packs \
+curl -X POST http://localhost:5009/texture-sets \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Metal Materials",
@@ -138,7 +138,7 @@ curl -X POST http://localhost:5009/texture-packs \
 
 ### Add Texture to Pack
 ```bash
-curl -X POST http://localhost:5009/texture-packs/1/textures \
+curl -X POST http://localhost:5009/texture-sets/1/textures \
   -H "Content-Type: application/json" \
   -d '{
     "fileId": 10,
@@ -148,9 +148,9 @@ curl -X POST http://localhost:5009/texture-packs/1/textures \
 
 Texture types: `Albedo`, `Normal`, `Metallic`, `Roughness`, `AmbientOcclusion`, `Emissive`, `Height`, `Opacity`
 
-### Associate Texture Pack with Model
+### Associate Texture Set with Model
 ```bash
-curl -X POST http://localhost:5009/texture-packs/1/models/5
+curl -X POST http://localhost:5009/texture-sets/1/models/5
 ```
 
 ## Endpoint Details
@@ -170,7 +170,7 @@ WebApi → Application → Domain ← Infrastructure
 ### Layers
 
 **Domain Layer** (`src/Domain/`)
-- Core business entities: `Model`, `File`, `Thumbnail`, `TexturePack`
+- Core business entities: `Model`, `File`, `Thumbnail`, `TextureSet`
 - Value objects: `FileType` with validation
 - Business logic and invariants
 - No external dependencies
@@ -237,7 +237,7 @@ Common error codes:
 - `FileType.InvalidForModelUpload` - Unsupported file format
 - `Model.NotFound` - Model doesn't exist
 - `File.NotFound` - File doesn't exist
-- `TexturePack.NotFound` - Texture pack doesn't exist
+- `TextureSet.NotFound` - Texture set doesn't exist
 - `Thumbnail.NotReady` - Thumbnail not yet generated
 
 ## Configuration

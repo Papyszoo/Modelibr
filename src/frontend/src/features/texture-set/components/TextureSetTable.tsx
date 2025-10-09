@@ -1,36 +1,36 @@
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
-import { TexturePackDto, TextureDto } from '../../../types'
+import { TextureSetDto, TextureDto } from '../../../types'
 import {
   getTextureTypeLabel,
   getTextureTypeColor,
   getTextureTypeIcon,
 } from '../../../utils/textureTypeUtils'
 
-interface TexturePackTableProps {
-  texturePacks: TexturePackDto[]
+interface TextureSetTableProps {
+  textureSets: TextureSetDto[]
   loading: boolean
-  onViewDetails: (pack: TexturePackDto) => void
-  onDeletePack: (pack: TexturePackDto) => void
+  onViewDetails: (pack: TextureSetDto) => void
+  onDeletePack: (pack: TextureSetDto) => void
 }
 
-export default function TexturePackTable({
-  texturePacks,
+export default function TextureSetTable({
+  textureSets,
   loading,
   onViewDetails,
   onDeletePack,
-}: TexturePackTableProps) {
-  const nameBodyTemplate = (rowData: TexturePackDto) => {
+}: TextureSetTableProps) {
+  const nameBodyTemplate = (rowData: TextureSetDto) => {
     return (
-      <div className="texture-pack-name">
+      <div className="texture-set-name">
         <strong>{rowData.name}</strong>
         {rowData.isEmpty && <span className="empty-badge">Empty</span>}
       </div>
     )
   }
 
-  const texturesBodyTemplate = (rowData: TexturePackDto) => {
+  const texturesBodyTemplate = (rowData: TextureSetDto) => {
     if (rowData.isEmpty || !rowData.textures) {
       return <span className="text-muted">No textures</span>
     }
@@ -59,7 +59,7 @@ export default function TexturePackTable({
     )
   }
 
-  const modelsBodyTemplate = (rowData: TexturePackDto) => {
+  const modelsBodyTemplate = (rowData: TextureSetDto) => {
     if (!rowData.associatedModels || rowData.associatedModels.length === 0) {
       return <span className="text-muted">No models</span>
     }
@@ -75,13 +75,13 @@ export default function TexturePackTable({
     )
   }
 
-  const dateBodyTemplate = (rowData: TexturePackDto) => {
+  const dateBodyTemplate = (rowData: TextureSetDto) => {
     return new Date(rowData.updatedAt).toLocaleDateString()
   }
 
-  const actionsBodyTemplate = (rowData: TexturePackDto) => {
+  const actionsBodyTemplate = (rowData: TextureSetDto) => {
     return (
-      <div className="texture-pack-actions">
+      <div className="texture-set-actions">
         <Button
           icon="pi pi-eye"
           className="p-button-text p-button-rounded"
@@ -99,18 +99,18 @@ export default function TexturePackTable({
   }
 
   return (
-    <div className="texture-pack-list-content">
+    <div className="texture-set-list-content">
       <DataTable
-        value={texturePacks}
+        value={textureSets}
         loading={loading}
         responsiveLayout="scroll"
         stripedRows
         showGridlines
-        emptyMessage="No texture packs found"
+        emptyMessage="No texture sets found"
         paginator
         rows={10}
         rowsPerPageOptions={[5, 10, 25, 50]}
-        className="texture-pack-table"
+        className="texture-set-table"
       >
         <Column
           field="name"

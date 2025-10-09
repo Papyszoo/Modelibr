@@ -4,8 +4,8 @@ import { TabView, TabPanel } from 'primereact/tabview'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
-import { TexturePackDto, TextureDto, ModelSummaryDto } from '../../../types'
-import { useTexturePacks } from '../hooks/useTexturePacks'
+import { TextureSetDto, TextureDto, ModelSummaryDto } from '../../../types'
+import { useTextureSets } from '../hooks/useTextureSets'
 import AddTextureToPackDialog from './AddTextureToPackDialog'
 import ModelAssociationDialog from './ModelAssociationDialog'
 import PackHeader from './PackHeader'
@@ -15,52 +15,52 @@ import ModelsTable from './ModelsTable'
 import { getTextureTypeLabel } from '../../../utils/textureTypeUtils'
 import './dialogs.css'
 
-interface TexturePackDetailDialogProps {
+interface TextureSetDetailDialogProps {
   visible: boolean
-  texturePack: TexturePackDto
+  textureSet: TextureSetDto
   onHide: () => void
   onPackUpdated: () => void
 }
 
-function TexturePackDetailDialog({
+function TextureSetDetailDialog({
   visible,
-  texturePack,
+  textureSet,
   onHide,
   onPackUpdated,
-}: TexturePackDetailDialogProps) {
-  const [currentPack, setCurrentPack] = useState<TexturePackDto>(texturePack)
+}: TextureSetDetailDialogProps) {
+  const [currentPack, setCurrentPack] = useState<TextureSetDto>(textureSet)
   const [updating, setUpdating] = useState(false)
   const [showAddTextureDialog, setShowAddTextureDialog] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
   const toast = useRef<Toast>(null)
-  const texturePacksApi = useTexturePacks()
+  const textureSetsApi = useTextureSets()
 
   useEffect(() => {
-    setCurrentPack(texturePack)
-  }, [texturePack])
+    setCurrentPack(textureSet)
+  }, [textureSet])
 
   const handleUpdateName = async (newName: string) => {
     try {
       setUpdating(true)
-      await texturePacksApi.updateTexturePack(currentPack.id, {
+      await textureSetsApi.updateTextureSet(currentPack.id, {
         name: newName,
       })
 
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Texture pack updated successfully',
+        detail: 'Texture set updated successfully',
         life: 3000,
       })
 
       onPackUpdated()
     } catch (error) {
-      console.error('Failed to update texture pack:', error)
+      console.error('Failed to update texture set:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to update texture pack',
+        detail: 'Failed to update texture set',
         life: 3000,
       })
       throw error // Re-throw to let the child component handle UI state
@@ -76,7 +76,7 @@ function TexturePackDetailDialog({
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await texturePacksApi.removeTextureFromPack(
+          await textureSetsApi.removeTextureFromPack(
             currentPack.id,
             texture.id
           )
@@ -102,12 +102,12 @@ function TexturePackDetailDialog({
 
   const handleDisassociateModel = (model: ModelSummaryDto) => {
     confirmDialog({
-      message: `Are you sure you want to disassociate the model "${model.name}" from this texture pack?`,
+      message: `Are you sure you want to disassociate the model "${model.name}" from this texture set?`,
       header: 'Disassociate Model',
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await texturePacksApi.disassociateTexturePackFromModel(
+          await textureSetsApi.disassociateTextureSetFromModel(
             currentPack.id,
             model.id
           )
@@ -145,14 +145,14 @@ function TexturePackDetailDialog({
   return (
     <>
       <Dialog
-        header={`Texture Pack: ${currentPack.name}`}
+        header={`Texture Set: ${currentPack.name}`}
         visible={visible}
         onHide={onHide}
         footer={dialogFooter}
         modal
         maximizable
         style={{ width: '80vw', height: '80vh' }}
-        className="texture-pack-detail-dialog"
+        className="texture-set-detail-dialog"
       >
         <Toast ref={toast} />
         <ConfirmDialog />
@@ -160,11 +160,11 @@ function TexturePackDetailDialog({
         <div className="pack-overview">
           <div className="pack-info">
             <PackHeader
-              texturePack={currentPack}
+              textureSet={currentPack}
               onNameUpdate={handleUpdateName}
               updating={updating}
             />
-            <PackStats texturePack={currentPack} />
+            <PackStats textureSet={currentPack} />
           </div>
         </div>
 
@@ -190,7 +190,7 @@ function TexturePackDetailDialog({
       {showAddTextureDialog && (
         <AddTextureToPackDialog
           visible={showAddTextureDialog}
-          texturePack={currentPack}
+          textureSet={currentPack}
           onHide={() => setShowAddTextureDialog(false)}
           onTextureAdded={() => {
             setShowAddTextureDialog(false)
@@ -202,7 +202,7 @@ function TexturePackDetailDialog({
       {showModelAssociationDialog && (
         <ModelAssociationDialog
           visible={showModelAssociationDialog}
-          texturePack={currentPack}
+          textureSet={currentPack}
           onHide={() => setShowModelAssociationDialog(false)}
           onAssociationsChanged={() => {
             setShowModelAssociationDialog(false)
@@ -214,4 +214,4 @@ function TexturePackDetailDialog({
   )
 }
 
-export default TexturePackDetailDialog
+export default TextureSetDetailDialog

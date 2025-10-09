@@ -2,21 +2,21 @@ import { useState } from 'react'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { classNames } from 'primereact/utils'
-import { TexturePackDto } from '../../../types'
+import { TextureSetDto } from '../../../types'
 
 interface PackHeaderProps {
-  texturePack: TexturePackDto
+  textureSet: TextureSetDto
   onNameUpdate: (newName: string) => Promise<void>
   updating: boolean
 }
 
 export default function PackHeader({
-  texturePack,
+  textureSet,
   onNameUpdate,
   updating,
 }: PackHeaderProps) {
   const [editing, setEditing] = useState(false)
-  const [editedName, setEditedName] = useState(texturePack.name)
+  const [editedName, setEditedName] = useState(textureSet.name)
   const [errors, setErrors] = useState<{ name?: string }>({})
 
   const validateName = (name: string) => {
@@ -48,7 +48,7 @@ export default function PackHeader({
   }
 
   const handleCancelEdit = () => {
-    setEditedName(texturePack.name)
+    setEditedName(textureSet.name)
     setEditing(false)
     setErrors({})
   }
@@ -61,7 +61,7 @@ export default function PackHeader({
             value={editedName}
             onChange={e => setEditedName(e.target.value)}
             className={classNames({ 'p-invalid': errors.name })}
-            placeholder="Texture pack name"
+            placeholder="Texture set name"
             maxLength={200}
             autoFocus
           />
@@ -81,7 +81,7 @@ export default function PackHeader({
         </div>
       ) : (
         <div className="pack-name-display">
-          <h3>{texturePack.name}</h3>
+          <h3>{textureSet.name}</h3>
           <Button
             icon="pi pi-pencil"
             className="p-button-text p-button-sm"

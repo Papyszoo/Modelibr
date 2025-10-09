@@ -32,9 +32,9 @@ export default function DockEmptyState({
       command: () => onAddTab('texture', 'Textures'),
     },
     {
-      label: 'Texture Packs',
+      label: 'Texture Sets',
       icon: 'pi pi-folder',
-      command: () => onAddTab('texturePacks', 'Texture Packs'),
+      command: () => onAddTab('textureSets', 'Texture Sets'),
     },
     {
       label: 'Animations List',

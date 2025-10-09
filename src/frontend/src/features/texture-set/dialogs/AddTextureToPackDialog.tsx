@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
-import { TexturePackDto, TextureType, Model } from '../../../types'
+import { TextureSetDto, TextureType, Model } from '../../../types'
 import { getTextureTypeOptions } from '../../../utils/textureTypeUtils'
-import { useTexturePacks } from '../hooks/useTexturePacks'
+import { useTextureSets } from '../hooks/useTextureSets'
 import TextureTypeDropdown from './TextureTypeDropdown'
 import FileSelectionTable, { FileOption } from './FileSelectionTable'
 import NoTextureTypesWarning from './NoTextureTypesWarning'
@@ -12,14 +12,14 @@ import './dialogs.css'
 
 interface AddTextureToPackDialogProps {
   visible: boolean
-  texturePack: TexturePackDto
+  textureSet: TextureSetDto
   onHide: () => void
   onTextureAdded: () => void
 }
 
 function AddTextureToPackDialog({
   visible,
-  texturePack,
+  textureSet,
   onHide,
   onTextureAdded,
 }: AddTextureToPackDialogProps) {
@@ -30,12 +30,12 @@ function AddTextureToPackDialog({
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const toast = useRef<Toast>(null)
-  const texturePacksApi = useTexturePacks()
+  const textureSetsApi = useTextureSets()
 
   const textureTypeOptions = getTextureTypeOptions()
 
   // Get used texture types in this pack
-  const usedTextureTypes = new Set(texturePack.textures.map(t => t.textureType))
+  const usedTextureTypes = new Set(textureSet.textures.map(t => t.textureType))
 
   // Filter available texture types (only allow one per type per pack)
   const availableTextureTypes = textureTypeOptions.filter(
@@ -45,7 +45,7 @@ function AddTextureToPackDialog({
   const loadAvailableFiles = useCallback(async () => {
     try {
       setLoading(true)
-      const models = await texturePacksApi.getModels()
+      const models = await textureSetsApi.getModels()
 
       // Extract all files from all models
       const allFiles: FileOption[] = []
@@ -75,7 +75,7 @@ function AddTextureToPackDialog({
     } finally {
       setLoading(false)
     }
-  }, [texturePacksApi])
+  }, [textureSetsApi])
 
   useEffect(() => {
     if (visible) {
@@ -90,7 +90,7 @@ function AddTextureToPackDialog({
 
     try {
       setSubmitting(true)
-      await texturePacksApi.addTextureToPackEndpoint(texturePack.id, {
+      await textureSetsApi.addTextureToPackEndpoint(textureSet.id, {
         fileId: selectedFileId,
         textureType: selectedTextureType,
       })
@@ -127,7 +127,7 @@ function AddTextureToPackDialog({
 
   return (
     <Dialog
-      header={`Add Texture to "${texturePack.name}"`}
+      header={`Add Texture to "${textureSet.name}"`}
       visible={visible}
       onHide={handleCancel}
       footer={
