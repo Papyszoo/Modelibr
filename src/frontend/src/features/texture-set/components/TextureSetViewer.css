@@ -51,6 +51,12 @@
   padding: 1.5rem;
 }
 
+/* Remove padding for preview tab to allow full-screen canvas */
+.set-viewer-tabs .p-tabview-panels:has(.texture-preview-panel) {
+  padding: 0;
+  overflow: hidden;
+}
+
 .texture-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
