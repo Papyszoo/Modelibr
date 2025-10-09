@@ -3,8 +3,8 @@ import { TabView, TabPanel } from 'primereact/tabview'
 import { TextureSetDto, TextureType } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import { getAllTextureTypes } from '../../../utils/textureTypeUtils'
-import PackHeader from '../dialogs/PackHeader'
-import PackStats from '../dialogs/PackStats'
+import SetHeader from '../dialogs/SetHeader'
+import SetStats from '../dialogs/SetStats'
 import ModelsTable from '../dialogs/ModelsTable'
 import TextureCard from './TextureCard'
 import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
@@ -14,10 +14,10 @@ import { ModelSummaryDto } from '../../../types'
 import './TextureSetViewer.css'
 
 interface TextureSetViewerProps {
-  packId: string
+  setId: string
 }
 
-function TextureSetViewer({ packId }: TextureSetViewerProps) {
+function TextureSetViewer({ setId }: TextureSetViewerProps) {
   const [textureSet, setTextureSet] = useState<TextureSetDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
@@ -31,8 +31,8 @@ function TextureSetViewer({ packId }: TextureSetViewerProps) {
     try {
       setLoading(true)
       setError('')
-      const pack = await textureSetsApi.getTextureSetById(parseInt(packId))
-      setTextureSet(pack)
+      const set = await textureSetsApi.getTextureSetById(parseInt(setId))
+      setTextureSet(set)
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load texture set'
@@ -45,7 +45,7 @@ function TextureSetViewer({ packId }: TextureSetViewerProps) {
   useEffect(() => {
     loadTextureSet()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [packId])
+  }, [setId])
 
   const handleUpdateName = async (newName: string) => {
     if (!textureSet) return
@@ -108,21 +108,21 @@ function TextureSetViewer({ packId }: TextureSetViewerProps) {
     <div className="texture-set-viewer">
       <ConfirmDialog />
 
-      <header className="pack-viewer-header">
-        <div className="pack-overview">
-          <div className="pack-info">
-            <PackHeader
+      <header className="set-viewer-header">
+        <div className="set-overview">
+          <div className="set-info">
+            <SetHeader
               textureSet={textureSet}
               onNameUpdate={handleUpdateName}
               updating={updating}
             />
-            <PackStats textureSet={textureSet} />
+            <SetStats textureSet={textureSet} />
           </div>
         </div>
       </header>
 
       <TabView
-        className="pack-viewer-tabs"
+        className="set-viewer-tabs"
         activeIndex={activeTabIndex}
         onTabChange={e => setActiveTabIndex(e.index)}
       >
@@ -138,7 +138,7 @@ function TextureSetViewer({ packId }: TextureSetViewerProps) {
                   key={textureType}
                   textureType={textureType}
                   texture={texture}
-                  packId={textureSet.id}
+                  setId={textureSet.id}
                   onTextureUpdated={loadTextureSet}
                 />
               )

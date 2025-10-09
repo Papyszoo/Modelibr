@@ -1,10 +1,10 @@
 import { TextureSetDto } from '../../../types'
 
-interface PackStatsProps {
+interface SetStatsProps {
   textureSet: TextureSetDto
 }
 
-export default function PackStats({ textureSet }: PackStatsProps) {
+export default function SetStats({ textureSet }: SetStatsProps) {
   return (
     <div className="pack-stats">
       <span className="stat-item">

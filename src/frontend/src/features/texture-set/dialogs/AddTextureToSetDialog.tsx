@@ -10,19 +10,19 @@ import NoTextureTypesWarning from './NoTextureTypesWarning'
 import AddTextureFooter from './AddTextureFooter'
 import './dialogs.css'
 
-interface AddTextureToPackDialogProps {
+interface AddTextureToSetDialogProps {
   visible: boolean
   textureSet: TextureSetDto
   onHide: () => void
   onTextureAdded: () => void
 }
 
-function AddTextureToPackDialog({
+function AddTextureToSetDialog({
   visible,
   textureSet,
   onHide,
   onTextureAdded,
-}: AddTextureToPackDialogProps) {
+}: AddTextureToSetDialogProps) {
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null)
   const [selectedTextureType, setSelectedTextureType] =
     useState<TextureType | null>(null)
@@ -165,4 +165,4 @@ function AddTextureToPackDialog({
   )
 }
 
-export default AddTextureToPackDialog
+export default AddTextureToSetDialog

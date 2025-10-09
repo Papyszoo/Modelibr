@@ -6,7 +6,7 @@ import {
   CreateTextureSetResponse,
   UpdateTextureSetRequest,
   UpdateTextureSetResponse,
-  AddTextureToPackRequest,
+  AddTextureToSetRequest,
   AddTextureToPackResponse,
   Model,
 } from '../../../types'
@@ -108,13 +108,13 @@ export function useTextureSets() {
 
   const addTextureToPackEndpoint = useCallback(
     async (
-      packId: number,
-      request: AddTextureToPackRequest
+      setId: number,
+      request: AddTextureToSetRequest
     ): Promise<AddTextureToPackResponse> => {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.addTextureToPackEndpoint(packId, request)
+        return await ApiClient.addTextureToPackEndpoint(setId, request)
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to add texture to pack'
@@ -128,11 +128,11 @@ export function useTextureSets() {
   )
 
   const removeTextureFromPack = useCallback(
-    async (packId: number, textureId: number): Promise<void> => {
+    async (setId: number, textureId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.removeTextureFromPack(packId, textureId)
+        await ApiClient.removeTextureFromPack(setId, textureId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -148,11 +148,11 @@ export function useTextureSets() {
   )
 
   const associateTextureSetWithModel = useCallback(
-    async (packId: number, modelId: number): Promise<void> => {
+    async (setId: number, modelId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.associateTextureSetWithModel(packId, modelId)
+        await ApiClient.associateTextureSetWithModel(setId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -168,11 +168,11 @@ export function useTextureSets() {
   )
 
   const disassociateTextureSetFromModel = useCallback(
-    async (packId: number, modelId: number): Promise<void> => {
+    async (setId: number, modelId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.disassociateTextureSetFromModel(packId, modelId)
+        await ApiClient.disassociateTextureSetFromModel(setId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error

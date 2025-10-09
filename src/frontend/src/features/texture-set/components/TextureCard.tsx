@@ -56,7 +56,7 @@ function TextureCard({
       const fileId = uploadResult.fileId
 
       // Then add it to the pack
-      await textureSetsApi.addTextureToPackEndpoint(packId, {
+      await textureSetsApi.addTextureToSetEndpoint(packId, {
         fileId: fileId,
         textureType,
       })
@@ -108,7 +108,7 @@ function TextureCard({
 
     try {
       setUploading(true)
-      await textureSetsApi.removeTextureFromPack(packId, texture.id)
+      await textureSetsApi.removeTextureFromSet(packId, texture.id)
 
       toast.current?.show({
         severity: 'success',

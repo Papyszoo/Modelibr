@@ -73,7 +73,7 @@ describe('TexturePreviewPanel', () => {
   })
 
   it('should render with only albedo texture', () => {
-    const packWithAlbedo: TextureSetDto = {
+    const setWithAlbedo: TextureSetDto = {
       ...mockTextureSet,
       textureCount: 1,
       textures: [
@@ -88,12 +88,12 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      render(<TexturePreviewPanel textureSet={packWithAlbedo} />)
+      render(<TexturePreviewPanel textureSet={setWithAlbedo} />)
     }).not.toThrow()
   })
 
   it('should render with multiple textures', () => {
-    const packWithMultipleTextures: TextureSetDto = {
+    const setWithMultipleTextures: TextureSetDto = {
       ...mockTextureSet,
       textureCount: 3,
       textures: [
@@ -122,7 +122,7 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      render(<TexturePreviewPanel textureSet={packWithMultipleTextures} />)
+      render(<TexturePreviewPanel textureSet={setWithMultipleTextures} />)
     }).not.toThrow()
   })
 })
