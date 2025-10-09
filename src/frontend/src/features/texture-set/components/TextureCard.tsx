@@ -14,14 +14,14 @@ import './TextureCard.css'
 interface TextureCardProps {
   textureType: TextureType
   texture: TextureDto | null
-  packId: number
+  setId: number
   onTextureUpdated: () => void
 }
 
 function TextureCard({
   textureType,
   texture,
-  packId,
+  setId,
   onTextureUpdated,
 }: TextureCardProps) {
   const [uploading, setUploading] = useState(false)
@@ -55,8 +55,8 @@ function TextureCard({
       const uploadResult = await ApiClient.uploadFile(file)
       const fileId = uploadResult.fileId
 
-      // Then add it to the pack
-      await textureSetsApi.addTextureToSetEndpoint(packId, {
+      // Then add it to the set
+      await textureSetsApi.addTextureToSetEndpoint(setId, {
         fileId: fileId,
         textureType,
       })
@@ -108,7 +108,7 @@ function TextureCard({
 
     try {
       setUploading(true)
-      await textureSetsApi.removeTextureFromSet(packId, texture.id)
+      await textureSetsApi.removeTextureFromSet(setId, texture.id)
 
       toast.current?.show({
         severity: 'success',
