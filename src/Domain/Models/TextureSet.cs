@@ -3,10 +3,10 @@ using Domain.ValueObjects;
 namespace Domain.Models;
 
 /// <summary>
-/// Represents a collection of textures grouped together as a texture pack.
-/// Enforces business rules such as allowing only one texture per type per pack.
+/// Represents a collection of textures grouped together as a texture set.
+/// Enforces business rules such as allowing only one texture per type per set.
 /// </summary>
-public class TexturePack : AggregateRoot
+public class TextureSet : AggregateRoot
 {
     private readonly List<Texture> _textures = new();
     private readonly List<Model> _models = new();
@@ -41,17 +41,17 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Creates a new TexturePack with the specified name.
+    /// Creates a new TextureSet with the specified name.
     /// </summary>
-    /// <param name="name">The name of the texture pack</param>
-    /// <param name="createdAt">When the texture pack was created</param>
-    /// <returns>A new TexturePack instance</returns>
+    /// <param name="name">The name of the texture set</param>
+    /// <param name="createdAt">When the texture set was created</param>
+    /// <returns>A new TextureSet instance</returns>
     /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
-    public static TexturePack Create(string name, DateTime createdAt)
+    public static TextureSet Create(string name, DateTime createdAt)
     {
         ValidateName(name);
 
-        return new TexturePack
+        return new TextureSet
         {
             Name = name.Trim(),
             CreatedAt = createdAt,
@@ -60,7 +60,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Updates the name of the texture pack.
+    /// Updates the name of the texture set.
     /// </summary>
     /// <param name="name">The new name</param>
     /// <param name="updatedAt">When the update occurred</param>
@@ -74,7 +74,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Adds a texture to the pack, enforcing the business rule that only one texture per type is allowed.
+    /// Adds a texture to the set, enforcing the business rule that only one texture per type is allowed.
     /// </summary>
     /// <param name="texture">The texture to add</param>
     /// <param name="updatedAt">When the texture was added</param>
@@ -88,8 +88,8 @@ public class TexturePack : AggregateRoot
         if (HasTextureOfType(texture.TextureType))
         {
             throw new InvalidOperationException(
-                $"A texture of type '{texture.TextureType.GetDescription()}' already exists in this pack. " +
-                "Only one texture per type is allowed per pack.");
+                $"A texture of type '{texture.TextureType.GetDescription()}' already exists in this set. " +
+                "Only one texture per type is allowed per set.");
         }
 
         _textures.Add(texture);
@@ -97,7 +97,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Removes a texture from the pack.
+    /// Removes a texture from the set.
     /// </summary>
     /// <param name="texture">The texture to remove</param>
     /// <param name="updatedAt">When the texture was removed</param>
@@ -114,7 +114,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Removes a texture of the specified type from the pack.
+    /// Removes a texture of the specified type from the set.
     /// </summary>
     /// <param name="textureType">The type of texture to remove</param>
     /// <param name="updatedAt">When the texture was removed</param>
@@ -133,7 +133,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Checks if the pack contains a texture of the specified type.
+    /// Checks if the set contains a texture of the specified type.
     /// </summary>
     /// <param name="textureType">The texture type to check</param>
     /// <returns>True if a texture of the specified type exists</returns>
@@ -153,7 +153,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Gets all texture types currently in the pack.
+    /// Gets all texture types currently in the set.
     /// </summary>
     /// <returns>Read-only list of texture types</returns>
     public IReadOnlyList<TextureType> GetTextureTypes()
@@ -162,19 +162,19 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Gets the number of textures in the pack.
+    /// Gets the number of textures in the set.
     /// </summary>
     /// <returns>The count of textures</returns>
     public int TextureCount => _textures.Count;
 
     /// <summary>
-    /// Checks if the texture pack is empty (contains no textures).
+    /// Checks if the texture set is empty (contains no textures).
     /// </summary>
-    /// <returns>True if the pack contains no textures</returns>
+    /// <returns>True if the set contains no textures</returns>
     public bool IsEmpty => _textures.Count == 0;
 
     /// <summary>
-    /// Associates a model with this texture pack.
+    /// Associates a model with this texture set.
     /// </summary>
     /// <param name="model">The model to associate</param>
     /// <param name="updatedAt">When the association was made</param>
@@ -192,7 +192,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Removes a model association from this texture pack.
+    /// Removes a model association from this texture set.
     /// </summary>
     /// <param name="model">The model to remove</param>
     /// <param name="updatedAt">When the association was removed</param>
@@ -209,17 +209,17 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Checks if this texture pack is associated with a model with the specified ID.
+    /// Checks if this texture set is associated with a model with the specified ID.
     /// </summary>
     /// <param name="modelId">The model ID to check</param>
-    /// <returns>True if the model is associated with this texture pack</returns>
+    /// <returns>True if the model is associated with this texture set</returns>
     public bool HasModel(int modelId)
     {
         return _models.Any(m => m.Id == modelId);
     }
 
     /// <summary>
-    /// Gets all models associated with this texture pack.
+    /// Gets all models associated with this texture set.
     /// </summary>
     /// <returns>Read-only list of associated models</returns>
     public IReadOnlyList<Model> GetModels()
@@ -228,7 +228,7 @@ public class TexturePack : AggregateRoot
     }
 
     /// <summary>
-    /// Gets a human-readable description of the texture pack.
+    /// Gets a human-readable description of the texture set.
     /// </summary>
     /// <returns>Description including name and texture count</returns>
     public string GetDescription()
@@ -243,9 +243,9 @@ public class TexturePack : AggregateRoot
     private static void ValidateName(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Texture pack name cannot be null or empty.", nameof(name));
+            throw new ArgumentException("Texture set name cannot be null or empty.", nameof(name));
 
         if (name.Length > 200)
-            throw new ArgumentException("Texture pack name cannot exceed 200 characters.", nameof(name));
+            throw new ArgumentException("Texture set name cannot exceed 200 characters.", nameof(name));
     }
 }

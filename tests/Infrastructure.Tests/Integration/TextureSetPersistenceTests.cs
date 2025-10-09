@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Infrastructure.Tests.Integration;
 
-public class TexturePackPersistenceTests
+public class TextureSetPersistenceTests
 {
     [Fact]
-    public async Task TexturePackRepository_LoadsModelsCorrectly()
+    public async Task TextureSetRepository_LoadsModelsCorrectly()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -19,80 +19,80 @@ public class TexturePackPersistenceTests
         using var context = new ApplicationDbContext(options);
         await context.Database.EnsureCreatedAsync();
 
-        var repository = new TexturePackRepository(context);
+        var repository = new TextureSetRepository(context);
 
         // Create and save entities with relationship
-        var texturePack = TexturePack.Create("Test Pack", DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Pack", DateTime.UtcNow);
         var model1 = Model.Create("Model 1", DateTime.UtcNow);
         var model2 = Model.Create("Model 2", DateTime.UtcNow);
         
-        context.TexturePacks.Add(texturePack);
+        context.TextureSets.Add(textureSet);
         context.Models.Add(model1);
         context.Models.Add(model2);
         await context.SaveChangesAsync();
 
-        texturePack.AddModel(model1, DateTime.UtcNow.AddMinutes(1));
-        texturePack.AddModel(model2, DateTime.UtcNow.AddMinutes(2));
+        textureSet.AddModel(model1, DateTime.UtcNow.AddMinutes(1));
+        textureSet.AddModel(model2, DateTime.UtcNow.AddMinutes(2));
         await context.SaveChangesAsync();
 
-        // Act - Load texture pack through repository
-        var loadedTexturePack = await repository.GetByIdAsync(texturePack.Id);
+        // Act - Load texture set through repository
+        var loadedTextureSet = await repository.GetByIdAsync(textureSet.Id);
 
         // Assert
-        Assert.NotNull(loadedTexturePack);
-        Assert.Equal(2, loadedTexturePack.Models.Count);
-        Assert.Contains(loadedTexturePack.Models, m => m.Name == "Model 1");
-        Assert.Contains(loadedTexturePack.Models, m => m.Name == "Model 2");
+        Assert.NotNull(loadedTextureSet);
+        Assert.Equal(2, loadedTextureSet.Models.Count);
+        Assert.Contains(loadedTextureSet.Models, m => m.Name == "Model 1");
+        Assert.Contains(loadedTextureSet.Models, m => m.Name == "Model 2");
     }
 
     [Fact]
-    public async Task TexturePackModelRelationship_BidirectionalPersistence()
+    public async Task TextureSetModelRelationship_BidirectionalPersistence()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: System.Guid.NewGuid().ToString())
             .Options;
 
-        // Create relationship from TexturePack side
+        // Create relationship from TextureSet side
         using (var context = new ApplicationDbContext(options))
         {
             await context.Database.EnsureCreatedAsync();
 
-            var texturePack = TexturePack.Create("Bidirectional Pack", DateTime.UtcNow);
+            var textureSet = TextureSet.Create("Bidirectional Pack", DateTime.UtcNow);
             var model = Model.Create("Bidirectional Model", DateTime.UtcNow);
             
-            context.TexturePacks.Add(texturePack);
+            context.TextureSets.Add(textureSet);
             context.Models.Add(model);
             await context.SaveChangesAsync();
 
-            // Add from TexturePack side
-            texturePack.AddModel(model, DateTime.UtcNow.AddMinutes(1));
+            // Add from TextureSet side
+            textureSet.AddModel(model, DateTime.UtcNow.AddMinutes(1));
             await context.SaveChangesAsync();
         }
 
         // Verify relationship is accessible from both sides
         using (var context = new ApplicationDbContext(options))
         {
-            var texturePack = await context.TexturePacks
+            var textureSet = await context.TextureSets
                 .Include(tp => tp.Models)
                 .FirstAsync();
 
             var model = await context.Models
-                .Include(m => m.TexturePacks)
+                .Include(m => m.TextureSets)
                 .FirstAsync();
 
-            // Assert TexturePack -> Model
-            Assert.Single(texturePack.Models);
-            Assert.Equal("Bidirectional Model", texturePack.Models.First().Name);
+            // Assert TextureSet -> Model
+            Assert.Single(textureSet.Models);
+            Assert.Equal("Bidirectional Model", textureSet.Models.First().Name);
 
-            // Assert Model -> TexturePack
-            Assert.Single(model.TexturePacks);
-            Assert.Equal("Bidirectional Pack", model.TexturePacks.First().Name);
+            // Assert Model -> TextureSet
+            Assert.Single(model.TextureSets);
+            Assert.Equal("Bidirectional Pack", model.TextureSets.First().Name);
         }
     }
 
     [Fact]
-    public async Task TexturePackRepository_GetAllIncludesModels()
+    public async Task TextureSetRepository_GetAllIncludesModels()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -102,28 +102,28 @@ public class TexturePackPersistenceTests
         using var context = new ApplicationDbContext(options);
         await context.Database.EnsureCreatedAsync();
 
-        var repository = new TexturePackRepository(context);
+        var repository = new TextureSetRepository(context);
 
         // Create entities
-        var texturePack1 = TexturePack.Create("Pack 1", DateTime.UtcNow);
-        var texturePack2 = TexturePack.Create("Pack 2", DateTime.UtcNow);
+        var textureSet1 = TextureSet.Create("Pack 1", DateTime.UtcNow);
+        var textureSet2 = TextureSet.Create("Pack 2", DateTime.UtcNow);
         var model = Model.Create("Shared Model", DateTime.UtcNow);
         
-        context.TexturePacks.AddRange(texturePack1, texturePack2);
+        context.TextureSets.AddRange(textureSet1, textureSet2);
         context.Models.Add(model);
         await context.SaveChangesAsync();
 
         // Associate model with both packs
-        texturePack1.AddModel(model, DateTime.UtcNow.AddMinutes(1));
-        texturePack2.AddModel(model, DateTime.UtcNow.AddMinutes(2));
+        textureSet1.AddModel(model, DateTime.UtcNow.AddMinutes(1));
+        textureSet2.AddModel(model, DateTime.UtcNow.AddMinutes(2));
         await context.SaveChangesAsync();
 
         // Act
-        var allTexturePacks = await repository.GetAllAsync();
+        var allTextureSets = await repository.GetAllAsync();
 
         // Assert
-        Assert.Equal(2, allTexturePacks.Count());
-        Assert.All(allTexturePacks, tp => 
+        Assert.Equal(2, allTextureSets.Count());
+        Assert.All(allTextureSets, tp => 
         {
             Assert.Single(tp.Models);
             Assert.Equal("Shared Model", tp.Models.First().Name);

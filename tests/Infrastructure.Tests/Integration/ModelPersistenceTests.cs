@@ -60,7 +60,7 @@ public class ModelPersistenceTests
     }
 
     [Fact]
-    public async Task ModelTexturePackRelationship_PersistsCorrectly()
+    public async Task ModelTextureSetRelationship_PersistsCorrectly()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -78,40 +78,40 @@ public class ModelPersistenceTests
             context.Models.Add(model);
             await context.SaveChangesAsync();
 
-            // Create texture packs
-            var texturePack1 = TexturePack.Create("Pack 1", DateTime.UtcNow);
-            var texturePack2 = TexturePack.Create("Pack 2", DateTime.UtcNow);
-            context.TexturePacks.Add(texturePack1);
-            context.TexturePacks.Add(texturePack2);
+            // Create texture sets
+            var textureSet1 = TextureSet.Create("Pack 1", DateTime.UtcNow);
+            var textureSet2 = TextureSet.Create("Pack 2", DateTime.UtcNow);
+            context.TextureSets.Add(textureSet1);
+            context.TextureSets.Add(textureSet2);
             await context.SaveChangesAsync();
 
-            // Associate texture packs with model using domain methods
-            model.AddTexturePack(texturePack1, DateTime.UtcNow.AddMinutes(1));
-            model.AddTexturePack(texturePack2, DateTime.UtcNow.AddMinutes(2));
+            // Associate texture sets with model using domain methods
+            model.AddTextureSet(textureSet1, DateTime.UtcNow.AddMinutes(1));
+            model.AddTextureSet(textureSet2, DateTime.UtcNow.AddMinutes(2));
             await context.SaveChangesAsync();
         }
 
         // Verify relationships persist correctly
         using (var context = new ApplicationDbContext(options))
         {
-            // Load model with texture packs
+            // Load model with texture sets
             var model = await context.Models
-                .Include(m => m.TexturePacks)
+                .Include(m => m.TextureSets)
                 .FirstAsync();
 
-            // Load texture packs with models
-            var texturePacks = await context.TexturePacks
+            // Load texture sets with models
+            var textureSets = await context.TextureSets
                 .Include(tp => tp.Models)
                 .ToListAsync();
 
             // Assert model side
-            Assert.Equal(2, model.TexturePacks.Count);
-            Assert.Contains(model.TexturePacks, tp => tp.Name == "Pack 1");
-            Assert.Contains(model.TexturePacks, tp => tp.Name == "Pack 2");
+            Assert.Equal(2, model.TextureSets.Count);
+            Assert.Contains(model.TextureSets, tp => tp.Name == "Pack 1");
+            Assert.Contains(model.TextureSets, tp => tp.Name == "Pack 2");
 
-            // Assert texture pack side
-            Assert.Equal(2, texturePacks.Count);
-            Assert.All(texturePacks, tp => 
+            // Assert texture set side
+            Assert.Equal(2, textureSets.Count);
+            Assert.All(textureSets, tp => 
             {
                 Assert.Single(tp.Models);
                 Assert.Equal("Test Model", tp.Models.First().Name);
@@ -120,7 +120,7 @@ public class ModelPersistenceTests
     }
 
     [Fact]
-    public async Task ModelRepository_LoadsTexturePacksCorrectly()
+    public async Task ModelRepository_LoadsTextureSetsCorrectly()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -135,13 +135,13 @@ public class ModelPersistenceTests
 
         // Create and save entities with relationship
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var texturePack = TexturePack.Create("Test Pack", DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Pack", DateTime.UtcNow);
         
         context.Models.Add(model);
-        context.TexturePacks.Add(texturePack);
+        context.TextureSets.Add(textureSet);
         await context.SaveChangesAsync();
 
-        model.AddTexturePack(texturePack, DateTime.UtcNow.AddMinutes(1));
+        model.AddTextureSet(textureSet, DateTime.UtcNow.AddMinutes(1));
         await context.SaveChangesAsync();
 
         // Act - Load model through repository
@@ -149,8 +149,8 @@ public class ModelPersistenceTests
 
         // Assert
         Assert.NotNull(loadedModel);
-        Assert.Single(loadedModel.TexturePacks);
-        Assert.Equal("Test Pack", loadedModel.TexturePacks.First().Name);
+        Assert.Single(loadedModel.TextureSets);
+        Assert.Equal("Test Pack", loadedModel.TextureSets.First().Name);
     }
 }
 

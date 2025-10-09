@@ -5,7 +5,7 @@ namespace Domain.Models
     public class Model : AggregateRoot
     {
         private readonly List<File> _files = new();
-        private readonly List<TexturePack> _texturePacks = new();
+        private readonly List<TextureSet> _textureSets = new();
 
         public int Id { get; set; }
         public string Name { get; private set; } = string.Empty;
@@ -24,15 +24,15 @@ namespace Domain.Models
             }
         }
 
-        // Navigation property for many-to-many relationship with TexturePacks - EF Core requires this to be settable
-        public ICollection<TexturePack> TexturePacks 
+        // Navigation property for many-to-many relationship with TextureSets - EF Core requires this to be settable
+        public ICollection<TextureSet> TextureSets 
         { 
-            get => _texturePacks; 
+            get => _textureSets; 
             set 
             {
-                _texturePacks.Clear();
+                _textureSets.Clear();
                 if (value != null)
-                    _texturePacks.AddRange(value);
+                    _textureSets.AddRange(value);
             }
         }
 
@@ -100,57 +100,57 @@ namespace Domain.Models
         }
 
         /// <summary>
-        /// Associates a texture pack with this model.
+        /// Associates a texture set with this model.
         /// </summary>
-        /// <param name="texturePack">The texture pack to associate</param>
+        /// <param name="textureSet">The texture set to associate</param>
         /// <param name="updatedAt">When the association was made</param>
-        /// <exception cref="ArgumentNullException">Thrown when texturePack is null</exception>
-        public void AddTexturePack(TexturePack texturePack, DateTime updatedAt)
+        /// <exception cref="ArgumentNullException">Thrown when textureSet is null</exception>
+        public void AddTextureSet(TextureSet textureSet, DateTime updatedAt)
         {
-            if (texturePack == null)
-                throw new ArgumentNullException(nameof(texturePack));
+            if (textureSet == null)
+                throw new ArgumentNullException(nameof(textureSet));
 
-            if (_texturePacks.Any(tp => tp.Id == texturePack.Id))
-                return; // Texture pack already associated
+            if (_textureSets.Any(tp => tp.Id == textureSet.Id))
+                return; // Texture set already associated
 
-            _texturePacks.Add(texturePack);
+            _textureSets.Add(textureSet);
             UpdatedAt = updatedAt;
         }
 
         /// <summary>
-        /// Removes a texture pack association from this model.
+        /// Removes a texture set association from this model.
         /// </summary>
-        /// <param name="texturePack">The texture pack to remove</param>
+        /// <param name="textureSet">The texture set to remove</param>
         /// <param name="updatedAt">When the association was removed</param>
-        /// <exception cref="ArgumentNullException">Thrown when texturePack is null</exception>
-        public void RemoveTexturePack(TexturePack texturePack, DateTime updatedAt)
+        /// <exception cref="ArgumentNullException">Thrown when textureSet is null</exception>
+        public void RemoveTextureSet(TextureSet textureSet, DateTime updatedAt)
         {
-            if (texturePack == null)
-                throw new ArgumentNullException(nameof(texturePack));
+            if (textureSet == null)
+                throw new ArgumentNullException(nameof(textureSet));
 
-            if (_texturePacks.Remove(texturePack))
+            if (_textureSets.Remove(textureSet))
             {
                 UpdatedAt = updatedAt;
             }
         }
 
         /// <summary>
-        /// Checks if this model has an associated texture pack with the specified ID.
+        /// Checks if this model has an associated texture set with the specified ID.
         /// </summary>
-        /// <param name="texturePackId">The texture pack ID to check</param>
-        /// <returns>True if the texture pack is associated with this model</returns>
-        public bool HasTexturePack(int texturePackId)
+        /// <param name="textureSetId">The texture set ID to check</param>
+        /// <returns>True if the texture set is associated with this model</returns>
+        public bool HasTextureSet(int textureSetId)
         {
-            return _texturePacks.Any(tp => tp.Id == texturePackId);
+            return _textureSets.Any(tp => tp.Id == textureSetId);
         }
 
         /// <summary>
-        /// Gets all texture packs associated with this model.
+        /// Gets all texture sets associated with this model.
         /// </summary>
-        /// <returns>Read-only list of associated texture packs</returns>
-        public IReadOnlyList<TexturePack> GetTexturePacks()
+        /// <returns>Read-only list of associated texture sets</returns>
+        public IReadOnlyList<TextureSet> GetTextureSets()
         {
-            return _texturePacks.AsReadOnly();
+            return _textureSets.AsReadOnly();
         }
 
         /// <summary>

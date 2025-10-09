@@ -3,22 +3,22 @@ using Application.Abstractions.Repositories;
 using Domain.ValueObjects;
 using SharedKernel;
 
-namespace Application.TexturePacks;
+namespace Application.TextureSets;
 
-internal class GetAllTexturePacksQueryHandler : IQueryHandler<GetAllTexturePacksQuery, GetAllTexturePacksResponse>
+internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse>
 {
-    private readonly ITexturePackRepository _texturePackRepository;
+    private readonly ITextureSetRepository _textureSetRepository;
 
-    public GetAllTexturePacksQueryHandler(ITexturePackRepository texturePackRepository)
+    public GetAllTextureSetsQueryHandler(ITextureSetRepository textureSetRepository)
     {
-        _texturePackRepository = texturePackRepository;
+        _textureSetRepository = textureSetRepository;
     }
 
-    public async Task<Result<GetAllTexturePacksResponse>> Handle(GetAllTexturePacksQuery query, CancellationToken cancellationToken)
+    public async Task<Result<GetAllTextureSetsResponse>> Handle(GetAllTextureSetsQuery query, CancellationToken cancellationToken)
     {
-        var texturePacks = await _texturePackRepository.GetAllAsync(cancellationToken);
+        var textureSets = await _textureSetRepository.GetAllAsync(cancellationToken);
 
-        var texturePackDtos = texturePacks.Select(tp => new TexturePackDto
+        var textureSetDtos = textureSets.Select(tp => new TextureSetDto
         {
             Id = tp.Id,
             Name = tp.Name,
@@ -41,14 +41,14 @@ internal class GetAllTexturePacksQueryHandler : IQueryHandler<GetAllTexturePacks
             }).ToList()
         }).ToList();
 
-        return Result.Success(new GetAllTexturePacksResponse(texturePackDtos));
+        return Result.Success(new GetAllTextureSetsResponse(textureSetDtos));
     }
 }
 
-public record GetAllTexturePacksQuery() : IQuery<GetAllTexturePacksResponse>;
-public record GetAllTexturePacksResponse(IEnumerable<TexturePackDto> TexturePacks);
+public record GetAllTextureSetsQuery() : IQuery<GetAllTextureSetsResponse>;
+public record GetAllTextureSetsResponse(IEnumerable<TextureSetDto> TextureSets);
 
-public record TexturePackDto
+public record TextureSetDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;

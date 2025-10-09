@@ -5,29 +5,29 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-internal sealed class TexturePackRepository : ITexturePackRepository
+internal sealed class TextureSetRepository : ITextureSetRepository
 {
     private readonly ApplicationDbContext _context;
 
-    public TexturePackRepository(ApplicationDbContext context)
+    public TextureSetRepository(ApplicationDbContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<TexturePack> AddAsync(TexturePack texturePack, CancellationToken cancellationToken = default)
+    public async Task<TextureSet> AddAsync(TextureSet textureSet, CancellationToken cancellationToken = default)
     {
-        if (texturePack == null)
-            throw new ArgumentNullException(nameof(texturePack));
+        if (textureSet == null)
+            throw new ArgumentNullException(nameof(textureSet));
 
-        var entityEntry = await _context.TexturePacks.AddAsync(texturePack, cancellationToken);
+        var entityEntry = await _context.TextureSets.AddAsync(textureSet, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
         
         return entityEntry.Entity;
     }
 
-    public async Task<IEnumerable<TexturePack>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<TextureSet>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.TexturePacks
+        return await _context.TextureSets
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
@@ -36,9 +36,9 @@ internal sealed class TexturePackRepository : ITexturePackRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TexturePack?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<TextureSet?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _context.TexturePacks
+        return await _context.TextureSets
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
@@ -46,12 +46,12 @@ internal sealed class TexturePackRepository : ITexturePackRepository
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
     }
 
-    public async Task<TexturePack?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+    public async Task<TextureSet?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(name))
             return null;
 
-        return await _context.TexturePacks
+        return await _context.TextureSets
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
@@ -59,25 +59,25 @@ internal sealed class TexturePackRepository : ITexturePackRepository
             .FirstOrDefaultAsync(tp => tp.Name == name.Trim(), cancellationToken);
     }
 
-    public async Task<TexturePack> UpdateAsync(TexturePack texturePack, CancellationToken cancellationToken = default)
+    public async Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default)
     {
-        if (texturePack == null)
-            throw new ArgumentNullException(nameof(texturePack));
+        if (textureSet == null)
+            throw new ArgumentNullException(nameof(textureSet));
 
-        _context.TexturePacks.Update(texturePack);
+        _context.TextureSets.Update(textureSet);
         await _context.SaveChangesAsync(cancellationToken);
         
-        return texturePack;
+        return textureSet;
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var texturePack = await _context.TexturePacks
+        var textureSet = await _context.TextureSets
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
 
-        if (texturePack != null)
+        if (textureSet != null)
         {
-            _context.TexturePacks.Remove(texturePack);
+            _context.TextureSets.Remove(textureSet);
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
