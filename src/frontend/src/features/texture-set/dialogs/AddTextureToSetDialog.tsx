@@ -90,7 +90,7 @@ function AddTextureToSetDialog({
 
     try {
       setSubmitting(true)
-      await textureSetsApi.addTextureToPackEndpoint(textureSet.id, {
+      await textureSetsApi.addTextureToSetEndpoint(textureSet.id, {
         fileId: selectedFileId,
         textureType: selectedTextureType,
       })
@@ -98,7 +98,7 @@ function AddTextureToSetDialog({
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Texture added to pack successfully',
+        detail: 'Texture added to set successfully',
         life: 3000,
       })
 
