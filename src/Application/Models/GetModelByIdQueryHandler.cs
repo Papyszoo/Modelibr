@@ -29,6 +29,8 @@ namespace Application.Models
                 Name = model.Name,
                 CreatedAt = model.CreatedAt,
                 UpdatedAt = model.UpdatedAt,
+                Tags = model.Tags,
+                Description = model.Description,
                 Files = model.Files.Select(f => new FileDto
                 {
                     Id = f.Id,

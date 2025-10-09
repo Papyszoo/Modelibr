@@ -25,6 +25,8 @@ namespace Application.Models
                 Name = m.Name,
                 CreatedAt = m.CreatedAt,
                 UpdatedAt = m.UpdatedAt,
+                Tags = m.Tags,
+                Description = m.Description,
                 Files = m.Files.Select(f => new FileDto
                 {
                     Id = f.Id,
@@ -50,6 +52,8 @@ namespace Application.Models
         public string Name { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
         public DateTime UpdatedAt { get; init; }
+        public string? Tags { get; init; }
+        public string? Description { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
     }
 
