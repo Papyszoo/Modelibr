@@ -11,7 +11,7 @@
   overflow: auto;
 }
 
-.model-grid-container:hover {
+.model-grid-container:hover:not(.drag-over) {
   border-color: #3182ce;
   background: rgba(49, 130, 206, 0.05);
 }
