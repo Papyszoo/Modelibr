@@ -69,7 +69,6 @@ function TexturePreviewPanel({ textureSet }: TexturePreviewPanelProps) {
         </div>
 
         <Canvas
-          camera={{ position: [4, 3, 4], fov: 50 }}
           shadows
           className="texture-preview-canvas"
           gl={{
@@ -80,12 +79,7 @@ function TexturePreviewPanel({ textureSet }: TexturePreviewPanelProps) {
           dpr={Math.min(window.devicePixelRatio, 2)}
         >
           {/* Stage provides automatic lighting, shadows, and camera positioning */}
-          <Stage
-            intensity={0.5}
-            environment="city"
-            shadows={{ type: 'accumulative', bias: -0.001 }}
-            adjustCamera={2.5}
-          >
+          <Stage intensity={0.5} environment="city" adjustCamera={2.5}>
             <Suspense fallback={<LoadingPlaceholder />}>
               <TexturedGeometry
                 geometryType={previewSettings.type}

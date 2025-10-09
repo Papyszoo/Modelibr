@@ -37,9 +37,7 @@ function TexturedGeometry({
   // Rotate the geometry with configurable speed
   useFrame(() => {
     if (meshRef.current) {
-      const rotationSpeed = geometryParams.rotationSpeed || 0.01
-      meshRef.current.rotation.y += rotationSpeed
-      meshRef.current.rotation.x += rotationSpeed * 0.5
+      meshRef.current.rotation.y += geometryParams.rotationSpeed
     }
   })
 

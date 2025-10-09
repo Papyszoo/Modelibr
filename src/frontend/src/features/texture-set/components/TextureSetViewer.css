@@ -64,6 +64,10 @@
   padding: 0.5rem;
 }
 
+.p-tabview-panel {
+  height: 100%;
+}
+
 @media (min-width: 1024px) {
   .texture-cards-grid {
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
