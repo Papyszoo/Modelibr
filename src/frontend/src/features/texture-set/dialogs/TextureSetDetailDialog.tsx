@@ -76,10 +76,7 @@ function TextureSetDetailDialog({
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await textureSetsApi.removeTextureFromSet(
-            currentSet.id,
-            texture.id
-          )
+          await textureSetsApi.removeTextureFromSet(currentSet.id, texture.id)
           toast.current?.show({
             severity: 'success',
             summary: 'Success',

@@ -67,7 +67,7 @@ function TextureSetList() {
     }
   }
 
-  const handleDeleteTextureSet = (textureSet: TextureSetDto) => {
+  const _handleDeleteTextureSet = (textureSet: TextureSetDto) => {
     confirmDialog({
       message: `Are you sure you want to delete the texture set "${textureSet.name}"?`,
       header: 'Delete Confirmation',
@@ -101,24 +101,24 @@ function TextureSetList() {
 
   const handleFileDrop = async (files: File[] | FileList) => {
     const fileArray = Array.from(files)
-    
+
     for (const file of fileArray) {
       try {
         // 1. Upload the file
         const uploadResult = await ApiClient.uploadFile(file)
-        
+
         // 2. Create a new texture set with the file name (without extension)
         const fileName = file.name.replace(/\.[^/.]+$/, '')
-        const createResult = await textureSetsApi.createTextureSet({ 
-          name: fileName 
+        const createResult = await textureSetsApi.createTextureSet({
+          name: fileName,
         })
-        
+
         // 3. Add the uploaded file as an albedo texture to the new set
         await ApiClient.addTextureToSetEndpoint(createResult.id, {
           fileId: uploadResult.fileId,
-          textureType: TextureType.Albedo
+          textureType: TextureType.Albedo,
         })
-        
+
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
@@ -135,7 +135,7 @@ function TextureSetList() {
         })
       }
     }
-    
+
     // Refresh the texture sets list
     loadTextureSets()
   }

@@ -34,7 +34,7 @@ export default function TextureSetGrid({
     const diffuse = textureSet.textures?.find(
       t => t.textureType === TextureType.Diffuse
     )
-    
+
     const texture = albedo || diffuse
     if (texture) {
       return ApiClient.getFileUrl(texture.fileId.toString())
@@ -70,7 +70,9 @@ export default function TextureSetGrid({
         <i className="pi pi-images" />
         <h3>No Texture Sets</h3>
         <p>Drag and drop texture files here to create new sets</p>
-        <p className="hint">Each file will create a new texture set with an albedo texture</p>
+        <p className="hint">
+          Each file will create a new texture set with an albedo texture
+        </p>
       </div>
     )
   }
@@ -104,7 +106,7 @@ export default function TextureSetGrid({
       <div className="texture-set-grid">
         {filteredTextureSets.map(textureSet => {
           const albedoUrl = getAlbedoTextureUrl(textureSet)
-          
+
           return (
             <div
               key={textureSet.id}
@@ -113,8 +115,8 @@ export default function TextureSetGrid({
             >
               <div className="texture-set-card-thumbnail">
                 {albedoUrl ? (
-                  <img 
-                    src={albedoUrl} 
+                  <img
+                    src={albedoUrl}
                     alt={textureSet.name}
                     className="texture-set-image"
                   />
@@ -125,11 +127,14 @@ export default function TextureSetGrid({
                   </div>
                 )}
                 <div className="texture-set-card-overlay">
-                  <span className="texture-set-card-name">{textureSet.name}</span>
+                  <span className="texture-set-card-name">
+                    {textureSet.name}
+                  </span>
                   <div className="texture-set-card-info">
                     <span className="texture-count">
                       <i className="pi pi-palette" />
-                      {textureSet.textureCount || 0} texture{textureSet.textureCount !== 1 ? 's' : ''}
+                      {textureSet.textureCount || 0} texture
+                      {textureSet.textureCount !== 1 ? 's' : ''}
                     </span>
                   </div>
                 </div>
