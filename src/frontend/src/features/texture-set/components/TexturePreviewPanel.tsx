@@ -12,9 +12,13 @@ import './TexturePreviewPanel.css'
 
 interface TexturePreviewPanelProps {
   textureSet: TextureSetDto
+  side?: 'left' | 'right'
 }
 
-function TexturePreviewPanel({ textureSet }: TexturePreviewPanelProps) {
+function TexturePreviewPanel({
+  textureSet,
+  side = 'left',
+}: TexturePreviewPanelProps) {
   const [infoWindowVisible, setInfoWindowVisible] = useState<boolean>(false)
   const [settingsWindowVisible, setSettingsWindowVisible] =
     useState<boolean>(false)
@@ -105,7 +109,7 @@ function TexturePreviewPanel({ textureSet }: TexturePreviewPanelProps) {
         visible={settingsWindowVisible}
         onClose={() => setSettingsWindowVisible(false)}
         title="Preview Settings"
-        side="left"
+        side={side}
         windowId="preview-settings"
       >
         <PreviewSettings
@@ -117,7 +121,7 @@ function TexturePreviewPanel({ textureSet }: TexturePreviewPanelProps) {
         visible={infoWindowVisible}
         onClose={() => setInfoWindowVisible(false)}
         title="Preview Information"
-        side="left"
+        side={side}
         windowId="preview-info"
       >
         <PreviewInfo
