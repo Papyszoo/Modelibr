@@ -266,6 +266,61 @@
             return Math.floor(count);
         }
 
+        // Clear the scene by removing the previous model
+        function clearScene() {
+            if (window.modelRenderer.model && window.modelRenderer.scene) {
+                try {
+                    // Remove the model from the scene
+                    window.modelRenderer.scene.remove(window.modelRenderer.model);
+                    
+                    // Dispose of geometries and materials to free memory
+                    window.modelRenderer.model.traverse((child) => {
+                        if (child.isMesh) {
+                            try {
+                                if (child.geometry) {
+                                    child.geometry.dispose();
+                                }
+                            } catch (e) {
+                                console.warn('Failed to dispose geometry:', e);
+                            }
+                            
+                            try {
+                                if (child.material) {
+                                    if (Array.isArray(child.material)) {
+                                        child.material.forEach(material => {
+                                            try {
+                                                material.dispose();
+                                            } catch (e) {
+                                                console.warn('Failed to dispose material:', e);
+                                            }
+                                        });
+                                    } else {
+                                        child.material.dispose();
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('Failed to dispose material:', e);
+                            }
+                        }
+                    });
+                    
+                    // Clear the model reference
+                    window.modelRenderer.model = null;
+                    window.modelRenderer.isReady = false;
+                    
+                    console.log('Scene cleared successfully');
+                    return true;
+                } catch (error) {
+                    console.error('Error clearing scene:', error);
+                    // Still clear the references even if disposal fails
+                    window.modelRenderer.model = null;
+                    window.modelRenderer.isReady = false;
+                    return false;
+                }
+            }
+            return false;
+        }
+
         // Expose THREE and API for Puppeteer
         window.THREE = THREE;
         window.initRenderer = initScene;
@@ -275,6 +330,7 @@
         window.renderScene = renderScene;
         window.getCanvasDataURL = getCanvasDataURL;
         window.countPolygons = countPolygons;
+        window.clearScene = clearScene;
 
         console.log('3D Renderer initialized and ready');
     </script>

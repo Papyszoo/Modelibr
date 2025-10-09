@@ -22,6 +22,8 @@ export class JobProcessor {
     this.frameEncoder = null // Will be initialized when needed
     this.isShuttingDown = false
     this.activeJobs = new Map()
+    this.jobQueue = [] // Local queue for sequential processing
+    this.isProcessingQueue = false // Flag to prevent concurrent queue processing
   }
 
   /**
@@ -74,12 +76,11 @@ export class JobProcessor {
    */
   async handleJobNotification(job) {
     try {
-      // Check if we can accept more jobs
-      if (this.activeJobs.size >= config.maxConcurrentJobs) {
-        logger.debug('Max concurrent jobs reached, ignoring job notification', {
+      // Check if we can accept more jobs (queue size limit)
+      if (this.jobQueue.length >= 50) {
+        logger.debug('Job queue is full, ignoring job notification', {
           jobId: job.id,
-          activeJobs: this.activeJobs.size,
-          maxConcurrentJobs: config.maxConcurrentJobs,
+          queueSize: this.jobQueue.length,
         })
         return
       }
@@ -101,16 +102,24 @@ export class JobProcessor {
           config.workerId
         )
 
-        // Process job asynchronously
-        this.processJobAsync(claimedJob)
+        // Add job to queue for sequential processing
+        this.jobQueue.push(claimedJob)
+        logger.debug('Job added to queue', {
+          jobId: claimedJob.id,
+          queuePosition: this.jobQueue.length,
+        })
+
+        // Start processing queue if not already processing
+        this.processQueue()
       } else if (claimedJob) {
         logger.debug('Claimed a different job than notified', {
           notifiedJobId: job.id,
           claimedJobId: claimedJob.id,
         })
 
-        // Still process the claimed job
-        this.processJobAsync(claimedJob)
+        // Still add the claimed job to queue
+        this.jobQueue.push(claimedJob)
+        this.processQueue()
       } else {
         logger.debug('Job was already claimed by another worker', {
           jobId: job.id,
@@ -122,6 +131,32 @@ export class JobProcessor {
         error: error.message,
         stack: error.stack,
       })
+    }
+  }
+
+  /**
+   * Process jobs from the queue sequentially
+   */
+  async processQueue() {
+    // Prevent concurrent queue processing
+    if (this.isProcessingQueue) {
+      return
+    }
+
+    this.isProcessingQueue = true
+
+    try {
+      while (this.jobQueue.length > 0 && !this.isShuttingDown) {
+        const job = this.jobQueue.shift()
+        logger.info('Processing job from queue', {
+          jobId: job.id,
+          remainingInQueue: this.jobQueue.length,
+        })
+
+        await this.processJobAsync(job)
+      }
+    } finally {
+      this.isProcessingQueue = false
     }
   }
 
@@ -542,6 +577,15 @@ export class JobProcessor {
       this.cleanupInterval = null
     }
 
+    // Log remaining jobs in queue
+    if (this.jobQueue.length > 0) {
+      logger.warn('Jobs remaining in queue during shutdown', {
+        queueSize: this.jobQueue.length,
+        jobIds: this.jobQueue.map(j => j.id),
+      })
+      this.jobQueue = [] // Clear the queue
+    }
+
     // Dispose of Puppeteer renderer resources
     if (this.puppeteerRenderer) {
       await this.puppeteerRenderer.dispose()
@@ -559,11 +603,12 @@ export class JobProcessor {
     const startTime = Date.now()
 
     while (
-      this.activeJobs.size > 0 &&
+      (this.activeJobs.size > 0 || this.isProcessingQueue) &&
       Date.now() - startTime < shutdownTimeout
     ) {
       logger.info('Waiting for active jobs to complete', {
         activeJobs: this.activeJobs.size,
+        isProcessingQueue: this.isProcessingQueue,
         remainingTimeoutMs: shutdownTimeout - (Date.now() - startTime),
       })
       await this.sleep(1000)
@@ -588,6 +633,8 @@ export class JobProcessor {
     return {
       isShuttingDown: this.isShuttingDown,
       activeJobs: this.activeJobs.size,
+      queueSize: this.jobQueue.length,
+      isProcessingQueue: this.isProcessingQueue,
       maxConcurrentJobs: config.maxConcurrentJobs,
       workerId: config.workerId,
       signalrConnected: this.signalrQueueService.connected,

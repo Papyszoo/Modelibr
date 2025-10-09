@@ -142,13 +142,54 @@ export class PuppeteerRenderer {
    * @returns {Promise<number>} Polygon count
    */
   async loadModel(filePath, fileType) {
-    if (!this.page) {
-      throw new Error('Renderer not initialized')
+    // Check if page exists and is still connected
+    if (!this.page || this.page.isClosed()) {
+      logger.warn('Renderer page is not available, reinitializing')
+      // Close existing browser if it exists
+      if (this.browser) {
+        try {
+          await this.browser.close()
+        } catch (e) {
+          logger.debug('Error closing browser during reinit', { error: e.message })
+        }
+        this.browser = null
+      }
+      this.page = null
+      
+      // Reinitialize
+      try {
+        await this.initialize()
+        logger.info('Renderer reinitialized successfully')
+      } catch (initError) {
+        logger.error('Failed to reinitialize renderer', {
+          error: initError.message,
+        })
+        throw new Error('Renderer not initialized and reinitialize failed')
+      }
     }
 
     logger.debug('Loading model in browser', { filePath, fileType })
 
     try {
+      // Clear any previously loaded model from the scene
+      try {
+        const cleared = await this.page.evaluate(() => {
+          if (typeof window.clearScene === 'function') {
+            return window.clearScene()
+          }
+          return false
+        })
+
+        if (cleared) {
+          logger.debug('Previous model cleared from scene')
+        }
+      } catch (clearError) {
+        logger.warn('Failed to clear previous scene, continuing anyway', {
+          error: clearError.message,
+        })
+        // Continue even if clearing fails - the new model will still load
+      }
+
       // Read the file and convert to data URL
       const fileBuffer = fs.readFileSync(filePath)
       const base64Data = fileBuffer.toString('base64')
