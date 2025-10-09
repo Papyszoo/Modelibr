@@ -57,16 +57,18 @@ export class TagAggregator {
     aggregatedTags.sort((a, b) => b.probability - a.probability)
     const topTags = aggregatedTags.slice(0, maxTags)
 
-    // Format tags as comma-separated string with confidence
+    // Format tags as comma-separated string (simple, searchable)
     const tagsString = topTags
+      .map(tag => tag.className)
+      .join(', ')
+
+    // Generate description with percentages and occurrences
+    const description = topTags
       .map(
         tag =>
           `${tag.className} (${(tag.probability * 100).toFixed(1)}%, ${tag.occurrences}x)`
       )
       .join(', ')
-
-    // Generate description from top 3 tags
-    const description = this.generateDescription(topTags.slice(0, 3))
 
     logger.info('Tags aggregated successfully', {
       totalPredictions: allTags.length,
@@ -78,28 +80,6 @@ export class TagAggregator {
     return {
       tags: tagsString,
       description,
-    }
-  }
-
-  /**
-   * Generate a simple description from top tags
-   * @param {Array<{className: string, probability: number}>} topTags
-   * @returns {string}
-   */
-  static generateDescription(topTags) {
-    if (topTags.length === 0) {
-      return 'No description available'
-    }
-
-    const tagNames = topTags.map(t => t.className)
-
-    if (tagNames.length === 1) {
-      return `Contains ${tagNames[0]}`
-    } else if (tagNames.length === 2) {
-      return `Contains ${tagNames[0]} and ${tagNames[1]}`
-    } else {
-      const lastTag = tagNames.pop()
-      return `Contains ${tagNames.join(', ')}, and ${lastTag}`
     }
   }
 }

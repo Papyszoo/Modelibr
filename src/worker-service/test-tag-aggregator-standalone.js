@@ -47,35 +47,22 @@ class TagAggregator {
     aggregatedTags.sort((a, b) => b.probability - a.probability)
     const topTags = aggregatedTags.slice(0, maxTags)
 
+    // Format tags as comma-separated string (simple, searchable)
     const tagsString = topTags
+      .map(tag => tag.className)
+      .join(', ')
+
+    // Generate description with percentages and occurrences
+    const description = topTags
       .map(
         tag =>
           `${tag.className} (${(tag.probability * 100).toFixed(1)}%, ${tag.occurrences}x)`
       )
       .join(', ')
 
-    const description = this.generateDescription(topTags.slice(0, 3))
-
     return {
       tags: tagsString,
       description,
-    }
-  }
-
-  static generateDescription(topTags) {
-    if (topTags.length === 0) {
-      return 'No description available'
-    }
-
-    const tagNames = topTags.map(t => t.className)
-
-    if (tagNames.length === 1) {
-      return `Contains ${tagNames[0]}`
-    } else if (tagNames.length === 2) {
-      return `Contains ${tagNames[0]} and ${tagNames[1]}`
-    } else {
-      const lastTag = tagNames.pop()
-      return `Contains ${tagNames.join(', ')}, and ${lastTag}`
     }
   }
 }
@@ -104,10 +91,8 @@ const result1 = TagAggregator.aggregateTags(predictions1, {
 
 console.log('Result:', result1)
 console.assert(result1.tags.includes('table'), 'Should include "table" tag')
-console.assert(
-  result1.description.includes('table'),
-  'Description should include "table"'
-)
+console.assert(result1.tags === 'table, chair, furniture, wooden object', 'Tags should be comma-separated names')
+console.assert(result1.description.includes('75.0%'), 'Description should include percentages')
 console.log('✓ Test 1 passed\n')
 
 // Test 2: Low confidence filtering
@@ -176,8 +161,8 @@ const result4 = TagAggregator.aggregateTags(predictions4, {
 
 console.log('Result:', result4)
 console.assert(
-  result4.description.startsWith('Contains'),
-  'Description should start with "Contains"'
+  result4.description.includes('%'),
+  'Description should include percentages'
 )
 console.log('✓ Test 4 passed\n')
 
@@ -193,8 +178,8 @@ const result5 = TagAggregator.aggregateTags(predictions5, {
 console.log('Result:', result5)
 console.assert(result5.tags === '', 'Tags should be empty')
 console.assert(
-  result5.description === 'No description available',
-  'Should have default description'
+  result5.description === '',
+  'Description should be empty too'
 )
 console.log('✓ Test 5 passed\n')
 
@@ -213,8 +198,8 @@ const result6 = TagAggregator.aggregateTags(predictions6, {
 })
 
 console.log('Result:', result6)
-console.assert(result6.tags.includes('3x'), 'Should show 3 occurrences for cube')
-console.assert(result6.tags.includes('1x'), 'Should show 1 occurrence for box')
+console.assert(result6.description.includes('3x'), 'Description should show 3 occurrences for cube')
+console.assert(result6.description.includes('1x'), 'Description should show 1 occurrence for box')
 console.log('✓ Test 6 passed\n')
 
 console.log('All tests passed! ✓')
