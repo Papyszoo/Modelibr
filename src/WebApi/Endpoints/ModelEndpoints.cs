@@ -17,6 +17,10 @@ public static class ModelEndpoints
         app.MapPost("/models/{modelId}/files", AddFileToModel)
         .WithName("Add File to Model")
         .DisableAntiforgery();
+
+        app.MapPost("/models/{modelId}/tags", UpdateModelTags)
+        .WithName("Update Model Tags")
+        .WithTags("Models");
     }
 
     private static async Task<IResult> CreateModel(
@@ -81,4 +85,28 @@ public static class ModelEndpoints
 
         return Result.Success();
     }
+
+    private static async Task<IResult> UpdateModelTags(
+        int modelId,
+        UpdateModelTagsRequest request,
+        ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new UpdateModelTagsCommand(
+            modelId,
+            request.Tags,
+            request.Description
+        );
+
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
 }
+
+public record UpdateModelTagsRequest(string? Tags, string? Description);

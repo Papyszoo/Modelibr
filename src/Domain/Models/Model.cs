@@ -11,6 +11,8 @@ namespace Domain.Models
         public string Name { get; private set; } = string.Empty;
         public DateTime CreatedAt { get; private set; }
         public DateTime UpdatedAt { get; private set; }
+        public string? Tags { get; private set; }
+        public string? Description { get; private set; }
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
         public ICollection<File> Files 
@@ -165,6 +167,19 @@ namespace Domain.Models
                 throw new ArgumentException("Model hash cannot be null or empty.", nameof(modelHash));
 
             RaiseDomainEvent(new ModelUploadedEvent(Id, modelHash, isNewModel));
+        }
+
+        /// <summary>
+        /// Sets the AI-generated tags and description for this model.
+        /// </summary>
+        /// <param name="tags">Comma-separated list of tags with optional confidence scores</param>
+        /// <param name="description">Generated description of the model</param>
+        /// <param name="updatedAt">When the tags were set</param>
+        public void SetTagsAndDescription(string? tags, string? description, DateTime updatedAt)
+        {
+            Tags = tags;
+            Description = description;
+            UpdatedAt = updatedAt;
         }
     }
 }
