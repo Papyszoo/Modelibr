@@ -10,12 +10,13 @@
 
 ## Quick Reference
 
-### Model Management (5 endpoints)
+### Model Management (6 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/models` | Upload new 3D model |
 | `POST` | `/models/{modelId}/files` | Add file to existing model |
+| `POST` | `/models/{modelId}/tags` | Update model tags and description (worker) |
 | `GET` | `/models` | List all models |
 | `GET` | `/models/{id}` | Get model details |
 | `GET` | `/models/{id}/file` | Download model file |
@@ -57,7 +58,7 @@
 | `POST` | `/api/thumbnail-jobs/{jobId}/complete` | Mark job complete (workers only) |
 | `POST` | `/api/test/thumbnail-complete/{modelId}` | Test completion notification (dev) |
 
-**Total:** 22 endpoints
+**Total:** 23 endpoints
 
 ## Common Usage Examples
 
