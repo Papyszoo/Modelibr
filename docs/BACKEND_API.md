@@ -17,6 +17,7 @@
 | `POST` | `/models` | Upload new 3D model |
 | `POST` | `/models/{modelId}/files` | Add file to existing model |
 | `GET` | `/models` | List all models |
+| `GET` | `/models?packId={id}` | List models filtered by pack |
 | `GET` | `/models/{id}` | Get model details |
 | `GET` | `/models/{id}/file` | Download model file |
 
@@ -40,14 +41,29 @@
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/texture-sets` | List all texture sets |
+| `GET` | `/texture-sets?packId={id}` | List texture sets filtered by pack |
 | `GET` | `/texture-sets/{id}` | Get texture set details |
 | `POST` | `/texture-sets` | Create new texture set |
 | `PUT` | `/texture-sets/{id}` | Update texture set |
 | `DELETE` | `/texture-sets/{id}` | Delete texture set |
-| `POST` | `/texture-sets/{id}/textures` | Add texture to pack |
-| `DELETE` | `/texture-sets/{packId}/textures/{textureId}` | Remove texture from pack |
-| `POST` | `/texture-sets/{packId}/models/{modelId}` | Associate pack with model |
-| `DELETE` | `/texture-sets/{packId}/models/{modelId}` | Disassociate pack from model |
+| `POST` | `/texture-sets/{id}/textures` | Add texture to set |
+| `DELETE` | `/texture-sets/{packId}/textures/{textureId}` | Remove texture from set |
+| `POST` | `/texture-sets/{packId}/models/{modelId}` | Associate set with model |
+| `DELETE` | `/texture-sets/{packId}/models/{modelId}` | Disassociate set from model |
+
+### Packs (9 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/packs` | List all packs |
+| `GET` | `/packs/{id}` | Get pack details |
+| `POST` | `/packs` | Create new pack |
+| `PUT` | `/packs/{id}` | Update pack |
+| `DELETE` | `/packs/{id}` | Delete pack |
+| `POST` | `/packs/{packId}/models/{modelId}` | Add model to pack |
+| `DELETE` | `/packs/{packId}/models/{modelId}` | Remove model from pack |
+| `POST` | `/packs/{packId}/texture-sets/{textureSetId}` | Add texture set to pack |
+| `DELETE` | `/packs/{packId}/texture-sets/{textureSetId}` | Remove texture set from pack |
 
 ### Worker API - Thumbnail Jobs (3 endpoints)
 
@@ -151,6 +167,45 @@ Texture types: `Albedo`, `Normal`, `Metallic`, `Roughness`, `AmbientOcclusion`, 
 ### Associate Texture Set with Model
 ```bash
 curl -X POST http://localhost:5009/texture-sets/1/models/5
+```
+
+### Create Pack
+```bash
+curl -X POST http://localhost:5009/packs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Character Assets",
+    "description": "All assets for the main character"
+  }'
+```
+
+Response:
+```json
+{
+  "id": 1,
+  "name": "Character Assets",
+  "description": "All assets for the main character"
+}
+```
+
+### Add Model to Pack
+```bash
+curl -X POST http://localhost:5009/packs/1/models/5
+```
+
+### Add Texture Set to Pack
+```bash
+curl -X POST http://localhost:5009/packs/1/texture-sets/3
+```
+
+### List Models in Pack
+```bash
+curl http://localhost:5009/models?packId=1
+```
+
+### List Texture Sets in Pack
+```bash
+curl http://localhost:5009/texture-sets?packId=1
 ```
 
 ## Endpoint Details
