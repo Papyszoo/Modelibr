@@ -243,4 +243,49 @@ export class ThumbnailApiService {
       return false
     }
   }
+
+  /**
+   * Update model tags and description via backend API
+   * @param {number} modelId - The model ID to update
+   * @param {string} tags - Comma-separated tags with confidence scores
+   * @param {string} description - Generated description
+   * @returns {Promise<Object>} Update result
+   */
+  async updateModelTags(modelId, tags, description) {
+    try {
+      logger.info('Updating model tags via API', {
+        modelId,
+        tagsPreview: tags?.substring(0, 100),
+        description,
+      })
+
+      const response = await this.client.post(`/models/${modelId}/tags`, {
+        tags,
+        description,
+      })
+
+      logger.info('Model tags updated successfully', {
+        modelId,
+        responseData: response.data,
+      })
+
+      return {
+        success: true,
+        data: response.data,
+      }
+    } catch (error) {
+      logger.error('Failed to update model tags via API', {
+        modelId,
+        error: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+      })
+
+      return {
+        success: false,
+        error: error.message,
+        details: error.response?.data,
+      }
+    }
+  }
 }

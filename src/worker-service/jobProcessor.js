@@ -5,6 +5,10 @@ import { PuppeteerRenderer } from './puppeteerRenderer.js'
 import { FrameEncoderService } from './frameEncoderService.js'
 import { ThumbnailStorageService } from './thumbnailStorageService.js'
 import { JobEventService } from './jobEventService.js'
+import { SixSideRenderer } from './sixSideRenderer.js'
+import { getTaggerInstance } from './imageTagger/mobilenetTagger.js'
+import { TagAggregator } from './imageTagger/tagAggregator.js'
+import { ThumbnailApiService } from './thumbnailApiService.js'
 import { config } from './config.js'
 import logger, { withJobContext } from './logger.js'
 
@@ -18,8 +22,11 @@ export class JobProcessor {
     this.modelFileService = new ModelFileService()
     this.thumbnailStorage = new ThumbnailStorageService()
     this.jobEventService = new JobEventService()
+    this.thumbnailApiService = new ThumbnailApiService()
     this.puppeteerRenderer = null // Will be initialized when needed
     this.frameEncoder = null // Will be initialized when needed
+    this.sixSideRenderer = null // Will be initialized when needed
+    this.imageTagger = getTaggerInstance() // Singleton image tagger
     this.isShuttingDown = false
     this.activeJobs = new Map()
     this.jobQueue = [] // Local queue for sequential processing
@@ -417,6 +424,87 @@ export class JobProcessor {
               job.id,
               storageResult.uploadResults
             )
+
+            // Step 7: Run image classification on 6-side views (if enabled)
+            if (config.imageClassification.enabled) {
+              try {
+                jobLogger.info('Starting image classification on 6-side views')
+
+                // Initialize six-side renderer if not already done
+                if (!this.sixSideRenderer) {
+                  this.sixSideRenderer = new SixSideRenderer(
+                    this.puppeteerRenderer
+                  )
+                }
+
+                // Render 6-side views
+                const sideImages = await this.sixSideRenderer.renderSixSides(
+                  jobLogger
+                )
+
+                // Initialize image tagger
+                await this.imageTagger.initialize()
+
+                // Classify each side image
+                const allPredictions = []
+                for (let i = 0; i < sideImages.length; i++) {
+                  const predictions = await this.imageTagger.describeImage(
+                    sideImages[i],
+                    config.imageClassification.topKPerImage
+                  )
+                  allPredictions.push(predictions)
+                  jobLogger.debug('Classified side image', {
+                    sideIndex: i,
+                    topPrediction: predictions[0]?.className,
+                    confidence: predictions[0]?.probability,
+                  })
+                }
+
+                // Aggregate tags from all predictions
+                const { tags, description } = TagAggregator.aggregateTags(
+                  allPredictions,
+                  {
+                    minConfidence: config.imageClassification.minConfidence,
+                    maxTags: config.imageClassification.maxTags,
+                  }
+                )
+
+                jobLogger.info('Image classification completed', {
+                  tags,
+                  description,
+                })
+
+                // Update model tags via API
+                const updateResult =
+                  await this.thumbnailApiService.updateModelTags(
+                    job.modelId,
+                    tags,
+                    description
+                  )
+
+                if (updateResult.success) {
+                  jobLogger.info('Model tags updated successfully')
+                } else {
+                  jobLogger.warn(
+                    'Failed to update model tags, continuing anyway',
+                    {
+                      error: updateResult.error,
+                    }
+                  )
+                }
+              } catch (classificationError) {
+                // Don't fail the entire job if classification fails
+                jobLogger.warn(
+                  'Image classification failed, continuing with thumbnail completion',
+                  {
+                    error: classificationError.message,
+                    stack: classificationError.stack,
+                  }
+                )
+              }
+            } else {
+              jobLogger.info('Image classification is disabled, skipping')
+            }
 
             // Extract thumbnail metadata from successful upload for job completion
             if (

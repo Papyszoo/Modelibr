@@ -79,4 +79,10 @@ internal sealed class ModelRepository : IModelRepository
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Files.Any(f => f.Sha256Hash == sha256Hash), cancellationToken);
     }
+
+    public async Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
+    {
+        _context.Models.Update(model);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }
