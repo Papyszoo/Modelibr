@@ -7,8 +7,8 @@ export interface Tab {
     | 'modelViewer'
     | 'texture'
     | 'animation'
-    | 'texturePacks'
-    | 'texturePackViewer'
+    | 'textureSets'
+    | 'textureSetViewer'
     | 'settings'
   label?: string
   modelId?: string
@@ -19,7 +19,7 @@ export interface SplitterEvent {
   sizes: number[]
 }
 
-// TexturePack related types
+// TextureSet related types
 export enum TextureType {
   Albedo = 1,
   Normal = 2,
@@ -44,7 +44,7 @@ export interface ModelSummaryDto {
   name: string
 }
 
-export interface TexturePackDto {
+export interface TextureSetDto {
   id: number
   name: string
   createdAt: string
@@ -56,40 +56,40 @@ export interface TexturePackDto {
 }
 
 // API Request/Response types
-export interface GetAllTexturePacksResponse {
-  texturePacks: TexturePackDto[]
+export interface GetAllTextureSetsResponse {
+  textureSets: TextureSetDto[]
 }
 
-export interface GetTexturePackByIdResponse {
-  texturePack: TexturePackDto
+export interface GetTextureSetByIdResponse {
+  textureSet: TextureSetDto
 }
 
-export interface CreateTexturePackRequest {
+export interface CreateTextureSetRequest {
   name: string
 }
 
-export interface CreateTexturePackResponse {
+export interface CreateTextureSetResponse {
   id: number
   name: string
 }
 
-export interface UpdateTexturePackRequest {
+export interface UpdateTextureSetRequest {
   name: string
 }
 
-export interface UpdateTexturePackResponse {
+export interface UpdateTextureSetResponse {
   id: number
   name: string
 }
 
-export interface AddTextureToPackRequest {
+export interface AddTextureToSetRequest {
   fileId: number
   textureType: TextureType
 }
 
-export interface AddTextureToPackResponse {
+export interface AddTextureToSetResponse {
   textureId: number
-  packId: number
+  setId: number
 }
 
 // Error response type

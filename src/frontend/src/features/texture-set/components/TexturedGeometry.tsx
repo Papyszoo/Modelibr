@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useTexture } from '@react-three/drei'
 import { GeometryType } from './GeometrySelector'
-import { TexturePackDto, TextureType } from '../../../types'
+import { TextureSetDto, TextureType } from '../../../types'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 
@@ -23,13 +23,13 @@ interface GeometryParams {
 
 interface TexturedGeometryProps {
   geometryType: GeometryType
-  texturePack: TexturePackDto
+  textureSet: TextureSetDto
   geometryParams?: GeometryParams
 }
 
 function TexturedGeometry({
   geometryType,
-  texturePack,
+  textureSet,
   geometryParams = {},
 }: TexturedGeometryProps) {
   const meshRef = useRef<THREE.Mesh>(null)
@@ -48,10 +48,10 @@ function TexturedGeometry({
     const urls: Record<string, string> = {}
 
     // Albedo or Diffuse for base color
-    const albedo = texturePack.textures.find(
+    const albedo = textureSet.textures.find(
       t => t.textureType === TextureType.Albedo
     )
-    const diffuse = texturePack.textures.find(
+    const diffuse = textureSet.textures.find(
       t => t.textureType === TextureType.Diffuse
     )
     if (albedo) {
@@ -61,7 +61,7 @@ function TexturedGeometry({
     }
 
     // Normal map
-    const normal = texturePack.textures.find(
+    const normal = textureSet.textures.find(
       t => t.textureType === TextureType.Normal
     )
     if (normal) {
@@ -69,7 +69,7 @@ function TexturedGeometry({
     }
 
     // Roughness map
-    const roughness = texturePack.textures.find(
+    const roughness = textureSet.textures.find(
       t => t.textureType === TextureType.Roughness
     )
     if (roughness) {
@@ -77,7 +77,7 @@ function TexturedGeometry({
     }
 
     // Metallic map
-    const metallic = texturePack.textures.find(
+    const metallic = textureSet.textures.find(
       t => t.textureType === TextureType.Metallic
     )
     if (metallic) {
@@ -85,13 +85,13 @@ function TexturedGeometry({
     }
 
     // AO map
-    const ao = texturePack.textures.find(t => t.textureType === TextureType.AO)
+    const ao = textureSet.textures.find(t => t.textureType === TextureType.AO)
     if (ao) {
       urls.aoMap = ApiClient.getFileUrl(ao.fileId.toString())
     }
 
     return urls
-  }, [texturePack])
+  }, [textureSet])
 
   // Always call useTexture (even with empty object) to satisfy React Hooks rules
   const loadedTextures = useTexture(

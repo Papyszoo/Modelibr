@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 import { Canvas } from '@react-three/fiber'
 import TexturedGeometry from '../TexturedGeometry'
-import { TexturePackDto, TextureType } from '../../../../types'
+import { TextureSetDto, TextureType } from '../../../../types'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
@@ -16,7 +16,7 @@ jest.mock('@react-three/drei', () => ({
   OrbitControls: () => null,
 }))
 
-const mockTexturePack: TexturePackDto = {
+const mockTextureSet: TextureSetDto = {
   id: 1,
   name: 'Test Pack',
   createdAt: new Date().toISOString(),
@@ -40,7 +40,7 @@ describe('TexturedGeometry', () => {
     expect(() => {
       render(
         <Canvas>
-          <TexturedGeometry geometryType="box" texturePack={mockTexturePack} />
+          <TexturedGeometry geometryType="box" textureSet={mockTextureSet} />
         </Canvas>
       )
     }).not.toThrow()
@@ -52,7 +52,7 @@ describe('TexturedGeometry', () => {
         <Canvas>
           <TexturedGeometry
             geometryType="sphere"
-            texturePack={mockTexturePack}
+            textureSet={mockTextureSet}
           />
         </Canvas>
       )
@@ -65,7 +65,7 @@ describe('TexturedGeometry', () => {
         <Canvas>
           <TexturedGeometry
             geometryType="cylinder"
-            texturePack={mockTexturePack}
+            textureSet={mockTextureSet}
           />
         </Canvas>
       )
@@ -78,7 +78,7 @@ describe('TexturedGeometry', () => {
         <Canvas>
           <TexturedGeometry
             geometryType="torus"
-            texturePack={mockTexturePack}
+            textureSet={mockTextureSet}
           />
         </Canvas>
       )

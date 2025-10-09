@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
-import { TexturePackDto, Model } from '../../../types'
-import { useTexturePacks } from '../hooks/useTexturePacks'
+import { TextureSetDto, Model } from '../../../types'
+import { useTextureSets } from '../hooks/useTextureSets'
 import AssociationInstructions from './AssociationInstructions'
 import ModelAssociationTable, {
   ModelAssociation,
@@ -13,14 +13,14 @@ import './dialogs.css'
 
 interface ModelAssociationDialogProps {
   visible: boolean
-  texturePack: TexturePackDto
+  textureSet: TextureSetDto
   onHide: () => void
   onAssociationsChanged: () => void
 }
 
 function ModelAssociationDialog({
   visible,
-  texturePack,
+  textureSet,
   onHide,
   onAssociationsChanged,
 }: ModelAssociationDialogProps) {
@@ -30,7 +30,7 @@ function ModelAssociationDialog({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const toast = useRef<Toast>(null)
-  const texturePacksApi = useTexturePacks()
+  const textureSetsApi = useTextureSets()
 
   useEffect(() => {
     if (visible) {
@@ -41,11 +41,11 @@ function ModelAssociationDialog({
   const loadModels = useCallback(async () => {
     try {
       setLoading(true)
-      const allModels = await texturePacksApi.getModels()
+      const allModels = await textureSetsApi.getModels()
 
       // Get currently associated model IDs
       const associatedModelIds = new Set(
-        texturePack.associatedModels.map(m => m.id)
+        textureSet.associatedModels.map(m => m.id)
       )
 
       // Create association objects
@@ -67,7 +67,7 @@ function ModelAssociationDialog({
     } finally {
       setLoading(false)
     }
-  }, [texturePacksApi, texturePack.associatedModels])
+  }, [textureSetsApi, textureSet.associatedModels])
 
   const handleToggleAssociation = (modelId: string, isAssociated: boolean) => {
     setModelAssociations(prev =>
@@ -110,16 +110,16 @@ function ModelAssociationDialog({
 
       // Process associations
       for (const model of toAssociate) {
-        await texturePacksApi.associateTexturePackWithModel(
-          texturePack.id,
+        await textureSetsApi.associateTextureSetWithModel(
+          textureSet.id,
           parseInt(model.id)
         )
       }
 
       // Process disassociations
       for (const model of toDisassociate) {
-        await texturePacksApi.disassociateTexturePackFromModel(
-          texturePack.id,
+        await textureSetsApi.disassociateTextureSetFromModel(
+          textureSet.id,
           parseInt(model.id)
         )
       }
@@ -158,7 +158,7 @@ function ModelAssociationDialog({
 
   return (
     <Dialog
-      header={`Manage Model Associations - "${texturePack.name}"`}
+      header={`Manage Model Associations - "${textureSet.name}"`}
       visible={visible}
       onHide={handleCancel}
       footer={

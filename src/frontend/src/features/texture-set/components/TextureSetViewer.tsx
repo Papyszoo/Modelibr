@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { TabView, TabPanel } from 'primereact/tabview'
-import { TexturePackDto, TextureType } from '../../../types'
-import { useTexturePacks } from '../hooks/useTexturePacks'
+import { TextureSetDto, TextureType } from '../../../types'
+import { useTextureSets } from '../hooks/useTextureSets'
 import { getAllTextureTypes } from '../../../utils/textureTypeUtils'
 import PackHeader from '../dialogs/PackHeader'
 import PackStats from '../dialogs/PackStats'
@@ -11,31 +11,31 @@ import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
 import TexturePreviewPanel from './TexturePreviewPanel'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { ModelSummaryDto } from '../../../types'
-import './TexturePackViewer.css'
+import './TextureSetViewer.css'
 
-interface TexturePackViewerProps {
+interface TextureSetViewerProps {
   packId: string
 }
 
-function TexturePackViewer({ packId }: TexturePackViewerProps) {
-  const [texturePack, setTexturePack] = useState<TexturePackDto | null>(null)
+function TextureSetViewer({ packId }: TextureSetViewerProps) {
+  const [textureSet, setTextureSet] = useState<TextureSetDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [updating, setUpdating] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
-  const texturePacksApi = useTexturePacks()
+  const textureSetsApi = useTextureSets()
 
-  const loadTexturePack = async () => {
+  const loadTextureSet = async () => {
     try {
       setLoading(true)
       setError('')
-      const pack = await texturePacksApi.getTexturePackById(parseInt(packId))
-      setTexturePack(pack)
+      const pack = await textureSetsApi.getTextureSetById(parseInt(packId))
+      setTextureSet(pack)
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to load texture pack'
+        err instanceof Error ? err.message : 'Failed to load texture set'
       )
     } finally {
       setLoading(false)
@@ -43,21 +43,21 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   }
 
   useEffect(() => {
-    loadTexturePack()
+    loadTextureSet()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packId])
 
   const handleUpdateName = async (newName: string) => {
-    if (!texturePack) return
+    if (!textureSet) return
 
     try {
       setUpdating(true)
-      await texturePacksApi.updateTexturePack(texturePack.id, {
+      await textureSetsApi.updateTextureSet(textureSet.id, {
         name: newName,
       })
-      await loadTexturePack()
+      await loadTextureSet()
     } catch (error) {
-      console.error('Failed to update texture pack:', error)
+      console.error('Failed to update texture set:', error)
       throw error
     } finally {
       setUpdating(false)
@@ -65,19 +65,19 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   }
 
   const handleDisassociateModel = (model: ModelSummaryDto) => {
-    if (!texturePack) return
+    if (!textureSet) return
 
     confirmDialog({
-      message: `Are you sure you want to disassociate the model "${model.name}" from this texture pack?`,
+      message: `Are you sure you want to disassociate the model "${model.name}" from this texture set?`,
       header: 'Disassociate Model',
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await texturePacksApi.disassociateTexturePackFromModel(
-            texturePack.id,
+          await textureSetsApi.disassociateTextureSetFromModel(
+            textureSet.id,
             model.id
           )
-          await loadTexturePack()
+          await loadTextureSet()
         } catch (error) {
           console.error('Failed to disassociate model:', error)
         }
@@ -87,17 +87,17 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
 
   if (loading) {
     return (
-      <div className="texture-pack-viewer-loading">Loading texture pack...</div>
+      <div className="texture-set-viewer-loading">Loading texture set...</div>
     )
   }
 
   if (error) {
-    return <div className="texture-pack-viewer-error">Error: {error}</div>
+    return <div className="texture-set-viewer-error">Error: {error}</div>
   }
 
-  if (!texturePack) {
+  if (!textureSet) {
     return (
-      <div className="texture-pack-viewer-error">Texture pack not found</div>
+      <div className="texture-set-viewer-error">Texture set not found</div>
     )
   }
 
@@ -105,18 +105,18 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   const allTextureTypes = getAllTextureTypes()
 
   return (
-    <div className="texture-pack-viewer">
+    <div className="texture-set-viewer">
       <ConfirmDialog />
 
       <header className="pack-viewer-header">
         <div className="pack-overview">
           <div className="pack-info">
             <PackHeader
-              texturePack={texturePack}
+              textureSet={textureSet}
               onNameUpdate={handleUpdateName}
               updating={updating}
             />
-            <PackStats texturePack={texturePack} />
+            <PackStats textureSet={textureSet} />
           </div>
         </div>
       </header>
@@ -130,7 +130,7 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
           <div className="texture-cards-grid">
             {allTextureTypes.map((textureType: TextureType) => {
               const texture =
-                texturePack.textures.find(t => t.textureType === textureType) ||
+                textureSet.textures.find(t => t.textureType === textureType) ||
                 null
 
               return (
@@ -138,8 +138,8 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
                   key={textureType}
                   textureType={textureType}
                   texture={texture}
-                  packId={texturePack.id}
-                  onTextureUpdated={loadTexturePack}
+                  packId={textureSet.id}
+                  onTextureUpdated={loadTextureSet}
                 />
               )
             })}
@@ -148,15 +148,15 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
 
         <TabPanel header="Models" leftIcon="pi pi-box">
           <ModelsTable
-            models={texturePack.associatedModels}
+            models={textureSet.associatedModels}
             onDisassociateModel={handleDisassociateModel}
             onManageAssociations={() => setShowModelAssociationDialog(true)}
           />
         </TabPanel>
 
-        {texturePack.textureCount > 0 && (
+        {textureSet.textureCount > 0 && (
           <TabPanel header="Preview" leftIcon="pi pi-eye">
-            <TexturePreviewPanel texturePack={texturePack} />
+            <TexturePreviewPanel textureSet={textureSet} />
           </TabPanel>
         )}
       </TabView>
@@ -164,11 +164,11 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
       {showModelAssociationDialog && (
         <ModelAssociationDialog
           visible={showModelAssociationDialog}
-          texturePack={texturePack}
+          textureSet={textureSet}
           onHide={() => setShowModelAssociationDialog(false)}
           onAssociationsChanged={() => {
             setShowModelAssociationDialog(false)
-            loadTexturePack()
+            loadTextureSet()
           }}
         />
       )}
@@ -176,4 +176,4 @@ function TexturePackViewer({ packId }: TexturePackViewerProps) {
   )
 }
 
-export default TexturePackViewer
+export default TextureSetViewer

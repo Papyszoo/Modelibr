@@ -1,7 +1,7 @@
 import { ModelList } from '../../features/models'
 import { ModelViewer } from '../../features/model-viewer'
 import TextureList from '../tabs/TextureList'
-import { TexturePackList, TexturePackViewer } from '../../features/texture-pack'
+import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
 import AnimationList from '../tabs/AnimationList'
 import Settings from '../tabs/Settings'
 import { Tab } from '../../types'
@@ -34,19 +34,19 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
       case 'texture':
         return <TextureList />
 
-      case 'texturePacks':
-        return <TexturePackList />
+      case 'textureSets':
+        return <TextureSetList />
 
-      case 'texturePackViewer':
+      case 'textureSetViewer':
         if (!tab.packId) {
           return (
             <div className="tab-error">
-              <h3>Texture pack data not available</h3>
-              <p>The texture pack information could not be loaded.</p>
+              <h3>Texture set data not available</h3>
+              <p>The texture set information could not be loaded.</p>
             </div>
           )
         }
-        return <TexturePackViewer packId={tab.packId} />
+        return <TextureSetViewer packId={tab.packId} />
 
       case 'animation':
         return <AnimationList />

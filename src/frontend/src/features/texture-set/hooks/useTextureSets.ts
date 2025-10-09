@@ -1,30 +1,30 @@
 import { useState, useCallback } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import {
-  TexturePackDto,
-  CreateTexturePackRequest,
-  CreateTexturePackResponse,
-  UpdateTexturePackRequest,
-  UpdateTexturePackResponse,
+  TextureSetDto,
+  CreateTextureSetRequest,
+  CreateTextureSetResponse,
+  UpdateTextureSetRequest,
+  UpdateTextureSetResponse,
   AddTextureToPackRequest,
   AddTextureToPackResponse,
   Model,
 } from '../../../types'
 
-export function useTexturePacks() {
+export function useTextureSets() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const getAllTexturePacks = useCallback(async (): Promise<
-    TexturePackDto[]
+  const getAllTextureSets = useCallback(async (): Promise<
+    TextureSetDto[]
   > => {
     try {
       setLoading(true)
       setError(null)
-      return await ApiClient.getAllTexturePacks()
+      return await ApiClient.getAllTextureSets()
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load texture packs'
+        err instanceof Error ? err.message : 'Failed to load texture sets'
       setError(errorMessage)
       throw err
     } finally {
@@ -32,15 +32,15 @@ export function useTexturePacks() {
     }
   }, [])
 
-  const getTexturePackById = useCallback(
-    async (id: number): Promise<TexturePackDto> => {
+  const getTextureSetById = useCallback(
+    async (id: number): Promise<TextureSetDto> => {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.getTexturePackById(id)
+        return await ApiClient.getTextureSetById(id)
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : 'Failed to load texture pack'
+          err instanceof Error ? err.message : 'Failed to load texture set'
         setError(errorMessage)
         throw err
       } finally {
@@ -50,17 +50,17 @@ export function useTexturePacks() {
     []
   )
 
-  const createTexturePack = useCallback(
+  const createTextureSet = useCallback(
     async (
-      request: CreateTexturePackRequest
-    ): Promise<CreateTexturePackResponse> => {
+      request: CreateTextureSetRequest
+    ): Promise<CreateTextureSetResponse> => {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.createTexturePack(request)
+        return await ApiClient.createTextureSet(request)
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : 'Failed to create texture pack'
+          err instanceof Error ? err.message : 'Failed to create texture set'
         setError(errorMessage)
         throw err
       } finally {
@@ -70,18 +70,18 @@ export function useTexturePacks() {
     []
   )
 
-  const updateTexturePack = useCallback(
+  const updateTextureSet = useCallback(
     async (
       id: number,
-      request: UpdateTexturePackRequest
-    ): Promise<UpdateTexturePackResponse> => {
+      request: UpdateTextureSetRequest
+    ): Promise<UpdateTextureSetResponse> => {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.updateTexturePack(id, request)
+        return await ApiClient.updateTextureSet(id, request)
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : 'Failed to update texture pack'
+          err instanceof Error ? err.message : 'Failed to update texture set'
         setError(errorMessage)
         throw err
       } finally {
@@ -91,14 +91,14 @@ export function useTexturePacks() {
     []
   )
 
-  const deleteTexturePack = useCallback(async (id: number): Promise<void> => {
+  const deleteTextureSet = useCallback(async (id: number): Promise<void> => {
     try {
       setLoading(true)
       setError(null)
-      await ApiClient.deleteTexturePack(id)
+      await ApiClient.deleteTextureSet(id)
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to delete texture pack'
+        err instanceof Error ? err.message : 'Failed to delete texture set'
       setError(errorMessage)
       throw err
     } finally {
@@ -147,17 +147,17 @@ export function useTexturePacks() {
     []
   )
 
-  const associateTexturePackWithModel = useCallback(
+  const associateTextureSetWithModel = useCallback(
     async (packId: number, modelId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.associateTexturePackWithModel(packId, modelId)
+        await ApiClient.associateTextureSetWithModel(packId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : 'Failed to associate texture pack with model'
+            : 'Failed to associate texture set with model'
         setError(errorMessage)
         throw err
       } finally {
@@ -167,17 +167,17 @@ export function useTexturePacks() {
     []
   )
 
-  const disassociateTexturePackFromModel = useCallback(
+  const disassociateTextureSetFromModel = useCallback(
     async (packId: number, modelId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.disassociateTexturePackFromModel(packId, modelId)
+        await ApiClient.disassociateTextureSetFromModel(packId, modelId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : 'Failed to disassociate texture pack from model'
+            : 'Failed to disassociate texture set from model'
         setError(errorMessage)
         throw err
       } finally {
@@ -205,15 +205,15 @@ export function useTexturePacks() {
   return {
     loading,
     error,
-    getAllTexturePacks,
-    getTexturePackById,
-    createTexturePack,
-    updateTexturePack,
-    deleteTexturePack,
+    getAllTextureSets,
+    getTextureSetById,
+    createTextureSet,
+    updateTextureSet,
+    deleteTextureSet,
     addTextureToPackEndpoint,
     removeTextureFromPack,
-    associateTexturePackWithModel,
-    disassociateTexturePackFromModel,
+    associateTextureSetWithModel,
+    disassociateTextureSetFromModel,
     getModels,
   }
 }

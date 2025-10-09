@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import TexturePreviewPanel from '../TexturePreviewPanel'
-import { TexturePackDto, TextureType } from '../../../../types'
+import { TextureSetDto, TextureType } from '../../../../types'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
@@ -44,7 +44,7 @@ jest.mock('leva', () => ({
   }),
 }))
 
-const mockTexturePack: TexturePackDto = {
+const mockTextureSet: TextureSetDto = {
   id: 1,
   name: 'Test Pack',
   createdAt: new Date().toISOString(),
@@ -68,13 +68,13 @@ describe('TexturePreviewPanel', () => {
     // This test ensures that the circular dependency issue is fixed
     // Previously, useControls referenced itself before initialization
     expect(() => {
-      render(<TexturePreviewPanel texturePack={mockTexturePack} />)
+      render(<TexturePreviewPanel textureSet={mockTextureSet} />)
     }).not.toThrow()
   })
 
   it('should render with only albedo texture', () => {
-    const packWithAlbedo: TexturePackDto = {
-      ...mockTexturePack,
+    const packWithAlbedo: TextureSetDto = {
+      ...mockTextureSet,
       textureCount: 1,
       textures: [
         {
@@ -88,13 +88,13 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      render(<TexturePreviewPanel texturePack={packWithAlbedo} />)
+      render(<TexturePreviewPanel textureSet={packWithAlbedo} />)
     }).not.toThrow()
   })
 
   it('should render with multiple textures', () => {
-    const packWithMultipleTextures: TexturePackDto = {
-      ...mockTexturePack,
+    const packWithMultipleTextures: TextureSetDto = {
+      ...mockTextureSet,
       textureCount: 3,
       textures: [
         {
@@ -122,7 +122,7 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      render(<TexturePreviewPanel texturePack={packWithMultipleTextures} />)
+      render(<TexturePreviewPanel textureSet={packWithMultipleTextures} />)
     }).not.toThrow()
   })
 })

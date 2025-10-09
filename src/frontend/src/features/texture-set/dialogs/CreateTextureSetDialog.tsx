@@ -4,17 +4,17 @@ import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { classNames } from 'primereact/utils'
 
-interface CreateTexturePackDialogProps {
+interface CreateTextureSetDialogProps {
   visible: boolean
   onHide: () => void
   onSubmit: (name: string) => Promise<void>
 }
 
-function CreateTexturePackDialog({
+function CreateTextureSetDialog({
   visible,
   onHide,
   onSubmit,
-}: CreateTexturePackDialogProps) {
+}: CreateTextureSetDialogProps) {
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ name?: string }>({})
@@ -46,7 +46,7 @@ function CreateTexturePackDialog({
       setName('')
       setErrors({})
     } catch (error) {
-      console.error('Failed to create texture pack:', error)
+      console.error('Failed to create texture set:', error)
     } finally {
       setSubmitting(false)
     }
@@ -79,7 +79,7 @@ function CreateTexturePackDialog({
 
   return (
     <Dialog
-      header="Create Texture Pack"
+      header="Create Texture Set"
       visible={visible}
       onHide={handleCancel}
       footer={dialogFooter}
@@ -97,7 +97,7 @@ function CreateTexturePackDialog({
           value={name}
           onChange={e => setName(e.target.value)}
           className={classNames({ 'p-invalid': errors.name })}
-          placeholder="Enter texture pack name"
+          placeholder="Enter texture set name"
           maxLength={200}
           autoFocus
           onKeyDown={e => {
@@ -108,11 +108,11 @@ function CreateTexturePackDialog({
         />
         {errors.name && <small className="p-error">{errors.name}</small>}
         <small className="p-text-secondary">
-          Choose a descriptive name for your texture pack (2-200 characters)
+          Choose a descriptive name for your texture set (2-200 characters)
         </small>
       </div>
     </Dialog>
   )
 }
 
-export default CreateTexturePackDialog
+export default CreateTextureSetDialog

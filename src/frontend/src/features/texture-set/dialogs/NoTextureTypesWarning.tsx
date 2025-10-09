@@ -14,7 +14,7 @@ export default function NoTextureTypesWarning({
           <i className="pi pi-exclamation-triangle"></i>
         </div>
         <div className="p-message-text">
-          This texture pack already contains all supported texture types. Remove
+          This texture set already contains all supported texture types. Remove
           existing textures to add different ones.
         </div>
       </div>

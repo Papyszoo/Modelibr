@@ -13,10 +13,10 @@ export function getTabLabel(
       return modelId ? `Model ${modelId}` : 'Model Viewer'
     case 'texture':
       return 'Textures'
-    case 'texturePacks':
-      return 'Texture Packs'
-    case 'texturePackViewer':
-      return packId ? `Pack ${packId}` : 'Texture Pack'
+    case 'textureSets':
+      return 'Texture Sets'
+    case 'textureSetViewer':
+      return packId ? `Pack ${packId}` : 'Texture Set'
     case 'animation':
       return 'Animations'
     default:
@@ -54,8 +54,8 @@ export function parseCompactTabFormat(
           'modelViewer',
           'texture',
           'animation',
-          'texturePacks',
-          'texturePackViewer',
+          'textureSets',
+          'textureSetViewer',
         ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${type}`)
@@ -71,8 +71,8 @@ export function parseCompactTabFormat(
         }
       }
 
-      // Handle texture pack viewer tabs
-      if (tabType === 'texturePackViewer' && id) {
+      // Handle texture set viewer tabs
+      if (tabType === 'textureSetViewer' && id) {
         return {
           id: `pack-${id}`,
           type: tabType,
