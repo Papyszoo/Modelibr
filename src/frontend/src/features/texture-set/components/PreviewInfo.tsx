@@ -18,7 +18,7 @@ function PreviewInfo({ textureSet, geometryType }: PreviewInfoProps) {
     <div className="preview-info-content">
       <div className="info-section">
         <h4 className="info-section-title">Preview Details</h4>
-        
+
         <div className="info-item">
           <span className="info-item-label">Texture Set:</span>
           <span className="info-item-value">{textureSet.name}</span>
@@ -26,12 +26,16 @@ function PreviewInfo({ textureSet, geometryType }: PreviewInfoProps) {
 
         <div className="info-item">
           <span className="info-item-label">Geometry Type:</span>
-          <span className="info-item-value">{geometryNames[geometryType] || geometryType}</span>
+          <span className="info-item-value">
+            {geometryNames[geometryType] || geometryType}
+          </span>
         </div>
 
         <div className="info-item">
           <span className="info-item-label">Textures Applied:</span>
-          <span className="info-item-value highlight">{textureSet.textureCount}</span>
+          <span className="info-item-value highlight">
+            {textureSet.textureCount}
+          </span>
         </div>
 
         <div className="info-item">
@@ -46,7 +50,10 @@ function PreviewInfo({ textureSet, geometryType }: PreviewInfoProps) {
           <ul className="texture-list">
             {textureSet.textures.map(texture => (
               <li key={texture.id} className="texture-list-item">
-                <i className="pi pi-check-circle" style={{ color: '#10b981' }}></i>
+                <i
+                  className="pi pi-check-circle"
+                  style={{ color: '#10b981' }}
+                ></i>
                 <span>{texture.textureType}</span>
               </li>
             ))}

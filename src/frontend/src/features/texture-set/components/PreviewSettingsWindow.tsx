@@ -24,7 +24,10 @@ function PreviewSettingsWindow({
       side={side}
       windowId="preview-settings"
     >
-      <PreviewSettings settings={settings} onSettingsChange={onSettingsChange} />
+      <PreviewSettings
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+      />
     </FloatingWindow>
   )
 }
