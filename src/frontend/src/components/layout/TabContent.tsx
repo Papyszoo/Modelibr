@@ -38,7 +38,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
         return <TextureSetList />
 
       case 'textureSetViewer':
-        if (!tab.packId) {
+        if (!tab.setId) {
           return (
             <div className="tab-error">
               <h3>Texture set data not available</h3>
@@ -46,7 +46,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return <TextureSetViewer packId={tab.packId} />
+        return <TextureSetViewer setId={tab.setId} />
 
       case 'animation':
         return <AnimationList />

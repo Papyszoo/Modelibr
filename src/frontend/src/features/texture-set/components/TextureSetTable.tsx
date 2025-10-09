@@ -11,15 +11,15 @@ import {
 interface TextureSetTableProps {
   textureSets: TextureSetDto[]
   loading: boolean
-  onViewDetails: (pack: TextureSetDto) => void
-  onDeletePack: (pack: TextureSetDto) => void
+  onViewDetails: (set: TextureSetDto) => void
+  onDeleteSet: (set: TextureSetDto) => void
 }
 
 export default function TextureSetTable({
   textureSets,
   loading,
   onViewDetails,
-  onDeletePack,
+  onDeleteSet,
 }: TextureSetTableProps) {
   const nameBodyTemplate = (rowData: TextureSetDto) => {
     return (
@@ -91,7 +91,7 @@ export default function TextureSetTable({
         <Button
           icon="pi pi-trash"
           className="p-button-text p-button-rounded p-button-danger"
-          onClick={() => onDeletePack(rowData)}
+          onClick={() => onDeleteSet(rowData)}
           tooltip="Delete"
         />
       </div>

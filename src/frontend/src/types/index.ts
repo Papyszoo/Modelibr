@@ -12,7 +12,7 @@ export interface Tab {
     | 'settings'
   label?: string
   modelId?: string
-  packId?: string
+  setId?: string
 }
 
 export interface SplitterEvent {
