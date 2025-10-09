@@ -5,8 +5,6 @@ export interface Tab {
   type:
     | 'modelList'
     | 'modelViewer'
-    | 'texture'
-    | 'animation'
     | 'textureSets'
     | 'textureSetViewer'
     | 'settings'
