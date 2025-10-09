@@ -6,7 +6,7 @@ interface SetStatsProps {
 
 export default function SetStats({ textureSet }: SetStatsProps) {
   return (
-    <div className="pack-stats">
+    <div className="set-stats">
       <span className="stat-item">
         <i className="pi pi-image"></i>
         {textureSet.textureCount} texture

@@ -7,7 +7,7 @@ import {
   UpdateTextureSetRequest,
   UpdateTextureSetResponse,
   AddTextureToSetRequest,
-  AddTextureToPackResponse,
+  AddTextureToSetResponse,
   Model,
 } from '../../../types'
 
@@ -106,18 +106,18 @@ export function useTextureSets() {
     }
   }, [])
 
-  const addTextureToPackEndpoint = useCallback(
+  const addTextureToSetEndpoint = useCallback(
     async (
       setId: number,
       request: AddTextureToSetRequest
-    ): Promise<AddTextureToPackResponse> => {
+    ): Promise<AddTextureToSetResponse> => {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.addTextureToPackEndpoint(setId, request)
+        return await ApiClient.addTextureToSetEndpoint(setId, request)
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : 'Failed to add texture to pack'
+          err instanceof Error ? err.message : 'Failed to add texture to set'
         setError(errorMessage)
         throw err
       } finally {
@@ -127,17 +127,17 @@ export function useTextureSets() {
     []
   )
 
-  const removeTextureFromPack = useCallback(
+  const removeTextureFromSet = useCallback(
     async (setId: number, textureId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.removeTextureFromPack(setId, textureId)
+        await ApiClient.removeTextureFromSet(setId, textureId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : 'Failed to remove texture from pack'
+            : 'Failed to remove texture from set'
         setError(errorMessage)
         throw err
       } finally {
@@ -210,8 +210,8 @@ export function useTextureSets() {
     createTextureSet,
     updateTextureSet,
     deleteTextureSet,
-    addTextureToPackEndpoint,
-    removeTextureFromPack,
+    addTextureToSetEndpoint,
+    removeTextureFromSet,
     associateTextureSetWithModel,
     disassociateTextureSetFromModel,
     getModels,

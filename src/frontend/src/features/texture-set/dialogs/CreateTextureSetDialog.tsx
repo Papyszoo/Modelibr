@@ -89,11 +89,11 @@ function CreateTextureSetDialog({
       blockScroll
     >
       <div className="p-field">
-        <label htmlFor="pack-name" className="p-text-bold">
+        <label htmlFor="set-name" className="p-text-bold">
           Name <span className="p-error">*</span>
         </label>
         <InputText
-          id="pack-name"
+          id="set-name"
           value={name}
           onChange={e => setName(e.target.value)}
           className={classNames({ 'p-invalid': errors.name })}
