@@ -10,7 +10,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   border: 2px solid transparent;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to show close button */
 }
 
 .draggable-tab:hover {
@@ -35,6 +35,40 @@
 
 .draggable-tab.active .tab-icon {
   color: white;
+}
+
+/* Close button - small icon in top right corner */
+.tab-close-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  background: #ef4444;
+  border: none;
+  border-radius: 50%;
+  display: none; /* Hidden by default */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.tab-close-btn i {
+  color: white;
+  font-size: 0.6rem;
+}
+
+.tab-close-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+/* Show close button on hover */
+.draggable-tab:hover .tab-close-btn {
+  display: flex;
 }
 
 /* Tab Thumbnail */
