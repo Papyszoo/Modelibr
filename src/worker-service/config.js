@@ -57,6 +57,14 @@ export const config = {
     skipDuplicates: false, // always false for API upload - backend handles deduplication
   },
 
+  // Image classification settings
+  imageClassification: {
+    enabled: process.env.IMAGE_CLASSIFICATION_ENABLED !== 'false',
+    minConfidence: parseFloat(process.env.CLASSIFICATION_MIN_CONFIDENCE) || 0.1,
+    maxTags: parseInt(process.env.CLASSIFICATION_MAX_TAGS) || 10,
+    topKPerImage: parseInt(process.env.CLASSIFICATION_TOP_K_PER_IMAGE) || 5,
+  },
+
   // Logging settings
   logging: {
     level: process.env.LOG_LEVEL || 'info',

@@ -225,6 +225,23 @@ class ApiClient {
     const response = await this.client.put('/settings', settings)
     return response.data
   }
+
+  // Model tags API
+  async updateModelTags(
+    modelId: string,
+    tags: string,
+    description: string
+  ): Promise<{
+    modelId: number
+    tags: string
+    description: string
+  }> {
+    const response = await this.client.post(`/models/${modelId}/tags`, {
+      tags,
+      description,
+    })
+    return response.data
+  }
 }
 
 export default new ApiClient()

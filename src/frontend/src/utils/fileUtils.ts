@@ -24,6 +24,7 @@ export interface Model {
   id: string
   name: string
   description?: string
+  tags?: string
   files: ModelFile[]
   createdAt: string
   updatedAt: string
