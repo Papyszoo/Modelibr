@@ -1,0 +1,311 @@
+/* Texture Set Grid Container */
+.texture-set-grid-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem;
+  border: 2px dashed transparent;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  overflow: auto;
+}
+
+.texture-set-grid-container:hover:not(.drag-over) {
+  border-color: #3182ce;
+  background: rgba(49, 130, 206, 0.05);
+}
+
+.texture-set-grid-container.drag-over {
+  border-color: #3182ce;
+  background: rgba(49, 130, 206, 0.1);
+  transform: scale(1.02);
+}
+
+/* Search and Filter Controls */
+.texture-set-grid-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.texture-set-grid-controls .search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.texture-set-grid-controls .search-bar:focus-within {
+  border-color: #3182ce;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+.texture-set-grid-controls .search-bar .pi-search {
+  color: #64748b;
+  font-size: 1rem;
+}
+
+.texture-set-grid-controls .search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 1rem;
+  color: #1e293b;
+}
+
+.texture-set-grid-controls .search-input::placeholder {
+  color: #94a3b8;
+}
+
+.texture-set-grid-controls .filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.texture-set-grid-controls .filter-placeholder {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Texture Set Grid */
+.texture-set-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+  padding: 0.5rem;
+}
+
+/* Texture Set Card */
+.texture-set-card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.texture-set-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.texture-set-card-thumbnail {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.texture-set-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.texture-set-card:hover .texture-set-image {
+  transform: scale(1.1);
+}
+
+.texture-set-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.texture-set-placeholder .pi {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.texture-set-placeholder span {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Overlay with texture set name and info */
+.texture-set-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  padding: 2rem 1rem 0.75rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.texture-set-card:hover .texture-set-card-overlay {
+  opacity: 1;
+}
+
+.texture-set-card-name {
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.texture-set-card-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.texture-set-card-info .texture-count {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.texture-set-card-info .texture-count .pi {
+  font-size: 0.75rem;
+}
+
+/* No results state */
+.no-results {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #64748b;
+}
+
+.no-results .pi {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.no-results p {
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Loading state */
+.texture-set-grid-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+}
+
+.texture-set-grid-loading p {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Empty state */
+.texture-set-grid-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+  border: 2px dashed #cbd5e0;
+  border-radius: 8px;
+  margin: 1rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.texture-set-grid-empty:hover:not(.drag-over) {
+  border-color: #3182ce;
+  background: rgba(49, 130, 206, 0.05);
+}
+
+.texture-set-grid-empty.drag-over {
+  border-color: #3182ce;
+  background: rgba(49, 130, 206, 0.1);
+  transform: scale(1.02);
+}
+
+.texture-set-grid-empty .pi {
+  font-size: 4rem;
+  color: #94a3b8;
+  opacity: 0.5;
+}
+
+.texture-set-grid-empty h3 {
+  font-size: 1.5rem;
+  color: #475569;
+  margin: 0;
+}
+
+.texture-set-grid-empty p {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0;
+  max-width: 400px;
+  text-align: center;
+}
+
+.texture-set-grid-empty .hint {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .texture-set-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .texture-set-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+
+  .texture-set-grid-controls {
+    padding: 1rem;
+  }
+
+  .texture-set-grid-controls .search-bar {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .texture-set-card-name {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .texture-set-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
