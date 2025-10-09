@@ -4,17 +4,17 @@ import { Button } from 'primereact/button'
 import { classNames } from 'primereact/utils'
 import { TextureSetDto } from '../../../types'
 
-interface PackHeaderProps {
+interface SetHeaderProps {
   textureSet: TextureSetDto
   onNameUpdate: (newName: string) => Promise<void>
   updating: boolean
 }
 
-export default function PackHeader({
+export default function SetHeader({
   textureSet,
   onNameUpdate,
   updating,
-}: PackHeaderProps) {
+}: SetHeaderProps) {
   const [editing, setEditing] = useState(false)
   const [editedName, setEditedName] = useState(textureSet.name)
   const [errors, setErrors] = useState<{ name?: string }>({})

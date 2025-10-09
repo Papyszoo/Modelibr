@@ -21,8 +21,8 @@ function TextureSetList() {
   const loadTextureSets = useCallback(async () => {
     try {
       setLoading(true)
-      const packs = await textureSetsApi.getAllTextureSets()
-      setTextureSets(packs || [])
+      const sets = await textureSetsApi.getAllTextureSets()
+      setTextureSets(sets || [])
     } catch (error) {
       console.error('Failed to load texture sets:', error)
       setTextureSets([]) // Ensure textureSets is always an array
