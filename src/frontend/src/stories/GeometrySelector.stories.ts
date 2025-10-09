@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import GeometrySelector from '../components/tabs/texture-set-viewer/GeometrySelector'
+import GeometrySelector from '../features/texture-set/components/GeometrySelector'
 
 const meta = {
   title: 'Components/GeometrySelector',

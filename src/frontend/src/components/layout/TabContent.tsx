@@ -46,7 +46,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return <TextureSetViewer setId={tab.setId} />
+        return <TextureSetViewer setId={tab.setId} side={side} />
 
       case 'animation':
         return <AnimationList />

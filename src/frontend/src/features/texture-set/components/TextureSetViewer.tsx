@@ -15,9 +15,10 @@ import './TextureSetViewer.css'
 
 interface TextureSetViewerProps {
   setId: string
+  side?: 'left' | 'right'
 }
 
-function TextureSetViewer({ setId }: TextureSetViewerProps) {
+function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
   const [textureSet, setTextureSet] = useState<TextureSetDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
@@ -154,7 +155,7 @@ function TextureSetViewer({ setId }: TextureSetViewerProps) {
 
         {textureSet.textureCount > 0 && (
           <TabPanel header="Preview" leftIcon="pi pi-eye">
-            <TexturePreviewPanel textureSet={textureSet} />
+            <TexturePreviewPanel textureSet={textureSet} side={side} />
           </TabPanel>
         )}
       </TabView>
