@@ -1,6 +1,3 @@
-import { useRef } from 'react'
-import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
 import { Tab } from '../../types'
 import './DraggableTab.css'
 
@@ -61,16 +58,6 @@ function DraggableTab({
   onDragEnd,
   side: _side, // prefix with underscore to indicate intentionally unused
 }: DraggableTabProps): JSX.Element {
-  const contextMenuRef = useRef<ContextMenu>(null)
-
-  const contextMenuItems: MenuItem[] = [
-    {
-      label: 'Close Tab',
-      icon: 'pi pi-times',
-      command: () => onClose(),
-    },
-  ]
-
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', tab.id)
@@ -85,32 +72,32 @@ function DraggableTab({
     onSelect()
   }
 
-  const handleContextMenu = (e: React.MouseEvent): void => {
-    e.preventDefault()
-    contextMenuRef.current?.show(e)
+  const handleCloseClick = (e: React.MouseEvent): void => {
+    e.stopPropagation() // Prevent tab selection when clicking close
+    onClose()
   }
 
   return (
-    <>
-      <div
-        className={`draggable-tab ${isActive ? 'active' : ''}`}
-        draggable
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onClick={handleClick}
-        onContextMenu={handleContextMenu}
-        title={getTabTooltip(tab)}
-      >
-        {/* Tab content - always show icon for now */}
-        <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
-      </div>
+    <div
+      className={`draggable-tab ${isActive ? 'active' : ''}`}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onClick={handleClick}
+      title={getTabTooltip(tab)}
+    >
+      {/* Tab content - always show icon for now */}
+      <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
 
-      <ContextMenu
-        model={contextMenuItems}
-        ref={contextMenuRef}
-        className="tab-context-menu"
-      />
-    </>
+      {/* Close button in top right corner */}
+      <button
+        className="tab-close-btn"
+        onClick={handleCloseClick}
+        aria-label="Close tab"
+      >
+        <i className="pi pi-times"></i>
+      </button>
+    </div>
   )
 }
 

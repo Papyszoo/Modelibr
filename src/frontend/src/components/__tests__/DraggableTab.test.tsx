@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import DraggableTab from '../layout/DraggableTab'
 import { Tab } from '../../types'
 
@@ -50,51 +50,19 @@ describe('DraggableTab', () => {
     expect(defaultProps.onSelect).toHaveBeenCalledTimes(1)
   })
 
-  it('should show context menu on right-click', async () => {
+  it('should have close button that calls onClose when clicked', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const closeButton = screen.getByLabelText('Close tab')
+    expect(closeButton).toBeInTheDocument()
 
-    await act(async () => {
-      fireEvent.contextMenu(tabElement)
-    })
-
-    // The context menu should be present in the DOM
-    const contextMenu = screen.getByText('Close Tab')
-    expect(contextMenu).toBeInTheDocument()
-  })
-
-  it('should call onClose when context menu close option is clicked', async () => {
-    render(<DraggableTab {...defaultProps} />)
-
-    const tabElement = screen.getByTitle('Test Tab')
-
-    await act(async () => {
-      fireEvent.contextMenu(tabElement)
-    })
-
-    const closeOption = screen.getByText('Close Tab')
-
-    await act(async () => {
-      fireEvent.click(closeOption)
-    })
+    fireEvent.click(closeButton)
 
     expect(defaultProps.onClose).toHaveBeenCalledTimes(1)
+    expect(defaultProps.onSelect).not.toHaveBeenCalled() // Should not trigger select
   })
 
-  it('should prevent default context menu behavior', () => {
-    render(<DraggableTab {...defaultProps} />)
-
-    const tabElement = screen.getByTitle('Test Tab')
-    const contextMenuEvent = new MouseEvent('contextmenu', { bubbles: true })
-    const preventDefaultSpy = jest.spyOn(contextMenuEvent, 'preventDefault')
-
-    fireEvent(tabElement, contextMenuEvent)
-
-    expect(preventDefaultSpy).toHaveBeenCalled()
-  })
-
-  it('should handle drag start correctly', () => {
+  it('should display correct tooltip for different tab types', () => {
     render(<DraggableTab {...defaultProps} />)
 
     const tabElement = screen.getByTitle('Test Tab')
@@ -140,11 +108,11 @@ describe('DraggableTab', () => {
     expect(tabElement).toBeInTheDocument()
   })
 
-  it('should not have close button in DOM', () => {
+  it('should have close button visible in DOM', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    // The old close button should not exist anymore
-    const closeButton = document.querySelector('.tab-close-button')
-    expect(closeButton).not.toBeInTheDocument()
+    // The close button should exist
+    const closeButton = screen.getByLabelText('Close tab')
+    expect(closeButton).toBeInTheDocument()
   })
 })
