@@ -54,7 +54,7 @@ export default function SetHeader({
   }
 
   return (
-    <div className="pack-name-section">
+    <div className="set-name-section">
       {editing ? (
         <div className="p-inputgroup">
           <InputText
@@ -80,7 +80,7 @@ export default function SetHeader({
           />
         </div>
       ) : (
-        <div className="pack-name-display">
+        <div className="set-name-display">
           <h3>{textureSet.name}</h3>
           <Button
             icon="pi pi-pencil"

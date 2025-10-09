@@ -5,38 +5,38 @@
   padding: 0;
 }
 
-.pack-overview {
+.set-overview {
   padding: 1.5rem;
   border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
 }
 
-.pack-info {
+.set-info {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.pack-name-section {
+.set-name-section {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.pack-name-display {
+.set-name-display {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.pack-name-display h3 {
+.set-name-display h3 {
   margin: 0;
   color: #1e293b;
   font-size: 1.5rem;
   font-weight: 600;
 }
 
-.pack-stats {
+.set-stats {
   display: flex;
   gap: 1.5rem;
   flex-wrap: wrap;
@@ -54,11 +54,11 @@
   color: #94a3b8;
 }
 
-.pack-detail-tabs {
+.set-detail-tabs {
   height: calc(100% - 120px);
 }
 
-.pack-detail-tabs .p-tabview-panels {
+.set-detail-tabs .p-tabview-panels {
   padding: 1.5rem;
   height: calc(100% - 60px);
   overflow: auto;
@@ -212,7 +212,7 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .pack-stats {
+  .set-stats {
     flex-direction: column;
     gap: 0.75rem;
   }
@@ -233,7 +233,7 @@
     gap: 0.25rem;
   }
 
-  .pack-name-display {
+  .set-name-display {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
