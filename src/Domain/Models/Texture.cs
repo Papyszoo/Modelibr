@@ -14,8 +14,8 @@ public class Texture
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    // Foreign key for optional TexturePack relationship
-    public int? TexturePackId { get; internal set; }
+    // Foreign key for optional TextureSet relationship
+    public int? TextureSetId { get; internal set; }
 
     // Navigation property for the associated file
     public File File { get; private set; } = null!;

@@ -166,128 +166,128 @@ public class ModelDomainTests
         Assert.False(hasFile);
     }
 
-    #region TexturePack Association Tests
+    #region TextureSet Association Tests
 
     [Fact]
-    public void AddTexturePack_WithValidTexturePack_AddsSuccessfully()
+    public void AddTextureSet_WithValidTextureSet_AddsSuccessfully()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
 
         // Act
-        model.AddTexturePack(texturePack, updatedAt);
+        model.AddTextureSet(textureSet, updatedAt);
 
         // Assert
-        Assert.Single(model.TexturePacks);
-        Assert.Contains(texturePack, model.TexturePacks);
+        Assert.Single(model.TextureSets);
+        Assert.Contains(textureSet, model.TextureSets);
         Assert.Equal(updatedAt, model.UpdatedAt);
     }
 
     [Fact]
-    public void AddTexturePack_WithNullTexturePack_ThrowsArgumentNullException()
+    public void AddTextureSet_WithNullTextureSet_ThrowsArgumentNullException()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => model.AddTexturePack(null!, updatedAt));
+        Assert.Throws<ArgumentNullException>(() => model.AddTextureSet(null!, updatedAt));
     }
 
     [Fact]
-    public void AddTexturePack_WithExistingTexturePack_DoesNotAddDuplicate()
+    public void AddTextureSet_WithExistingTextureSet_DoesNotAddDuplicate()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
-        texturePack.Id = 1; // Set ID to simulate existing entity
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.Id = 1; // Set ID to simulate existing entity
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
-        model.AddTexturePack(texturePack, updatedAt);
+        model.AddTextureSet(textureSet, updatedAt);
 
         // Act
-        model.AddTexturePack(texturePack, updatedAt.AddMinutes(1));
+        model.AddTextureSet(textureSet, updatedAt.AddMinutes(1));
 
         // Assert
-        Assert.Single(model.TexturePacks);
+        Assert.Single(model.TextureSets);
     }
 
     [Fact]
-    public void RemoveTexturePack_WithExistingTexturePack_RemovesSuccessfully()
+    public void RemoveTextureSet_WithExistingTextureSet_RemovesSuccessfully()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
-        model.AddTexturePack(texturePack, updatedAt);
+        model.AddTextureSet(textureSet, updatedAt);
 
         // Act
-        model.RemoveTexturePack(texturePack, updatedAt.AddMinutes(1));
+        model.RemoveTextureSet(textureSet, updatedAt.AddMinutes(1));
 
         // Assert
-        Assert.Empty(model.TexturePacks);
+        Assert.Empty(model.TextureSets);
         Assert.Equal(updatedAt.AddMinutes(1), model.UpdatedAt);
     }
 
     [Fact]
-    public void RemoveTexturePack_WithNullTexturePack_ThrowsArgumentNullException()
+    public void RemoveTextureSet_WithNullTextureSet_ThrowsArgumentNullException()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => model.RemoveTexturePack(null!, updatedAt));
+        Assert.Throws<ArgumentNullException>(() => model.RemoveTextureSet(null!, updatedAt));
     }
 
     [Fact]
-    public void HasTexturePack_WithExistingTexturePack_ReturnsTrue()
+    public void HasTextureSet_WithExistingTextureSet_ReturnsTrue()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var texturePack = TexturePack.Create("Test Texture Pack", DateTime.UtcNow);
-        texturePack.Id = 123;
-        model.AddTexturePack(texturePack, DateTime.UtcNow.AddMinutes(1));
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.Id = 123;
+        model.AddTextureSet(textureSet, DateTime.UtcNow.AddMinutes(1));
 
         // Act
-        var hasTexturePack = model.HasTexturePack(123);
+        var hasTextureSet = model.HasTextureSet(123);
 
         // Assert
-        Assert.True(hasTexturePack);
+        Assert.True(hasTextureSet);
     }
 
     [Fact]
-    public void HasTexturePack_WithNonExistingTexturePack_ReturnsFalse()
+    public void HasTextureSet_WithNonExistingTextureSet_ReturnsFalse()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
 
         // Act
-        var hasTexturePack = model.HasTexturePack(999);
+        var hasTextureSet = model.HasTextureSet(999);
 
         // Assert
-        Assert.False(hasTexturePack);
+        Assert.False(hasTextureSet);
     }
 
     [Fact]
-    public void GetTexturePacks_ReturnsReadOnlyList()
+    public void GetTextureSets_ReturnsReadOnlyList()
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var texturePack1 = TexturePack.Create("Texture Pack 1", DateTime.UtcNow);
-        var texturePack2 = TexturePack.Create("Texture Pack 2", DateTime.UtcNow);
-        model.AddTexturePack(texturePack1, DateTime.UtcNow.AddMinutes(1));
-        model.AddTexturePack(texturePack2, DateTime.UtcNow.AddMinutes(2));
+        var textureSet1 = TextureSet.Create("Texture Set 1", DateTime.UtcNow);
+        var textureSet2 = TextureSet.Create("Texture Set 2", DateTime.UtcNow);
+        model.AddTextureSet(textureSet1, DateTime.UtcNow.AddMinutes(1));
+        model.AddTextureSet(textureSet2, DateTime.UtcNow.AddMinutes(2));
 
         // Act
-        var texturePacks = model.GetTexturePacks();
+        var textureSets = model.GetTextureSets();
 
         // Assert
-        Assert.Equal(2, texturePacks.Count);
-        Assert.Contains(texturePack1, texturePacks);
-        Assert.Contains(texturePack2, texturePacks);
-        Assert.IsAssignableFrom<IReadOnlyList<TexturePack>>(texturePacks);
+        Assert.Equal(2, textureSets.Count);
+        Assert.Contains(textureSet1, textureSets);
+        Assert.Contains(textureSet2, textureSets);
+        Assert.IsAssignableFrom<IReadOnlyList<TextureSet>>(textureSets);
     }
 
     #endregion

@@ -4,20 +4,20 @@ using Domain.Services;
 using Domain.ValueObjects;
 using SharedKernel;
 
-namespace Application.TexturePacks;
+namespace Application.TextureSets;
 
 internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPackCommand, AddTextureToPackResponse>
 {
-    private readonly ITexturePackRepository _texturePackRepository;
+    private readonly ITextureSetRepository _textureSetRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public AddTextureToPackCommandHandler(
-        ITexturePackRepository texturePackRepository,
+        ITextureSetRepository textureSetRepository,
         IFileRepository fileRepository,
         IDateTimeProvider dateTimeProvider)
     {
-        _texturePackRepository = texturePackRepository;
+        _textureSetRepository = textureSetRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -26,12 +26,12 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
     {
         try
         {
-            // Get the texture pack
-            var texturePack = await _texturePackRepository.GetByIdAsync(command.TexturePackId, cancellationToken);
-            if (texturePack == null)
+            // Get the texture set
+            var textureSet = await _textureSetRepository.GetByIdAsync(command.TextureSetId, cancellationToken);
+            if (textureSet == null)
             {
                 return Result.Failure<AddTextureToPackResponse>(
-                    new Error("TexturePackNotFound", $"Texture pack with ID {command.TexturePackId} was not found."));
+                    new Error("TextureSetNotFound", $"Texture set with ID {command.TextureSetId} was not found."));
             }
 
             // Get the file
@@ -52,11 +52,11 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
             // Create the texture using domain factory method
             var texture = Domain.Models.Texture.Create(file, command.TextureType, _dateTimeProvider.UtcNow);
 
-            // Add texture to the pack (domain will enforce business rules)
-            texturePack.AddTexture(texture, _dateTimeProvider.UtcNow);
+            // Add texture to the set (domain will enforce business rules)
+            textureSet.AddTexture(texture, _dateTimeProvider.UtcNow);
 
-            // Update the texture pack
-            var updatedTexturePack = await _texturePackRepository.UpdateAsync(texturePack, cancellationToken);
+            // Update the texture set
+            var updatedTextureSet = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
 
             return Result.Success(new AddTextureToPackResponse(texture.Id, texture.TextureType));
         }
@@ -73,5 +73,5 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
     }
 }
 
-public record AddTextureToPackCommand(int TexturePackId, int FileId, TextureType TextureType) : ICommand<AddTextureToPackResponse>;
+public record AddTextureToPackCommand(int TextureSetId, int FileId, TextureType TextureType) : ICommand<AddTextureToPackResponse>;
 public record AddTextureToPackResponse(int TextureId, TextureType TextureType);
