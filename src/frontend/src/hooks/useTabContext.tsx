@@ -118,9 +118,7 @@ export const TabProvider = ({
       modelId:
         type === 'modelViewer' ? (data as { id?: string })?.id : undefined,
       setId:
-        type === 'textureSetViewer'
-          ? (data as { id?: string })?.id
-          : undefined,
+        type === 'textureSetViewer' ? (data as { id?: string })?.id : undefined,
     }
 
     const newTabs = [...tabs, newTab]

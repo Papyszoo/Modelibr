@@ -50,10 +50,7 @@ describe('TexturedGeometry', () => {
     expect(() => {
       render(
         <Canvas>
-          <TexturedGeometry
-            geometryType="sphere"
-            textureSet={mockTextureSet}
-          />
+          <TexturedGeometry geometryType="sphere" textureSet={mockTextureSet} />
         </Canvas>
       )
     }).not.toThrow()
@@ -76,10 +73,7 @@ describe('TexturedGeometry', () => {
     expect(() => {
       render(
         <Canvas>
-          <TexturedGeometry
-            geometryType="torus"
-            textureSet={mockTextureSet}
-          />
+          <TexturedGeometry geometryType="torus" textureSet={mockTextureSet} />
         </Canvas>
       )
     }).not.toThrow()

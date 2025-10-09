@@ -170,10 +170,7 @@ class ApiClient {
     return response.data
   }
 
-  async removeTextureFromSet(
-    setId: number,
-    textureId: number
-  ): Promise<void> {
+  async removeTextureFromSet(setId: number, textureId: number): Promise<void> {
     await this.client.delete(`/texture-sets/${setId}/textures/${textureId}`)
   }
 

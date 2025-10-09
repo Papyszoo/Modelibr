@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import { TextureSetDto } from '../../../types'
+import { TextureSetDto, TextureType } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import { useTabContext } from '../../../hooks/useTabContext'
+import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
+// eslint-disable-next-line no-restricted-imports
+import ApiClient from '../../../services/ApiClient'
 import CreateTextureSetDialog from '../dialogs/CreateTextureSetDialog'
 import TextureSetListHeader from './TextureSetListHeader'
-import TextureSetTable from './TextureSetTable'
+import TextureSetGrid from './TextureSetGrid'
 import './TextureSetList.css'
 
 function TextureSetList() {
@@ -64,7 +67,7 @@ function TextureSetList() {
     }
   }
 
-  const handleDeleteTextureSet = (textureSet: TextureSetDto) => {
+  const _handleDeleteTextureSet = (textureSet: TextureSetDto) => {
     confirmDialog({
       message: `Are you sure you want to delete the texture set "${textureSet.name}"?`,
       header: 'Delete Confirmation',
@@ -96,6 +99,51 @@ function TextureSetList() {
     openTextureSetDetailsTab(textureSet)
   }
 
+  const handleFileDrop = async (files: File[] | FileList) => {
+    const fileArray = Array.from(files)
+
+    for (const file of fileArray) {
+      try {
+        // 1. Upload the file
+        const uploadResult = await ApiClient.uploadFile(file)
+
+        // 2. Create a new texture set with the file name (without extension)
+        const fileName = file.name.replace(/\.[^/.]+$/, '')
+        const createResult = await textureSetsApi.createTextureSet({
+          name: fileName,
+        })
+
+        // 3. Add the uploaded file as an albedo texture to the new set
+        await ApiClient.addTextureToSetEndpoint(createResult.id, {
+          fileId: uploadResult.fileId,
+          textureType: TextureType.Albedo,
+        })
+
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: `Texture set "${fileName}" created with albedo texture`,
+          life: 3000,
+        })
+      } catch (error) {
+        console.error('Failed to create texture set from file:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: `Failed to create texture set from ${file.name}`,
+          life: 3000,
+        })
+      }
+    }
+
+    // Refresh the texture sets list
+    loadTextureSets()
+  }
+
+  // Use drag and drop hook
+  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
+    useDragAndDrop(handleFileDrop)
+
   return (
     <div className="texture-set-list">
       <Toast ref={toast} />
@@ -106,11 +154,14 @@ function TextureSetList() {
         onCreateSet={() => setShowCreateDialog(true)}
       />
 
-      <TextureSetTable
+      <TextureSetGrid
         textureSets={textureSets}
         loading={loading}
-        onViewDetails={handleViewDetails}
-        onDeleteSet={handleDeleteTextureSet}
+        onTextureSetSelect={handleViewDetails}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
       />
 
       {showCreateDialog && (

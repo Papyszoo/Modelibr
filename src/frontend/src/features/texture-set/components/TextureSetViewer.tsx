@@ -96,9 +96,7 @@ function TextureSetViewer({ setId }: TextureSetViewerProps) {
   }
 
   if (!textureSet) {
-    return (
-      <div className="texture-set-viewer-error">Texture set not found</div>
-    )
+    return <div className="texture-set-viewer-error">Texture set not found</div>
   }
 
   // Get all texture types for cards
