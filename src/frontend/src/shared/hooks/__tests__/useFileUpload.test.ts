@@ -296,12 +296,15 @@ describe('useDragAndDrop', () => {
     expect(document.body.classList.contains('dragging-file')).toBe(true)
     expect(mockElement.classList.contains('drag-over')).toBe(true)
 
-    // Simulate drag leave with null relatedTarget (common in drop scenarios)
+    // Simulate drag leave - counter should decrement to 0
     const mockDragLeaveEvent = {
       preventDefault: jest.fn(),
       stopPropagation: jest.fn(),
       currentTarget: mockElement,
       relatedTarget: null,
+      dataTransfer: {
+        types: ['Files'],
+      },
     }
     handlers.onDragLeave(mockDragLeaveEvent)
 
@@ -333,12 +336,15 @@ describe('useDragAndDrop', () => {
     // Create an element that's not in the document
     const outsideElement = document.createElement('div')
 
-    // Simulate drag leave with relatedTarget outside document
+    // Simulate drag leave - counter should decrement to 0
     const mockDragLeaveEvent = {
       preventDefault: jest.fn(),
       stopPropagation: jest.fn(),
       currentTarget: mockElement,
       relatedTarget: outsideElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
     }
     handlers.onDragLeave(mockDragLeaveEvent)
 
@@ -381,5 +387,71 @@ describe('useDragAndDrop', () => {
 
     expect(onFilesDropped).not.toHaveBeenCalled()
     expect(document.body.classList.contains('dragging-file')).toBe(false)
+  })
+
+  it('should use drag counter to prevent flickering on child element enters/leaves', () => {
+    const onFilesDropped = jest.fn()
+    const handlers = useDragAndDrop(onFilesDropped)
+
+    const mockElement = document.createElement('div')
+
+    // First drag enter - counter becomes 1, styles added
+    const mockDragEnterEvent1 = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
+    }
+    handlers.onDragEnter(mockDragEnterEvent1)
+
+    expect(document.body.classList.contains('dragging-file')).toBe(true)
+    expect(mockElement.classList.contains('drag-over')).toBe(true)
+
+    // Second drag enter (e.g., entering a child element) - counter becomes 2, styles remain
+    const mockDragEnterEvent2 = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
+    }
+    handlers.onDragEnter(mockDragEnterEvent2)
+
+    // Styles should still be present
+    expect(document.body.classList.contains('dragging-file')).toBe(true)
+    expect(mockElement.classList.contains('drag-over')).toBe(true)
+
+    // First drag leave (e.g., leaving child element) - counter becomes 1, styles remain
+    const mockDragLeaveEvent1 = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
+    }
+    handlers.onDragLeave(mockDragLeaveEvent1)
+
+    // Styles should still be present (counter is 1, not 0)
+    expect(document.body.classList.contains('dragging-file')).toBe(true)
+    expect(mockElement.classList.contains('drag-over')).toBe(true)
+
+    // Second drag leave (leaving the container) - counter becomes 0, styles removed
+    const mockDragLeaveEvent2 = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
+    }
+    handlers.onDragLeave(mockDragLeaveEvent2)
+
+    // Styles should now be removed
+    expect(document.body.classList.contains('dragging-file')).toBe(false)
+    expect(mockElement.classList.contains('drag-over')).toBe(false)
   })
 })

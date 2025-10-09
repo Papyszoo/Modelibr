@@ -205,9 +205,16 @@ export function useFileUpload(options = {}) {
  * @returns {Object} Drag and drop event handlers
  */
 export function useDragAndDrop(onFilesDropped) {
+  // Use a counter to track nested drag enter/leave events
+  // This prevents flickering when dragging over child elements
+  let dragCounter = 0
+
   const onDrop = e => {
     e.preventDefault()
     e.stopPropagation()
+
+    // Reset drag counter
+    dragCounter = 0
 
     // Remove drag visual feedback immediately and unconditionally
     document.body.classList.remove('dragging-file')
@@ -227,6 +234,7 @@ export function useDragAndDrop(onFilesDropped) {
         onFilesDropped(files)
       } catch (error) {
         // Ensure drag state is cleared even if callback fails
+        dragCounter = 0
         document.body.classList.remove('dragging-file')
         e.currentTarget.classList.remove('drag-over')
         throw error
@@ -245,8 +253,13 @@ export function useDragAndDrop(onFilesDropped) {
       e.dataTransfer.types &&
       e.dataTransfer.types.includes('Files')
     ) {
-      document.body.classList.add('dragging-file')
-      e.currentTarget.classList.add('drag-over')
+      dragCounter++
+
+      // Only add classes on the first drag enter (not on child element enters)
+      if (dragCounter === 1) {
+        document.body.classList.add('dragging-file')
+        e.currentTarget.classList.add('drag-over')
+      }
     }
   }
 
@@ -254,21 +267,24 @@ export function useDragAndDrop(onFilesDropped) {
     e.preventDefault()
     e.stopPropagation()
 
-    // More robust check for leaving the container
-    // Handle cases where relatedTarget might be null or outside the document
-    const relatedTarget = e.relatedTarget
-    const currentTarget = e.currentTarget
-
-    // If there's no relatedTarget, or if the relatedTarget is not contained
-    // within the currentTarget, then we're leaving the drop zone
+    // Only decrement for file drags
     if (
-      !relatedTarget ||
-      !currentTarget.contains(relatedTarget) ||
-      !document.contains(relatedTarget)
+      e.dataTransfer &&
+      e.dataTransfer.types &&
+      e.dataTransfer.types.includes('Files')
     ) {
-      // Only remove drag styles if they were added (for file drags)
-      document.body.classList.remove('dragging-file')
-      currentTarget.classList.remove('drag-over')
+      dragCounter--
+
+      // Only remove classes when we've left all nested elements (counter reaches 0)
+      if (dragCounter === 0) {
+        document.body.classList.remove('dragging-file')
+        e.currentTarget.classList.remove('drag-over')
+      }
+
+      // Safety check: prevent negative counter
+      if (dragCounter < 0) {
+        dragCounter = 0
+      }
     }
   }
 
