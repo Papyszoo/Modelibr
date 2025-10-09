@@ -15,9 +15,7 @@ export function useTextureSets() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const getAllTextureSets = useCallback(async (): Promise<
-    TextureSetDto[]
-  > => {
+  const getAllTextureSets = useCallback(async (): Promise<TextureSetDto[]> => {
     try {
       setLoading(true)
       setError(null)
