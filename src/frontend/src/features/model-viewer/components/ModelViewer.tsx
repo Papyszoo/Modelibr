@@ -165,6 +165,7 @@ function ModelViewer({
             </div>
           ) : (
             <Canvas
+              key={`canvas-${model.id}-${side}`}
               shadows
               className="viewer-canvas"
               gl={{
@@ -174,7 +175,11 @@ function ModelViewer({
               }}
               dpr={Math.min(window.devicePixelRatio, 2)}
             >
-              <ModelPreviewScene model={model} settings={viewerSettings} />
+              <ModelPreviewScene
+                key={`scene-${model.id}-${side}`}
+                model={model}
+                settings={viewerSettings}
+              />
             </Canvas>
           )}
         </div>
