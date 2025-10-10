@@ -11,6 +11,12 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-folder'
     case 'textureSetViewer':
       return 'pi pi-image'
+    case 'textureSets':
+      return 'pi pi-palette'
+    case 'textureSetViewer':
+      return 'pi pi-images'
+    case 'animation':
+      return 'pi pi-play'
     case 'settings':
       return 'pi pi-cog'
     default:
@@ -28,10 +34,14 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Models List'
     case 'modelViewer':
       return `Model: ${tab.modelId || 'Unknown'}`
+    case 'texture':
+      return 'Textures List'
     case 'textureSets':
       return 'Texture Sets'
     case 'textureSetViewer':
       return `Texture Set: ${tab.setId || 'Unknown'}`
+    case 'animation':
+      return 'Animations List'
     case 'settings':
       return 'Settings'
     default:

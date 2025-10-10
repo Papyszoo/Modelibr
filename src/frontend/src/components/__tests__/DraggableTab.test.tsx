@@ -115,4 +115,36 @@ describe('DraggableTab', () => {
     const closeButton = screen.getByLabelText('Close tab')
     expect(closeButton).toBeInTheDocument()
   })
+
+  it('should render textureSets tab with palette icon', () => {
+    const textureSetsTab: Tab = {
+      id: 'test-tab-3',
+      type: 'textureSets',
+      label: 'Texture Sets',
+    }
+
+    render(<DraggableTab {...defaultProps} tab={textureSetsTab} />)
+
+    const tabElement = screen.getByTitle('Texture Sets')
+    expect(tabElement).toBeInTheDocument()
+
+    const icon = tabElement.querySelector('.tab-icon')
+    expect(icon).toHaveClass('pi', 'pi-palette')
+  })
+
+  it('should render textureSetViewer tab with images icon', () => {
+    const textureSetViewerTab: Tab = {
+      id: 'test-tab-4',
+      type: 'textureSetViewer',
+      setId: 'set-123',
+    }
+
+    render(<DraggableTab {...defaultProps} tab={textureSetViewerTab} />)
+
+    const tabElement = screen.getByTitle('Texture Set: set-123')
+    expect(tabElement).toBeInTheDocument()
+
+    const icon = tabElement.querySelector('.tab-icon')
+    expect(icon).toHaveClass('pi', 'pi-images')
+  })
 })
