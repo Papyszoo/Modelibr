@@ -29,12 +29,38 @@ public static class DatabaseExtensions
             // Apply pending migrations to ensure database is up to date
             await context.Database.MigrateAsync();
             
+            // Seed default environment if none exists
+            await SeedDefaultEnvironmentAsync(context, logger);
+            
             logger.LogInformation("Database initialization completed successfully");
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Database initialization failed. Application will start without database connectivity.");
             // Don't throw - allow application to start even if database is not available
+        }
+    }
+
+    private static async Task SeedDefaultEnvironmentAsync(ApplicationDbContext context, ILogger logger)
+    {
+        try
+        {
+            // Check if any environments exist
+            var hasEnvironments = await context.Environments.AnyAsync();
+            if (!hasEnvironments)
+            {
+                logger.LogInformation("No environments found. Creating default 'Stage' environment...");
+                
+                var defaultEnvironment = Domain.Models.Environment.CreateDefaultStage(DateTime.UtcNow);
+                context.Environments.Add(defaultEnvironment);
+                await context.SaveChangesAsync();
+                
+                logger.LogInformation("Default 'Stage' environment created successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to seed default environment. This is not critical.");
         }
     }
 }
