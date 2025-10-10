@@ -87,6 +87,18 @@ function DraggableTab({
     onClose()
   }
 
+  const handleMouseDown = (e: React.MouseEvent): void => {
+    // Middle button click (button === 1) should close the tab
+    // This follows browser tab conventions and doesn't interfere with:
+    // - Left button (0): used for selection and dragging
+    // - Right button (2): used for context menu
+    if (e.button === 1) {
+      e.preventDefault() // Prevent default middle button behavior (e.g., auto-scroll)
+      e.stopPropagation() // Prevent tab selection when closing
+      onClose()
+    }
+  }
+
   return (
     <div
       className={`draggable-tab ${isActive ? 'active' : ''}`}
@@ -94,6 +106,7 @@ function DraggableTab({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
+      onMouseDown={handleMouseDown}
       title={getTabTooltip(tab)}
     >
       {/* Tab content - always show icon for now */}
