@@ -14,6 +14,7 @@ namespace Infrastructure.Persistence
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
+        public DbSet<Domain.Models.Environment> Environments => Set<Domain.Models.Environment>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -184,6 +185,30 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
+            });
+
+            // Configure Environment entity
+            modelBuilder.Entity<Domain.Models.Environment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.IsDefault).IsRequired();
+                entity.Property(e => e.LightIntensity).IsRequired();
+                entity.Property(e => e.EnvironmentPreset).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.ShowShadows).IsRequired();
+                entity.Property(e => e.ShadowType).HasMaxLength(50);
+                entity.Property(e => e.ShadowOpacity).IsRequired();
+                entity.Property(e => e.ShadowBlur).IsRequired();
+                entity.Property(e => e.AutoAdjustCamera).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // Create index for efficient querying by IsDefault
+                entity.HasIndex(e => e.IsDefault);
+                
+                // Create unique index for Name to prevent duplicate environment names
+                entity.HasIndex(e => e.Name).IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);
