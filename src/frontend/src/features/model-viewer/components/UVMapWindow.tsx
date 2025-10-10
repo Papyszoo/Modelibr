@@ -1,4 +1,3 @@
-import { Canvas } from '@react-three/fiber'
 import FloatingWindow from '../../../components/FloatingWindow'
 import { Model } from '../../../utils/fileUtils'
 import UVMapScene from './UVMapScene'
@@ -20,7 +19,7 @@ function UVMapWindow({
     <FloatingWindow
       visible={visible}
       onClose={onClose}
-      title="UV Map / Vertex Position"
+      title="UV Map"
       side={side}
       windowId="uvmap"
     >
@@ -33,20 +32,11 @@ function UVMapWindow({
               color: '#64748b',
             }}
           >
-            Vertices colored by position: Red=X, Green=Y, Blue=Z
+            2D UV layout with faces colored by 3D position (R=X, G=Y, B=Z)
           </div>
-          <Canvas
-            shadows={false}
-            style={{ width: '100%', height: 'calc(100% - 2rem)' }}
-            gl={{
-              antialias: true,
-              alpha: true,
-              powerPreference: 'high-performance',
-            }}
-            dpr={Math.min(window.devicePixelRatio, 2)}
-          >
-            <UVMapScene />
-          </Canvas>
+          <div style={{ width: '100%', height: 'calc(100% - 2rem)' }}>
+            <UVMapScene width={500} height={400} />
+          </div>
         </div>
       ) : (
         <p style={{ color: '#64748b', fontStyle: 'italic' }}>No model loaded</p>

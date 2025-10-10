@@ -159,7 +159,7 @@ function ModelViewer({
               icon="pi pi-map"
               className="p-button-rounded viewer-control-btn"
               onClick={() => setUvMapWindowVisible(!uvMapWindowVisible)}
-              tooltip="UV Map / Vertex Position"
+              tooltip="UV Map"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
               }}
