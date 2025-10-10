@@ -1,8 +1,6 @@
 import { ModelList } from '../../features/models'
 import { ModelViewer } from '../../features/model-viewer'
-import TextureList from '../tabs/TextureList'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
-import AnimationList from '../tabs/AnimationList'
 import Settings from '../tabs/Settings'
 import { Tab } from '../../types'
 import { useTabContext } from '../../hooks/useTabContext'
@@ -31,9 +29,6 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
         }
         return <ModelViewer modelId={tab.modelId} side={side} />
 
-      case 'texture':
-        return <TextureList />
-
       case 'textureSets':
         return <TextureSetList />
 
@@ -47,9 +42,6 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
           )
         }
         return <TextureSetViewer setId={tab.setId} side={side} />
-
-      case 'animation':
-        return <AnimationList />
 
       case 'settings':
         return <Settings />
