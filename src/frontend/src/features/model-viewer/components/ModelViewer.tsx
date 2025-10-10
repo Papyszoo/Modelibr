@@ -5,6 +5,7 @@ import ModelInfoWindow from './ModelInfoWindow'
 import ThumbnailWindow from './ThumbnailWindow'
 import ModelHierarchyWindow from './ModelHierarchyWindow'
 import ViewerSettingsWindow from './ViewerSettingsWindow'
+import UVMapWindow from './UVMapWindow'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
 import { getModelFileFormat, Model } from '../../../utils/fileUtils'
@@ -35,6 +36,7 @@ function ModelViewer({
     useState<boolean>(false)
   const [settingsWindowVisible, setSettingsWindowVisible] =
     useState<boolean>(false)
+  const [uvMapWindowVisible, setUvMapWindowVisible] = useState<boolean>(false)
   const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
     orbitSpeed: 1,
     zoomSpeed: 1,
@@ -153,6 +155,15 @@ function ModelViewer({
                 position: buttonPosition === 'left' ? 'right' : 'left',
               }}
             />
+            <Button
+              icon="pi pi-map"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() => setUvMapWindowVisible(!uvMapWindowVisible)}
+              tooltip="UV Map"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
           </div>
 
           {error ? (
@@ -209,6 +220,12 @@ function ModelViewer({
           visible={hierarchyWindowVisible}
           onClose={() => setHierarchyWindowVisible(false)}
           side={side}
+        />
+        <UVMapWindow
+          visible={uvMapWindowVisible}
+          onClose={() => setUvMapWindowVisible(false)}
+          side={side}
+          model={model}
         />
       </ModelProvider>
     </div>
