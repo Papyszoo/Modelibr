@@ -1,5 +1,9 @@
 import { Slider } from 'primereact/slider'
 import { InputSwitch } from 'primereact/inputswitch'
+import { Dropdown } from 'primereact/dropdown'
+import { useState, useEffect } from 'react'
+// eslint-disable-next-line no-restricted-imports
+import ApiClient, { EnvironmentDto } from '../../../services/ApiClient'
 import './ViewerSettings.css'
 
 export interface ViewerSettingsType {
@@ -8,6 +12,7 @@ export interface ViewerSettingsType {
   panSpeed: number
   modelRotationSpeed: number
   showShadows: boolean
+  environmentId?: number
 }
 
 interface ViewerSettingsProps {
@@ -16,6 +21,23 @@ interface ViewerSettingsProps {
 }
 
 function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
+  const [environments, setEnvironments] = useState<EnvironmentDto[]>([])
+  const [isLoadingEnvironments, setIsLoadingEnvironments] = useState(true)
+
+  useEffect(() => {
+    const fetchEnvironments = async () => {
+      try {
+        const envs = await ApiClient.getEnvironments()
+        setEnvironments(envs)
+      } catch (error) {
+        console.error('Failed to load environments:', error)
+      } finally {
+        setIsLoadingEnvironments(false)
+      }
+    }
+    fetchEnvironments()
+  }, [])
+
   const handleChange = (
     key: keyof ViewerSettingsType,
     value: number | boolean
@@ -28,6 +50,27 @@ function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
 
   return (
     <div className="viewer-settings">
+      <div className="settings-group">
+        <h4 className="settings-group-title">Environment</h4>
+
+        <div className="setting-item">
+          <label>Scene Environment</label>
+          <div className="setting-control">
+            <Dropdown
+              value={settings.environmentId}
+              options={environments.map(env => ({
+                label: env.isDefault ? `${env.name} (Default)` : env.name,
+                value: env.id
+              }))}
+              onChange={e => handleChange('environmentId', e.value as number)}
+              placeholder={isLoadingEnvironments ? 'Loading...' : 'Select environment'}
+              disabled={isLoadingEnvironments}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="settings-group">
         <h4 className="settings-group-title">Control Settings</h4>
 
