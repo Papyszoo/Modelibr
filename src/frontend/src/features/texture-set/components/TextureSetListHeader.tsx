@@ -15,7 +15,7 @@ export default function TextureSetListHeader({
         <h1>Texture Sets</h1>
         <div className="texture-set-stats">
           <span className="stat-item">
-            <i className="pi pi-folder"></i>
+            <i className="pi pi-palette"></i>
             {setCount} set{setCount !== 1 ? 's' : ''}
           </span>
         </div>
