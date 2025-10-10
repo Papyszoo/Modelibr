@@ -14,6 +14,7 @@ A modern 3D model file upload service built with .NET 9.0 and React, featuring h
 - **3D Model Support**: Support for popular 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
 - **Hash-based Deduplication**: Intelligent storage system that prevents duplicate files
 - **Interactive 3D Viewer**: Real-time 3D model rendering with Three.js TSL (Three.js Shading Language)
+- **Customizable Environments**: Create and manage custom 3D scene environments with configurable lighting, shadows, and HDR maps
 - **Real-time Thumbnail Processing**: SignalR-based queue system with Node.js worker service
 - **Clean Architecture**: Well-structured backend following SOLID principles and DDD patterns
 - **Modern React Frontend**: Responsive UI with PrimeReact components and advanced state management
@@ -349,6 +350,15 @@ If you encounter "container webapi is unhealthy" errors:
 - **Port conflicts**: Make sure ports 3000, 8080, 5432, and 3001 are available (port 8081 only needed for local HTTPS development)
 - **Upload permission errors**: Set `UPLOAD_STORAGE_PATH` to a writable directory
 - **Thumbnail worker "no such file" error**: If you see `exec /app/docker-entrypoint.sh: no such file or directory`, this was caused by Windows line endings. **The issue is now fixed** - simply rebuild the container with `docker compose build thumbnail-worker`. The Dockerfile automatically converts line endings. See [docs/WORKER.md](docs/WORKER.md#troubleshooting) for details
+
+## 📖 Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+- **[Backend API Reference](docs/BACKEND_API.md)**: Complete API documentation, endpoints, and examples
+- **[Frontend Development Guide](docs/FRONTEND.md)**: Frontend architecture, patterns, and best practices
+- **[Thumbnail Worker Documentation](docs/WORKER.md)**: Worker service setup and troubleshooting
+- **[Environments Feature](docs/ENVIRONMENTS.md)**: Complete guide to the environments feature for customizable 3D scene configurations
 
 ## 🤝 Contributing
 
