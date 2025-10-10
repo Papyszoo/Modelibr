@@ -27,6 +27,25 @@ export interface ThumbnailStatus {
   processedAt?: string
 }
 
+export interface EnvironmentDto {
+  id: number
+  name: string
+  description?: string
+  isDefault: boolean
+  lightIntensity: number
+  environmentPreset: string
+  showShadows: boolean
+  shadowType?: string
+  shadowOpacity: number
+  shadowBlur: number
+  autoAdjustCamera: boolean
+  cameraDistance?: number
+  cameraAngle?: number
+  backgroundModelId?: number
+  createdAt: string
+  updatedAt: string
+}
+
 class ApiClient {
   private baseURL: string
   private client: AxiosInstance
@@ -224,6 +243,55 @@ class ApiClient {
   }> {
     const response = await this.client.put('/settings', settings)
     return response.data
+  }
+
+  // Environments API
+  async getEnvironments(): Promise<EnvironmentDto[]> {
+    const response = await this.client.get('/environments')
+    return response.data
+  }
+
+  async getEnvironmentById(id: number): Promise<EnvironmentDto> {
+    const response = await this.client.get(`/environments/${id}`)
+    return response.data
+  }
+
+  async createEnvironment(environment: {
+    name: string
+    lightIntensity: number
+    environmentPreset: string
+    showShadows: boolean
+    isDefault?: boolean
+    description?: string
+  }): Promise<{ id: number; name: string; description?: string; isDefault: boolean }> {
+    const response = await this.client.post('/environments', environment)
+    return response.data
+  }
+
+  async updateEnvironment(
+    id: number,
+    environment: {
+      name: string
+      description?: string
+      lightIntensity: number
+      environmentPreset: string
+      showShadows: boolean
+      shadowType?: string
+      shadowOpacity: number
+      shadowBlur: number
+    }
+  ): Promise<{ id: number }> {
+    const response = await this.client.put(`/environments/${id}`, environment)
+    return response.data
+  }
+
+  async setDefaultEnvironment(id: number): Promise<{ id: number }> {
+    const response = await this.client.post(`/environments/${id}/set-default`)
+    return response.data
+  }
+
+  async deleteEnvironment(id: number): Promise<void> {
+    await this.client.delete(`/environments/${id}`)
   }
 
   // Model tags API
