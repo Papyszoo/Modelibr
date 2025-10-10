@@ -58,6 +58,11 @@ export default function DockBar({
       command: () => onAddTab('textureSets', 'Texture Sets'),
     },
     {
+      label: 'Packs',
+      icon: 'pi pi-box',
+      command: () => onAddTab('packs', 'Packs'),
+    },
+    {
       label: 'Animations List',
       icon: 'pi pi-play',
       command: () => onAddTab('animation', 'Animations'),

@@ -9,6 +9,7 @@ export interface Tab {
     | 'animation'
     | 'textureSets'
     | 'textureSetViewer'
+    | 'packs'
     | 'packViewer'
     | 'settings'
   label?: string

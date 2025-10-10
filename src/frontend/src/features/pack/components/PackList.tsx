@@ -9,6 +9,7 @@ import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto } from '../../../types'
+import { useTabContext } from '../../../hooks/useTabContext'
 import './PackList.css'
 
 export default function PackList() {
@@ -18,6 +19,7 @@ export default function PackList() {
   const [newPackName, setNewPackName] = useState('')
   const [newPackDescription, setNewPackDescription] = useState('')
   const toast = useRef<Toast>(null)
+  const { openTab } = useTabContext()
 
   useEffect(() => {
     loadPacks()
@@ -109,8 +111,7 @@ export default function PackList() {
           className="p-button-text p-button-rounded"
           tooltip="View Pack"
           onClick={() => {
-            // TODO: Open pack viewer tab
-            console.log('View pack:', rowData.id)
+            openTab('packViewer', rowData.name, { id: rowData.id.toString() })
           }}
         />
         <Button
