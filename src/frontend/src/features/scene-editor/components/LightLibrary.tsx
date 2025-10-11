@@ -17,26 +17,26 @@ function LightLibrary({ onAddLight }: LightLibraryProps): JSX.Element {
       type: 'ambient',
       label: 'Ambient Light',
       icon: 'pi pi-sun',
-      description: 'Globally illuminates all objects'
+      description: 'Globally illuminates all objects',
     },
     {
       type: 'directional',
       label: 'Directional Light',
       icon: 'pi pi-arrow-down',
-      description: 'Light from a distance (like sun)'
+      description: 'Light from a distance (like sun)',
     },
     {
       type: 'point',
       label: 'Point Light',
       icon: 'pi pi-circle',
-      description: 'Light emanating from a point'
+      description: 'Light emanating from a point',
     },
     {
       type: 'spot',
       label: 'Spot Light',
       icon: 'pi pi-angle-down',
-      description: 'Cone-shaped light beam'
-    }
+      description: 'Cone-shaped light beam',
+    },
   ]
 
   return (

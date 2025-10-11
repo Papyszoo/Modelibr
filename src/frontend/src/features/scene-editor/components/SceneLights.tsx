@@ -9,7 +9,7 @@ interface SceneLightsProps {
 function SceneLights({
   lights,
   selectedId,
-  onSelectLight
+  onSelectLight,
 }: SceneLightsProps): JSX.Element {
   return (
     <>

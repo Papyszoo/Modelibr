@@ -15,7 +15,7 @@ interface EditorCanvasProps {
 function EditorCanvas({
   sceneConfig,
   selectedObjectId,
-  onSelectObject
+  onSelectObject,
 }: EditorCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -28,7 +28,7 @@ function EditorCanvas({
         gl={{
           antialias: true,
           alpha: true,
-          powerPreference: 'high-performance'
+          powerPreference: 'high-performance',
         }}
         dpr={Math.min(window.devicePixelRatio, 2)}
       >

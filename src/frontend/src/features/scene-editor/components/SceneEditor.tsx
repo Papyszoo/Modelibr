@@ -24,7 +24,7 @@ export interface SceneConfig {
 
 function SceneEditor(): JSX.Element {
   const [sceneConfig, setSceneConfig] = useState<SceneConfig>({
-    lights: []
+    lights: [],
   })
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
 
@@ -40,14 +40,14 @@ function SceneEditor(): JSX.Element {
         angle: Math.PI / 6,
         penumbra: 0.1,
         distance: 0,
-        decay: 2
+        decay: 2,
       }),
-      ...(type === 'point' && { distance: 0, decay: 2 })
+      ...(type === 'point' && { distance: 0, decay: 2 }),
     }
 
     setSceneConfig(prev => ({
       ...prev,
-      lights: [...prev.lights, newLight]
+      lights: [...prev.lights, newLight],
     }))
     setSelectedObjectId(newLight.id)
   }
@@ -57,14 +57,14 @@ function SceneEditor(): JSX.Element {
       ...prev,
       lights: prev.lights.map(light =>
         light.id === id ? { ...light, ...updates } : light
-      )
+      ),
     }))
   }
 
   const handleDeleteLight = (id: string) => {
     setSceneConfig(prev => ({
       ...prev,
-      lights: prev.lights.filter(light => light.id !== id)
+      lights: prev.lights.filter(light => light.id !== id),
     }))
     if (selectedObjectId === id) {
       setSelectedObjectId(null)
