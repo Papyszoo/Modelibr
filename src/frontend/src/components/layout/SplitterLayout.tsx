@@ -97,7 +97,10 @@ function SplitterLayout(): JSX.Element {
       if (activeLeftTab === tab.id) {
         if (newLeftTabs.length > 0) {
           // Activate the previous tab or the next one if it was the first
-          const newActiveIndex = movedTabIndex > 0 ? movedTabIndex - 1 : 0
+          const newActiveIndex = Math.min(
+            movedTabIndex > 0 ? movedTabIndex - 1 : 0,
+            newLeftTabs.length - 1
+          )
           setActiveLeftTab(newLeftTabs[newActiveIndex].id)
         } else {
           setActiveLeftTab('')
@@ -117,7 +120,10 @@ function SplitterLayout(): JSX.Element {
       if (activeRightTab === tab.id) {
         if (newRightTabs.length > 0) {
           // Activate the previous tab or the next one if it was the first
-          const newActiveIndex = movedTabIndex > 0 ? movedTabIndex - 1 : 0
+          const newActiveIndex = Math.min(
+            movedTabIndex > 0 ? movedTabIndex - 1 : 0,
+            newRightTabs.length - 1
+          )
           setActiveRightTab(newRightTabs[newActiveIndex].id)
         } else {
           setActiveRightTab('')
