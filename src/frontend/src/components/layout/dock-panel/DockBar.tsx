@@ -53,6 +53,11 @@ export default function DockBar({
       command: () => onAddTab('textureSets', 'Texture Sets'),
     },
     {
+      label: 'Scene Editor',
+      icon: 'pi pi-desktop',
+      command: () => onAddTab('sceneEditor', 'Scene Editor'),
+    },
+    {
       separator: true,
     },
     {
