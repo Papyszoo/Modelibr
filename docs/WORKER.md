@@ -230,6 +230,25 @@ curl http://localhost:5009/hubs/thumbnail-jobs
 
 ### Processing Failures
 
+**"TensorFlow native bindings error"**
+
+If you see:
+```
+Error: /app/node_modules/@tensorflow/tfjs-node/lib/napi-v8/tfjs_binding.node: cannot open shared object file
+```
+
+**Fixed in latest Dockerfile:**
+- Build tools (python3, make, g++) added to builder stage
+- Runtime libraries (libstdc++6) added to runtime stage  
+- Uses `--ignore-scripts` and rebuild to avoid download issues
+- TensorFlow is now optional with dynamic imports
+
+**Workaround if needed:**
+```bash
+# Disable image classification
+IMAGE_CLASSIFICATION_ENABLED=false
+```
+
 **"Failed to create WebGL context with headless-gl"**
 
 Requires two fixes:
