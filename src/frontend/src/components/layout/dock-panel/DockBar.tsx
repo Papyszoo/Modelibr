@@ -54,7 +54,7 @@ export default function DockBar({
     },
     {
       label: 'Packs',
-      icon: 'pi pi-box',
+      icon: 'pi pi-inbox',
       command: () => onAddTab('packs', 'Packs'),
     },
     {

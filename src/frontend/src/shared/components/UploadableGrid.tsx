@@ -28,8 +28,17 @@ export default function UploadableGrid({
     e.preventDefault()
     e.stopPropagation()
     
-    // Only set dragging to false if we're leaving the container itself
-    if (e.currentTarget === e.target) {
+    // Check if we're actually leaving the container (not just entering a child)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX
+    const y = e.clientY
+    
+    if (
+      x < rect.left ||
+      x >= rect.right ||
+      y < rect.top ||
+      y >= rect.bottom
+    ) {
       setIsDragging(false)
     }
   }
