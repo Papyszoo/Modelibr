@@ -6,6 +6,7 @@ namespace Domain.Models
     {
         private readonly List<File> _files = new();
         private readonly List<TextureSet> _textureSets = new();
+        private readonly List<Pack> _packs = new();
 
         public int Id { get; set; }
         public string Name { get; private set; } = string.Empty;
@@ -35,6 +36,18 @@ namespace Domain.Models
                 _textureSets.Clear();
                 if (value != null)
                     _textureSets.AddRange(value);
+            }
+        }
+
+        // Navigation property for many-to-many relationship with Packs - EF Core requires this to be settable
+        public ICollection<Pack> Packs 
+        { 
+            get => _packs; 
+            set 
+            {
+                _packs.Clear();
+                if (value != null)
+                    _packs.AddRange(value);
             }
         }
 

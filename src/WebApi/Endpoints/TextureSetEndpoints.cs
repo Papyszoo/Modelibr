@@ -59,10 +59,11 @@ public static class TextureSetEndpoints
     }
 
     private static async Task<IResult> GetAllTextureSets(
+        int? packId,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(), cancellationToken);
+        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId), cancellationToken);
 
         if (!result.IsSuccess)
         {

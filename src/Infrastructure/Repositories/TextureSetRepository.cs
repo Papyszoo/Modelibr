@@ -31,6 +31,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
             .AsSplitQuery()
             .OrderBy(tp => tp.Name)
             .ToListAsync(cancellationToken);
@@ -42,6 +43,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
             .AsSplitQuery()
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
     }
@@ -55,6 +57,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
             .AsSplitQuery()
             .FirstOrDefaultAsync(tp => tp.Name == name.Trim(), cancellationToken);
     }

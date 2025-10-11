@@ -18,6 +18,12 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
     {
         var textureSets = await _textureSetRepository.GetAllAsync(cancellationToken);
 
+        // Filter by pack if specified
+        if (query.PackId.HasValue)
+        {
+            textureSets = textureSets.Where(ts => ts.Packs.Any(p => p.Id == query.PackId.Value));
+        }
+
         var textureSetDtos = textureSets.Select(tp => new TextureSetDto
         {
             Id = tp.Id,
@@ -38,6 +44,11 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             {
                 Id = m.Id,
                 Name = m.Name
+            }).ToList(),
+            Packs = tp.Packs.Select(p => new PackSummaryDto
+            {
+                Id = p.Id,
+                Name = p.Name
             }).ToList()
         }).ToList();
 
@@ -45,7 +56,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
     }
 }
 
-public record GetAllTextureSetsQuery() : IQuery<GetAllTextureSetsResponse>;
+public record GetAllTextureSetsQuery(int? PackId = null) : IQuery<GetAllTextureSetsResponse>;
 public record GetAllTextureSetsResponse(IEnumerable<TextureSetDto> TextureSets);
 
 public record TextureSetDto
@@ -58,6 +69,7 @@ public record TextureSetDto
     public bool IsEmpty { get; init; }
     public ICollection<TextureDto> Textures { get; init; } = new List<TextureDto>();
     public ICollection<ModelSummaryDto> AssociatedModels { get; init; } = new List<ModelSummaryDto>();
+    public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
 }
 
 public record TextureDto
@@ -70,6 +82,12 @@ public record TextureDto
 }
 
 public record ModelSummaryDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record PackSummaryDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
