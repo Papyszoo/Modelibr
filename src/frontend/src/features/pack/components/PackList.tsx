@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react'
-import { DataTable } from 'primereact/datatable'
-import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
@@ -103,33 +101,10 @@ export default function PackList() {
     }
   }
 
-  const actionBodyTemplate = (rowData: PackDto) => {
-    return (
-      <div className="flex gap-2">
-        <Button
-          icon="pi pi-eye"
-          className="p-button-text p-button-rounded"
-          tooltip="View Pack"
-          onClick={() => {
-            openTab('packViewer', rowData.name, { id: rowData.id.toString() })
-          }}
-        />
-        <Button
-          icon="pi pi-trash"
-          className="p-button-text p-button-rounded p-button-danger"
-          tooltip="Delete Pack"
-          onClick={() => handleDeletePack(rowData.id)}
-        />
-      </div>
-    )
-  }
-
-  const contentBodyTemplate = (rowData: PackDto) => {
-    return (
-      <div>
-        {rowData.modelCount} models, {rowData.textureSetCount} texture sets
-      </div>
-    )
+  const getPackThumbnail = (pack: PackDto) => {
+    // TODO: Add pack thumbnail support
+    // For now, return null - will be implemented when thumbnail upload is added
+    return null
   }
 
   return (
@@ -145,26 +120,69 @@ export default function PackList() {
         />
       </div>
 
-      <DataTable
-        value={packs}
-        loading={loading}
-        emptyMessage="No packs found"
-        responsiveLayout="scroll"
-        stripedRows
-        showGridlines
-      >
-        <Column field="name" header="Name" sortable style={{ minWidth: '200px' }} />
-        <Column field="description" header="Description" style={{ minWidth: '300px' }} />
-        <Column body={contentBodyTemplate} header="Content" style={{ minWidth: '150px' }} />
-        <Column
-          field="createdAt"
-          header="Created"
-          sortable
-          body={(rowData) => new Date(rowData.createdAt).toLocaleDateString()}
-          style={{ minWidth: '120px' }}
-        />
-        <Column body={actionBodyTemplate} header="Actions" style={{ width: '120px' }} />
-      </DataTable>
+      {loading ? (
+        <div className="pack-list-loading">
+          <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }} />
+          <p>Loading packs...</p>
+        </div>
+      ) : packs.length === 0 ? (
+        <div className="pack-list-empty">
+          <i className="pi pi-box" style={{ fontSize: '3rem' }} />
+          <h3>No Packs Yet</h3>
+          <p>Create your first pack to organize models and texture sets</p>
+          <Button
+            label="Create Pack"
+            icon="pi pi-plus"
+            onClick={() => setShowCreateDialog(true)}
+          />
+        </div>
+      ) : (
+        <div className="pack-grid">
+          {packs.map(pack => {
+            const thumbnail = getPackThumbnail(pack)
+            return (
+              <div
+                key={pack.id}
+                className="pack-grid-card"
+                onClick={() => {
+                  openTab('packViewer', pack.name, { id: pack.id.toString() })
+                }}
+              >
+                <div className="pack-grid-card-image">
+                  {thumbnail ? (
+                    <img src={thumbnail} alt={pack.name} />
+                  ) : (
+                    <div className="pack-grid-card-placeholder">
+                      <i className="pi pi-box" />
+                    </div>
+                  )}
+                </div>
+                <div className="pack-grid-card-content">
+                  <h3 className="pack-grid-card-title">{pack.name}</h3>
+                  {pack.description && (
+                    <p className="pack-grid-card-description">{pack.description}</p>
+                  )}
+                  <div className="pack-grid-card-stats">
+                    <span><i className="pi pi-cube" /> {pack.modelCount}</span>
+                    <span><i className="pi pi-palette" /> {pack.textureSetCount}</span>
+                  </div>
+                </div>
+                <div className="pack-grid-card-actions">
+                  <Button
+                    icon="pi pi-trash"
+                    className="p-button-text p-button-rounded p-button-danger p-button-sm"
+                    tooltip="Delete Pack"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeletePack(pack.id)
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <Dialog
         header="Create New Pack"

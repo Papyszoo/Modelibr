@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import { Dialog } from 'primereact/dialog'
+import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
@@ -30,6 +32,7 @@ export default function TextureSetGrid({
   const [searchQuery, setSearchQuery] = useState('')
   const [packs, setPacks] = useState<PackDto[]>([])
   const [selectedTextureSet, setSelectedTextureSet] = useState<TextureSetDto | null>(null)
+  const [showPackDialog, setShowPackDialog] = useState(false)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
 
@@ -57,6 +60,7 @@ export default function TextureSetGrid({
         detail: 'Texture set added to pack',
         life: 3000,
       })
+      setShowPackDialog(false)
     } catch (error) {
       console.error('Failed to add texture set to pack:', error)
       toast.current?.show({
@@ -93,15 +97,10 @@ export default function TextureSetGrid({
     {
       label: 'Add to pack',
       icon: 'pi pi-box',
-      items: packs.length > 0 ? packs.map(pack => ({
-        label: pack.name,
-        command: () => handleAddToPack(pack.id),
-      })) : [
-        {
-          label: 'No packs available',
-          disabled: true,
-        },
-      ],
+      command: () => {
+        loadPacks()
+        setShowPackDialog(true)
+      },
     },
   ]
 
@@ -216,6 +215,42 @@ export default function TextureSetGrid({
           <p>No texture sets found matching "{searchQuery}"</p>
         </div>
       )}
+      
+      {/* Add to Pack Dialog */}
+      <Dialog
+        header="Add to Pack"
+        visible={showPackDialog}
+        style={{ width: '500px' }}
+        onHide={() => setShowPackDialog(false)}
+      >
+        <div className="pack-selection-dialog">
+          <p>Select a pack to add this texture set to:</p>
+          <div className="pack-list">
+            {packs.map(pack => (
+              <div
+                key={pack.id}
+                className="pack-item"
+                onClick={() => handleAddToPack(pack.id)}
+              >
+                <i className="pi pi-box" />
+                <div className="pack-item-content">
+                  <span className="pack-item-name">{pack.name}</span>
+                  {pack.description && (
+                    <span className="pack-item-description">{pack.description}</span>
+                  )}
+                </div>
+                <i className="pi pi-chevron-right" />
+              </div>
+            ))}
+          </div>
+          {packs.length === 0 && (
+            <div className="no-packs">
+              <i className="pi pi-inbox" />
+              <p>No packs available. Create a pack first.</p>
+            </div>
+          )}
+        </div>
+      </Dialog>
     </div>
   )
 }

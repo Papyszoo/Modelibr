@@ -5,6 +5,7 @@ import { Dialog } from 'primereact/dialog'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { InputText } from 'primereact/inputtext'
+import { Checkbox } from 'primereact/checkbox'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto, Model, TextureSetDto, TextureType } from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
@@ -25,6 +26,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
   const [showAddTextureSetDialog, setShowAddTextureSetDialog] = useState(false)
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [textureSetSearchQuery, setTextureSetSearchQuery] = useState('')
+  const [selectedModelIds, setSelectedModelIds] = useState<number[]>([])
+  const [selectedTextureSetIds, setSelectedTextureSetIds] = useState<number[]>([])
+  const [uploadingModel, setUploadingModel] = useState(false)
+  const [uploadingTextureSet, setUploadingTextureSet] = useState(false)
   const toast = useRef<Toast>(null)
   const modelContextMenu = useRef<ContextMenu>(null)
   const textureSetContextMenu = useRef<ContextMenu>(null)
@@ -141,50 +146,157 @@ export default function PackViewer({ packId }: PackViewerProps) {
     }
   }
 
-  const handleAddModel = async (modelId: number) => {
+  const handleAddModels = async () => {
+    if (selectedModelIds.length === 0) return
+    
     try {
-      await ApiClient.addModelToPack(packId, modelId)
+      await Promise.all(
+        selectedModelIds.map(modelId => ApiClient.addModelToPack(packId, modelId))
+      )
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Model added to pack',
+        detail: `${selectedModelIds.length} model(s) added to pack`,
         life: 3000,
       })
       setShowAddModelDialog(false)
+      setSelectedModelIds([])
       loadPackContent()
       loadPack()
     } catch (error) {
-      console.error('Failed to add model:', error)
+      console.error('Failed to add models:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to add model to pack',
+        detail: 'Failed to add models to pack',
         life: 3000,
       })
     }
   }
 
-  const handleAddTextureSet = async (textureSetId: number) => {
+  const handleAddTextureSets = async () => {
+    if (selectedTextureSetIds.length === 0) return
+    
     try {
-      await ApiClient.addTextureSetToPack(packId, textureSetId)
+      await Promise.all(
+        selectedTextureSetIds.map(textureSetId => 
+          ApiClient.addTextureSetToPack(packId, textureSetId)
+        )
+      )
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Texture set added to pack',
+        detail: `${selectedTextureSetIds.length} texture set(s) added to pack`,
         life: 3000,
       })
       setShowAddTextureSetDialog(false)
+      setSelectedTextureSetIds([])
       loadPackContent()
       loadPack()
     } catch (error) {
-      console.error('Failed to add texture set:', error)
+      console.error('Failed to add texture sets:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to add texture set to pack',
+        detail: 'Failed to add texture sets to pack',
         life: 3000,
       })
     }
+  }
+
+  const handleModelUpload = async (files: File[]) => {
+    if (files.length === 0) return
+    
+    try {
+      setUploadingModel(true)
+      const response = await ApiClient.uploadModel(files[0])
+      await ApiClient.addModelToPack(packId, response.id)
+      
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Model uploaded and added to pack',
+        life: 3000,
+      })
+      loadPackContent()
+      loadPack()
+    } catch (error) {
+      console.error('Failed to upload model:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to upload model',
+        life: 3000,
+      })
+    } finally {
+      setUploadingModel(false)
+    }
+  }
+
+  const handleTextureUpload = async (files: File[]) => {
+    if (files.length === 0) return
+    
+    try {
+      setUploadingTextureSet(true)
+      const fileResponse = await ApiClient.uploadFile(files[0])
+      
+      const setName = files[0].name.replace(/\.[^/.]+$/, '')
+      const setResponse = await ApiClient.createTextureSet({ name: setName })
+      
+      await ApiClient.addTextureToSet(setResponse.id, {
+        fileId: fileResponse.fileId,
+        textureType: 'Albedo'
+      })
+      
+      await ApiClient.addTextureSetToPack(packId, setResponse.id)
+      
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Texture set created and added to pack',
+        life: 3000,
+      })
+      loadPackContent()
+      loadPack()
+    } catch (error) {
+      console.error('Failed to upload texture:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to upload texture',
+        life: 3000,
+      })
+    } finally {
+      setUploadingTextureSet(false)
+    }
+  }
+
+  const handleModelDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const files = Array.from(e.dataTransfer.files)
+    handleModelUpload(files)
+  }
+
+  const handleTextureDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const files = Array.from(e.dataTransfer.files)
+    handleTextureUpload(files)
+  }
+
+  const toggleModelSelection = (modelId: number) => {
+    setSelectedModelIds(prev =>
+      prev.includes(modelId)
+        ? prev.filter(id => id !== modelId)
+        : [...prev, modelId]
+    )
+  }
+
+  const toggleTextureSetSelection = (textureSetId: number) => {
+    setSelectedTextureSetIds(prev =>
+      prev.includes(textureSetId)
+        ? prev.filter(id => id !== textureSetId)
+        : [...prev, textureSetId]
+    )
   }
 
   const getModelName = (model: Model) => {
@@ -266,6 +378,19 @@ export default function PackViewer({ packId }: PackViewerProps) {
         {/* Models Section */}
         <div className="pack-section">
           <h3>Models</h3>
+          
+          {/* Drag & Drop Zone for Models */}
+          <div
+            className={`pack-dropzone ${uploadingModel ? 'uploading' : ''}`}
+            onDrop={handleModelDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => e.preventDefault()}
+            onDragLeave={(e) => e.preventDefault()}
+          >
+            <i className="pi pi-cloud-upload" />
+            <p>Drag & drop model files here to upload to pack</p>
+          </div>
+
           <div className="pack-grid">
             {models.map(model => (
               <div
@@ -291,6 +416,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
               onClick={() => {
                 loadAvailableModels()
                 setModelSearchQuery('')
+                setSelectedModelIds([])
                 setShowAddModelDialog(true)
               }}
             >
@@ -305,6 +431,19 @@ export default function PackViewer({ packId }: PackViewerProps) {
         {/* Texture Sets Section */}
         <div className="pack-section">
           <h3>Texture Sets</h3>
+          
+          {/* Drag & Drop Zone for Textures */}
+          <div
+            className={`pack-dropzone ${uploadingTextureSet ? 'uploading' : ''}`}
+            onDrop={handleTextureDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => e.preventDefault()}
+            onDragLeave={(e) => e.preventDefault()}
+          >
+            <i className="pi pi-cloud-upload" />
+            <p>Drag & drop texture files here to create and add to pack</p>
+          </div>
+
           <div className="pack-grid">
             {textureSets.map(textureSet => {
               const albedoUrl = getAlbedoTextureUrl(textureSet)
@@ -344,6 +483,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
               onClick={() => {
                 loadAvailableTextureSets()
                 setTextureSetSearchQuery('')
+                setSelectedTextureSetIds([])
                 setShowAddTextureSetDialog(true)
               }}
             >
@@ -358,10 +498,32 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
       {/* Add Model Dialog */}
       <Dialog
-        header="Add Model to Pack"
+        header="Add Models to Pack"
         visible={showAddModelDialog}
         style={{ width: '80vw', maxWidth: '1200px' }}
-        onHide={() => setShowAddModelDialog(false)}
+        onHide={() => {
+          setShowAddModelDialog(false)
+          setSelectedModelIds([])
+        }}
+        footer={
+          <div>
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              onClick={() => {
+                setShowAddModelDialog(false)
+                setSelectedModelIds([])
+              }}
+              className="p-button-text"
+            />
+            <Button
+              label={`Add Selected (${selectedModelIds.length})`}
+              icon="pi pi-check"
+              onClick={handleAddModels}
+              disabled={selectedModelIds.length === 0}
+            />
+          </div>
+        }
       >
         <div className="add-dialog-content">
           <div className="search-bar">
@@ -376,20 +538,26 @@ export default function PackViewer({ packId }: PackViewerProps) {
             />
           </div>
           <div className="pack-grid">
-            {filteredAvailableModels.map(model => (
-              <div
-                key={model.id}
-                className="pack-card"
-                onClick={() => handleAddModel(model.id)}
-              >
-                <div className="pack-card-thumbnail">
-                  <ThumbnailDisplay modelId={model.id} />
-                  <div className="pack-card-overlay">
-                    <span className="pack-card-name">{getModelName(model)}</span>
+            {filteredAvailableModels.map(model => {
+              const isSelected = selectedModelIds.includes(model.id)
+              return (
+                <div
+                  key={model.id}
+                  className={`pack-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => toggleModelSelection(model.id)}
+                >
+                  <div className="pack-card-checkbox">
+                    <Checkbox checked={isSelected} onChange={() => toggleModelSelection(model.id)} />
+                  </div>
+                  <div className="pack-card-thumbnail">
+                    <ThumbnailDisplay modelId={model.id} />
+                    <div className="pack-card-overlay">
+                      <span className="pack-card-name">{getModelName(model)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           {filteredAvailableModels.length === 0 && (
             <div className="no-results">
@@ -402,10 +570,32 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
       {/* Add Texture Set Dialog */}
       <Dialog
-        header="Add Texture Set to Pack"
+        header="Add Texture Sets to Pack"
         visible={showAddTextureSetDialog}
         style={{ width: '80vw', maxWidth: '1200px' }}
-        onHide={() => setShowAddTextureSetDialog(false)}
+        onHide={() => {
+          setShowAddTextureSetDialog(false)
+          setSelectedTextureSetIds([])
+        }}
+        footer={
+          <div>
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              onClick={() => {
+                setShowAddTextureSetDialog(false)
+                setSelectedTextureSetIds([])
+              }}
+              className="p-button-text"
+            />
+            <Button
+              label={`Add Selected (${selectedTextureSetIds.length})`}
+              icon="pi pi-check"
+              onClick={handleAddTextureSets}
+              disabled={selectedTextureSetIds.length === 0}
+            />
+          </div>
+        }
       >
         <div className="add-dialog-content">
           <div className="search-bar">
@@ -422,12 +612,16 @@ export default function PackViewer({ packId }: PackViewerProps) {
           <div className="pack-grid">
             {filteredAvailableTextureSets.map(textureSet => {
               const albedoUrl = getAlbedoTextureUrl(textureSet)
+              const isSelected = selectedTextureSetIds.includes(textureSet.id)
               return (
                 <div
                   key={textureSet.id}
-                  className="pack-card"
-                  onClick={() => handleAddTextureSet(textureSet.id)}
+                  className={`pack-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => toggleTextureSetSelection(textureSet.id)}
                 >
+                  <div className="pack-card-checkbox">
+                    <Checkbox checked={isSelected} onChange={() => toggleTextureSetSelection(textureSet.id)} />
+                  </div>
                   <div className="pack-card-thumbnail">
                     {albedoUrl ? (
                       <img
