@@ -85,6 +85,7 @@ function SplitterLayout(): JSX.Element {
   const moveTabBetweenPanels = (tab: Tab, fromSide: 'left' | 'right'): void => {
     if (fromSide === 'left') {
       // Move from left to right
+      const movedTabIndex = leftTabs.findIndex(t => t.id === tab.id)
       const newLeftTabs = leftTabs.filter(t => t.id !== tab.id)
       const newRightTabs = [...rightTabs, tab]
 
@@ -95,13 +96,16 @@ function SplitterLayout(): JSX.Element {
       // Update active tab in left panel if needed
       if (activeLeftTab === tab.id) {
         if (newLeftTabs.length > 0) {
-          setActiveLeftTab(newLeftTabs[0].id)
+          // Activate the previous tab or the next one if it was the first
+          const newActiveIndex = movedTabIndex > 0 ? movedTabIndex - 1 : 0
+          setActiveLeftTab(newLeftTabs[newActiveIndex].id)
         } else {
           setActiveLeftTab('')
         }
       }
     } else {
       // Move from right to left
+      const movedTabIndex = rightTabs.findIndex(t => t.id === tab.id)
       const newRightTabs = rightTabs.filter(t => t.id !== tab.id)
       const newLeftTabs = [...leftTabs, tab]
 
@@ -112,7 +116,9 @@ function SplitterLayout(): JSX.Element {
       // Update active tab in right panel if needed
       if (activeRightTab === tab.id) {
         if (newRightTabs.length > 0) {
-          setActiveRightTab(newRightTabs[0].id)
+          // Activate the previous tab or the next one if it was the first
+          const newActiveIndex = movedTabIndex > 0 ? movedTabIndex - 1 : 0
+          setActiveRightTab(newRightTabs[newActiveIndex].id)
         } else {
           setActiveRightTab('')
         }
