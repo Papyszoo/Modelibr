@@ -1,8 +1,34 @@
 .scene-editor {
   display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
   background: var(--surface-ground);
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.editor-toolbar .toolbar-left h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.editor-toolbar .toolbar-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.editor-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
 .editor-sidebar {
@@ -27,4 +53,37 @@
   flex-direction: column;
   position: relative;
   overflow: hidden;
+}
+
+.saved-scenes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.saved-scene-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+}
+
+.scene-info h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+}
+
+.scene-info small {
+  color: var(--text-color-secondary);
+}
+
+.no-scenes {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-color-secondary);
 }
