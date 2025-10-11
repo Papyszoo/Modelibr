@@ -348,7 +348,7 @@ Error: /app/node_modules/@tensorflow/tfjs-node/lib/napi-v8/tfjs_binding.node: ca
 This has been fixed in the Dockerfile by:
 1. Using `--ignore-scripts` during npm install to skip problematic downloads
 2. Rebuilding native modules in the build stage
-3. Making TensorFlow load dynamically only when needed (graceful degradation)
+3. Dynamic loading (graceful degradation: service runs normally but skips ML features if TensorFlow fails)
 
 The service will work with or without TensorFlow:
 - If TensorFlow fails to load, the service starts normally but image classification will be skipped
