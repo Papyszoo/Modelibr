@@ -14,6 +14,7 @@ namespace Infrastructure.Persistence
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
+        public DbSet<Scene> Scenes => Set<Scene>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -184,6 +185,19 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
+            });
+
+            // Configure Scene entity
+            modelBuilder.Entity<Scene>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.ConfigurationJson).IsRequired();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+                
+                // Create index for efficient querying by name
+                entity.HasIndex(s => s.Name);
             });
 
             base.OnModelCreating(modelBuilder);
