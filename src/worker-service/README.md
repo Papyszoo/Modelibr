@@ -338,6 +338,23 @@ Structured logs can be easily integrated with log aggregation systems like:
 - Verify environment configuration
 - Check port availability (default 3001)
 
+**TensorFlow native bindings error in Docker**
+
+If you see an error like:
+```
+Error: /app/node_modules/@tensorflow/tfjs-node/lib/napi-v8/tfjs_binding.node: cannot open shared object file
+```
+
+This has been fixed in the Dockerfile by:
+1. Using `--ignore-scripts` during npm install to skip problematic downloads
+2. Rebuilding native modules in the build stage
+3. Making TensorFlow optional with dynamic imports
+
+The service will work with or without TensorFlow:
+- If TensorFlow is not available, image classification will fail gracefully when enabled
+- To disable image classification: set `IMAGE_CLASSIFICATION_ENABLED=false`
+- The Dockerfile includes necessary build tools (python3, make, g++) and runtime libraries (libstdc++6)
+
 **Cannot connect to API**
 
 - Verify `API_BASE_URL` configuration
