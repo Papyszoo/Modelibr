@@ -345,16 +345,16 @@ If you see an error like:
 Error: /app/node_modules/@tensorflow/tfjs-node/lib/napi-v8/tfjs_binding.node: cannot open shared object file
 ```
 
-This has been fixed in the Dockerfile by:
-1. Using `--ignore-scripts` during npm install to skip problematic downloads
-2. Rebuilding native modules in the build stage
-3. Dynamic loading (graceful degradation: service runs normally but skips ML features if TensorFlow fails)
+This has been fixed by making TensorFlow packages optional dependencies:
+1. TensorFlow packages are now in `optionalDependencies` in package.json
+2. npm will attempt to install them but won't fail the build if they can't be installed
+3. The service uses dynamic imports to load TensorFlow only when needed
 
 The service will work with or without TensorFlow:
-- If TensorFlow fails to load, the service starts normally but image classification will be skipped
+- If TensorFlow fails to install, the service starts normally but image classification will be skipped
 - Jobs will complete successfully but without tags/descriptions from ML classification
 - To disable image classification entirely: set `IMAGE_CLASSIFICATION_ENABLED=false`
-- The Dockerfile includes necessary build tools (python3, make, g++) and runtime libraries (libstdc++6)
+- The Dockerfile includes necessary build tools (python3, make, g++) and runtime libraries (libstdc++6) for environments where TensorFlow can be installed
 
 **Cannot connect to API**
 
