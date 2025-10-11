@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Button } from 'primereact/button'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
+import { Toast } from 'primereact/toast'
+import { useRef } from 'react'
 import EditorCanvas from './EditorCanvas'
 import LightLibrary from './LightLibrary'
 import PropertyPanel from './PropertyPanel'
 import CodePanel from './CodePanel'
+// eslint-disable-next-line no-restricted-imports -- Scene editor needs API access for saving/loading scenes
+import apiClient from '../../../services/ApiClient'
 import './SceneEditor.css'
 
 export interface SceneLight {
@@ -27,6 +34,119 @@ function SceneEditor(): JSX.Element {
     lights: [],
   })
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
+  const [currentSceneId, setCurrentSceneId] = useState<number | null>(null)
+  const [sceneName, setSceneName] = useState<string>('Untitled Scene')
+  const [saveDialogVisible, setSaveDialogVisible] = useState(false)
+  const [loadDialogVisible, setLoadDialogVisible] = useState(false)
+  const [savedScenes, setSavedScenes] = useState<
+    Array<{
+      id: number
+      name: string
+      createdAt: string
+      updatedAt: string
+    }>
+  >([])
+  const [isSaving, setIsSaving] = useState(false)
+  const toast = useRef<Toast>(null)
+
+  useEffect(() => {
+    loadSavedScenes()
+  }, [])
+
+  const loadSavedScenes = async () => {
+    try {
+      const response = await apiClient.getAllScenes()
+      setSavedScenes(response.scenes)
+    } catch (error) {
+      console.error('Failed to load scenes:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load saved scenes',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleSaveScene = async () => {
+    setIsSaving(true)
+    try {
+      const configJson = JSON.stringify(sceneConfig)
+
+      if (currentSceneId) {
+        // Update existing scene
+        await apiClient.updateScene(currentSceneId, configJson)
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Scene updated successfully',
+          life: 3000,
+        })
+      } else {
+        // Create new scene
+        const response = await apiClient.createScene(sceneName, configJson)
+        setCurrentSceneId(response.id)
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Scene saved successfully',
+          life: 3000,
+        })
+      }
+
+      setSaveDialogVisible(false)
+      await loadSavedScenes()
+    } catch (error) {
+      console.error('Failed to save scene:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to save scene',
+        life: 3000,
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleLoadScene = async (sceneId: number) => {
+    try {
+      const scene = await apiClient.getSceneById(sceneId)
+      const config = JSON.parse(scene.configurationJson) as SceneConfig
+      setSceneConfig(config)
+      setCurrentSceneId(scene.id)
+      setSceneName(scene.name)
+      setSelectedObjectId(null)
+      setLoadDialogVisible(false)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Scene loaded successfully',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to load scene:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load scene',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleNewScene = () => {
+    setSceneConfig({ lights: [] })
+    setSelectedObjectId(null)
+    setCurrentSceneId(null)
+    setSceneName('Untitled Scene')
+    toast.current?.show({
+      severity: 'info',
+      summary: 'New Scene',
+      detail: 'Started new scene',
+      life: 2000,
+    })
+  }
 
   const handleAddLight = (type: SceneLight['type']) => {
     const newLight: SceneLight = {
@@ -77,26 +197,124 @@ function SceneEditor(): JSX.Element {
 
   return (
     <div className="scene-editor">
-      <div className="editor-sidebar left">
-        <LightLibrary onAddLight={handleAddLight} />
+      <Toast ref={toast} />
+
+      <div className="editor-toolbar">
+        <div className="toolbar-left">
+          <h3>{sceneName}</h3>
+        </div>
+        <div className="toolbar-right">
+          <Button
+            icon="pi pi-file"
+            label="New"
+            className="p-button-text"
+            onClick={handleNewScene}
+            tooltip="New Scene"
+          />
+          <Button
+            icon="pi pi-save"
+            label="Save"
+            className="p-button-text"
+            onClick={() => setSaveDialogVisible(true)}
+            tooltip="Save Scene"
+          />
+          <Button
+            icon="pi pi-folder-open"
+            label="Load"
+            className="p-button-text"
+            onClick={() => {
+              setLoadDialogVisible(true)
+              loadSavedScenes()
+            }}
+            tooltip="Load Scene"
+          />
+        </div>
       </div>
 
-      <div className="editor-main">
-        <EditorCanvas
-          sceneConfig={sceneConfig}
-          selectedObjectId={selectedObjectId}
-          onSelectObject={setSelectedObjectId}
-        />
-        <CodePanel sceneConfig={sceneConfig} />
+      <div className="editor-content">
+        <div className="editor-sidebar left">
+          <LightLibrary onAddLight={handleAddLight} />
+        </div>
+
+        <div className="editor-main">
+          <EditorCanvas
+            sceneConfig={sceneConfig}
+            selectedObjectId={selectedObjectId}
+            onSelectObject={setSelectedObjectId}
+          />
+          <CodePanel sceneConfig={sceneConfig} />
+        </div>
+
+        <div className="editor-sidebar right">
+          <PropertyPanel
+            selectedObject={selectedObject}
+            onUpdateObject={handleUpdateLight}
+            onDeleteObject={handleDeleteLight}
+          />
+        </div>
       </div>
 
-      <div className="editor-sidebar right">
-        <PropertyPanel
-          selectedObject={selectedObject}
-          onUpdateObject={handleUpdateLight}
-          onDeleteObject={handleDeleteLight}
-        />
-      </div>
+      {/* Save Dialog */}
+      <Dialog
+        header="Save Scene"
+        visible={saveDialogVisible}
+        style={{ width: '400px' }}
+        onHide={() => setSaveDialogVisible(false)}
+      >
+        <div className="p-fluid">
+          <div className="field">
+            <label htmlFor="sceneName">Scene Name</label>
+            <InputText
+              id="sceneName"
+              value={sceneName}
+              onChange={e => setSceneName(e.target.value)}
+              disabled={!!currentSceneId}
+            />
+            {currentSceneId && (
+              <small>Scene name cannot be changed after creation</small>
+            )}
+          </div>
+          <div className="field" style={{ marginTop: '1rem' }}>
+            <Button
+              label={isSaving ? 'Saving...' : 'Save'}
+              icon="pi pi-save"
+              onClick={handleSaveScene}
+              disabled={!sceneName.trim() || isSaving}
+            />
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Load Dialog */}
+      <Dialog
+        header="Load Scene"
+        visible={loadDialogVisible}
+        style={{ width: '500px' }}
+        onHide={() => setLoadDialogVisible(false)}
+      >
+        <div className="saved-scenes-list">
+          {savedScenes.length === 0 ? (
+            <p className="no-scenes">No saved scenes found</p>
+          ) : (
+            savedScenes.map(scene => (
+              <div key={scene.id} className="saved-scene-item">
+                <div className="scene-info">
+                  <h4>{scene.name}</h4>
+                  <small>
+                    Updated: {new Date(scene.updatedAt).toLocaleString()}
+                  </small>
+                </div>
+                <Button
+                  icon="pi pi-folder-open"
+                  label="Load"
+                  className="p-button-sm"
+                  onClick={() => handleLoadScene(scene.id)}
+                />
+              </div>
+            ))
+          )}
+        </div>
+      </Dialog>
     </div>
   )
 }

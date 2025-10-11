@@ -242,6 +242,51 @@ class ApiClient {
     })
     return response.data
   }
+
+  // Scene API
+  async createScene(
+    name: string,
+    configurationJson: string
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post('/scenes', {
+      name,
+      configurationJson,
+    })
+    return response.data
+  }
+
+  async getAllScenes(): Promise<{
+    scenes: Array<{
+      id: number
+      name: string
+      createdAt: string
+      updatedAt: string
+    }>
+  }> {
+    const response = await this.client.get('/scenes')
+    return response.data
+  }
+
+  async getSceneById(id: number): Promise<{
+    id: number
+    name: string
+    configurationJson: string
+    createdAt: string
+    updatedAt: string
+  }> {
+    const response = await this.client.get(`/scenes/${id}`)
+    return response.data
+  }
+
+  async updateScene(
+    id: number,
+    configurationJson: string
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.put(`/scenes/${id}`, {
+      configurationJson,
+    })
+    return response.data
+  }
 }
 
 export default new ApiClient()
