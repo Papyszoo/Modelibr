@@ -66,6 +66,11 @@ export default function DockBar({
       separator: true,
     },
     {
+      label: 'Environments',
+      icon: 'pi pi-sun',
+      command: () => onAddTab('environments', 'Environments'),
+    },
+    {
       label: 'Settings',
       icon: 'pi pi-cog',
       command: () => onAddTab('settings', 'Settings'),
