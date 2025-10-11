@@ -348,11 +348,12 @@ Error: /app/node_modules/@tensorflow/tfjs-node/lib/napi-v8/tfjs_binding.node: ca
 This has been fixed in the Dockerfile by:
 1. Using `--ignore-scripts` during npm install to skip problematic downloads
 2. Rebuilding native modules in the build stage
-3. Making TensorFlow optional with dynamic imports
+3. Making TensorFlow load dynamically only when needed (graceful degradation)
 
 The service will work with or without TensorFlow:
-- If TensorFlow is not available, image classification will fail gracefully when enabled
-- To disable image classification: set `IMAGE_CLASSIFICATION_ENABLED=false`
+- If TensorFlow fails to load, the service starts normally but image classification will be skipped
+- Jobs will complete successfully but without tags/descriptions from ML classification
+- To disable image classification entirely: set `IMAGE_CLASSIFICATION_ENABLED=false`
 - The Dockerfile includes necessary build tools (python3, make, g++) and runtime libraries (libstdc++6)
 
 **Cannot connect to API**

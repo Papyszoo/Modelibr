@@ -241,11 +241,13 @@ Error: /app/node_modules/@tensorflow/tfjs-node/lib/napi-v8/tfjs_binding.node: ca
 - Build tools (python3, make, g++) added to builder stage
 - Runtime libraries (libstdc++6) added to runtime stage  
 - Uses `--ignore-scripts` and rebuild to avoid download issues
-- TensorFlow is now optional with dynamic imports
+- TensorFlow loads dynamically (graceful degradation: service runs, but ML classification is skipped if TensorFlow fails)
 
-**Workaround if needed:**
+**Note:** TensorFlow packages remain in package.json but the service will start and function normally even if they fail to load. Jobs complete successfully but without ML-generated tags/descriptions.
+
+**Workaround to disable classification:**
 ```bash
-# Disable image classification
+# Completely disable image classification feature
 IMAGE_CLASSIFICATION_ENABLED=false
 ```
 
