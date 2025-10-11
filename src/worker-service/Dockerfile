@@ -4,8 +4,10 @@
 FROM node:20-bookworm-slim AS builder
 
 # Install build dependencies and CA certificates
+# python3, make, g++ are required for building native node modules like @tensorflow/tfjs-node
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget git \
+    python3 make g++ \
   && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
@@ -22,19 +24,22 @@ RUN npm config set strict-ssl false && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
-    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || \
+    npm cache clean --force && \
     PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
 
 # Runtime stage - only copy what's needed
 FROM node:20-bookworm-slim AS runtime
 
-# Install runtime dependencies for Puppeteer
+# Install runtime dependencies for Puppeteer and TensorFlow
 # Puppeteer requires these dependencies for headless Chrome
+# TensorFlow.js-node requires C++ runtime libraries
 # Based on https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     gnupg \
+    # C++ runtime libraries for TensorFlow.js native bindings
+    libstdc++6 \
     # Dependencies for Chromium
     chromium \
     chromium-driver \
