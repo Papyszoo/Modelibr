@@ -19,15 +19,14 @@ COPY package*.json .npmrc ./
 # Install dependencies with proper SSL configuration
 # The allowlist proxy uses a self-signed certificate, so we need to disable strict SSL
 # Also, .npmrc tells Puppeteer to skip Chromium download
-# TensorFlow native bindings may fail to download - we handle this gracefully in code
+# TensorFlow is an optional dependency - failures are acceptable
 RUN npm config set strict-ssl false && \
     npm config set fetch-timeout 300000 && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
     npm cache clean --force && \
-    (PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production --ignore-scripts && \
-     PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm rebuild --production || true)
+    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
 
 # Runtime stage - only copy what's needed
 FROM node:20-bookworm-slim AS runtime
