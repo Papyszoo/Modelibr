@@ -1,0 +1,30 @@
+.scene-editor {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  background: var(--surface-ground);
+}
+
+.editor-sidebar {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  overflow-y: auto;
+}
+
+.editor-sidebar.left {
+  width: 250px;
+  border-right: 1px solid var(--surface-border);
+}
+
+.editor-sidebar.right {
+  width: 300px;
+  border-left: 1px solid var(--surface-border);
+}
+
+.editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}

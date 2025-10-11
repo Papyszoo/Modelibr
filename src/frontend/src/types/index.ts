@@ -8,6 +8,7 @@ export interface Tab {
     | 'textureSets'
     | 'textureSetViewer'
     | 'settings'
+    | 'sceneEditor'
   label?: string
   modelId?: string
   setId?: string

@@ -1,6 +1,7 @@
 import { ModelList } from '../../features/models'
 import { ModelViewer } from '../../features/model-viewer'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
+import { SceneEditor } from '../../features/scene-editor'
 import Settings from '../tabs/Settings'
 import { Tab } from '../../types'
 import { useTabContext } from '../../hooks/useTabContext'
@@ -42,6 +43,9 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
           )
         }
         return <TextureSetViewer setId={tab.setId} side={side} />
+
+      case 'sceneEditor':
+        return <SceneEditor />
 
       case 'settings':
         return <Settings />
