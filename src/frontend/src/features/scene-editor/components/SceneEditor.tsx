@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
-import { useRef } from 'react'
 import EditorCanvas from './EditorCanvas'
 import LightLibrary from './LightLibrary'
 import PropertyPanel from './PropertyPanel'
@@ -112,7 +111,22 @@ function SceneEditor(): JSX.Element {
   const handleLoadScene = async (sceneId: number) => {
     try {
       const scene = await apiClient.getSceneById(sceneId)
-      const config = JSON.parse(scene.configurationJson) as SceneConfig
+
+      // Parse JSON with error handling
+      let config: SceneConfig
+      try {
+        config = JSON.parse(scene.configurationJson) as SceneConfig
+      } catch (parseError) {
+        console.error('Failed to parse scene configuration:', parseError)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Scene configuration is corrupted',
+          life: 3000,
+        })
+        return
+      }
+
       setSceneConfig(config)
       setCurrentSceneId(scene.id)
       setSceneName(scene.name)
@@ -269,9 +283,12 @@ function SceneEditor(): JSX.Element {
               value={sceneName}
               onChange={e => setSceneName(e.target.value)}
               disabled={!!currentSceneId}
+              aria-describedby={currentSceneId ? 'scene-name-help' : undefined}
             />
             {currentSceneId && (
-              <small>Scene name cannot be changed after creation</small>
+              <small id="scene-name-help">
+                Scene name cannot be changed after creation
+              </small>
             )}
           </div>
           <div className="field" style={{ marginTop: '1rem' }}>
