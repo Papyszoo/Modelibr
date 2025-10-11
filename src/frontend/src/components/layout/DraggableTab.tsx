@@ -7,8 +7,14 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-list'
     case 'modelViewer':
       return 'pi pi-eye'
-    case 'texture':
+    case 'textureSets':
+      return 'pi pi-folder'
+    case 'textureSetViewer':
       return 'pi pi-image'
+    case 'textureSets':
+      return 'pi pi-palette'
+    case 'textureSetViewer':
+      return 'pi pi-images'
     case 'animation':
       return 'pi pi-play'
     case 'settings':
@@ -30,6 +36,10 @@ const getTabTooltip = (tab: Tab): string => {
       return `Model: ${tab.modelId || 'Unknown'}`
     case 'texture':
       return 'Textures List'
+    case 'textureSets':
+      return 'Texture Sets'
+    case 'textureSetViewer':
+      return `Texture Set: ${tab.setId || 'Unknown'}`
     case 'animation':
       return 'Animations List'
     case 'settings':
@@ -77,6 +87,18 @@ function DraggableTab({
     onClose()
   }
 
+  const handleMouseDown = (e: React.MouseEvent): void => {
+    // Middle button click (button === 1) should close the tab
+    // This follows browser tab conventions and doesn't interfere with:
+    // - Left button (0): used for selection and dragging
+    // - Right button (2): used for context menu
+    if (e.button === 1) {
+      e.preventDefault() // Prevent default middle button behavior (e.g., auto-scroll)
+      e.stopPropagation() // Prevent tab selection when closing
+      onClose()
+    }
+  }
+
   return (
     <div
       className={`draggable-tab ${isActive ? 'active' : ''}`}
@@ -84,6 +106,7 @@ function DraggableTab({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
+      onMouseDown={handleMouseDown}
       title={getTabTooltip(tab)}
     >
       {/* Tab content - always show icon for now */}

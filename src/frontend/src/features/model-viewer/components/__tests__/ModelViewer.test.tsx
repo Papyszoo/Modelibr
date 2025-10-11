@@ -52,6 +52,12 @@ jest.mock('../ViewerSettingsWindow', () => {
   }
 })
 
+jest.mock('../UVMapWindow', () => {
+  return function MockUVMapWindow() {
+    return <div data-testid="uv-map-window" />
+  }
+})
+
 // Mock Toast
 jest.mock('primereact/toast', () => ({
   Toast: () => <div data-testid="toast" />,

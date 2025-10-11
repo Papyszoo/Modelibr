@@ -27,11 +27,6 @@ export default function DockEmptyState({
       command: () => onAddTab('modelList', 'Models'),
     },
     {
-      label: 'Textures List',
-      icon: 'pi pi-image',
-      command: () => onAddTab('texture', 'Textures'),
-    },
-    {
       label: 'Texture Sets',
       icon: 'pi pi-folder',
       command: () => onAddTab('textureSets', 'Texture Sets'),
@@ -40,11 +35,6 @@ export default function DockEmptyState({
       label: 'Packs',
       icon: 'pi pi-box',
       command: () => onAddTab('packs', 'Packs'),
-    },
-    {
-      label: 'Animations List',
-      icon: 'pi pi-play',
-      command: () => onAddTab('animation', 'Animations'),
     },
   ]
 

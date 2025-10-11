@@ -115,4 +115,68 @@ describe('DraggableTab', () => {
     const closeButton = screen.getByLabelText('Close tab')
     expect(closeButton).toBeInTheDocument()
   })
+
+  it('should close tab when middle mouse button is clicked', () => {
+    render(<DraggableTab {...defaultProps} />)
+
+    const tabElement = screen.getByTitle('Test Tab')
+
+    // Simulate middle button click (button: 1)
+    fireEvent.mouseDown(tabElement, { button: 1 })
+
+    expect(defaultProps.onClose).toHaveBeenCalledTimes(1)
+    expect(defaultProps.onSelect).not.toHaveBeenCalled() // Should not trigger select
+  })
+
+  it('should not close tab when left mouse button is clicked', () => {
+    render(<DraggableTab {...defaultProps} />)
+
+    const tabElement = screen.getByTitle('Test Tab')
+
+    // Simulate left button click (button: 0)
+    fireEvent.mouseDown(tabElement, { button: 0 })
+
+    expect(defaultProps.onClose).not.toHaveBeenCalled()
+  })
+
+  it('should not close tab when right mouse button is clicked', () => {
+    render(<DraggableTab {...defaultProps} />)
+
+    const tabElement = screen.getByTitle('Test Tab')
+
+    // Simulate right button click (button: 2)
+    fireEvent.mouseDown(tabElement, { button: 2 })
+
+    expect(defaultProps.onClose).not.toHaveBeenCalled()
+  it('should render textureSets tab with palette icon', () => {
+    const textureSetsTab: Tab = {
+      id: 'test-tab-3',
+      type: 'textureSets',
+      label: 'Texture Sets',
+    }
+
+    render(<DraggableTab {...defaultProps} tab={textureSetsTab} />)
+
+    const tabElement = screen.getByTitle('Texture Sets')
+    expect(tabElement).toBeInTheDocument()
+
+    const icon = tabElement.querySelector('.tab-icon')
+    expect(icon).toHaveClass('pi', 'pi-palette')
+  })
+
+  it('should render textureSetViewer tab with images icon', () => {
+    const textureSetViewerTab: Tab = {
+      id: 'test-tab-4',
+      type: 'textureSetViewer',
+      setId: 'set-123',
+    }
+
+    render(<DraggableTab {...defaultProps} tab={textureSetViewerTab} />)
+
+    const tabElement = screen.getByTitle('Texture Set: set-123')
+    expect(tabElement).toBeInTheDocument()
+
+    const icon = tabElement.querySelector('.tab-icon')
+    expect(icon).toHaveClass('pi', 'pi-images')
+  })
 })
