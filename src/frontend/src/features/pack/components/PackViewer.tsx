@@ -87,7 +87,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
   const loadAvailableTextureSets = async () => {
     try {
-      const response = await ApiClient.getTextureSets()
+      const response = await ApiClient.getAllTextureSets()
       // Filter out texture sets already in this pack
       const textureSetIds = textureSets.map(ts => ts.id)
       const available = response.filter(ts => !textureSetIds.includes(ts.id))

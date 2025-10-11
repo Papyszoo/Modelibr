@@ -52,6 +52,37 @@
   font-size: 1.25rem;
 }
 
+.pack-dropzone {
+  border: 2px dashed var(--surface-border);
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  background: var(--surface-50);
+  transition: all 0.2s;
+}
+
+.pack-dropzone:hover {
+  border-color: var(--primary-color);
+  background: var(--surface-100);
+}
+
+.pack-dropzone.uploading {
+  border-color: var(--primary-color);
+  background: var(--primary-50);
+}
+
+.pack-dropzone i {
+  font-size: 2rem;
+  color: var(--text-color-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.pack-dropzone p {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
 .pack-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -74,6 +105,22 @@
   border-color: var(--primary-color);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pack-card.selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.2);
+}
+
+.pack-card-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  background: white;
+  border-radius: 4px;
+  padding: 0.25rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .pack-card-thumbnail {
