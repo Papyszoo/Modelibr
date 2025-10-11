@@ -90,6 +90,11 @@
   padding: 0.5rem 0;
 }
 
+/* Fix grid in dialogs to prevent card overlap */
+.add-dialog-content .pack-grid {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
 .pack-card {
   position: relative;
   cursor: pointer;

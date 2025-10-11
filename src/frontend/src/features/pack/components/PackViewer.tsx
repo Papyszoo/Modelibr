@@ -217,6 +217,14 @@ export default function PackViewer({ packId }: PackViewerProps) {
       const uploadPromises = files.map(async (file) => {
         const response = await ApiClient.uploadModel(file)
         await ApiClient.addModelToPack(packId, response.id)
+        // Trigger thumbnail generation if not already exists
+        if (!response.alreadyExists) {
+          try {
+            await ApiClient.regenerateThumbnail(response.id.toString())
+          } catch (err) {
+            console.warn('Failed to generate thumbnail:', err)
+          }
+        }
         return response
       })
       
@@ -256,9 +264,9 @@ export default function PackViewer({ packId }: PackViewerProps) {
         const setName = file.name.replace(/\.[^/.]+$/, '')
         const setResponse = await ApiClient.createTextureSet({ name: setName })
         
-        await ApiClient.addTextureToSet(setResponse.id, {
+        await ApiClient.addTextureToSetEndpoint(setResponse.id, {
           fileId: fileResponse.fileId,
-          textureType: 'Albedo'
+          textureType: 'Albedo' as TextureType
         })
         
         await ApiClient.addTextureSetToPack(packId, setResponse.id)
