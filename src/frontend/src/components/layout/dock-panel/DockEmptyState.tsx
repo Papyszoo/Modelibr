@@ -31,6 +31,11 @@ export default function DockEmptyState({
       icon: 'pi pi-folder',
       command: () => onAddTab('textureSets', 'Texture Sets'),
     },
+    {
+      label: 'Packs',
+      icon: 'pi pi-box',
+      command: () => onAddTab('packs', 'Packs'),
+    },
   ]
 
   const handleEmptyAreaContextMenu = (e: React.MouseEvent): void => {

@@ -29,6 +29,7 @@ internal sealed class ModelRepository : IModelRepository
         var model = await _context.Models
             .Include(m => m.Files)
             .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
             .Include(m => m.Thumbnail)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == modelId, cancellationToken);
@@ -55,6 +56,7 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Include(m => m.Files)
             .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
             .Include(m => m.Thumbnail)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
@@ -65,6 +67,7 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Include(m => m.Files)
             .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
             .Include(m => m.Thumbnail)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
@@ -75,6 +78,7 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Include(m => m.Files)
             .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
             .Include(m => m.Thumbnail)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Files.Any(f => f.Sha256Hash == sha256Hash), cancellationToken);

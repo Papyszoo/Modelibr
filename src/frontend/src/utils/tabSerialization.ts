@@ -4,7 +4,8 @@ import { Tab } from '../types'
 export function getTabLabel(
   type: Tab['type'],
   modelId?: string,
-  setId?: string
+  setId?: string,
+  packId?: string
 ): string {
   switch (type) {
     case 'modelList':
@@ -17,6 +18,10 @@ export function getTabLabel(
       return 'Texture Sets'
     case 'textureSetViewer':
       return setId ? `Set ${setId}` : 'Texture Set'
+    case 'packs':
+      return 'Packs'
+    case 'packViewer':
+      return packId ? `Pack ${packId}` : 'Pack Viewer'
     case 'animation':
       return 'Animations'
     default:
@@ -56,6 +61,8 @@ export function parseCompactTabFormat(
           'animation',
           'textureSets',
           'textureSetViewer',
+          'packs',
+          'packViewer',
         ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${type}`)
@@ -81,6 +88,16 @@ export function parseCompactTabFormat(
         }
       }
 
+      // Handle pack viewer tabs
+      if (tabType === 'packViewer' && id) {
+        return {
+          id: `pack-${id}`,
+          type: tabType,
+          label: getTabLabel(tabType, undefined, undefined, id),
+          packId: id,
+        }
+      }
+
       // Handle simple tabs (no ID)
       return {
         id: tabType,
@@ -99,6 +116,7 @@ export function serializeToCompactFormat(tabs: Tab[]): string {
     .map(tab => {
       if (tab.modelId) return `${tab.type}:${tab.modelId}`
       if (tab.setId) return `${tab.type}:${tab.setId}`
+      if (tab.packId) return `${tab.type}:${tab.packId}`
       return tab.type
     })
     .join(',')
