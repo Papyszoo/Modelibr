@@ -230,6 +230,26 @@ curl http://localhost:5009/hubs/thumbnail-jobs
 
 ### Processing Failures
 
+**"TensorFlow native bindings error"**
+
+If you see:
+```
+Error: /app/node_modules/@tensorflow/tfjs-node/lib/napi-v8/tfjs_binding.node: cannot open shared object file
+```
+
+**Fixed by making TensorFlow optional:**
+- TensorFlow packages moved to `optionalDependencies` in package.json
+- npm attempts installation but won't fail the build if unsuccessful
+- Build tools (python3, make, g++) and runtime libraries (libstdc++6) included for environments where TensorFlow can install
+- Service uses dynamic imports to load TensorFlow only when needed
+
+**Behavior:** TensorFlow packages will be skipped if they fail to install. Service runs normally, ML classification is gracefully skipped when unavailable.
+
+**To disable classification entirely:**
+```bash
+IMAGE_CLASSIFICATION_ENABLED=false
+```
+
 **"Failed to create WebGL context with headless-gl"**
 
 Requires two fixes:

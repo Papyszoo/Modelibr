@@ -1,6 +1,31 @@
-import * as tf from '@tensorflow/tfjs-node'
-import * as mobilenet from '@tensorflow-models/mobilenet'
 import logger from '../logger.js'
+
+// Lazy-load TensorFlow to avoid startup errors if not available
+let tf = null
+let mobilenet = null
+
+/**
+ * Load TensorFlow modules dynamically
+ */
+async function loadTensorFlowModules() {
+  if (tf && mobilenet) {
+    return { tf, mobilenet }
+  }
+
+  try {
+    tf = await import('@tensorflow/tfjs-node')
+    mobilenet = await import('@tensorflow-models/mobilenet')
+    return { tf, mobilenet }
+  } catch (error) {
+    logger.error('Failed to load TensorFlow modules', {
+      error: error.message,
+      stack: error.stack,
+    })
+    throw new Error(
+      'TensorFlow modules not available. Please ensure @tensorflow/tfjs-node is properly installed.'
+    )
+  }
+}
 
 /**
  * MobileNet-based image tagger for classifying 3D model thumbnails
@@ -30,6 +55,10 @@ export class MobilenetTagger {
     try {
       logger.info('Loading MobileNet model for image classification...')
       const startTime = Date.now()
+
+      // Load TensorFlow modules dynamically
+      const modules = await loadTensorFlowModules()
+      mobilenet = modules.mobilenet
 
       this.model = await mobilenet.load({
         version: 2,
@@ -79,6 +108,12 @@ export class MobilenetTagger {
     }
 
     try {
+      // Load TensorFlow if not already loaded
+      if (!tf) {
+        const modules = await loadTensorFlowModules()
+        tf = modules.tf
+      }
+
       // Decode image buffer to tensor
       const imageTensor = tf.node.decodeImage(imageBuffer, 3)
 

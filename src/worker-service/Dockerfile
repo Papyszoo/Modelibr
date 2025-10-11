@@ -4,8 +4,10 @@
 FROM node:20-bookworm-slim AS builder
 
 # Install build dependencies and CA certificates
+# python3, make, g++ are required for building native node modules like @tensorflow/tfjs-node
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget git \
+    python3 make g++ \
   && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
@@ -14,27 +16,26 @@ WORKDIR /app
 # Copy package files and .npmrc
 COPY package*.json .npmrc ./
 
-# Install dependencies with proper SSL configuration
-# The allowlist proxy uses a self-signed certificate, so we need to disable strict SSL
-# Also, .npmrc tells Puppeteer to skip Chromium download
-RUN npm config set strict-ssl false && \
-    npm config set fetch-timeout 300000 && \
-    npm config set fetch-retries 5 && \
-    npm config set fetch-retry-mintimeout 20000 && \
-    npm config set fetch-retry-maxtimeout 120000 && \
-    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || \
-    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
+# Install dependencies
+# Puppeteer download is skipped via .npmrc
+# TensorFlow native bindings will be downloaded and built during npm install
+RUN npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 3 && \
+    PUPPETEER_SKIP_DOWNLOAD=true npm install --production
 
 # Runtime stage - only copy what's needed
 FROM node:20-bookworm-slim AS runtime
 
-# Install runtime dependencies for Puppeteer
+# Install runtime dependencies for Puppeteer and TensorFlow
 # Puppeteer requires these dependencies for headless Chrome
+# TensorFlow.js-node requires C++ runtime libraries
 # Based on https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     gnupg \
+    # C++ runtime libraries for TensorFlow.js native bindings
+    libstdc++6 \
     # Dependencies for Chromium
     chromium \
     chromium-driver \
