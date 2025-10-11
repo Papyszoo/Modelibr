@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { ContextMenu } from 'primereact/contextmenu'
+import { MenuItem } from 'primereact/menuitem'
+import { Toast } from 'primereact/toast'
 import './ModelGrid.css'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { Model } from '../../../utils/fileUtils'
+import ApiClient from '../../../services/ApiClient'
+import { PackDto } from '../../../types'
 
 interface ModelGridProps {
   models: Model[]
@@ -21,6 +26,45 @@ export default function ModelGrid({
   onDragLeave,
 }: ModelGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [packs, setPacks] = useState<PackDto[]>([])
+  const [selectedModel, setSelectedModel] = useState<Model | null>(null)
+  const contextMenu = useRef<ContextMenu>(null)
+  const toast = useRef<Toast>(null)
+
+  useEffect(() => {
+    loadPacks()
+  }, [])
+
+  const loadPacks = async () => {
+    try {
+      const data = await ApiClient.getAllPacks()
+      setPacks(data)
+    } catch (error) {
+      console.error('Failed to load packs:', error)
+    }
+  }
+
+  const handleAddToPack = async (packId: number) => {
+    if (!selectedModel) return
+    
+    try {
+      await ApiClient.addModelToPack(packId, selectedModel.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Model added to pack',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to add model to pack:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to add model to pack',
+        life: 3000,
+      })
+    }
+  }
 
   const getModelName = (model: Model) => {
     // Get the first file's name or use the model name
@@ -34,6 +78,22 @@ export default function ModelGrid({
     return modelName.includes(searchQuery.toLowerCase())
   })
 
+  const contextMenuItems: MenuItem[] = [
+    {
+      label: 'Add to pack',
+      icon: 'pi pi-box',
+      items: packs.length > 0 ? packs.map(pack => ({
+        label: pack.name,
+        command: () => handleAddToPack(pack.id),
+      })) : [
+        {
+          label: 'No packs available',
+          disabled: true,
+        },
+      ],
+    },
+  ]
+
   return (
     <div
       className="model-grid-container"
@@ -42,6 +102,9 @@ export default function ModelGrid({
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
     >
+      <Toast ref={toast} />
+      <ContextMenu model={contextMenuItems} ref={contextMenu} />
+      
       {/* Search and filter bar */}
       <div className="model-grid-controls">
         <div className="search-bar">
@@ -66,6 +129,11 @@ export default function ModelGrid({
             key={model.id}
             className="model-card"
             onClick={() => onModelSelect(model)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setSelectedModel(model)
+              contextMenu.current?.show(e)
+            }}
           >
             <div className="model-card-thumbnail">
               <ThumbnailDisplay modelId={model.id} />

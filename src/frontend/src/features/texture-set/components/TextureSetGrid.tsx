@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { ContextMenu } from 'primereact/contextmenu'
+import { MenuItem } from 'primereact/menuitem'
+import { Toast } from 'primereact/toast'
 import './TextureSetGrid.css'
-import { TextureSetDto, TextureType } from '../../../types'
+import { TextureSetDto, TextureType, PackDto } from '../../../types'
 import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
@@ -25,6 +28,45 @@ export default function TextureSetGrid({
   onDragLeave,
 }: TextureSetGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [packs, setPacks] = useState<PackDto[]>([])
+  const [selectedTextureSet, setSelectedTextureSet] = useState<TextureSetDto | null>(null)
+  const contextMenu = useRef<ContextMenu>(null)
+  const toast = useRef<Toast>(null)
+
+  useEffect(() => {
+    loadPacks()
+  }, [])
+
+  const loadPacks = async () => {
+    try {
+      const data = await ApiClient.getAllPacks()
+      setPacks(data)
+    } catch (error) {
+      console.error('Failed to load packs:', error)
+    }
+  }
+
+  const handleAddToPack = async (packId: number) => {
+    if (!selectedTextureSet) return
+    
+    try {
+      await ApiClient.addTextureSetToPack(packId, selectedTextureSet.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Texture set added to pack',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to add texture set to pack:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to add texture set to pack',
+        life: 3000,
+      })
+    }
+  }
 
   const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
     // Find albedo texture first, then fallback to diffuse
@@ -46,6 +88,22 @@ export default function TextureSetGrid({
     const name = textureSet.name.toLowerCase()
     return name.includes(searchQuery.toLowerCase())
   })
+
+  const contextMenuItems: MenuItem[] = [
+    {
+      label: 'Add to pack',
+      icon: 'pi pi-box',
+      items: packs.length > 0 ? packs.map(pack => ({
+        label: pack.name,
+        command: () => handleAddToPack(pack.id),
+      })) : [
+        {
+          label: 'No packs available',
+          disabled: true,
+        },
+      ],
+    },
+  ]
 
   // Loading state
   if (loading) {
@@ -85,6 +143,9 @@ export default function TextureSetGrid({
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
     >
+      <Toast ref={toast} />
+      <ContextMenu model={contextMenuItems} ref={contextMenu} />
+      
       {/* Search and filter bar */}
       <div className="texture-set-grid-controls">
         <div className="search-bar">
@@ -112,6 +173,11 @@ export default function TextureSetGrid({
               key={textureSet.id}
               className="texture-set-card"
               onClick={() => onTextureSetSelect(textureSet)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setSelectedTextureSet(textureSet)
+                contextMenu.current?.show(e)
+              }}
             >
               <div className="texture-set-card-thumbnail">
                 {albedoUrl ? (
