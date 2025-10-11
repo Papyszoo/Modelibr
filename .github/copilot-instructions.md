@@ -614,12 +614,7 @@ Update existing docs **only** when changes affect:
 - Development workflow
 
 #### How to Document Fixes
-**Do NOT create separate fix documentation files.** Instead:
-1. **For worker issues:** Add to troubleshooting section in `docs/WORKER.md`
-2. **For backend issues:** Update relevant section in `docs/BACKEND_API.md`
-3. **For frontend issues:** Update relevant section in `docs/FRONTEND.md`
-4. **For Docker issues:** Update Troubleshooting section in `README.md`
-5. **For architecture/build issues:** Update `.github/copilot-instructions.md`
+**Do NOT create separate fix documentation files.**
 
 #### Content Separation
 - **README.md**: High-level, user-friendly, features and quick start
@@ -654,7 +649,7 @@ docs/FRONTEND.md (all frontend info, minimal)
 docs/WORKER.md (all worker info, minimal)
 ```
 
-All documentation is consolidated and minimal.
+All documentation is consolidated and minimal and only in files listed above.
 
 ## Frontend Development Guidelines
 
