@@ -1,0 +1,87 @@
+.property-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.property-panel-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--surface-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.property-panel-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.property-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.property-panel-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+.property-group {
+  margin-bottom: 1.25rem;
+}
+
+.property-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-color-secondary);
+}
+
+.property-group .p-inputtext,
+.property-group .p-inputnumber {
+  width: 100%;
+}
+
+.color-input-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.color-input-group .p-colorpicker {
+  flex-shrink: 0;
+}
+
+.color-input-group .p-inputtext {
+  flex: 1;
+}
+
+.property-vector {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.property-vector-item {
+  flex: 1;
+}
+
+.property-vector-item label {
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+  color: var(--text-color-secondary);
+}
+
+.property-vector-item .p-inputnumber {
+  width: 100%;
+}
