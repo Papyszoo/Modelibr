@@ -14,7 +14,7 @@ interface PropertyPanelProps {
 function PropertyPanel({
   selectedObject,
   onUpdateObject,
-  onDeleteObject
+  onDeleteObject,
 }: PropertyPanelProps): JSX.Element {
   if (!selectedObject) {
     return (
@@ -53,8 +53,8 @@ function PropertyPanel({
                   position: [
                     e.value ?? 0,
                     selectedObject.position![1],
-                    selectedObject.position![2]
-                  ]
+                    selectedObject.position![2],
+                  ],
                 })
               }
               mode="decimal"
@@ -72,8 +72,8 @@ function PropertyPanel({
                   position: [
                     selectedObject.position![0],
                     e.value ?? 0,
-                    selectedObject.position![2]
-                  ]
+                    selectedObject.position![2],
+                  ],
                 })
               }
               mode="decimal"
@@ -91,8 +91,8 @@ function PropertyPanel({
                   position: [
                     selectedObject.position![0],
                     selectedObject.position![1],
-                    e.value ?? 0
-                  ]
+                    e.value ?? 0,
+                  ],
                 })
               }
               mode="decimal"
@@ -114,10 +114,12 @@ function PropertyPanel({
         <div className="property-group">
           <label>Angle</label>
           <InputNumber
-            value={selectedObject.angle ? (selectedObject.angle * 180) / Math.PI : 30}
+            value={
+              selectedObject.angle ? (selectedObject.angle * 180) / Math.PI : 30
+            }
             onValueChange={e =>
               onUpdateObject(selectedObject.id, {
-                angle: ((e.value ?? 30) * Math.PI) / 180
+                angle: ((e.value ?? 30) * Math.PI) / 180,
               })
             }
             suffix="°"
