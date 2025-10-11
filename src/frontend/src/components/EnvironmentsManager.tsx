@@ -9,7 +9,7 @@ import { Dropdown } from 'primereact/dropdown'
 import { Checkbox } from 'primereact/checkbox'
 import { InputTextarea } from 'primereact/inputtextarea'
 // eslint-disable-next-line no-restricted-imports
-import apiClient, { EnvironmentDto } from '../../services/ApiClient'
+import ApiClient, { EnvironmentDto } from '../services/ApiClient'
 
 const ENVIRONMENT_PRESETS = [
   { label: 'City', value: 'city' },
@@ -53,7 +53,7 @@ function EnvironmentsManager(): JSX.Element {
   const fetchEnvironments = async () => {
     setIsLoading(true)
     try {
-      const data = await apiClient.getEnvironments()
+      const data = await ApiClient.getEnvironments()
       setEnvironments(data)
     } catch (error) {
       console.error('Failed to load environments:', error)
@@ -91,7 +91,7 @@ function EnvironmentsManager(): JSX.Element {
   const handleSave = async () => {
     try {
       if (editingEnvironment) {
-        await apiClient.updateEnvironment(editingEnvironment.id, {
+        await ApiClient.updateEnvironment(editingEnvironment.id, {
           name: formData.name,
           description: formData.description || undefined,
           lightIntensity: formData.lightIntensity,
@@ -102,7 +102,7 @@ function EnvironmentsManager(): JSX.Element {
           shadowBlur: 2,
         })
       } else {
-        await apiClient.createEnvironment({
+        await ApiClient.createEnvironment({
           name: formData.name,
           description: formData.description || undefined,
           lightIntensity: formData.lightIntensity,
@@ -121,7 +121,7 @@ function EnvironmentsManager(): JSX.Element {
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this environment?')) {
       try {
-        await apiClient.deleteEnvironment(id)
+        await ApiClient.deleteEnvironment(id)
         fetchEnvironments()
       } catch (error) {
         console.error('Failed to delete environment:', error)
@@ -131,7 +131,7 @@ function EnvironmentsManager(): JSX.Element {
 
   const handleSetDefault = async (id: number) => {
     try {
-      await apiClient.setDefaultEnvironment(id)
+      await ApiClient.setDefaultEnvironment(id)
       fetchEnvironments()
     } catch (error) {
       console.error('Failed to set default environment:', error)

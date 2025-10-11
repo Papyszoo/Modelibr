@@ -10,6 +10,7 @@ export interface Tab {
     | 'textureSets'
     | 'textureSetViewer'
     | 'settings'
+    | 'environments'
   label?: string
   modelId?: string
   setId?: string

@@ -4,6 +4,7 @@ import TextureList from '../tabs/TextureList'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
 import AnimationList from '../tabs/AnimationList'
 import Settings from '../tabs/Settings'
+import EnvironmentsManager from '../EnvironmentsManager'
 import { Tab } from '../../types'
 import { useTabContext } from '../../hooks/useTabContext'
 import './TabContent.css'
@@ -50,6 +51,9 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'animation':
         return <AnimationList />
+
+      case 'environments':
+        return <EnvironmentsManager />
 
       case 'settings':
         return <Settings />
