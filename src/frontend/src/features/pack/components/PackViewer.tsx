@@ -9,6 +9,8 @@ import { Checkbox } from 'primereact/checkbox'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto, Model, TextureSetDto, TextureType } from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
+import { UploadableGrid } from '../../../shared/components'
+import { useTabContext } from '../../../hooks/useTabContext'
 import './PackViewer.css'
 
 interface PackViewerProps {
@@ -35,6 +37,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
   const textureSetContextMenu = useRef<ContextMenu>(null)
   const [selectedModel, setSelectedModel] = useState<Model | null>(null)
   const [selectedTextureSet, setSelectedTextureSet] = useState<TextureSetDto | null>(null)
+  const { openModelDetailsTab, openTextureSetDetailsTab } = useTabContext()
 
   useEffect(() => {
     loadPack()
@@ -209,23 +212,30 @@ export default function PackViewer({ packId }: PackViewerProps) {
     
     try {
       setUploadingModel(true)
-      const response = await ApiClient.uploadModel(files[0])
-      await ApiClient.addModelToPack(packId, response.id)
+      
+      // Upload all files and add them to pack
+      const uploadPromises = files.map(async (file) => {
+        const response = await ApiClient.uploadModel(file)
+        await ApiClient.addModelToPack(packId, response.id)
+        return response
+      })
+      
+      await Promise.all(uploadPromises)
       
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Model uploaded and added to pack',
+        detail: `${files.length} model(s) uploaded and added to pack`,
         life: 3000,
       })
       loadPackContent()
       loadPack()
     } catch (error) {
-      console.error('Failed to upload model:', error)
+      console.error('Failed to upload models:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to upload model',
+        detail: 'Failed to upload models',
         life: 3000,
       })
     } finally {
@@ -238,32 +248,39 @@ export default function PackViewer({ packId }: PackViewerProps) {
     
     try {
       setUploadingTextureSet(true)
-      const fileResponse = await ApiClient.uploadFile(files[0])
       
-      const setName = files[0].name.replace(/\.[^/.]+$/, '')
-      const setResponse = await ApiClient.createTextureSet({ name: setName })
-      
-      await ApiClient.addTextureToSet(setResponse.id, {
-        fileId: fileResponse.fileId,
-        textureType: 'Albedo'
+      // Upload all texture files and create texture sets
+      const uploadPromises = files.map(async (file) => {
+        const fileResponse = await ApiClient.uploadFile(file)
+        
+        const setName = file.name.replace(/\.[^/.]+$/, '')
+        const setResponse = await ApiClient.createTextureSet({ name: setName })
+        
+        await ApiClient.addTextureToSet(setResponse.id, {
+          fileId: fileResponse.fileId,
+          textureType: 'Albedo'
+        })
+        
+        await ApiClient.addTextureSetToPack(packId, setResponse.id)
+        return setResponse
       })
       
-      await ApiClient.addTextureSetToPack(packId, setResponse.id)
+      await Promise.all(uploadPromises)
       
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Texture set created and added to pack',
+        detail: `${files.length} texture set(s) created and added to pack`,
         life: 3000,
       })
       loadPackContent()
       loadPack()
     } catch (error) {
-      console.error('Failed to upload texture:', error)
+      console.error('Failed to upload textures:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to upload texture',
+        detail: 'Failed to upload textures',
         life: 3000,
       })
     } finally {
@@ -271,15 +288,11 @@ export default function PackViewer({ packId }: PackViewerProps) {
     }
   }
 
-  const handleModelDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const files = Array.from(e.dataTransfer.files)
+  const handleModelDrop = (files: File[]) => {
     handleModelUpload(files)
   }
 
-  const handleTextureDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const files = Array.from(e.dataTransfer.files)
+  const handleTextureDrop = (files: File[]) => {
     handleTextureUpload(files)
   }
 
@@ -379,120 +392,112 @@ export default function PackViewer({ packId }: PackViewerProps) {
         <div className="pack-section">
           <h3>Models</h3>
           
-          {/* Drag & Drop Zone for Models */}
-          <div
-            className={`pack-dropzone ${uploadingModel ? 'uploading' : ''}`}
-            onDrop={handleModelDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onDragEnter={(e) => e.preventDefault()}
-            onDragLeave={(e) => e.preventDefault()}
+          <UploadableGrid
+            onFilesDropped={handleModelDrop}
+            isUploading={uploadingModel}
+            uploadMessage="Drop model files here to upload to pack"
+            className="pack-grid-wrapper"
           >
-            <i className="pi pi-cloud-upload" />
-            <p>Drag & drop model files here to upload to pack</p>
-          </div>
-
-          <div className="pack-grid">
-            {models.map(model => (
-              <div
-                key={model.id}
-                className="pack-card"
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  setSelectedModel(model)
-                  modelContextMenu.current?.show(e)
-                }}
-              >
-                <div className="pack-card-thumbnail">
-                  <ThumbnailDisplay modelId={model.id} />
-                  <div className="pack-card-overlay">
-                    <span className="pack-card-name">{getModelName(model)}</span>
+            <div className="pack-grid">
+              {models.map(model => (
+                <div
+                  key={model.id}
+                  className="pack-card"
+                  onClick={() => openModelDetailsTab(model)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setSelectedModel(model)
+                    modelContextMenu.current?.show(e)
+                  }}
+                >
+                  <div className="pack-card-thumbnail">
+                    <ThumbnailDisplay modelId={model.id} />
+                    <div className="pack-card-overlay">
+                      <span className="pack-card-name">{getModelName(model)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {/* Add New Card */}
-            <div
-              className="pack-card pack-card-add"
-              onClick={() => {
-                loadAvailableModels()
-                setModelSearchQuery('')
-                setSelectedModelIds([])
-                setShowAddModelDialog(true)
-              }}
-            >
-              <div className="pack-card-add-content">
-                <i className="pi pi-plus" />
-                <span>Add Model</span>
+              ))}
+              {/* Add New Card */}
+              <div
+                className="pack-card pack-card-add"
+                onClick={() => {
+                  loadAvailableModels()
+                  setModelSearchQuery('')
+                  setSelectedModelIds([])
+                  setShowAddModelDialog(true)
+                }}
+              >
+                <div className="pack-card-add-content">
+                  <i className="pi pi-plus" />
+                  <span>Add Model</span>
+                </div>
               </div>
             </div>
-          </div>
+          </UploadableGrid>
         </div>
 
         {/* Texture Sets Section */}
         <div className="pack-section">
           <h3>Texture Sets</h3>
           
-          {/* Drag & Drop Zone for Textures */}
-          <div
-            className={`pack-dropzone ${uploadingTextureSet ? 'uploading' : ''}`}
-            onDrop={handleTextureDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onDragEnter={(e) => e.preventDefault()}
-            onDragLeave={(e) => e.preventDefault()}
+          <UploadableGrid
+            onFilesDropped={handleTextureDrop}
+            isUploading={uploadingTextureSet}
+            uploadMessage="Drop texture files here to create and add to pack"
+            className="pack-grid-wrapper"
           >
-            <i className="pi pi-cloud-upload" />
-            <p>Drag & drop texture files here to create and add to pack</p>
-          </div>
-
-          <div className="pack-grid">
-            {textureSets.map(textureSet => {
-              const albedoUrl = getAlbedoTextureUrl(textureSet)
-              return (
-                <div
-                  key={textureSet.id}
-                  className="pack-card"
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setSelectedTextureSet(textureSet)
-                    textureSetContextMenu.current?.show(e)
-                  }}
-                >
-                  <div className="pack-card-thumbnail">
-                    {albedoUrl ? (
-                      <img
-                        src={albedoUrl}
-                        alt={textureSet.name}
-                        className="pack-card-image"
-                      />
-                    ) : (
-                      <div className="pack-card-placeholder">
-                        <i className="pi pi-image" />
-                        <span>No Preview</span>
+            <div className="pack-grid">
+              {textureSets.map(textureSet => {
+                const albedoUrl = getAlbedoTextureUrl(textureSet)
+                return (
+                  <div
+                    key={textureSet.id}
+                    className="pack-card"
+                    onClick={() => openTextureSetDetailsTab(textureSet)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setSelectedTextureSet(textureSet)
+                      textureSetContextMenu.current?.show(e)
+                    }}
+                  >
+                    <div className="pack-card-thumbnail">
+                      {albedoUrl ? (
+                        <img
+                          src={albedoUrl}
+                          alt={textureSet.name}
+                          className="pack-card-image"
+                        />
+                      ) : (
+                        <div className="pack-card-placeholder">
+                          <i className="pi pi-image" />
+                          <span>No Preview</span>
+                        </div>
+                      )}
+                      <div className="pack-card-overlay">
+                        <span className="pack-card-name">{textureSet.name}</span>
                       </div>
-                    )}
-                    <div className="pack-card-overlay">
-                      <span className="pack-card-name">{textureSet.name}</span>
                     </div>
                   </div>
+                )
+              })}
+              {/* Add New Card */}
+              <div
+                className="pack-card pack-card-add"
+                onClick={() => {
+                  loadAvailableTextureSets()
+                  setTextureSetSearchQuery('')
+                  setSelectedTextureSetIds([])
+                  setShowAddTextureSetDialog(true)
+                }}
+              >
+                <div className="pack-card-add-content">
+                  <i className="pi pi-plus" />
+                  <span>Add Texture Set</span>
                 </div>
-              )
-            })}
-            {/* Add New Card */}
-            <div
-              className="pack-card pack-card-add"
-              onClick={() => {
-                loadAvailableTextureSets()
-                setTextureSetSearchQuery('')
-                setSelectedTextureSetIds([])
-                setShowAddTextureSetDialog(true)
-              }}
-            >
-              <div className="pack-card-add-content">
-                <i className="pi pi-plus" />
-                <span>Add Texture Set</span>
               </div>
             </div>
-          </div>
+          </UploadableGrid>
         </div>
       </div>
 
@@ -500,7 +505,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
       <Dialog
         header="Add Models to Pack"
         visible={showAddModelDialog}
-        style={{ width: '80vw', maxWidth: '1200px' }}
+        style={{ width: '80vw', maxWidth: '1200px', maxHeight: '80vh' }}
         onHide={() => {
           setShowAddModelDialog(false)
           setSelectedModelIds([])
@@ -537,7 +542,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
               style={{ width: '100%' }}
             />
           </div>
-          <div className="pack-grid">
+          <div className="pack-grid scrollable-grid">
             {filteredAvailableModels.map(model => {
               const isSelected = selectedModelIds.includes(model.id)
               return (
@@ -572,7 +577,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
       <Dialog
         header="Add Texture Sets to Pack"
         visible={showAddTextureSetDialog}
-        style={{ width: '80vw', maxWidth: '1200px' }}
+        style={{ width: '80vw', maxWidth: '1200px', maxHeight: '80vh' }}
         onHide={() => {
           setShowAddTextureSetDialog(false)
           setSelectedTextureSetIds([])
@@ -609,7 +614,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
               style={{ width: '100%' }}
             />
           </div>
-          <div className="pack-grid">
+          <div className="pack-grid scrollable-grid">
             {filteredAvailableTextureSets.map(textureSet => {
               const albedoUrl = getAlbedoTextureUrl(textureSet)
               const isSelected = selectedTextureSetIds.includes(textureSet.id)

@@ -1,0 +1,67 @@
+.uploadable-grid-container {
+  position: relative;
+  min-height: 200px;
+}
+
+.uploadable-grid-container.dragging {
+  opacity: 0.6;
+}
+
+.uploadable-grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px dashed #3b82f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.uploadable-grid-overlay-content {
+  text-align: center;
+  color: #3b82f6;
+}
+
+.uploadable-grid-overlay-content i {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.uploadable-grid-overlay-content p {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.uploadable-grid-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 101;
+}
+
+.uploadable-grid-loading i {
+  font-size: 2.5rem;
+  color: #3b82f6;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.uploadable-grid-loading p {
+  margin: 0;
+  font-size: 1rem;
+  color: #666;
+}

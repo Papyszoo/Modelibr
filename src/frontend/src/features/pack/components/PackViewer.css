@@ -208,8 +208,6 @@
   flex-direction: column;
   gap: 1rem;
   min-height: 400px;
-  max-height: 70vh;
-  overflow-y: auto;
 }
 
 .add-dialog-content .search-bar {
@@ -219,6 +217,35 @@
   padding: 0.5rem;
   background: var(--surface-50);
   border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.scrollable-grid {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.scrollable-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollable-grid::-webkit-scrollbar-track {
+  background: var(--surface-100);
+  border-radius: 4px;
+}
+
+.scrollable-grid::-webkit-scrollbar-thumb {
+  background: var(--surface-400);
+  border-radius: 4px;
+}
+
+.scrollable-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--surface-500);
+}
+
+.pack-grid-wrapper {
+  min-height: 200px;
 }
 
 .add-dialog-content .search-bar i {
