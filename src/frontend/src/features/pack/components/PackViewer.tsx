@@ -266,7 +266,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
         
         await ApiClient.addTextureToSetEndpoint(setResponse.id, {
           fileId: fileResponse.fileId,
-          textureType: 'Albedo' as TextureType
+          textureType: TextureType.Albedo
         })
         
         await ApiClient.addTextureSetToPack(packId, setResponse.id)
