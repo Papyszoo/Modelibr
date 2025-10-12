@@ -2,33 +2,32 @@ import { config } from './config.js'
 import logger from './logger.js'
 
 /**
- * Service to render 6-side views of a 3D model for image classification
+ * Service to render multiple views of a 3D model for image classification
  */
-export class SixSideRenderer {
+export class ClassificationRenderer {
   constructor(puppeteerRenderer) {
     this.renderer = puppeteerRenderer
   }
 
   /**
-   * Render 6 side views of the loaded model
+   * Render classification views of the loaded model
    * @param {Object} jobLogger - Logger with job context
-   * @returns {Promise<Array<Buffer>>} Array of 6 image buffers (front, back, left, right, top, bottom)
+   * @returns {Promise<Array<Buffer>>} Array of image buffers for classification
    */
-  async renderSixSides(jobLogger) {
+  async renderClassificationViews(jobLogger) {
     if (!this.renderer || !this.renderer.page) {
       throw new Error('Renderer not initialized')
     }
 
-    jobLogger.info('Starting 6-side view rendering for classification')
+    jobLogger.info('Starting classification view rendering')
 
-    // Define the 6 camera positions (angle, height for orbit)
-    const sides = [
-      { name: 'front', angle: 0, height: 0 },
-      { name: 'back', angle: 180, height: 0 },
-      { name: 'left', angle: 270, height: 0 },
-      { name: 'right', angle: 90, height: 0 },
-      { name: 'top', angle: 0, height: 2 }, // Looking down from above
-      { name: 'bottom', angle: 0, height: -2 }, // Looking up from below
+    // Define the 4 camera positions with rotation pairs (elevation, azimuth)
+    // Elevation: 20 degrees, Azimuth: 30, 330, 150, 210 degrees
+    const views = [
+      { name: 'view1', elevation: 20, azimuth: 30 },
+      { name: 'view2', elevation: 20, azimuth: 330 },
+      { name: 'view3', elevation: 20, azimuth: 150 },
+      { name: 'view4', elevation: 20, azimuth: 210 },
     ]
 
     const imageBuffers = []
@@ -38,11 +37,11 @@ export class SixSideRenderer {
       const cameraDistance =
         await this.renderer.calculateOptimalCameraDistance()
 
-      for (const side of sides) {
+      for (const view of views) {
         const result = await this.renderer.page.evaluate(
-          async (ang, dist, height) => {
+          async (azimuth, dist, elevation) => {
             try {
-              window.positionCamera(ang, dist, height)
+              window.positionCamera(azimuth, dist, elevation)
               const rendered = await window.renderScene()
 
               if (!rendered) {
@@ -63,14 +62,14 @@ export class SixSideRenderer {
               return { success: false, error: error.message }
             }
           },
-          side.angle,
+          view.azimuth,
           cameraDistance,
-          side.height
+          view.elevation
         )
 
         if (!result.success) {
           throw new Error(
-            `Failed to render ${side.name} view: ${result.error || 'Unknown error'}`
+            `Failed to render ${view.name}: ${result.error || 'Unknown error'}`
           )
         }
 
@@ -82,19 +81,21 @@ export class SixSideRenderer {
         const buffer = Buffer.from(base64Data, 'base64')
         imageBuffers.push(buffer)
 
-        jobLogger.debug('Rendered side view', {
-          side: side.name,
+        jobLogger.debug('Rendered classification view', {
+          view: view.name,
+          elevation: view.elevation,
+          azimuth: view.azimuth,
           bufferSize: buffer.length,
         })
       }
 
-      jobLogger.info('6-side view rendering completed', {
+      jobLogger.info('Classification view rendering completed', {
         imageCount: imageBuffers.length,
       })
 
       return imageBuffers
     } catch (error) {
-      jobLogger.error('Failed to render 6-side views', {
+      jobLogger.error('Failed to render classification views', {
         error: error.message,
         stack: error.stack,
       })
