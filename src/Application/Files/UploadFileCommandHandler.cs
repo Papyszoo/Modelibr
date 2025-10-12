@@ -2,6 +2,8 @@ using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Services;
+using Domain.Models;
+using Domain.Services;
 using Domain.ValueObjects;
 using SharedKernel;
 
@@ -11,13 +13,19 @@ namespace Application.Files
     {
         private readonly IFileCreationService _fileCreationService;
         private readonly IFilePersistence _filePersistence;
+        private readonly IBatchUploadRepository _batchUploadRepository;
+        private readonly IDateTimeProvider _dateTimeProvider;
 
         public UploadFileCommandHandler(
             IFileCreationService fileCreationService,
-            IFilePersistence filePersistence)
+            IFilePersistence filePersistence,
+            IBatchUploadRepository batchUploadRepository,
+            IDateTimeProvider dateTimeProvider)
         {
             _fileCreationService = fileCreationService;
             _filePersistence = filePersistence;
+            _batchUploadRepository = batchUploadRepository;
+            _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<Result<UploadFileCommandResponse>> Handle(UploadFileCommand command, CancellationToken cancellationToken)
@@ -46,10 +54,32 @@ namespace Application.Files
             // Persist the file to the database if it's new
             await _filePersistence.PersistAsync(fileEntity, cancellationToken);
 
+            // Track batch upload if batch information is provided
+            if (!string.IsNullOrWhiteSpace(command.BatchId) && !string.IsNullOrWhiteSpace(command.UploadType))
+            {
+                var batchUpload = BatchUpload.Create(
+                    command.BatchId,
+                    command.UploadType,
+                    fileEntity.Id,
+                    _dateTimeProvider.UtcNow,
+                    command.PackId,
+                    command.ModelId,
+                    command.TextureSetId);
+                
+                await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+            }
+
             return Result.Success(new UploadFileCommandResponse(fileEntity.Id, alreadyExists));
         }
     }
 
-    public record UploadFileCommand(IFileUpload File) : ICommand<UploadFileCommandResponse>;
+    public record UploadFileCommand(
+        IFileUpload File,
+        string? BatchId = null,
+        string? UploadType = null,
+        int? PackId = null,
+        int? ModelId = null,
+        int? TextureSetId = null) : ICommand<UploadFileCommandResponse>;
+    
     public record UploadFileCommandResponse(int FileId, bool AlreadyExists = false);
 }

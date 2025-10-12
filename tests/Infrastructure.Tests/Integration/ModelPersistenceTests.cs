@@ -1,3 +1,4 @@
+using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Models;
 using Application.Services;
@@ -54,7 +55,10 @@ public class ModelPersistenceTests
         // Create a fake domain event dispatcher for testing
         var domainEventDispatcher = new FakeDomainEventDispatcher();
         
-        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider, domainEventDispatcher);
+        // Create a fake batch upload repository for testing
+        var batchUploadRepository = new FakeBatchUploadRepository();
+        
+        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider, domainEventDispatcher, batchUploadRepository);
         
         Assert.NotNull(handler);
     }
@@ -163,5 +167,43 @@ internal class FakeDomainEventDispatcher : IDomainEventDispatcher
     {
         // Do nothing for tests
         return Task.FromResult(Result.Success());
+    }
+}
+
+/// <summary>
+/// Fake batch upload repository for testing that does nothing.
+/// </summary>
+internal class FakeBatchUploadRepository : IBatchUploadRepository
+{
+    public Task<BatchUpload?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<BatchUpload?>(null);
+    }
+
+    public Task<IEnumerable<BatchUpload>> GetByBatchIdAsync(string batchId, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Enumerable.Empty<BatchUpload>());
+    }
+
+    public Task<IEnumerable<BatchUpload>> GetByUploadTypeAsync(string uploadType, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Enumerable.Empty<BatchUpload>());
+    }
+
+    public Task<IEnumerable<BatchUpload>> GetByDateRangeAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Enumerable.Empty<BatchUpload>());
+    }
+
+    public Task AddAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default)
+    {
+        // Do nothing for tests
+        return Task.CompletedTask;
+    }
+
+    public Task AddRangeAsync(IEnumerable<BatchUpload> batchUploads, CancellationToken cancellationToken = default)
+    {
+        // Do nothing for tests
+        return Task.CompletedTask;
     }
 }

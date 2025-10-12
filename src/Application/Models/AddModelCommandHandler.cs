@@ -16,17 +16,20 @@ namespace Application.Models
         private readonly IFileCreationService _fileCreationService;
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IDomainEventDispatcher _domainEventDispatcher;
+        private readonly IBatchUploadRepository _batchUploadRepository;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository, 
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
-            IDomainEventDispatcher domainEventDispatcher)
+            IDomainEventDispatcher domainEventDispatcher,
+            IBatchUploadRepository batchUploadRepository)
         {
             _modelRepository = modelRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
             _domainEventDispatcher = domainEventDispatcher;
+            _batchUploadRepository = batchUploadRepository;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -62,6 +65,19 @@ namespace Application.Models
                 await _domainEventDispatcher.PublishAsync(existingModel.DomainEvents, cancellationToken);
                 existingModel.ClearDomainEvents();
                 
+                // Track batch upload if batch information is provided
+                if (!string.IsNullOrWhiteSpace(command.BatchId))
+                {
+                    var batchUpload = BatchUpload.Create(
+                        command.BatchId,
+                        "model",
+                        fileEntity.Id,
+                        _dateTimeProvider.UtcNow,
+                        modelId: existingModel.Id);
+                    
+                    await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+                }
+                
                 return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
             }
 
@@ -86,6 +102,19 @@ namespace Application.Models
                 await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);
                 savedModel.ClearDomainEvents();
                 
+                // Track batch upload if batch information is provided
+                if (!string.IsNullOrWhiteSpace(command.BatchId))
+                {
+                    var batchUpload = BatchUpload.Create(
+                        command.BatchId,
+                        "model",
+                        fileEntity.Id,
+                        _dateTimeProvider.UtcNow,
+                        modelId: savedModel.Id);
+                    
+                    await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+                }
+                
                 return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
             }
             catch (ArgumentException ex)
@@ -95,6 +124,6 @@ namespace Application.Models
         }
     }
 
-    public record AddModelCommand(IFileUpload File, string? ModelName = null) : ICommand<AddModelCommandResponse>;
+    public record AddModelCommand(IFileUpload File, string? ModelName = null, string? BatchId = null) : ICommand<AddModelCommandResponse>;
     public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
 }
