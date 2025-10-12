@@ -186,6 +186,8 @@ function DockPanel({
         ) : (
           <DockEmptyState
             onAddTab={addTab}
+            recentlyClosedTabs={recentlyClosedTabs}
+            onReopenTab={reopenTab}
             onDrop={handleDropOnOtherPanel}
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
