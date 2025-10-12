@@ -49,7 +49,7 @@ export default function ModelGrid({
 
   const handleAddToPack = async (packId: number) => {
     if (!selectedModel) return
-    
+
     try {
       await ApiClient.addModelToPack(packId, selectedModel.id)
       toast.current?.show({
@@ -103,7 +103,7 @@ export default function ModelGrid({
     >
       <Toast ref={toast} />
       <ContextMenu model={contextMenuItems} ref={contextMenu} />
-      
+
       {/* Search and filter bar */}
       <div className="model-grid-controls">
         <div className="search-bar">
@@ -128,7 +128,7 @@ export default function ModelGrid({
             key={model.id}
             className="model-card"
             onClick={() => onModelSelect(model)}
-            onContextMenu={(e) => {
+            onContextMenu={e => {
               e.preventDefault()
               setSelectedModel(model)
               contextMenu.current?.show(e)
@@ -171,7 +171,9 @@ export default function ModelGrid({
                 <div className="pack-item-content">
                   <span className="pack-item-name">{pack.name}</span>
                   {pack.description && (
-                    <span className="pack-item-description">{pack.description}</span>
+                    <span className="pack-item-description">
+                      {pack.description}
+                    </span>
                   )}
                 </div>
                 <i className="pi pi-chevron-right" />

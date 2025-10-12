@@ -6,7 +6,7 @@ interface FloatingWindowProps {
   visible: boolean
   onClose: () => void
   title: string
-  side?: 'left' | 'right'
+  side?: 'left' | 'right' | 'none'
   children: ReactNode
   windowId: string
 }
@@ -25,9 +25,20 @@ function FloatingWindow({
   const { leftPanelWidth, activeWindowId, setActiveWindow } = usePanelStore()
 
   // Position based on side
-  const initialPosition =
-    side === 'left' ? { x: 20, y: 80 } : { x: window.innerWidth - 370, y: 80 }
-  const [position, setPosition] = useState(initialPosition)
+  const getInitialPosition = () => {
+    if (side === 'none') {
+      // Center of screen
+      return {
+        x: (window.innerWidth - 450) / 2,
+        y: (window.innerHeight - 400) / 2,
+      }
+    }
+    return side === 'left'
+      ? { x: 20, y: 80 }
+      : { x: window.innerWidth - 370, y: 80 }
+  }
+
+  const [position, setPosition] = useState(getInitialPosition())
   const [dragging, setDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const windowRef = useRef<HTMLDivElement>(null)
@@ -45,15 +56,25 @@ function FloatingWindow({
   // Reset position when side changes
   useEffect(() => {
     const TAB_BAR_WIDTH = 60
-    const newPosition =
-      side === 'left'
-        ? { x: 80, y: 80 }
-        : { x: window.innerWidth - 370 - TAB_BAR_WIDTH, y: 80 }
+    let newPosition
+    if (side === 'none') {
+      newPosition = {
+        x: (window.innerWidth - 450) / 2,
+        y: (window.innerHeight - 400) / 2,
+      }
+    } else if (side === 'left') {
+      newPosition = { x: 80, y: 80 }
+    } else {
+      newPosition = { x: window.innerWidth - 370 - TAB_BAR_WIDTH, y: 80 }
+    }
     setPosition(newPosition)
   }, [side])
 
   // Reposition window if it ends up on wrong panel after splitter resize
+  // Only apply this logic for left/right sides, not for 'none'
   useEffect(() => {
+    if (side === 'none') return // Skip panel repositioning for 'none' side
+
     const windowElement = windowRef.current
     const windowElementWidth = windowElement?.offsetWidth || 350
     const TAB_BAR_WIDTH = 60
@@ -115,25 +136,33 @@ function FloatingWindow({
           Math.min(newY, window.innerHeight - windowElementHeight)
         )
 
-        // Restrict dragging based on actual panel widths from zustand store
-        // Account for 60px tab bar on both left and right panels
-        const TAB_BAR_WIDTH = 60
-        if (side === 'left') {
-          // Keep on left panel - starts at tab bar (60px) and ends at panel width
+        if (side === 'none') {
+          // For 'none' side, allow movement anywhere on screen
           newX = Math.max(
-            TAB_BAR_WIDTH,
-            Math.min(newX, leftPanelWidth - windowElementWidth)
+            0,
+            Math.min(newX, window.innerWidth - windowElementWidth)
           )
         } else {
-          // Keep on right panel - starts at panel boundary and ends before tab bar
-          const rightPanelStart = leftPanelWidth
-          newX = Math.max(
-            rightPanelStart,
-            Math.min(
-              newX,
-              window.innerWidth - windowElementWidth - TAB_BAR_WIDTH
+          // Restrict dragging based on actual panel widths from zustand store
+          // Account for 60px tab bar on both left and right panels
+          const TAB_BAR_WIDTH = 60
+          if (side === 'left') {
+            // Keep on left panel - starts at tab bar (60px) and ends at panel width
+            newX = Math.max(
+              TAB_BAR_WIDTH,
+              Math.min(newX, leftPanelWidth - windowElementWidth)
             )
-          )
+          } else {
+            // Keep on right panel - starts at panel boundary and ends before tab bar
+            const rightPanelStart = leftPanelWidth
+            newX = Math.max(
+              rightPanelStart,
+              Math.min(
+                newX,
+                window.innerWidth - windowElementWidth - TAB_BAR_WIDTH
+              )
+            )
+          }
         }
 
         setPosition({
@@ -168,6 +197,7 @@ function FloatingWindow({
       }}
       onMouseDown={handleMouseDown}
       onClick={handleWindowClick}
+      id={windowId}
     >
       <div className="floating-window-header">
         <span className="floating-window-title">{title}</span>
