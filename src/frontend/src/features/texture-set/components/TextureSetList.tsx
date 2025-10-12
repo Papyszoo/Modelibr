@@ -6,7 +6,6 @@ import { TextureSetDto, TextureType } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
-import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
@@ -22,7 +21,6 @@ function TextureSetList() {
   const toast = useRef<Toast>(null)
   const textureSetsApi = useTextureSets()
   const { openTextureSetDetailsTab } = useTabContext()
-  const { uploadFile } = useGenericFileUpload({ fileType: 'texture' })
   const uploadProgressContext = useUploadProgress()
 
   const loadTextureSets = useCallback(async () => {

@@ -22,7 +22,11 @@ interface UploadProgressStore {
   uploads: UploadItem[]
   batches: UploadBatch[]
   isVisible: boolean
-  addUpload: (file: File, fileType: 'model' | 'texture' | 'file', batchId?: string) => string
+  addUpload: (
+    file: File,
+    fileType: 'model' | 'texture' | 'file',
+    batchId?: string
+  ) => string
   updateUploadProgress: (id: string, progress: number) => void
   completeUpload: (id: string, result?: unknown) => void
   updateUploadResult: (id: string, result: unknown) => void
@@ -35,200 +39,213 @@ interface UploadProgressStore {
   createBatch: () => string
 }
 
-export const useUploadProgressStore = create<UploadProgressStore>((set, get) => ({
+export const useUploadProgressStore = create<UploadProgressStore>(set => ({
   uploads: [],
   batches: [],
   isVisible: false,
 
   createBatch: () => {
-    const batchId = `batch-${Date.now()}-${Math.random()}`
-    set(state => ({
-      batches: [
-        ...state.batches,
-        { id: batchId, timestamp: Date.now(), files: [], collapsed: false },
-      ],
-    }))
-    return batchId
-  },
+      const batchId = `batch-${Date.now()}-${Math.random()}`
+      set(state => ({
+        batches: [
+          ...state.batches,
+          { id: batchId, timestamp: Date.now(), files: [], collapsed: false },
+        ],
+      }))
+      return batchId
+    },
 
-  addUpload: (file: File, fileType: 'model' | 'texture' | 'file', batchId?: string) => {
-    const id = `upload-${Date.now()}-${Math.random()}`
-    const newUpload: UploadItem = {
-      id,
-      file,
-      progress: 0,
-      status: 'pending',
-      fileType,
-      batchId,
-    }
-    set(state => {
-      const newUploads = [...state.uploads, newUpload]
-      const newBatches = batchId
-        ? state.batches.map(batch =>
-            batch.id === batchId
-              ? { ...batch, files: [...batch.files, newUpload] }
-              : batch
-          )
-        : state.batches
-
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-        isVisible: true,
+    addUpload: (
+      file: File,
+      fileType: 'model' | 'texture' | 'file',
+      batchId?: string
+    ) => {
+      const id = `upload-${Date.now()}-${Math.random()}`
+      const newUpload: UploadItem = {
+        id,
+        file,
+        progress: 0,
+        status: 'pending',
+        fileType,
+        batchId,
       }
-    })
-    return id
-  },
+      set(state => {
+        const newUploads = [...state.uploads, newUpload]
+        const newBatches = batchId
+          ? state.batches.map(batch =>
+              batch.id === batchId
+                ? { ...batch, files: [...batch.files, newUpload] }
+                : batch
+            )
+          : state.batches
 
-  updateUploadProgress: (id: string, progress: number) => {
-    set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, progress, status: 'uploading' as const }
-          : upload
-      )
-      
-      // Update batches too
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
+        return {
+          uploads: newUploads,
+          batches: newBatches,
+          isVisible: true,
+        }
+      })
+      return id
+    },
+
+    updateUploadProgress: (id: string, progress: number) => {
+      set(state => {
+        const newUploads = state.uploads.map(upload =>
           upload.id === id
             ? { ...upload, progress, status: 'uploading' as const }
             : upload
-        ),
-      }))
+        )
 
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
-  },
+        // Update batches too
+        const newBatches = state.batches.map(batch => ({
+          ...batch,
+          files: batch.files.map(upload =>
+            upload.id === id
+              ? { ...upload, progress, status: 'uploading' as const }
+              : upload
+          ),
+        }))
 
-  completeUpload: (id: string, result?: unknown) => {
-    set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, progress: 100, status: 'completed' as const, result }
-          : upload
-      )
+        return {
+          uploads: newUploads,
+          batches: newBatches,
+        }
+      })
+    },
 
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
+    completeUpload: (id: string, result?: unknown) => {
+      set(state => {
+        const newUploads = state.uploads.map(upload =>
           upload.id === id
             ? { ...upload, progress: 100, status: 'completed' as const, result }
             : upload
-        ),
-      }))
+        )
 
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
-  },
+        const newBatches = state.batches.map(batch => ({
+          ...batch,
+          files: batch.files.map(upload =>
+            upload.id === id
+              ? {
+                  ...upload,
+                  progress: 100,
+                  status: 'completed' as const,
+                  result,
+                }
+              : upload
+          ),
+        }))
 
-  updateUploadResult: (id: string, result: unknown) => {
-    set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, result: { ...upload.result, ...result } }
-          : upload
-      )
+        return {
+          uploads: newUploads,
+          batches: newBatches,
+        }
+      })
+    },
 
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
+    updateUploadResult: (id: string, result: unknown) => {
+      set(state => {
+        const newUploads = state.uploads.map(upload =>
           upload.id === id
             ? { ...upload, result: { ...upload.result, ...result } }
             : upload
-        ),
-      }))
+        )
 
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
-  },
+        const newBatches = state.batches.map(batch => ({
+          ...batch,
+          files: batch.files.map(upload =>
+            upload.id === id
+              ? { ...upload, result: { ...upload.result, ...result } }
+              : upload
+          ),
+        }))
 
-  failUpload: (id: string, error: Error) => {
-    set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, status: 'error' as const, error }
-          : upload
-      )
+        return {
+          uploads: newUploads,
+          batches: newBatches,
+        }
+      })
+    },
 
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
+    failUpload: (id: string, error: Error) => {
+      set(state => {
+        const newUploads = state.uploads.map(upload =>
           upload.id === id
             ? { ...upload, status: 'error' as const, error }
             : upload
-        ),
-      }))
+        )
 
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
-  },
-
-  removeUpload: (id: string) => {
-    set(state => {
-      const newUploads = state.uploads.filter(upload => upload.id !== id)
-      const newBatches = state.batches
-        .map(batch => ({
+        const newBatches = state.batches.map(batch => ({
           ...batch,
-          files: batch.files.filter(upload => upload.id !== id),
-        }))
-        .filter(batch => batch.files.length > 0) // Remove empty batches
-
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
-  },
-
-  clearCompleted: () => {
-    set(state => {
-      const newUploads = state.uploads.filter(
-        upload => upload.status !== 'completed' && upload.status !== 'error'
-      )
-
-      const newBatches = state.batches
-        .map(batch => ({
-          ...batch,
-          files: batch.files.filter(
-            upload => upload.status !== 'completed' && upload.status !== 'error'
+          files: batch.files.map(upload =>
+            upload.id === id
+              ? { ...upload, status: 'error' as const, error }
+              : upload
           ),
         }))
-        .filter(batch => batch.files.length > 0)
 
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
-  },
+        return {
+          uploads: newUploads,
+          batches: newBatches,
+        }
+      })
+    },
 
-  showWindow: () => {
-    set({ isVisible: true })
-  },
+    removeUpload: (id: string) => {
+      set(state => {
+        const newUploads = state.uploads.filter(upload => upload.id !== id)
+        const newBatches = state.batches
+          .map(batch => ({
+            ...batch,
+            files: batch.files.filter(upload => upload.id !== id),
+          }))
+          .filter(batch => batch.files.length > 0) // Remove empty batches
 
-  hideWindow: () => {
-    set({ isVisible: false })
-  },
+        return {
+          uploads: newUploads,
+          batches: newBatches,
+        }
+      })
+    },
 
-  toggleBatchCollapse: (batchId: string) => {
-    set(state => ({
-      batches: state.batches.map(batch =>
-        batch.id === batchId ? { ...batch, collapsed: !batch.collapsed } : batch
-      ),
-    }))
-  },
-}))
+    clearCompleted: () => {
+      set(state => {
+        const newUploads = state.uploads.filter(
+          upload => upload.status !== 'completed' && upload.status !== 'error'
+        )
+
+        const newBatches = state.batches
+          .map(batch => ({
+            ...batch,
+            files: batch.files.filter(
+              upload =>
+                upload.status !== 'completed' && upload.status !== 'error'
+            ),
+          }))
+          .filter(batch => batch.files.length > 0)
+
+        return {
+          uploads: newUploads,
+          batches: newBatches,
+        }
+      })
+    },
+
+    showWindow: () => {
+      set({ isVisible: true })
+    },
+
+    hideWindow: () => {
+      set({ isVisible: false })
+    },
+
+    toggleBatchCollapse: (batchId: string) => {
+      set(state => ({
+        batches: state.batches.map(batch =>
+          batch.id === batchId
+            ? { ...batch, collapsed: !batch.collapsed }
+            : batch
+        ),
+      }))
+    },
+  })
+)

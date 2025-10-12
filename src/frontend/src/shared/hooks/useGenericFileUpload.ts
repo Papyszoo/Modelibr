@@ -98,7 +98,9 @@ export function useGenericFileUpload(options = {}) {
         } catch (error) {
           if (uploadProgressContext) {
             // Find the upload by file and mark as failed
-            const upload = uploadProgressContext.uploads?.find(u => u.file === file)
+            const upload = uploadProgressContext.uploads?.find(
+              u => u.file === file
+            )
             if (upload) {
               uploadProgressContext.failUpload(upload.id, error)
             }
