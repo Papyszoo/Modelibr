@@ -220,11 +220,18 @@
         }
 
         // Position camera for rendering
-        function positionCamera(angle, distance, height = 0) {
-            const radians = (angle * Math.PI) / 180;
-            window.modelRenderer.camera.position.x = Math.cos(radians) * distance;
-            window.modelRenderer.camera.position.z = Math.sin(radians) * distance;
-            window.modelRenderer.camera.position.y = height;
+        function positionCamera(azimuthAngle, distance, elevationAngle = 0) {
+            // Convert angles to radians
+            const azimuthRad = (azimuthAngle * Math.PI) / 180;
+            const elevationRad = (elevationAngle * Math.PI) / 180;
+            
+            // Calculate camera position using spherical coordinates
+            // X-Z plane rotation (azimuth) and vertical angle (elevation)
+            const horizontalDistance = Math.cos(elevationRad) * distance;
+            window.modelRenderer.camera.position.x = Math.cos(azimuthRad) * horizontalDistance;
+            window.modelRenderer.camera.position.z = Math.sin(azimuthRad) * horizontalDistance;
+            window.modelRenderer.camera.position.y = Math.sin(elevationRad) * distance;
+            
             window.modelRenderer.camera.lookAt(0, 0, 0);
         }
 
