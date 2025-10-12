@@ -14,7 +14,7 @@ namespace Infrastructure.Persistence
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
-        public DbSet<Scene> Scenes => Set<Scene>();
+        public DbSet<Domain.Models.Environment> Environments => Set<Domain.Models.Environment>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -188,16 +188,16 @@ namespace Infrastructure.Persistence
             });
 
             // Configure Scene entity
-            modelBuilder.Entity<Scene>(entity =>
+            modelBuilder.Entity<Domain.Models.Environment>(entity =>
             {
-                entity.HasKey(s => s.Id);
-                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
-                entity.Property(s => s.ConfigurationJson).IsRequired();
-                entity.Property(s => s.CreatedAt).IsRequired();
-                entity.Property(s => s.UpdatedAt).IsRequired();
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.ConfigurationJson).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
                 
                 // Create index for efficient querying by name
-                entity.HasIndex(s => s.Name);
+                entity.HasIndex(e => e.Name);
             });
 
             base.OnModelCreating(modelBuilder);
