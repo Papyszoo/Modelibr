@@ -124,6 +124,12 @@ export function useFileUpload(options = {}) {
     setUploading(true)
     setUploadProgress(0)
 
+    // Create batch for multiple files
+    const batchId =
+      useGlobalProgress && uploadProgressContext && fileArray.length > 1
+        ? uploadProgressContext.createBatch()
+        : undefined
+
     try {
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i]
@@ -131,7 +137,7 @@ export function useFileUpload(options = {}) {
         // Add to global progress tracker if enabled and available
         const uploadId =
           useGlobalProgress && uploadProgressContext
-            ? uploadProgressContext.addUpload(file, fileType)
+            ? uploadProgressContext.addUpload(file, fileType, batchId)
             : null
 
         try {
