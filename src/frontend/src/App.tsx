@@ -1,6 +1,8 @@
 import { NuqsAdapter } from 'nuqs/adapters/react'
 import SplitterLayout from './components/layout/SplitterLayout'
 import { useGlobalDragPrevention } from './hooks/useGlobalDragPrevention'
+import { UploadProgressProvider } from './contexts/UploadProgressContext'
+import { UploadProgressWindow } from './shared/components'
 import './App.css'
 
 function App(): JSX.Element {
@@ -9,7 +11,10 @@ function App(): JSX.Element {
 
   return (
     <NuqsAdapter>
-      <SplitterLayout />
+      <UploadProgressProvider>
+        <SplitterLayout />
+        <UploadProgressWindow />
+      </UploadProgressProvider>
     </NuqsAdapter>
   )
 }
