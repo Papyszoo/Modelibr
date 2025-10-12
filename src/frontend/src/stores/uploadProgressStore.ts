@@ -25,6 +25,7 @@ interface UploadProgressStore {
   addUpload: (file: File, fileType: 'model' | 'texture' | 'file', batchId?: string) => string
   updateUploadProgress: (id: string, progress: number) => void
   completeUpload: (id: string, result?: unknown) => void
+  updateUploadResult: (id: string, result: unknown) => void
   failUpload: (id: string, error: Error) => void
   removeUpload: (id: string) => void
   clearCompleted: () => void
@@ -117,6 +118,30 @@ export const useUploadProgressStore = create<UploadProgressStore>((set, get) => 
         files: batch.files.map(upload =>
           upload.id === id
             ? { ...upload, progress: 100, status: 'completed' as const, result }
+            : upload
+        ),
+      }))
+
+      return {
+        uploads: newUploads,
+        batches: newBatches,
+      }
+    })
+  },
+
+  updateUploadResult: (id: string, result: unknown) => {
+    set(state => {
+      const newUploads = state.uploads.map(upload =>
+        upload.id === id
+          ? { ...upload, result: { ...upload.result, ...result } }
+          : upload
+      )
+
+      const newBatches = state.batches.map(batch => ({
+        ...batch,
+        files: batch.files.map(upload =>
+          upload.id === id
+            ? { ...upload, result: { ...upload.result, ...result } }
             : upload
         ),
       }))
