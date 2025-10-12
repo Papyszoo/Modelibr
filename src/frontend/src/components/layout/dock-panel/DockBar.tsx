@@ -58,6 +58,11 @@ export default function DockBar({
       command: () => onAddTab('packs', 'Packs'),
     },
     {
+      label: 'History',
+      icon: 'pi pi-history',
+      command: () => onAddTab('history', 'History'),
+    },
+    {
       separator: true,
     },
     {

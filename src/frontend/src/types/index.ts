@@ -10,6 +10,7 @@ export interface Tab {
     | 'packs'
     | 'packViewer'
     | 'settings'
+    | 'history'
   label?: string
   modelId?: string
   setId?: string

@@ -1,0 +1,32 @@
+.history-container {
+  padding: 1rem;
+  height: 100%;
+  overflow: auto;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.history-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.assignment-item {
+  font-size: 0.9rem;
+}
+
+.text-muted {
+  color: #6c757d;
+  font-style: italic;
+}
