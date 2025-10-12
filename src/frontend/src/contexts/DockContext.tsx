@@ -1,10 +1,22 @@
-import { createContext, ReactNode, useState, useContext } from 'react'
+import {
+  createContext,
+  ReactNode,
+  useState,
+  useContext,
+  useRef,
+  useEffect,
+  RefObject,
+} from 'react'
+import { ContextMenu } from 'primereact/contextmenu'
 import { Tab } from '../types'
 
 interface DockContextValue {
   recentlyClosedTabs: Tab[]
   addRecentlyClosedTab: (tab: Tab) => void
   removeRecentlyClosedTab: (tabId: string) => void
+  registerContextMenu: (ref: RefObject<ContextMenu>) => void
+  unregisterContextMenu: (ref: RefObject<ContextMenu>) => void
+  showContextMenu: (ref: RefObject<ContextMenu>, event: React.MouseEvent) => void
 }
 
 const DockContext = createContext<DockContextValue | null>(null)
@@ -23,6 +35,7 @@ interface DockProviderProps {
 
 export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
   const [recentlyClosedTabs, setRecentlyClosedTabs] = useState<Tab[]>([])
+  const contextMenuRefs = useRef<Set<RefObject<ContextMenu>>>(new Set())
 
   const addRecentlyClosedTab = (tab: Tab): void => {
     setRecentlyClosedTabs(prev => {
@@ -35,10 +48,56 @@ export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
     setRecentlyClosedTabs(prev => prev.filter(t => t.id !== tabId))
   }
 
+  const registerContextMenu = (ref: RefObject<ContextMenu>): void => {
+    contextMenuRefs.current.add(ref)
+  }
+
+  const unregisterContextMenu = (ref: RefObject<ContextMenu>): void => {
+    contextMenuRefs.current.delete(ref)
+  }
+
+  const showContextMenu = (
+    ref: RefObject<ContextMenu>,
+    event: React.MouseEvent
+  ): void => {
+    // Hide all other menus immediately
+    contextMenuRefs.current.forEach(otherRef => {
+      if (otherRef !== ref && otherRef.current) {
+        otherRef.current.hide()
+      }
+    })
+    
+    // Then show the requested menu
+    if (ref.current) {
+      ref.current.show(event)
+    }
+  }
+
+  useEffect(() => {
+    // Close all context menus when clicking/right-clicking anywhere
+    const handleGlobalClick = (): void => {
+      contextMenuRefs.current.forEach(ref => {
+        if (ref.current) {
+          ref.current.hide()
+        }
+      })
+    }
+
+    // Only listen to actual clicks (not right-clicks) to close menus
+    document.addEventListener('click', handleGlobalClick)
+
+    return () => {
+      document.removeEventListener('click', handleGlobalClick)
+    }
+  }, [])
+
   const value: DockContextValue = {
     recentlyClosedTabs,
     addRecentlyClosedTab,
     removeRecentlyClosedTab,
+    registerContextMenu,
+    unregisterContextMenu,
+    showContextMenu,
   }
 
   return <DockContext.Provider value={value}>{children}</DockContext.Provider>

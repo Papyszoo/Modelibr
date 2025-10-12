@@ -20,12 +20,18 @@ jest.mock('primereact/contextmenu', () => ({
   ContextMenu: React.forwardRef(
     (
       { children, ...props }: React.PropsWithChildren<unknown>,
-      ref: React.Ref<HTMLDivElement>
-    ) => (
-      <div {...props} ref={ref}>
-        {children}
-      </div>
-    )
+      ref: React.Ref<{ hide: () => void; show: (e: unknown) => void }>
+    ) => {
+      React.useImperativeHandle(ref, () => ({
+        hide: jest.fn(),
+        show: jest.fn(),
+      }))
+      return (
+        <div {...props}>
+          {children}
+        </div>
+      )
+    }
   ),
 }))
 
