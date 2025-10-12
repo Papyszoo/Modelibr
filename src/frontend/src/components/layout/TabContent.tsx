@@ -1,7 +1,7 @@
 import { ModelList } from '../../features/models'
 import { ModelViewer } from '../../features/model-viewer'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
-import { EnvironmentEditor } from '../../features/environment-editor'
+import { StageEditor } from '../../features/stage-editor'
 import Settings from '../tabs/Settings'
 import { Tab } from '../../types'
 import { useTabContext } from '../../hooks/useTabContext'
@@ -44,11 +44,11 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
         }
         return <TextureSetViewer setId={tab.setId} side={side} />
 
-      case 'environmentList':
-        return <div>Environment List - Coming Soon</div>
+      case 'stageList':
+        return <div>Stage List - Coming Soon</div>
 
-      case 'environmentEditor':
-        return <EnvironmentEditor />
+      case 'stageEditor':
+        return <StageEditor />
 
       case 'settings':
         return <Settings />

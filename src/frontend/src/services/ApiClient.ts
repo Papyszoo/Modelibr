@@ -243,46 +243,46 @@ class ApiClient {
     return response.data
   }
 
-  // Environment API
-  async createEnvironment(
+  // Stage API
+  async createStage(
     name: string,
     configurationJson: string
   ): Promise<{ id: number; name: string }> {
-    const response = await this.client.post('/environments', {
+    const response = await this.client.post('/stages', {
       name,
       configurationJson,
     })
     return response.data
   }
 
-  async getAllEnvironments(): Promise<{
-    environments: Array<{
+  async getAllStages(): Promise<{
+    stages: Array<{
       id: number
       name: string
       createdAt: string
       updatedAt: string
     }>
   }> {
-    const response = await this.client.get('/environments')
+    const response = await this.client.get('/stages')
     return response.data
   }
 
-  async getEnvironmentById(id: number): Promise<{
+  async getStageById(id: number): Promise<{
     id: number
     name: string
     configurationJson: string
     createdAt: string
     updatedAt: string
   }> {
-    const response = await this.client.get(`/environments/${id}`)
+    const response = await this.client.get(`/stages/${id}`)
     return response.data
   }
 
-  async updateEnvironment(
+  async updateStage(
     id: number,
     configurationJson: string
   ): Promise<{ id: number; name: string }> {
-    const response = await this.client.put(`/environments/${id}`, {
+    const response = await this.client.put(`/stages/${id}`, {
       configurationJson,
     })
     return response.data

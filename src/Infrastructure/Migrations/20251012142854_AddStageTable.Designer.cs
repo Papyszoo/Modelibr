@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251012142854_AddEnvironmentTable")]
-    partial class AddEnvironmentTable
+    [Migration("20251012142854_AddStageTable")]
+    partial class AddStageTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -65,7 +65,7 @@ namespace Infrastructure.Migrations
                     b.ToTable("ApplicationSettings");
                 });
 
-            modelBuilder.Entity("Domain.Models.Environment", b =>
+            modelBuilder.Entity("Domain.Models.Stage", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -92,7 +92,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("Name");
 
-                    b.ToTable("Environments");
+                    b.ToTable("Stages");
                 });
 
             modelBuilder.Entity("Domain.Models.File", b =>
