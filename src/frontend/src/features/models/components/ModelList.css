@@ -32,6 +32,7 @@
 .model-stats {
   display: flex;
   gap: 1rem;
+  align-items: center;
 }
 
 .stat-item {
@@ -52,6 +53,8 @@
   position: absolute;
   left: 0;
   top: 0;
+  display: flex;
+  gap: 0.5rem;
 }
 
 .model-list-header h1 {
