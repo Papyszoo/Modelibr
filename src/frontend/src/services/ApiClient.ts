@@ -264,6 +264,7 @@ class ApiClient {
     }>
   }> {
     const response = await this.client.get('/stages')
+    // Backend returns { stages: [...] } with lowercase from JSON serialization
     return response.data
   }
 

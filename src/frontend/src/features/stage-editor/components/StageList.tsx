@@ -27,7 +27,9 @@ function StageList() {
     try {
       setLoading(true)
       const response = await ApiClient.getAllStages()
-      setStages(response.stages || [])
+      // Handle both response formats
+      const stagesList = Array.isArray(response.stages) ? response.stages : []
+      setStages(stagesList)
     } catch (error) {
       console.error('Failed to load stages:', error)
       setStages([])
