@@ -5,17 +5,17 @@ import ApiClient from '../services/ApiClient'
 /**
  * Hook to provide cache refresh utilities.
  * Can be used to manually refresh cached data or integrate with SignalR for real-time updates.
- * 
+ *
  * @example
  * ```tsx
  * function MyComponent() {
  *   const { refreshModels, refreshAll } = useApiCache()
- *   
+ *
  *   // Manually refresh models when needed
  *   const handleRefresh = () => {
  *     refreshModels()
  *   }
- *   
+ *
  *   // Or refresh everything
  *   const handleRefreshAll = () => {
  *     refreshAll()
@@ -63,36 +63,28 @@ export function useApiCache() {
 /**
  * Hook to integrate cache invalidation with SignalR events.
  * This allows the cache to be automatically invalidated when SignalR messages indicate data changes.
- * 
+ *
  * @param connection - SignalR connection instance (optional)
- * 
+ *
  * @example
  * ```tsx
  * function App() {
- *   const [connection] = useState(() => 
+ *   const [connection] = useState(() =>
  *     new HubConnectionBuilder()
  *       .withUrl('/hub')
  *       .build()
  *   )
- *   
+ *
  *   useSignalRCacheInvalidation(connection)
- *   
+ *
  *   // Cache will automatically be invalidated when SignalR events are received
  * }
  * ```
  */
-export function useSignalRCacheInvalidation(
-  connection?: {
-    on: (
-      methodName: string,
-      callback: (...args: unknown[]) => void
-    ) => void
-    off: (
-      methodName: string,
-      callback?: (...args: unknown[]) => void
-    ) => void
-  }
-) {
+export function useSignalRCacheInvalidation(connection?: {
+  on: (methodName: string, callback: (...args: unknown[]) => void) => void
+  off: (methodName: string, callback?: (...args: unknown[]) => void) => void
+}) {
   const store = useApiCacheStore()
 
   useEffect(() => {
