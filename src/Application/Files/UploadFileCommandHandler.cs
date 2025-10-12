@@ -54,20 +54,20 @@ namespace Application.Files
             // Persist the file to the database if it's new
             await _filePersistence.PersistAsync(fileEntity, cancellationToken);
 
-            // Track batch upload if batch information is provided
-            if (!string.IsNullOrWhiteSpace(command.BatchId) && !string.IsNullOrWhiteSpace(command.UploadType))
-            {
-                var batchUpload = BatchUpload.Create(
-                    command.BatchId,
-                    command.UploadType,
-                    fileEntity.Id,
-                    _dateTimeProvider.UtcNow,
-                    command.PackId,
-                    command.ModelId,
-                    command.TextureSetId);
-                
-                await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
-            }
+            // Always track batch upload - generate batch ID if not provided
+            var batchId = command.BatchId ?? Guid.NewGuid().ToString();
+            var uploadType = command.UploadType ?? "file"; // Default to "file" if not specified
+            
+            var batchUpload = BatchUpload.Create(
+                batchId,
+                uploadType,
+                fileEntity.Id,
+                _dateTimeProvider.UtcNow,
+                command.PackId,
+                command.ModelId,
+                command.TextureSetId);
+            
+            await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
 
             return Result.Success(new UploadFileCommandResponse(fileEntity.Id, alreadyExists));
         }

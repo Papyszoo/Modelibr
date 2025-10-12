@@ -89,7 +89,7 @@ public class BatchUpload
             throw new ArgumentException("Upload type cannot be null or empty.", nameof(uploadType));
         
         // Validate upload type
-        var validTypes = new[] { "pack", "model", "textureSet" };
+        var validTypes = new[] { "pack", "model", "textureSet", "file" };
         if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
         

@@ -65,18 +65,16 @@ namespace Application.Models
                 await _domainEventDispatcher.PublishAsync(existingModel.DomainEvents, cancellationToken);
                 existingModel.ClearDomainEvents();
                 
-                // Track batch upload if batch information is provided
-                if (!string.IsNullOrWhiteSpace(command.BatchId))
-                {
-                    var batchUpload = BatchUpload.Create(
-                        command.BatchId,
-                        "model",
-                        fileEntity.Id,
-                        _dateTimeProvider.UtcNow,
-                        modelId: existingModel.Id);
-                    
-                    await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
-                }
+                // Always track batch upload - generate batch ID if not provided
+                var batchId = command.BatchId ?? Guid.NewGuid().ToString();
+                var batchUpload = BatchUpload.Create(
+                    batchId,
+                    "model",
+                    fileEntity.Id,
+                    _dateTimeProvider.UtcNow,
+                    modelId: existingModel.Id);
+                
+                await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 
                 return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
             }
@@ -102,18 +100,16 @@ namespace Application.Models
                 await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);
                 savedModel.ClearDomainEvents();
                 
-                // Track batch upload if batch information is provided
-                if (!string.IsNullOrWhiteSpace(command.BatchId))
-                {
-                    var batchUpload = BatchUpload.Create(
-                        command.BatchId,
-                        "model",
-                        fileEntity.Id,
-                        _dateTimeProvider.UtcNow,
-                        modelId: savedModel.Id);
-                    
-                    await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
-                }
+                // Always track batch upload - generate batch ID if not provided
+                var batchId = command.BatchId ?? Guid.NewGuid().ToString();
+                var batchUpload = BatchUpload.Create(
+                    batchId,
+                    "model",
+                    fileEntity.Id,
+                    _dateTimeProvider.UtcNow,
+                    modelId: savedModel.Id);
+                
+                await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 
                 return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
             }
