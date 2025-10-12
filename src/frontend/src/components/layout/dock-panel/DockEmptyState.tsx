@@ -1,11 +1,11 @@
 import { useRef } from 'react'
 import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
 import { Tab } from '../../../types'
+import { useDockContext } from '../../../contexts/DockContext'
+import { useTabMenuItems } from '../../../hooks/useTabMenuItems'
 
 interface DockEmptyStateProps {
   onAddTab: (type: Tab['type'], title: string) => void
-  recentlyClosedTabs: Tab[]
   onReopenTab: (tab: Tab) => void
   onDrop: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
@@ -15,7 +15,6 @@ interface DockEmptyStateProps {
 
 export default function DockEmptyState({
   onAddTab,
-  recentlyClosedTabs,
   onReopenTab,
   onDrop,
   onDragOver,
@@ -23,47 +22,13 @@ export default function DockEmptyState({
   onDragLeave,
 }: DockEmptyStateProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
+  const { recentlyClosedTabs } = useDockContext()
 
-  // Menu items for adding new tabs (same as DockBar)
-  const addMenuItems: MenuItem[] = [
-    {
-      label: 'Models List',
-      icon: 'pi pi-list',
-      command: () => onAddTab('modelList', 'Models'),
-    },
-    {
-      label: 'Texture Sets',
-      icon: 'pi pi-folder',
-      command: () => onAddTab('textureSets', 'Texture Sets'),
-    },
-    {
-      label: 'Packs',
-      icon: 'pi pi-inbox',
-      command: () => onAddTab('packs', 'Packs'),
-    },
-    {
-      separator: true,
-    },
-    {
-      label: 'Settings',
-      icon: 'pi pi-cog',
-      command: () => onAddTab('settings', 'Settings'),
-    },
-  ]
-
-  // Add recently closed tabs to menu if any exist
-  if (recentlyClosedTabs.length > 0) {
-    addMenuItems.push(
-      {
-        separator: true,
-      },
-      ...recentlyClosedTabs.map(tab => ({
-        label: `Reopen: ${tab.label || tab.type}`,
-        icon: 'pi pi-history',
-        command: () => onReopenTab(tab),
-      }))
-    )
-  }
+  const addMenuItems = useTabMenuItems({
+    onAddTab,
+    recentlyClosedTabs,
+    onReopenTab,
+  })
 
   const handleEmptyAreaContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
