@@ -57,7 +57,7 @@ export default function PackList() {
         name: newPackName.trim(),
         description: newPackDescription.trim() || undefined,
       })
-      
+
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -110,7 +110,7 @@ export default function PackList() {
   return (
     <div className="pack-list">
       <Toast ref={toast} />
-      
+
       <div className="pack-list-header">
         <h2>Packs</h2>
         <Button
@@ -160,11 +160,17 @@ export default function PackList() {
                 <div className="pack-grid-card-content">
                   <h3 className="pack-grid-card-title">{pack.name}</h3>
                   {pack.description && (
-                    <p className="pack-grid-card-description">{pack.description}</p>
+                    <p className="pack-grid-card-description">
+                      {pack.description}
+                    </p>
                   )}
                   <div className="pack-grid-card-stats">
-                    <span><i className="pi pi-cube" /> {pack.modelCount}</span>
-                    <span><i className="pi pi-palette" /> {pack.textureSetCount}</span>
+                    <span>
+                      <i className="pi pi-cube" /> {pack.modelCount}
+                    </span>
+                    <span>
+                      <i className="pi pi-palette" /> {pack.textureSetCount}
+                    </span>
                   </div>
                 </div>
                 <div className="pack-grid-card-actions">
@@ -172,7 +178,7 @@ export default function PackList() {
                     icon="pi pi-trash"
                     className="p-button-text p-button-rounded p-button-danger p-button-sm"
                     tooltip="Delete Pack"
-                    onClick={(e) => {
+                    onClick={e => {
                       e.stopPropagation()
                       handleDeletePack(pack.id)
                     }}
@@ -220,7 +226,7 @@ export default function PackList() {
             <InputText
               id="pack-name"
               value={newPackName}
-              onChange={(e) => setNewPackName(e.target.value)}
+              onChange={e => setNewPackName(e.target.value)}
               placeholder="Enter pack name"
             />
           </div>
@@ -229,7 +235,7 @@ export default function PackList() {
             <InputTextarea
               id="pack-description"
               value={newPackDescription}
-              onChange={(e) => setNewPackDescription(e.target.value)}
+              onChange={e => setNewPackDescription(e.target.value)}
               rows={3}
               placeholder="Enter pack description (optional)"
             />

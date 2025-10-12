@@ -31,16 +31,21 @@ export default function PackViewer({ packId }: PackViewerProps) {
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [textureSetSearchQuery, setTextureSetSearchQuery] = useState('')
   const [selectedModelIds, setSelectedModelIds] = useState<number[]>([])
-  const [selectedTextureSetIds, setSelectedTextureSetIds] = useState<number[]>([])
+  const [selectedTextureSetIds, setSelectedTextureSetIds] = useState<number[]>(
+    []
+  )
   const [uploadingModel, setUploadingModel] = useState(false)
   const [uploadingTextureSet, setUploadingTextureSet] = useState(false)
   const toast = useRef<Toast>(null)
   const modelContextMenu = useRef<ContextMenu>(null)
   const textureSetContextMenu = useRef<ContextMenu>(null)
   const [selectedModel, setSelectedModel] = useState<Model | null>(null)
-  const [selectedTextureSet, setSelectedTextureSet] = useState<TextureSetDto | null>(null)
+  const [selectedTextureSet, setSelectedTextureSet] =
+    useState<TextureSetDto | null>(null)
   const { openModelDetailsTab, openTextureSetDetailsTab } = useTabContext()
-  const { uploadFile: uploadTextureFile } = useGenericFileUpload({ fileType: 'texture' })
+  const { uploadFile: uploadTextureFile } = useGenericFileUpload({
+    fileType: 'texture',
+  })
   const { uploadModel: uploadModelFile } = useModelUpload()
 
   useEffect(() => {
@@ -155,10 +160,12 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
   const handleAddModels = async () => {
     if (selectedModelIds.length === 0) return
-    
+
     try {
       await Promise.all(
-        selectedModelIds.map(modelId => ApiClient.addModelToPack(packId, modelId))
+        selectedModelIds.map(modelId =>
+          ApiClient.addModelToPack(packId, modelId)
+        )
       )
       toast.current?.show({
         severity: 'success',
@@ -183,10 +190,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
   const handleAddTextureSets = async () => {
     if (selectedTextureSetIds.length === 0) return
-    
+
     try {
       await Promise.all(
-        selectedTextureSetIds.map(textureSetId => 
+        selectedTextureSetIds.map(textureSetId =>
           ApiClient.addTextureSetToPack(packId, textureSetId)
         )
       )
@@ -213,12 +220,12 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
   const handleModelUpload = async (files: File[]) => {
     if (files.length === 0) return
-    
+
     try {
       setUploadingModel(true)
-      
+
       // Upload all files and add them to pack
-      const uploadPromises = files.map(async (file) => {
+      const uploadPromises = files.map(async file => {
         const response = await uploadModelFile(file)
         await ApiClient.addModelToPack(packId, response.id)
         // Trigger thumbnail generation if not already exists
@@ -231,9 +238,9 @@ export default function PackViewer({ packId }: PackViewerProps) {
         }
         return response
       })
-      
+
       await Promise.all(uploadPromises)
-      
+
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -257,28 +264,28 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
   const handleTextureUpload = async (files: File[]) => {
     if (files.length === 0) return
-    
+
     try {
       setUploadingTextureSet(true)
-      
+
       // Upload all texture files and create texture sets
-      const uploadPromises = files.map(async (file) => {
+      const uploadPromises = files.map(async file => {
         const fileResponse = await uploadTextureFile(file)
-        
+
         const setName = file.name.replace(/\.[^/.]+$/, '')
         const setResponse = await ApiClient.createTextureSet({ name: setName })
-        
+
         await ApiClient.addTextureToSetEndpoint(setResponse.id, {
           fileId: fileResponse.fileId,
-          textureType: TextureType.Albedo
+          textureType: TextureType.Albedo,
         })
-        
+
         await ApiClient.addTextureSetToPack(packId, setResponse.id)
         return setResponse
       })
-      
+
       await Promise.all(uploadPromises)
-      
+
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -386,12 +393,17 @@ export default function PackViewer({ packId }: PackViewerProps) {
     <div className="pack-viewer">
       <Toast ref={toast} />
       <ContextMenu model={modelContextMenuItems} ref={modelContextMenu} />
-      <ContextMenu model={textureSetContextMenuItems} ref={textureSetContextMenu} />
-      
+      <ContextMenu
+        model={textureSetContextMenuItems}
+        ref={textureSetContextMenu}
+      />
+
       <div className="pack-header">
         <div>
           <h2>{pack.name}</h2>
-          {pack.description && <p className="pack-description">{pack.description}</p>}
+          {pack.description && (
+            <p className="pack-description">{pack.description}</p>
+          )}
         </div>
         <div className="pack-stats">
           <span>{pack.modelCount} models</span>
@@ -403,7 +415,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
         {/* Models Section */}
         <div className="pack-section">
           <h3>Models</h3>
-          
+
           <UploadableGrid
             onFilesDropped={handleModelDrop}
             isUploading={uploadingModel}
@@ -416,7 +428,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
                   key={model.id}
                   className="pack-card"
                   onClick={() => openModelDetailsTab(model)}
-                  onContextMenu={(e) => {
+                  onContextMenu={e => {
                     e.preventDefault()
                     setSelectedModel(model)
                     modelContextMenu.current?.show(e)
@@ -425,7 +437,9 @@ export default function PackViewer({ packId }: PackViewerProps) {
                   <div className="pack-card-thumbnail">
                     <ThumbnailDisplay modelId={model.id} />
                     <div className="pack-card-overlay">
-                      <span className="pack-card-name">{getModelName(model)}</span>
+                      <span className="pack-card-name">
+                        {getModelName(model)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -452,7 +466,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
         {/* Texture Sets Section */}
         <div className="pack-section">
           <h3>Texture Sets</h3>
-          
+
           <UploadableGrid
             onFilesDropped={handleTextureDrop}
             isUploading={uploadingTextureSet}
@@ -467,7 +481,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
                     key={textureSet.id}
                     className="pack-card"
                     onClick={() => openTextureSetDetailsTab(textureSet)}
-                    onContextMenu={(e) => {
+                    onContextMenu={e => {
                       e.preventDefault()
                       setSelectedTextureSet(textureSet)
                       textureSetContextMenu.current?.show(e)
@@ -487,7 +501,9 @@ export default function PackViewer({ packId }: PackViewerProps) {
                         </div>
                       )}
                       <div className="pack-card-overlay">
-                        <span className="pack-card-name">{textureSet.name}</span>
+                        <span className="pack-card-name">
+                          {textureSet.name}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -564,12 +580,17 @@ export default function PackViewer({ packId }: PackViewerProps) {
                   onClick={() => toggleModelSelection(model.id)}
                 >
                   <div className="pack-card-checkbox">
-                    <Checkbox checked={isSelected} onChange={() => toggleModelSelection(model.id)} />
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={() => toggleModelSelection(model.id)}
+                    />
                   </div>
                   <div className="pack-card-thumbnail">
                     <ThumbnailDisplay modelId={model.id} />
                     <div className="pack-card-overlay">
-                      <span className="pack-card-name">{getModelName(model)}</span>
+                      <span className="pack-card-name">
+                        {getModelName(model)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -637,7 +658,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
                   onClick={() => toggleTextureSetSelection(textureSet.id)}
                 >
                   <div className="pack-card-checkbox">
-                    <Checkbox checked={isSelected} onChange={() => toggleTextureSetSelection(textureSet.id)} />
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={() => toggleTextureSetSelection(textureSet.id)}
+                    />
                   </div>
                   <div className="pack-card-thumbnail">
                     {albedoUrl ? (

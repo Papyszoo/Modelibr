@@ -27,18 +27,13 @@ export default function UploadableGrid({
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     // Check if we're actually leaving the container (not just entering a child)
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX
     const y = e.clientY
-    
-    if (
-      x < rect.left ||
-      x >= rect.right ||
-      y < rect.top ||
-      y >= rect.bottom
-    ) {
+
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
       setIsDragging(false)
     }
   }

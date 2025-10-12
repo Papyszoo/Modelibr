@@ -29,15 +29,9 @@ export function useFileUpload(options = {}) {
 
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  
-  // Get upload progress context (may be undefined if not wrapped in provider)
-  let uploadProgressContext
-  try {
-    uploadProgressContext = useGlobalProgress ? useUploadProgress() : null
-  } catch (error) {
-    // If context is not available, continue without it
-    uploadProgressContext = null
-  }
+
+  // Always call the hook unconditionally, but only use it if enabled
+  const uploadProgressContext = useUploadProgress()
 
   /**
    * Upload a single file
@@ -58,12 +52,12 @@ export function useFileUpload(options = {}) {
         `File ${file.name} is not a supported 3D model format`
       )
       error.type = 'UNSUPPORTED_FORMAT'
-      
-      // Update global progress if available
-      if (uploadId && uploadProgressContext) {
+
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.failUpload(uploadId, error)
       }
-      
+
       throw error
     }
 
@@ -73,36 +67,36 @@ export function useFileUpload(options = {}) {
         `File ${file.name} (${fileExtension.toUpperCase()}) is supported but not renderable in 3D viewer. Use the upload page for this file type.`
       )
       error.type = 'NON_RENDERABLE'
-      
-      // Update global progress if available
-      if (uploadId && uploadProgressContext) {
+
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.failUpload(uploadId, error)
       }
-      
+
       throw error
     }
 
     try {
-      // Update global progress if available
-      if (uploadId && uploadProgressContext) {
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.updateUploadProgress(uploadId, 50)
       }
-      
+
       const result = await ApiClient.uploadModel(file)
 
-      // Update global progress if available
-      if (uploadId && uploadProgressContext) {
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.updateUploadProgress(uploadId, 100)
         uploadProgressContext.completeUpload(uploadId, result)
       }
 
       return result
     } catch (error) {
-      // Update global progress if available
-      if (uploadId && uploadProgressContext) {
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.failUpload(uploadId, error)
       }
-      
+
       if (!error.type) {
         error.type = 'NETWORK_ERROR'
       }
@@ -133,11 +127,12 @@ export function useFileUpload(options = {}) {
     try {
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i]
-        
-        // Add to global progress tracker if available
-        const uploadId = uploadProgressContext
-          ? uploadProgressContext.addUpload(file, fileType)
-          : null
+
+        // Add to global progress tracker if enabled and available
+        const uploadId =
+          useGlobalProgress && uploadProgressContext
+            ? uploadProgressContext.addUpload(file, fileType)
+            : null
 
         try {
           const result = await uploadSingleFile(file, uploadId)
@@ -217,10 +212,11 @@ export function useFileUpload(options = {}) {
     setUploading(true)
     setUploadProgress(0)
 
-    // Add to global progress tracker if available
-    const uploadId = uploadProgressContext
-      ? uploadProgressContext.addUpload(file, fileType)
-      : null
+    // Add to global progress tracker if enabled and available
+    const uploadId =
+      useGlobalProgress && uploadProgressContext
+        ? uploadProgressContext.addUpload(file, fileType)
+        : null
 
     try {
       setUploadProgress(50)

@@ -31,7 +31,8 @@ export default function TextureSetGrid({
 }: TextureSetGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [packs, setPacks] = useState<PackDto[]>([])
-  const [selectedTextureSet, setSelectedTextureSet] = useState<TextureSetDto | null>(null)
+  const [selectedTextureSet, setSelectedTextureSet] =
+    useState<TextureSetDto | null>(null)
   const [showPackDialog, setShowPackDialog] = useState(false)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
@@ -51,7 +52,7 @@ export default function TextureSetGrid({
 
   const handleAddToPack = async (packId: number) => {
     if (!selectedTextureSet) return
-    
+
     try {
       await ApiClient.addTextureSetToPack(packId, selectedTextureSet.id)
       toast.current?.show({
@@ -144,7 +145,7 @@ export default function TextureSetGrid({
     >
       <Toast ref={toast} />
       <ContextMenu model={contextMenuItems} ref={contextMenu} />
-      
+
       {/* Search and filter bar */}
       <div className="texture-set-grid-controls">
         <div className="search-bar">
@@ -172,7 +173,7 @@ export default function TextureSetGrid({
               key={textureSet.id}
               className="texture-set-card"
               onClick={() => onTextureSetSelect(textureSet)}
-              onContextMenu={(e) => {
+              onContextMenu={e => {
                 e.preventDefault()
                 setSelectedTextureSet(textureSet)
                 contextMenu.current?.show(e)
@@ -215,7 +216,7 @@ export default function TextureSetGrid({
           <p>No texture sets found matching "{searchQuery}"</p>
         </div>
       )}
-      
+
       {/* Add to Pack Dialog */}
       <Dialog
         header="Add to Pack"
@@ -236,7 +237,9 @@ export default function TextureSetGrid({
                 <div className="pack-item-content">
                   <span className="pack-item-name">{pack.name}</span>
                   {pack.description && (
-                    <span className="pack-item-description">{pack.description}</span>
+                    <span className="pack-item-description">
+                      {pack.description}
+                    </span>
                   )}
                 </div>
                 <i className="pi pi-chevron-right" />

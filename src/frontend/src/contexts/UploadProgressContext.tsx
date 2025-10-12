@@ -75,7 +75,9 @@ export const UploadProgressProvider = ({
   const failUpload = useCallback((id: string, error: Error) => {
     setUploads(prev =>
       prev.map(upload =>
-        upload.id === id ? { ...upload, status: 'error' as const, error } : upload
+        upload.id === id
+          ? { ...upload, status: 'error' as const, error }
+          : upload
       )
     )
   }, [])
@@ -86,7 +88,9 @@ export const UploadProgressProvider = ({
 
   const clearCompleted = useCallback(() => {
     setUploads(prev =>
-      prev.filter(upload => upload.status !== 'completed' && upload.status !== 'error')
+      prev.filter(
+        upload => upload.status !== 'completed' && upload.status !== 'error'
+      )
     )
   }, [])
 
