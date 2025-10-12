@@ -1,41 +1,23 @@
 # Dockerfile for the thumbnail worker service using Puppeteer
+# Single-stage build to ensure TensorFlow native bindings work correctly
 
-# Build stage - install dependencies
-FROM node:20-bookworm-slim AS builder
+FROM node:20-bookworm-slim
 
-# Install build dependencies and CA certificates
-# python3, make, g++ are required for building native node modules like @tensorflow/tfjs-node
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates wget git \
-    python3 make g++ \
-  && update-ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy package files and .npmrc
-COPY package*.json .npmrc ./
-
-# Install dependencies
-# Puppeteer download is skipped via .npmrc
-# TensorFlow native bindings will be downloaded and built during npm install
-RUN npm config set fetch-timeout 600000 && \
-    npm config set fetch-retries 3 && \
-    PUPPETEER_SKIP_DOWNLOAD=true npm install --production
-
-# Runtime stage - only copy what's needed
-FROM node:20-bookworm-slim AS runtime
-
-# Install runtime dependencies for Puppeteer and TensorFlow
-# Puppeteer requires these dependencies for headless Chrome
-# TensorFlow.js-node requires C++ runtime libraries
-# Based on https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux
+# Install all dependencies including build tools and runtime libraries
+# Build tools: python3, make, g++ for compiling native modules
+# Runtime libraries: for running TensorFlow and Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     gnupg \
-    # C++ runtime libraries for TensorFlow.js native bindings
+    git \
+    # Build tools for native modules
+    python3 \
+    make \
+    g++ \
+    # C++ runtime libraries for TensorFlow.js native bindings  
     libstdc++6 \
+    libgomp1 \
     # Dependencies for Chromium
     chromium \
     chromium-driver \
@@ -75,11 +57,14 @@ ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Copy node_modules from builder stage
-COPY --from=builder /app/node_modules ./node_modules
+# Copy package files and .npmrc
+COPY package*.json .npmrc ./
 
-# Copy package files
-COPY package*.json ./
+# Install dependencies with increased timeout for TensorFlow download
+# TensorFlow native bindings will be downloaded and built during npm install
+RUN npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 3 && \
+    PUPPETEER_SKIP_DOWNLOAD=true npm install --production
 
 # Copy application code
 COPY . .
