@@ -3,6 +3,7 @@ import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
 import { useUploadProgress } from '../../hooks/useUploadProgress'
 import FloatingWindow from '../../components/FloatingWindow'
+import { openTabInPanel } from '../../utils/tabNavigation'
 import './UploadProgressWindow.css'
 
 // Utility function to get file extension
@@ -20,8 +21,8 @@ const formatFileSize = (bytes: number): string => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
-// Map file extensions to PrimeIcons
-const getExtensionIcon = (extension: string): string => {
+// Map file extensions to PrimeIcons with extension name display
+const getExtensionIcon = (extension: string): { icon: string; name: string } => {
   const iconMap: Record<string, string> = {
     // Images
     jpg: 'pi-image',
@@ -50,7 +51,10 @@ const getExtensionIcon = (extension: string): string => {
     '7z': 'pi-folder',
     // Default
   }
-  return iconMap[extension] || 'pi-file'
+  return {
+    icon: iconMap[extension] || 'pi-file',
+    name: extension.toUpperCase(),
+  }
 }
 
 // Map file type to icon
@@ -64,8 +68,15 @@ const getFileTypeIcon = (fileType: 'model' | 'texture' | 'file'): string => {
 }
 
 export default function UploadProgressWindow() {
-  const { uploads, isVisible, hideWindow, removeUpload, clearCompleted } =
-    useUploadProgress()
+  const {
+    uploads,
+    batches,
+    isVisible,
+    hideWindow,
+    removeUpload,
+    clearCompleted,
+    toggleBatchCollapse,
+  } = useUploadProgress()
   const windowRef = useRef<HTMLDivElement>(null)
 
   // Calculate overall progress
@@ -81,6 +92,9 @@ export default function UploadProgressWindow() {
   const completedUploads = uploads.filter(u => u.status === 'completed')
   const failedUploads = uploads.filter(u => u.status === 'error')
 
+  // Group uploads without batches separately
+  const unbatchedUploads = uploads.filter(u => !u.batchId)
+
   const handleOpenInTab = (upload: (typeof uploads)[0]) => {
     if (upload.status !== 'completed' || !upload.result) return
 
@@ -89,30 +103,18 @@ export default function UploadProgressWindow() {
       if (upload.fileType === 'model' && upload.result) {
         const modelResult = upload.result as { id: number; name?: string }
         if (modelResult.id) {
-          // Navigate to the model details page using URL
-          // This works globally without needing TabContext
-          const url = new URL(window.location.href)
-          const currentLeftTabs = url.searchParams.get('leftTabs') || 'models'
-          const newTab = `model-${modelResult.id}:mv`
-
-          // Add the new tab to left panel if not already there
-          if (!currentLeftTabs.includes(newTab)) {
-            const newLeftTabs = currentLeftTabs + ',' + newTab
-            url.searchParams.set('leftTabs', newLeftTabs)
-          }
-
-          // Set as active tab
-          url.searchParams.set('activeLeft', `model-${modelResult.id}`)
-
-          // Navigate to the new URL
-          window.history.pushState({}, '', url.toString())
-          // Trigger a popstate event to update the UI
-          window.dispatchEvent(new PopStateEvent('popstate'))
+          openTabInPanel('modelViewer', 'left', modelResult.id.toString())
         }
       } else if (upload.fileType === 'texture') {
-        // For textures, we could open a texture viewer if available
-        // For now, just show a message
-        console.log('Texture uploaded:', upload.result)
+        // Check if result contains a texture set ID
+        const textureResult = upload.result as {
+          setId?: number
+          textureSetId?: number
+        }
+        const setId = textureResult.setId || textureResult.textureSetId
+        if (setId) {
+          openTabInPanel('textureSetViewer', 'left', setId.toString())
+        }
       }
     } catch (error) {
       console.error('Failed to open file in tab:', error)
@@ -141,6 +143,122 @@ export default function UploadProgressWindow() {
     }
   }, [activeUploads.length, uploads.length, failedUploads.length])
 
+  const renderUploadItem = (upload: (typeof uploads)[0]) => {
+    const extension = getFileExtension(upload.file.name)
+    const extensionInfo = getExtensionIcon(extension)
+    const typeIcon = getFileTypeIcon(upload.fileType)
+    const fileSize = formatFileSize(upload.file.size)
+
+    return (
+      <div
+        key={upload.id}
+        className={`upload-item upload-item-${upload.status}`}
+      >
+        <div className="upload-item-icons">
+          <div className="upload-item-ext-icon-container">
+            <i className={`pi ${extensionInfo.icon} upload-item-ext-icon`} />
+            <span className="upload-item-ext-name">{extensionInfo.name}</span>
+          </div>
+          <i className={`pi ${typeIcon} upload-item-type-icon`} />
+        </div>
+
+        <div className="upload-item-details">
+          <div className="upload-item-header">
+            <span className="upload-item-name" title={upload.file.name}>
+              {upload.file.name}
+            </span>
+            <span className="upload-item-size">{fileSize}</span>
+          </div>
+
+          {upload.status === 'error' ? (
+            <div className="upload-item-error">
+              <i className="pi pi-exclamation-triangle" />
+              <span>{upload.error?.message || 'Upload failed'}</span>
+            </div>
+          ) : (
+            <ProgressBar
+              value={upload.progress}
+              className="upload-item-progress"
+              showValue={false}
+            />
+          )}
+        </div>
+
+        <div className="upload-item-actions">
+          {upload.status === 'completed' && (
+            <Button
+              icon="pi pi-external-link"
+              size="small"
+              text
+              rounded
+              title="Open in new tab"
+              onClick={() => handleOpenInTab(upload)}
+            />
+          )}
+          {(upload.status === 'completed' || upload.status === 'error') && (
+            <Button
+              icon="pi pi-times"
+              size="small"
+              text
+              rounded
+              severity="secondary"
+              title="Remove"
+              onClick={() => removeUpload(upload.id)}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const renderBatch = (batch: (typeof batches)[0]) => {
+    const batchProgress =
+      batch.files.length > 0
+        ? batch.files.reduce((sum, upload) => sum + upload.progress, 0) /
+          batch.files.length
+        : 0
+
+    const batchActiveUploads = batch.files.filter(
+      u => u.status === 'uploading' || u.status === 'pending'
+    )
+    const batchCompleted = batch.files.filter(u => u.status === 'completed')
+    const batchFailed = batch.files.filter(u => u.status === 'error')
+
+    return (
+      <div key={batch.id} className="upload-batch">
+        <div
+          className="upload-batch-header"
+          onClick={() => toggleBatchCollapse(batch.id)}
+        >
+          <div className="upload-batch-info">
+            <i
+              className={`pi ${batch.collapsed ? 'pi-chevron-right' : 'pi-chevron-down'} upload-batch-toggle`}
+            />
+            <span className="upload-batch-title">
+              Batch Upload - {batch.files.length} file
+              {batch.files.length > 1 ? 's' : ''}
+            </span>
+            <span className="upload-batch-status">
+              {batchActiveUploads.length > 0
+                ? `Uploading ${batchActiveUploads.length}...`
+                : `${batchCompleted.length} completed${batchFailed.length > 0 ? `, ${batchFailed.length} failed` : ''}`}
+            </span>
+          </div>
+          <ProgressBar
+            value={Math.round(batchProgress)}
+            className="upload-batch-progress"
+            showValue={false}
+          />
+        </div>
+        {!batch.collapsed && (
+          <div className="upload-batch-items">
+            {batch.files.map(upload => renderUploadItem(upload))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (!isVisible || uploads.length === 0) return null
 
   return (
@@ -148,7 +266,7 @@ export default function UploadProgressWindow() {
       visible={isVisible}
       onClose={hideWindow}
       title="File Uploads"
-      side="left"
+      side="none"
       windowId="upload-progress-window"
     >
       <div ref={windowRef} className="upload-progress-window">
@@ -178,72 +296,11 @@ export default function UploadProgressWindow() {
 
         {/* Upload Items List */}
         <div className="upload-items-list">
-          {uploads.map(upload => {
-            const extension = getFileExtension(upload.file.name)
-            const extensionIcon = getExtensionIcon(extension)
-            const typeIcon = getFileTypeIcon(upload.fileType)
-            const fileSize = formatFileSize(upload.file.size)
+          {/* Render batches */}
+          {batches.map(batch => renderBatch(batch))}
 
-            return (
-              <div
-                key={upload.id}
-                className={`upload-item upload-item-${upload.status}`}
-              >
-                <div className="upload-item-icons">
-                  <i className={`pi ${extensionIcon} upload-item-ext-icon`} />
-                  <i className={`pi ${typeIcon} upload-item-type-icon`} />
-                </div>
-
-                <div className="upload-item-details">
-                  <div className="upload-item-header">
-                    <span className="upload-item-name" title={upload.file.name}>
-                      {upload.file.name}
-                    </span>
-                    <span className="upload-item-size">{fileSize}</span>
-                  </div>
-
-                  {upload.status === 'error' ? (
-                    <div className="upload-item-error">
-                      <i className="pi pi-exclamation-triangle" />
-                      <span>{upload.error?.message || 'Upload failed'}</span>
-                    </div>
-                  ) : (
-                    <ProgressBar
-                      value={upload.progress}
-                      className="upload-item-progress"
-                      showValue={false}
-                    />
-                  )}
-                </div>
-
-                <div className="upload-item-actions">
-                  {upload.status === 'completed' &&
-                    upload.fileType === 'model' && (
-                      <Button
-                        icon="pi pi-external-link"
-                        size="small"
-                        text
-                        rounded
-                        title="Open in new tab"
-                        onClick={() => handleOpenInTab(upload)}
-                      />
-                    )}
-                  {(upload.status === 'completed' ||
-                    upload.status === 'error') && (
-                    <Button
-                      icon="pi pi-times"
-                      size="small"
-                      text
-                      rounded
-                      severity="secondary"
-                      title="Remove"
-                      onClick={() => removeUpload(upload.id)}
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          })}
+          {/* Render unbatched uploads */}
+          {unbatchedUploads.map(upload => renderUploadItem(upload))}
         </div>
       </div>
     </FloatingWindow>

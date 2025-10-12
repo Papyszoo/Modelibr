@@ -36,6 +36,63 @@
   overflow-y: auto;
 }
 
+/* Batch Styles */
+.upload-batch {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.upload-batch-header {
+  padding: 0.75rem;
+  background: #f9fafb;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.upload-batch-header:hover {
+  background: #f3f4f6;
+}
+
+.upload-batch-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.upload-batch-toggle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  transition: transform 0.2s;
+}
+
+.upload-batch-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.upload-batch-status {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-left: auto;
+}
+
+.upload-batch-progress {
+  height: 0.375rem;
+}
+
+.upload-batch-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: white;
+}
+
+/* Upload Item Styles */
 .upload-item {
   display: flex;
   align-items: flex-start;
@@ -71,12 +128,26 @@
   flex-direction: column;
   gap: 0.25rem;
   align-items: center;
-  min-width: 36px;
+  min-width: 48px;
+}
+
+.upload-item-ext-icon-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
 }
 
 .upload-item-ext-icon {
   font-size: 1.25rem;
   color: #6b7280;
+}
+
+.upload-item-ext-name {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .upload-item-type-icon {

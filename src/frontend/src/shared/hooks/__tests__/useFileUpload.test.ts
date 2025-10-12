@@ -19,8 +19,9 @@ jest.mock('../../../utils/fileUtils', () => ({
 jest.mock('../../../stores/uploadProgressStore', () => ({
   useUploadProgressStore: () => ({
     uploads: [],
+    batches: [],
     isVisible: false,
-    addUpload: jest.fn((file, fileType) => `upload-${Date.now()}`),
+    addUpload: jest.fn((file, fileType, batchId) => `upload-${Date.now()}`),
     updateUploadProgress: jest.fn(),
     completeUpload: jest.fn(),
     failUpload: jest.fn(),
@@ -28,6 +29,8 @@ jest.mock('../../../stores/uploadProgressStore', () => ({
     clearCompleted: jest.fn(),
     showWindow: jest.fn(),
     hideWindow: jest.fn(),
+    createBatch: jest.fn(() => `batch-${Date.now()}`),
+    toggleBatchCollapse: jest.fn(),
   }),
 }))
 

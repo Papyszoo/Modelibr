@@ -70,18 +70,46 @@ export function useGenericFileUpload(options = {}) {
       const fileArray = Array.from(files)
       const results = []
 
+      // Create batch for multiple files
+      const batchId =
+        uploadProgressContext && fileArray.length > 1
+          ? uploadProgressContext.createBatch()
+          : undefined
+
       for (const file of fileArray) {
         try {
-          const result = await uploadFile(file)
+          // Modify uploadFile to accept batchId
+          const uploadId = uploadProgressContext
+            ? uploadProgressContext.addUpload(file, fileType, batchId)
+            : null
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 50)
+          }
+
+          const result = await ApiClient.uploadFile(file)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, result)
+          }
+
           results.push({ file, result, success: true })
         } catch (error) {
+          if (uploadProgressContext) {
+            // Find the upload by file and mark as failed
+            const upload = uploadProgressContext.uploads?.find(u => u.file === file)
+            if (upload) {
+              uploadProgressContext.failUpload(upload.id, error)
+            }
+          }
           results.push({ file, error, success: false })
         }
       }
 
       return results
     },
-    [uploadFile]
+    [fileType, uploadProgressContext]
   )
 
   return {
