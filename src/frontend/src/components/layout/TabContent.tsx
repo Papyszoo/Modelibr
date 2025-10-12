@@ -48,7 +48,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
         return <StageList />
 
       case 'stageEditor':
-        return <StageEditor />
+        return <StageEditor stageId={tab.stageId} />
 
       case 'settings':
         return <Settings />

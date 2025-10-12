@@ -28,12 +28,18 @@ export interface StageConfig {
   lights: StageLight[]
 }
 
-function StageEditor(): JSX.Element {
+interface StageEditorProps {
+  stageId?: string
+}
+
+function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   const [stageConfig, setStageConfig] = useState<StageConfig>({
     lights: [],
   })
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
-  const [currentStageId, setCurrentStageId] = useState<number | null>(null)
+  const [currentStageId, setCurrentStageId] = useState<number | null>(
+    stageId ? parseInt(stageId, 10) : null
+  )
   const [stageName, setStageName] = useState<string>('Untitled Stage')
   const [saveDialogVisible, setSaveDialogVisible] = useState(false)
   const [loadDialogVisible, setLoadDialogVisible] = useState(false)
@@ -46,11 +52,50 @@ function StageEditor(): JSX.Element {
     }>
   >([])
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const toast = useRef<Toast>(null)
 
   useEffect(() => {
     loadSavedStages()
   }, [])
+
+  useEffect(() => {
+    if (stageId) {
+      loadStageById(parseInt(stageId, 10))
+    }
+  }, [stageId])
+
+  const loadStageById = async (id: number) => {
+    try {
+      setIsLoading(true)
+      const stage = await apiClient.getStageById(id.toString())
+      setStageName(stage.name)
+      setCurrentStageId(stage.id)
+      
+      try {
+        const config = JSON.parse(stage.configurationJson)
+        setStageConfig(config)
+      } catch (parseError) {
+        console.error('Failed to parse stage configuration:', parseError)
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Warning',
+          detail: 'Stage configuration could not be loaded. Starting with empty stage.',
+          life: 3000,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load stage:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load stage',
+        life: 3000,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const loadSavedStages = async () => {
     try {
@@ -208,6 +253,18 @@ function StageEditor(): JSX.Element {
   const selectedObject = stageConfig.lights.find(
     light => light.id === selectedObjectId
   )
+
+  if (isLoading) {
+    return (
+      <div className="stage-editor-loading">
+        <Toast ref={toast} />
+        <div className="loading-message">
+          <i className="pi pi-spinner pi-spin" style={{ fontSize: '2rem' }} />
+          <p>Loading stage...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="stage-editor">
