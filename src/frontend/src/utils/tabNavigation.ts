@@ -1,4 +1,7 @@
-import { serializeToCompactFormat, parseCompactTabFormat } from './tabSerialization'
+import {
+  serializeToCompactFormat,
+  parseCompactTabFormat,
+} from './tabSerialization'
 import { Tab } from '../types'
 
 /**
@@ -18,12 +21,10 @@ export function openTabInPanel(
   const currentTabsStr = url.searchParams.get(tabsParam) || ''
   const currentTabs = parseCompactTabFormat(currentTabsStr, [])
 
-  // Create new tab spec
-  let newTabSpec = tabType
+  // Create new tab ID
   let newTabId = tabType
 
   if (id) {
-    newTabSpec = `${tabType}:${id}`
     if (tabType === 'modelViewer') {
       newTabId = `model-${id}`
     } else if (tabType === 'textureSetViewer') {
@@ -55,8 +56,12 @@ export function openTabInPanel(
   // Set as active tab
   url.searchParams.set(activeParam, newTabId)
 
+  // Build URL manually to avoid encoding issues
+  const params = new URLSearchParams(url.search)
+  const newUrl = `${url.origin}${url.pathname}?${params.toString()}`
+
   // Navigate to the new URL
-  window.history.pushState({}, '', url.toString())
+  window.history.pushState({}, '', newUrl)
   // Trigger a popstate event to update the UI
   window.dispatchEvent(new PopStateEvent('popstate'))
 }

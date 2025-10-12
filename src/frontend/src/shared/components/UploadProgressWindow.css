@@ -43,9 +43,16 @@
   overflow: hidden;
 }
 
-.upload-batch-header {
-  padding: 0.75rem;
+.upload-batch-header-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   background: #f9fafb;
+}
+
+.upload-batch-header {
+  flex: 1;
+  padding: 0.75rem;
   cursor: pointer;
   user-select: none;
   transition: background 0.2s;
@@ -53,6 +60,10 @@
 
 .upload-batch-header:hover {
   background: #f3f4f6;
+}
+
+.upload-batch-actions {
+  padding-right: 0.5rem;
 }
 
 .upload-batch-info {

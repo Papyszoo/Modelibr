@@ -138,7 +138,10 @@ function FloatingWindow({
 
         if (side === 'none') {
           // For 'none' side, allow movement anywhere on screen
-          newX = Math.max(0, Math.min(newX, window.innerWidth - windowElementWidth))
+          newX = Math.max(
+            0,
+            Math.min(newX, window.innerWidth - windowElementWidth)
+          )
         } else {
           // Restrict dragging based on actual panel widths from zustand store
           // Account for 60px tab bar on both left and right panels

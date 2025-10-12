@@ -22,7 +22,9 @@ const formatFileSize = (bytes: number): string => {
 }
 
 // Map file extensions to PrimeIcons with extension name display
-const getExtensionIcon = (extension: string): { icon: string; name: string } => {
+const getExtensionIcon = (
+  extension: string
+): { icon: string; name: string } => {
   const iconMap: Record<string, string> = {
     // Images
     jpg: 'pi-image',
@@ -129,6 +131,14 @@ export default function UploadProgressWindow() {
     }
   }
 
+  const handleRemoveBatch = (batchId: string) => {
+    // Get all upload IDs in this batch
+    const batch = batches.find(b => b.id === batchId)
+    if (batch) {
+      batch.files.forEach(upload => removeUpload(upload.id))
+    }
+  }
+
   // Auto-hide window when all uploads are done and some time has passed
   useEffect(() => {
     if (uploads.length > 0 && activeUploads.length === 0) {
@@ -148,6 +158,7 @@ export default function UploadProgressWindow() {
     const extensionInfo = getExtensionIcon(extension)
     const typeIcon = getFileTypeIcon(upload.fileType)
     const fileSize = formatFileSize(upload.file.size)
+    const isInBatch = !!upload.batchId
 
     return (
       <div
@@ -195,17 +206,19 @@ export default function UploadProgressWindow() {
               onClick={() => handleOpenInTab(upload)}
             />
           )}
-          {(upload.status === 'completed' || upload.status === 'error') && (
-            <Button
-              icon="pi pi-times"
-              size="small"
-              text
-              rounded
-              severity="secondary"
-              title="Remove"
-              onClick={() => removeUpload(upload.id)}
-            />
-          )}
+          {/* Only show remove button for files NOT in a batch */}
+          {!isInBatch &&
+            (upload.status === 'completed' || upload.status === 'error') && (
+              <Button
+                icon="pi pi-times"
+                size="small"
+                text
+                rounded
+                severity="secondary"
+                title="Remove"
+                onClick={() => removeUpload(upload.id)}
+              />
+            )}
         </div>
       </div>
     )
@@ -223,32 +236,53 @@ export default function UploadProgressWindow() {
     )
     const batchCompleted = batch.files.filter(u => u.status === 'completed')
     const batchFailed = batch.files.filter(u => u.status === 'error')
+    const canRemoveBatch =
+      batchActiveUploads.length === 0 &&
+      (batchCompleted.length > 0 || batchFailed.length > 0)
 
     return (
       <div key={batch.id} className="upload-batch">
-        <div
-          className="upload-batch-header"
-          onClick={() => toggleBatchCollapse(batch.id)}
-        >
-          <div className="upload-batch-info">
-            <i
-              className={`pi ${batch.collapsed ? 'pi-chevron-right' : 'pi-chevron-down'} upload-batch-toggle`}
+        <div className="upload-batch-header-wrapper">
+          <div
+            className="upload-batch-header"
+            onClick={() => toggleBatchCollapse(batch.id)}
+          >
+            <div className="upload-batch-info">
+              <i
+                className={`pi ${batch.collapsed ? 'pi-chevron-right' : 'pi-chevron-down'} upload-batch-toggle`}
+              />
+              <span className="upload-batch-title">
+                Batch Upload - {batch.files.length} file
+                {batch.files.length > 1 ? 's' : ''}
+              </span>
+              <span className="upload-batch-status">
+                {batchActiveUploads.length > 0
+                  ? `Uploading ${batchActiveUploads.length}...`
+                  : `${batchCompleted.length} completed${batchFailed.length > 0 ? `, ${batchFailed.length} failed` : ''}`}
+              </span>
+            </div>
+            <ProgressBar
+              value={Math.round(batchProgress)}
+              className="upload-batch-progress"
+              showValue={false}
             />
-            <span className="upload-batch-title">
-              Batch Upload - {batch.files.length} file
-              {batch.files.length > 1 ? 's' : ''}
-            </span>
-            <span className="upload-batch-status">
-              {batchActiveUploads.length > 0
-                ? `Uploading ${batchActiveUploads.length}...`
-                : `${batchCompleted.length} completed${batchFailed.length > 0 ? `, ${batchFailed.length} failed` : ''}`}
-            </span>
           </div>
-          <ProgressBar
-            value={Math.round(batchProgress)}
-            className="upload-batch-progress"
-            showValue={false}
-          />
+          {canRemoveBatch && (
+            <div className="upload-batch-actions">
+              <Button
+                icon="pi pi-times"
+                size="small"
+                text
+                rounded
+                severity="secondary"
+                title="Remove batch"
+                onClick={e => {
+                  e.stopPropagation()
+                  handleRemoveBatch(batch.id)
+                }}
+              />
+            </div>
+          )}
         </div>
         {!batch.collapsed && (
           <div className="upload-batch-items">
