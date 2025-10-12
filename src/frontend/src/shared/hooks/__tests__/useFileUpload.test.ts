@@ -15,6 +15,25 @@ jest.mock('../../../utils/fileUtils', () => ({
   isThreeJSRenderable: jest.fn(),
 }))
 
+// Mock uploadProgressStore
+jest.mock('../../../stores/uploadProgressStore', () => ({
+  useUploadProgressStore: () => ({
+    uploads: [],
+    batches: [],
+    isVisible: false,
+    addUpload: jest.fn((file, fileType, batchId) => `upload-${Date.now()}`),
+    updateUploadProgress: jest.fn(),
+    completeUpload: jest.fn(),
+    failUpload: jest.fn(),
+    removeUpload: jest.fn(),
+    clearCompleted: jest.fn(),
+    showWindow: jest.fn(),
+    hideWindow: jest.fn(),
+    createBatch: jest.fn(() => `batch-${Date.now()}`),
+    toggleBatchCollapse: jest.fn(),
+  }),
+}))
+
 import ApiClient from '../../../services/ApiClient'
 import {
   isSupportedModelFormat,

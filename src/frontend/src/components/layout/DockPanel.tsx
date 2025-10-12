@@ -95,7 +95,10 @@ function DockPanel({
       if (newTabs.length > 0) {
         // If there's a tab before the closed one, activate it
         // Otherwise, activate the tab that will be at the same index (which is the next tab)
-        const newActiveIndex = Math.min(closedTabIndex > 0 ? closedTabIndex - 1 : 0, newTabs.length - 1)
+        const newActiveIndex = Math.min(
+          closedTabIndex > 0 ? closedTabIndex - 1 : 0,
+          newTabs.length - 1
+        )
         setActiveTab(newTabs[newActiveIndex].id)
       } else {
         setActiveTab('')
