@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { ContextMenu } from 'primereact/contextmenu'
 import { Tab } from '../../../types'
 import { useDockContext } from '../../../contexts/DockContext'
@@ -22,7 +22,12 @@ export default function DockEmptyState({
   onDragLeave,
 }: DockEmptyStateProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
-  const { recentlyClosedTabs } = useDockContext()
+  const {
+    recentlyClosedTabs,
+    registerContextMenu,
+    unregisterContextMenu,
+    showContextMenu,
+  } = useDockContext()
 
   const addMenuItems = useTabMenuItems({
     onAddTab,
@@ -30,9 +35,21 @@ export default function DockEmptyState({
     onReopenTab,
   })
 
+  useEffect(() => {
+    if (contextMenuRef.current) {
+      registerContextMenu(contextMenuRef)
+    }
+    return () => {
+      if (contextMenuRef.current) {
+        unregisterContextMenu(contextMenuRef)
+      }
+    }
+  }, [registerContextMenu, unregisterContextMenu])
+
   const handleEmptyAreaContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
-    contextMenuRef.current?.show(e)
+    e.stopPropagation()
+    showContextMenu(contextMenuRef, e)
   }
 
   return (
@@ -54,6 +71,8 @@ export default function DockEmptyState({
         model={addMenuItems}
         ref={contextMenuRef}
         className="dock-add-menu"
+        appendTo="self"
+        autoZIndex
       />
     </div>
   )

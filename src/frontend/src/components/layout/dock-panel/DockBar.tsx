@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
 import DraggableTab from '../DraggableTab'
@@ -38,7 +38,12 @@ export default function DockBar({
   onDragLeave,
 }: DockBarProps) {
   const menuRef = useRef<ContextMenu>(null)
-  const { recentlyClosedTabs } = useDockContext()
+  const {
+    recentlyClosedTabs,
+    registerContextMenu,
+    unregisterContextMenu,
+    showContextMenu,
+  } = useDockContext()
 
   const addMenuItems = useTabMenuItems({
     onAddTab,
@@ -46,9 +51,21 @@ export default function DockBar({
     onReopenTab,
   })
 
+  useEffect(() => {
+    if (menuRef.current) {
+      registerContextMenu(menuRef)
+    }
+    return () => {
+      if (menuRef.current) {
+        unregisterContextMenu(menuRef)
+      }
+    }
+  }, [registerContextMenu, unregisterContextMenu])
+
   const handleBarContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
-    menuRef.current?.show(e)
+    e.stopPropagation()
+    showContextMenu(menuRef, e)
   }
 
   return (
@@ -87,6 +104,8 @@ export default function DockBar({
           model={addMenuItems}
           ref={menuRef}
           className="dock-add-menu"
+          appendTo="self"
+          autoZIndex
         />
       </div>
     </div>
