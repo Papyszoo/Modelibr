@@ -7,6 +7,7 @@ This file provides practical examples of how to use the API response caching in 
 The caching works automatically for all API GET requests. No code changes needed:
 
 ```tsx
+import { useState, useEffect } from 'react'
 import ApiClient from '../services/ApiClient'
 
 function ModelList() {
@@ -93,6 +94,10 @@ function ModelViewer({ modelId }: { modelId: string }) {
 Combine cache with loading states:
 
 ```tsx
+import { useState, useEffect } from 'react'
+import { useApiCacheStore } from '../stores/apiCacheStore'
+import ApiClient from '../services/ApiClient'
+
 function ModelList() {
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(true)
@@ -144,6 +149,8 @@ function Header() {
 When SignalR is implemented, use the hook for automatic invalidation:
 
 ```tsx
+import { useState } from 'react'
+import { HubConnectionBuilder } from '@microsoft/signalr'
 import { useSignalRCacheInvalidation } from '../hooks/useApiCache'
 
 function App() {
@@ -270,8 +277,13 @@ function CacheDebugger() {
 ### Check if data is cached:
 
 ```tsx
-const store = useApiCacheStore.getState()
+// Inside a component
+const store = useApiCacheStore()
 console.log('Models cached:', store.getModels())
+
+// Outside a component (e.g., dev tools, debugging)
+const state = useApiCacheStore.getState()
+console.log('Models cached:', state.getModels())
 ```
 
 ### Monitor cache hits/misses:
