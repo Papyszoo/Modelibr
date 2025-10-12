@@ -5,6 +5,8 @@ import { Tab } from '../../../types'
 
 interface DockEmptyStateProps {
   onAddTab: (type: Tab['type'], title: string) => void
+  recentlyClosedTabs: Tab[]
+  onReopenTab: (tab: Tab) => void
   onDrop: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
@@ -13,6 +15,8 @@ interface DockEmptyStateProps {
 
 export default function DockEmptyState({
   onAddTab,
+  recentlyClosedTabs,
+  onReopenTab,
   onDrop,
   onDragOver,
   onDragEnter,
@@ -20,6 +24,7 @@ export default function DockEmptyState({
 }: DockEmptyStateProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
 
+  // Menu items for adding new tabs (same as DockBar)
   const addMenuItems: MenuItem[] = [
     {
       label: 'Models List',
@@ -33,10 +38,32 @@ export default function DockEmptyState({
     },
     {
       label: 'Packs',
-      icon: 'pi pi-box',
+      icon: 'pi pi-inbox',
       command: () => onAddTab('packs', 'Packs'),
     },
+    {
+      separator: true,
+    },
+    {
+      label: 'Settings',
+      icon: 'pi pi-cog',
+      command: () => onAddTab('settings', 'Settings'),
+    },
   ]
+
+  // Add recently closed tabs to menu if any exist
+  if (recentlyClosedTabs.length > 0) {
+    addMenuItems.push(
+      {
+        separator: true,
+      },
+      ...recentlyClosedTabs.map(tab => ({
+        label: `Reopen: ${tab.label || tab.type}`,
+        icon: 'pi pi-history',
+        command: () => onReopenTab(tab),
+      }))
+    )
+  }
 
   const handleEmptyAreaContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
