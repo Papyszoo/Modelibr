@@ -1,7 +1,5 @@
 import { renderHook, act } from '@testing-library/react'
-import { ReactNode } from 'react'
 import { useFileUpload, useDragAndDrop } from '../useFileUpload'
-import { UploadProgressProvider } from '../../../contexts/UploadProgressContext'
 
 // Mock ApiClient
 jest.mock('../../../services/ApiClient', () => ({
@@ -17,6 +15,22 @@ jest.mock('../../../utils/fileUtils', () => ({
   isThreeJSRenderable: jest.fn(),
 }))
 
+// Mock uploadProgressStore
+jest.mock('../../../stores/uploadProgressStore', () => ({
+  useUploadProgressStore: () => ({
+    uploads: [],
+    isVisible: false,
+    addUpload: jest.fn((file, fileType) => `upload-${Date.now()}`),
+    updateUploadProgress: jest.fn(),
+    completeUpload: jest.fn(),
+    failUpload: jest.fn(),
+    removeUpload: jest.fn(),
+    clearCompleted: jest.fn(),
+    showWindow: jest.fn(),
+    hideWindow: jest.fn(),
+  }),
+}))
+
 import ApiClient from '../../../services/ApiClient'
 import {
   isSupportedModelFormat,
@@ -30,11 +44,6 @@ const mockIsThreeJSRenderable = isThreeJSRenderable as jest.MockedFunction<
   typeof isThreeJSRenderable
 >
 
-// Wrapper component to provide upload progress context
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <UploadProgressProvider>{children}</UploadProgressProvider>
-)
-
 describe('useFileUpload', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -44,7 +53,7 @@ describe('useFileUpload', () => {
 
   describe('uploadMultipleFiles', () => {
     it('should handle empty file list gracefully', async () => {
-      const { result } = renderHook(() => useFileUpload(), { wrapper })
+      const { result } = renderHook(() => useFileUpload())
 
       const uploadResult = await act(async () => {
         return result.current.uploadMultipleFiles([])
@@ -56,7 +65,7 @@ describe('useFileUpload', () => {
     })
 
     it('should handle null file list gracefully', async () => {
-      const { result } = renderHook(() => useFileUpload(), { wrapper })
+      const { result } = renderHook(() => useFileUpload())
 
       const uploadResult = await act(async () => {
         return result.current.uploadMultipleFiles(null)
@@ -76,13 +85,11 @@ describe('useFileUpload', () => {
       })
       const mockToast = { current: { show: jest.fn() } }
 
-      const { result } = renderHook(
-        () =>
-          useFileUpload({
-            requireThreeJSRenderable: true,
-            toast: mockToast,
-          }),
-        { wrapper }
+      const { result } = renderHook(() =>
+        useFileUpload({
+          requireThreeJSRenderable: true,
+          toast: mockToast,
+        })
       )
 
       const uploadResult = await act(async () => {
@@ -115,7 +122,7 @@ describe('useFileUpload', () => {
         }),
       ]
 
-      const { result } = renderHook(() => useFileUpload(), { wrapper })
+      const { result } = renderHook(() => useFileUpload())
 
       await act(async () => {
         // Upload 3 files, each should update progress to 33.33, 66.67, 100
@@ -144,9 +151,7 @@ describe('useFileUpload', () => {
         }),
       ]
 
-      const { result } = renderHook(() => useFileUpload({ onSuccess }), {
-        wrapper,
-      })
+      const { result } = renderHook(() => useFileUpload({ onSuccess }))
 
       await act(async () => {
         await result.current.uploadMultipleFiles(mockFiles)
