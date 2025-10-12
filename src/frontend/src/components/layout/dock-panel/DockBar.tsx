@@ -53,9 +53,9 @@ export default function DockBar({
       command: () => onAddTab('textureSets', 'Texture Sets'),
     },
     {
-      label: 'Environments',
+      label: 'Stages',
       icon: 'pi pi-sun',
-      command: () => onAddTab('environmentList', 'Environments'),
+      command: () => onAddTab('stageList', 'Stages'),
     },
     {
       separator: true,

@@ -7,11 +7,11 @@ import EditorCanvas from './EditorCanvas'
 import LightLibrary from './LightLibrary'
 import PropertyPanel from './PropertyPanel'
 import CodePanel from './CodePanel'
-// eslint-disable-next-line no-restricted-imports -- Scene editor needs API access for saving/loading scenes
+// eslint-disable-next-line no-restricted-imports -- Stage editor needs API access for saving/loading stages
 import apiClient from '../../../services/ApiClient'
 import './SceneEditor.css'
 
-export interface SceneLight {
+export interface StageLight {
   id: string
   type: 'ambient' | 'directional' | 'point' | 'spot'
   color: string
@@ -24,20 +24,20 @@ export interface SceneLight {
   decay?: number
 }
 
-export interface SceneConfig {
-  lights: SceneLight[]
+export interface StageConfig {
+  lights: StageLight[]
 }
 
-function SceneEditor(): JSX.Element {
-  const [sceneConfig, setSceneConfig] = useState<SceneConfig>({
+function StageEditor(): JSX.Element {
+  const [stageConfig, setStageConfig] = useState<StageConfig>({
     lights: [],
   })
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
-  const [currentSceneId, setCurrentSceneId] = useState<number | null>(null)
-  const [sceneName, setSceneName] = useState<string>('Untitled Scene')
+  const [currentStageId, setCurrentStageId] = useState<number | null>(null)
+  const [stageName, setStageName] = useState<string>('Untitled Stage')
   const [saveDialogVisible, setSaveDialogVisible] = useState(false)
   const [loadDialogVisible, setLoadDialogVisible] = useState(false)
-  const [savedScenes, setSavedScenes] = useState<
+  const [savedStages, setSavedStages] = useState<
     Array<{
       id: number
       name: string
@@ -49,58 +49,58 @@ function SceneEditor(): JSX.Element {
   const toast = useRef<Toast>(null)
 
   useEffect(() => {
-    loadSavedScenes()
+    loadSavedStages()
   }, [])
 
-  const loadSavedScenes = async () => {
+  const loadSavedStages = async () => {
     try {
-      const response = await apiClient.getAllScenes()
-      setSavedScenes(response.scenes)
+      const response = await apiClient.getAllStages()
+      setSavedStages(response.stages)
     } catch (error) {
-      console.error('Failed to load scenes:', error)
+      console.error('Failed to load stages:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to load saved scenes',
+        detail: 'Failed to load saved stages',
         life: 3000,
       })
     }
   }
 
-  const handleSaveScene = async () => {
+  const handleSaveStage = async () => {
     setIsSaving(true)
     try {
-      const configJson = JSON.stringify(sceneConfig)
+      const configJson = JSON.stringify(stageConfig)
 
-      if (currentSceneId) {
-        // Update existing scene
-        await apiClient.updateScene(currentSceneId, configJson)
+      if (currentStageId) {
+        // Update existing stage
+        await apiClient.updateStage(currentStageId, configJson)
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
-          detail: 'Scene updated successfully',
+          detail: 'Stage updated successfully',
           life: 3000,
         })
       } else {
-        // Create new scene
-        const response = await apiClient.createScene(sceneName, configJson)
-        setCurrentSceneId(response.id)
+        // Create new stage
+        const response = await apiClient.createStage(stageName, configJson)
+        setCurrentStageId(response.id)
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
-          detail: 'Scene saved successfully',
+          detail: 'Stage saved successfully',
           life: 3000,
         })
       }
 
       setSaveDialogVisible(false)
-      await loadSavedScenes()
+      await loadSavedStages()
     } catch (error) {
-      console.error('Failed to save scene:', error)
+      console.error('Failed to save stage:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to save scene',
+        detail: 'Failed to save stage',
         life: 3000,
       })
     } finally {
@@ -108,62 +108,62 @@ function SceneEditor(): JSX.Element {
     }
   }
 
-  const handleLoadScene = async (sceneId: number) => {
+  const handleLoadStage = async (stageId: number) => {
     try {
-      const scene = await apiClient.getSceneById(sceneId)
+      const stage = await apiClient.getStageById(stageId)
 
       // Parse JSON with error handling
-      let config: SceneConfig
+      let config: StageConfig
       try {
-        config = JSON.parse(scene.configurationJson) as SceneConfig
+        config = JSON.parse(stage.configurationJson) as StageConfig
       } catch (parseError) {
-        console.error('Failed to parse scene configuration:', parseError)
+        console.error('Failed to parse stage configuration:', parseError)
         toast.current?.show({
           severity: 'error',
           summary: 'Error',
-          detail: 'Scene configuration is corrupted',
+          detail: 'Stage configuration is corrupted',
           life: 3000,
         })
         return
       }
 
-      setSceneConfig(config)
-      setCurrentSceneId(scene.id)
-      setSceneName(scene.name)
+      setStageConfig(config)
+      setCurrentStageId(stage.id)
+      setStageName(stage.name)
       setSelectedObjectId(null)
       setLoadDialogVisible(false)
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Scene loaded successfully',
+        detail: 'Stage loaded successfully',
         life: 3000,
       })
     } catch (error) {
-      console.error('Failed to load scene:', error)
+      console.error('Failed to load stage:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to load scene',
+        detail: 'Failed to load stage',
         life: 3000,
       })
     }
   }
 
-  const handleNewScene = () => {
-    setSceneConfig({ lights: [] })
+  const handleNewStage = () => {
+    setStageConfig({ lights: [] })
     setSelectedObjectId(null)
-    setCurrentSceneId(null)
-    setSceneName('Untitled Scene')
+    setCurrentStageId(null)
+    setStageName('Untitled Stage')
     toast.current?.show({
       severity: 'info',
-      summary: 'New Scene',
-      detail: 'Started new scene',
+      summary: 'New Stage',
+      detail: 'Started new stage',
       life: 2000,
     })
   }
 
-  const handleAddLight = (type: SceneLight['type']) => {
-    const newLight: SceneLight = {
+  const handleAddLight = (type: StageLight['type']) => {
+    const newLight: StageLight = {
       id: `light-${Date.now()}`,
       type,
       color: '#ffffff',
@@ -179,15 +179,15 @@ function SceneEditor(): JSX.Element {
       ...(type === 'point' && { distance: 0, decay: 2 }),
     }
 
-    setSceneConfig(prev => ({
+    setStageConfig(prev => ({
       ...prev,
       lights: [...prev.lights, newLight],
     }))
     setSelectedObjectId(newLight.id)
   }
 
-  const handleUpdateLight = (id: string, updates: Partial<SceneLight>) => {
-    setSceneConfig(prev => ({
+  const handleUpdateLight = (id: string, updates: Partial<StageLight>) => {
+    setStageConfig(prev => ({
       ...prev,
       lights: prev.lights.map(light =>
         light.id === id ? { ...light, ...updates } : light
@@ -196,7 +196,7 @@ function SceneEditor(): JSX.Element {
   }
 
   const handleDeleteLight = (id: string) => {
-    setSceneConfig(prev => ({
+    setStageConfig(prev => ({
       ...prev,
       lights: prev.lights.filter(light => light.id !== id),
     }))
@@ -205,32 +205,32 @@ function SceneEditor(): JSX.Element {
     }
   }
 
-  const selectedObject = sceneConfig.lights.find(
+  const selectedObject = stageConfig.lights.find(
     light => light.id === selectedObjectId
   )
 
   return (
-    <div className="scene-editor">
+    <div className="stage-editor">
       <Toast ref={toast} />
 
       <div className="editor-toolbar">
         <div className="toolbar-left">
-          <h3>{sceneName}</h3>
+          <h3>{stageName}</h3>
         </div>
         <div className="toolbar-right">
           <Button
             icon="pi pi-file"
             label="New"
             className="p-button-text"
-            onClick={handleNewScene}
-            tooltip="New Scene"
+            onClick={handleNewStage}
+            tooltip="New Stage"
           />
           <Button
             icon="pi pi-save"
             label="Save"
             className="p-button-text"
             onClick={() => setSaveDialogVisible(true)}
-            tooltip="Save Scene"
+            tooltip="Save Stage"
           />
           <Button
             icon="pi pi-folder-open"
@@ -238,9 +238,9 @@ function SceneEditor(): JSX.Element {
             className="p-button-text"
             onClick={() => {
               setLoadDialogVisible(true)
-              loadSavedScenes()
+              loadSavedStages()
             }}
-            tooltip="Load Scene"
+            tooltip="Load Stage"
           />
         </div>
       </div>
@@ -252,11 +252,11 @@ function SceneEditor(): JSX.Element {
 
         <div className="editor-main">
           <EditorCanvas
-            sceneConfig={sceneConfig}
+            stageConfig={stageConfig}
             selectedObjectId={selectedObjectId}
             onSelectObject={setSelectedObjectId}
           />
-          <CodePanel sceneConfig={sceneConfig} />
+          <CodePanel stageConfig={stageConfig} />
         </div>
 
         <div className="editor-sidebar right">
@@ -270,24 +270,24 @@ function SceneEditor(): JSX.Element {
 
       {/* Save Dialog */}
       <Dialog
-        header="Save Scene"
+        header="Save Stage"
         visible={saveDialogVisible}
         style={{ width: '400px' }}
         onHide={() => setSaveDialogVisible(false)}
       >
         <div className="p-fluid">
           <div className="field">
-            <label htmlFor="sceneName">Scene Name</label>
+            <label htmlFor="stageName">Stage Name</label>
             <InputText
-              id="sceneName"
-              value={sceneName}
-              onChange={e => setSceneName(e.target.value)}
-              disabled={!!currentSceneId}
-              aria-describedby={currentSceneId ? 'scene-name-help' : undefined}
+              id="stageName"
+              value={stageName}
+              onChange={e => setStageName(e.target.value)}
+              disabled={!!currentStageId}
+              aria-describedby={currentStageId ? 'stage-name-help' : undefined}
             />
-            {currentSceneId && (
-              <small id="scene-name-help">
-                Scene name cannot be changed after creation
+            {currentStageId && (
+              <small id="stage-name-help">
+                Stage name cannot be changed after creation
               </small>
             )}
           </div>
@@ -295,8 +295,8 @@ function SceneEditor(): JSX.Element {
             <Button
               label={isSaving ? 'Saving...' : 'Save'}
               icon="pi pi-save"
-              onClick={handleSaveScene}
-              disabled={!sceneName.trim() || isSaving}
+              onClick={handleSaveStage}
+              disabled={!stageName.trim() || isSaving}
             />
           </div>
         </div>
@@ -304,28 +304,28 @@ function SceneEditor(): JSX.Element {
 
       {/* Load Dialog */}
       <Dialog
-        header="Load Scene"
+        header="Load Stage"
         visible={loadDialogVisible}
         style={{ width: '500px' }}
         onHide={() => setLoadDialogVisible(false)}
       >
-        <div className="saved-scenes-list">
-          {savedScenes.length === 0 ? (
-            <p className="no-scenes">No saved scenes found</p>
+        <div className="saved-stages-list">
+          {savedStages.length === 0 ? (
+            <p className="no-stages">No saved stages found</p>
           ) : (
-            savedScenes.map(scene => (
-              <div key={scene.id} className="saved-scene-item">
-                <div className="scene-info">
-                  <h4>{scene.name}</h4>
+            savedStages.map(stage => (
+              <div key={stage.id} className="saved-stage-item">
+                <div className="stage-info">
+                  <h4>{stage.name}</h4>
                   <small>
-                    Updated: {new Date(scene.updatedAt).toLocaleString()}
+                    Updated: {new Date(stage.updatedAt).toLocaleString()}
                   </small>
                 </div>
                 <Button
                   icon="pi pi-folder-open"
                   label="Load"
                   className="p-button-sm"
-                  onClick={() => handleLoadScene(scene.id)}
+                  onClick={() => handleLoadStage(stage.id)}
                 />
               </div>
             ))
@@ -336,4 +336,4 @@ function SceneEditor(): JSX.Element {
   )
 }
 
-export default SceneEditor
+export default StageEditor

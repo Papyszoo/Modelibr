@@ -2,7 +2,7 @@ using SharedKernel;
 
 namespace Domain.Models;
 
-public class Environment : AggregateRoot
+public class Stage : AggregateRoot
 {
     public int Id { get; set; }
     public string Name { get; private set; } = string.Empty;
@@ -10,9 +10,9 @@ public class Environment : AggregateRoot
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    private Environment() { } // For EF Core
+    private Stage() { } // For EF Core
 
-    private Environment(string name, string configurationJson)
+    private Stage(string name, string configurationJson)
     {
         Name = name;
         ConfigurationJson = configurationJson;
@@ -20,27 +20,27 @@ public class Environment : AggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public static Result<Environment> Create(string name, string configurationJson)
+    public static Result<Stage> Create(string name, string configurationJson)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            return Result.Failure<Environment>(new Error("Environment.InvalidName", "Environment name cannot be empty"));
+            return Result.Failure<Stage>(new Error("Stage.InvalidName", "Stage name cannot be empty"));
         }
 
         if (string.IsNullOrWhiteSpace(configurationJson))
         {
-            return Result.Failure<Environment>(new Error("Environment.InvalidConfiguration", "Environment configuration cannot be empty"));
+            return Result.Failure<Stage>(new Error("Stage.InvalidConfiguration", "Stage configuration cannot be empty"));
         }
 
-        var environment = new Environment(name, configurationJson);
-        return Result.Success(environment);
+        var stage = new Stage(name, configurationJson);
+        return Result.Success(stage);
     }
 
     public Result UpdateConfiguration(string configurationJson)
     {
         if (string.IsNullOrWhiteSpace(configurationJson))
         {
-            return Result.Failure(new Error("Environment.InvalidConfiguration", "Environment configuration cannot be empty"));
+            return Result.Failure(new Error("Stage.InvalidConfiguration", "Stage configuration cannot be empty"));
         }
 
         ConfigurationJson = configurationJson;
@@ -52,7 +52,7 @@ public class Environment : AggregateRoot
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            return Result.Failure(new Error("Environment.InvalidName", "Environment name cannot be empty"));
+            return Result.Failure(new Error("Stage.InvalidName", "Stage name cannot be empty"));
         }
 
         Name = name;

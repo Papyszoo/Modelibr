@@ -14,7 +14,7 @@ namespace Infrastructure.Persistence
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
-        public DbSet<Domain.Models.Environment> Environments => Set<Domain.Models.Environment>();
+        public DbSet<Stage> Stages => Set<Stage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -187,8 +187,8 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.UpdatedAt).IsRequired();
             });
 
-            // Configure Scene entity
-            modelBuilder.Entity<Domain.Models.Environment>(entity =>
+            // Configure Stage entity
+            modelBuilder.Entity<Stage>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(200);

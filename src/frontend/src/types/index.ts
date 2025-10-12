@@ -8,12 +8,12 @@ export interface Tab {
     | 'textureSets'
     | 'textureSetViewer'
     | 'settings'
-    | 'environmentList'
-    | 'environmentEditor'
+    | 'stageList'
+    | 'stageEditor'
   label?: string
   modelId?: string
   setId?: string
-  environmentId?: string
+  stageId?: string
 }
 
 export interface SplitterEvent {

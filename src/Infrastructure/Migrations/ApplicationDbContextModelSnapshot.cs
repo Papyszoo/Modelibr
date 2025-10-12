@@ -62,7 +62,7 @@ namespace Infrastructure.Migrations
                     b.ToTable("ApplicationSettings");
                 });
 
-            modelBuilder.Entity("Domain.Models.Environment", b =>
+            modelBuilder.Entity("Domain.Models.Stage", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -89,7 +89,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("Name");
 
-                    b.ToTable("Environments");
+                    b.ToTable("Stages");
                 });
 
             modelBuilder.Entity("Domain.Models.File", b =>
