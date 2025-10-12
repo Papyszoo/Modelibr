@@ -425,7 +425,7 @@ export class JobProcessor {
               storageResult.uploadResults
             )
 
-            // Step 7: Run image classification on 6-side views (if enabled)
+            // Step 7: Run image classification on model views (if enabled)
             if (config.imageClassification.enabled) {
               try {
                 jobLogger.info('Starting image classification on model views')
