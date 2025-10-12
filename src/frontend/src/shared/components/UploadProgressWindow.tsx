@@ -18,7 +18,7 @@ const formatFileSize = (bytes: number): string => {
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
 // Map file extensions to PrimeIcons
@@ -67,13 +67,15 @@ const getFileTypeIcon = (fileType: 'model' | 'texture' | 'file'): string => {
 export default function UploadProgressWindow() {
   const { uploads, isVisible, hideWindow, removeUpload, clearCompleted } =
     useUploadProgress()
-  const { openModelDetailsTab, openTab } = useTabContext()
+  const { openModelDetailsTab } = useTabContext()
   const windowRef = useRef<HTMLDivElement>(null)
 
   // Calculate overall progress
-  const totalProgress = uploads.length > 0
-    ? uploads.reduce((sum, upload) => sum + upload.progress, 0) / uploads.length
-    : 0
+  const totalProgress =
+    uploads.length > 0
+      ? uploads.reduce((sum, upload) => sum + upload.progress, 0) /
+        uploads.length
+      : 0
 
   const activeUploads = uploads.filter(
     u => u.status === 'uploading' || u.status === 'pending'
@@ -81,7 +83,7 @@ export default function UploadProgressWindow() {
   const completedUploads = uploads.filter(u => u.status === 'completed')
   const failedUploads = uploads.filter(u => u.status === 'error')
 
-  const handleOpenInTab = (upload: typeof uploads[0]) => {
+  const handleOpenInTab = (upload: (typeof uploads)[0]) => {
     if (upload.status !== 'completed' || !upload.result) return
 
     try {
@@ -89,7 +91,10 @@ export default function UploadProgressWindow() {
       if (upload.fileType === 'model' && upload.result) {
         const modelResult = upload.result as { id: number; name?: string }
         if (modelResult.id) {
-          openModelDetailsTab({ id: modelResult.id.toString(), name: modelResult.name || upload.file.name })
+          openModelDetailsTab({
+            id: modelResult.id.toString(),
+            name: modelResult.name || upload.file.name,
+          })
         }
       } else if (upload.fileType === 'texture') {
         // For textures, we could open a texture viewer if available
@@ -175,7 +180,7 @@ export default function UploadProgressWindow() {
                   <i className={`pi ${extensionIcon} upload-item-ext-icon`} />
                   <i className={`pi ${typeIcon} upload-item-type-icon`} />
                 </div>
-                
+
                 <div className="upload-item-details">
                   <div className="upload-item-header">
                     <span className="upload-item-name" title={upload.file.name}>
@@ -183,7 +188,7 @@ export default function UploadProgressWindow() {
                     </span>
                     <span className="upload-item-size">{fileSize}</span>
                   </div>
-                  
+
                   {upload.status === 'error' ? (
                     <div className="upload-item-error">
                       <i className="pi pi-exclamation-triangle" />
@@ -199,17 +204,19 @@ export default function UploadProgressWindow() {
                 </div>
 
                 <div className="upload-item-actions">
-                  {upload.status === 'completed' && upload.fileType === 'model' && (
-                    <Button
-                      icon="pi pi-external-link"
-                      size="small"
-                      text
-                      rounded
-                      title="Open in new tab"
-                      onClick={() => handleOpenInTab(upload)}
-                    />
-                  )}
-                  {(upload.status === 'completed' || upload.status === 'error') && (
+                  {upload.status === 'completed' &&
+                    upload.fileType === 'model' && (
+                      <Button
+                        icon="pi pi-external-link"
+                        size="small"
+                        text
+                        rounded
+                        title="Open in new tab"
+                        onClick={() => handleOpenInTab(upload)}
+                      />
+                    )}
+                  {(upload.status === 'completed' ||
+                    upload.status === 'error') && (
                     <Button
                       icon="pi pi-times"
                       size="small"

@@ -259,9 +259,7 @@ class ApiClient {
     return response.data
   }
 
-  async createPack(
-    request: CreatePackRequest
-  ): Promise<CreatePackResponse> {
+  async createPack(request: CreatePackRequest): Promise<CreatePackResponse> {
     const response = await this.client.post<CreatePackResponse>(
       '/packs',
       request
@@ -269,10 +267,7 @@ class ApiClient {
     return response.data
   }
 
-  async updatePack(
-    id: number,
-    request: UpdatePackRequest
-  ): Promise<void> {
+  async updatePack(id: number, request: UpdatePackRequest): Promise<void> {
     await this.client.put(`/packs/${id}`, request)
   }
 
@@ -288,11 +283,17 @@ class ApiClient {
     await this.client.delete(`/packs/${packId}/models/${modelId}`)
   }
 
-  async addTextureSetToPack(packId: number, textureSetId: number): Promise<void> {
+  async addTextureSetToPack(
+    packId: number,
+    textureSetId: number
+  ): Promise<void> {
     await this.client.post(`/packs/${packId}/texture-sets/${textureSetId}`)
   }
 
-  async removeTextureSetFromPack(packId: number, textureSetId: number): Promise<void> {
+  async removeTextureSetFromPack(
+    packId: number,
+    textureSetId: number
+  ): Promise<void> {
     await this.client.delete(`/packs/${packId}/texture-sets/${textureSetId}`)
   }
 
