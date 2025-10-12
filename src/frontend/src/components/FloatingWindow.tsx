@@ -197,6 +197,7 @@ function FloatingWindow({
       }}
       onMouseDown={handleMouseDown}
       onClick={handleWindowClick}
+      id={windowId}
     >
       <div className="floating-window-header">
         <span className="floating-window-title">{title}</span>
