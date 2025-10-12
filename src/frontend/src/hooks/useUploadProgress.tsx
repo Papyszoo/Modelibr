@@ -1,14 +1,5 @@
-import { useContext } from 'react'
-import UploadProgressContext, {
-  UploadProgressContextValue,
-} from '../contexts/UploadProgressContext'
+import { useUploadProgressStore } from '../stores/uploadProgressStore'
 
-export const useUploadProgress = (): UploadProgressContextValue => {
-  const context = useContext(UploadProgressContext)
-  if (!context) {
-    throw new Error(
-      'useUploadProgress must be used within an UploadProgressProvider'
-    )
-  }
-  return context
+export const useUploadProgress = () => {
+  return useUploadProgressStore()
 }
