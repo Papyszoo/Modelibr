@@ -6,6 +6,7 @@ import { TextureSetDto, TextureType } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
+import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import CreateTextureSetDialog from '../dialogs/CreateTextureSetDialog'
@@ -20,6 +21,7 @@ function TextureSetList() {
   const toast = useRef<Toast>(null)
   const textureSetsApi = useTextureSets()
   const { openTextureSetDetailsTab } = useTabContext()
+  const { uploadFile } = useGenericFileUpload({ fileType: 'texture' })
 
   const loadTextureSets = useCallback(async () => {
     try {
@@ -104,8 +106,8 @@ function TextureSetList() {
 
     for (const file of fileArray) {
       try {
-        // 1. Upload the file
-        const uploadResult = await ApiClient.uploadFile(file)
+        // 1. Upload the file with global progress tracking
+        const uploadResult = await uploadFile(file)
 
         // 2. Create a new texture set with the file name (without extension)
         const fileName = file.name.replace(/\.[^/.]+$/, '')

@@ -11,6 +11,8 @@ import { PackDto, Model, TextureSetDto, TextureType } from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
+import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
+import { useModelUpload } from '../../../shared/hooks/useModelUpload'
 import './PackViewer.css'
 
 interface PackViewerProps {
@@ -38,6 +40,8 @@ export default function PackViewer({ packId }: PackViewerProps) {
   const [selectedModel, setSelectedModel] = useState<Model | null>(null)
   const [selectedTextureSet, setSelectedTextureSet] = useState<TextureSetDto | null>(null)
   const { openModelDetailsTab, openTextureSetDetailsTab } = useTabContext()
+  const { uploadFile: uploadTextureFile } = useGenericFileUpload({ fileType: 'texture' })
+  const { uploadModel: uploadModelFile } = useModelUpload()
 
   useEffect(() => {
     loadPack()
@@ -215,7 +219,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
       
       // Upload all files and add them to pack
       const uploadPromises = files.map(async (file) => {
-        const response = await ApiClient.uploadModel(file)
+        const response = await uploadModelFile(file)
         await ApiClient.addModelToPack(packId, response.id)
         // Trigger thumbnail generation if not already exists
         if (!response.alreadyExists) {
@@ -259,7 +263,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
       
       // Upload all texture files and create texture sets
       const uploadPromises = files.map(async (file) => {
-        const fileResponse = await ApiClient.uploadFile(file)
+        const fileResponse = await uploadTextureFile(file)
         
         const setName = file.name.replace(/\.[^/.]+$/, '')
         const setResponse = await ApiClient.createTextureSet({ name: setName })
