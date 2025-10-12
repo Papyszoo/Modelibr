@@ -5,7 +5,7 @@ import { PuppeteerRenderer } from './puppeteerRenderer.js'
 import { FrameEncoderService } from './frameEncoderService.js'
 import { ThumbnailStorageService } from './thumbnailStorageService.js'
 import { JobEventService } from './jobEventService.js'
-import { SixSideRenderer } from './sixSideRenderer.js'
+import { ClassificationRenderer } from './classificationRenderer.js'
 import { getTaggerInstance } from './imageTagger/mobilenetTagger.js'
 import { TagAggregator } from './imageTagger/tagAggregator.js'
 import { ThumbnailApiService } from './thumbnailApiService.js'
@@ -25,7 +25,7 @@ export class JobProcessor {
     this.thumbnailApiService = new ThumbnailApiService()
     this.puppeteerRenderer = null // Will be initialized when needed
     this.frameEncoder = null // Will be initialized when needed
-    this.sixSideRenderer = null // Will be initialized when needed
+    this.classificationRenderer = null // Will be initialized when needed
     this.imageTagger = getTaggerInstance() // Singleton image tagger
     this.isShuttingDown = false
     this.activeJobs = new Map()
@@ -428,33 +428,33 @@ export class JobProcessor {
             // Step 7: Run image classification on 6-side views (if enabled)
             if (config.imageClassification.enabled) {
               try {
-                jobLogger.info('Starting image classification on 6-side views')
+                jobLogger.info('Starting image classification on model views')
 
-                // Initialize six-side renderer if not already done
-                if (!this.sixSideRenderer) {
-                  this.sixSideRenderer = new SixSideRenderer(
+                // Initialize classification renderer if not already done
+                if (!this.classificationRenderer) {
+                  this.classificationRenderer = new ClassificationRenderer(
                     this.puppeteerRenderer
                   )
                 }
 
-                // Render 6-side views
-                const sideImages = await this.sixSideRenderer.renderSixSides(
+                // Render classification views
+                const viewImages = await this.classificationRenderer.renderClassificationViews(
                   jobLogger
                 )
 
                 // Initialize image tagger
                 await this.imageTagger.initialize()
 
-                // Classify each side image
+                // Classify each view image
                 const allPredictions = []
-                for (let i = 0; i < sideImages.length; i++) {
+                for (let i = 0; i < viewImages.length; i++) {
                   const predictions = await this.imageTagger.describeImage(
-                    sideImages[i],
+                    viewImages[i],
                     config.imageClassification.topKPerImage
                   )
                   allPredictions.push(predictions)
-                  jobLogger.debug('Classified side image', {
-                    sideIndex: i,
+                  jobLogger.debug('Classified view image', {
+                    viewIndex: i,
                     topPrediction: predictions[0]?.className,
                     confidence: predictions[0]?.probability,
                   })
