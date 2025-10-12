@@ -7,6 +7,7 @@ import { useTextureSets } from '../hooks/useTextureSets'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
+import { useUploadProgress } from '../../../hooks/useUploadProgress'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import CreateTextureSetDialog from '../dialogs/CreateTextureSetDialog'
@@ -22,6 +23,7 @@ function TextureSetList() {
   const textureSetsApi = useTextureSets()
   const { openTextureSetDetailsTab } = useTabContext()
   const { uploadFile } = useGenericFileUpload({ fileType: 'texture' })
+  const uploadProgressContext = useUploadProgress()
 
   const loadTextureSets = useCallback(async () => {
     try {
@@ -105,21 +107,41 @@ function TextureSetList() {
     const fileArray = Array.from(files)
 
     for (const file of fileArray) {
+      let uploadId: string | null = null
       try {
-        // 1. Upload the file with global progress tracking
-        const uploadResult = await uploadFile(file)
+        // 1. Track the upload and get its ID
+        uploadId = uploadProgressContext?.addUpload(file, 'texture') || null
 
-        // 2. Create a new texture set with the file name (without extension)
+        // 2. Upload the file with progress tracking
+        if (uploadId && uploadProgressContext) {
+          uploadProgressContext.updateUploadProgress(uploadId, 50)
+        }
+
+        const uploadResult = await ApiClient.uploadFile(file)
+
+        if (uploadId && uploadProgressContext) {
+          uploadProgressContext.updateUploadProgress(uploadId, 75)
+        }
+
+        // 3. Create a new texture set with the file name (without extension)
         const fileName = file.name.replace(/\.[^/.]+$/, '')
         const createResult = await textureSetsApi.createTextureSet({
           name: fileName,
         })
 
-        // 3. Add the uploaded file as an albedo texture to the new set
+        // 4. Add the uploaded file as an albedo texture to the new set
         await ApiClient.addTextureToSetEndpoint(createResult.id, {
           fileId: uploadResult.fileId,
           textureType: TextureType.Albedo,
         })
+
+        // 5. Complete the upload with texture set ID
+        if (uploadId && uploadProgressContext) {
+          uploadProgressContext.completeUpload(uploadId, {
+            ...uploadResult,
+            textureSetId: createResult.id,
+          })
+        }
 
         toast.current?.show({
           severity: 'success',
@@ -128,6 +150,11 @@ function TextureSetList() {
           life: 3000,
         })
       } catch (error) {
+        // Mark upload as failed
+        if (uploadId && uploadProgressContext) {
+          uploadProgressContext.failUpload(uploadId, error as Error)
+        }
+
         console.error('Failed to create texture set from file:', error)
         toast.current?.show({
           severity: 'error',
