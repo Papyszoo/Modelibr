@@ -138,7 +138,7 @@ export class PuppeteerRenderer {
   /**
    * Load a model from file path
    * @param {string} filePath - Path to the model file
-   * @param {string} fileType - Type of the file (obj, gltf, glb)
+   * @param {string} fileType - Type of the file (obj, fbx, gltf, glb)
    * @returns {Promise<number>} Polygon count
    */
   async loadModel(filePath, fileType) {
@@ -465,6 +465,7 @@ export class PuppeteerRenderer {
   getMimeType(fileType) {
     const mimeTypes = {
       obj: 'text/plain',
+      fbx: 'application/octet-stream',
       gltf: 'model/gltf+json',
       glb: 'model/gltf-binary',
     }
