@@ -12,7 +12,6 @@ import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
-import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
 import './PackViewer.css'
 
 interface PackViewerProps {
@@ -44,9 +43,6 @@ export default function PackViewer({ packId }: PackViewerProps) {
     useState<TextureSetDto | null>(null)
   const { openModelDetailsTab, openTextureSetDetailsTab } = useTabContext()
   const uploadProgressContext = useUploadProgress()
-  const { uploadFile: uploadTextureFile } = useGenericFileUpload({
-    fileType: 'texture',
-  })
 
   useEffect(() => {
     loadPack()
@@ -321,7 +317,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
             uploadProgressContext.updateUploadProgress(uploadId, 30)
           }
 
-          const fileResponse = await uploadTextureFile(file)
+          const fileResponse = await ApiClient.uploadFile(file)
 
           if (uploadId && uploadProgressContext) {
             uploadProgressContext.updateUploadProgress(uploadId, 60)
