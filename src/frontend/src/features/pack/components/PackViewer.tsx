@@ -292,11 +292,26 @@ export default function PackViewer({ packId }: PackViewerProps) {
       let newCount = 0
       let existingCount = 0
 
+      // Helper function to create a new texture set with a file
+      const createTextureSetWithFile = async (
+        fileName: string,
+        fileId: number
+      ): Promise<number> => {
+        const setName = fileName.replace(/\.[^/.]+$/, '')
+        const setResponse = await ApiClient.createTextureSet({ name: setName })
+
+        await ApiClient.addTextureToSetEndpoint(setResponse.id, {
+          fileId: fileId,
+          textureType: TextureType.Albedo,
+        })
+
+        return setResponse.id
+      }
+
       // Upload all texture files and create/link texture sets
       const uploadPromises = files.map(async file => {
         const fileResponse = await uploadTextureFile(file)
-
-        let textureSetId: number
+        let textureSetId: number | null = null
 
         // Check if file already exists and has an associated texture set
         if (fileResponse.alreadyExists) {
@@ -310,34 +325,23 @@ export default function PackViewer({ packId }: PackViewerProps) {
             existingCount++
           } else {
             // File exists but no texture set has it yet, create new texture set
-            const setName = file.name.replace(/\.[^/.]+$/, '')
-            const setResponse = await ApiClient.createTextureSet({
-              name: setName,
-            })
-            textureSetId = setResponse.id
-
-            await ApiClient.addTextureToSetEndpoint(setResponse.id, {
-              fileId: fileResponse.fileId,
-              textureType: TextureType.Albedo,
-            })
+            textureSetId = await createTextureSetWithFile(
+              file.name,
+              fileResponse.fileId
+            )
             newCount++
           }
         } else {
           // New file, create new texture set
-          const setName = file.name.replace(/\.[^/.]+$/, '')
-          const setResponse = await ApiClient.createTextureSet({ name: setName })
-          textureSetId = setResponse.id
-
-          await ApiClient.addTextureToSetEndpoint(setResponse.id, {
-            fileId: fileResponse.fileId,
-            textureType: TextureType.Albedo,
-          })
+          textureSetId = await createTextureSetWithFile(
+            file.name,
+            fileResponse.fileId
+          )
           newCount++
         }
 
         // Add texture set to pack (idempotent operation)
         await ApiClient.addTextureSetToPack(packId, textureSetId)
-        return textureSetId
       })
 
       await Promise.all(uploadPromises)
