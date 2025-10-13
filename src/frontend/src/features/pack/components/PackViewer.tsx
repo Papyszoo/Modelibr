@@ -328,7 +328,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
           ? uploadProgressContext.createBatch()
           : undefined
 
-      // Helper function to create a new texture set with a file
+      // Helper function to create a new texture set with uploaded file
       const createTextureSetWithFile = async (
         fileName: string,
         fileId: number
