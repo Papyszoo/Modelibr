@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
-import { DataTable } from 'primereact/datatable'
-import { Column } from 'primereact/column'
+import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
-import { Tag } from 'primereact/tag'
 import ApiClient from '../../services/ApiClient'
 import { useTabContext } from '../../hooks/useTabContext'
 import './History.css'
@@ -22,15 +20,100 @@ interface BatchUploadHistory {
   textureSetName: string | null
 }
 
+interface BatchGroup {
+  batchId: string
+  files: BatchUploadHistory[]
+  timestamp: string
+  collapsed: boolean
+}
+
+// Utility function to get file extension
+const getFileExtension = (fileName: string): string => {
+  const parts = fileName.split('.')
+  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : ''
+}
+
+// Map file extensions to PrimeIcons with extension name display
+const getExtensionIcon = (
+  extension: string
+): { icon: string; name: string } => {
+  const iconMap: Record<string, string> = {
+    // Images
+    jpg: 'pi-image',
+    jpeg: 'pi-image',
+    png: 'pi-image',
+    gif: 'pi-image',
+    webp: 'pi-image',
+    svg: 'pi-image',
+    tga: 'pi-image',
+    bmp: 'pi-image',
+    // 3D Models
+    obj: 'pi-box',
+    fbx: 'pi-box',
+    gltf: 'pi-box',
+    glb: 'pi-box',
+    stl: 'pi-box',
+    dae: 'pi-box',
+    '3ds': 'pi-box',
+  }
+  return {
+    icon: iconMap[extension] || 'pi-file',
+    name: extension.toUpperCase(),
+  }
+}
+
+// Map file type to icon
+const getFileTypeIcon = (fileType: string): string => {
+  const typeIconMap: Record<string, string> = {
+    model: 'pi-box',
+    texture: 'pi-image',
+    textureSet: 'pi-image',
+    pack: 'pi-inbox',
+    file: 'pi-file',
+  }
+  return typeIconMap[fileType] || 'pi-file'
+}
+
 export default function History() {
   const [history, setHistory] = useState<BatchUploadHistory[]>([])
   const [loading, setLoading] = useState(true)
+  const [batchGroups, setBatchGroups] = useState<BatchGroup[]>([])
   const { openModelDetailsTab, openTextureSetDetailsTab, openPackDetailsTab } =
     useTabContext()
 
   useEffect(() => {
     loadHistory()
   }, [])
+
+  useEffect(() => {
+    // Group uploads by batchId
+    const grouped = new Map<string, BatchUploadHistory[]>()
+    
+    history.forEach(upload => {
+      if (!grouped.has(upload.batchId)) {
+        grouped.set(upload.batchId, [])
+      }
+      grouped.get(upload.batchId)!.push(upload)
+    })
+
+    // Create batch groups
+    const groups: BatchGroup[] = Array.from(grouped.entries()).map(
+      ([batchId, files]) => ({
+        batchId,
+        files: files.sort((a, b) => a.fileName.localeCompare(b.fileName)),
+        timestamp: files[0].uploadedAt,
+        collapsed: false,
+      })
+    )
+
+    // Sort groups by timestamp descending
+    groups.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    )
+
+    setBatchGroups(groups)
+  }, [history])
 
   const loadHistory = async () => {
     try {
@@ -44,156 +127,162 @@ export default function History() {
     }
   }
 
-  const uploadTypeTemplate = (rowData: BatchUploadHistory) => {
-    const severityMap: Record<
-      string,
-      'success' | 'info' | 'warning' | 'danger' | undefined
-    > = {
-      model: 'success',
-      pack: 'info',
-      textureSet: 'warning',
-      texture: 'warning',
-      file: undefined,
-    }
-
-    const labelMap: Record<string, string> = {
-      model: 'Model',
-      pack: 'Pack',
-      textureSet: 'Texture Set',
-      texture: 'Texture',
-      file: 'File',
-    }
-
-    return (
-      <Tag
-        value={labelMap[rowData.uploadType] || rowData.uploadType}
-        severity={severityMap[rowData.uploadType]}
-      />
+  const toggleBatchCollapse = (batchId: string) => {
+    setBatchGroups(prev =>
+      prev.map(group =>
+        group.batchId === batchId
+          ? { ...group, collapsed: !group.collapsed }
+          : group
+      )
     )
   }
 
-  const dateTemplate = (rowData: BatchUploadHistory) => {
-    const date = new Date(rowData.uploadedAt)
-    return (
-      <div>
-        <div>{date.toLocaleDateString()}</div>
-        <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-          {date.toLocaleTimeString()}
-        </div>
-      </div>
-    )
-  }
-
-  const uploadedToTemplate = (rowData: BatchUploadHistory) => {
-    // Priority: Pack > Model > TextureSet > Default list
-    if (rowData.packId && rowData.packName) {
-      return (
-        <div className="uploaded-to">
-          <i className="pi pi-inbox"></i>
-          <span>Pack: {rowData.packName}</span>
-        </div>
-      )
+  const getUploadedToText = (upload: BatchUploadHistory): string => {
+    // Priority: Pack > Model > TextureSet > Default
+    if (upload.packId && upload.packName) {
+      return `Pack: ${upload.packName}`
     }
-    
-    // If model exists (but not in a pack), show Models List
-    if (rowData.modelId) {
-      return (
-        <div className="uploaded-to">
-          <i className="pi pi-list"></i>
-          <span>Models List</span>
-        </div>
-      )
+    if (upload.modelId) {
+      return 'Models List'
     }
-    
-    // If texture set exists (but not in a pack), show Texture Sets List
-    if (rowData.textureSetId) {
-      return (
-        <div className="uploaded-to">
-          <i className="pi pi-list"></i>
-          <span>Texture Sets List</span>
-        </div>
-      )
+    if (upload.textureSetId) {
+      return 'Texture Sets List'
     }
-    
     // Fallback based on upload type
-    if (rowData.uploadType === 'model') {
-      return (
-        <div className="uploaded-to">
-          <i className="pi pi-list"></i>
-          <span>Models List</span>
-        </div>
-      )
+    if (upload.uploadType === 'model') {
+      return 'Models List'
     }
-    
-    if (rowData.uploadType === 'texture' || rowData.uploadType === 'textureSet') {
-      return (
-        <div className="uploaded-to">
-          <i className="pi pi-list"></i>
-          <span>Texture Sets List</span>
-        </div>
-      )
+    if (upload.uploadType === 'texture' || upload.uploadType === 'textureSet') {
+      return 'Texture Sets List'
     }
-    
-    return <span className="text-muted">Unknown</span>
+    return 'Unknown'
   }
 
-  const actionsTemplate = (rowData: BatchUploadHistory) => {
+  const renderHistoryItem = (upload: BatchUploadHistory) => {
+    const extension = getFileExtension(upload.fileName)
+    const extensionInfo = getExtensionIcon(extension)
+    const typeIcon = getFileTypeIcon(upload.uploadType)
+    const uploadedTo = getUploadedToText(upload)
+    const uploadDate = new Date(upload.uploadedAt)
+
     return (
-      <div className="history-actions">
-        {rowData.modelId && (
-          <Button
-            icon="pi pi-box"
-            className="p-button-text p-button-rounded p-button-sm"
-            onClick={async () => {
-              try {
-                const model = await ApiClient.getModelById(
-                  rowData.modelId!.toString()
-                )
-                openModelDetailsTab(model)
-              } catch (error) {
-                console.error('Failed to open model:', error)
-              }
-            }}
-            tooltip="Open Model"
-            tooltipOptions={{ position: 'left' }}
-          />
-        )}
-        {rowData.textureSetId && (
-          <Button
-            icon="pi pi-image"
-            className="p-button-text p-button-rounded p-button-sm"
-            onClick={async () => {
-              try {
-                const textureSet = await ApiClient.getTextureSetById(
-                  rowData.textureSetId!
-                )
-                openTextureSetDetailsTab(textureSet)
-              } catch (error) {
-                console.error('Failed to open texture set:', error)
-              }
-            }}
-            tooltip="Open Texture Set"
-            tooltipOptions={{ position: 'left' }}
-          />
-        )}
-        {rowData.packId && (
-          <Button
-            icon="pi pi-inbox"
-            className="p-button-text p-button-rounded p-button-sm"
-            onClick={() => openPackDetailsTab(rowData.packId!.toString())}
-            tooltip="Open Pack"
-            tooltipOptions={{ position: 'left' }}
-          />
+      <div key={upload.id} className="history-item">
+        <div className="history-item-icons">
+          <div className="history-item-ext-icon-container">
+            <i className={`pi ${extensionInfo.icon} history-item-ext-icon`} />
+            <span className="history-item-ext-name">{extensionInfo.name}</span>
+          </div>
+          <i className={`pi ${typeIcon} history-item-type-icon`} />
+        </div>
+
+        <div className="history-item-details">
+          <div className="history-item-header">
+            <span className="history-item-name" title={upload.fileName}>
+              {upload.fileName}
+            </span>
+            <span className="history-item-uploaded-to">{uploadedTo}</span>
+          </div>
+          <div className="history-item-timestamp">
+            {uploadDate.toLocaleString()}
+          </div>
+        </div>
+
+        <div className="history-item-actions">
+          {upload.modelId && (
+            <Button
+              icon="pi pi-box"
+              size="small"
+              text
+              rounded
+              title="Open Model"
+              onClick={async () => {
+                try {
+                  const model = await ApiClient.getModelById(
+                    upload.modelId!.toString()
+                  )
+                  openModelDetailsTab(model)
+                } catch (error) {
+                  console.error('Failed to open model:', error)
+                }
+              }}
+            />
+          )}
+          {upload.textureSetId && (
+            <Button
+              icon="pi pi-image"
+              size="small"
+              text
+              rounded
+              title="Open Texture Set"
+              onClick={async () => {
+                try {
+                  const textureSet = await ApiClient.getTextureSetById(
+                    upload.textureSetId!
+                  )
+                  openTextureSetDetailsTab(textureSet)
+                } catch (error) {
+                  console.error('Failed to open texture set:', error)
+                }
+              }}
+            />
+          )}
+          {upload.packId && (
+            <Button
+              icon="pi pi-inbox"
+              size="small"
+              text
+              rounded
+              title="Open Pack"
+              onClick={() => openPackDetailsTab(upload.packId!.toString())}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const renderBatch = (batch: BatchGroup) => {
+    const uploadDate = new Date(batch.timestamp)
+
+    return (
+      <div key={batch.batchId} className="history-batch">
+        <div
+          className="history-batch-header"
+          onClick={() => toggleBatchCollapse(batch.batchId)}
+        >
+          <div className="history-batch-info">
+            <i
+              className={`pi ${batch.collapsed ? 'pi-chevron-right' : 'pi-chevron-down'} history-batch-toggle`}
+            />
+            <span className="history-batch-title">
+              Batch Upload - {batch.files.length} file
+              {batch.files.length > 1 ? 's' : ''}
+            </span>
+            <span className="history-batch-timestamp">
+              {uploadDate.toLocaleString()}
+            </span>
+          </div>
+        </div>
+        {!batch.collapsed && (
+          <div className="history-batch-items">
+            {batch.files.map(upload => renderHistoryItem(upload))}
+          </div>
         )}
       </div>
     )
   }
 
-  const batchIdTemplate = (rowData: BatchUploadHistory) => {
+  if (loading) {
     return (
-      <code className="batch-id-code">
-        {rowData.batchId.substring(0, 8)}...
-      </code>
+      <div className="history-container">
+        <div className="history-toolbar">
+          <h2>Upload History</h2>
+        </div>
+        <div className="history-loading">
+          <ProgressBar mode="indeterminate" />
+          <p>Loading history...</p>
+        </div>
+      </div>
     )
   }
 
@@ -210,59 +299,16 @@ export default function History() {
         />
       </div>
 
-      <DataTable
-        value={history}
-        loading={loading}
-        paginator
-        rows={25}
-        rowsPerPageOptions={[10, 25, 50, 100]}
-        sortField="uploadedAt"
-        sortOrder={-1}
-        stripedRows
-        emptyMessage="No upload history found"
-        rowGroupMode="subheader"
-        groupRowsBy="batchId"
-        sortMode="single"
-        rowClassName={() => 'history-row'}
-      >
-        <Column
-          field="fileName"
-          header="File Name"
-          sortable
-          style={{ minWidth: '200px' }}
-        />
-        <Column
-          field="uploadType"
-          header="Type"
-          body={uploadTypeTemplate}
-          sortable
-          style={{ width: '120px' }}
-        />
-        <Column
-          field="uploadedAt"
-          header="Uploaded"
-          body={dateTemplate}
-          sortable
-          style={{ width: '150px' }}
-        />
-        <Column
-          header="Uploaded To"
-          body={uploadedToTemplate}
-          style={{ minWidth: '200px' }}
-        />
-        <Column
-          field="batchId"
-          header="Batch"
-          body={batchIdTemplate}
-          sortable
-          style={{ width: '120px' }}
-        />
-        <Column
-          header="Actions"
-          body={actionsTemplate}
-          style={{ width: '120px' }}
-        />
-      </DataTable>
+      {batchGroups.length === 0 ? (
+        <div className="history-empty">
+          <i className="pi pi-history" />
+          <p>No upload history found</p>
+        </div>
+      ) : (
+        <div className="history-list">
+          {batchGroups.map(batch => renderBatch(batch))}
+        </div>
+      )}
     </div>
   )
 }
