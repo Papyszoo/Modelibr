@@ -1,10 +1,12 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
 import { Tab } from '../../../types'
+import { useDockContext } from '../../../contexts/DockContext'
+import { useTabMenuItems } from '../../../hooks/useTabMenuItems'
 
 interface DockEmptyStateProps {
   onAddTab: (type: Tab['type'], title: string) => void
+  onReopenTab: (tab: Tab) => void
   onDrop: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
@@ -13,34 +15,41 @@ interface DockEmptyStateProps {
 
 export default function DockEmptyState({
   onAddTab,
+  onReopenTab,
   onDrop,
   onDragOver,
   onDragEnter,
   onDragLeave,
 }: DockEmptyStateProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
+  const {
+    recentlyClosedTabs,
+    registerContextMenu,
+    unregisterContextMenu,
+    showContextMenu,
+  } = useDockContext()
 
-  const addMenuItems: MenuItem[] = [
-    {
-      label: 'Models List',
-      icon: 'pi pi-list',
-      command: () => onAddTab('modelList', 'Models'),
-    },
-    {
-      label: 'Texture Sets',
-      icon: 'pi pi-folder',
-      command: () => onAddTab('textureSets', 'Texture Sets'),
-    },
-    {
-      label: 'Packs',
-      icon: 'pi pi-box',
-      command: () => onAddTab('packs', 'Packs'),
-    },
-  ]
+  const addMenuItems = useTabMenuItems({
+    onAddTab,
+    recentlyClosedTabs,
+    onReopenTab,
+  })
+
+  useEffect(() => {
+    if (contextMenuRef.current) {
+      registerContextMenu(contextMenuRef)
+    }
+    return () => {
+      if (contextMenuRef.current) {
+        unregisterContextMenu(contextMenuRef)
+      }
+    }
+  }, [registerContextMenu, unregisterContextMenu])
 
   const handleEmptyAreaContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
-    contextMenuRef.current?.show(e)
+    e.stopPropagation()
+    showContextMenu(contextMenuRef, e)
   }
 
   return (
@@ -62,6 +71,7 @@ export default function DockEmptyState({
         model={addMenuItems}
         ref={contextMenuRef}
         className="dock-add-menu"
+        autoZIndex
       />
     </div>
   )
