@@ -207,12 +207,6 @@ export default function TextureSetGrid({
       setDropTargetTextureSet(null)
     } catch (error) {
       console.error('Failed to merge texture sets:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to merge texture sets',
-        life: 3000,
-      })
       throw error
     }
   }

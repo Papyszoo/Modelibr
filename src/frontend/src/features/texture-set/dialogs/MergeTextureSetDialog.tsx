@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
@@ -26,6 +26,13 @@ function MergeTextureSetDialog({
     useState<TextureType | null>(null)
   const [merging, setMerging] = useState(false)
   const toast = useRef<Toast>(null)
+
+  // Reset selected texture type when dialog is hidden or source/target changes
+  useEffect(() => {
+    if (!visible) {
+      setSelectedTextureType(null)
+    }
+  }, [visible])
 
   // Get available texture types (all types that the target set doesn't already have)
   const getAvailableTextureTypes = () => {
