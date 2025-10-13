@@ -163,6 +163,24 @@ export default function TextureSetGrid({
         return
       }
 
+      // Check if source has other textures besides Albedo
+      const hasOtherTextures = draggedTextureSet.textures?.some(
+        t => t.textureType !== TextureType.Albedo
+      )
+
+      if (hasOtherTextures) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Warning',
+          detail:
+            'Source texture set has other textures besides Albedo. Only texture sets with Albedo only can be merged.',
+          life: 3000,
+        })
+        setDraggedTextureSet(null)
+        setDragOverCardId(null)
+        return
+      }
+
       // Show merge dialog
       setDropTargetTextureSet(targetTextureSet)
       setShowMergeDialog(true)
@@ -189,6 +207,9 @@ export default function TextureSetGrid({
         fileId: albedoTexture.fileId,
         textureType: textureType,
       })
+
+      // Delete the source texture set after successful merge
+      await ApiClient.deleteTextureSet(draggedTextureSet.id)
 
       toast.current?.show({
         severity: 'success',

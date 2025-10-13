@@ -3,6 +3,7 @@ import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { TextureSetDto, TextureType } from '../../../types'
 import { getTextureTypeLabel } from '../../../utils/textureTypeUtils'
 import './dialogs.css'
@@ -34,12 +35,8 @@ function MergeTextureSetDialog({
     }
   }, [visible])
 
-  // Get available texture types (all types that the target set doesn't already have)
-  const getAvailableTextureTypes = () => {
-    if (!targetTextureSet) return []
-
-    const existingTypes =
-      targetTextureSet.textures?.map(t => t.textureType) || []
+  // Get all texture types for the dropdown
+  const getAllTextureTypes = () => {
     const allTypes = [
       TextureType.Albedo,
       TextureType.Normal,
@@ -51,12 +48,18 @@ function MergeTextureSetDialog({
       TextureType.Specular,
     ]
 
-    return allTypes
-      .filter(type => !existingTypes.includes(type))
-      .map(type => ({
-        label: getTextureTypeLabel(type),
-        value: type,
-      }))
+    return allTypes.map(type => ({
+      label: getTextureTypeLabel(type),
+      value: type,
+    }))
+  }
+
+  // Check if a texture type already exists in the target set
+  const textureTypeExists = (textureType: TextureType) => {
+    if (!targetTextureSet) return false
+    const existingTypes =
+      targetTextureSet.textures?.map(t => t.textureType) || []
+    return existingTypes.includes(textureType)
   }
 
   const handleMerge = async () => {
@@ -70,9 +73,25 @@ function MergeTextureSetDialog({
       return
     }
 
+    // Check if texture type already exists and confirm replacement
+    if (textureTypeExists(selectedTextureType)) {
+      confirmDialog({
+        message: `Are you sure you want to replace the ${getTextureTypeLabel(selectedTextureType)} texture in "${targetTextureSet?.name}" texture set?`,
+        header: 'Replace Texture',
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+          await performMerge()
+        },
+      })
+    } else {
+      await performMerge()
+    }
+  }
+
+  const performMerge = async () => {
     try {
       setMerging(true)
-      await onMerge(selectedTextureType)
+      await onMerge(selectedTextureType!)
       onHide()
     } catch (error) {
       console.error('Failed to merge texture sets:', error)
@@ -87,7 +106,7 @@ function MergeTextureSetDialog({
     }
   }
 
-  const availableTypes = getAvailableTextureTypes()
+  const availableTypes = getAllTextureTypes()
 
   const footer = (
     <div>
@@ -139,20 +158,10 @@ function MergeTextureSetDialog({
                   options={availableTypes}
                   onChange={e => setSelectedTextureType(e.value)}
                   placeholder="Select a texture type"
-                  disabled={merging || availableTypes.length === 0}
+                  disabled={merging}
                   className="w-full"
                 />
               </div>
-
-              {availableTypes.length === 0 && (
-                <div className="no-available-types">
-                  <i className="pi pi-info-circle" />
-                  <p>
-                    The target texture set already has all texture types filled.
-                    Please remove a texture from the target set first.
-                  </p>
-                </div>
-              )}
             </>
           )}
         </div>
