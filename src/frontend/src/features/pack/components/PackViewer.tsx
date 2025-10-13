@@ -224,10 +224,21 @@ export default function PackViewer({ packId }: PackViewerProps) {
     try {
       setUploadingModel(true)
 
+      let newCount = 0
+      let existingCount = 0
+
       // Upload all files and add them to pack
       const uploadPromises = files.map(async file => {
         const response = await uploadModelFile(file)
         await ApiClient.addModelToPack(packId, response.id)
+
+        // Count new vs existing models
+        if (response.alreadyExists) {
+          existingCount++
+        } else {
+          newCount++
+        }
+
         // Trigger thumbnail generation if not already exists
         if (!response.alreadyExists) {
           try {
@@ -241,10 +252,20 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
       await Promise.all(uploadPromises)
 
+      // Show appropriate success message
+      let message = ''
+      if (newCount > 0 && existingCount > 0) {
+        message = `${newCount} new model(s) uploaded and ${existingCount} existing linked to pack`
+      } else if (newCount > 0) {
+        message = `${newCount} model(s) uploaded and added to pack`
+      } else {
+        message = `${existingCount} existing model(s) linked to pack`
+      }
+
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: `${files.length} model(s) uploaded and added to pack`,
+        detail: message,
         life: 3000,
       })
       loadPackContent()
@@ -268,28 +289,77 @@ export default function PackViewer({ packId }: PackViewerProps) {
     try {
       setUploadingTextureSet(true)
 
-      // Upload all texture files and create texture sets
-      const uploadPromises = files.map(async file => {
-        const fileResponse = await uploadTextureFile(file)
+      let newCount = 0
+      let existingCount = 0
 
-        const setName = file.name.replace(/\.[^/.]+$/, '')
+      // Helper function to create a new texture set with a file
+      const createTextureSetWithFile = async (
+        fileName: string,
+        fileId: number
+      ): Promise<number> => {
+        const setName = fileName.replace(/\.[^/.]+$/, '')
         const setResponse = await ApiClient.createTextureSet({ name: setName })
 
         await ApiClient.addTextureToSetEndpoint(setResponse.id, {
-          fileId: fileResponse.fileId,
+          fileId: fileId,
           textureType: TextureType.Albedo,
         })
 
-        await ApiClient.addTextureSetToPack(packId, setResponse.id)
-        return setResponse
+        return setResponse.id
+      }
+
+      // Upload all texture files and create/link texture sets
+      const uploadPromises = files.map(async file => {
+        const fileResponse = await uploadTextureFile(file)
+        let textureSetId: number | null = null
+
+        // Check if file already exists and has an associated texture set
+        if (fileResponse.alreadyExists) {
+          const existingSetResponse = await ApiClient.getTextureSetByFileId(
+            fileResponse.fileId
+          )
+
+          if (existingSetResponse.textureSetId) {
+            // Use existing texture set
+            textureSetId = existingSetResponse.textureSetId
+            existingCount++
+          } else {
+            // File exists but no texture set has it yet, create new texture set
+            textureSetId = await createTextureSetWithFile(
+              file.name,
+              fileResponse.fileId
+            )
+            newCount++
+          }
+        } else {
+          // New file, create new texture set
+          textureSetId = await createTextureSetWithFile(
+            file.name,
+            fileResponse.fileId
+          )
+          newCount++
+        }
+
+        // Add texture set to pack (idempotent operation)
+        await ApiClient.addTextureSetToPack(packId, textureSetId)
       })
 
       await Promise.all(uploadPromises)
 
+      // Show appropriate success message
+      let message = ''
+      if (newCount > 0 && existingCount > 0) {
+        message = `${newCount} new texture set(s) created and ${existingCount} existing linked to pack`
+      } else if (newCount > 0) {
+        message = `${newCount} texture set(s) created and added to pack`
+      } else {
+        message = `${existingCount} existing texture set(s) linked to pack`
+      }
+
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: `${files.length} texture set(s) created and added to pack`,
+        detail: message,
         life: 3000,
       })
       loadPackContent()
