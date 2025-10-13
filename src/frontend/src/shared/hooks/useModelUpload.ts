@@ -13,17 +13,18 @@ export function useModelUpload() {
   /**
    * Upload a single model file
    * @param {File} file - File to upload
+   * @param {Object} options - Optional upload options
    * @returns {Promise<Object>} Upload result
    */
   const uploadModel = useCallback(
-    async file => {
+    async (file, options = {}) => {
       if (!file) {
         throw new Error('No file provided')
       }
 
       // Add to global progress tracker if available
       const uploadId = uploadProgressContext
-        ? uploadProgressContext.addUpload(file, 'model')
+        ? uploadProgressContext.addUpload(file, 'model', options.batchId)
         : null
 
       try {
@@ -32,7 +33,9 @@ export function useModelUpload() {
           uploadProgressContext.updateUploadProgress(uploadId, 50)
         }
 
-        const result = await ApiClient.uploadModel(file)
+        const result = await ApiClient.uploadModel(file, {
+          batchId: options.batchId,
+        })
 
         // Complete upload
         if (uploadId && uploadProgressContext) {
@@ -66,9 +69,15 @@ export function useModelUpload() {
       const fileArray = Array.from(files)
       const results = []
 
+      // Create batch for multiple files
+      const batchId =
+        uploadProgressContext && fileArray.length > 1
+          ? uploadProgressContext.createBatch()
+          : undefined
+
       for (const file of fileArray) {
         try {
-          const result = await uploadModel(file)
+          const result = await uploadModel(file, { batchId })
           results.push({ file, result, success: true })
         } catch (error) {
           results.push({ file, error, success: false })
@@ -77,7 +86,7 @@ export function useModelUpload() {
 
       return results
     },
-    [uploadModel]
+    [uploadModel, uploadProgressContext]
   )
 
   return {

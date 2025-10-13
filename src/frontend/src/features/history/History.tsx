@@ -84,36 +84,37 @@ export default function History() {
     )
   }
 
-  const assignmentTemplate = (rowData: BatchUploadHistory) => {
-    const hasAssignment =
-      rowData.modelId || rowData.packId || rowData.textureSetId
-
-    if (!hasAssignment) {
-      return <span className="text-muted">Not assigned</span>
+  const uploadedToTemplate = (rowData: BatchUploadHistory) => {
+    // Determine where the file was uploaded to
+    if (rowData.packId && rowData.packName) {
+      return (
+        <div className="uploaded-to">
+          <i className="pi pi-inbox"></i>
+          <span>Pack: {rowData.packName}</span>
+        </div>
+      )
     }
-
-    return (
-      <div className="assignment-list">
-        {rowData.modelId && rowData.modelName && (
-          <div className="assignment-item">
-            <i className="pi pi-box"></i>
-            <span>Model: {rowData.modelName}</span>
-          </div>
-        )}
-        {rowData.packId && rowData.packName && (
-          <div className="assignment-item">
-            <i className="pi pi-inbox"></i>
-            <span>Pack: {rowData.packName}</span>
-          </div>
-        )}
-        {rowData.textureSetId && rowData.textureSetName && (
-          <div className="assignment-item">
-            <i className="pi pi-image"></i>
-            <span>Texture Set: {rowData.textureSetName}</span>
-          </div>
-        )}
-      </div>
-    )
+    
+    // Check upload type to determine the list
+    if (rowData.uploadType === 'model' || rowData.modelId) {
+      return (
+        <div className="uploaded-to">
+          <i className="pi pi-list"></i>
+          <span>Models List</span>
+        </div>
+      )
+    }
+    
+    if (rowData.uploadType === 'texture' || rowData.uploadType === 'textureSet' || rowData.textureSetId) {
+      return (
+        <div className="uploaded-to">
+          <i className="pi pi-list"></i>
+          <span>Texture Sets List</span>
+        </div>
+      )
+    }
+    
+    return <span className="text-muted">Unknown</span>
   }
 
   const actionsTemplate = (rowData: BatchUploadHistory) => {
@@ -123,7 +124,16 @@ export default function History() {
           <Button
             icon="pi pi-box"
             className="p-button-text p-button-rounded p-button-sm"
-            onClick={() => openModelDetailsTab(rowData.modelId!.toString())}
+            onClick={async () => {
+              try {
+                const model = await ApiClient.getModelById(
+                  rowData.modelId!.toString()
+                )
+                openModelDetailsTab(model)
+              } catch (error) {
+                console.error('Failed to open model:', error)
+              }
+            }}
             tooltip="Open Model"
             tooltipOptions={{ position: 'left' }}
           />
@@ -132,9 +142,16 @@ export default function History() {
           <Button
             icon="pi pi-image"
             className="p-button-text p-button-rounded p-button-sm"
-            onClick={() =>
-              openTextureSetDetailsTab(rowData.textureSetId!.toString())
-            }
+            onClick={async () => {
+              try {
+                const textureSet = await ApiClient.getTextureSetById(
+                  rowData.textureSetId!
+                )
+                openTextureSetDetailsTab(textureSet)
+              } catch (error) {
+                console.error('Failed to open texture set:', error)
+              }
+            }}
             tooltip="Open Texture Set"
             tooltipOptions={{ position: 'left' }}
           />
@@ -209,8 +226,8 @@ export default function History() {
           style={{ width: '150px' }}
         />
         <Column
-          header="Assigned To"
-          body={assignmentTemplate}
+          header="Uploaded To"
+          body={uploadedToTemplate}
           style={{ minWidth: '200px' }}
         />
         <Column

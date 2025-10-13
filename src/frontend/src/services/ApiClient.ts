@@ -51,12 +51,21 @@ class ApiClient {
     return this.baseURL
   }
 
-  async uploadModel(file: File): Promise<UploadModelResponse> {
+  async uploadModel(
+    file: File,
+    options?: { batchId?: string }
+  ): Promise<UploadModelResponse> {
     const formData = new FormData()
     formData.append('file', file)
 
+    // Build query parameters
+    const params = new URLSearchParams()
+    if (options?.batchId) params.append('batchId', options.batchId)
+
+    const url = `/models${params.toString() ? `?${params.toString()}` : ''}`
+
     const response: AxiosResponse<UploadModelResponse> = await this.client.post(
-      '/models',
+      url,
       formData,
       {
         headers: {

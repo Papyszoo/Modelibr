@@ -24,6 +24,10 @@ export function getTabLabel(
       return packId ? `Pack ${packId}` : 'Pack Viewer'
     case 'animation':
       return 'Animations'
+    case 'history':
+      return 'History'
+    case 'settings':
+      return 'Settings'
     default:
       return 'Unknown'
   }
@@ -63,6 +67,8 @@ export function parseCompactTabFormat(
           'textureSetViewer',
           'packs',
           'packViewer',
+          'history',
+          'settings',
         ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${type}`)
