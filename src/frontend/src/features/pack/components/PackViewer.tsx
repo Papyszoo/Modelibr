@@ -11,8 +11,7 @@ import { PackDto, Model, TextureSetDto, TextureType } from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
-import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
-import { useModelUpload } from '../../../shared/hooks/useModelUpload'
+import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import './PackViewer.css'
 
 interface PackViewerProps {
@@ -43,10 +42,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
   const [selectedTextureSet, setSelectedTextureSet] =
     useState<TextureSetDto | null>(null)
   const { openModelDetailsTab, openTextureSetDetailsTab } = useTabContext()
-  const { uploadFile: uploadTextureFile } = useGenericFileUpload({
-    fileType: 'texture',
-  })
-  const { uploadModel: uploadModelFile } = useModelUpload()
+  const uploadProgressContext = useUploadProgress()
 
   useEffect(() => {
     loadPack()
@@ -227,27 +223,61 @@ export default function PackViewer({ packId }: PackViewerProps) {
       let newCount = 0
       let existingCount = 0
 
+      // Create batch for multiple files
+      const batchId =
+        uploadProgressContext && files.length > 1
+          ? uploadProgressContext.createBatch()
+          : undefined
+
       // Upload all files and add them to pack
       const uploadPromises = files.map(async file => {
-        const response = await uploadModelFile(file)
-        await ApiClient.addModelToPack(packId, response.id)
+        let uploadId: string | null = null
+        try {
+          // Track the upload with batchId
+          uploadId =
+            uploadProgressContext?.addUpload(file, 'model', batchId) || null
 
-        // Count new vs existing models
-        if (response.alreadyExists) {
-          existingCount++
-        } else {
-          newCount++
-        }
-
-        // Trigger thumbnail generation if not already exists
-        if (!response.alreadyExists) {
-          try {
-            await ApiClient.regenerateThumbnail(response.id.toString())
-          } catch (err) {
-            console.warn('Failed to generate thumbnail:', err)
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 50)
           }
+
+          const response = await ApiClient.uploadModel(file)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 75)
+          }
+
+          await ApiClient.addModelToPack(packId, response.id)
+
+          // Count new vs existing models
+          if (response.alreadyExists) {
+            existingCount++
+          } else {
+            newCount++
+          }
+
+          // Complete upload
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, response)
+          }
+
+          // Trigger thumbnail generation if not already exists
+          if (!response.alreadyExists) {
+            try {
+              await ApiClient.regenerateThumbnail(response.id.toString())
+            } catch (err) {
+              console.warn('Failed to generate thumbnail:', err)
+            }
+          }
+          return response
+        } catch (error) {
+          // Mark upload as failed
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error as Error)
+          }
+          throw error
         }
-        return response
       })
 
       await Promise.all(uploadPromises)
@@ -292,7 +322,13 @@ export default function PackViewer({ packId }: PackViewerProps) {
       let newCount = 0
       let existingCount = 0
 
-      // Helper function to create a new texture set with a file
+      // Create batch for multiple files
+      const batchId =
+        uploadProgressContext && files.length > 1
+          ? uploadProgressContext.createBatch()
+          : undefined
+
+      // Helper function to create a new texture set with uploaded file
       const createTextureSetWithFile = async (
         fileName: string,
         fileId: number
@@ -310,38 +346,75 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
       // Upload all texture files and create/link texture sets
       const uploadPromises = files.map(async file => {
-        const fileResponse = await uploadTextureFile(file)
-        let textureSetId: number | null = null
+        let uploadId: string | null = null
+        try {
+          // Track the upload with batchId
+          uploadId =
+            uploadProgressContext?.addUpload(file, 'texture', batchId) || null
 
-        // Check if file already exists and has an associated texture set
-        if (fileResponse.alreadyExists) {
-          const existingSetResponse = await ApiClient.getTextureSetByFileId(
-            fileResponse.fileId
-          )
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 30)
+          }
 
-          if (existingSetResponse.textureSetId) {
-            // Use existing texture set
-            textureSetId = existingSetResponse.textureSetId
-            existingCount++
+          const fileResponse = await ApiClient.uploadFile(file)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 60)
+          }
+
+          let textureSetId: number | null = null
+
+          // Check if file already exists and has an associated texture set
+          if (fileResponse.alreadyExists) {
+            const existingSetResponse = await ApiClient.getTextureSetByFileId(
+              fileResponse.fileId
+            )
+
+            if (existingSetResponse.textureSetId) {
+              // Use existing texture set
+              textureSetId = existingSetResponse.textureSetId
+              existingCount++
+            } else {
+              // File exists but no texture set has it yet, create new texture set
+              textureSetId = await createTextureSetWithFile(
+                file.name,
+                fileResponse.fileId
+              )
+              newCount++
+            }
           } else {
-            // File exists but no texture set has it yet, create new texture set
+            // New file, create new texture set
             textureSetId = await createTextureSetWithFile(
               file.name,
               fileResponse.fileId
             )
             newCount++
           }
-        } else {
-          // New file, create new texture set
-          textureSetId = await createTextureSetWithFile(
-            file.name,
-            fileResponse.fileId
-          )
-          newCount++
-        }
 
-        // Add texture set to pack (idempotent operation)
-        await ApiClient.addTextureSetToPack(packId, textureSetId)
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 80)
+          }
+
+          // Add texture set to pack (idempotent operation)
+          await ApiClient.addTextureSetToPack(packId, textureSetId)
+
+          // Complete upload with textureSetId for the "Open in tab" button
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, {
+              ...fileResponse,
+              textureSetId: textureSetId,
+            })
+          }
+
+          return textureSetId
+        } catch (error) {
+          // Mark upload as failed
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error as Error)
+          }
+          throw error
+        }
       })
 
       await Promise.all(uploadPromises)
