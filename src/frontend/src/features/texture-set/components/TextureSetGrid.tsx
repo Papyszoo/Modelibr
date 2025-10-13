@@ -9,6 +9,7 @@ import { TextureSetDto, TextureType, PackDto } from '../../../types'
 import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
+import MergeTextureSetDialog from '../dialogs/MergeTextureSetDialog'
 
 interface TextureSetGridProps {
   textureSets: TextureSetDto[]
@@ -18,6 +19,7 @@ interface TextureSetGridProps {
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
   onDragLeave: (e: React.DragEvent) => void
+  onTextureSetUpdated?: () => void
 }
 
 export default function TextureSetGrid({
@@ -28,12 +30,17 @@ export default function TextureSetGrid({
   onDragOver,
   onDragEnter,
   onDragLeave,
+  onTextureSetUpdated,
 }: TextureSetGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [packs, setPacks] = useState<PackDto[]>([])
   const [selectedTextureSet, setSelectedTextureSet] =
     useState<TextureSetDto | null>(null)
   const [showPackDialog, setShowPackDialog] = useState(false)
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
+  const [draggedTextureSet, setDraggedTextureSet] = useState<TextureSetDto | null>(null)
+  const [dropTargetTextureSet, setDropTargetTextureSet] = useState<TextureSetDto | null>(null)
+  const [dragOverCardId, setDragOverCardId] = useState<number | null>(null)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
 
@@ -71,6 +78,133 @@ export default function TextureSetGrid({
         life: 3000,
       })
     }
+  }
+
+  const handleCardDragStart = (e: React.DragEvent, textureSet: TextureSetDto) => {
+    e.stopPropagation()
+    setDraggedTextureSet(textureSet)
+    // Set drag data to distinguish between file drops and texture set drops
+    e.dataTransfer.effectAllowed = 'copy'
+    e.dataTransfer.setData('application/x-texture-set-id', textureSet.id.toString())
+  }
+
+  const handleCardDragEnd = (e: React.DragEvent) => {
+    e.stopPropagation()
+    setDraggedTextureSet(null)
+    setDragOverCardId(null)
+  }
+
+  const handleCardDragOver = (e: React.DragEvent, textureSet: TextureSetDto) => {
+    // Check if this is a texture set being dragged (not a file)
+    if (e.dataTransfer.types.includes('application/x-texture-set-id')) {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOverCardId(textureSet.id)
+    }
+  }
+
+  const handleCardDragLeave = (e: React.DragEvent, textureSet: TextureSetDto) => {
+    e.stopPropagation()
+    if (dragOverCardId === textureSet.id) {
+      setDragOverCardId(null)
+    }
+  }
+
+  const handleCardDrop = (e: React.DragEvent, targetTextureSet: TextureSetDto) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Check if this is a texture set being dragged (not a file)
+    const draggedSetId = e.dataTransfer.getData('application/x-texture-set-id')
+    if (draggedSetId && draggedTextureSet) {
+      // Prevent dropping on itself
+      if (draggedTextureSet.id === targetTextureSet.id) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Warning',
+          detail: 'Cannot merge a texture set with itself',
+          life: 3000,
+        })
+        setDraggedTextureSet(null)
+        setDragOverCardId(null)
+        return
+      }
+
+      // Check if source has an albedo texture
+      const albedoTexture = draggedTextureSet.textures?.find(
+        t => t.textureType === TextureType.Albedo
+      )
+      
+      if (!albedoTexture) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Warning',
+          detail: 'Source texture set does not have an Albedo texture to merge',
+          life: 3000,
+        })
+        setDraggedTextureSet(null)
+        setDragOverCardId(null)
+        return
+      }
+
+      // Show merge dialog
+      setDropTargetTextureSet(targetTextureSet)
+      setShowMergeDialog(true)
+    }
+    
+    setDragOverCardId(null)
+  }
+
+  const handleMergeTextureSets = async (textureType: TextureType) => {
+    if (!draggedTextureSet || !dropTargetTextureSet) return
+
+    try {
+      // Find the albedo texture from the source set
+      const albedoTexture = draggedTextureSet.textures?.find(
+        t => t.textureType === TextureType.Albedo
+      )
+
+      if (!albedoTexture) {
+        throw new Error('Source texture set does not have an Albedo texture')
+      }
+
+      // Add the texture to the target set with the selected type
+      await ApiClient.addTextureToSetEndpoint(dropTargetTextureSet.id, {
+        fileId: albedoTexture.fileId,
+        textureType: textureType,
+      })
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: `Texture merged successfully as ${textureType}`,
+        life: 3000,
+      })
+
+      // Refresh the texture sets if callback provided
+      if (onTextureSetUpdated) {
+        onTextureSetUpdated()
+      }
+
+      setShowMergeDialog(false)
+      setDraggedTextureSet(null)
+      setDropTargetTextureSet(null)
+    } catch (error) {
+      console.error('Failed to merge texture sets:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to merge texture sets',
+        life: 3000,
+      })
+      throw error
+    }
+  }
+
+  const handleMergeDialogHide = () => {
+    setShowMergeDialog(false)
+    setDraggedTextureSet(null)
+    setDropTargetTextureSet(null)
   }
 
   const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
@@ -167,11 +301,18 @@ export default function TextureSetGrid({
       <div className="texture-set-grid">
         {filteredTextureSets.map(textureSet => {
           const albedoUrl = getAlbedoTextureUrl(textureSet)
+          const isDraggedOver = dragOverCardId === textureSet.id
 
           return (
             <div
               key={textureSet.id}
-              className="texture-set-card"
+              className={`texture-set-card ${isDraggedOver ? 'drag-over-card' : ''}`}
+              draggable={true}
+              onDragStart={e => handleCardDragStart(e, textureSet)}
+              onDragEnd={handleCardDragEnd}
+              onDragOver={e => handleCardDragOver(e, textureSet)}
+              onDragLeave={e => handleCardDragLeave(e, textureSet)}
+              onDrop={e => handleCardDrop(e, textureSet)}
               onClick={() => onTextureSetSelect(textureSet)}
               onContextMenu={e => {
                 e.preventDefault()
@@ -254,6 +395,15 @@ export default function TextureSetGrid({
           )}
         </div>
       </Dialog>
+
+      {/* Merge Texture Set Dialog */}
+      <MergeTextureSetDialog
+        visible={showMergeDialog}
+        sourceTextureSet={draggedTextureSet}
+        targetTextureSet={dropTargetTextureSet}
+        onHide={handleMergeDialogHide}
+        onMerge={handleMergeTextureSets}
+      />
     </div>
   )
 }
