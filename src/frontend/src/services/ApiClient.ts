@@ -308,6 +308,27 @@ class ApiClient {
     )
     return response.data.textureSets
   }
+
+  // Batch Upload History API
+  async getBatchUploadHistory(): Promise<{
+    uploads: Array<{
+      id: number
+      batchId: string
+      uploadType: string
+      uploadedAt: string
+      fileId: number
+      fileName: string
+      packId: number | null
+      packName: string | null
+      modelId: number | null
+      modelName: string | null
+      textureSetId: number | null
+      textureSetName: string | null
+    }>
+  }> {
+    const response = await this.client.get('/batch-uploads/history')
+    return response.data
+  }
 }
 
 export default new ApiClient()

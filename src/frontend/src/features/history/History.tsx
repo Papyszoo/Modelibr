@@ -33,7 +33,7 @@ export default function History() {
   const loadHistory = async () => {
     try {
       setLoading(true)
-      const response = await ApiClient.get('/batch-uploads/history')
+      const response = await ApiClient.getBatchUploadHistory()
       setHistory(response.uploads || [])
     } catch (error) {
       console.error('Failed to load upload history:', error)
