@@ -338,4 +338,87 @@ describe('ApiCacheStore', () => {
       expect(result.current.getModelById('2')).toEqual(mockModels[1])
     })
   })
+
+  describe('Thumbnail caching', () => {
+    it('should cache and retrieve thumbnail status', () => {
+      const mockStatus = {
+        status: 'Ready' as const,
+        fileUrl: '/thumbnails/1.jpg',
+        sizeBytes: 1024,
+        width: 200,
+        height: 200,
+      }
+
+      const { result } = renderHook(() => useApiCacheStore())
+
+      act(() => {
+        result.current.setThumbnailStatus('1', mockStatus)
+      })
+
+      const cached = result.current.getThumbnailStatus('1')
+      expect(cached).toEqual(mockStatus)
+    })
+
+    it('should cache and retrieve thumbnail blob', () => {
+      const mockBlob = new Blob(['test'], { type: 'image/jpeg' })
+
+      const { result } = renderHook(() => useApiCacheStore())
+
+      act(() => {
+        result.current.setThumbnailBlob('1', mockBlob)
+      })
+
+      const cached = result.current.getThumbnailBlob('1')
+      expect(cached).toEqual(mockBlob)
+    })
+
+    it('should invalidate thumbnails for specific model', () => {
+      const mockStatus = {
+        status: 'Ready' as const,
+        fileUrl: '/thumbnails/1.jpg',
+      }
+      const mockBlob = new Blob(['test'], { type: 'image/jpeg' })
+
+      const { result } = renderHook(() => useApiCacheStore())
+
+      act(() => {
+        result.current.setThumbnailStatus('1', mockStatus)
+        result.current.setThumbnailBlob('1', mockBlob)
+      })
+
+      expect(result.current.getThumbnailStatus('1')).toEqual(mockStatus)
+      expect(result.current.getThumbnailBlob('1')).toEqual(mockBlob)
+
+      act(() => {
+        result.current.invalidateThumbnailById('1')
+      })
+
+      expect(result.current.getThumbnailStatus('1')).toBeNull()
+      expect(result.current.getThumbnailBlob('1')).toBeNull()
+    })
+
+    it('should invalidate all thumbnails', () => {
+      const mockStatus = {
+        status: 'Ready' as const,
+        fileUrl: '/thumbnails/1.jpg',
+      }
+
+      const { result } = renderHook(() => useApiCacheStore())
+
+      act(() => {
+        result.current.setThumbnailStatus('1', mockStatus)
+        result.current.setThumbnailStatus('2', mockStatus)
+      })
+
+      expect(result.current.getThumbnailStatus('1')).toEqual(mockStatus)
+      expect(result.current.getThumbnailStatus('2')).toEqual(mockStatus)
+
+      act(() => {
+        result.current.invalidateThumbnails()
+      })
+
+      expect(result.current.getThumbnailStatus('1')).toBeNull()
+      expect(result.current.getThumbnailStatus('2')).toBeNull()
+    })
+  })
 })
