@@ -73,6 +73,7 @@ export function formatFileSize(bytes: number): string {
  */
 export const THREEJS_SUPPORTED_FORMATS = [
   '.obj', // OBJLoader
+  '.fbx', // FBXLoader
   '.gltf', // GLTFLoader
   '.glb', // GLTFLoader
 ] as const
