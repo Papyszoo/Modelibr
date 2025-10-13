@@ -10,6 +10,7 @@ import {
 import { useTabContext } from '../../../hooks/useTabContext'
 import { TabContextValue } from '../../../contexts/TabContext'
 import { Model } from '../../../utils/fileUtils'
+import { useApiCache } from '../../../hooks/useApiCache'
 import ModelListHeader from './ModelListHeader'
 import UploadProgress from './UploadProgress'
 import LoadingState from './LoadingState'
@@ -74,6 +75,7 @@ function ModelListContent({
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string>('')
   const toast = useRef<Toast>(null)
+  const { refreshModels } = useApiCache()
 
   // Use the file upload hook with Three.js renderability requirement
   const { uploading, uploadProgress, uploadMultipleFiles } = useFileUpload({
@@ -107,6 +109,17 @@ function ModelListContent({
     }
   }
 
+  const handleRefresh = async () => {
+    refreshModels() // Invalidate cache
+    await fetchModels() // Fetch fresh data
+    toast.current?.show({
+      severity: 'success',
+      summary: 'Refreshed',
+      detail: 'Models list has been refreshed',
+      life: 2000,
+    })
+  }
+
   const handleModelSelect = (model: Model) => {
     if (isTabContent && tabContext) {
       // Open model details in new tab
@@ -124,6 +137,7 @@ function ModelListContent({
       <ModelListHeader
         isTabContent={isTabContent}
         onBackToUpload={onBackToUpload}
+        onRefresh={handleRefresh}
         modelCount={models.length}
       />
 
