@@ -139,7 +139,17 @@ function MergeTextureSetDialog({
         modal
       >
         <div className="merge-texture-set-dialog">
-          {sourceTextureSet && targetTextureSet && (
+          {!sourceTextureSet || !targetTextureSet ? (
+            <div className="merge-error">
+              <p>Error: Unable to load texture set information.</p>
+              <p>
+                Source: {sourceTextureSet ? sourceTextureSet.name : 'Not loaded'}
+              </p>
+              <p>
+                Target: {targetTextureSet ? targetTextureSet.name : 'Not loaded'}
+              </p>
+            </div>
+          ) : (
             <>
               <div className="merge-info">
                 <p>

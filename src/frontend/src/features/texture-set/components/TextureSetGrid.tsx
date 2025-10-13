@@ -181,9 +181,17 @@ export default function TextureSetGrid({
         return
       }
 
-      // Show merge dialog
+      // Store both values before showing the dialog
+      // This ensures React has the latest state when dialog renders
       setDropTargetTextureSet(targetTextureSet)
-      setShowMergeDialog(true)
+      // Use setTimeout to ensure state is updated before showing dialog
+      setTimeout(() => {
+        setShowMergeDialog(true)
+        console.log('Opening merge dialog', {
+          source: draggedTextureSet?.name,
+          target: targetTextureSet?.name,
+        })
+      }, 0)
     }
 
     setDragOverCardId(null)
