@@ -71,7 +71,6 @@ export default function DockEmptyState({
         model={addMenuItems}
         ref={contextMenuRef}
         className="dock-add-menu"
-        appendTo="self"
         autoZIndex
       />
     </div>

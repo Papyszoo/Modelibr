@@ -74,7 +74,7 @@ export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
   }
 
   useEffect(() => {
-    // Close all context menus when clicking/right-clicking anywhere
+    // Close all context menus when clicking anywhere
     const handleGlobalClick = (): void => {
       contextMenuRefs.current.forEach(ref => {
         if (ref.current) {
@@ -83,11 +83,13 @@ export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
       })
     }
 
-    // Only listen to actual clicks (not right-clicks) to close menus
+    // Listen to both click and contextmenu events to close menus
     document.addEventListener('click', handleGlobalClick)
+    document.addEventListener('contextmenu', handleGlobalClick)
 
     return () => {
       document.removeEventListener('click', handleGlobalClick)
+      document.removeEventListener('contextmenu', handleGlobalClick)
     }
   }, [])
 

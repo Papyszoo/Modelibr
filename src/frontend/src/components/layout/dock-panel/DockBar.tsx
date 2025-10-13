@@ -104,7 +104,6 @@ export default function DockBar({
           model={addMenuItems}
           ref={menuRef}
           className="dock-add-menu"
-          appendTo="self"
           autoZIndex
         />
       </div>
