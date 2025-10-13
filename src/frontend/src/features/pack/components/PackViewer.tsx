@@ -224,9 +224,12 @@ export default function PackViewer({ packId }: PackViewerProps) {
     try {
       setUploadingModel(true)
 
+      // Create a single batch ID for all uploads
+      const batchId = `batch-${Date.now()}-${Math.random()}`
+
       // Upload all files and add them to pack
       const uploadPromises = files.map(async file => {
-        const response = await uploadModelFile(file)
+        const response = await uploadModelFile(file, { batchId })
         await ApiClient.addModelToPack(packId, response.id)
         // Trigger thumbnail generation if not already exists
         if (!response.alreadyExists) {
@@ -268,9 +271,15 @@ export default function PackViewer({ packId }: PackViewerProps) {
     try {
       setUploadingTextureSet(true)
 
+      // Create a single batch ID for all uploads
+      const batchId = `batch-${Date.now()}-${Math.random()}`
+
       // Upload all texture files and create texture sets
       const uploadPromises = files.map(async file => {
-        const fileResponse = await uploadTextureFile(file)
+        const fileResponse = await uploadTextureFile(file, {
+          batchId,
+          packId: packId,
+        })
 
         const setName = file.name.replace(/\.[^/.]+$/, '')
         const setResponse = await ApiClient.createTextureSet({ name: setName })

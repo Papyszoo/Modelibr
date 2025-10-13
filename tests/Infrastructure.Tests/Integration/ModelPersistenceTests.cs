@@ -195,6 +195,11 @@ internal class FakeBatchUploadRepository : IBatchUploadRepository
         return Task.FromResult(Enumerable.Empty<BatchUpload>());
     }
 
+    public Task<BatchUpload?> GetByFileIdAsync(int fileId, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<BatchUpload?>(null);
+    }
+
     public Task AddAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default)
     {
         // Do nothing for tests
@@ -202,6 +207,12 @@ internal class FakeBatchUploadRepository : IBatchUploadRepository
     }
 
     public Task AddRangeAsync(IEnumerable<BatchUpload> batchUploads, CancellationToken cancellationToken = default)
+    {
+        // Do nothing for tests
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default)
     {
         // Do nothing for tests
         return Task.CompletedTask;

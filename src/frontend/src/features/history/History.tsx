@@ -85,7 +85,7 @@ export default function History() {
   }
 
   const uploadedToTemplate = (rowData: BatchUploadHistory) => {
-    // Determine where the file was uploaded to
+    // Priority: Pack > Model > TextureSet > Default list
     if (rowData.packId && rowData.packName) {
       return (
         <div className="uploaded-to">
@@ -95,8 +95,8 @@ export default function History() {
       )
     }
     
-    // Check upload type to determine the list
-    if (rowData.uploadType === 'model' || rowData.modelId) {
+    // If model exists (but not in a pack), show Models List
+    if (rowData.modelId) {
       return (
         <div className="uploaded-to">
           <i className="pi pi-list"></i>
@@ -105,7 +105,27 @@ export default function History() {
       )
     }
     
-    if (rowData.uploadType === 'texture' || rowData.uploadType === 'textureSet' || rowData.textureSetId) {
+    // If texture set exists (but not in a pack), show Texture Sets List
+    if (rowData.textureSetId) {
+      return (
+        <div className="uploaded-to">
+          <i className="pi pi-list"></i>
+          <span>Texture Sets List</span>
+        </div>
+      )
+    }
+    
+    // Fallback based on upload type
+    if (rowData.uploadType === 'model') {
+      return (
+        <div className="uploaded-to">
+          <i className="pi pi-list"></i>
+          <span>Models List</span>
+        </div>
+      )
+    }
+    
+    if (rowData.uploadType === 'texture' || rowData.uploadType === 'textureSet') {
       return (
         <div className="uploaded-to">
           <i className="pi pi-list"></i>

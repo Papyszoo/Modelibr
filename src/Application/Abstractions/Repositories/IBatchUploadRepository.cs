@@ -8,6 +8,8 @@ public interface IBatchUploadRepository
     Task<IEnumerable<BatchUpload>> GetByBatchIdAsync(string batchId, CancellationToken cancellationToken = default);
     Task<IEnumerable<BatchUpload>> GetByUploadTypeAsync(string uploadType, CancellationToken cancellationToken = default);
     Task<IEnumerable<BatchUpload>> GetByDateRangeAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default);
+    Task<BatchUpload?> GetByFileIdAsync(int fileId, CancellationToken cancellationToken = default);
     Task AddAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default);
     Task AddRangeAsync(IEnumerable<BatchUpload> batchUploads, CancellationToken cancellationToken = default);
+    Task UpdateAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default);
 }

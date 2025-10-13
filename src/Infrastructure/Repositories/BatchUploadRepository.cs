@@ -71,4 +71,20 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         await _context.BatchUploads.AddRangeAsync(batchUploads, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<BatchUpload?> GetByFileIdAsync(int fileId, CancellationToken cancellationToken = default)
+    {
+        return await _context.BatchUploads
+            .Include(bu => bu.File)
+            .Include(bu => bu.Pack)
+            .Include(bu => bu.Model)
+            .Include(bu => bu.TextureSet)
+            .FirstOrDefaultAsync(bu => bu.FileId == fileId, cancellationToken);
+    }
+
+    public async Task UpdateAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default)
+    {
+        _context.BatchUploads.Update(batchUpload);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }
