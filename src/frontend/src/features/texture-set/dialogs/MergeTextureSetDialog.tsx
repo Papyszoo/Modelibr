@@ -22,15 +22,17 @@ function MergeTextureSetDialog({
   onHide,
   onMerge,
 }: MergeTextureSetDialogProps) {
-  const [selectedTextureType, setSelectedTextureType] = useState<TextureType | null>(null)
+  const [selectedTextureType, setSelectedTextureType] =
+    useState<TextureType | null>(null)
   const [merging, setMerging] = useState(false)
   const toast = useRef<Toast>(null)
 
   // Get available texture types (all types that the target set doesn't already have)
   const getAvailableTextureTypes = () => {
     if (!targetTextureSet) return []
-    
-    const existingTypes = targetTextureSet.textures?.map(t => t.textureType) || []
+
+    const existingTypes =
+      targetTextureSet.textures?.map(t => t.textureType) || []
     const allTypes = [
       TextureType.Albedo,
       TextureType.Normal,
@@ -41,7 +43,7 @@ function MergeTextureSetDialog({
       TextureType.Diffuse,
       TextureType.Specular,
     ]
-    
+
     return allTypes
       .filter(type => !existingTypes.includes(type))
       .map(type => ({

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { Dialog } from 'primereact/dialog'
-import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
@@ -38,8 +37,10 @@ export default function TextureSetGrid({
     useState<TextureSetDto | null>(null)
   const [showPackDialog, setShowPackDialog] = useState(false)
   const [showMergeDialog, setShowMergeDialog] = useState(false)
-  const [draggedTextureSet, setDraggedTextureSet] = useState<TextureSetDto | null>(null)
-  const [dropTargetTextureSet, setDropTargetTextureSet] = useState<TextureSetDto | null>(null)
+  const [draggedTextureSet, setDraggedTextureSet] =
+    useState<TextureSetDto | null>(null)
+  const [dropTargetTextureSet, setDropTargetTextureSet] =
+    useState<TextureSetDto | null>(null)
   const [dragOverCardId, setDragOverCardId] = useState<number | null>(null)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
@@ -80,12 +81,18 @@ export default function TextureSetGrid({
     }
   }
 
-  const handleCardDragStart = (e: React.DragEvent, textureSet: TextureSetDto) => {
+  const handleCardDragStart = (
+    e: React.DragEvent,
+    textureSet: TextureSetDto
+  ) => {
     e.stopPropagation()
     setDraggedTextureSet(textureSet)
     // Set drag data to distinguish between file drops and texture set drops
     e.dataTransfer.effectAllowed = 'copy'
-    e.dataTransfer.setData('application/x-texture-set-id', textureSet.id.toString())
+    e.dataTransfer.setData(
+      'application/x-texture-set-id',
+      textureSet.id.toString()
+    )
   }
 
   const handleCardDragEnd = (e: React.DragEvent) => {
@@ -94,7 +101,10 @@ export default function TextureSetGrid({
     setDragOverCardId(null)
   }
 
-  const handleCardDragOver = (e: React.DragEvent, textureSet: TextureSetDto) => {
+  const handleCardDragOver = (
+    e: React.DragEvent,
+    textureSet: TextureSetDto
+  ) => {
     // Check if this is a texture set being dragged (not a file)
     if (e.dataTransfer.types.includes('application/x-texture-set-id')) {
       e.preventDefault()
@@ -103,17 +113,23 @@ export default function TextureSetGrid({
     }
   }
 
-  const handleCardDragLeave = (e: React.DragEvent, textureSet: TextureSetDto) => {
+  const handleCardDragLeave = (
+    e: React.DragEvent,
+    textureSet: TextureSetDto
+  ) => {
     e.stopPropagation()
     if (dragOverCardId === textureSet.id) {
       setDragOverCardId(null)
     }
   }
 
-  const handleCardDrop = (e: React.DragEvent, targetTextureSet: TextureSetDto) => {
+  const handleCardDrop = (
+    e: React.DragEvent,
+    targetTextureSet: TextureSetDto
+  ) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     // Check if this is a texture set being dragged (not a file)
     const draggedSetId = e.dataTransfer.getData('application/x-texture-set-id')
     if (draggedSetId && draggedTextureSet) {
@@ -134,7 +150,7 @@ export default function TextureSetGrid({
       const albedoTexture = draggedTextureSet.textures?.find(
         t => t.textureType === TextureType.Albedo
       )
-      
+
       if (!albedoTexture) {
         toast.current?.show({
           severity: 'warn',
@@ -151,7 +167,7 @@ export default function TextureSetGrid({
       setDropTargetTextureSet(targetTextureSet)
       setShowMergeDialog(true)
     }
-    
+
     setDragOverCardId(null)
   }
 
