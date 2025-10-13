@@ -8,6 +8,18 @@ interface CacheEntry<T> {
   timestamp: number
 }
 
+// Thumbnail status type (matching ApiClient interface)
+interface ThumbnailStatus {
+  status: 'Pending' | 'Processing' | 'Ready' | 'Failed'
+  fileUrl?: string
+  sizeBytes?: number
+  width?: number
+  height?: number
+  errorMessage?: string
+  createdAt?: string
+  processedAt?: string
+}
+
 // Cache store state
 interface ApiCacheStore {
   // Cached data
@@ -17,6 +29,8 @@ interface ApiCacheStore {
   textureSetsById: Map<number, CacheEntry<TextureSetDto>>
   packs: CacheEntry<PackDto[]> | null
   packsById: Map<number, CacheEntry<PackDto>>
+  thumbnailStatusById: Map<string, CacheEntry<ThumbnailStatus>>
+  thumbnailBlobById: Map<string, CacheEntry<Blob>>
 
   // Cache configuration
   defaultTTL: number // Time to live in milliseconds (default: 5 minutes)
@@ -28,6 +42,8 @@ interface ApiCacheStore {
   setTextureSetById: (id: number, set: TextureSetDto) => void
   setPacks: (packs: PackDto[]) => void
   setPackById: (id: number, pack: PackDto) => void
+  setThumbnailStatus: (modelId: string, status: ThumbnailStatus) => void
+  setThumbnailBlob: (modelId: string, blob: Blob) => void
 
   // Cache getters with freshness check
   getModels: () => Model[] | null
@@ -36,6 +52,8 @@ interface ApiCacheStore {
   getTextureSetById: (id: number) => TextureSetDto | null
   getPacks: () => PackDto[] | null
   getPackById: (id: number) => PackDto | null
+  getThumbnailStatus: (modelId: string) => ThumbnailStatus | null
+  getThumbnailBlob: (modelId: string) => Blob | null
 
   // Cache invalidation
   invalidateModels: () => void
@@ -44,6 +62,8 @@ interface ApiCacheStore {
   invalidateTextureSetById: (id: number) => void
   invalidatePacks: () => void
   invalidatePackById: (id: number) => void
+  invalidateThumbnails: () => void
+  invalidateThumbnailById: (modelId: string) => void
   invalidateAll: () => void
 
   // Cache refresh helpers
@@ -60,6 +80,8 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
   textureSetsById: new Map(),
   packs: null,
   packsById: new Map(),
+  thumbnailStatusById: new Map(),
+  thumbnailBlobById: new Map(),
   defaultTTL: 5 * 60 * 1000, // 5 minutes
 
   // Setters
@@ -114,6 +136,18 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
     set({ packsById })
   },
 
+  setThumbnailStatus: (modelId: string, status: ThumbnailStatus) => {
+    const thumbnailStatusById = new Map(get().thumbnailStatusById)
+    thumbnailStatusById.set(modelId, { data: status, timestamp: Date.now() })
+    set({ thumbnailStatusById })
+  },
+
+  setThumbnailBlob: (modelId: string, blob: Blob) => {
+    const thumbnailBlobById = new Map(get().thumbnailBlobById)
+    thumbnailBlobById.set(modelId, { data: blob, timestamp: Date.now() })
+    set({ thumbnailBlobById })
+  },
+
   // Getters with freshness check
   getModels: () => {
     const entry = get().models
@@ -163,6 +197,22 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
     return entry.data
   },
 
+  getThumbnailStatus: (modelId: string) => {
+    const entry = get().thumbnailStatusById.get(modelId)
+    if (!entry) return null
+    const age = Date.now() - entry.timestamp
+    if (age > get().defaultTTL) return null
+    return entry.data
+  },
+
+  getThumbnailBlob: (modelId: string) => {
+    const entry = get().thumbnailBlobById.get(modelId)
+    if (!entry) return null
+    const age = Date.now() - entry.timestamp
+    if (age > get().defaultTTL) return null
+    return entry.data
+  },
+
   // Invalidation
   invalidateModels: () => set({ models: null }),
 
@@ -188,6 +238,20 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
     set({ packsById })
   },
 
+  invalidateThumbnails: () =>
+    set({
+      thumbnailStatusById: new Map(),
+      thumbnailBlobById: new Map(),
+    }),
+
+  invalidateThumbnailById: (modelId: string) => {
+    const thumbnailStatusById = new Map(get().thumbnailStatusById)
+    const thumbnailBlobById = new Map(get().thumbnailBlobById)
+    thumbnailStatusById.delete(modelId)
+    thumbnailBlobById.delete(modelId)
+    set({ thumbnailStatusById, thumbnailBlobById })
+  },
+
   invalidateAll: () =>
     set({
       models: null,
@@ -196,6 +260,8 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
       textureSetsById: new Map(),
       packs: null,
       packsById: new Map(),
+      thumbnailStatusById: new Map(),
+      thumbnailBlobById: new Map(),
     }),
 
   // Refresh helpers (mark as stale by invalidating, forcing refetch)

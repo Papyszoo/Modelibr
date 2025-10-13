@@ -44,6 +44,10 @@ export function useApiCache() {
     ApiClient.getAllPacks({ skipCache: true }).catch(console.error)
   }
 
+  const refreshThumbnails = () => {
+    store.invalidateThumbnails()
+  }
+
   const refreshAll = () => {
     store.invalidateAll()
     // Optionally trigger background fetches for all
@@ -56,6 +60,7 @@ export function useApiCache() {
     refreshModels,
     refreshTextureSets,
     refreshPacks,
+    refreshThumbnails,
     refreshAll,
   }
 }

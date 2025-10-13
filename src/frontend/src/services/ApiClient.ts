@@ -136,10 +136,25 @@ class ApiClient {
   }
 
   // Thumbnail methods
-  async getThumbnailStatus(modelId: string): Promise<ThumbnailStatus> {
+  async getThumbnailStatus(
+    modelId: string,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ThumbnailStatus> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getThumbnailStatus(modelId)
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<ThumbnailStatus> = await this.client.get(
       `/models/${modelId}/thumbnail`
     )
+
+    // Update cache
+    useApiCacheStore.getState().setThumbnailStatus(modelId, response.data)
+
     return response.data
   }
 
@@ -147,11 +162,26 @@ class ApiClient {
     return `${this.baseURL}/models/${modelId}/thumbnail/file`
   }
 
-  async getThumbnailFile(modelId: string): Promise<Blob> {
+  async getThumbnailFile(
+    modelId: string,
+    options: { skipCache?: boolean } = {}
+  ): Promise<Blob> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getThumbnailBlob(modelId)
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<Blob> = await this.client.get(
       `/models/${modelId}/thumbnail/file`,
       { responseType: 'blob' }
     )
+
+    // Update cache
+    useApiCacheStore.getState().setThumbnailBlob(modelId, response.data)
+
     return response.data
   }
 
@@ -159,6 +189,10 @@ class ApiClient {
     const response: AxiosResponse<void> = await this.client.post(
       `/models/${modelId}/thumbnail/regenerate`
     )
+
+    // Invalidate thumbnail cache for this model
+    useApiCacheStore.getState().invalidateThumbnailById(modelId)
+
     return response.data
   }
 
