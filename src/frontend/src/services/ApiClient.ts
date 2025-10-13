@@ -145,6 +145,14 @@ class ApiClient {
     return response.data
   }
 
+  async getTextureSetByFileId(
+    fileId: number
+  ): Promise<{ textureSetId: number | null }> {
+    const response: AxiosResponse<{ textureSetId: number | null }> =
+      await this.client.get(`/texture-sets/by-file/${fileId}`)
+    return response.data
+  }
+
   async createTextureSet(
     request: CreateTextureSetRequest
   ): Promise<CreateTextureSetResponse> {
