@@ -88,24 +88,26 @@ describe('fileUtils', () => {
   describe('isThreeJSRenderable', () => {
     it('should return true for Three.js supported formats', () => {
       expect(isThreeJSRenderable('.obj')).toBe(true)
+      expect(isThreeJSRenderable('.fbx')).toBe(true)
       expect(isThreeJSRenderable('.gltf')).toBe(true)
       expect(isThreeJSRenderable('.glb')).toBe(true)
     })
 
     it('should handle formats without leading dot', () => {
       expect(isThreeJSRenderable('obj')).toBe(true)
+      expect(isThreeJSRenderable('fbx')).toBe(true)
       expect(isThreeJSRenderable('gltf')).toBe(true)
       expect(isThreeJSRenderable('glb')).toBe(true)
     })
 
     it('should handle case insensitive formats', () => {
       expect(isThreeJSRenderable('OBJ')).toBe(true)
+      expect(isThreeJSRenderable('.FBX')).toBe(true)
       expect(isThreeJSRenderable('.GLTF')).toBe(true)
       expect(isThreeJSRenderable('GLB')).toBe(true)
     })
 
     it('should return false for non-Three.js formats', () => {
-      expect(isThreeJSRenderable('.fbx')).toBe(false)
       expect(isThreeJSRenderable('.dae')).toBe(false)
       expect(isThreeJSRenderable('.3ds')).toBe(false)
       expect(isThreeJSRenderable('.blend')).toBe(false)
@@ -147,7 +149,7 @@ describe('fileUtils', () => {
 
   describe('constants', () => {
     it('should have correct Three.js supported formats', () => {
-      expect(THREEJS_SUPPORTED_FORMATS).toEqual(['.obj', '.gltf', '.glb'])
+      expect(THREEJS_SUPPORTED_FORMATS).toEqual(['.obj', '.fbx', '.gltf', '.glb'])
     })
 
     it('should have correct all supported formats', () => {
