@@ -183,6 +183,23 @@
                         } else {
                             model = result;
                         }
+                        
+                        // Apply standard material to OBJ and FBX models for consistent appearance
+                        if (fileType === 'obj' || fileType === 'fbx') {
+                            model.traverse((child) => {
+                                if (child.isMesh) {
+                                    child.material = new THREE.MeshStandardMaterial({
+                                        color: new THREE.Color(0.7, 0.7, 0.9),
+                                        metalness: 0.3,
+                                        roughness: 0.4,
+                                        envMapIntensity: 1.0,
+                                    });
+                                    child.castShadow = true;
+                                    child.receiveShadow = true;
+                                }
+                            });
+                        }
+                        
                         resolve(model);
                     },
                     undefined,
