@@ -104,11 +104,18 @@ function TextureSetList() {
   const handleFileDrop = async (files: File[] | FileList) => {
     const fileArray = Array.from(files)
 
+    // Create batch for multiple files
+    const batchId =
+      uploadProgressContext && fileArray.length > 1
+        ? uploadProgressContext.createBatch()
+        : undefined
+
     for (const file of fileArray) {
       let uploadId: string | null = null
       try {
         // 1. Track the upload and get its ID
-        uploadId = uploadProgressContext?.addUpload(file, 'texture') || null
+        uploadId =
+          uploadProgressContext?.addUpload(file, 'texture', batchId) || null
 
         // 2. Upload the file with progress tracking
         if (uploadId && uploadProgressContext) {
