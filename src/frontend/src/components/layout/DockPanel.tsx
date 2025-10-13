@@ -1,5 +1,4 @@
 import { Tab } from '../../types'
-import { DockProvider } from '../../contexts/DockContext'
 import DockPanelContent from './DockPanelContent'
 import './DockPanel.css'
 
@@ -19,11 +18,7 @@ interface DockPanelProps {
 }
 
 function DockPanel(props: DockPanelProps): JSX.Element {
-  return (
-    <DockProvider>
-      <DockPanelContent {...props} />
-    </DockProvider>
-  )
+  return <DockPanelContent {...props} />
 }
 
 export default DockPanel
