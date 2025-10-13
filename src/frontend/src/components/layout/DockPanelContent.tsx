@@ -1,0 +1,195 @@
+import { Tab } from '../../types'
+import { useDockContext } from '../../contexts/DockContext'
+import DockBar from './dock-panel/DockBar'
+import DockEmptyState from './dock-panel/DockEmptyState'
+import DockContentArea from './dock-panel/DockContentArea'
+
+interface DockPanelContentProps {
+  side: 'left' | 'right'
+  tabs: Tab[]
+  setTabs: (tabs: Tab[]) => void
+  activeTab: string
+  setActiveTab: (tabId: string) => void
+  otherTabs: Tab[]
+  setOtherTabs: (tabs: Tab[]) => void
+  otherActiveTab: string
+  setOtherActiveTab: (tabId: string) => void
+  draggedTab: Tab | null
+  setDraggedTab: (tab: Tab | null) => void
+  moveTabBetweenPanels: (tab: Tab, fromSide: 'left' | 'right') => void
+}
+
+function DockPanelContent({
+  side,
+  tabs,
+  setTabs,
+  activeTab,
+  setActiveTab,
+  otherTabs: _otherTabs,
+  setOtherTabs: _setOtherTabs,
+  otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
+  setOtherActiveTab: _setOtherActiveTab,
+  draggedTab,
+  setDraggedTab,
+  moveTabBetweenPanels,
+}: DockPanelContentProps): JSX.Element {
+  const { addRecentlyClosedTab, removeRecentlyClosedTab } = useDockContext()
+
+  const addTab = (type: Tab['type'], title: string): void => {
+    // Check if tab already exists on this side
+    const existingTab = tabs.find(tab => tab.type === type)
+
+    if (existingTab) {
+      // Make existing tab active instead of adding duplicate
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    const newTab: Tab = {
+      id: type,
+      type,
+      label: title,
+    }
+
+    const newTabs = [...tabs, newTab]
+    setTabs(newTabs)
+    setActiveTab(newTab.id)
+  }
+
+  const reopenTab = (tab: Tab): void => {
+    // Check if tab already exists on this side
+    const existingTab = tabs.find(t => t.id === tab.id || t.type === tab.type)
+
+    if (existingTab) {
+      // Make existing tab active instead of adding duplicate
+      setActiveTab(existingTab.id)
+    } else {
+      // Add the tab back
+      const newTabs = [...tabs, tab]
+      setTabs(newTabs)
+      setActiveTab(tab.id)
+    }
+
+    // Remove from recently closed
+    removeRecentlyClosedTab(tab.id)
+  }
+
+  const closeTab = (tabId: string): void => {
+    const closedTab = tabs.find(tab => tab.id === tabId)
+    const closedTabIndex = tabs.findIndex(tab => tab.id === tabId)
+    const newTabs = tabs.filter(tab => tab.id !== tabId)
+    setTabs(newTabs)
+
+    // Add to recently closed tabs (max 5)
+    if (closedTab) {
+      addRecentlyClosedTab(closedTab)
+    }
+
+    // If the closed tab was active, switch to the previous tab (or next if it was the first)
+    if (activeTab === tabId) {
+      if (newTabs.length > 0) {
+        // If there's a tab before the closed one, activate it
+        // Otherwise, activate the tab that will be at the same index (which is the next tab)
+        const newActiveIndex = Math.min(
+          closedTabIndex > 0 ? closedTabIndex - 1 : 0,
+          newTabs.length - 1
+        )
+        setActiveTab(newTabs[newActiveIndex].id)
+      } else {
+        setActiveTab('')
+      }
+    }
+  }
+
+  const handleTabDragStart = (tab: Tab): void => {
+    setDraggedTab(tab)
+  }
+
+  const handleTabDragEnd = (): void => {
+    setDraggedTab(null)
+  }
+
+  const handleDropOnOtherPanel = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Only process drop if there's a dragged tab and it's not from this panel
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      // Determine which panel the dragged tab came from
+      const fromSide = side === 'left' ? 'right' : 'left'
+      moveTabBetweenPanels(draggedTab, fromSide)
+    }
+    // Always remove drag visual feedback after drop attempt
+    e.currentTarget.classList.remove('drag-over')
+  }
+
+  const handleDragOver = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Only allow drop if there's a dragged tab and it's not from this panel
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      e.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Add visual feedback for valid drop zone
+    if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
+      e.currentTarget.classList.add('drag-over')
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // Remove visual feedback - only if we're actually leaving the drop zone
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      e.currentTarget.classList.remove('drag-over')
+    }
+  }
+
+  const activeTabData = tabs.find(tab => tab.id === activeTab)
+
+  return (
+    <div className={`dock-panel dock-panel-${side}`}>
+      {/* Dock/Menu Bar */}
+      <DockBar
+        side={side}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabSelect={setActiveTab}
+        onTabClose={closeTab}
+        onTabDragStart={handleTabDragStart}
+        onTabDragEnd={handleTabDragEnd}
+        onAddTab={addTab}
+        onReopenTab={reopenTab}
+        onDrop={handleDropOnOtherPanel}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+      />
+
+      {/* Content Area */}
+      <div className="dock-content">
+        {activeTabData ? (
+          <DockContentArea
+            side={side}
+            tabs={tabs}
+            setTabs={setTabs}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            activeTabData={activeTabData}
+          />
+        ) : (
+          <DockEmptyState
+            onAddTab={addTab}
+            onReopenTab={reopenTab}
+            onDrop={handleDropOnOtherPanel}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default DockPanelContent
