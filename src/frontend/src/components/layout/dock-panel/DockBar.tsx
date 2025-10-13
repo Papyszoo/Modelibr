@@ -1,9 +1,10 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
 import DraggableTab from '../DraggableTab'
 import { Tab } from '../../../types'
+import { useDockContext } from '../../../contexts/DockContext'
+import { useTabMenuItems } from '../../../hooks/useTabMenuItems'
 
 interface DockBarProps {
   side: 'left' | 'right'
@@ -14,7 +15,6 @@ interface DockBarProps {
   onTabDragStart: (tab: Tab) => void
   onTabDragEnd: () => void
   onAddTab: (type: Tab['type'], title: string) => void
-  recentlyClosedTabs: Tab[]
   onReopenTab: (tab: Tab) => void
   onDrop: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
@@ -31,7 +31,6 @@ export default function DockBar({
   onTabDragStart,
   onTabDragEnd,
   onAddTab,
-  recentlyClosedTabs,
   onReopenTab,
   onDrop,
   onDragOver,
@@ -39,51 +38,34 @@ export default function DockBar({
   onDragLeave,
 }: DockBarProps) {
   const menuRef = useRef<ContextMenu>(null)
+  const {
+    recentlyClosedTabs,
+    registerContextMenu,
+    unregisterContextMenu,
+    showContextMenu,
+  } = useDockContext()
 
-  // Menu items for adding new tabs
-  const addMenuItems: MenuItem[] = [
-    {
-      label: 'Models List',
-      icon: 'pi pi-list',
-      command: () => onAddTab('modelList', 'Models'),
-    },
-    {
-      label: 'Texture Sets',
-      icon: 'pi pi-folder',
-      command: () => onAddTab('textureSets', 'Texture Sets'),
-    },
-    {
-      label: 'Packs',
-      icon: 'pi pi-inbox',
-      command: () => onAddTab('packs', 'Packs'),
-    },
-    {
-      separator: true,
-    },
-    {
-      label: 'Settings',
-      icon: 'pi pi-cog',
-      command: () => onAddTab('settings', 'Settings'),
-    },
-  ]
+  const addMenuItems = useTabMenuItems({
+    onAddTab,
+    recentlyClosedTabs,
+    onReopenTab,
+  })
 
-  // Add recently closed tabs to menu if any exist
-  if (recentlyClosedTabs.length > 0) {
-    addMenuItems.push(
-      {
-        separator: true,
-      },
-      ...recentlyClosedTabs.map(tab => ({
-        label: `Reopen: ${tab.label || tab.type}`,
-        icon: 'pi pi-history',
-        command: () => onReopenTab(tab),
-      }))
-    )
-  }
+  useEffect(() => {
+    if (menuRef.current) {
+      registerContextMenu(menuRef)
+    }
+    return () => {
+      if (menuRef.current) {
+        unregisterContextMenu(menuRef)
+      }
+    }
+  }, [registerContextMenu, unregisterContextMenu])
 
   const handleBarContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
-    menuRef.current?.show(e)
+    e.stopPropagation()
+    showContextMenu(menuRef, e)
   }
 
   return (
@@ -122,6 +104,7 @@ export default function DockBar({
           model={addMenuItems}
           ref={menuRef}
           className="dock-add-menu"
+          autoZIndex
         />
       </div>
     </div>
