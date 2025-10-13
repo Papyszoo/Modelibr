@@ -11,8 +11,8 @@ import { PackDto, Model, TextureSetDto, TextureType } from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
+import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
-import { useModelUpload } from '../../../shared/hooks/useModelUpload'
 import './PackViewer.css'
 
 interface PackViewerProps {
@@ -43,10 +43,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
   const [selectedTextureSet, setSelectedTextureSet] =
     useState<TextureSetDto | null>(null)
   const { openModelDetailsTab, openTextureSetDetailsTab } = useTabContext()
+  const uploadProgressContext = useUploadProgress()
   const { uploadFile: uploadTextureFile } = useGenericFileUpload({
     fileType: 'texture',
   })
-  const { uploadModel: uploadModelFile } = useModelUpload()
 
   useEffect(() => {
     loadPack()
@@ -224,19 +224,54 @@ export default function PackViewer({ packId }: PackViewerProps) {
     try {
       setUploadingModel(true)
 
+      // Create batch for multiple files
+      const batchId =
+        uploadProgressContext && files.length > 1
+          ? uploadProgressContext.createBatch()
+          : undefined
+
       // Upload all files and add them to pack
       const uploadPromises = files.map(async file => {
-        const response = await uploadModelFile(file)
-        await ApiClient.addModelToPack(packId, response.id)
-        // Trigger thumbnail generation if not already exists
-        if (!response.alreadyExists) {
-          try {
-            await ApiClient.regenerateThumbnail(response.id.toString())
-          } catch (err) {
-            console.warn('Failed to generate thumbnail:', err)
+        let uploadId: string | null = null
+        try {
+          // Track the upload with batchId
+          uploadId =
+            uploadProgressContext?.addUpload(file, 'model', batchId) || null
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 50)
           }
+
+          const response = await ApiClient.uploadModel(file)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 75)
+          }
+
+          await ApiClient.addModelToPack(packId, response.id)
+
+          // Complete upload
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, response)
+          }
+
+          // Trigger thumbnail generation if not already exists
+          if (!response.alreadyExists) {
+            try {
+              await ApiClient.regenerateThumbnail(response.id.toString())
+            } catch (err) {
+              console.warn('Failed to generate thumbnail:', err)
+            }
+          }
+          return response
+        } catch (error) {
+          // Mark upload as failed
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error as Error)
+          }
+          throw error
         }
-        return response
       })
 
       await Promise.all(uploadPromises)
@@ -268,20 +303,63 @@ export default function PackViewer({ packId }: PackViewerProps) {
     try {
       setUploadingTextureSet(true)
 
+      // Create batch for multiple files
+      const batchId =
+        uploadProgressContext && files.length > 1
+          ? uploadProgressContext.createBatch()
+          : undefined
+
       // Upload all texture files and create texture sets
       const uploadPromises = files.map(async file => {
-        const fileResponse = await uploadTextureFile(file)
+        let uploadId: string | null = null
+        try {
+          // Track the upload with batchId
+          uploadId =
+            uploadProgressContext?.addUpload(file, 'texture', batchId) || null
 
-        const setName = file.name.replace(/\.[^/.]+$/, '')
-        const setResponse = await ApiClient.createTextureSet({ name: setName })
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 30)
+          }
 
-        await ApiClient.addTextureToSetEndpoint(setResponse.id, {
-          fileId: fileResponse.fileId,
-          textureType: TextureType.Albedo,
-        })
+          const fileResponse = await uploadTextureFile(file)
 
-        await ApiClient.addTextureSetToPack(packId, setResponse.id)
-        return setResponse
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 60)
+          }
+
+          const setName = file.name.replace(/\.[^/.]+$/, '')
+          const setResponse = await ApiClient.createTextureSet({
+            name: setName,
+          })
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 80)
+          }
+
+          await ApiClient.addTextureToSetEndpoint(setResponse.id, {
+            fileId: fileResponse.fileId,
+            textureType: TextureType.Albedo,
+          })
+
+          await ApiClient.addTextureSetToPack(packId, setResponse.id)
+
+          // Complete upload with textureSetId for the "Open in tab" button
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, {
+              ...fileResponse,
+              textureSetId: setResponse.id,
+            })
+          }
+
+          return setResponse
+        } catch (error) {
+          // Mark upload as failed
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error as Error)
+          }
+          throw error
+        }
       })
 
       await Promise.all(uploadPromises)
