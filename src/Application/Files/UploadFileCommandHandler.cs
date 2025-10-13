@@ -56,7 +56,19 @@ namespace Application.Files
 
             // Always track batch upload - generate batch ID if not provided
             var batchId = command.BatchId ?? Guid.NewGuid().ToString();
-            var uploadType = command.UploadType ?? "file"; // Default to "file" if not specified
+            
+            // Determine upload type based on file type if not explicitly provided
+            var uploadType = command.UploadType;
+            if (string.IsNullOrWhiteSpace(uploadType))
+            {
+                // Auto-detect type based on file category
+                uploadType = fileTypeResult.Value.Category switch
+                {
+                    FileTypeCategory.Texture => "texture",
+                    FileTypeCategory.Model3D => "model",
+                    _ => "file"
+                };
+            }
             
             var batchUpload = BatchUpload.Create(
                 batchId,

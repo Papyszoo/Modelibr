@@ -81,6 +81,31 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openPackDetailsTab = (packId: string): void => {
+    // Check if tab already exists
+    const existingTab = tabs.find(
+      tab => tab.type === 'packViewer' && tab.packId === packId
+    )
+
+    if (existingTab) {
+      // Switch to existing tab
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    // Create new tab
+    const newTab: Tab = {
+      id: `pack-${packId}`,
+      type: 'packViewer',
+      label: `Pack ${packId}`,
+      packId: packId,
+    }
+
+    const newTabs = [...tabs, newTab]
+    setTabs(newTabs)
+    setActiveTab(newTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -140,6 +165,7 @@ export const TabProvider = ({
     setActiveTab,
     openModelDetailsTab,
     openTextureSetDetailsTab,
+    openPackDetailsTab,
     openTab,
   }
 

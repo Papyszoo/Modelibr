@@ -10,6 +10,7 @@ export interface TabContextValue {
   setActiveTab: (tabId: string) => void
   openModelDetailsTab: (model: Model) => void
   openTextureSetDetailsTab: (textureSet: TextureSetDto) => void
+  openPackDetailsTab: (packId: string) => void
   openTab: (type: Tab['type'], title: string, data?: unknown) => void
 }
 

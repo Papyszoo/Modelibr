@@ -1,19 +1,24 @@
 .history-container {
   padding: 1rem;
   height: 100%;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.history-header {
+.history-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--surface-border);
 }
 
-.history-header h2 {
+.history-toolbar h2 {
   margin: 0;
   font-size: 1.5rem;
+  font-weight: 600;
 }
 
 .assignment-list {
@@ -23,10 +28,41 @@
 }
 
 .assignment-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.9rem;
 }
 
+.assignment-item i {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
 .text-muted {
-  color: #6c757d;
+  color: var(--text-color-secondary);
   font-style: italic;
+}
+
+.history-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+}
+
+.batch-id-code {
+  font-family: monospace;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-100);
+  border-radius: 4px;
+  color: var(--text-color);
+}
+
+.history-row {
+  transition: background-color 0.2s;
+}
+
+.history-row:hover {
+  background-color: var(--surface-hover) !important;
 }
