@@ -48,6 +48,7 @@ function ModelAssociationDialog({
       loadModels()
       loadPacks()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
 
   const loadPacks = async () => {
@@ -103,7 +104,11 @@ function ModelAssociationDialog({
               return newSet
             })
           }
-          return { ...assoc, isAssociated, recentlyUnlinked: !isAssociated && assoc.originallyAssociated }
+          return {
+            ...assoc,
+            isAssociated,
+            recentlyUnlinked: !isAssociated && assoc.originallyAssociated,
+          }
         }
         return assoc
       })

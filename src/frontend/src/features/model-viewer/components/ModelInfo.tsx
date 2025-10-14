@@ -4,6 +4,7 @@ import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Button } from 'primereact/button'
 import { getModelFileFormat } from '../../../utils/fileUtils'
+// eslint-disable-next-line no-restricted-imports -- ModelInfo needs direct API access
 import apiClient from '../../../services/ApiClient'
 import TextureSetAssociationDialog from './TextureSetAssociationDialog'
 
@@ -52,7 +53,10 @@ function ModelInfo({ model, onModelUpdated }) {
 
   const handleRemoveTextureSet = async (textureSetId: number) => {
     try {
-      await apiClient.disassociateTextureSetFromModel(textureSetId, parseInt(model.id))
+      await apiClient.disassociateTextureSetFromModel(
+        textureSetId,
+        parseInt(model.id)
+      )
       if (onModelUpdated) {
         onModelUpdated()
       }

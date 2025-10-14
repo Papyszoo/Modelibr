@@ -4,7 +4,13 @@ import { Toast } from 'primereact/toast'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
-import { Model, TextureSetDto, PackSummaryDto, TextureType } from '../../../types'
+import {
+  Model,
+  TextureSetDto,
+  PackSummaryDto,
+  TextureType,
+} from '../../../types'
+// eslint-disable-next-line no-restricted-imports -- Dialog needs direct API access
 import ApiClient from '../../../services/ApiClient'
 import './TextureSetAssociationDialog.css'
 
@@ -46,6 +52,7 @@ function TextureSetAssociationDialog({
       loadTextureSets()
       loadPacks()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
 
   const loadPacks = async () => {
@@ -410,7 +417,8 @@ function TextureSetCard({
         <div className="texture-set-card-overlay">
           <span className="texture-set-card-name">{textureSet.name}</span>
           <span className="texture-set-card-info">
-            {textureSet.textureCount} texture{textureSet.textureCount !== 1 ? 's' : ''}
+            {textureSet.textureCount} texture
+            {textureSet.textureCount !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
