@@ -52,7 +52,7 @@ function TextureSetAssociationDialog({
       loadTextureSets()
       loadPacks()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when dialog becomes visible
   }, [visible])
 
   const loadPacks = async () => {
