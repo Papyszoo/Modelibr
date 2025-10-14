@@ -29,6 +29,7 @@ export interface Model {
   createdAt: string
   updatedAt: string
   textureSets?: { id: number; name: string }[]
+  packs?: { id: number; name: string }[]
 }
 
 /**
