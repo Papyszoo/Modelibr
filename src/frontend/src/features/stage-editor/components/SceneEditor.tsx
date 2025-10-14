@@ -71,16 +71,22 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
       const stage = await apiClient.getStageById(id.toString())
       setStageName(stage.name)
       setCurrentStageId(stage.id)
-      
+
       try {
         const config = JSON.parse(stage.configurationJson)
-        setStageConfig(config)
+        // Ensure config has valid structure
+        setStageConfig({
+          lights: Array.isArray(config.lights) ? config.lights : [],
+        })
       } catch (parseError) {
         console.error('Failed to parse stage configuration:', parseError)
+        // Set default empty configuration
+        setStageConfig({ lights: [] })
         toast.current?.show({
           severity: 'warn',
           summary: 'Warning',
-          detail: 'Stage configuration could not be loaded. Starting with empty stage.',
+          detail:
+            'Stage configuration could not be loaded. Starting with empty stage.',
           life: 3000,
         })
       }
@@ -160,7 +166,11 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
       // Parse JSON with error handling
       let config: StageConfig
       try {
-        config = JSON.parse(stage.configurationJson) as StageConfig
+        const parsed = JSON.parse(stage.configurationJson)
+        // Ensure config has valid structure
+        config = {
+          lights: Array.isArray(parsed.lights) ? parsed.lights : [],
+        }
       } catch (parseError) {
         console.error('Failed to parse stage configuration:', parseError)
         toast.current?.show({
