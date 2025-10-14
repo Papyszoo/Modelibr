@@ -52,12 +52,25 @@ class ApiClient {
     return this.baseURL
   }
 
-  async uploadModel(file: File): Promise<UploadModelResponse> {
+  async uploadModel(
+    file: File,
+    options: { batchId?: string } = {}
+  ): Promise<UploadModelResponse> {
     const formData = new FormData()
     formData.append('file', file)
 
+    // Build URL with query parameters
+    let url = '/models'
+    const params = new URLSearchParams()
+    if (options.batchId) {
+      params.append('batchId', options.batchId)
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`
+    }
+
     const response: AxiosResponse<UploadModelResponse> = await this.client.post(
-      '/models',
+      url,
       formData,
       {
         headers: {
@@ -73,13 +86,42 @@ class ApiClient {
   }
 
   async uploadFile(
-    file: File
+    file: File,
+    options: {
+      batchId?: string
+      uploadType?: string
+      packId?: number
+      modelId?: number
+      textureSetId?: number
+    } = {}
   ): Promise<{ fileId: number; alreadyExists: boolean }> {
     const formData = new FormData()
     formData.append('file', file)
 
+    // Build URL with query parameters
+    let url = '/files'
+    const params = new URLSearchParams()
+    if (options.batchId) {
+      params.append('batchId', options.batchId)
+    }
+    if (options.uploadType) {
+      params.append('uploadType', options.uploadType)
+    }
+    if (options.packId) {
+      params.append('packId', options.packId.toString())
+    }
+    if (options.modelId) {
+      params.append('modelId', options.modelId.toString())
+    }
+    if (options.textureSetId) {
+      params.append('textureSetId', options.textureSetId.toString())
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`
+    }
+
     const response: AxiosResponse<{ fileId: number; alreadyExists: boolean }> =
-      await this.client.post('/files', formData, {
+      await this.client.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

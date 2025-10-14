@@ -69,11 +69,10 @@ export function useModelUpload() {
       const fileArray = Array.from(files)
       const results = []
 
-      // Create batch for multiple files
-      const batchId =
-        uploadProgressContext && fileArray.length > 1
-          ? uploadProgressContext.createBatch()
-          : undefined
+      // Create batch for all uploads (even single files need batch tracking)
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
 
       for (const file of fileArray) {
         try {
