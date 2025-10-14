@@ -5,14 +5,16 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { Button } from 'primereact/button'
 import { getModelFileFormat } from '../../../utils/fileUtils'
 import apiClient from '../../../services/ApiClient'
+import TextureSetAssociationDialog from './TextureSetAssociationDialog'
 
-function ModelInfo({ model }) {
+function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(
     model.tags ? model.tags.split(', ').filter(t => t.trim()) : []
   )
   const [description, setDescription] = useState(model.description || '')
   const [newTag, setNewTag] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [showTextureSetDialog, setShowTextureSetDialog] = useState(false)
 
   const handleAddTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
@@ -37,11 +39,25 @@ function ModelInfo({ model }) {
       const tagsString = tags.join(', ')
       await apiClient.updateModelTags(model.id, tagsString, description)
       // Success - could show a toast notification here
+      if (onModelUpdated) {
+        onModelUpdated()
+      }
     } catch (error) {
       console.error('Failed to save tags:', error)
       // Could show error toast here
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleRemoveTextureSet = async (textureSetId: number) => {
+    try {
+      await apiClient.disassociateTextureSetFromModel(textureSetId, parseInt(model.id))
+      if (onModelUpdated) {
+        onModelUpdated()
+      }
+    } catch (error) {
+      console.error('Failed to remove texture set:', error)
     }
   }
 
@@ -160,6 +176,51 @@ function ModelInfo({ model }) {
       </div>
 
       <div className="info-section">
+        <h3>Linked Texture Sets</h3>
+        <div className="texture-sets-section" style={{ marginBottom: '1rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.5rem',
+              marginBottom: '0.75rem',
+              minHeight: '2rem',
+            }}
+          >
+            {model.textureSets && model.textureSets.length > 0 ? (
+              model.textureSets.map(textureSet => (
+                <Chip
+                  key={textureSet.id}
+                  label={textureSet.name}
+                  removable
+                  onRemove={() => handleRemoveTextureSet(textureSet.id)}
+                  icon="pi pi-image"
+                  style={{ background: '#8b5cf6', color: 'white' }}
+                />
+              ))
+            ) : (
+              <span
+                style={{
+                  color: '#94a3b8',
+                  fontStyle: 'italic',
+                  alignSelf: 'center',
+                }}
+              >
+                No texture sets linked
+              </span>
+            )}
+          </div>
+          <Button
+            label="Link Texture Sets"
+            icon="pi pi-link"
+            onClick={() => setShowTextureSetDialog(true)}
+            style={{ width: '100%' }}
+            size="small"
+          />
+        </div>
+      </div>
+
+      <div className="info-section">
         <h3>Controls</h3>
         <ul className="controls-list">
           <li>
@@ -173,6 +234,20 @@ function ModelInfo({ model }) {
           </li>
         </ul>
       </div>
+
+      {showTextureSetDialog && (
+        <TextureSetAssociationDialog
+          visible={showTextureSetDialog}
+          model={model}
+          onHide={() => setShowTextureSetDialog(false)}
+          onAssociationsChanged={() => {
+            setShowTextureSetDialog(false)
+            if (onModelUpdated) {
+              onModelUpdated()
+            }
+          }}
+        />
+      )}
     </>
   )
 }

@@ -7,6 +7,7 @@ interface ModelInfoWindowProps {
   onClose: () => void
   side?: 'left' | 'right'
   model: Model | null
+  onModelUpdated?: () => void
 }
 
 function ModelInfoWindow({
@@ -14,6 +15,7 @@ function ModelInfoWindow({
   onClose,
   side = 'left',
   model,
+  onModelUpdated,
 }: ModelInfoWindowProps) {
   return (
     <FloatingWindow
@@ -24,7 +26,7 @@ function ModelInfoWindow({
       windowId="info"
     >
       {model ? (
-        <ModelInfo model={model} />
+        <ModelInfo model={model} onModelUpdated={onModelUpdated} />
       ) : (
         <p style={{ color: '#64748b', fontStyle: 'italic' }}>No model loaded</p>
       )}

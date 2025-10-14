@@ -68,6 +68,12 @@ function ModelViewer({
     }
   }
 
+  const handleModelUpdated = () => {
+    if (modelId) {
+      fetchModel(modelId)
+    }
+  }
+
   const handleRegenerateThumbnail = async () => {
     if (!model) return
 
@@ -208,6 +214,7 @@ function ModelViewer({
           onClose={() => setInfoWindowVisible(false)}
           side={side}
           model={model}
+          onModelUpdated={handleModelUpdated}
         />
         <ThumbnailWindow
           visible={thumbnailWindowVisible}
