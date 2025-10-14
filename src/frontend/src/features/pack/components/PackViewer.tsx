@@ -223,11 +223,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
       let newCount = 0
       let existingCount = 0
 
-      // Create batch for multiple files
-      const batchId =
-        uploadProgressContext && files.length > 1
-          ? uploadProgressContext.createBatch()
-          : undefined
+      // Create batch for all uploads (even single files need batch tracking)
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
 
       // Upload all files and add them to pack
       const uploadPromises = files.map(async file => {
@@ -241,7 +240,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
             uploadProgressContext.updateUploadProgress(uploadId, 50)
           }
 
-          const response = await ApiClient.uploadModel(file)
+          const response = await ApiClient.uploadModel(file, { batchId })
 
           if (uploadId && uploadProgressContext) {
             uploadProgressContext.updateUploadProgress(uploadId, 75)
@@ -322,11 +321,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
       let newCount = 0
       let existingCount = 0
 
-      // Create batch for multiple files
-      const batchId =
-        uploadProgressContext && files.length > 1
-          ? uploadProgressContext.createBatch()
-          : undefined
+      // Create batch for all uploads (even single files need batch tracking)
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
 
       // Helper function to create a new texture set with uploaded file
       const createTextureSetWithFile = async (
