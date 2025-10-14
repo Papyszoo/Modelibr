@@ -93,14 +93,14 @@ export const TabProvider = ({
         (type === 'modelList' ||
           type === 'texture' ||
           type === 'textureSets' ||
-          type === 'stageList' ||
+          type === 'packs' ||
           type === 'animation' ||
           (type === 'modelViewer' &&
             tab.modelId === (data as { id?: string })?.id) ||
           (type === 'textureSetViewer' &&
             tab.setId === (data as { id?: string })?.id) ||
-          (type === 'stageEditor' &&
-            tab.stageId === (data as { id?: string })?.id))
+          (type === 'packViewer' &&
+            tab.packId === (data as { id?: string })?.id))
     )
 
     if (existingTab) {
@@ -115,8 +115,8 @@ export const TabProvider = ({
           ? `model-${(data as { id?: string }).id}`
           : type === 'textureSetViewer' && (data as { id?: string })?.id
             ? `set-${(data as { id?: string }).id}`
-            : type === 'stageEditor' && (data as { id?: string })?.id
-              ? `stage-${(data as { id?: string }).id}`
+            : type === 'packViewer' && (data as { id?: string })?.id
+              ? `pack-${(data as { id?: string }).id}`
               : type,
       type,
       label: title,
@@ -124,8 +124,7 @@ export const TabProvider = ({
         type === 'modelViewer' ? (data as { id?: string })?.id : undefined,
       setId:
         type === 'textureSetViewer' ? (data as { id?: string })?.id : undefined,
-      stageId:
-        type === 'stageEditor' ? (data as { id?: string })?.id : undefined,
+      packId: type === 'packViewer' ? (data as { id?: string })?.id : undefined,
     }
 
     const newTabs = [...tabs, newTab]

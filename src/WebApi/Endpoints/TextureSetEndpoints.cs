@@ -20,6 +20,11 @@ public static class TextureSetEndpoints
             .WithSummary("Gets a specific texture set by ID")
             .WithOpenApi();
 
+        app.MapGet("/texture-sets/by-file/{fileId}", GetTextureSetByFileId)
+            .WithName("Get Texture Set By File ID")
+            .WithSummary("Gets a texture set that contains the specified file")
+            .WithOpenApi();
+
         app.MapPost("/texture-sets", CreateTextureSet)
             .WithName("Create Texture Set")
             .WithSummary("Creates a new texture set")
@@ -59,10 +64,11 @@ public static class TextureSetEndpoints
     }
 
     private static async Task<IResult> GetAllTextureSets(
+        int? packId,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(), cancellationToken);
+        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId), cancellationToken);
 
         if (!result.IsSuccess)
         {
@@ -85,6 +91,21 @@ public static class TextureSetEndpoints
         }
 
         return Results.Ok(result.Value.TextureSet);
+    }
+
+    private static async Task<IResult> GetTextureSetByFileId(
+        int fileId,
+        IQueryHandler<GetTextureSetByFileIdQuery, GetTextureSetByFileIdResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetTextureSetByFileIdQuery(fileId), cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
     }
 
     private static async Task<IResult> CreateTextureSet(

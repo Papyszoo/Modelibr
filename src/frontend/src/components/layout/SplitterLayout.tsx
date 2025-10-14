@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
+import { DockProvider } from '../../contexts/DockContext'
 import DockPanel from './DockPanel'
 import { Tab, SplitterEvent } from '../../types'
 import {
@@ -85,6 +86,7 @@ function SplitterLayout(): JSX.Element {
   const moveTabBetweenPanels = (tab: Tab, fromSide: 'left' | 'right'): void => {
     if (fromSide === 'left') {
       // Move from left to right
+      const movedTabIndex = leftTabs.findIndex(t => t.id === tab.id)
       const newLeftTabs = leftTabs.filter(t => t.id !== tab.id)
       const newRightTabs = [...rightTabs, tab]
 
@@ -95,13 +97,19 @@ function SplitterLayout(): JSX.Element {
       // Update active tab in left panel if needed
       if (activeLeftTab === tab.id) {
         if (newLeftTabs.length > 0) {
-          setActiveLeftTab(newLeftTabs[0].id)
+          // Activate the previous tab or the next one if it was the first
+          const newActiveIndex = Math.min(
+            movedTabIndex > 0 ? movedTabIndex - 1 : 0,
+            newLeftTabs.length - 1
+          )
+          setActiveLeftTab(newLeftTabs[newActiveIndex].id)
         } else {
           setActiveLeftTab('')
         }
       }
     } else {
       // Move from right to left
+      const movedTabIndex = rightTabs.findIndex(t => t.id === tab.id)
       const newRightTabs = rightTabs.filter(t => t.id !== tab.id)
       const newLeftTabs = [...leftTabs, tab]
 
@@ -112,7 +120,12 @@ function SplitterLayout(): JSX.Element {
       // Update active tab in right panel if needed
       if (activeRightTab === tab.id) {
         if (newRightTabs.length > 0) {
-          setActiveRightTab(newRightTabs[0].id)
+          // Activate the previous tab or the next one if it was the first
+          const newActiveIndex = Math.min(
+            movedTabIndex > 0 ? movedTabIndex - 1 : 0,
+            newRightTabs.length - 1
+          )
+          setActiveRightTab(newRightTabs[newActiveIndex].id)
         } else {
           setActiveRightTab('')
         }
@@ -128,47 +141,49 @@ function SplitterLayout(): JSX.Element {
   const rightSize = 100 - leftSize
 
   return (
-    <div className="splitter-layout">
-      <Splitter
-        layout="horizontal"
-        onResize={handleSplitterResize}
-        onResizeEnd={handleSplitterResizeEnd}
-        resizerStyle={{ background: '#e2e8f0', width: '4px' }}
-      >
-        <SplitterPanel size={leftSize} minSize={20}>
-          <DockPanel
-            side="left"
-            tabs={leftTabs}
-            setTabs={setLeftTabs}
-            activeTab={activeLeftTab}
-            setActiveTab={setActiveLeftTab}
-            otherTabs={rightTabs}
-            setOtherTabs={setRightTabs}
-            otherActiveTab={activeRightTab}
-            setOtherActiveTab={setActiveRightTab}
-            draggedTab={draggedTab}
-            setDraggedTab={setDraggedTab}
-            moveTabBetweenPanels={moveTabBetweenPanels}
-          />
-        </SplitterPanel>
-        <SplitterPanel size={rightSize} minSize={20}>
-          <DockPanel
-            side="right"
-            tabs={rightTabs}
-            setTabs={setRightTabs}
-            activeTab={activeRightTab}
-            setActiveTab={setActiveRightTab}
-            otherTabs={leftTabs}
-            setOtherTabs={setLeftTabs}
-            otherActiveTab={activeLeftTab}
-            setOtherActiveTab={setActiveLeftTab}
-            draggedTab={draggedTab}
-            setDraggedTab={setDraggedTab}
-            moveTabBetweenPanels={moveTabBetweenPanels}
-          />
-        </SplitterPanel>
-      </Splitter>
-    </div>
+    <DockProvider>
+      <div className="splitter-layout">
+        <Splitter
+          layout="horizontal"
+          onResize={handleSplitterResize}
+          onResizeEnd={handleSplitterResizeEnd}
+          resizerStyle={{ background: '#e2e8f0', width: '4px' }}
+        >
+          <SplitterPanel size={leftSize} minSize={20}>
+            <DockPanel
+              side="left"
+              tabs={leftTabs}
+              setTabs={setLeftTabs}
+              activeTab={activeLeftTab}
+              setActiveTab={setActiveLeftTab}
+              otherTabs={rightTabs}
+              setOtherTabs={setRightTabs}
+              otherActiveTab={activeRightTab}
+              setOtherActiveTab={setActiveRightTab}
+              draggedTab={draggedTab}
+              setDraggedTab={setDraggedTab}
+              moveTabBetweenPanels={moveTabBetweenPanels}
+            />
+          </SplitterPanel>
+          <SplitterPanel size={rightSize} minSize={20}>
+            <DockPanel
+              side="right"
+              tabs={rightTabs}
+              setTabs={setRightTabs}
+              activeTab={activeRightTab}
+              setActiveTab={setActiveRightTab}
+              otherTabs={leftTabs}
+              setOtherTabs={setLeftTabs}
+              otherActiveTab={activeLeftTab}
+              setOtherActiveTab={setActiveLeftTab}
+              draggedTab={draggedTab}
+              setDraggedTab={setDraggedTab}
+              moveTabBetweenPanels={moveTabBetweenPanels}
+            />
+          </SplitterPanel>
+        </Splitter>
+      </div>
+    </DockProvider>
   )
 }
 

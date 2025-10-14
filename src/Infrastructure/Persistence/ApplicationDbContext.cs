@@ -10,11 +10,11 @@ namespace Infrastructure.Persistence
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
+        public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
-        public DbSet<Stage> Stages => Set<Stage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -29,6 +29,18 @@ namespace Infrastructure.Persistence
                 .HasMany(m => m.TextureSets)
                 .WithMany(tp => tp.Models)
                 .UsingEntity(j => j.ToTable("ModelTextureSets"));
+
+            // Configure many-to-many relationship between Model and Pack
+            modelBuilder.Entity<Model>()
+                .HasMany(m => m.Packs)
+                .WithMany(p => p.Models)
+                .UsingEntity(j => j.ToTable("PackModels"));
+
+            // Configure many-to-many relationship between TextureSet and Pack
+            modelBuilder.Entity<TextureSet>()
+                .HasMany(ts => ts.Packs)
+                .WithMany(p => p.TextureSets)
+                .UsingEntity(j => j.ToTable("PackTextureSets"));
 
             // Configure Model entity
             modelBuilder.Entity<Model>(entity =>
@@ -109,6 +121,19 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(tp => tp.Name);
             });
 
+            // Configure Pack entity
+            modelBuilder.Entity<Pack>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+                entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+                entity.Property(p => p.Description).HasMaxLength(1000);
+                entity.Property(p => p.CreatedAt).IsRequired();
+                entity.Property(p => p.UpdatedAt).IsRequired();
+
+                // Create index for efficient querying by name
+                entity.HasIndex(p => p.Name);
+            });
+
             // Configure Thumbnail entity
             modelBuilder.Entity<Thumbnail>(entity =>
             {
@@ -185,19 +210,6 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
-            });
-
-            // Configure Stage entity
-            modelBuilder.Entity<Stage>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
-                entity.Property(e => e.ConfigurationJson).IsRequired();
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UpdatedAt).IsRequired();
-                
-                // Create index for efficient querying by name
-                entity.HasIndex(e => e.Name);
             });
 
             base.OnModelCreating(modelBuilder);

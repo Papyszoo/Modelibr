@@ -148,6 +148,8 @@ describe('DraggableTab', () => {
     fireEvent.mouseDown(tabElement, { button: 2 })
 
     expect(defaultProps.onClose).not.toHaveBeenCalled()
+  })
+
   it('should render textureSets tab with palette icon', () => {
     const textureSetsTab: Tab = {
       id: 'test-tab-3',

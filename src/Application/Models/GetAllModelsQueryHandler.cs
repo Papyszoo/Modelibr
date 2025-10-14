@@ -19,6 +19,12 @@ namespace Application.Models
         {
             var models = await _modelRepository.GetAllAsync(cancellationToken);
             
+            // Filter by pack if specified
+            if (query.PackId.HasValue)
+            {
+                models = models.Where(m => m.Packs.Any(p => p.Id == query.PackId.Value));
+            }
+            
             var modelDtos = models.Select(m => new ModelDto
             {
                 Id = m.Id,
@@ -35,6 +41,11 @@ namespace Application.Models
                     FileType = f.FileType,
                     IsRenderable = f.FileType.IsRenderable,
                     SizeBytes = f.SizeBytes
+                }).ToList(),
+                Packs = m.Packs.Select(p => new PackSummaryDto
+                {
+                    Id = p.Id,
+                    Name = p.Name
                 }).ToList()
             }).ToList();
 
@@ -42,7 +53,7 @@ namespace Application.Models
         }
     }
 
-    public record GetAllModelsQuery() : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(int? PackId = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelDto> Models);
     
@@ -55,6 +66,7 @@ namespace Application.Models
         public string? Tags { get; init; }
         public string? Description { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
+        public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
     }
 
     public record FileDto
@@ -65,5 +77,11 @@ namespace Application.Models
         public required FileType FileType { get; init; }
         public bool IsRenderable { get; init; }
         public long SizeBytes { get; init; }
+    }
+
+    public record PackSummaryDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
     }
 }

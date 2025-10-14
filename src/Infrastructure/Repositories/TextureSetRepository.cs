@@ -31,6 +31,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
             .AsSplitQuery()
             .OrderBy(tp => tp.Name)
             .ToListAsync(cancellationToken);
@@ -42,6 +43,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
             .AsSplitQuery()
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
     }
@@ -55,8 +57,23 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
             .AsSplitQuery()
             .FirstOrDefaultAsync(tp => tp.Name == name.Trim(), cancellationToken);
+    }
+
+    public async Task<TextureSet?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await _context.TextureSets
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.File)
+            .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(tp => tp.Textures.Any(t => t.File.Sha256Hash == sha256Hash), cancellationToken);
     }
 
     public async Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default)

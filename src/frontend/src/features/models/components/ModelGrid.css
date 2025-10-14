@@ -261,3 +261,77 @@
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
 }
+
+
+/* Pack Selection Dialog */
+.pack-selection-dialog {
+  padding: 1rem 0;
+}
+
+.pack-selection-dialog p {
+  margin-bottom: 1rem;
+  color: var(--text-color-secondary);
+}
+
+.pack-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.pack-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pack-item:hover {
+  background: var(--surface-100);
+  border-color: var(--primary-color);
+}
+
+.pack-item > .pi-box {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.pack-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pack-item-name {
+  font-weight: 600;
+}
+
+.pack-item-description {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.pack-item > .pi-chevron-right {
+  color: var(--text-color-secondary);
+}
+
+.no-packs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem;
+  color: var(--text-color-secondary);
+}
+
+.no-packs i {
+  font-size: 3rem;
+}

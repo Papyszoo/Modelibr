@@ -4,6 +4,7 @@ import {
   isSupportedModelFormat,
   isThreeJSRenderable,
 } from '../../utils/fileUtils'
+import { useUploadProgress } from '../../hooks/useUploadProgress'
 
 /**
  * Custom hook for handling file uploads with validation and progress tracking
@@ -12,6 +13,8 @@ import {
  * @param {Function} options.onSuccess - Callback called on successful upload
  * @param {Function} options.onError - Callback called on upload error
  * @param {Object} options.toast - Toast reference for showing notifications
+ * @param {boolean} options.useGlobalProgress - Whether to use global upload progress window (default: true)
+ * @param {string} options.fileType - Type of file being uploaded: 'model' | 'texture' | 'file' (default: 'model')
  * @returns {Object} Upload state and functions
  */
 export function useFileUpload(options = {}) {
@@ -20,17 +23,23 @@ export function useFileUpload(options = {}) {
     onSuccess,
     onError,
     toast,
+    useGlobalProgress = true,
+    fileType = 'model',
   } = options
 
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
 
+  // Always call the hook unconditionally, but only use it if enabled
+  const uploadProgressContext = useUploadProgress()
+
   /**
    * Upload a single file
    * @param {File} file - File to upload
+   * @param {string} uploadId - Optional upload ID for global progress tracking
    * @returns {Promise<Object>} Upload result
    */
-  const uploadSingleFile = async file => {
+  const uploadSingleFile = async (file, uploadId = null) => {
     if (!file) {
       throw new Error('No file provided')
     }
@@ -43,6 +52,12 @@ export function useFileUpload(options = {}) {
         `File ${file.name} is not a supported 3D model format`
       )
       error.type = 'UNSUPPORTED_FORMAT'
+
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.failUpload(uploadId, error)
+      }
+
       throw error
     }
 
@@ -52,14 +67,36 @@ export function useFileUpload(options = {}) {
         `File ${file.name} (${fileExtension.toUpperCase()}) is supported but not renderable in 3D viewer. Use the upload page for this file type.`
       )
       error.type = 'NON_RENDERABLE'
+
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.failUpload(uploadId, error)
+      }
+
       throw error
     }
 
     try {
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.updateUploadProgress(uploadId, 50)
+      }
+
       const result = await ApiClient.uploadModel(file)
+
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.updateUploadProgress(uploadId, 100)
+        uploadProgressContext.completeUpload(uploadId, result)
+      }
 
       return result
     } catch (error) {
+      // Update global progress if enabled and available
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.failUpload(uploadId, error)
+      }
+
       if (!error.type) {
         error.type = 'NETWORK_ERROR'
       }
@@ -87,12 +124,24 @@ export function useFileUpload(options = {}) {
     setUploading(true)
     setUploadProgress(0)
 
+    // Create batch for multiple files
+    const batchId =
+      useGlobalProgress && uploadProgressContext && fileArray.length > 1
+        ? uploadProgressContext.createBatch()
+        : undefined
+
     try {
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i]
 
+        // Add to global progress tracker if enabled and available
+        const uploadId =
+          useGlobalProgress && uploadProgressContext
+            ? uploadProgressContext.addUpload(file, fileType, batchId)
+            : null
+
         try {
-          const result = await uploadSingleFile(file)
+          const result = await uploadSingleFile(file, uploadId)
           results.succeeded.push({ file, result })
 
           // Show success notification if toast is provided
@@ -169,9 +218,15 @@ export function useFileUpload(options = {}) {
     setUploading(true)
     setUploadProgress(0)
 
+    // Add to global progress tracker if enabled and available
+    const uploadId =
+      useGlobalProgress && uploadProgressContext
+        ? uploadProgressContext.addUpload(file, fileType)
+        : null
+
     try {
       setUploadProgress(50)
-      const result = await uploadSingleFile(file)
+      const result = await uploadSingleFile(file, uploadId)
       setUploadProgress(100)
 
       if (onSuccess) {

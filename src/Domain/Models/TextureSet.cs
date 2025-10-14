@@ -10,6 +10,7 @@ public class TextureSet : AggregateRoot
 {
     private readonly List<Texture> _textures = new();
     private readonly List<Model> _models = new();
+    private readonly List<Pack> _packs = new();
 
     public int Id { get; set; }
     public string Name { get; private set; } = string.Empty;
@@ -37,6 +38,18 @@ public class TextureSet : AggregateRoot
             _models.Clear();
             if (value != null)
                 _models.AddRange(value);
+        }
+    }
+
+    // Navigation property for many-to-many relationship with Packs - EF Core requires this to be settable
+    public ICollection<Pack> Packs
+    {
+        get => _packs;
+        set
+        {
+            _packs.Clear();
+            if (value != null)
+                _packs.AddRange(value);
         }
     }
 

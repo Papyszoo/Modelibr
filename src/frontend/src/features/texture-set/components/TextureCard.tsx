@@ -7,6 +7,7 @@ import { TextureType, TextureDto } from '../../../types'
 import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
 import { useTextureSets } from '../hooks/useTextureSets'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
+import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
 // eslint-disable-next-line no-restricted-imports -- ApiClient needed for file operations
 import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
@@ -31,6 +32,7 @@ function TextureCard({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textureSetsApi = useTextureSets()
   const typeInfo = getTextureTypeInfo(textureType)
+  const { uploadFile } = useGenericFileUpload({ fileType: 'texture' })
 
   const handleFileUpload = async (files: File[]) => {
     if (files.length === 0) return
@@ -51,8 +53,8 @@ function TextureCard({
     try {
       setUploading(true)
 
-      // Upload the file using the dedicated files endpoint
-      const uploadResult = await ApiClient.uploadFile(file)
+      // Upload the file using the dedicated files endpoint with global progress
+      const uploadResult = await uploadFile(file)
       const fileId = uploadResult.fileId
 
       // Then add it to the set

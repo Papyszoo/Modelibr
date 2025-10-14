@@ -3,12 +3,14 @@ import { Button } from 'primereact/button'
 interface ModelListHeaderProps {
   isTabContent: boolean
   onBackToUpload?: () => void
+  onRefresh?: () => void
   modelCount?: number
 }
 
 export default function ModelListHeader({
   isTabContent,
   onBackToUpload,
+  onRefresh,
   modelCount = 0,
 }: ModelListHeaderProps) {
   if (isTabContent) {
@@ -20,6 +22,15 @@ export default function ModelListHeader({
             <i className="pi pi-box"></i>
             {modelCount} models
           </span>
+          {onRefresh && (
+            <Button
+              icon="pi pi-refresh"
+              className="p-button-text p-button-sm"
+              onClick={onRefresh}
+              tooltip="Refresh models"
+              tooltipOptions={{ position: 'bottom' }}
+            />
+          )}
         </div>
       </header>
     )
@@ -34,6 +45,16 @@ export default function ModelListHeader({
           className="p-button-outlined"
           onClick={onBackToUpload}
         />
+        {onRefresh && (
+          <Button
+            icon="pi pi-refresh"
+            label="Refresh"
+            className="p-button-outlined"
+            onClick={onRefresh}
+            tooltip="Refresh models list"
+            tooltipOptions={{ position: 'bottom' }}
+          />
+        )}
       </div>
       <h1>3D Model Library</h1>
       <p>
