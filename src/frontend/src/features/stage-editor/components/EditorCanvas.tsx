@@ -3,17 +3,17 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid } from '@react-three/drei'
 import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 import SceneLights from './SceneLights'
-import { SceneConfig } from './SceneEditor'
+import { StageConfig } from './SceneEditor'
 import './EditorCanvas.css'
 
 interface EditorCanvasProps {
-  sceneConfig: SceneConfig
+  stageConfig: StageConfig
   selectedObjectId: string | null
   onSelectObject: (id: string | null) => void
 }
 
 function EditorCanvas({
-  sceneConfig,
+  stageConfig,
   selectedObjectId,
   onSelectObject,
 }: EditorCanvasProps): JSX.Element {
@@ -48,9 +48,9 @@ function EditorCanvas({
             infiniteGrid={true}
           />
 
-          {/* Scene lights */}
+          {/* Stage lights */}
           <SceneLights
-            lights={sceneConfig.lights}
+            lights={stageConfig.lights}
             selectedId={selectedObjectId}
             onSelectLight={onSelectObject}
           />

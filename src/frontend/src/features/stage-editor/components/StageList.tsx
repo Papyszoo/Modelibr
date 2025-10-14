@@ -104,21 +104,16 @@ function StageList() {
 
   const handleEditStage = (stage: StageDto) => {
     // Open stage editor in a new tab
-    openTab({
-      id: `stage-editor-${stage.id}`,
-      type: 'stageEditor',
-      label: stage.name,
-      stageId: stage.id.toString(),
-    })
+    openTab('stageEditor', stage.name, { id: stage.id.toString() })
   }
 
   return (
     <div className="stage-list-container">
       <Toast ref={toast} />
       <ConfirmDialog />
-      
+
       <StageListHeader onCreateClick={() => setShowCreateDialog(true)} />
-      
+
       <StageGrid
         stages={stages}
         loading={loading}

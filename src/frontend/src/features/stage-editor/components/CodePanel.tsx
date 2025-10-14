@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Button } from 'primereact/button'
 import { Accordion, AccordionTab } from 'primereact/accordion'
-import { SceneConfig } from './SceneEditor'
+import { StageConfig } from './SceneEditor'
 import './CodePanel.css'
 
 interface CodePanelProps {
-  sceneConfig: SceneConfig
+  stageConfig: StageConfig
 }
 
-function CodePanel({ sceneConfig }: CodePanelProps): JSX.Element {
+function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
   const [copied, setCopied] = useState(false)
 
   const generateCode = (): string => {
@@ -20,7 +20,7 @@ function Scene() {
     <Canvas shadows camera={{ position: [10, 10, 10], fov: 50 }}>
       {/* Lights */}`
 
-    const lights = sceneConfig.lights
+    const lights = stageConfig.lights
       .map(light => {
         switch (light.type) {
           case 'ambient':
