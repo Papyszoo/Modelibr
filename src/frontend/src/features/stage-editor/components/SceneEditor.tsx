@@ -71,7 +71,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
       const stage = await apiClient.getStageById(id.toString())
       setStageName(stage.name)
       setCurrentStageId(stage.id)
-      
+
       try {
         const config = JSON.parse(stage.configurationJson)
         setStageConfig(config)
@@ -80,7 +80,8 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         toast.current?.show({
           severity: 'warn',
           summary: 'Warning',
-          detail: 'Stage configuration could not be loaded. Starting with empty stage.',
+          detail:
+            'Stage configuration could not be loaded. Starting with empty stage.',
           life: 3000,
         })
       }
