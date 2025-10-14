@@ -1,7 +1,8 @@
 import { ModelList } from '../../features/models'
 import { ModelViewer } from '../../features/model-viewer'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
-import { StageEditor, StageList } from '../../features/stage-editor'
+import { PackList, PackViewer } from '../../features/pack'
+import AnimationList from '../tabs/AnimationList'
 import Settings from '../tabs/Settings'
 import { Tab } from '../../types'
 import { useTabContext } from '../../hooks/useTabContext'
@@ -44,11 +45,19 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
         }
         return <TextureSetViewer setId={tab.setId} side={side} />
 
-      case 'stageList':
-        return <StageList />
+      case 'packs':
+        return <PackList />
 
-      case 'stageEditor':
-        return <StageEditor stageId={tab.stageId} />
+      case 'packViewer':
+        if (!tab.packId) {
+          return (
+            <div className="tab-error">
+              <h3>Pack data not available</h3>
+              <p>The pack information could not be loaded.</p>
+            </div>
+          )
+        }
+        return <PackViewer packId={parseInt(tab.packId)} />
 
       case 'settings':
         return <Settings />

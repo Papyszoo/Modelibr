@@ -49,7 +49,7 @@ The service is configured via environment variables. See `.env.example` for all 
 - `ORBIT_ANGLE_STEP`: Degrees between each frame (default: `12`, resulting in ~30 frames for full 360° rotation)
 - `ORBIT_START_ANGLE`: Starting angle in degrees (default: `0`)
 - `ORBIT_END_ANGLE`: Ending angle in degrees (default: `360`)
-- `ORBIT_CAMERA_HEIGHT`: Vertical camera offset from center (default: `0`)
+- `ORBIT_CAMERA_HEIGHT`: Camera elevation angle in degrees (vertical tilt) (default: `0`)
 
 ### Logging
 

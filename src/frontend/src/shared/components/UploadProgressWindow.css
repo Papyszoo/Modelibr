@@ -1,0 +1,251 @@
+#upload-progress-window {
+  max-height: 600px;
+}
+
+.upload-progress-window {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 400px;
+  max-width: 500px;
+}
+
+.upload-summary {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.75rem;
+}
+
+.upload-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.upload-summary-text {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.upload-summary-progress {
+  height: 0.5rem;
+}
+
+.upload-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+/* Batch Styles */
+.upload-batch {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.upload-batch-header-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f9fafb;
+}
+
+.upload-batch-header {
+  flex: 1;
+  padding: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.upload-batch-header:hover {
+  background: #f3f4f6;
+}
+
+.upload-batch-actions {
+  padding-right: 0.5rem;
+}
+
+.upload-batch-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.upload-batch-toggle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  transition: transform 0.2s;
+}
+
+.upload-batch-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.upload-batch-status {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-left: auto;
+}
+
+.upload-batch-progress {
+  height: 0.375rem;
+}
+
+.upload-batch-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: white;
+}
+
+/* Upload Item Styles */
+.upload-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: #f9fafb;
+  transition: background 0.2s;
+}
+
+.upload-item:hover {
+  background: #f3f4f6;
+}
+
+.upload-item-completed {
+  background: #f0fdf4;
+}
+
+.upload-item-completed:hover {
+  background: #dcfce7;
+}
+
+.upload-item-error {
+  background: #fef2f2;
+}
+
+.upload-item-error:hover {
+  background: #fee2e2;
+}
+
+.upload-item-icons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+  min-width: 48px;
+}
+
+.upload-item-ext-icon-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.upload-item-ext-icon {
+  font-size: 1.25rem;
+  color: #6b7280;
+}
+
+.upload-item-ext-name {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.upload-item-type-icon {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+.upload-item-completed .upload-item-ext-icon {
+  color: #10b981;
+}
+
+.upload-item-error .upload-item-ext-icon {
+  color: #ef4444;
+}
+
+.upload-item-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.upload-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.upload-item-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-item-size {
+  font-size: 0.75rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.upload-item-progress {
+  height: 0.375rem;
+}
+
+.upload-item-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #dc2626;
+  font-size: 0.75rem;
+}
+
+.upload-item-error i {
+  font-size: 0.875rem;
+}
+
+.upload-item-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+/* Scrollbar styling for upload items list */
+.upload-items-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.upload-items-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.upload-items-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.upload-items-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

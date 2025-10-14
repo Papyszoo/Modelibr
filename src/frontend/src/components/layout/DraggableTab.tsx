@@ -8,13 +8,13 @@ const getTabIcon = (tabType: Tab['type']): string => {
     case 'modelViewer':
       return 'pi pi-eye'
     case 'textureSets':
-      return 'pi pi-palette'
+      return 'pi pi-folder'
     case 'textureSetViewer':
-      return 'pi pi-images'
-    case 'stageList':
-      return 'pi pi-sun'
-    case 'stageEditor':
-      return 'pi pi-pencil'
+      return 'pi pi-image'
+    case 'packs':
+      return 'pi pi-inbox'
+    case 'packViewer':
+      return 'pi pi-folder-open'
     case 'animation':
       return 'pi pi-play'
     case 'settings':
@@ -40,10 +40,10 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Texture Sets'
     case 'textureSetViewer':
       return `Texture Set: ${tab.setId || 'Unknown'}`
-    case 'stageList':
-      return 'Stages'
-    case 'stageEditor':
-      return `Stage: ${tab.stageId || 'New Stage'}`
+    case 'packs':
+      return 'Packs'
+    case 'packViewer':
+      return `Pack: ${tab.packId || 'Unknown'}`
     case 'animation':
       return 'Animations List'
     case 'settings':

@@ -9,7 +9,13 @@ import {
   UpdateTextureSetResponse,
   AddTextureToSetRequest,
   AddTextureToSetResponse,
+  PackDto,
+  GetAllPacksResponse,
+  CreatePackRequest,
+  CreatePackResponse,
+  UpdatePackRequest,
 } from '../types'
+import { useApiCacheStore } from '../stores/apiCacheStore'
 
 export interface UploadModelResponse {
   id: number
@@ -60,6 +66,9 @@ class ApiClient {
       }
     )
 
+    // Invalidate models cache on successful upload
+    useApiCacheStore.getState().invalidateModels()
+
     return response.data
   }
 
@@ -79,15 +88,42 @@ class ApiClient {
     return response.data
   }
 
-  async getModels(): Promise<Model[]> {
+  async getModels(options: { skipCache?: boolean } = {}): Promise<Model[]> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getModels()
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<Model[]> = await this.client.get('/models')
+
+    // Update cache
+    useApiCacheStore.getState().setModels(response.data)
+
     return response.data
   }
 
-  async getModelById(modelId: string): Promise<Model> {
+  async getModelById(
+    modelId: string,
+    options: { skipCache?: boolean } = {}
+  ): Promise<Model> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getModelById(modelId)
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<Model> = await this.client.get(
       `/models/${modelId}`
     )
+
+    // Update cache
+    useApiCacheStore.getState().setModelById(modelId, response.data)
+
     return response.data
   }
 
@@ -100,10 +136,25 @@ class ApiClient {
   }
 
   // Thumbnail methods
-  async getThumbnailStatus(modelId: string): Promise<ThumbnailStatus> {
+  async getThumbnailStatus(
+    modelId: string,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ThumbnailStatus> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getThumbnailStatus(modelId)
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<ThumbnailStatus> = await this.client.get(
       `/models/${modelId}/thumbnail`
     )
+
+    // Update cache
+    useApiCacheStore.getState().setThumbnailStatus(modelId, response.data)
+
     return response.data
   }
 
@@ -111,11 +162,26 @@ class ApiClient {
     return `${this.baseURL}/models/${modelId}/thumbnail/file`
   }
 
-  async getThumbnailFile(modelId: string): Promise<Blob> {
+  async getThumbnailFile(
+    modelId: string,
+    options: { skipCache?: boolean } = {}
+  ): Promise<Blob> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getThumbnailBlob(modelId)
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<Blob> = await this.client.get(
       `/models/${modelId}/thumbnail/file`,
       { responseType: 'blob' }
     )
+
+    // Update cache
+    useApiCacheStore.getState().setThumbnailBlob(modelId, response.data)
+
     return response.data
   }
 
@@ -123,20 +189,61 @@ class ApiClient {
     const response: AxiosResponse<void> = await this.client.post(
       `/models/${modelId}/thumbnail/regenerate`
     )
+
+    // Invalidate thumbnail cache for this model
+    useApiCacheStore.getState().invalidateThumbnailById(modelId)
+
     return response.data
   }
 
   // TextureSet methods
-  async getAllTextureSets(): Promise<TextureSetDto[]> {
+  async getAllTextureSets(
+    options: { skipCache?: boolean } = {}
+  ): Promise<TextureSetDto[]> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getTextureSets()
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<GetAllTextureSetsResponse> =
       await this.client.get('/texture-sets')
+
+    // Update cache
+    useApiCacheStore.getState().setTextureSets(response.data.textureSets)
+
     return response.data.textureSets
   }
 
-  async getTextureSetById(id: number): Promise<TextureSetDto> {
+  async getTextureSetById(
+    id: number,
+    options: { skipCache?: boolean } = {}
+  ): Promise<TextureSetDto> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getTextureSetById(id)
+      if (cached) {
+        return cached
+      }
+    }
+
     const response: AxiosResponse<TextureSetDto> = await this.client.get(
       `/texture-sets/${id}`
     )
+
+    // Update cache
+    useApiCacheStore.getState().setTextureSetById(id, response.data)
+
+    return response.data
+  }
+
+  async getTextureSetByFileId(
+    fileId: number
+  ): Promise<{ textureSetId: number | null }> {
+    const response: AxiosResponse<{ textureSetId: number | null }> =
+      await this.client.get(`/texture-sets/by-file/${fileId}`)
     return response.data
   }
 
@@ -145,6 +252,10 @@ class ApiClient {
   ): Promise<CreateTextureSetResponse> {
     const response: AxiosResponse<CreateTextureSetResponse> =
       await this.client.post('/texture-sets', request)
+
+    // Invalidate texture sets cache on successful creation
+    useApiCacheStore.getState().invalidateTextureSets()
+
     return response.data
   }
 
@@ -154,11 +265,20 @@ class ApiClient {
   ): Promise<UpdateTextureSetResponse> {
     const response: AxiosResponse<UpdateTextureSetResponse> =
       await this.client.put(`/texture-sets/${id}`, request)
+
+    // Invalidate texture sets cache on successful update
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(id)
+
     return response.data
   }
 
   async deleteTextureSet(id: number): Promise<void> {
     await this.client.delete(`/texture-sets/${id}`)
+
+    // Invalidate texture sets cache on successful deletion
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(id)
   }
 
   async addTextureToSetEndpoint(
@@ -167,11 +287,20 @@ class ApiClient {
   ): Promise<AddTextureToSetResponse> {
     const response: AxiosResponse<AddTextureToSetResponse> =
       await this.client.post(`/texture-sets/${setId}/textures`, request)
+
+    // Invalidate texture sets cache when textures are added
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
+
     return response.data
   }
 
   async removeTextureFromSet(setId: number, textureId: number): Promise<void> {
     await this.client.delete(`/texture-sets/${setId}/textures/${textureId}`)
+
+    // Invalidate texture sets cache when textures are removed
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
   }
 
   async associateTextureSetWithModel(
@@ -179,6 +308,12 @@ class ApiClient {
     modelId: number
   ): Promise<void> {
     await this.client.post(`/texture-sets/${setId}/models/${modelId}`)
+
+    // Invalidate texture sets and models cache when associations change
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
   }
 
   async disassociateTextureSetFromModel(
@@ -186,6 +321,12 @@ class ApiClient {
     modelId: number
   ): Promise<void> {
     await this.client.delete(`/texture-sets/${setId}/models/${modelId}`)
+
+    // Invalidate texture sets and models cache when associations change
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
   }
 
   // Settings API
@@ -243,50 +384,142 @@ class ApiClient {
     return response.data
   }
 
-  // Stage API
-  async createStage(
-    name: string,
-    configurationJson: string
-  ): Promise<{ id: number; name: string }> {
-    const response = await this.client.post('/stages', {
-      name,
-      configurationJson,
-    })
-    return response.data
+  // Pack API methods
+  async getAllPacks(options: { skipCache?: boolean } = {}): Promise<PackDto[]> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getPacks()
+      if (cached) {
+        return cached
+      }
+    }
+
+    const response = await this.client.get<GetAllPacksResponse>('/packs')
+
+    // Update cache
+    useApiCacheStore.getState().setPacks(response.data.packs)
+
+    return response.data.packs
   }
 
-  async getAllStages(): Promise<{
-    stages: Array<{
-      id: number
-      name: string
-      createdAt: string
-      updatedAt: string
-    }>
-  }> {
-    const response = await this.client.get('/stages')
-    // Backend returns { stages: [...] } with lowercase from JSON serialization
-    return response.data
-  }
-
-  async getStageById(id: number): Promise<{
-    id: number
-    name: string
-    configurationJson: string
-    createdAt: string
-    updatedAt: string
-  }> {
-    const response = await this.client.get(`/stages/${id}`)
-    return response.data
-  }
-
-  async updateStage(
+  async getPackById(
     id: number,
-    configurationJson: string
-  ): Promise<{ id: number; name: string }> {
-    const response = await this.client.put(`/stages/${id}`, {
-      configurationJson,
-    })
+    options: { skipCache?: boolean } = {}
+  ): Promise<PackDto> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getPackById(id)
+      if (cached) {
+        return cached
+      }
+    }
+
+    const response = await this.client.get<PackDto>(`/packs/${id}`)
+
+    // Update cache
+    useApiCacheStore.getState().setPackById(id, response.data)
+
     return response.data
+  }
+
+  async createPack(request: CreatePackRequest): Promise<CreatePackResponse> {
+    const response = await this.client.post<CreatePackResponse>(
+      '/packs',
+      request
+    )
+
+    // Invalidate packs cache on successful creation
+    useApiCacheStore.getState().invalidatePacks()
+
+    return response.data
+  }
+
+  async updatePack(id: number, request: UpdatePackRequest): Promise<void> {
+    await this.client.put(`/packs/${id}`, request)
+
+    // Invalidate packs cache on successful update
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(id)
+  }
+
+  async deletePack(id: number): Promise<void> {
+    await this.client.delete(`/packs/${id}`)
+
+    // Invalidate packs cache on successful deletion
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(id)
+  }
+
+  async addModelToPack(packId: number, modelId: number): Promise<void> {
+    await this.client.post(`/packs/${packId}/models/${modelId}`)
+
+    // Invalidate packs and models cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+  }
+
+  async removeModelFromPack(packId: number, modelId: number): Promise<void> {
+    await this.client.delete(`/packs/${packId}/models/${modelId}`)
+
+    // Invalidate packs and models cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+  }
+
+  async addTextureSetToPack(
+    packId: number,
+    textureSetId: number
+  ): Promise<void> {
+    await this.client.post(`/packs/${packId}/texture-sets/${textureSetId}`)
+
+    // Invalidate packs and texture sets cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
+  }
+
+  async removeTextureSetFromPack(
+    packId: number,
+    textureSetId: number
+  ): Promise<void> {
+    await this.client.delete(`/packs/${packId}/texture-sets/${textureSetId}`)
+
+    // Invalidate packs and texture sets cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
+  }
+
+  async getModelsByPack(packId: number): Promise<Model[]> {
+    const response = await this.client.get<Model[]>(`/models?packId=${packId}`)
+    return response.data
+  }
+
+  async getTextureSetsByPack(packId: number): Promise<TextureSetDto[]> {
+    const response = await this.client.get<GetAllTextureSetsResponse>(
+      `/texture-sets?packId=${packId}`
+    )
+    return response.data.textureSets
+  }
+
+  // Cache management methods
+  refreshCache(type?: 'models' | 'textureSets' | 'packs'): void {
+    const store = useApiCacheStore.getState()
+    if (!type) {
+      store.invalidateAll()
+    } else if (type === 'models') {
+      store.refreshModels()
+    } else if (type === 'textureSets') {
+      store.refreshTextureSets()
+    } else if (type === 'packs') {
+      store.refreshPacks()
+    }
   }
 }
 

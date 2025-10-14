@@ -13,11 +13,6 @@ describe('SplitterLayout URL Serialization', () => {
       expect(getTabLabel('animation')).toBe('Animations')
       expect(getTabLabel('modelViewer')).toBe('Model Viewer')
       expect(getTabLabel('modelViewer', '123')).toBe('Model 123')
-      expect(getTabLabel('stageList')).toBe('Stages')
-      expect(getTabLabel('stageEditor')).toBe('Stage Editor')
-      expect(getTabLabel('stageEditor', undefined, undefined, '5')).toBe(
-        'Stage 5'
-      )
     })
   })
 
@@ -45,23 +40,6 @@ describe('SplitterLayout URL Serialization', () => {
       expect(result[1].type).toBe('texture')
       expect(result[2].type).toBe('modelViewer')
       expect(result[2].modelId).toBe('456')
-    })
-
-    it('should parse stageEditor tab with stageId', () => {
-      const result = parseCompactTabFormat('stageEditor:10')
-      expect(result).toHaveLength(1)
-      expect(result[0].type).toBe('stageEditor')
-      expect(result[0].label).toBe('Stage 10')
-      expect(result[0].stageId).toBe('10')
-      expect(result[0].id).toBe('stage-10')
-    })
-
-    it('should parse stageList tab', () => {
-      const result = parseCompactTabFormat('stageList')
-      expect(result).toHaveLength(1)
-      expect(result[0].type).toBe('stageList')
-      expect(result[0].label).toBe('Stages')
-      expect(result[0].stageId).toBeUndefined()
     })
 
     it('should handle legacy JSON format', () => {
@@ -118,19 +96,6 @@ describe('SplitterLayout URL Serialization', () => {
 
     it('should handle empty array', () => {
       expect(serializeToCompactFormat([])).toBe('')
-    })
-
-    it('should serialize tabs with stageId', () => {
-      const tabs: Tab[] = [
-        { id: 'stages', type: 'stageList', label: 'Stages' },
-        {
-          id: 'stage-10',
-          type: 'stageEditor',
-          label: 'My Stage',
-          stageId: '10',
-        },
-      ]
-      expect(serializeToCompactFormat(tabs)).toBe('stageList,stageEditor:10')
     })
   })
 })

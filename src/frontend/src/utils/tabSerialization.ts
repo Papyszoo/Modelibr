@@ -5,7 +5,7 @@ export function getTabLabel(
   type: Tab['type'],
   modelId?: string,
   setId?: string,
-  stageId?: string
+  packId?: string
 ): string {
   switch (type) {
     case 'modelList':
@@ -18,10 +18,10 @@ export function getTabLabel(
       return 'Texture Sets'
     case 'textureSetViewer':
       return setId ? `Set ${setId}` : 'Texture Set'
-    case 'stageList':
-      return 'Stages'
-    case 'stageEditor':
-      return stageId ? `Stage ${stageId}` : 'Stage Editor'
+    case 'packs':
+      return 'Packs'
+    case 'packViewer':
+      return packId ? `Pack ${packId}` : 'Pack Viewer'
     case 'animation':
       return 'Animations'
     default:
@@ -61,8 +61,8 @@ export function parseCompactTabFormat(
           'animation',
           'textureSets',
           'textureSetViewer',
-          'stageList',
-          'stageEditor',
+          'packs',
+          'packViewer',
         ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${type}`)
@@ -88,13 +88,13 @@ export function parseCompactTabFormat(
         }
       }
 
-      // Handle stage editor tabs
-      if (tabType === 'stageEditor' && id) {
+      // Handle pack viewer tabs
+      if (tabType === 'packViewer' && id) {
         return {
-          id: `stage-${id}`,
+          id: `pack-${id}`,
           type: tabType,
           label: getTabLabel(tabType, undefined, undefined, id),
-          stageId: id,
+          packId: id,
         }
       }
 
@@ -116,7 +116,7 @@ export function serializeToCompactFormat(tabs: Tab[]): string {
     .map(tab => {
       if (tab.modelId) return `${tab.type}:${tab.modelId}`
       if (tab.setId) return `${tab.type}:${tab.setId}`
-      if (tab.stageId) return `${tab.type}:${tab.stageId}`
+      if (tab.packId) return `${tab.type}:${tab.packId}`
       return tab.type
     })
     .join(',')

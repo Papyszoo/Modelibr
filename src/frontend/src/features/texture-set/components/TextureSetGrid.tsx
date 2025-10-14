@@ -1,6 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { Dialog } from 'primereact/dialog'
+import { Button } from 'primereact/button'
+import { ContextMenu } from 'primereact/contextmenu'
+import { MenuItem } from 'primereact/menuitem'
+import { Toast } from 'primereact/toast'
 import './TextureSetGrid.css'
-import { TextureSetDto, TextureType } from '../../../types'
+import { TextureSetDto, TextureType, PackDto } from '../../../types'
 import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
@@ -25,6 +30,48 @@ export default function TextureSetGrid({
   onDragLeave,
 }: TextureSetGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [packs, setPacks] = useState<PackDto[]>([])
+  const [selectedTextureSet, setSelectedTextureSet] =
+    useState<TextureSetDto | null>(null)
+  const [showPackDialog, setShowPackDialog] = useState(false)
+  const contextMenu = useRef<ContextMenu>(null)
+  const toast = useRef<Toast>(null)
+
+  useEffect(() => {
+    loadPacks()
+  }, [])
+
+  const loadPacks = async () => {
+    try {
+      const data = await ApiClient.getAllPacks()
+      setPacks(data)
+    } catch (error) {
+      console.error('Failed to load packs:', error)
+    }
+  }
+
+  const handleAddToPack = async (packId: number) => {
+    if (!selectedTextureSet) return
+
+    try {
+      await ApiClient.addTextureSetToPack(packId, selectedTextureSet.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Texture set added to pack',
+        life: 3000,
+      })
+      setShowPackDialog(false)
+    } catch (error) {
+      console.error('Failed to add texture set to pack:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to add texture set to pack',
+        life: 3000,
+      })
+    }
+  }
 
   const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
     // Find albedo texture first, then fallback to diffuse
@@ -46,6 +93,17 @@ export default function TextureSetGrid({
     const name = textureSet.name.toLowerCase()
     return name.includes(searchQuery.toLowerCase())
   })
+
+  const contextMenuItems: MenuItem[] = [
+    {
+      label: 'Add to pack',
+      icon: 'pi pi-box',
+      command: () => {
+        loadPacks()
+        setShowPackDialog(true)
+      },
+    },
+  ]
 
   // Loading state
   if (loading) {
@@ -85,6 +143,9 @@ export default function TextureSetGrid({
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
     >
+      <Toast ref={toast} />
+      <ContextMenu model={contextMenuItems} ref={contextMenu} />
+
       {/* Search and filter bar */}
       <div className="texture-set-grid-controls">
         <div className="search-bar">
@@ -112,6 +173,11 @@ export default function TextureSetGrid({
               key={textureSet.id}
               className="texture-set-card"
               onClick={() => onTextureSetSelect(textureSet)}
+              onContextMenu={e => {
+                e.preventDefault()
+                setSelectedTextureSet(textureSet)
+                contextMenu.current?.show(e)
+              }}
             >
               <div className="texture-set-card-thumbnail">
                 {albedoUrl ? (
@@ -150,6 +216,44 @@ export default function TextureSetGrid({
           <p>No texture sets found matching "{searchQuery}"</p>
         </div>
       )}
+
+      {/* Add to Pack Dialog */}
+      <Dialog
+        header="Add to Pack"
+        visible={showPackDialog}
+        style={{ width: '500px' }}
+        onHide={() => setShowPackDialog(false)}
+      >
+        <div className="pack-selection-dialog">
+          <p>Select a pack to add this texture set to:</p>
+          <div className="pack-list">
+            {packs.map(pack => (
+              <div
+                key={pack.id}
+                className="pack-item"
+                onClick={() => handleAddToPack(pack.id)}
+              >
+                <i className="pi pi-box" />
+                <div className="pack-item-content">
+                  <span className="pack-item-name">{pack.name}</span>
+                  {pack.description && (
+                    <span className="pack-item-description">
+                      {pack.description}
+                    </span>
+                  )}
+                </div>
+                <i className="pi pi-chevron-right" />
+              </div>
+            ))}
+          </div>
+          {packs.length === 0 && (
+            <div className="no-packs">
+              <i className="pi pi-inbox" />
+              <p>No packs available. Create a pack first.</p>
+            </div>
+          )}
+        </div>
+      </Dialog>
     </div>
   )
 }

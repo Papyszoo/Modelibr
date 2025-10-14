@@ -34,6 +34,7 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 
         // Global state for external control
         window.modelRenderer = {
@@ -166,6 +167,8 @@
                     loader = new GLTFLoader();
                 } else if (fileType === 'obj') {
                     loader = new OBJLoader();
+                } else if (fileType === 'fbx') {
+                    loader = new FBXLoader();
                 } else {
                     reject(new Error(`Unsupported file type: ${fileType}`));
                     return;
@@ -180,6 +183,23 @@
                         } else {
                             model = result;
                         }
+                        
+                        // Apply standard material to OBJ and FBX models for consistent appearance
+                        if (fileType === 'obj' || fileType === 'fbx') {
+                            model.traverse((child) => {
+                                if (child.isMesh) {
+                                    child.material = new THREE.MeshStandardMaterial({
+                                        color: new THREE.Color(0.7, 0.7, 0.9),
+                                        metalness: 0.3,
+                                        roughness: 0.4,
+                                        envMapIntensity: 1.0,
+                                    });
+                                    child.castShadow = true;
+                                    child.receiveShadow = true;
+                                }
+                            });
+                        }
+                        
                         resolve(model);
                     },
                     undefined,
@@ -220,11 +240,18 @@
         }
 
         // Position camera for rendering
-        function positionCamera(angle, distance, height = 0) {
-            const radians = (angle * Math.PI) / 180;
-            window.modelRenderer.camera.position.x = Math.cos(radians) * distance;
-            window.modelRenderer.camera.position.z = Math.sin(radians) * distance;
-            window.modelRenderer.camera.position.y = height;
+        function positionCamera(azimuthAngle, distance, elevationAngle = 0) {
+            // Convert angles to radians
+            const azimuthRad = (azimuthAngle * Math.PI) / 180;
+            const elevationRad = (elevationAngle * Math.PI) / 180;
+            
+            // Calculate camera position using spherical coordinates
+            // X-Z plane rotation (azimuth) and vertical angle (elevation)
+            const horizontalDistance = Math.cos(elevationRad) * distance;
+            window.modelRenderer.camera.position.x = Math.cos(azimuthRad) * horizontalDistance;
+            window.modelRenderer.camera.position.z = Math.sin(azimuthRad) * horizontalDistance;
+            window.modelRenderer.camera.position.y = Math.sin(elevationRad) * distance;
+            
             window.modelRenderer.camera.lookAt(0, 0, 0);
         }
 
