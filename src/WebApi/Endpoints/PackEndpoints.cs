@@ -191,14 +191,14 @@ public static class PackEndpoints
         [FromForm] int textureType,
         [FromQuery] string? batchId,
         [FromQuery] string? uploadType,
-        ICommandHandler<AddTextureToPackWithFileCommand, SharedKernel.Result<int>> commandHandler,
+        ICommandHandler<AddTextureToPackWithFileCommand, int> commandHandler,
         CancellationToken cancellationToken)
     {
         var command = new AddTextureToPackWithFileCommand(
             packId,
-            file,
+            new Files.FormFileUpload(file),
             name,
-            (Domain.Models.TextureType)textureType,
+            (Domain.ValueObjects.TextureType)textureType,
             batchId,
             uploadType
         );

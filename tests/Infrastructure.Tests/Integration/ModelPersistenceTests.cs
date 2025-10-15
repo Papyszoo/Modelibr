@@ -217,4 +217,10 @@ internal class FakeBatchUploadRepository : IBatchUploadRepository
         // Do nothing for tests
         return Task.CompletedTask;
     }
+
+    public Task<IEnumerable<BatchUpload>> GetByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
+    {
+        // Do nothing for tests
+        return Task.FromResult(Enumerable.Empty<BatchUpload>());
+    }
 }

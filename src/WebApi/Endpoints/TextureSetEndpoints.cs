@@ -148,7 +148,7 @@ public static class TextureSetEndpoints
         }
 
         // Use file name without extension as default texture set name
-        var textureSetName = name ?? Path.GetFileNameWithoutExtension(file.FileName);
+        var textureSetName = name ?? Path.GetFileNameWithoutExtension(file.FileName);   
         var texType = textureType ?? TextureType.Albedo;
 
         var result = await commandHandler.Handle(

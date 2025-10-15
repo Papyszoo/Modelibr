@@ -58,7 +58,7 @@ internal sealed class AddTextureToPackWithFileCommandHandler
 
         // Validate file type
         var fileTypeResult = FileType.ValidateForUpload(request.File.FileName);
-        if (fileTypeResult.IsFailure)
+        if (!fileTypeResult.IsSuccess)
         {
             return Result.Failure<int>(fileTypeResult.Error);
         }
@@ -72,7 +72,7 @@ internal sealed class AddTextureToPackWithFileCommandHandler
             cancellationToken
         );
 
-        if (fileResult.IsFailure)
+        if (!fileResult.IsSuccess)
         {
             return Result.Failure<int>(fileResult.Error);
         }
@@ -84,7 +84,8 @@ internal sealed class AddTextureToPackWithFileCommandHandler
         await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 
         // Add texture to set
-        textureSet.AddTexture(file, request.TextureType, now);
+        var texture = Texture.Create(file, request.TextureType, now);
+        textureSet.AddTexture(texture, now);
 
         // Add texture set to pack
         pack.AddTextureSet(textureSet, now);
