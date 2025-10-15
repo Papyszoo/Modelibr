@@ -49,6 +49,17 @@
 | `POST` | `/texture-sets/{packId}/models/{modelId}` | Associate pack with model |
 | `DELETE` | `/texture-sets/{packId}/models/{modelId}` | Disassociate pack from model |
 
+### Stages (6 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/stages` | List all stages |
+| `GET` | `/stages/{id}` | Get stage details |
+| `POST` | `/stages` | Create new stage |
+| `PUT` | `/stages/{id}` | Update stage configuration |
+| `POST` | `/stages/{id}/generate-tsx` | Generate and save TSX file |
+| `GET` | `/stages/{id}/tsx` | Download TSX file |
+
 ### Worker API - Thumbnail Jobs (3 endpoints)
 
 | Method | Endpoint | Description |
@@ -57,7 +68,7 @@
 | `POST` | `/api/thumbnail-jobs/{jobId}/complete` | Mark job complete (workers only) |
 | `POST` | `/api/test/thumbnail-complete/{modelId}` | Test completion notification (dev) |
 
-**Total:** 22 endpoints
+**Total:** 28 endpoints
 
 ## Common Usage Examples
 
@@ -391,6 +402,7 @@ Response:
 - No authentication/authorization (development phase)
 - File type validation on upload
 - File size limits configured
+- **Stage file storage:** Path traversal prevention, sanitized file names
 
 ### Future Enhancements
 - JWT authentication
@@ -399,8 +411,159 @@ Response:
 - Rate limiting
 - CORS configuration for production
 
+---
+
+## Stage Management API
+
+Stages allow users to create reusable 3D scene configurations with lights and effects, which can be exported as TypeScript React components.
+
+### List All Stages
+
+**Endpoint:** `GET /stages`
+
+**Response:**
+```json
+{
+  "stages": [
+    {
+      "id": 1,
+      "name": "Sunset Studio",
+      "tsxFilePath": "stages/SunsetStudio.tsx",
+      "createdAt": "2024-10-15T10:00:00Z",
+      "updatedAt": "2024-10-15T12:30:00Z"
+    }
+  ]
+}
+```
+
+### Get Stage by ID
+
+**Endpoint:** `GET /stages/{id}`
+
+**Response:**
+```json
+{
+  "id": 1,
+  "name": "Sunset Studio",
+  "configurationJson": "{\"lights\":[...]}",
+  "tsxFilePath": "stages/SunsetStudio.tsx",
+  "createdAt": "2024-10-15T10:00:00Z",
+  "updatedAt": "2024-10-15T12:30:00Z"
+}
+```
+
+### Create Stage
+
+**Endpoint:** `POST /stages`
+
+**Request Body:**
+```json
+{
+  "name": "My Custom Stage",
+  "configurationJson": "{\"lights\":[{\"id\":\"1\",\"type\":\"ambient\",\"color\":\"#ffffff\",\"intensity\":0.5}]}"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 2,
+  "name": "My Custom Stage"
+}
+```
+
+### Update Stage
+
+**Endpoint:** `PUT /stages/{id}`
+
+**Request Body:**
+```json
+{
+  "configurationJson": "{\"lights\":[...]}"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 2,
+  "name": "My Custom Stage"
+}
+```
+
+### Generate TSX File
+
+**Endpoint:** `POST /stages/{id}/generate-tsx`
+
+Generates a TypeScript React component file from the stage configuration and saves it to the file system.
+
+**Response:**
+```json
+{
+  "filePath": "stages/MyCustomStage.tsx",
+  "tsxCode": "import { JSX, ReactNode } from 'react';\n..."
+}
+```
+
+**Generated TSX Structure:**
+- Valid TypeScript React component
+- Imports for React Three Fiber and Drei
+- Configured lights from stage
+- Children prop for 3D models
+- Orbit controls
+
+### Download TSX File
+
+**Endpoint:** `GET /stages/{id}/tsx`
+
+Downloads the generated TSX file.
+
+**Response:** File download with content-type `text/plain`
+
+**Example Usage:**
+```bash
+curl -X POST http://localhost:5009/stages/1/generate-tsx
+curl -O http://localhost:5009/stages/1/tsx
+```
+
+### Stage Configuration Schema
+
+The `configurationJson` field contains a JSON object with the following structure:
+
+```json
+{
+  "lights": [
+    {
+      "id": "unique-id",
+      "type": "ambient|directional|point|spot",
+      "color": "#ffffff",
+      "intensity": 1.0,
+      "position": [x, y, z],  // Optional, not for ambient
+      "angle": 0.523,         // Optional, spot light only
+      "penumbra": 0.1,        // Optional, spot light only
+      "distance": 10,         // Optional, point/spot only
+      "decay": 2              // Optional, point/spot only
+    }
+  ]
+}
+```
+
+**Supported Light Types:**
+- **ambient**: Global illumination
+- **directional**: Sun-like directional light with shadows
+- **point**: Omnidirectional point light
+- **spot**: Cone-shaped spotlight with shadows
+
+### Stage File Storage
+
+- **Directory:** `{UPLOAD_STORAGE_PATH}/stages/`
+- **File naming:** Stage name sanitized + `.tsx` extension
+- **Security:** Path validation prevents directory traversal
+- **Component names:** Automatically sanitized for TypeScript validity
+
 ## Related Documentation
 
+- **Stage TSX Generation:** `docs/STAGE_TSX_GENERATION.md` for detailed usage guide
 - **Clean Architecture Guide:** See `.github/copilot-instructions.md` for detailed DDD/Clean Architecture patterns
 - **Project README:** `README.md` for full application setup
 - **Worker Service:** `docs/WORKER.md` for thumbnail worker documentation
