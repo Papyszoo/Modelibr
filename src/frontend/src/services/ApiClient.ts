@@ -553,6 +553,17 @@ class ApiClient {
     return response.data
   }
 
+  async generateStageTsx(
+    id: number
+  ): Promise<{ filePath: string; tsxCode: string }> {
+    const response = await this.client.post(`/stages/${id}/generate-tsx`)
+    return response.data
+  }
+
+  async getStageTsxDownloadUrl(id: number): string {
+    return `${this.baseURL}/stages/${id}/tsx`
+  }
+
   // Cache management methods
   refreshCache(type?: 'models' | 'textureSets' | 'packs'): void {
     const store = useApiCacheStore.getState()

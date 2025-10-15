@@ -102,7 +102,7 @@ ${lights}${footer}`
           header={
             <div className="code-panel-header">
               <span>
-                <i className="pi pi-code" /> Generated Code
+                <i className="pi pi-code" /> Generated Code Preview
               </span>
               <Button
                 icon={copied ? 'pi pi-check' : 'pi pi-copy'}
@@ -117,6 +117,11 @@ ${lights}${footer}`
             </div>
           }
         >
+          <div className="code-info">
+            <small>
+              💡 Use "Generate TSX" button to save this as a reusable TypeScript component file.
+            </small>
+          </div>
           <pre className="code-content">
             <code>{code}</code>
           </pre>
