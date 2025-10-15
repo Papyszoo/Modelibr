@@ -7,4 +7,4 @@ public sealed record GetAllStagesQuery : IQuery<GetAllStagesResponse>;
 
 public sealed record GetAllStagesResponse(IEnumerable<StageDto> Stages);
 
-public sealed record StageDto(int Id, string Name, DateTime CreatedAt, DateTime UpdatedAt);
+public sealed record StageDto(int Id, string Name, string? TsxFilePath, DateTime CreatedAt, DateTime UpdatedAt);

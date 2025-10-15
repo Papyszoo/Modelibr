@@ -18,7 +18,7 @@ internal sealed class GetAllStagesQueryHandler : IQueryHandler<GetAllStagesQuery
     {
         var stages = await _stageRepository.GetAllAsync(cancellationToken);
         
-        var stageDtos = stages.Select(s => new StageDto(s.Id, s.Name, s.CreatedAt, s.UpdatedAt));
+        var stageDtos = stages.Select(s => new StageDto(s.Id, s.Name, s.TsxFilePath, s.CreatedAt, s.UpdatedAt));
         
         return Result.Success(new GetAllStagesResponse(stageDtos));
     }
