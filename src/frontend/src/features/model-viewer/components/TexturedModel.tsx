@@ -24,8 +24,12 @@ function buildTextureUrls(textureSet: TextureSetDto | null) {
   const urls: Record<string, string> = {}
 
   // Albedo or Diffuse for base color
-  const albedo = textureSet.textures?.find(t => t.textureType === TextureType.Albedo)
-  const diffuse = textureSet.textures?.find(t => t.textureType === TextureType.Diffuse)
+  const albedo = textureSet.textures?.find(
+    t => t.textureType === TextureType.Albedo
+  )
+  const diffuse = textureSet.textures?.find(
+    t => t.textureType === TextureType.Diffuse
+  )
   if (albedo) {
     urls.map = ApiClient.getFileUrl(albedo.fileId.toString())
   } else if (diffuse) {
@@ -33,19 +37,25 @@ function buildTextureUrls(textureSet: TextureSetDto | null) {
   }
 
   // Normal map
-  const normal = textureSet.textures?.find(t => t.textureType === TextureType.Normal)
+  const normal = textureSet.textures?.find(
+    t => t.textureType === TextureType.Normal
+  )
   if (normal) {
     urls.normalMap = ApiClient.getFileUrl(normal.fileId.toString())
   }
 
   // Roughness map
-  const roughness = textureSet.textures?.find(t => t.textureType === TextureType.Roughness)
+  const roughness = textureSet.textures?.find(
+    t => t.textureType === TextureType.Roughness
+  )
   if (roughness) {
     urls.roughnessMap = ApiClient.getFileUrl(roughness.fileId.toString())
   }
 
   // Metallic map
-  const metallic = textureSet.textures?.find(t => t.textureType === TextureType.Metallic)
+  const metallic = textureSet.textures?.find(
+    t => t.textureType === TextureType.Metallic
+  )
   if (metallic) {
     urls.metalnessMap = ApiClient.getFileUrl(metallic.fileId.toString())
   }
@@ -60,7 +70,11 @@ function buildTextureUrls(textureSet: TextureSetDto | null) {
 }
 
 // OBJ Model with textures
-function OBJModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
+function OBJModelWithTextures({
+  modelUrl,
+  rotationSpeed,
+  textureSet,
+}: {
   modelUrl: string
   rotationSpeed: number
   textureSet: TextureSetDto | null
@@ -78,10 +92,8 @@ function OBJModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
   const model = useLoader(OBJLoader, modelUrl)
   const textureUrls = buildTextureUrls(textureSet)
   const hasTextures = Object.keys(textureUrls).length > 0
-  
-  const loadedTextures = useTexture(
-    hasTextures ? textureUrls : { dummy: '' }
-  )
+
+  const loadedTextures = useTexture(hasTextures ? textureUrls : { dummy: '' })
 
   // Configure texture properties
   if (hasTextures) {
@@ -161,7 +173,11 @@ function OBJModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
 }
 
 // GLTF Model with textures
-function GLTFModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
+function GLTFModelWithTextures({
+  modelUrl,
+  rotationSpeed,
+  textureSet,
+}: {
   modelUrl: string
   rotationSpeed: number
   textureSet: TextureSetDto | null
@@ -180,10 +196,8 @@ function GLTFModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
   const model = gltf?.scene
   const textureUrls = buildTextureUrls(textureSet)
   const hasTextures = Object.keys(textureUrls).length > 0
-  
-  const loadedTextures = useTexture(
-    hasTextures ? textureUrls : { dummy: '' }
-  )
+
+  const loadedTextures = useTexture(hasTextures ? textureUrls : { dummy: '' })
 
   // Configure texture properties
   if (hasTextures) {
@@ -263,7 +277,11 @@ function GLTFModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
 }
 
 // FBX Model with textures
-function FBXModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
+function FBXModelWithTextures({
+  modelUrl,
+  rotationSpeed,
+  textureSet,
+}: {
   modelUrl: string
   rotationSpeed: number
   textureSet: TextureSetDto | null
@@ -281,10 +299,8 @@ function FBXModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
   const model = useLoader(FBXLoader, modelUrl)
   const textureUrls = buildTextureUrls(textureSet)
   const hasTextures = Object.keys(textureUrls).length > 0
-  
-  const loadedTextures = useTexture(
-    hasTextures ? textureUrls : { dummy: '' }
-  )
+
+  const loadedTextures = useTexture(hasTextures ? textureUrls : { dummy: '' })
 
   // Configure texture properties
   if (hasTextures) {
@@ -363,15 +379,38 @@ function FBXModelWithTextures({ modelUrl, rotationSpeed, textureSet }: {
   return <group ref={meshRef} />
 }
 
-function TexturedModel({ modelUrl, fileExtension, rotationSpeed, textureSet }: TexturedModelProps) {
+function TexturedModel({
+  modelUrl,
+  fileExtension,
+  rotationSpeed,
+  textureSet,
+}: TexturedModelProps) {
   if (fileExtension === 'obj') {
-    return <OBJModelWithTextures modelUrl={modelUrl} rotationSpeed={rotationSpeed} textureSet={textureSet} />
+    return (
+      <OBJModelWithTextures
+        modelUrl={modelUrl}
+        rotationSpeed={rotationSpeed}
+        textureSet={textureSet}
+      />
+    )
   }
   if (fileExtension === 'fbx') {
-    return <FBXModelWithTextures modelUrl={modelUrl} rotationSpeed={rotationSpeed} textureSet={textureSet} />
+    return (
+      <FBXModelWithTextures
+        modelUrl={modelUrl}
+        rotationSpeed={rotationSpeed}
+        textureSet={textureSet}
+      />
+    )
   }
   if (fileExtension === 'gltf' || fileExtension === 'glb') {
-    return <GLTFModelWithTextures modelUrl={modelUrl} rotationSpeed={rotationSpeed} textureSet={textureSet} />
+    return (
+      <GLTFModelWithTextures
+        modelUrl={modelUrl}
+        rotationSpeed={rotationSpeed}
+        textureSet={textureSet}
+      />
+    )
   }
   // Fallback to basic model without textures
   return null

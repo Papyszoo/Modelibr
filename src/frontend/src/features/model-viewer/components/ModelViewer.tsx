@@ -69,7 +69,7 @@ function ModelViewer({
     if (model?.defaultTextureSetId && selectedTextureSetId === null) {
       setSelectedTextureSetId(model.defaultTextureSetId)
     }
-  }, [model?.defaultTextureSetId])
+  }, [model?.defaultTextureSetId, selectedTextureSetId])
 
   // Load selected texture set data
   useEffect(() => {

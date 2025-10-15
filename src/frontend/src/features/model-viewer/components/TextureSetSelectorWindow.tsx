@@ -28,12 +28,6 @@ function TextureSetSelectorWindow({
   const [loading, setLoading] = useState(false)
   const [settingDefault, setSettingDefault] = useState(false)
 
-  useEffect(() => {
-    if (visible && model.textureSets) {
-      loadTextureSets()
-    }
-  }, [visible, model.textureSets])
-
   const loadTextureSets = async () => {
     if (!model.textureSets || model.textureSets.length === 0) {
       setTextureSets([])
@@ -55,6 +49,13 @@ function TextureSetSelectorWindow({
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (visible && model.textureSets) {
+      loadTextureSets()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, model.textureSets])
 
   const handleSetDefault = async (textureSetId: number | null) => {
     try {
@@ -158,9 +159,7 @@ function TextureSetSelectorWindow({
                     </div>
                   </div>
                   <div className="texture-set-actions">
-                    {isSelected && (
-                      <i className="pi pi-check selected-icon" />
-                    )}
+                    {isSelected && <i className="pi pi-check selected-icon" />}
                     {!isDefault && (
                       <Button
                         icon="pi pi-star"
