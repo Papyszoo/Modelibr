@@ -53,6 +53,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   >([])
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isGeneratingTsx, setIsGeneratingTsx] = useState(false)
   const toast = useRef<Toast>(null)
 
   useEffect(() => {
@@ -217,6 +218,54 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     })
   }
 
+  const handleGenerateTsx = async () => {
+    if (!currentStageId) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Please save the stage first before generating TSX',
+        life: 3000,
+      })
+      return
+    }
+
+    setIsGeneratingTsx(true)
+    try {
+      await apiClient.generateStageTsx(currentStageId)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'TSX file generated successfully',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to generate TSX:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to generate TSX file',
+        life: 3000,
+      })
+    } finally {
+      setIsGeneratingTsx(false)
+    }
+  }
+
+  const handleDownloadTsx = () => {
+    if (!currentStageId) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Please save the stage first',
+        life: 3000,
+      })
+      return
+    }
+
+    const downloadUrl = apiClient.getStageTsxDownloadUrl(currentStageId)
+    window.open(downloadUrl, '_blank')
+  }
+
   const handleAddLight = (type: StageLight['type']) => {
     const newLight: StageLight = {
       id: `light-${Date.now()}`,
@@ -308,6 +357,22 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
               loadSavedStages()
             }}
             tooltip="Load Stage"
+          />
+          <Button
+            icon="pi pi-code"
+            label="Generate TSX"
+            className="p-button-text"
+            onClick={handleGenerateTsx}
+            disabled={!currentStageId || isGeneratingTsx}
+            tooltip="Generate and save TSX file"
+          />
+          <Button
+            icon="pi pi-download"
+            label="Download TSX"
+            className="p-button-text"
+            onClick={handleDownloadTsx}
+            disabled={!currentStageId}
+            tooltip="Download TSX file"
           />
         </div>
       </div>

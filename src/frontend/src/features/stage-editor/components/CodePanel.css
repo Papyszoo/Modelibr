@@ -45,3 +45,15 @@
 .code-content code {
   white-space: pre;
 }
+
+.code-info {
+  padding: 0.75rem 1rem;
+  background: var(--highlight-bg);
+  border-left: 3px solid var(--primary-color);
+  margin-bottom: 1rem;
+  border-radius: 4px;
+}
+
+.code-info small {
+  color: var(--text-color-secondary);
+}
