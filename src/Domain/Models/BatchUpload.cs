@@ -104,4 +104,26 @@ public class BatchUpload
             TextureSetId = textureSetId
         };
     }
+    
+    /// <summary>
+    /// Updates the pack association for this batch upload.
+    /// </summary>
+    /// <param name="packId">The pack ID to associate</param>
+    public void UpdatePackAssociation(int packId)
+    {
+        PackId = packId;
+    }
+    
+    /// <summary>
+    /// Updates the upload type.
+    /// </summary>
+    /// <param name="uploadType">The new upload type</param>
+    public void UpdateUploadType(string uploadType)
+    {
+        var validTypes = new[] { "pack", "model", "textureSet", "texture", "file" };
+        if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
+            throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
+        
+        UploadType = uploadType.ToLowerInvariant();
+    }
 }

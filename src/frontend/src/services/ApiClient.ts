@@ -559,6 +559,42 @@ class ApiClient {
     useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
   }
 
+  async addTextureToPackWithFile(
+    packId: number,
+    file: File,
+    name: string,
+    textureType: number,
+    batchId?: string
+  ): Promise<{ textureSetId: number }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('name', name)
+    formData.append('textureType', textureType.toString())
+
+    const params = new URLSearchParams()
+    if (batchId) {
+      params.append('batchId', batchId)
+    }
+    params.append('uploadType', 'pack')
+
+    const response = await this.client.post<{ textureSetId: number }>(
+      `/packs/${packId}/textures/with-file?${params.toString()}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    // Invalidate caches
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+    useApiCacheStore.getState().invalidateTextureSets()
+
+    return response.data
+  }
+
   async removeTextureSetFromPack(
     packId: number,
     textureSetId: number

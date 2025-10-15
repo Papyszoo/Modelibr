@@ -82,6 +82,17 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
             .FirstOrDefaultAsync(bu => bu.FileId == fileId, cancellationToken);
     }
 
+    public async Task<IEnumerable<BatchUpload>> GetByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
+    {
+        return await _context.BatchUploads
+            .Include(bu => bu.File)
+            .Include(bu => bu.Pack)
+            .Include(bu => bu.Model)
+            .Include(bu => bu.TextureSet)
+            .Where(bu => bu.ModelId == modelId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task UpdateAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default)
     {
         _context.BatchUploads.Update(batchUpload);
