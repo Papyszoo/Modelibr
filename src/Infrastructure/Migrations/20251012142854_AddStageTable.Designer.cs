@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251012142854_AddStageTable")]
+    partial class AddStageTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -165,36 +168,6 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Models");
-                });
-
-            modelBuilder.Entity("Domain.Models.Pack", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name");
-
-                    b.ToTable("Packs");
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>
@@ -422,21 +395,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("ModelFiles", (string)null);
                 });
 
-            modelBuilder.Entity("ModelPack", b =>
-                {
-                    b.Property<int>("ModelsId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PacksId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("ModelsId", "PacksId");
-
-                    b.HasIndex("PacksId");
-
-                    b.ToTable("PackModels", (string)null);
-                });
-
             modelBuilder.Entity("ModelTextureSet", b =>
                 {
                     b.Property<int>("ModelsId")
@@ -450,21 +408,6 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TextureSetsId");
 
                     b.ToTable("ModelTextureSets", (string)null);
-                });
-
-            modelBuilder.Entity("PackTextureSet", b =>
-                {
-                    b.Property<int>("PacksId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TextureSetsId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("PacksId", "TextureSetsId");
-
-                    b.HasIndex("TextureSetsId");
-
-                    b.ToTable("PackTextureSets", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>
@@ -531,41 +474,11 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ModelPack", b =>
-                {
-                    b.HasOne("Domain.Models.Model", null)
-                        .WithMany()
-                        .HasForeignKey("ModelsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Models.Pack", null)
-                        .WithMany()
-                        .HasForeignKey("PacksId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("ModelTextureSet", b =>
                 {
                     b.HasOne("Domain.Models.Model", null)
                         .WithMany()
                         .HasForeignKey("ModelsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Models.TextureSet", null)
-                        .WithMany()
-                        .HasForeignKey("TextureSetsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PackTextureSet", b =>
-                {
-                    b.HasOne("Domain.Models.Pack", null)
-                        .WithMany()
-                        .HasForeignKey("PacksId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
