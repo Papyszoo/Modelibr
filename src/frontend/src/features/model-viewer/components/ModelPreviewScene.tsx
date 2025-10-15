@@ -1,18 +1,21 @@
 import { JSX, Suspense } from 'react'
 import { Stage, OrbitControls } from '@react-three/drei'
 import Model from './Model'
+import TexturedModel from './TexturedModel'
 import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import { Model as ModelType } from '../../../utils/fileUtils'
 import { ViewerSettingsType } from './ViewerSettings'
+import { TextureSetDto } from '../../../types'
 
 interface SceneProps {
   model: ModelType
   settings?: ViewerSettingsType
+  textureSet?: TextureSetDto | null
 }
 
-function Scene({ model, settings }: SceneProps): JSX.Element {
+function Scene({ model, settings, textureSet }: SceneProps): JSX.Element {
   // Find the first renderable file
   const renderableFile =
     model.files?.find(f => f.isRenderable) || model.files?.[0]
@@ -52,12 +55,22 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
         adjustCamera={false}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
-          <Model
-            key={modelUrl}
-            modelUrl={modelUrl}
-            fileExtension={fileExtension}
-            rotationSpeed={modelRotationSpeed}
-          />
+          {textureSet !== undefined ? (
+            <TexturedModel
+              key={`${modelUrl}-${textureSet?.id || 'none'}`}
+              modelUrl={modelUrl}
+              fileExtension={fileExtension}
+              rotationSpeed={modelRotationSpeed}
+              textureSet={textureSet}
+            />
+          ) : (
+            <Model
+              key={modelUrl}
+              modelUrl={modelUrl}
+              fileExtension={fileExtension}
+              rotationSpeed={modelRotationSpeed}
+            />
+          )}
         </Suspense>
       </Stage>
 

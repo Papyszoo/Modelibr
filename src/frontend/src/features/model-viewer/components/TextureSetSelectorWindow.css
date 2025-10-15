@@ -1,0 +1,158 @@
+.texture-set-selector-window .sidebar-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.texture-set-selector-window .sidebar-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 1.25rem;
+  color: var(--text-color);
+}
+
+.texture-set-selector-window .sidebar-content {
+  padding: 1rem;
+  height: calc(100% - 4rem);
+  overflow-y: auto;
+}
+
+.texture-set-selector-window .loading-state,
+.texture-set-selector-window .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+.texture-set-selector-window .loading-state i,
+.texture-set-selector-window .empty-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.texture-set-selector-window .empty-state .hint {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.texture-set-selector-window .texture-set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.texture-set-selector-window .texture-set-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--surface-card);
+}
+
+.texture-set-selector-window .texture-set-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-color);
+}
+
+.texture-set-selector-window .texture-set-item.selected {
+  background: var(--primary-50);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.texture-set-selector-window .texture-set-item.is-default {
+  border-color: var(--yellow-500);
+}
+
+.texture-set-selector-window .texture-set-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-100);
+}
+
+.texture-set-selector-window .texture-set-preview.no-texture {
+  background: var(--surface-200);
+}
+
+.texture-set-selector-window .texture-set-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.texture-set-selector-window .texture-set-preview i {
+  font-size: 2rem;
+  color: var(--text-color-secondary);
+  opacity: 0.5;
+}
+
+.texture-set-selector-window .texture-set-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.texture-set-selector-window .texture-set-name {
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.texture-set-selector-window .texture-set-name .default-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  background: var(--yellow-500);
+  color: var(--yellow-900);
+}
+
+.texture-set-selector-window .texture-set-meta {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.texture-set-selector-window .texture-set-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.texture-set-selector-window .selected-icon {
+  color: var(--primary-color);
+  font-size: 1.25rem;
+}
+
+.texture-set-selector-window .set-default-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.texture-set-selector-window .texture-set-item:hover .set-default-btn {
+  opacity: 1;
+}
+
+.texture-set-selector-window .set-default-btn:hover {
+  color: var(--yellow-500);
+}
