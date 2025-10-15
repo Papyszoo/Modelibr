@@ -4,103 +4,114 @@ import { Toast } from 'primereact/toast'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
-import { TextureSetDto, Model, PackSummaryDto } from '../../../types'
-import { useTextureSets } from '../hooks/useTextureSets'
-import ThumbnailDisplay from '../../thumbnail/components/ThumbnailDisplay'
-import './dialogs.css'
+import {
+  Model,
+  TextureSetDto,
+  PackSummaryDto,
+  TextureType,
+} from '../../../types'
+// eslint-disable-next-line no-restricted-imports -- Dialog needs direct API access
+import ApiClient from '../../../services/ApiClient'
+import './TextureSetAssociationDialog.css'
 
-interface ModelAssociationDialogProps {
+interface TextureSetAssociationDialogProps {
   visible: boolean
-  textureSet: TextureSetDto
+  model: Model
   onHide: () => void
   onAssociationsChanged: () => void
 }
 
-interface ModelAssociation {
-  model: Model
+interface TextureSetAssociation {
+  textureSet: TextureSetDto
   isAssociated: boolean
   originallyAssociated: boolean
   recentlyUnlinked?: boolean
 }
 
-function ModelAssociationDialog({
+function TextureSetAssociationDialog({
   visible,
-  textureSet,
+  model,
   onHide,
   onAssociationsChanged,
-}: ModelAssociationDialogProps) {
-  const [modelAssociations, setModelAssociations] = useState<
-    ModelAssociation[]
+}: TextureSetAssociationDialogProps) {
+  const [textureSetAssociations, setTextureSetAssociations] = useState<
+    TextureSetAssociation[]
   >([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>([])
   const [availablePacks, setAvailablePacks] = useState<PackSummaryDto[]>([])
-  const [recentlyUnlinkedIds, setRecentlyUnlinkedIds] = useState<Set<string>>(
+  const [recentlyUnlinkedIds, setRecentlyUnlinkedIds] = useState<Set<number>>(
     new Set()
   )
   const toast = useRef<Toast>(null)
-  const textureSetsApi = useTextureSets()
 
   useEffect(() => {
     if (visible) {
-      loadModels()
+      loadTextureSets()
       loadPacks()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when dialog becomes visible
   }, [visible])
 
   const loadPacks = async () => {
-    // Get packs from texture set
-    if (textureSet.packs && textureSet.packs.length > 0) {
-      setAvailablePacks(textureSet.packs)
+    try {
+      const packs = await ApiClient.getAllPacks()
+      setAvailablePacks(packs)
+    } catch (error) {
+      console.error('Failed to load packs:', error)
     }
   }
 
-  const loadModels = useCallback(async () => {
+  const loadTextureSets = useCallback(async () => {
     try {
       setLoading(true)
-      const allModels = await textureSetsApi.getModels()
+      const allTextureSets = await ApiClient.getAllTextureSets()
 
-      // Get currently associated model IDs
-      const associatedModelIds = new Set(
-        textureSet.associatedModels.map(m => m.id)
+      // Get currently associated texture set IDs
+      const associatedTextureSetIds = new Set(
+        model.textureSets?.map(ts => ts.id) || []
       )
 
       // Create association objects
-      const associations: ModelAssociation[] = allModels.map(model => ({
-        model,
-        isAssociated: associatedModelIds.has(parseInt(model.id)),
-        originallyAssociated: associatedModelIds.has(parseInt(model.id)),
-        recentlyUnlinked: false,
-      }))
+      const associations: TextureSetAssociation[] = allTextureSets.map(
+        textureSet => ({
+          textureSet,
+          isAssociated: associatedTextureSetIds.has(textureSet.id),
+          originallyAssociated: associatedTextureSetIds.has(textureSet.id),
+          recentlyUnlinked: false,
+        })
+      )
 
-      setModelAssociations(associations)
+      setTextureSetAssociations(associations)
     } catch (error) {
-      console.error('Failed to load models:', error)
+      console.error('Failed to load texture sets:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to load models',
+        detail: 'Failed to load texture sets',
         life: 3000,
       })
     } finally {
       setLoading(false)
     }
-  }, [textureSetsApi, textureSet.associatedModels])
+  }, [model.textureSets])
 
-  const handleToggleAssociation = (modelId: string, isAssociated: boolean) => {
-    setModelAssociations(prev =>
+  const handleToggleAssociation = (
+    textureSetId: number,
+    isAssociated: boolean
+  ) => {
+    setTextureSetAssociations(prev =>
       prev.map(assoc => {
-        if (assoc.model.id === modelId) {
+        if (assoc.textureSet.id === textureSetId) {
           // Track recently unlinked
           if (assoc.originallyAssociated && !isAssociated) {
-            setRecentlyUnlinkedIds(prev => new Set(prev).add(modelId))
+            setRecentlyUnlinkedIds(prev => new Set(prev).add(textureSetId))
           } else if (!isAssociated && assoc.originallyAssociated) {
             setRecentlyUnlinkedIds(prev => {
               const newSet = new Set(prev)
-              newSet.delete(modelId)
+              newSet.delete(textureSetId)
               return newSet
             })
           }
@@ -116,14 +127,14 @@ function ModelAssociationDialog({
   }
 
   const getChanges = () => {
-    const toAssociate: Model[] = []
-    const toDisassociate: Model[] = []
+    const toAssociate: TextureSetDto[] = []
+    const toDisassociate: TextureSetDto[] = []
 
-    modelAssociations.forEach(assoc => {
+    textureSetAssociations.forEach(assoc => {
       if (assoc.isAssociated && !assoc.originallyAssociated) {
-        toAssociate.push(assoc.model)
+        toAssociate.push(assoc.textureSet)
       } else if (!assoc.isAssociated && assoc.originallyAssociated) {
-        toDisassociate.push(assoc.model)
+        toDisassociate.push(assoc.textureSet)
       }
     })
 
@@ -147,16 +158,16 @@ function ModelAssociationDialog({
       setSaving(true)
 
       // Process associations
-      for (const model of toAssociate) {
-        await textureSetsApi.associateTextureSetWithModel(
+      for (const textureSet of toAssociate) {
+        await ApiClient.associateTextureSetWithModel(
           textureSet.id,
           parseInt(model.id)
         )
       }
 
       // Process disassociations
-      for (const model of toDisassociate) {
-        await textureSetsApi.disassociateTextureSetFromModel(
+      for (const textureSet of toDisassociate) {
+        await ApiClient.disassociateTextureSetFromModel(
           textureSet.id,
           parseInt(model.id)
         )
@@ -165,7 +176,7 @@ function ModelAssociationDialog({
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Model associations updated successfully',
+        detail: 'Texture set associations updated successfully',
         life: 3000,
       })
 
@@ -173,11 +184,11 @@ function ModelAssociationDialog({
       setRecentlyUnlinkedIds(new Set())
       onAssociationsChanged()
     } catch (error) {
-      console.error('Failed to update model associations:', error)
+      console.error('Failed to update texture set associations:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to update model associations',
+        detail: 'Failed to update texture set associations',
         life: 3000,
       })
     } finally {
@@ -187,7 +198,7 @@ function ModelAssociationDialog({
 
   const handleCancel = () => {
     // Reset changes
-    setModelAssociations(prev =>
+    setTextureSetAssociations(prev =>
       prev.map(assoc => ({
         ...assoc,
         isAssociated: assoc.originallyAssociated,
@@ -200,26 +211,28 @@ function ModelAssociationDialog({
     onHide()
   }
 
-  // Filter models
-  const filteredModels = modelAssociations.filter(assoc => {
-    const matchesSearch = assoc.model.name
+  // Filter texture sets
+  const filteredTextureSets = textureSetAssociations.filter(assoc => {
+    const matchesSearch = assoc.textureSet.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
 
     const matchesPack =
       selectedPackIds.length === 0 ||
-      (assoc.model.packs &&
-        assoc.model.packs.some(pack => selectedPackIds.includes(pack.id)))
+      (assoc.textureSet.packs &&
+        assoc.textureSet.packs.some(pack => selectedPackIds.includes(pack.id)))
 
     return matchesSearch && matchesPack
   })
 
   // Split into recently unlinked and others
-  const recentlyUnlinkedModels = filteredModels.filter(
-    assoc => assoc.recentlyUnlinked && recentlyUnlinkedIds.has(assoc.model.id)
+  const recentlyUnlinkedTextureSets = filteredTextureSets.filter(
+    assoc =>
+      assoc.recentlyUnlinked && recentlyUnlinkedIds.has(assoc.textureSet.id)
   )
-  const otherModels = filteredModels.filter(
-    assoc => !assoc.recentlyUnlinked || !recentlyUnlinkedIds.has(assoc.model.id)
+  const otherTextureSets = filteredTextureSets.filter(
+    assoc =>
+      !assoc.recentlyUnlinked || !recentlyUnlinkedIds.has(assoc.textureSet.id)
   )
 
   const handlePackFilterToggle = (packId: number) => {
@@ -232,7 +245,7 @@ function ModelAssociationDialog({
 
   return (
     <Dialog
-      header={`Link Models - "${textureSet.name}"`}
+      header={`Link Texture Sets - "${model.name}"`}
       visible={visible}
       onHide={handleCancel}
       footer={
@@ -254,7 +267,7 @@ function ModelAssociationDialog({
       modal
       maximizable
       style={{ width: '85vw', maxWidth: '1400px', height: '80vh' }}
-      className="model-association-dialog"
+      className="texture-set-association-dialog"
     >
       <Toast ref={toast} />
 
@@ -266,7 +279,7 @@ function ModelAssociationDialog({
             <InputText
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search models..."
+              placeholder="Search texture sets..."
               className="search-input"
             />
           </div>
@@ -299,22 +312,22 @@ function ModelAssociationDialog({
         {loading ? (
           <div className="association-loading">
             <i className="pi pi-spin pi-spinner" />
-            <p>Loading models...</p>
+            <p>Loading texture sets...</p>
           </div>
         ) : (
           <>
             {/* Recently Unlinked Section */}
-            {recentlyUnlinkedModels.length > 0 && (
+            {recentlyUnlinkedTextureSets.length > 0 && (
               <div className="association-section">
                 <h4 className="section-header">
                   <i className="pi pi-history" />
-                  Recently Unlinked ({recentlyUnlinkedModels.length})
+                  Recently Unlinked ({recentlyUnlinkedTextureSets.length})
                 </h4>
-                <div className="models-card-grid">
-                  {recentlyUnlinkedModels.map(assoc => (
-                    <ModelCard
-                      key={assoc.model.id}
-                      model={assoc.model}
+                <div className="texture-sets-card-grid">
+                  {recentlyUnlinkedTextureSets.map(assoc => (
+                    <TextureSetCard
+                      key={assoc.textureSet.id}
+                      textureSet={assoc.textureSet}
                       isAssociated={assoc.isAssociated}
                       onToggle={handleToggleAssociation}
                     />
@@ -323,23 +336,23 @@ function ModelAssociationDialog({
               </div>
             )}
 
-            {/* All Models Section */}
+            {/* All Texture Sets Section */}
             <div className="association-section">
               <h4 className="section-header">
-                <i className="pi pi-box" />
-                All Models ({otherModels.length})
+                <i className="pi pi-image" />
+                All Texture Sets ({otherTextureSets.length})
               </h4>
-              {otherModels.length === 0 ? (
+              {otherTextureSets.length === 0 ? (
                 <div className="no-results">
                   <i className="pi pi-inbox" />
-                  <p>No models found</p>
+                  <p>No texture sets found</p>
                 </div>
               ) : (
-                <div className="models-card-grid">
-                  {otherModels.map(assoc => (
-                    <ModelCard
-                      key={assoc.model.id}
-                      model={assoc.model}
+                <div className="texture-sets-card-grid">
+                  {otherTextureSets.map(assoc => (
+                    <TextureSetCard
+                      key={assoc.textureSet.id}
+                      textureSet={assoc.textureSet}
                       isAssociated={assoc.isAssociated}
                       onToggle={handleToggleAssociation}
                     />
@@ -354,29 +367,63 @@ function ModelAssociationDialog({
   )
 }
 
-interface ModelCardProps {
-  model: Model
+interface TextureSetCardProps {
+  textureSet: TextureSetDto
   isAssociated: boolean
-  onToggle: (modelId: string, isAssociated: boolean) => void
+  onToggle: (textureSetId: number, isAssociated: boolean) => void
 }
 
-function ModelCard({ model, isAssociated, onToggle }: ModelCardProps) {
+function TextureSetCard({
+  textureSet,
+  isAssociated,
+  onToggle,
+}: TextureSetCardProps) {
+  // Get albedo or diffuse texture for preview
+  const getPreviewTexture = () => {
+    const albedo = textureSet.textures?.find(
+      t => t.textureType === TextureType.Albedo
+    )
+    const diffuse = textureSet.textures?.find(
+      t => t.textureType === TextureType.Diffuse
+    )
+    return albedo || diffuse
+  }
+
+  const previewTexture = getPreviewTexture()
+  const previewUrl = previewTexture
+    ? ApiClient.getFileUrl(previewTexture.fileId.toString())
+    : null
+
   return (
     <div
-      className={`model-association-card ${isAssociated ? 'selected' : ''}`}
-      onClick={() => onToggle(model.id, !isAssociated)}
+      className={`texture-set-association-card ${isAssociated ? 'selected' : ''}`}
+      onClick={() => onToggle(textureSet.id, !isAssociated)}
     >
-      <div className="model-association-checkbox">
+      <div className="texture-set-association-checkbox">
         <Checkbox checked={isAssociated} readOnly />
       </div>
-      <div className="model-card-thumbnail">
-        <ThumbnailDisplay modelId={model.id} />
-        <div className="model-card-overlay">
-          <span className="model-card-name">{model.name}</span>
+      <div className="texture-set-card-thumbnail">
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={textureSet.name}
+            className="texture-set-preview-image"
+          />
+        ) : (
+          <div className="texture-set-placeholder">
+            <i className="pi pi-image" />
+          </div>
+        )}
+        <div className="texture-set-card-overlay">
+          <span className="texture-set-card-name">{textureSet.name}</span>
+          <span className="texture-set-card-info">
+            {textureSet.textureCount} texture
+            {textureSet.textureCount !== 1 ? 's' : ''}
+          </span>
         </div>
       </div>
     </div>
   )
 }
 
-export default ModelAssociationDialog
+export default TextureSetAssociationDialog

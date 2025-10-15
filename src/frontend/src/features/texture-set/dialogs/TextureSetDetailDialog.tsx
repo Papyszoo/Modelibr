@@ -11,7 +11,7 @@ import ModelAssociationDialog from './ModelAssociationDialog'
 import SetHeader from './SetHeader'
 import SetStats from './SetStats'
 import TexturesTable from './TexturesTable'
-import ModelsTable from './ModelsTable'
+import ModelsCardGrid from './ModelsCardGrid'
 import { getTextureTypeLabel } from '../../../utils/textureTypeUtils'
 import './dialogs.css'
 
@@ -175,7 +175,7 @@ function TextureSetDetailDialog({
           </TabPanel>
 
           <TabPanel header="Models" leftIcon="pi pi-box">
-            <ModelsTable
+            <ModelsCardGrid
               models={currentSet.associatedModels}
               onDisassociateModel={handleDisassociateModel}
               onManageAssociations={() => setShowModelAssociationDialog(true)}

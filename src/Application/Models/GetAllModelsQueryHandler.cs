@@ -46,6 +46,11 @@ namespace Application.Models
                 {
                     Id = p.Id,
                     Name = p.Name
+                }).ToList(),
+                TextureSets = m.TextureSets.Select(ts => new TextureSetSummaryDto
+                {
+                    Id = ts.Id,
+                    Name = ts.Name
                 }).ToList()
             }).ToList();
 
@@ -67,6 +72,7 @@ namespace Application.Models
         public string? Description { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
+        public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();
     }
 
     public record FileDto
@@ -80,6 +86,12 @@ namespace Application.Models
     }
 
     public record PackSummaryDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
+
+    public record TextureSetSummaryDto
     {
         public int Id { get; init; }
         public string Name { get; init; } = string.Empty;

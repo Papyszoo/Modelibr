@@ -5,7 +5,7 @@ import { useTextureSets } from '../hooks/useTextureSets'
 import { getAllTextureTypes } from '../../../utils/textureTypeUtils'
 import SetHeader from '../dialogs/SetHeader'
 import SetStats from '../dialogs/SetStats'
-import ModelsTable from '../dialogs/ModelsTable'
+import ModelsCardGrid from '../dialogs/ModelsCardGrid'
 import TextureCard from './TextureCard'
 import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
 import TexturePreviewPanel from './TexturePreviewPanel'
@@ -146,7 +146,7 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
         </TabPanel>
 
         <TabPanel header="Models" leftIcon="pi pi-box">
-          <ModelsTable
+          <ModelsCardGrid
             models={textureSet.associatedModels}
             onDisassociateModel={handleDisassociateModel}
             onManageAssociations={() => setShowModelAssociationDialog(true)}
