@@ -32,11 +32,7 @@ jest.mock('primereact/contextmenu', () => ({
         hide: jest.fn(),
         show: jest.fn(),
       }))
-      return (
-        <div {...props}>
-          {children}
-        </div>
-      )
+      return <div {...props}>{children}</div>
     }
   ),
 }))

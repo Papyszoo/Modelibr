@@ -1,0 +1,104 @@
+.models-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.model-card {
+  position: relative;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-card);
+  border: 2px solid transparent;
+  transition: all 0.2s;
+  aspect-ratio: 1;
+}
+
+.model-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.model-card-delete {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.model-card-thumbnail {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-ground);
+}
+
+.model-card-thumbnail .thumbnail-display,
+.model-card-thumbnail .thumbnail-image-container,
+.model-card-thumbnail .thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+}
+
+.model-card-thumbnail .thumbnail-image {
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.model-card:hover .thumbnail-image {
+  transform: scale(1.1);
+}
+
+.model-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.7) 50%,
+    transparent 100%
+  );
+  padding: 2rem 0.75rem 0.75rem;
+  color: white;
+}
+
+.model-card-name {
+  display: block;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.models-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 2rem;
+  color: var(--text-color-secondary);
+  text-align: center;
+}
+
+.models-empty-state i {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.models-empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
+}

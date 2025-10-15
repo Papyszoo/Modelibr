@@ -149,7 +149,12 @@ describe('fileUtils', () => {
 
   describe('constants', () => {
     it('should have correct Three.js supported formats', () => {
-      expect(THREEJS_SUPPORTED_FORMATS).toEqual(['.obj', '.fbx', '.gltf', '.glb'])
+      expect(THREEJS_SUPPORTED_FORMATS).toEqual([
+        '.obj',
+        '.fbx',
+        '.gltf',
+        '.glb',
+      ])
     })
 
     it('should have correct all supported formats', () => {

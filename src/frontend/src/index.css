@@ -79,7 +79,7 @@ button:focus-visible {
 /* Disable pointer events only on interactive elements during drag, not the drop zone */
 .dragging-file button,
 .dragging-file a,
-.dragging-file input:not([type="file"]),
+.dragging-file input:not([type='file']),
 .dragging-file select,
 .dragging-file textarea {
   pointer-events: none;

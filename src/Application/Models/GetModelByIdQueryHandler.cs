@@ -39,6 +39,11 @@ namespace Application.Models
                     FileType = f.FileType,
                     IsRenderable = f.FileType.IsRenderable,
                     SizeBytes = f.SizeBytes
+                }).ToList(),
+                TextureSets = model.TextureSets.Select(ts => new TextureSetSummaryDto
+                {
+                    Id = ts.Id,
+                    Name = ts.Name
                 }).ToList()
             };
 

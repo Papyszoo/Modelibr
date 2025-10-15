@@ -16,7 +16,10 @@ interface DockContextValue {
   removeRecentlyClosedTab: (tabId: string) => void
   registerContextMenu: (ref: RefObject<ContextMenu>) => void
   unregisterContextMenu: (ref: RefObject<ContextMenu>) => void
-  showContextMenu: (ref: RefObject<ContextMenu>, event: React.MouseEvent) => void
+  showContextMenu: (
+    ref: RefObject<ContextMenu>,
+    event: React.MouseEvent
+  ) => void
 }
 
 const DockContext = createContext<DockContextValue | null>(null)
@@ -66,7 +69,7 @@ export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
         otherRef.current.hide()
       }
     })
-    
+
     // Then show the requested menu
     if (ref.current) {
       ref.current.show(event)
