@@ -301,6 +301,40 @@ class ApiClient {
     return response.data
   }
 
+  async createTextureSetWithFile(
+    file: File,
+    options?: { name?: string; textureType?: string; batchId?: string }
+  ): Promise<{
+    textureSetId: number
+    name: string
+    fileId: number
+    textureId: number
+    textureType: string
+  }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const params = new URLSearchParams()
+    if (options?.name) params.append('name', options.name)
+    if (options?.textureType) params.append('textureType', options.textureType)
+    if (options?.batchId) params.append('batchId', options.batchId)
+
+    const response = await this.client.post(
+      `/texture-sets/with-file?${params.toString()}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    // Invalidate texture sets cache on successful creation
+    useApiCacheStore.getState().invalidateTextureSets()
+
+    return response.data
+  }
+
   async updateTextureSet(
     id: number,
     request: UpdateTextureSetRequest
