@@ -605,6 +605,51 @@ class ApiClient {
     return response.data
   }
 
+  // Stage API
+  async createStage(
+    name: string,
+    configurationJson: string
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post('/stages', {
+      name,
+      configurationJson,
+    })
+    return response.data
+  }
+
+  async getAllStages(): Promise<{
+    stages: Array<{
+      id: number
+      name: string
+      createdAt: string
+      updatedAt: string
+    }>
+  }> {
+    const response = await this.client.get('/stages')
+    return response.data
+  }
+
+  async getStageById(id: number): Promise<{
+    id: number
+    name: string
+    configurationJson: string
+    createdAt: string
+    updatedAt: string
+  }> {
+    const response = await this.client.get(`/stages/${id}`)
+    return response.data
+  }
+
+  async updateStage(
+    id: number,
+    configurationJson: string
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.put(`/stages/${id}`, {
+      configurationJson,
+    })
+    return response.data
+  }
+
   // Cache management methods
   refreshCache(type?: 'models' | 'textureSets' | 'packs'): void {
     const store = useApiCacheStore.getState()

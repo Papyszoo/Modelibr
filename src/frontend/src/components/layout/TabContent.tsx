@@ -3,6 +3,7 @@ import { ModelViewer } from '../../features/model-viewer'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
 import { PackList, PackViewer } from '../../features/pack'
 import { History } from '../../features/history'
+import { StageEditor, StageList } from '../../features/stage-editor'
 import AnimationList from '../tabs/AnimationList'
 import Settings from '../tabs/Settings'
 import { Tab } from '../../types'
@@ -59,6 +60,12 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
           )
         }
         return <PackViewer packId={parseInt(tab.packId)} />
+
+      case 'stageList':
+        return <StageList />
+
+      case 'stageEditor':
+        return <StageEditor stageId={tab.stageId} />
 
       case 'settings':
         return <Settings />

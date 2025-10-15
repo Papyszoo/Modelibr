@@ -9,12 +9,15 @@ export interface Tab {
     | 'textureSetViewer'
     | 'packs'
     | 'packViewer'
+    | 'stageList'
+    | 'stageEditor'
     | 'settings'
     | 'history'
   label?: string
   modelId?: string
   setId?: string
   packId?: string
+  stageId?: string
 }
 
 export interface SplitterEvent {

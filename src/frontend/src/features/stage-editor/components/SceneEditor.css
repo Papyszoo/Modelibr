@@ -1,0 +1,113 @@
+.scene-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--surface-ground);
+}
+
+.stage-editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  background: var(--surface-ground);
+}
+
+.stage-editor-loading .loading-message {
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+.stage-editor-loading .loading-message i {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.stage-editor-loading .loading-message p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.editor-toolbar .toolbar-left h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.editor-toolbar .toolbar-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.editor-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-sidebar {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  overflow-y: auto;
+}
+
+.editor-sidebar.left {
+  width: 250px;
+  border-right: 1px solid var(--surface-border);
+}
+
+.editor-sidebar.right {
+  width: 300px;
+  border-left: 1px solid var(--surface-border);
+}
+
+.editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.saved-scenes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.saved-scene-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+}
+
+.scene-info h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+}
+
+.scene-info small {
+  color: var(--text-color-secondary);
+}
+
+.no-scenes {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-color-secondary);
+}
