@@ -119,7 +119,8 @@ ${lights}${footer}`
         >
           <div className="code-info">
             <small>
-              💡 Use "Generate TSX" button to save this as a reusable TypeScript component file.
+              💡 Use "Generate TSX" button to save this as a reusable TypeScript
+              component file.
             </small>
           </div>
           <pre className="code-content">
