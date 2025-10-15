@@ -68,7 +68,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   const loadStageById = async (id: number) => {
     try {
       setIsLoading(true)
-      const stage = await apiClient.getStageById(id.toString())
+      const stage = await apiClient.getStageById(id)
       setStageName(stage.name)
       setCurrentStageId(stage.id)
 
