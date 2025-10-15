@@ -44,6 +44,7 @@ export default function TextureSetGrid({
   const [dragOverCardId, setDragOverCardId] = useState<number | null>(null)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
+  const isShowingMergeDialog = useRef(false)
 
   useEffect(() => {
     loadPacks()
@@ -97,7 +98,11 @@ export default function TextureSetGrid({
 
   const handleCardDragEnd = (e: React.DragEvent) => {
     e.stopPropagation()
-    setDraggedTextureSet(null)
+    // Only clear draggedTextureSet if we're not showing the merge dialog
+    // If merge dialog is being shown, it will clear the state when it's hidden
+    if (!isShowingMergeDialog.current) {
+      setDraggedTextureSet(null)
+    }
     setDragOverCardId(null)
   }
 
@@ -182,16 +187,14 @@ export default function TextureSetGrid({
       }
 
       // Store both values before showing the dialog
-      // This ensures React has the latest state when dialog renders
+      // Set flag to prevent drag end from clearing the dragged texture set
+      isShowingMergeDialog.current = true
       setDropTargetTextureSet(targetTextureSet)
-      // Use setTimeout to ensure state is updated before showing dialog
-      setTimeout(() => {
-        setShowMergeDialog(true)
-        console.log('Opening merge dialog', {
-          source: draggedTextureSet?.name,
-          target: targetTextureSet?.name,
-        })
-      }, 0)
+      setShowMergeDialog(true)
+      console.log('Opening merge dialog', {
+        source: draggedTextureSet?.name,
+        target: targetTextureSet?.name,
+      })
     }
 
     setDragOverCardId(null)
@@ -244,6 +247,7 @@ export default function TextureSetGrid({
     setShowMergeDialog(false)
     setDraggedTextureSet(null)
     setDropTargetTextureSet(null)
+    isShowingMergeDialog.current = false
   }
 
   const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
