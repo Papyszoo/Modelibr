@@ -7,6 +7,7 @@ public class Stage : AggregateRoot
     public int Id { get; set; }
     public string Name { get; private set; } = string.Empty;
     public string ConfigurationJson { get; private set; } = string.Empty;
+    public string? TsxFilePath { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -58,5 +59,11 @@ public class Stage : AggregateRoot
         Name = name;
         UpdatedAt = DateTime.UtcNow;
         return Result.Success();
+    }
+
+    public void SetTsxFilePath(string filePath)
+    {
+        TsxFilePath = filePath;
+        UpdatedAt = DateTime.UtcNow;
     }
 }

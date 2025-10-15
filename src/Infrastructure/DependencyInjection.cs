@@ -39,6 +39,8 @@ namespace Infrastructure
             services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+            services.AddScoped<ITsxGenerationService, TsxGenerationService>();
+            services.AddScoped<IStageFileStorage, StageFileStorage>();
 
             return services;
         }

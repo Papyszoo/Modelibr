@@ -69,6 +69,45 @@ public static class StageEndpoints
         })
         .WithName("Update Stage")
         .WithSummary("Update an existing stage");
+
+        app.MapPost("/stages/{id}/generate-tsx", async (int id, ICommandHandler<GenerateStageTsxCommand, GenerateStageTsxResponse> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(
+                new GenerateStageTsxCommand(id),
+                CancellationToken.None
+            );
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("Generate Stage TSX")
+        .WithSummary("Generate and save TSX file for a stage");
+
+        app.MapGet("/stages/{id}/tsx", async (int id, IQueryHandler<GetStageTsxQuery, GetStageTsxResponse> queryHandler) =>
+        {
+            var result = await queryHandler.Handle(
+                new GetStageTsxQuery(id),
+                CancellationToken.None
+            );
+
+            if (!result.IsSuccess)
+            {
+                return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            // Return as downloadable file
+            return Results.File(
+                System.Text.Encoding.UTF8.GetBytes(result.Value.TsxCode),
+                "text/plain",
+                result.Value.FileName
+            );
+        })
+        .WithName("Get Stage TSX")
+        .WithSummary("Get TSX code for a stage as a downloadable file");
     }
 }
 

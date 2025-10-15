@@ -26,7 +26,8 @@ internal sealed class GetStageByIdQueryHandler : IQueryHandler<GetStageByIdQuery
         return Result.Success(new GetStageByIdResponse(
             stage.Id, 
             stage.Name, 
-            stage.ConfigurationJson, 
+            stage.ConfigurationJson,
+            stage.TsxFilePath,
             stage.CreatedAt, 
             stage.UpdatedAt
         ));
