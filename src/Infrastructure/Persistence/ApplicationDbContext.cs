@@ -11,6 +11,7 @@ namespace Infrastructure.Persistence
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
         public DbSet<Pack> Packs => Set<Pack>();
+        public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
@@ -132,6 +133,19 @@ namespace Infrastructure.Persistence
 
                 // Create index for efficient querying by name
                 entity.HasIndex(p => p.Name);
+            });
+
+            // Configure Stage entity
+            modelBuilder.Entity<Stage>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.ConfigurationJson).IsRequired();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+
+                // Create index for efficient querying by name
+                entity.HasIndex(s => s.Name);
             });
 
             // Configure Thumbnail entity

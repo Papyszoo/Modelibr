@@ -1,0 +1,11 @@
+.editor-canvas-container {
+  flex: 1;
+  position: relative;
+  background: #1a1a1a;
+  min-height: 400px;
+}
+
+.editor-canvas-container canvas {
+  display: block;
+  outline: none;
+}

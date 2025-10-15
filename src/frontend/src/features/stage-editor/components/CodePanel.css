@@ -1,0 +1,47 @@
+.code-panel {
+  border-top: 1px solid var(--surface-border);
+  background: var(--surface-card);
+}
+
+.code-panel .p-accordion {
+  background: transparent;
+}
+
+.code-panel .p-accordion-header-link {
+  background: transparent;
+  border: none;
+  padding: 0.75rem 1rem;
+}
+
+.code-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
+}
+
+.code-panel-header > span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.code-content {
+  margin: 0;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #e0e0e0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.code-content code {
+  white-space: pre;
+}
