@@ -1,19 +1,6 @@
-.texture-set-selector-window .sidebar-header {
-  padding: 1rem;
-  border-bottom: 1px solid var(--surface-border);
-}
-
-.texture-set-selector-window .sidebar-header h3 {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  font-size: 1.25rem;
-  color: var(--text-color);
-}
-
-.texture-set-selector-window .sidebar-content {
-  padding: 1rem;
-  height: calc(100% - 4rem);
+.texture-set-selector-window .dialog-content {
+  padding: 0;
+  max-height: 60vh;
   overflow-y: auto;
 }
 

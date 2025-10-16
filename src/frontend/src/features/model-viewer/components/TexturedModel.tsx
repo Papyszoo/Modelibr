@@ -93,7 +93,6 @@ function OBJModelWithTextures({
   const textureUrls = buildTextureUrls(textureSet)
   const hasTextures = Object.keys(textureUrls).length > 0
 
-
   // Configure texture properties
   let loadedTextures:
     | Record<string, THREE.Texture>

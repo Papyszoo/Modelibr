@@ -274,6 +274,7 @@ function ModelViewer({
           model={model}
           selectedTextureSetId={selectedTextureSetId}
           onTextureSetSelect={handleTextureSetSelect}
+          onModelUpdated={handleModelUpdated}
         />
         <ThumbnailWindow
           visible={thumbnailWindowVisible}
