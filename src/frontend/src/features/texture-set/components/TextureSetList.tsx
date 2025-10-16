@@ -184,6 +184,7 @@ function TextureSetList() {
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
+        onTextureSetUpdated={loadTextureSets}
       />
 
       {showCreateDialog && (

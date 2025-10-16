@@ -104,6 +104,17 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* Drag over card styling */
+.texture-set-card.drag-over-card {
+  border: 2px solid #3182ce;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2);
+  transform: scale(1.02);
+}
+
+.texture-set-card.drag-over-card .texture-set-card-thumbnail {
+  opacity: 0.7;
+}
+
 .texture-set-card-thumbnail {
   position: relative;
   width: 100%;
