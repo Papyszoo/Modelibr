@@ -1,6 +1,9 @@
-.texture-set-selector-window .dialog-content {
-  padding: 0;
-  max-height: 60vh;
+.texture-set-selector-window .texture-window-header {
+  margin-bottom: 0.5rem;
+}
+
+.texture-set-selector-window .texture-window-content {
+  max-height: 400px;
   overflow-y: auto;
 }
 
@@ -97,15 +100,12 @@
   font-weight: 600;
   color: var(--text-color);
   margin-bottom: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  white-space: nowrap;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.texture-set-selector-window .texture-set-name .default-badge {
+.texture-set-selector-window .default-badge {
   display: inline-block;
   font-size: 0.65rem;
   font-weight: 700;
@@ -118,6 +118,9 @@
 .texture-set-selector-window .texture-set-meta {
   font-size: 0.875rem;
   color: var(--text-color-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .texture-set-selector-window .texture-set-actions {

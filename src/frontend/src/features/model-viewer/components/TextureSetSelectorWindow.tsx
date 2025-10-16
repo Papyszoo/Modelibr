@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { Model } from '../../../utils/fileUtils'
 import { TextureSetDto } from '../../../types'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
+import FloatingWindow from '../../../components/FloatingWindow'
 import TextureSetAssociationDialog from './TextureSetAssociationDialog'
 import './TextureSetSelectorWindow.css'
 
@@ -21,6 +21,7 @@ interface TextureSetSelectorWindowProps {
 function TextureSetSelectorWindow({
   visible,
   onClose,
+  side,
   model,
   selectedTextureSetId,
   onTextureSetSelect,
@@ -75,8 +76,10 @@ function TextureSetSelectorWindow({
 
   const handleLinkDialogClose = () => {
     setLinkDialogVisible(false)
-    // Refresh model data after linking texture sets
+    // Refresh model data and reload texture sets after linking
     onModelUpdated()
+    // Also reload the texture sets to show newly linked ones
+    loadTextureSets()
   }
 
   const getPreviewUrl = (textureSet: TextureSetDto) => {
@@ -88,35 +91,25 @@ function TextureSetSelectorWindow({
 
   return (
     <>
-      <Dialog
-        header={
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>
-              <i className="pi pi-image" style={{ marginRight: '0.5rem' }} />
-              Texture Sets
-            </span>
-            <Button
-              icon="pi pi-link"
-              label="Link Texture Sets"
-              className="p-button-sm p-button-outlined"
-              onClick={() => setLinkDialogVisible(true)}
-              tooltip="Link texture sets to this model"
-            />
-          </div>
-        }
+      <FloatingWindow
         visible={visible}
-        onHide={onClose}
-        modal
-        style={{ width: '500px', maxHeight: '80vh' }}
-        className="texture-set-selector-window"
+        onClose={onClose}
+        title="Texture Sets"
+        side={side}
+        windowId="texture-sets"
       >
-        <div className="dialog-content">
+        <div className="texture-window-header">
+          <Button
+            icon="pi pi-link"
+            label="Link Texture Sets"
+            className="p-button-sm p-button-outlined"
+            onClick={() => setLinkDialogVisible(true)}
+            tooltip="Link texture sets to this model"
+            style={{ marginBottom: '1rem' }}
+          />
+        </div>
+
+        <div className="texture-window-content">
           {loading ? (
             <div className="loading-state">
               <i className="pi pi-spin pi-spinner" />
@@ -170,15 +163,13 @@ function TextureSetSelectorWindow({
                       )}
                     </div>
                     <div className="texture-set-info">
-                      <div className="texture-set-name">
-                        {textureSet.name}
-                        {isDefault && (
-                          <span className="default-badge">DEFAULT</span>
-                        )}
-                      </div>
+                      <div className="texture-set-name">{textureSet.name}</div>
                       <div className="texture-set-meta">
                         {textureSet.textureCount} texture
                         {textureSet.textureCount !== 1 ? 's' : ''}
+                        {isDefault && (
+                          <span className="default-badge">DEFAULT</span>
+                        )}
                       </div>
                     </div>
                     <div className="texture-set-actions">
@@ -205,7 +196,7 @@ function TextureSetSelectorWindow({
             </div>
           )}
         </div>
-      </Dialog>
+      </FloatingWindow>
 
       <TextureSetAssociationDialog
         visible={linkDialogVisible}
