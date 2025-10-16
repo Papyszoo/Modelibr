@@ -24,7 +24,8 @@ public static class ModelEndpoints
     }
 
     private static async Task<IResult> CreateModel(
-        IFormFile file, 
+        IFormFile file,
+        string? batchId,
         ICommandHandler<AddModelCommand, AddModelCommandResponse> commandHandler,
         Application.Settings.ISettingsService settingsService,
         CancellationToken cancellationToken)
@@ -36,7 +37,9 @@ public static class ModelEndpoints
             return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
         }
 
-        var result = await commandHandler.Handle(new AddModelCommand(new FormFileUpload(file)), cancellationToken);
+        var result = await commandHandler.Handle(
+            new AddModelCommand(new FormFileUpload(file), BatchId: batchId),
+            cancellationToken);
 
         if (!result.IsSuccess)
         {

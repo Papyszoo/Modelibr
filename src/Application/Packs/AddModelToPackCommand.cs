@@ -9,15 +9,18 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
 {
     private readonly IPackRepository _packRepository;
     private readonly IModelRepository _modelRepository;
+    private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public AddModelToPackCommandHandler(
         IPackRepository packRepository,
         IModelRepository modelRepository,
+        IBatchUploadRepository batchUploadRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _packRepository = packRepository;
         _modelRepository = modelRepository;
+        _batchUploadRepository = batchUploadRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -40,6 +43,15 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
         pack.AddModel(model, _dateTimeProvider.UtcNow);
 
         await _packRepository.UpdateAsync(pack, cancellationToken);
+
+        // Update batch upload records for this model to include pack association
+        var batchUploads = await _batchUploadRepository.GetByModelIdAsync(model.Id, cancellationToken);
+        foreach (var batchUpload in batchUploads)
+        {
+            batchUpload.UpdatePackAssociation(pack.Id);
+            batchUpload.UpdateUploadType("pack");
+            await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
+        }
 
         return Result.Success();
     }

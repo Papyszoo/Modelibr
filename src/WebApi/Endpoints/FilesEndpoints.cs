@@ -33,7 +33,12 @@ public static class FilesEndpoints
     }
 
     private static async Task<IResult> UploadFile(
-        IFormFile file, 
+        IFormFile file,
+        string? batchId,
+        string? uploadType,
+        int? packId,
+        int? modelId,
+        int? textureSetId,
         ICommandHandler<UploadFileCommand, UploadFileCommandResponse> commandHandler,
         Application.Settings.ISettingsService settingsService,
         CancellationToken cancellationToken)
@@ -45,7 +50,15 @@ public static class FilesEndpoints
             return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
         }
 
-        var result = await commandHandler.Handle(new UploadFileCommand(new FormFileUpload(file)), cancellationToken);
+        var result = await commandHandler.Handle(
+            new UploadFileCommand(
+                new FormFileUpload(file),
+                batchId,
+                uploadType,
+                packId,
+                modelId,
+                textureSetId),
+            cancellationToken);
 
         if (!result.IsSuccess)
         {

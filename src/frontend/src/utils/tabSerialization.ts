@@ -29,6 +29,10 @@ export function getTabLabel(
       return stageId ? `Stage ${stageId}` : 'Stage Editor'
     case 'animation':
       return 'Animations'
+    case 'history':
+      return 'History'
+    case 'settings':
+      return 'Settings'
     default:
       return 'Unknown'
   }
@@ -70,6 +74,8 @@ export function parseCompactTabFormat(
           'packViewer',
           'stageList',
           'stageEditor',
+          'history',
+          'settings',
         ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${type}`)

@@ -17,17 +17,18 @@ export function useGenericFileUpload(options = {}) {
   /**
    * Upload a single file
    * @param {File} file - File to upload
+   * @param {Object} options - Optional upload options
    * @returns {Promise<Object>} Upload result
    */
   const uploadFile = useCallback(
-    async file => {
+    async (file, options = {}) => {
       if (!file) {
         throw new Error('No file provided')
       }
 
       // Add to global progress tracker if available
       const uploadId = uploadProgressContext
-        ? uploadProgressContext.addUpload(file, fileType)
+        ? uploadProgressContext.addUpload(file, fileType, options.batchId)
         : null
 
       try {
@@ -36,7 +37,13 @@ export function useGenericFileUpload(options = {}) {
           uploadProgressContext.updateUploadProgress(uploadId, 50)
         }
 
-        const result = await ApiClient.uploadFile(file)
+        const result = await ApiClient.uploadFile(file, {
+          batchId: options.batchId,
+          uploadType: options.uploadType || fileType,
+          packId: options.packId,
+          modelId: options.modelId,
+          textureSetId: options.textureSetId,
+        })
 
         // Complete upload
         if (uploadId && uploadProgressContext) {
@@ -70,11 +77,10 @@ export function useGenericFileUpload(options = {}) {
       const fileArray = Array.from(files)
       const results = []
 
-      // Create batch for multiple files
-      const batchId =
-        uploadProgressContext && fileArray.length > 1
-          ? uploadProgressContext.createBatch()
-          : undefined
+      // Create batch for all uploads (even single files need batch tracking)
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
 
       for (const file of fileArray) {
         try {
@@ -87,7 +93,10 @@ export function useGenericFileUpload(options = {}) {
             uploadProgressContext.updateUploadProgress(uploadId, 50)
           }
 
-          const result = await ApiClient.uploadFile(file)
+          const result = await ApiClient.uploadFile(file, {
+            batchId,
+            uploadType: fileType,
+          })
 
           if (uploadId && uploadProgressContext) {
             uploadProgressContext.updateUploadProgress(uploadId, 100)
