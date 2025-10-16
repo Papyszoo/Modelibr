@@ -93,7 +93,15 @@ function OBJModelWithTextures({
   const textureUrls = buildTextureUrls(textureSet)
   const hasTextures = Object.keys(textureUrls).length > 0
 
-  const loadedTextures = useTexture(hasTextures ? textureUrls : { dummy: '' })
+
+  // Configure texture properties
+  let loadedTextures:
+    | Record<string, THREE.Texture>
+    | THREE.Texture[]
+    | THREE.Texture = {}
+  if (hasTextures) {
+    loadedTextures = useTexture(textureUrls)
+  }
 
   // Configure texture properties
   if (hasTextures) {
