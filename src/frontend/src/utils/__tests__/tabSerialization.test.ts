@@ -112,6 +112,48 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     it('should handle empty array', () => {
       expect(serializeToCompactFormat([])).toBe('')
     })
+
+    it('should deduplicate tabs with same id', () => {
+      const tabs: Tab[] = [
+        { id: 'models', type: 'modelList', label: 'Models' },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Model 123',
+          modelId: '123',
+        },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Model 123',
+          modelId: '123',
+        }, // duplicate
+        { id: 'texture', type: 'texture', label: 'Textures' },
+      ]
+      expect(serializeToCompactFormat(tabs)).toBe(
+        'modelList,modelViewer:123,texture'
+      )
+    })
+
+    it('should keep first occurrence when deduplicating', () => {
+      const tabs: Tab[] = [
+        { id: 'models', type: 'modelList', label: 'Models' },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'First',
+          modelId: '123',
+        },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Second',
+          modelId: '123',
+        }, // duplicate with different label
+      ]
+      // Should only serialize once
+      expect(serializeToCompactFormat(tabs)).toBe('modelList,modelViewer:123')
+    })
   })
 
   describe('roundtrip compatibility (critical for browser refresh)', () => {
