@@ -31,6 +31,7 @@ function TextureSetSelectorWindow({
   const [loading, setLoading] = useState(false)
   const [settingDefault, setSettingDefault] = useState(false)
   const [linkDialogVisible, setLinkDialogVisible] = useState(false)
+  const [unlinking, setUnlinking] = useState<number | null>(null)
 
   const loadTextureSets = async () => {
     if (!model.textureSets || model.textureSets.length === 0) {
@@ -80,6 +81,31 @@ function TextureSetSelectorWindow({
     onModelUpdated()
     // Also reload the texture sets to show newly linked ones
     loadTextureSets()
+  }
+
+  const handleUnlinkTextureSet = async (
+    textureSetId: number,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation()
+    try {
+      setUnlinking(textureSetId)
+      await ApiClient.disassociateTextureSetFromModel(
+        textureSetId,
+        parseInt(model.id)
+      )
+      // If this was the selected texture set, clear selection
+      if (selectedTextureSetId === textureSetId) {
+        onTextureSetSelect(null)
+      }
+      // Refresh model data and reload texture sets
+      onModelUpdated()
+      loadTextureSets()
+    } catch (error) {
+      console.error('Failed to unlink texture set:', error)
+    } finally {
+      setUnlinking(null)
+    }
   }
 
   const getPreviewUrl = (textureSet: TextureSetDto) => {
@@ -189,6 +215,14 @@ function TextureSetSelectorWindow({
                           tooltipOptions={{ position: 'left' }}
                         />
                       )}
+                      <Button
+                        icon="pi pi-times"
+                        className="p-button-text p-button-sm p-button-danger unlink-btn"
+                        onClick={e => handleUnlinkTextureSet(textureSet.id, e)}
+                        disabled={unlinking === textureSet.id}
+                        tooltip="Unlink texture set"
+                        tooltipOptions={{ position: 'left' }}
+                      />
                     </div>
                   </div>
                 )

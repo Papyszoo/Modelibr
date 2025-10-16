@@ -55,7 +55,7 @@ function Scene({ model, settings, textureSet }: SceneProps): JSX.Element {
         adjustCamera={false}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
-          {textureSet !== undefined ? (
+          {textureSet !== undefined && textureSet !== null ? (
             <TexturedModel
               key={`${modelUrl}-${textureSet?.id || 'none'}`}
               modelUrl={modelUrl}

@@ -139,10 +139,20 @@
   transition: opacity 0.2s;
 }
 
-.texture-set-selector-window .texture-set-item:hover .set-default-btn {
+.texture-set-selector-window .texture-set-item:hover .set-default-btn,
+.texture-set-selector-window .texture-set-item:hover .unlink-btn {
   opacity: 1;
 }
 
 .texture-set-selector-window .set-default-btn:hover {
   color: var(--yellow-500);
+}
+
+.texture-set-selector-window .unlink-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.texture-set-selector-window .unlink-btn:hover {
+  color: var(--red-500);
 }
