@@ -55,6 +55,9 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
             // Create the texture using domain factory method
             var texture = Domain.Models.Texture.Create(file, command.TextureType, _dateTimeProvider.UtcNow);
 
+            // Remove existing texture of the same type if it exists (for replacement)
+            textureSet.RemoveTextureOfType(command.TextureType, _dateTimeProvider.UtcNow);
+
             // Add texture to the set (domain will enforce business rules)
             textureSet.AddTexture(texture, _dateTimeProvider.UtcNow);
 
