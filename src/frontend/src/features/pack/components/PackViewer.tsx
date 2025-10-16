@@ -223,11 +223,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
       let newCount = 0
       let existingCount = 0
 
-      // Create batch for multiple files
-      const batchId =
-        uploadProgressContext && files.length > 1
-          ? uploadProgressContext.createBatch()
-          : undefined
+      // Create batch for all uploads (even single files need batch tracking)
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
 
       // Upload all files and add them to pack
       const uploadPromises = files.map(async file => {
@@ -241,7 +240,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
             uploadProgressContext.updateUploadProgress(uploadId, 50)
           }
 
-          const response = await ApiClient.uploadModel(file)
+          const response = await ApiClient.uploadModel(file, { batchId })
 
           if (uploadId && uploadProgressContext) {
             uploadProgressContext.updateUploadProgress(uploadId, 75)
@@ -320,31 +319,13 @@ export default function PackViewer({ packId }: PackViewerProps) {
       setUploadingTextureSet(true)
 
       let newCount = 0
-      let existingCount = 0
 
-      // Create batch for multiple files
-      const batchId =
-        uploadProgressContext && files.length > 1
-          ? uploadProgressContext.createBatch()
-          : undefined
+      // Create batch for all uploads (even single files need batch tracking)
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
 
-      // Helper function to create a new texture set with uploaded file
-      const createTextureSetWithFile = async (
-        fileName: string,
-        fileId: number
-      ): Promise<number> => {
-        const setName = fileName.replace(/\.[^/.]+$/, '')
-        const setResponse = await ApiClient.createTextureSet({ name: setName })
-
-        await ApiClient.addTextureToSetEndpoint(setResponse.id, {
-          fileId: fileId,
-          textureType: TextureType.Albedo,
-        })
-
-        return setResponse.id
-      }
-
-      // Upload all texture files and create/link texture sets
+      // Upload all texture files and create/link texture sets to pack
       const uploadPromises = files.map(async file => {
         let uploadId: string | null = null
         try {
@@ -356,58 +337,24 @@ export default function PackViewer({ packId }: PackViewerProps) {
             uploadProgressContext.updateUploadProgress(uploadId, 30)
           }
 
-          const fileResponse = await ApiClient.uploadFile(file)
+          const setName = file.name.replace(/\.[^/.]+$/, '')
 
-          if (uploadId && uploadProgressContext) {
-            uploadProgressContext.updateUploadProgress(uploadId, 60)
-          }
+          // Use consolidated endpoint that handles file upload, texture set creation, and pack association
+          const response = await ApiClient.addTextureToPackWithFile(
+            packId,
+            file,
+            setName,
+            1, // TextureType.Albedo (enum starts at 1)
+            batchId
+          )
 
-          let textureSetId: number | null = null
-
-          // Check if file already exists and has an associated texture set
-          if (fileResponse.alreadyExists) {
-            const existingSetResponse = await ApiClient.getTextureSetByFileId(
-              fileResponse.fileId
-            )
-
-            if (existingSetResponse.textureSetId) {
-              // Use existing texture set
-              textureSetId = existingSetResponse.textureSetId
-              existingCount++
-            } else {
-              // File exists but no texture set has it yet, create new texture set
-              textureSetId = await createTextureSetWithFile(
-                file.name,
-                fileResponse.fileId
-              )
-              newCount++
-            }
-          } else {
-            // New file, create new texture set
-            textureSetId = await createTextureSetWithFile(
-              file.name,
-              fileResponse.fileId
-            )
-            newCount++
-          }
-
-          if (uploadId && uploadProgressContext) {
-            uploadProgressContext.updateUploadProgress(uploadId, 80)
-          }
-
-          // Add texture set to pack (idempotent operation)
-          await ApiClient.addTextureSetToPack(packId, textureSetId)
-
-          // Complete upload with textureSetId for the "Open in tab" button
           if (uploadId && uploadProgressContext) {
             uploadProgressContext.updateUploadProgress(uploadId, 100)
-            uploadProgressContext.completeUpload(uploadId, {
-              ...fileResponse,
-              textureSetId: textureSetId,
-            })
+            uploadProgressContext.completeUpload(uploadId, response)
           }
 
-          return textureSetId
+          newCount++
+          return response.textureSetId
         } catch (error) {
           // Mark upload as failed
           if (uploadId && uploadProgressContext) {
@@ -419,20 +366,10 @@ export default function PackViewer({ packId }: PackViewerProps) {
 
       await Promise.all(uploadPromises)
 
-      // Show appropriate success message
-      let message = ''
-      if (newCount > 0 && existingCount > 0) {
-        message = `${newCount} new texture set(s) created and ${existingCount} existing linked to pack`
-      } else if (newCount > 0) {
-        message = `${newCount} texture set(s) created and added to pack`
-      } else {
-        message = `${existingCount} existing texture set(s) linked to pack`
-      }
-
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: message,
+        detail: `${newCount} texture(s) uploaded and added to pack`,
         life: 3000,
       })
       loadPackContent()

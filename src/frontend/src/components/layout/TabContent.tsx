@@ -2,6 +2,7 @@ import { ModelList } from '../../features/models'
 import { ModelViewer } from '../../features/model-viewer'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
 import { PackList, PackViewer } from '../../features/pack'
+import { History } from '../../features/history'
 import { StageEditor, StageList } from '../../features/stage-editor'
 import AnimationList from '../tabs/AnimationList'
 import Settings from '../tabs/Settings'
@@ -68,6 +69,9 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'settings':
         return <Settings />
+
+      case 'history':
+        return <History />
 
       default:
         return (

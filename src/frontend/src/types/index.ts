@@ -12,6 +12,7 @@ export interface Tab {
     | 'stageList'
     | 'stageEditor'
     | 'settings'
+    | 'history'
   label?: string
   modelId?: string
   setId?: string

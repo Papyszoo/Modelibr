@@ -36,6 +36,11 @@ export const useTabMenuItems = ({
         command: () => onAddTab('stageList', 'Stages'),
       },
       {
+        label: 'History',
+        icon: 'pi pi-history',
+        command: () => onAddTab('history', 'History'),
+      },
+      {
         separator: true,
       },
       {
