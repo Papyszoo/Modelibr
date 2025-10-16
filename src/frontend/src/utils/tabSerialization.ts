@@ -136,9 +136,15 @@ export function parseCompactTabFormat(
 // Helper function to serialize to compact format
 export function serializeToCompactFormat(tabs: Tab[]): string {
   // Deduplicate tabs by id to prevent duplicate entries in URL
-  const uniqueTabs = tabs.filter(
-    (tab, index, self) => index === self.findIndex(t => t.id === tab.id)
-  )
+  // Using Set for O(n) performance instead of O(n²)
+  const seen = new Set<string>()
+  const uniqueTabs = tabs.filter(tab => {
+    if (seen.has(tab.id)) {
+      return false
+    }
+    seen.add(tab.id)
+    return true
+  })
 
   return uniqueTabs
     .map(tab => {
