@@ -344,7 +344,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
             packId,
             file,
             setName,
-            0, // TextureType.Albedo
+            1, // TextureType.Albedo (enum starts at 1)
             batchId
           )
 
