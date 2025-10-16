@@ -81,7 +81,9 @@ namespace WebApi
             app.MapThumbnailJobEndpoints();
             app.MapTextureSetEndpoints();
             app.MapPackEndpoints();
+            app.MapStageEndpoints();
             app.MapSettingsEndpoints();
+            app.MapBatchUploadEndpoints();
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");

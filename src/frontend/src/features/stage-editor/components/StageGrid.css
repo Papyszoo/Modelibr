@@ -1,0 +1,152 @@
+.stage-grid-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  overflow: auto;
+}
+
+.stage-grid-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.search-bar {
+  flex: 1;
+  position: relative;
+  max-width: 400px;
+}
+
+.search-bar i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-color-secondary);
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  background: var(--surface-card);
+  color: var(--text-color);
+  font-size: 0.9rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.stage-card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.stage-card-content {
+  flex: 1;
+  padding: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stage-card-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-color-text));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.stage-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.stage-card-name {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage-card-date {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+}
+
+.stage-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-top: 1px solid var(--surface-border);
+  background: var(--surface-ground);
+}
+
+.stage-grid-loading,
+.stage-grid-empty,
+.stage-grid-no-results {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-color-secondary);
+}
+
+.stage-grid-empty i,
+.stage-grid-no-results i {
+  font-size: 4rem;
+  color: var(--text-color-secondary);
+  margin-bottom: 1rem;
+}
+
+.stage-grid-empty h3 {
+  margin: 1rem 0 0.5rem;
+  color: var(--text-color);
+}
+
+.stage-grid-empty p {
+  margin: 0.5rem 0;
+  color: var(--text-color-secondary);
+}
+
+.stage-grid-empty .hint {
+  font-size: 0.85rem;
+  font-style: italic;
+}

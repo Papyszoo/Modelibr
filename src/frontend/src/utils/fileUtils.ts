@@ -28,6 +28,8 @@ export interface Model {
   files: ModelFile[]
   createdAt: string
   updatedAt: string
+  textureSets?: { id: number; name: string }[]
+  packs?: { id: number; name: string }[]
 }
 
 /**
@@ -73,6 +75,7 @@ export function formatFileSize(bytes: number): string {
  */
 export const THREEJS_SUPPORTED_FORMATS = [
   '.obj', // OBJLoader
+  '.fbx', // FBXLoader
   '.gltf', // GLTFLoader
   '.glb', // GLTFLoader
 ] as const

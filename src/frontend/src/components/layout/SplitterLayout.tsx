@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
+import { DockProvider } from '../../contexts/DockContext'
 import DockPanel from './DockPanel'
 import { Tab, SplitterEvent } from '../../types'
 import {
@@ -140,47 +141,49 @@ function SplitterLayout(): JSX.Element {
   const rightSize = 100 - leftSize
 
   return (
-    <div className="splitter-layout">
-      <Splitter
-        layout="horizontal"
-        onResize={handleSplitterResize}
-        onResizeEnd={handleSplitterResizeEnd}
-        resizerStyle={{ background: '#e2e8f0', width: '4px' }}
-      >
-        <SplitterPanel size={leftSize} minSize={20}>
-          <DockPanel
-            side="left"
-            tabs={leftTabs}
-            setTabs={setLeftTabs}
-            activeTab={activeLeftTab}
-            setActiveTab={setActiveLeftTab}
-            otherTabs={rightTabs}
-            setOtherTabs={setRightTabs}
-            otherActiveTab={activeRightTab}
-            setOtherActiveTab={setActiveRightTab}
-            draggedTab={draggedTab}
-            setDraggedTab={setDraggedTab}
-            moveTabBetweenPanels={moveTabBetweenPanels}
-          />
-        </SplitterPanel>
-        <SplitterPanel size={rightSize} minSize={20}>
-          <DockPanel
-            side="right"
-            tabs={rightTabs}
-            setTabs={setRightTabs}
-            activeTab={activeRightTab}
-            setActiveTab={setActiveRightTab}
-            otherTabs={leftTabs}
-            setOtherTabs={setLeftTabs}
-            otherActiveTab={activeLeftTab}
-            setOtherActiveTab={setActiveLeftTab}
-            draggedTab={draggedTab}
-            setDraggedTab={setDraggedTab}
-            moveTabBetweenPanels={moveTabBetweenPanels}
-          />
-        </SplitterPanel>
-      </Splitter>
-    </div>
+    <DockProvider>
+      <div className="splitter-layout">
+        <Splitter
+          layout="horizontal"
+          onResize={handleSplitterResize}
+          onResizeEnd={handleSplitterResizeEnd}
+          resizerStyle={{ background: '#e2e8f0', width: '4px' }}
+        >
+          <SplitterPanel size={leftSize} minSize={20}>
+            <DockPanel
+              side="left"
+              tabs={leftTabs}
+              setTabs={setLeftTabs}
+              activeTab={activeLeftTab}
+              setActiveTab={setActiveLeftTab}
+              otherTabs={rightTabs}
+              setOtherTabs={setRightTabs}
+              otherActiveTab={activeRightTab}
+              setOtherActiveTab={setActiveRightTab}
+              draggedTab={draggedTab}
+              setDraggedTab={setDraggedTab}
+              moveTabBetweenPanels={moveTabBetweenPanels}
+            />
+          </SplitterPanel>
+          <SplitterPanel size={rightSize} minSize={20}>
+            <DockPanel
+              side="right"
+              tabs={rightTabs}
+              setTabs={setRightTabs}
+              activeTab={activeRightTab}
+              setActiveTab={setActiveRightTab}
+              otherTabs={leftTabs}
+              setOtherTabs={setLeftTabs}
+              otherActiveTab={activeLeftTab}
+              setOtherActiveTab={setActiveLeftTab}
+              draggedTab={draggedTab}
+              setDraggedTab={setDraggedTab}
+              moveTabBetweenPanels={moveTabBetweenPanels}
+            />
+          </SplitterPanel>
+        </Splitter>
+      </div>
+    </DockProvider>
   )
 }
 

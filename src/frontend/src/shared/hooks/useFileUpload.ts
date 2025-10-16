@@ -37,9 +37,10 @@ export function useFileUpload(options = {}) {
    * Upload a single file
    * @param {File} file - File to upload
    * @param {string} uploadId - Optional upload ID for global progress tracking
+   * @param {string} batchId - Optional batch ID for backend tracking
    * @returns {Promise<Object>} Upload result
    */
-  const uploadSingleFile = async (file, uploadId = null) => {
+  const uploadSingleFile = async (file, uploadId = null, batchId = null) => {
     if (!file) {
       throw new Error('No file provided')
     }
@@ -82,7 +83,7 @@ export function useFileUpload(options = {}) {
         uploadProgressContext.updateUploadProgress(uploadId, 50)
       }
 
-      const result = await ApiClient.uploadModel(file)
+      const result = await ApiClient.uploadModel(file, { batchId })
 
       // Update global progress if enabled and available
       if (useGlobalProgress && uploadId && uploadProgressContext) {
@@ -141,7 +142,7 @@ export function useFileUpload(options = {}) {
             : null
 
         try {
-          const result = await uploadSingleFile(file, uploadId)
+          const result = await uploadSingleFile(file, uploadId, batchId)
           results.succeeded.push({ file, result })
 
           // Show success notification if toast is provided

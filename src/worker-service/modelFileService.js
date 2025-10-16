@@ -225,6 +225,7 @@ export class ModelFileService {
   getFileTypeFromExtension(extension) {
     const supportedTypes = {
       '.obj': 'obj',
+      '.fbx': 'fbx',
       '.gltf': 'gltf',
       '.glb': 'glb',
     }

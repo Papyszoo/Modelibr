@@ -11,10 +11,12 @@ namespace Infrastructure.Persistence
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
         public DbSet<Pack> Packs => Set<Pack>();
+        public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
+        public DbSet<BatchUpload> BatchUploads => Set<BatchUpload>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -134,6 +136,19 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(p => p.Name);
             });
 
+            // Configure Stage entity
+            modelBuilder.Entity<Stage>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.ConfigurationJson).IsRequired();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+
+                // Create index for efficient querying by name
+                entity.HasIndex(s => s.Name);
+            });
+
             // Configure Thumbnail entity
             modelBuilder.Entity<Thumbnail>(entity =>
             {
@@ -210,6 +225,49 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
+            });
+
+            // Configure BatchUpload entity
+            modelBuilder.Entity<BatchUpload>(entity =>
+            {
+                entity.HasKey(bu => bu.Id);
+                entity.Property(bu => bu.BatchId).IsRequired().HasMaxLength(100);
+                entity.Property(bu => bu.UploadType).IsRequired().HasMaxLength(50);
+                entity.Property(bu => bu.UploadedAt).IsRequired();
+                entity.Property(bu => bu.FileId).IsRequired();
+
+                // Create index for efficient querying by batch ID
+                entity.HasIndex(bu => bu.BatchId);
+                
+                // Create index for efficient querying by upload type
+                entity.HasIndex(bu => bu.UploadType);
+                
+                // Create index for efficient querying by timestamp
+                entity.HasIndex(bu => bu.UploadedAt);
+                
+                // Configure relationship with File
+                entity.HasOne(bu => bu.File)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                
+                // Configure optional relationship with Pack
+                entity.HasOne(bu => bu.Pack)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.PackId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                
+                // Configure optional relationship with Model
+                entity.HasOne(bu => bu.Model)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.ModelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                
+                // Configure optional relationship with TextureSet
+                entity.HasOne(bu => bu.TextureSet)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.TextureSetId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             base.OnModelCreating(modelBuilder);

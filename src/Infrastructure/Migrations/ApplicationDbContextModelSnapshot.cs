@@ -62,6 +62,58 @@ namespace Infrastructure.Migrations
                     b.ToTable("ApplicationSettings");
                 });
 
+            modelBuilder.Entity("Domain.Models.BatchUpload", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BatchId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ModelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PackId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TextureSetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UploadType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("ModelId");
+
+                    b.HasIndex("PackId");
+
+                    b.HasIndex("TextureSetId");
+
+                    b.HasIndex("UploadType");
+
+                    b.HasIndex("UploadedAt");
+
+                    b.ToTable("BatchUploads");
+                });
+
             modelBuilder.Entity("Domain.Models.File", b =>
                 {
                     b.Property<int>("Id")
@@ -165,6 +217,36 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("Packs");
+                });
+
+            modelBuilder.Entity("Domain.Models.Stage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("Stages");
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>
@@ -435,6 +517,38 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TextureSetsId");
 
                     b.ToTable("PackTextureSets", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Models.BatchUpload", b =>
+                {
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Model", "Model")
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Pack", "Pack")
+                        .WithMany()
+                        .HasForeignKey("PackId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.TextureSet", "TextureSet")
+                        .WithMany()
+                        .HasForeignKey("TextureSetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("File");
+
+                    b.Navigation("Model");
+
+                    b.Navigation("Pack");
+
+                    b.Navigation("TextureSet");
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>

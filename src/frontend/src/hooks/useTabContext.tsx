@@ -81,6 +81,31 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openPackDetailsTab = (packId: string): void => {
+    // Check if tab already exists
+    const existingTab = tabs.find(
+      tab => tab.type === 'packViewer' && tab.packId === packId
+    )
+
+    if (existingTab) {
+      // Switch to existing tab
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    // Create new tab
+    const newTab: Tab = {
+      id: `pack-${packId}`,
+      type: 'packViewer',
+      label: `Pack ${packId}`,
+      packId: packId,
+    }
+
+    const newTabs = [...tabs, newTab]
+    setTabs(newTabs)
+    setActiveTab(newTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -94,13 +119,16 @@ export const TabProvider = ({
           type === 'texture' ||
           type === 'textureSets' ||
           type === 'packs' ||
+          type === 'stageList' ||
           type === 'animation' ||
           (type === 'modelViewer' &&
             tab.modelId === (data as { id?: string })?.id) ||
           (type === 'textureSetViewer' &&
             tab.setId === (data as { id?: string })?.id) ||
           (type === 'packViewer' &&
-            tab.packId === (data as { id?: string })?.id))
+            tab.packId === (data as { id?: string })?.id) ||
+          (type === 'stageEditor' &&
+            tab.stageId === (data as { id?: string })?.id))
     )
 
     if (existingTab) {
@@ -117,7 +145,9 @@ export const TabProvider = ({
             ? `set-${(data as { id?: string }).id}`
             : type === 'packViewer' && (data as { id?: string })?.id
               ? `pack-${(data as { id?: string }).id}`
-              : type,
+              : type === 'stageEditor' && (data as { id?: string })?.id
+                ? `stage-${(data as { id?: string }).id}`
+                : type,
       type,
       label: title,
       modelId:
@@ -125,6 +155,8 @@ export const TabProvider = ({
       setId:
         type === 'textureSetViewer' ? (data as { id?: string })?.id : undefined,
       packId: type === 'packViewer' ? (data as { id?: string })?.id : undefined,
+      stageId:
+        type === 'stageEditor' ? (data as { id?: string })?.id : undefined,
     }
 
     const newTabs = [...tabs, newTab]
@@ -140,6 +172,7 @@ export const TabProvider = ({
     setActiveTab,
     openModelDetailsTab,
     openTextureSetDetailsTab,
+    openPackDetailsTab,
     openTab,
   }
 
