@@ -124,7 +124,7 @@ function TextureSetSelectorWindow({
         side={side}
         windowId="texture-sets"
       >
-        <div className="texture-window-header">
+        <div className="tswindow-header">
           <Button
             icon="pi pi-link"
             label="Link Texture Sets"
@@ -135,42 +135,40 @@ function TextureSetSelectorWindow({
           />
         </div>
 
-        <div className="texture-window-content">
+        <div className="tswindow-content">
           {loading ? (
-            <div className="loading-state">
+            <div className="tswindow-loading">
               <i className="pi pi-spin pi-spinner" />
               <p>Loading texture sets...</p>
             </div>
           ) : textureSets.length === 0 ? (
-            <div className="empty-state">
+            <div className="tswindow-empty">
               <i className="pi pi-inbox" />
               <p>No texture sets linked to this model</p>
-              <p className="hint">
+              <p className="tswindow-empty-hint">
                 Link texture sets in the Model Information window
               </p>
             </div>
           ) : (
-            <div className="texture-set-list">
+            <div className="tswindow-list">
               {/* None option */}
               <div
-                className={`texture-set-item ${selectedTextureSetId === null ? 'selected' : ''}`}
+                className={`tswindow-item ${selectedTextureSetId === null ? 'tswindow-selected' : ''}`}
                 onClick={() => onTextureSetSelect(null)}
               >
-                <div className="texture-set-preview no-texture">
+                <div className="tswindow-preview tswindow-no-texture">
                   <i className="pi pi-times" />
                 </div>
-                {selectedTextureSetId === null && (
-                  <div className="selected-indicator">
-                    <i className="pi pi-check" />
+                <div className="tswindow-info">
+                  <div className="tswindow-name">No Texture</div>
+                  <div className="tswindow-meta">
+                    Use default material without textures
                   </div>
-                )}
-                <div className="texture-set-content">
-                  <div className="texture-set-info">
-                    <div className="texture-set-name">No Texture</div>
-                    <div className="texture-set-meta">
-                      Use default material without textures
-                    </div>
-                  </div>
+                </div>
+                <div className="tswindow-actions">
+                  {selectedTextureSetId === null && (
+                    <i className="pi pi-check tswindow-icon-selected" />
+                  )}
                 </div>
               </div>
 
@@ -182,57 +180,59 @@ function TextureSetSelectorWindow({
                 return (
                   <div
                     key={textureSet.id}
-                    className={`texture-set-item ${isSelected ? 'selected' : ''} ${isDefault ? 'is-default' : ''}`}
+                    className={`tswindow-item ${isSelected ? 'tswindow-selected' : ''} ${isDefault ? 'tswindow-default' : ''}`}
                     onClick={() => onTextureSetSelect(textureSet.id)}
                   >
-                    <div className="texture-set-preview">
+                    <div className="tswindow-preview">
                       {previewUrl ? (
-                        <img src={previewUrl} alt={textureSet.name} />
+                        <img
+                          src={previewUrl}
+                          alt={textureSet.name}
+                          className="tswindow-preview-img"
+                        />
                       ) : (
                         <i className="pi pi-image" />
                       )}
                     </div>
-                    {isSelected && (
-                      <div className="selected-indicator">
-                        <i className="pi pi-check" />
+                    <div className="tswindow-info">
+                      <div className="tswindow-name">
+                        {textureSet.name}
                       </div>
-                    )}
-                    <div className="texture-set-content">
-                      <div className="texture-set-info">
-                        <div className="texture-set-name">
-                          {textureSet.name}
-                        </div>
-                        <div className="texture-set-meta">
-                          {textureSet.textureCount} texture
-                          {textureSet.textureCount !== 1 ? 's' : ''}
-                          {isDefault && (
-                            <span className="default-badge">Default</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="texture-set-actions">
-                        {!isDefault && (
-                          <Button
-                            icon="pi pi-star"
-                            label="Set Default"
-                            className="p-button-sm p-button-outlined set-default-btn"
-                            onClick={e => {
-                              e.stopPropagation()
-                              handleSetDefault(textureSet.id)
-                            }}
-                            disabled={settingDefault}
-                          />
+                      <div className="tswindow-meta">
+                        {textureSet.textureCount} texture
+                        {textureSet.textureCount !== 1 ? 's' : ''}
+                        {isDefault && (
+                          <span className="tswindow-badge">Default</span>
                         )}
-                        <Button
-                          icon="pi pi-times"
-                          label="Unlink"
-                          className="p-button-sm p-button-outlined p-button-danger unlink-btn"
-                          onClick={e =>
-                            handleUnlinkTextureSet(textureSet.id, e)
-                          }
-                          disabled={unlinking === textureSet.id}
-                        />
                       </div>
+                    </div>
+                    <div className="tswindow-actions">
+                      {isSelected && (
+                        <i className="pi pi-check tswindow-icon-selected" />
+                      )}
+                      {!isDefault && (
+                        <Button
+                          icon="pi pi-star"
+                          className="p-button-text p-button-sm tswindow-btn-default"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleSetDefault(textureSet.id)
+                          }}
+                          disabled={settingDefault}
+                          tooltip="Set as default"
+                          tooltipOptions={{ position: 'left' }}
+                        />
+                      )}
+                      <Button
+                        icon="pi pi-times"
+                        className="p-button-text p-button-sm p-button-danger tswindow-btn-unlink"
+                        onClick={e =>
+                          handleUnlinkTextureSet(textureSet.id, e)
+                        }
+                        disabled={unlinking === textureSet.id}
+                        tooltip="Unlink texture set"
+                        tooltipOptions={{ position: 'left' }}
+                      />
                     </div>
                   </div>
                 )
