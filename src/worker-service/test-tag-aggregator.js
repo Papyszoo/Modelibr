@@ -139,7 +139,10 @@ const result6 = TagAggregator.aggregateTags(predictions6, {
 })
 
 console.log('Result:', result6)
-console.assert(result6.tags.includes('3x'), 'Should show 3 occurrences for cube')
+console.assert(
+  result6.tags.includes('3x'),
+  'Should show 3 occurrences for cube'
+)
 console.assert(result6.tags.includes('1x'), 'Should show 1 occurrence for box')
 console.log('✓ Test 6 passed\n')
 

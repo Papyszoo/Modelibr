@@ -1,12 +1,11 @@
 /**
  * Test script for Hugging Face image tagger
- * 
+ *
  * This script tests the new HuggingFaceTagger implementation
  * Run with: node test-huggingface-tagger.js
  */
 
 import { HuggingFaceTagger } from './imageTagger/huggingfaceTagger.js'
-import fs from 'fs/promises'
 import sharp from 'sharp'
 
 async function testTagger() {
@@ -18,8 +17,8 @@ async function testTagger() {
       width: 256,
       height: 256,
       channels: 3,
-      background: { r: 50, g: 100, b: 200 }
-    }
+      background: { r: 50, g: 100, b: 200 },
+    },
   })
     .png()
     .toBuffer()
@@ -35,7 +34,9 @@ async function testTagger() {
   console.log('Tagger initialized\n')
 
   // Test image description
-  console.log('Describing image (this may take 20-30 seconds on first request)...')
+  console.log(
+    'Describing image (this may take 20-30 seconds on first request)...'
+  )
   const startTime = Date.now()
 
   try {
@@ -47,17 +48,21 @@ async function testTagger() {
     console.log('Predictions:', JSON.stringify(predictions, null, 2))
 
     if (predictions.length === 0) {
-      console.log('\nNote: Empty predictions may indicate the model is loading.')
+      console.log(
+        '\nNote: Empty predictions may indicate the model is loading.'
+      )
       console.log('Try running the test again in 20-30 seconds.')
     } else {
       console.log('\n=== Success! ===')
-      console.log('Tags extracted:', predictions.map(p => p.className).join(', '))
+      console.log(
+        'Tags extracted:',
+        predictions.map(p => p.className).join(', ')
+      )
     }
 
     // Test cleanup
     await tagger.dispose()
     console.log('\nTagger disposed successfully')
-
   } catch (error) {
     console.error('\n=== Error ===')
     console.error('Failed to describe image:', error.message)

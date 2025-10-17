@@ -7,7 +7,9 @@ import logger from '../logger.js'
  */
 export class HuggingFaceTagger {
   constructor() {
-    this.apiUrl = process.env.HF_API_URL || 'https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large'
+    this.apiUrl =
+      process.env.HF_API_URL ||
+      'https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large'
     this.apiToken = process.env.HF_API_TOKEN || null
     this.isInitialized = false
     this.modelLoadTimeMs = 0
@@ -38,10 +40,10 @@ export class HuggingFaceTagger {
   /**
    * Describe an image using Hugging Face BLIP-2 model
    * @param {Buffer} imageBuffer - Image data as Buffer
-   * @param {number} topK - Not used, kept for API compatibility
+   * @param {number} _topK - Not used, kept for API compatibility
    * @returns {Promise<Array<{className: string, probability: number}>>}
    */
-  async describeImage(imageBuffer, topK = 5) {
+  async describeImage(imageBuffer, _topK = 5) {
     if (!this.isInitialized) {
       await this.initialize()
     }
@@ -79,10 +81,13 @@ export class HuggingFaceTagger {
       // Parse response - BLIP returns an array with a single caption object
       // Example: [{ "generated_text": "a cat sitting on a table" }]
       let caption = ''
-      
+
       if (Array.isArray(response.data) && response.data.length > 0) {
         caption = response.data[0].generated_text || ''
-      } else if (typeof response.data === 'object' && response.data.generated_text) {
+      } else if (
+        typeof response.data === 'object' &&
+        response.data.generated_text
+      ) {
         caption = response.data.generated_text
       } else {
         logger.warn('Unexpected response format from Hugging Face API', {
@@ -110,7 +115,7 @@ export class HuggingFaceTagger {
           estimatedTime,
           error: error.response.data,
         })
-        
+
         // For model loading, return empty result rather than failing
         // The job will be retried or will use other views
         return []
@@ -145,9 +150,31 @@ export class HuggingFaceTagger {
 
     // Remove common articles and prepositions
     const stopWords = new Set([
-      'a', 'an', 'the', 'in', 'on', 'at', 'of', 'with', 'by', 'for',
-      'to', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'and', 'or', 'but', 'nor', 'so', 'yet',
+      'a',
+      'an',
+      'the',
+      'in',
+      'on',
+      'at',
+      'of',
+      'with',
+      'by',
+      'for',
+      'to',
+      'from',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'and',
+      'or',
+      'but',
+      'nor',
+      'so',
+      'yet',
     ])
 
     // Split into words and filter

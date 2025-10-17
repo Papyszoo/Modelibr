@@ -438,9 +438,10 @@ export class JobProcessor {
                 }
 
                 // Render classification views
-                const viewImages = await this.classificationRenderer.renderClassificationViews(
-                  jobLogger
-                )
+                const viewImages =
+                  await this.classificationRenderer.renderClassificationViews(
+                    jobLogger
+                  )
 
                 // Initialize image tagger
                 await this.imageTagger.initialize()
