@@ -63,7 +63,7 @@ This feature allows users to change a texture's type by dragging it from one tex
 ## Business Rules
 1. Can only change texture type within the same texture set
 2. Cannot change to a type that already exists in the set
-3. Changing to the same type is a no-op (no error, just success)
+3. Changing to the same type returns early (no database update, but still considered success)
 4. Only one texture of each type per set (existing rule, enforced)
 
 ## Error Handling
