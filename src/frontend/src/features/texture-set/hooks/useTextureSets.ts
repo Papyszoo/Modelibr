@@ -145,6 +145,28 @@ export function useTextureSets() {
     []
   )
 
+  const changeTextureType = useCallback(
+    async (
+      setId: number,
+      textureId: number,
+      newTextureType: number
+    ): Promise<void> => {
+      try {
+        setLoading(true)
+        setError(null)
+        await ApiClient.changeTextureType(setId, textureId, newTextureType)
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to change texture type'
+        setError(errorMessage)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
   const associateTextureSetWithModel = useCallback(
     async (setId: number, modelId: number): Promise<void> => {
       try {
@@ -210,6 +232,7 @@ export function useTextureSets() {
     deleteTextureSet,
     addTextureToSetEndpoint,
     removeTextureFromSet,
+    changeTextureType,
     associateTextureSetWithModel,
     disassociateTextureSetFromModel,
     getModels,
