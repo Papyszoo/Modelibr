@@ -11,6 +11,11 @@
   transform: scale(1.02);
 }
 
+.texture-card.dragging-source {
+  opacity: 0.5;
+  cursor: move;
+}
+
 .texture-card.has-texture {
   border-style: solid;
 }
@@ -78,7 +83,7 @@
   height: 100%;
   min-height: 180px;
   overflow: hidden;
-  cursor: default;
+  cursor: move;
 }
 
 .texture-preview-image {
