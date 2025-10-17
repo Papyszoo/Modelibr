@@ -57,6 +57,11 @@ public static class TextureSetEndpoints
             .WithSummary("Removes a texture from the specified texture set")
             .WithOpenApi();
 
+        app.MapPut("/texture-sets/{setId}/textures/{textureId}/type", ChangeTextureType)
+            .WithName("Change Texture Type")
+            .WithSummary("Changes the texture type of an existing texture in a set")
+            .WithOpenApi();
+
         // Model association
         app.MapPost("/texture-sets/{packId}/models/{modelId}", AssociateTextureSetWithModel)
             .WithName("Associate Texture Set with Model")
@@ -239,6 +244,25 @@ public static class TextureSetEndpoints
         return Results.NoContent();
     }
 
+    private static async Task<IResult> ChangeTextureType(
+        int setId,
+        int textureId,
+        [FromBody] ChangeTextureTypeRequest request,
+        ICommandHandler<ChangeTextureTypeCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new ChangeTextureTypeCommand(setId, textureId, request.TextureType),
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
+
     private static async Task<IResult> AssociateTextureSetWithModel(
         int packId,
         int modelId,
@@ -280,3 +304,4 @@ public static class TextureSetEndpoints
 public record CreateTextureSetRequest(string Name);
 public record UpdateTextureSetRequest(string Name);
 public record AddTextureToPackRequest(int FileId, TextureType TextureType);
+public record ChangeTextureTypeRequest(TextureType TextureType);
