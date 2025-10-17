@@ -46,6 +46,7 @@ function ModelViewer({
   >(null)
   const [selectedTextureSet, setSelectedTextureSet] =
     useState<TextureSetDto | null>(null)
+  const [hasUserSelectedTexture, setHasUserSelectedTexture] = useState(false)
   const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
     orbitSpeed: 1,
     zoomSpeed: 1,
@@ -65,11 +66,16 @@ function ModelViewer({
   }, [propModel, modelId])
 
   // Set initial selected texture set to default if available
+  // Only auto-select if user hasn't made a manual selection yet
   useEffect(() => {
-    if (model?.defaultTextureSetId && selectedTextureSetId === null) {
+    if (
+      model?.defaultTextureSetId &&
+      selectedTextureSetId === null &&
+      !hasUserSelectedTexture
+    ) {
       setSelectedTextureSetId(model.defaultTextureSetId)
     }
-  }, [model?.defaultTextureSetId, selectedTextureSetId])
+  }, [model?.defaultTextureSetId, selectedTextureSetId, hasUserSelectedTexture])
 
   // Load selected texture set data
   useEffect(() => {
@@ -132,6 +138,7 @@ function ModelViewer({
 
   const handleTextureSetSelect = (textureSetId: number | null) => {
     setSelectedTextureSetId(textureSetId)
+    setHasUserSelectedTexture(true)
   }
 
   if (loading) {
