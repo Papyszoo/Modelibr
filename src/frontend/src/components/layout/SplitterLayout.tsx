@@ -48,6 +48,7 @@ function SplitterLayout(): JSX.Element {
     parse: (value): Tab[] =>
       parseCompactTabFormat(value, [{ id: 'models', type: 'modelList' }]),
     serialize: serializeToCompactFormat,
+    clearOnDefault: false,
   })
 
   // URL state for right panel tabs
@@ -62,6 +63,7 @@ function SplitterLayout(): JSX.Element {
     defaultValue: 'models',
     parse: value => value || 'models',
     serialize: value => value,
+    clearOnDefault: false,
   })
 
   const [activeRightTab, setActiveRightTab] = useQueryState('activeRight', {

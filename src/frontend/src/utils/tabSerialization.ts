@@ -133,34 +133,7 @@ export function parseCompactTabFormat(
   }
 }
 
-/**
- * Serialize tabs to compact format for URL storage.
- * Deduplicates tabs by ID, keeping only the first occurrence of each unique tab.
- * 
- * @param tabs - Array of tabs to serialize
- * @returns Comma-separated string in format "type" or "type:id"
- * 
- * @example
- * // Without ID
- * serializeToCompactFormat([{ id: 'models', type: 'modelList' }]) 
- * // => "modelList"
- * 
- * // With ID
- * serializeToCompactFormat([{ id: 'model-123', type: 'modelViewer', modelId: '123' }])
- * // => "modelViewer:123"
- * 
- * // Deduplication (keeps first occurrence)
- * serializeToCompactFormat([
- *   { id: 'models', type: 'modelList' },
- *   { id: 'model-123', type: 'modelViewer', modelId: '123' },
- *   { id: 'model-123', type: 'modelViewer', modelId: '123' } // duplicate removed
- * ])
- * // => "modelList,modelViewer:123"
- */
 export function serializeToCompactFormat(tabs: Tab[]): string {
-  // Deduplicate tabs by id to prevent duplicate entries in URL
-  // Using Set for O(n) performance instead of O(n²)
-  // When duplicates are found, the first occurrence is kept
   const seen = new Set<string>()
   const uniqueTabs = tabs.filter(tab => {
     if (seen.has(tab.id)) {
