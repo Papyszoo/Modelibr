@@ -14,18 +14,16 @@ Object.assign(navigator, {
 // Mock PrimeReact components
 jest.mock('primereact/button', () => ({
   Button: ({ onClick, label, icon, ...props }: any) => (
-    <button 
-      onClick={(e) => onClick?.(e)} 
-      data-icon={icon} 
-      {...props}
-    >
+    <button onClick={e => onClick?.(e)} data-icon={icon} {...props}>
       {label}
     </button>
   ),
 }))
 
 jest.mock('primereact/accordion', () => ({
-  Accordion: ({ children }: any) => <div data-testid="accordion">{children}</div>,
+  Accordion: ({ children }: any) => (
+    <div data-testid="accordion">{children}</div>
+  ),
   AccordionTab: ({ children, header }: any) => (
     <div data-testid="accordion-tab">
       <div data-testid="accordion-header">{header}</div>
@@ -116,7 +114,9 @@ describe('CodePanel', () => {
       ],
     }
 
-    const { container } = render(<CodePanel stageConfig={configWithPointLight} />)
+    const { container } = render(
+      <CodePanel stageConfig={configWithPointLight} />
+    )
     const codeElement = container.querySelector('code')
     expect(codeElement?.textContent).toContain('<pointLight')
     expect(codeElement?.textContent).toContain('distance={0}')
@@ -140,7 +140,9 @@ describe('CodePanel', () => {
       ],
     }
 
-    const { container } = render(<CodePanel stageConfig={configWithSpotLight} />)
+    const { container } = render(
+      <CodePanel stageConfig={configWithSpotLight} />
+    )
     const codeElement = container.querySelector('code')
     expect(codeElement?.textContent).toContain('<spotLight')
     expect(codeElement?.textContent).toContain('angle={0.5235987755982988}')
