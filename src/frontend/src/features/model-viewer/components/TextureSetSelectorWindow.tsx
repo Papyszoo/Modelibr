@@ -159,14 +159,18 @@ function TextureSetSelectorWindow({
                 <div className="texture-set-preview no-texture">
                   <i className="pi pi-times" />
                 </div>
-                <div className="texture-set-info">
-                  <div className="texture-set-name">No Texture</div>
-                  <div className="texture-set-meta">Default material</div>
-                </div>
-                <div className="texture-set-actions">
-                  {selectedTextureSetId === null && (
-                    <i className="pi pi-check selected-icon" />
-                  )}
+                {selectedTextureSetId === null && (
+                  <div className="selected-indicator">
+                    <i className="pi pi-check" />
+                  </div>
+                )}
+                <div className="texture-set-content">
+                  <div className="texture-set-info">
+                    <div className="texture-set-name">No Texture</div>
+                    <div className="texture-set-meta">
+                      Use default material without textures
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -188,41 +192,47 @@ function TextureSetSelectorWindow({
                         <i className="pi pi-image" />
                       )}
                     </div>
-                    <div className="texture-set-info">
-                      <div className="texture-set-name">{textureSet.name}</div>
-                      <div className="texture-set-meta">
-                        {textureSet.textureCount} texture
-                        {textureSet.textureCount !== 1 ? 's' : ''}
-                        {isDefault && (
-                          <span className="default-badge">DEFAULT</span>
-                        )}
+                    {isSelected && (
+                      <div className="selected-indicator">
+                        <i className="pi pi-check" />
                       </div>
-                    </div>
-                    <div className="texture-set-actions">
-                      {isSelected && (
-                        <i className="pi pi-check selected-icon" />
-                      )}
-                      {!isDefault && (
+                    )}
+                    <div className="texture-set-content">
+                      <div className="texture-set-info">
+                        <div className="texture-set-name">
+                          {textureSet.name}
+                        </div>
+                        <div className="texture-set-meta">
+                          {textureSet.textureCount} texture
+                          {textureSet.textureCount !== 1 ? 's' : ''}
+                          {isDefault && (
+                            <span className="default-badge">Default</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="texture-set-actions">
+                        {!isDefault && (
+                          <Button
+                            icon="pi pi-star"
+                            label="Set Default"
+                            className="p-button-sm p-button-outlined set-default-btn"
+                            onClick={e => {
+                              e.stopPropagation()
+                              handleSetDefault(textureSet.id)
+                            }}
+                            disabled={settingDefault}
+                          />
+                        )}
                         <Button
-                          icon="pi pi-star"
-                          className="p-button-text p-button-sm set-default-btn"
-                          onClick={e => {
-                            e.stopPropagation()
-                            handleSetDefault(textureSet.id)
-                          }}
-                          disabled={settingDefault}
-                          tooltip="Set as default"
-                          tooltipOptions={{ position: 'left' }}
+                          icon="pi pi-times"
+                          label="Unlink"
+                          className="p-button-sm p-button-outlined p-button-danger unlink-btn"
+                          onClick={e =>
+                            handleUnlinkTextureSet(textureSet.id, e)
+                          }
+                          disabled={unlinking === textureSet.id}
                         />
-                      )}
-                      <Button
-                        icon="pi pi-times"
-                        className="p-button-text p-button-sm p-button-danger unlink-btn"
-                        onClick={e => handleUnlinkTextureSet(textureSet.id, e)}
-                        disabled={unlinking === textureSet.id}
-                        tooltip="Unlink texture set"
-                        tooltipOptions={{ position: 'left' }}
-                      />
+                      </div>
                     </div>
                   </div>
                 )

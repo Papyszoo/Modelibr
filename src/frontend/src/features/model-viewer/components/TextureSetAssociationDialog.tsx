@@ -164,8 +164,6 @@ function TextureSetAssociationDialog({
         life: 3000,
       })
 
-      // Clear recently unlinked
-      setRecentlyUnlinkedIds(new Set())
       onAssociationsChanged()
     } catch (error) {
       console.error('Failed to update texture set associations:', error)
