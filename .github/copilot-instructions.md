@@ -9,7 +9,7 @@ Always reference these instructions first and fallback to search or bash command
 - Code should be as simple as possible without unnecessary clutter
 - Only implement what is specifically requested in the issue or PR comments
 - Avoid excessive comments, documentation, or examples unless explicitly requested
-- Do not add JSDoc comments or extensive inline documentation unless necessary for complex logic
+- Do not add JSDoc comments or extensive inline documentation
 - Focus on clean, readable code that speaks for itself
 
 ## Working Effectively
