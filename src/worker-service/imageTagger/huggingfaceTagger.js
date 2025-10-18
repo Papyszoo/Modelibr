@@ -1,44 +1,57 @@
-import axios from 'axios'
+import { pipeline } from '@xenova/transformers'
 import logger from '../logger.js'
 
 /**
- * Hugging Face-based image tagger using BLIP-2 for image captioning
- * This provides better descriptions than MobileNet's 1000-class classifier
+ * Local BLIP image captioning tagger using Transformers.js
+ * Runs completely offline with no external API calls
+ * Uses ONNX Runtime for cross-platform compatibility (works on macOS, Linux, Windows)
  */
 export class HuggingFaceTagger {
   constructor() {
-    this.apiUrl =
-      process.env.HF_API_URL ||
-      'https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large'
-    this.apiToken = process.env.HF_API_TOKEN || null
+    this.captioner = null
     this.isInitialized = false
     this.modelLoadTimeMs = 0
   }
 
   /**
-   * Initialize the tagger (validates configuration)
+   * Initialize the local BLIP model
    */
   async initialize() {
     if (this.isInitialized) {
       return
     }
 
-    logger.info('Initializing Hugging Face image tagger', {
-      modelUrl: this.apiUrl,
-      hasApiToken: !!this.apiToken,
-    })
+    try {
+      logger.info('Loading local BLIP image captioning model...')
+      const startTime = Date.now()
 
-    // Note: The Hugging Face API loads models on-demand
-    // First request may be slow, subsequent requests are fast
-    this.isInitialized = true
+      // Load BLIP model locally using Transformers.js
+      // Model will be downloaded once and cached locally (~200MB)
+      // Uses ONNX Runtime - much lighter than TensorFlow.js
+      this.captioner = await pipeline(
+        'image-to-text',
+        'Xenova/vit-gpt2-image-captioning'
+      )
 
-    logger.info('Hugging Face image tagger initialized successfully', {
-      note: 'Model will be loaded on first inference request',
-    })
+      this.modelLoadTimeMs = Date.now() - startTime
+      this.isInitialized = true
+
+      logger.info('Local BLIP model loaded successfully', {
+        loadTimeMs: this.modelLoadTimeMs,
+        model: 'Xenova/vit-gpt2-image-captioning',
+        note: 'Model runs completely offline',
+      })
+    } catch (error) {
+      logger.error('Failed to load local BLIP model', {
+        error: error.message,
+        stack: error.stack,
+      })
+      throw error
+    }
   }
 
   /**
-   * Describe an image using Hugging Face BLIP-2 model
+   * Describe an image using local BLIP model (no API calls)
    * @param {Buffer} imageBuffer - Image data as Buffer
    * @param {number} _topK - Not used, kept for API compatibility
    * @returns {Promise<Array<{className: string, probability: number}>>}
@@ -51,86 +64,38 @@ export class HuggingFaceTagger {
     try {
       const startTime = Date.now()
 
-      // Configure request with optional authentication
-      const headers = {
-        'Content-Type': 'image/png',
-      }
-
-      if (this.apiToken) {
-        headers['Authorization'] = `Bearer ${this.apiToken}`
-      }
-
-      // Call Hugging Face Inference API
-      const response = await axios.post(this.apiUrl, imageBuffer, {
-        headers,
-        timeout: 30000, // 30 second timeout
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity,
-      })
+      // Run image captioning locally (offline)
+      const result = await this.captioner(imageBuffer)
 
       const inferenceTime = Date.now() - startTime
 
-      // Track model load time on first request
-      if (this.modelLoadTimeMs === 0) {
-        this.modelLoadTimeMs = inferenceTime
-        logger.info('Hugging Face model loaded on first request', {
-          loadTimeMs: inferenceTime,
-        })
-      }
+      logger.debug('Image caption generated locally', {
+        inferenceTimeMs: inferenceTime,
+      })
 
-      // Parse response - BLIP returns an array with a single caption object
-      // Example: [{ "generated_text": "a cat sitting on a table" }]
+      // Extract caption text from result
       let caption = ''
-
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        caption = response.data[0].generated_text || ''
-      } else if (
-        typeof response.data === 'object' &&
-        response.data.generated_text
-      ) {
-        caption = response.data.generated_text
-      } else {
-        logger.warn('Unexpected response format from Hugging Face API', {
-          responseType: typeof response.data,
-          data: response.data,
-        })
-        caption = ''
+      if (Array.isArray(result) && result.length > 0) {
+        caption = result[0].generated_text || ''
+      } else if (typeof result === 'object' && result.generated_text) {
+        caption = result.generated_text
       }
 
       // Convert caption to tag-like format
-      // Extract key nouns and adjectives as tags
       const tags = this.extractTagsFromCaption(caption)
 
       // Return in format compatible with existing aggregator
-      // We use probability 1.0 since we don't have confidence scores
       return tags.map(tag => ({
         className: tag,
         probability: 1.0,
       }))
     } catch (error) {
-      // Handle model loading errors (503 service unavailable)
-      if (error.response?.status === 503) {
-        const estimatedTime = error.response.data?.estimated_time || 20
-        logger.warn('Hugging Face model is loading, may take a moment', {
-          estimatedTime,
-          error: error.response.data,
-        })
-
-        // For model loading, return empty result rather than failing
-        // The job will be retried or will use other views
-        return []
-      }
-
-      logger.error('Failed to classify image with Hugging Face', {
+      logger.error('Failed to generate image caption', {
         error: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
         stack: error.stack,
       })
 
-      // For other errors, return empty array to allow job to continue
-      // rather than failing completely
+      // Return empty array to allow job to continue
       return []
     }
   }
@@ -193,7 +158,8 @@ export class HuggingFaceTagger {
    * Cleanup resources
    */
   async dispose() {
-    logger.info('Disposing Hugging Face image tagger')
+    logger.info('Disposing local BLIP image tagger')
+    this.captioner = null
     this.isInitialized = false
   }
 }

@@ -1,7 +1,7 @@
 /**
- * Test script for Hugging Face image tagger
+ * Test script for local BLIP image tagger
  *
- * This script tests the new HuggingFaceTagger implementation
+ * This script tests the HuggingFaceTagger implementation with local model
  * Run with: node test-huggingface-tagger.js
  */
 
@@ -9,7 +9,7 @@ import { HuggingFaceTagger } from './imageTagger/huggingfaceTagger.js'
 import sharp from 'sharp'
 
 async function testTagger() {
-  console.log('=== Testing Hugging Face Image Tagger ===\n')
+  console.log('=== Testing Local BLIP Image Tagger ===\n')
 
   // Create a simple test image (a blue square)
   const testImageBuffer = await sharp({
@@ -35,7 +35,7 @@ async function testTagger() {
 
   // Test image description
   console.log(
-    'Describing image (this may take 20-30 seconds on first request)...'
+    'Describing image (first run downloads ~200MB model, may take a few minutes)...'
   )
   const startTime = Date.now()
 
@@ -48,15 +48,16 @@ async function testTagger() {
     console.log('Predictions:', JSON.stringify(predictions, null, 2))
 
     if (predictions.length === 0) {
-      console.log(
-        '\nNote: Empty predictions may indicate the model is loading.'
-      )
-      console.log('Try running the test again in 20-30 seconds.')
+      console.log('\nNote: Empty predictions may indicate an error occurred.')
+      console.log('Check the logs above for details.')
     } else {
       console.log('\n=== Success! ===')
       console.log(
         'Tags extracted:',
         predictions.map(p => p.className).join(', ')
+      )
+      console.log(
+        '\nThe model is now cached locally and will be faster on subsequent runs.'
       )
     }
 

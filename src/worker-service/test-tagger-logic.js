@@ -1,6 +1,6 @@
 /**
- * Unit test for Hugging Face tagger logic
- * Tests the tag extraction and formatting logic without making real API calls
+ * Unit test for local BLIP tagger logic
+ * Tests the tag extraction and formatting logic without running the model
  */
 
 import { HuggingFaceTagger } from './imageTagger/huggingfaceTagger.js'
@@ -106,7 +106,7 @@ testExtractTagsFromCaption()
 testApiResponseParsing()
 
 console.log('\n=== All Tests Passed! ===')
-console.log('The Hugging Face tagger logic is working correctly.')
+console.log('The local BLIP tagger logic is working correctly.')
 console.log(
-  'In production, it will make API calls to Hugging Face for image captioning.'
+  'In production, it will run the BLIP model locally (offline) for image captioning.'
 )

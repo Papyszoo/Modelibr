@@ -3,6 +3,11 @@ Modelibr is a .NET 9.0 C# Web API application built using Clean Architecture pri
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
+## Core Principles
+
+### Offline-First Design
+**CRITICAL**: The application MUST work completely offline without any internet connection or external API calls. All features, including AI/ML capabilities, must use local models and resources. Never suggest or implement solutions that require external API calls (e.g., cloud AI services, external APIs).
+
 ## Working Effectively
 
 ### Prerequisites and Setup

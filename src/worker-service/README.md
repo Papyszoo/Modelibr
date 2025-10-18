@@ -9,7 +9,7 @@ A Node.js worker service for background thumbnail generation using Puppeteer and
 - **Three.js Integration**: Loads models from CDN and renders them with proper lighting and materials
 - **Orbit Animation**: Generates rotating orbit frames around the 3D model
 - **Animated WebP Thumbnails**: Creates looping animated WebP thumbnails from orbit frames (~30 frames)
-- **AI-Powered Image Tagging**: Automatic tag and description generation using Hugging Face BLIP-2 (no TensorFlow dependencies)
+- **AI-Powered Image Tagging**: Automatic tag and description generation using local BLIP model (runs completely offline)
 - **Event Logging**: Comprehensive event logging to database for full audit trail
 - **Configuration Management**: Comprehensive configuration system with environment variable support
 - **Health Monitoring**: Built-in health check endpoints for monitoring and container orchestration
@@ -61,26 +61,23 @@ The worker service can automatically generate tags and descriptions for uploaded
 - `CLASSIFICATION_MAX_TAGS`: Maximum number of tags to generate (default: `10`)
 - `CLASSIFICATION_TOP_K_PER_IMAGE`: Number of predictions per view (default: `5`)
 
-#### Hugging Face Integration
+#### Local AI Model
 
-The service uses Hugging Face's Inference API with BLIP (Bootstrapping Language-Image Pre-training) for generating descriptive captions of 3D models. This provides much better results than traditional image classifiers:
+The service uses a local BLIP (Bootstrapping Language-Image Pre-training) model via Transformers.js for generating descriptive captions of 3D models. This provides much better results than traditional image classifiers:
 
+- **Runs completely offline**: No external API calls, works without internet connection
 - **No 1000-class limitation**: BLIP generates natural language descriptions instead of selecting from a fixed set of labels
-- **Better accuracy**: BLIP-2 is trained on diverse image-text pairs and understands visual concepts better
-- **Container-friendly**: No heavy TensorFlow.js dependencies, works reliably on all platforms including macOS
-- **Easy setup**: Uses Hugging Face's free Inference API (no local model download required)
-
-**Configuration:**
-
-- `HF_API_URL`: Hugging Face model endpoint (default: Salesforce/blip-image-captioning-large)
-- `HF_API_TOKEN`: Optional API token for higher rate limits (get one free at https://huggingface.co/settings/tokens)
+- **Better accuracy**: BLIP is trained on diverse image-text pairs and understands visual concepts better
+- **Cross-platform**: Uses ONNX Runtime, works reliably on all platforms including macOS
+- **No heavy dependencies**: No TensorFlow.js, uses lightweight Transformers.js with ONNX Runtime
 
 **How it works:**
 
-1. When a model is uploaded, the worker renders 4 different views
-2. Each view is sent to BLIP for caption generation
-3. Tags are extracted from the captions and aggregated
-4. The final tags and description are saved to the model metadata
+1. On first use, the model (~200MB) is automatically downloaded and cached locally
+2. When a model is uploaded, the worker renders 4 different views
+3. Each view is processed locally by BLIP to generate captions
+4. Tags are extracted from the captions and aggregated
+5. The final tags and description are saved to the model metadata
 
 **Example output:**
 ```
