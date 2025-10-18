@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -12,13 +13,19 @@ namespace Application.Models
     internal class SetDefaultTextureSetCommandHandler : ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>
     {
         private readonly IModelRepository _modelRepository;
+        private readonly IThumbnailRepository _thumbnailRepository;
+        private readonly IThumbnailQueue _thumbnailQueue;
         private readonly IDateTimeProvider _dateTimeProvider;
 
         public SetDefaultTextureSetCommandHandler(
             IModelRepository modelRepository,
+            IThumbnailRepository thumbnailRepository,
+            IThumbnailQueue thumbnailQueue,
             IDateTimeProvider dateTimeProvider)
         {
             _modelRepository = modelRepository;
+            _thumbnailRepository = thumbnailRepository;
+            _thumbnailQueue = thumbnailQueue;
             _dateTimeProvider = dateTimeProvider;
         }
 
@@ -36,6 +43,29 @@ namespace Application.Models
             {
                 model.SetDefaultTextureSet(command.TextureSetId, _dateTimeProvider.UtcNow);
                 await _modelRepository.UpdateAsync(model, cancellationToken);
+
+                // Cancel any active thumbnail jobs for this model
+                await _thumbnailQueue.CancelActiveJobsForModelAsync(command.ModelId, cancellationToken);
+
+                // Get the model's primary file hash for thumbnail generation
+                var primaryFile = model.Files.FirstOrDefault();
+                if (primaryFile != null)
+                {
+                    var currentTime = _dateTimeProvider.UtcNow;
+
+                    // Reset existing thumbnail if it exists
+                    if (model.Thumbnail != null)
+                    {
+                        model.Thumbnail.Reset(currentTime);
+                        await _thumbnailRepository.UpdateAsync(model.Thumbnail, cancellationToken);
+                    }
+
+                    // Enqueue new thumbnail generation job
+                    await _thumbnailQueue.EnqueueAsync(
+                        command.ModelId,
+                        primaryFile.Sha256Hash,
+                        cancellationToken: cancellationToken);
+                }
 
                 return Result.Success(new SetDefaultTextureSetResponse(model.Id, model.DefaultTextureSetId));
             }
