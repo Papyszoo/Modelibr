@@ -51,6 +51,9 @@ namespace Infrastructure.Persistence
                 entity.Property(m => m.Name).IsRequired();
                 entity.Property(m => m.CreatedAt).IsRequired();
                 entity.Property(m => m.UpdatedAt).IsRequired();
+                entity.Property(m => m.Vertices);
+                entity.Property(m => m.Faces);
+                entity.Property(m => m.PolyCount).IsRequired();
 
                 // Configure one-to-one relationship with Thumbnail
                 entity.HasOne(m => m.Thumbnail)
@@ -63,6 +66,10 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(m => m.DefaultTextureSetId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                // Create indexes for filtering
+                entity.HasIndex(m => m.PolyCount);
+                entity.HasIndex(m => new { m.Name, m.Vertices });
             });
 
             // Configure File entity
