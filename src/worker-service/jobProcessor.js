@@ -447,13 +447,14 @@ export class JobProcessor {
                 await this.imageTagger.initialize()
 
                 // Get storage path for debug images (use thumbnailStorage path or a fallback)
-                const storagePath = config.thumbnailStorage?.basePath || '/tmp/modelibr'
+                const storagePath =
+                  config.thumbnailStorage?.basePath || '/tmp/modelibr'
 
                 // Classify each view image and save debug images
                 const allPredictions = []
                 for (let i = 0; i < viewImages.length; i++) {
                   const { buffer, view } = viewImages[i]
-                  
+
                   // Save debug image for frontend display
                   await this.imageTagger.saveDebugImage(
                     buffer,
@@ -461,7 +462,7 @@ export class JobProcessor {
                     view,
                     storagePath
                   )
-                  
+
                   // Classify the image with view information
                   const predictions = await this.imageTagger.describeImage(
                     buffer,
