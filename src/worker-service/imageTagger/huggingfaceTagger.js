@@ -78,7 +78,8 @@ export class HuggingFaceTagger {
 
       // Convert Buffer to RawImage for Transformers.js
       // The pipeline expects RawImage, not a raw Buffer
-      const image = await RawImage.fromBuffer(imageBuffer)
+      // Use RawImage.read() which accepts a Buffer directly
+      const image = await RawImage.read(imageBuffer)
 
       // Run image captioning locally (offline)
       const result = await this.captioner(image)
