@@ -77,7 +77,7 @@ function TextureSetSelectorWindow({
 
   const handleLinkDialogClose = () => {
     setLinkDialogVisible(false)
-    // Refresh model data, which will trigger the useEffect to reload texture sets
+    // Refresh model data, which will trigger the useEffect (line 58) to reload texture sets
     onModelUpdated()
   }
 
@@ -109,7 +109,7 @@ function TextureSetSelectorWindow({
         onTextureSetSelect(null)
       }
 
-      // Refresh model data, which will trigger the useEffect to reload texture sets
+      // Refresh model data, which will trigger the useEffect (line 58) to reload texture sets
       onModelUpdated()
     } catch (error) {
       console.error('Failed to unlink texture set:', error)
