@@ -10,7 +10,9 @@ import { config } from './config.js'
 
 async function testCrashpadFix() {
   console.log('=== Testing Crashpad Fix ===\n')
-  console.log('This test validates Chrome launch options to prevent crashpad errors.\n')
+  console.log(
+    'This test validates Chrome launch options to prevent crashpad errors.\n'
+  )
 
   let renderer = null
 
@@ -48,10 +50,10 @@ async function testCrashpadFix() {
     console.log('✓ Environment configured correctly\n')
 
     console.log('=== All crashpad fix tests passed! ===')
+    console.log('\nThe crashpad crash handler should be completely disabled.')
     console.log(
-      '\nThe crashpad crash handler should be completely disabled.'
+      'If you see "chrome_crashpad_handler" errors, please report this issue.'
     )
-    console.log('If you see "chrome_crashpad_handler" errors, please report this issue.')
 
     process.exit(0)
   } catch (error) {

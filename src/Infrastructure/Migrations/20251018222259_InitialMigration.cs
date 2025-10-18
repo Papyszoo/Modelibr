@@ -71,6 +71,39 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Projects",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Projects", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Settings",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Key = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Value = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Settings", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Stages",
                 columns: table => new
                 {
@@ -150,6 +183,30 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ProjectTextureSets",
+                columns: table => new
+                {
+                    ProjectsId = table.Column<int>(type: "integer", nullable: false),
+                    TextureSetsId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ProjectTextureSets", x => new { x.ProjectsId, x.TextureSetsId });
+                    table.ForeignKey(
+                        name: "FK_ProjectTextureSets_Projects_ProjectsId",
+                        column: x => x.ProjectsId,
+                        principalTable: "Projects",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ProjectTextureSets_TextureSets_TextureSetsId",
+                        column: x => x.TextureSetsId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Textures",
                 columns: table => new
                 {
@@ -188,6 +245,7 @@ namespace Infrastructure.Migrations
                     UploadType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     UploadedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     PackId = table.Column<int>(type: "integer", nullable: true),
+                    ProjectId = table.Column<int>(type: "integer", nullable: true),
                     ModelId = table.Column<int>(type: "integer", nullable: true),
                     TextureSetId = table.Column<int>(type: "integer", nullable: true),
                     FileId = table.Column<int>(type: "integer", nullable: false)
@@ -211,6 +269,12 @@ namespace Infrastructure.Migrations
                         name: "FK_BatchUploads_Packs_PackId",
                         column: x => x.PackId,
                         principalTable: "Packs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_BatchUploads_Projects_ProjectId",
+                        column: x => x.ProjectId,
+                        principalTable: "Projects",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
@@ -289,6 +353,30 @@ namespace Infrastructure.Migrations
                         name: "FK_PackModels_Packs_PacksId",
                         column: x => x.PacksId,
                         principalTable: "Packs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ProjectModels",
+                columns: table => new
+                {
+                    ModelsId = table.Column<int>(type: "integer", nullable: false),
+                    ProjectsId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ProjectModels", x => new { x.ModelsId, x.ProjectsId });
+                    table.ForeignKey(
+                        name: "FK_ProjectModels_Models_ModelsId",
+                        column: x => x.ModelsId,
+                        principalTable: "Models",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ProjectModels_Projects_ProjectsId",
+                        column: x => x.ProjectsId,
+                        principalTable: "Projects",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -396,6 +484,11 @@ namespace Infrastructure.Migrations
                 column: "PackId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_BatchUploads_ProjectId",
+                table: "BatchUploads",
+                column: "ProjectId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_BatchUploads_TextureSetId",
                 table: "BatchUploads",
                 column: "TextureSetId");
@@ -439,6 +532,27 @@ namespace Infrastructure.Migrations
                 name: "IX_PackTextureSets_TextureSetsId",
                 table: "PackTextureSets",
                 column: "TextureSetsId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProjectModels_ProjectsId",
+                table: "ProjectModels",
+                column: "ProjectsId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Projects_Name",
+                table: "Projects",
+                column: "Name");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProjectTextureSets_TextureSetsId",
+                table: "ProjectTextureSets",
+                column: "TextureSetsId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Settings_Key",
+                table: "Settings",
+                column: "Key",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Stages_Name",
@@ -518,6 +632,15 @@ namespace Infrastructure.Migrations
                 name: "PackTextureSets");
 
             migrationBuilder.DropTable(
+                name: "ProjectModels");
+
+            migrationBuilder.DropTable(
+                name: "ProjectTextureSets");
+
+            migrationBuilder.DropTable(
+                name: "Settings");
+
+            migrationBuilder.DropTable(
                 name: "Stages");
 
             migrationBuilder.DropTable(
@@ -531,6 +654,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "Packs");
+
+            migrationBuilder.DropTable(
+                name: "Projects");
 
             migrationBuilder.DropTable(
                 name: "Files");

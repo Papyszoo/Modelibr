@@ -634,6 +634,167 @@ class ApiClient {
     return response.data.textureSets
   }
 
+  // Project API
+  async getAllProjects(options: { skipCache?: boolean } = {}): Promise<ProjectDto[]> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getProjects()
+      if (cached) {
+        return cached
+      }
+    }
+
+    const response = await this.client.get<GetAllProjectsResponse>('/projects')
+
+    // Update cache
+    useApiCacheStore.getState().setProjects(response.data.projects)
+
+    return response.data.projects
+  }
+
+  async getProjectById(
+    id: number,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ProjectDto> {
+    // Check cache first unless skipCache is true
+    if (!options.skipCache) {
+      const cached = useApiCacheStore.getState().getProjectById(id)
+      if (cached) {
+        return cached
+      }
+    }
+
+    const response = await this.client.get<ProjectDto>(`/projects/${id}`)
+
+    // Update cache
+    useApiCacheStore.getState().setProjectById(id, response.data)
+
+    return response.data
+  }
+
+  async createProject(request: CreateProjectRequest): Promise<CreateProjectResponse> {
+    const response = await this.client.post<CreateProjectResponse>(
+      '/projects',
+      request
+    )
+
+    // Invalidate projects cache on successful creation
+    useApiCacheStore.getState().invalidateProjects()
+
+    return response.data
+  }
+
+  async updateProject(id: number, request: UpdateProjectRequest): Promise<void> {
+    await this.client.put(`/projects/${id}`, request)
+
+    // Invalidate projects cache on successful update
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(id)
+  }
+
+  async deleteProject(id: number): Promise<void> {
+    await this.client.delete(`/projects/${id}`)
+
+    // Invalidate projects cache on successful deletion
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(id)
+  }
+
+  async addModelToProject(projectId: number, modelId: number): Promise<void> {
+    await this.client.post(`/projects/${projectId}/models/${modelId}`)
+
+    // Invalidate projects and models cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+  }
+
+  async removeModelFromProject(projectId: number, modelId: number): Promise<void> {
+    await this.client.delete(`/projects/${projectId}/models/${modelId}`)
+
+    // Invalidate projects and models cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+  }
+
+  async addTextureSetToProject(
+    projectId: number,
+    textureSetId: number
+  ): Promise<void> {
+    await this.client.post(`/projects/${projectId}/texture-sets/${textureSetId}`)
+
+    // Invalidate projects and texture sets cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
+  }
+
+  async addTextureToProjectWithFile(
+    projectId: number,
+    file: File,
+    name: string,
+    textureType: number,
+    batchId?: string
+  ): Promise<{ textureSetId: number }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('name', name)
+    formData.append('textureType', textureType.toString())
+
+    const params = new URLSearchParams()
+    if (batchId) {
+      params.append('batchId', batchId)
+    }
+    params.append('uploadType', 'project')
+
+    const response = await this.client.post<{ textureSetId: number }>(
+      `/projects/${projectId}/textures/with-file?${params.toString()}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    // Invalidate caches
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+    useApiCacheStore.getState().invalidateTextureSets()
+
+    return response.data
+  }
+
+  async removeTextureSetFromProject(
+    projectId: number,
+    textureSetId: number
+  ): Promise<void> {
+    await this.client.delete(`/projects/${projectId}/texture-sets/${textureSetId}`)
+
+    // Invalidate projects and texture sets cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
+  }
+
+  async getModelsByProject(projectId: number): Promise<Model[]> {
+    const response = await this.client.get<Model[]>(`/models?projectId=${projectId}`)
+    return response.data
+  }
+
+  async getTextureSetsByProject(projectId: number): Promise<TextureSetDto[]> {
+    const response = await this.client.get<GetAllTextureSetsResponse>(
+      `/texture-sets?projectId=${projectId}`
+    )
+    return response.data.textureSets
+  }
+
+
   // Batch Upload History API
   async getBatchUploadHistory(): Promise<{
     uploads: Array<{
@@ -645,6 +806,8 @@ class ApiClient {
       fileName: string
       packId: number | null
       packName: string | null
+      projectId: number | null
+      projectName: string | null
       modelId: number | null
       modelName: string | null
       textureSetId: number | null

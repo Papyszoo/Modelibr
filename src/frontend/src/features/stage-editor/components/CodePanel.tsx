@@ -52,6 +52,13 @@ function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
         castShadow
       />`
 
+          case 'hemisphere':
+            return `      <hemisphereLight
+        color="${light.color}"
+        groundColor="${light.groundColor || '#080820'}"
+        intensity={${light.intensity}}
+      />`
+
           default:
             return ''
         }

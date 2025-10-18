@@ -11,6 +11,7 @@ namespace Infrastructure.Persistence
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
         public DbSet<Pack> Packs => Set<Pack>();
+        public DbSet<Project> Projects => Set<Project>();
         public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
@@ -44,6 +45,18 @@ namespace Infrastructure.Persistence
                 .HasMany(ts => ts.Packs)
                 .WithMany(p => p.TextureSets)
                 .UsingEntity(j => j.ToTable("PackTextureSets"));
+
+            // Configure many-to-many relationship between Model and Project
+            modelBuilder.Entity<Model>()
+                .HasMany(m => m.Projects)
+                .WithMany(p => p.Models)
+                .UsingEntity(j => j.ToTable("ProjectModels"));
+
+            // Configure many-to-many relationship between TextureSet and Project
+            modelBuilder.Entity<TextureSet>()
+                .HasMany(ts => ts.Projects)
+                .WithMany(p => p.TextureSets)
+                .UsingEntity(j => j.ToTable("ProjectTextureSets"));
 
             // Configure Model entity
             modelBuilder.Entity<Model>(entity =>
@@ -132,6 +145,19 @@ namespace Infrastructure.Persistence
 
             // Configure Pack entity
             modelBuilder.Entity<Pack>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+                entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+                entity.Property(p => p.Description).HasMaxLength(1000);
+                entity.Property(p => p.CreatedAt).IsRequired();
+                entity.Property(p => p.UpdatedAt).IsRequired();
+
+                // Create index for efficient querying by name
+                entity.HasIndex(p => p.Name);
+            });
+
+            // Configure Project entity
+            modelBuilder.Entity<Project>(entity =>
             {
                 entity.HasKey(p => p.Id);
                 entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
@@ -276,6 +302,12 @@ namespace Infrastructure.Persistence
                 entity.HasOne(bu => bu.Pack)
                     .WithMany()
                     .HasForeignKey(bu => bu.PackId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                
+                // Configure optional relationship with Project
+                entity.HasOne(bu => bu.Project)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.ProjectId)
                     .OnDelete(DeleteBehavior.SetNull);
                 
                 // Configure optional relationship with Model

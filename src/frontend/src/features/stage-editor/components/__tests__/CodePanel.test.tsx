@@ -35,6 +35,9 @@ jest.mock('primereact/accordion', () => ({
 describe('CodePanel', () => {
   const mockStageConfig: StageConfig = {
     lights: [],
+    meshes: [],
+    groups: [],
+    helpers: [],
   }
 
   beforeEach(() => {
@@ -66,6 +69,9 @@ describe('CodePanel', () => {
           intensity: 0.5,
         },
       ],
+      meshes: [],
+      groups: [],
+      helpers: [],
     }
 
     const { container } = render(
@@ -88,6 +94,9 @@ describe('CodePanel', () => {
           position: [5, 5, 5],
         },
       ],
+      meshes: [],
+      groups: [],
+      helpers: [],
     }
 
     const { container } = render(
@@ -112,6 +121,9 @@ describe('CodePanel', () => {
           decay: 2,
         },
       ],
+      meshes: [],
+      groups: [],
+      helpers: [],
     }
 
     const { container } = render(
@@ -138,6 +150,9 @@ describe('CodePanel', () => {
           decay: 2,
         },
       ],
+      meshes: [],
+      groups: [],
+      helpers: [],
     }
 
     const { container } = render(
@@ -175,6 +190,9 @@ describe('CodePanel', () => {
           decay: 2,
         },
       ],
+      meshes: [],
+      groups: [],
+      helpers: [],
     }
 
     const { container } = render(

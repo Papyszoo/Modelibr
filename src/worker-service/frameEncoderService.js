@@ -155,28 +155,28 @@ export class FrameEncoderService {
 
       // Create animated WebP using instance methods
       const img = new webpmux.Image()
-      
+
       // Initialize the library
       await img.initLib()
-      
+
       // Load the first frame as the base image
       const firstFrameBuffer = await sharp(frames[0].pixels)
         .webp({ quality })
         .toBuffer()
       await img.load(firstFrameBuffer)
-      
+
       // Convert to animation
       img.convertToAnim()
-      
+
       // Set animation properties
       img.anim.bgColor = [255, 255, 255, 255] // White background (RGBA)
       img.anim.loops = 0 // 0 = infinite loop
-      
+
       // Add all frames (the first frame from load is replaced by pushing all frames)
       for (const frame of webpFrames) {
         img.frames.push(frame)
       }
-      
+
       // Save the animated WebP
       await img.save(webpPath)
 

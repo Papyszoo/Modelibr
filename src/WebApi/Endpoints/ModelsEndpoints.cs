@@ -8,9 +8,9 @@ public static class ModelsEndpoints
 {
     public static void MapModelsEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/models", async (int? packId, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
+        app.MapGet("/models", async (int? packId, int? projectId, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
         {
-            var result = await queryHandler.Handle(new GetAllModelsQuery(packId), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId), CancellationToken.None);
             
             if (!result.IsSuccess)
             {

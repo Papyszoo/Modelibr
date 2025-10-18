@@ -9,6 +9,7 @@ A Node.js worker service for background thumbnail generation using Puppeteer and
 - **Three.js Integration**: Loads models from CDN and renders them with proper lighting and materials
 - **Orbit Animation**: Generates rotating orbit frames around the 3D model
 - **Animated WebP Thumbnails**: Creates looping animated WebP thumbnails from orbit frames (~30 frames)
+- **AI-Powered Image Tagging**: Automatic tag and description generation using local BLIP model (runs completely offline)
 - **Event Logging**: Comprehensive event logging to database for full audit trail
 - **Configuration Management**: Comprehensive configuration system with environment variable support
 - **Health Monitoring**: Built-in health check endpoints for monitoring and container orchestration
@@ -50,6 +51,40 @@ The service is configured via environment variables. See `.env.example` for all 
 - `ORBIT_START_ANGLE`: Starting angle in degrees (default: `0`)
 - `ORBIT_END_ANGLE`: Ending angle in degrees (default: `360`)
 - `ORBIT_CAMERA_HEIGHT`: Camera elevation angle in degrees (vertical tilt) (default: `0`)
+
+### Image Classification & Tagging
+
+The worker service can automatically generate tags and descriptions for uploaded 3D models using AI-powered image classification.
+
+- `IMAGE_CLASSIFICATION_ENABLED`: Enable automatic tagging (default: `true`)
+- `CLASSIFICATION_MIN_CONFIDENCE`: Minimum confidence threshold for tags (default: `0.1`)
+- `CLASSIFICATION_MAX_TAGS`: Maximum number of tags to generate (default: `10`)
+- `CLASSIFICATION_TOP_K_PER_IMAGE`: Number of predictions per view (default: `5`)
+
+#### Local AI Model
+
+The service uses a local BLIP (Bootstrapping Language-Image Pre-training) model via Transformers.js for generating descriptive captions of 3D models. This provides much better results than traditional image classifiers:
+
+- **Runs completely offline**: No external API calls, works without internet connection
+- **No 1000-class limitation**: BLIP generates natural language descriptions instead of selecting from a fixed set of labels
+- **Better accuracy**: BLIP is trained on diverse image-text pairs and understands visual concepts better
+- **Cross-platform**: Uses ONNX Runtime, works reliably on all platforms including macOS
+- **No heavy dependencies**: No TensorFlow.js, uses lightweight Transformers.js with ONNX Runtime
+
+**How it works:**
+
+1. During `npm install`, the model (~200MB) is automatically pre-downloaded to `.model-cache/`
+2. The application starts instantly with no download delays - model is ready immediately
+3. When a model is uploaded, the worker renders 4 different views
+4. Each view is processed locally by BLIP to generate captions (completely offline)
+5. Tags are extracted from the captions and aggregated
+6. The final tags and description are saved to the model metadata
+
+**Example output:**
+```
+Tags: model, object, 3d, render, design
+Description: a 3d model of an object (100.0%, 4x), render (100.0%, 3x), design (100.0%, 2x)
+```
 
 ### Logging
 
