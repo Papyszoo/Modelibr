@@ -241,7 +241,7 @@
             const centerY = (scaledBox.max.y + scaledBox.min.y) / 2;
             
             // Adjust model position within container so rotation happens around center
-            model.position.y = model.position.y - centerY;
+            model.position.y -= centerY;
             
             // Position container at center height
             container.position.y = centerY;
