@@ -171,6 +171,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("DefaultTextureSetId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
@@ -185,6 +188,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DefaultTextureSetId");
 
                     b.ToTable("Models");
                 });
@@ -549,6 +554,14 @@ namespace Infrastructure.Migrations
                     b.Navigation("Pack");
 
                     b.Navigation("TextureSet");
+                });
+
+            modelBuilder.Entity("Domain.Models.Model", b =>
+                {
+                    b.HasOne("Domain.Models.TextureSet", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultTextureSetId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>

@@ -31,6 +31,7 @@ namespace Application.Models
                 UpdatedAt = model.UpdatedAt,
                 Tags = model.Tags,
                 Description = model.Description,
+                DefaultTextureSetId = model.DefaultTextureSetId,
                 Files = model.Files.Select(f => new FileDto
                 {
                     Id = f.Id,

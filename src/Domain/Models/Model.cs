@@ -14,6 +14,7 @@ namespace Domain.Models
         public DateTime UpdatedAt { get; private set; }
         public string? Tags { get; private set; }
         public string? Description { get; private set; }
+        public int? DefaultTextureSetId { get; private set; }
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
         public ICollection<File> Files 
@@ -166,6 +167,23 @@ namespace Domain.Models
         public IReadOnlyList<TextureSet> GetTextureSets()
         {
             return _textureSets.AsReadOnly();
+        }
+
+        /// <summary>
+        /// Sets the default texture set for this model.
+        /// </summary>
+        /// <param name="textureSetId">The ID of the texture set to set as default, or null to clear</param>
+        /// <param name="updatedAt">When the default was set</param>
+        /// <exception cref="InvalidOperationException">Thrown when the texture set is not associated with this model</exception>
+        public void SetDefaultTextureSet(int? textureSetId, DateTime updatedAt)
+        {
+            if (textureSetId.HasValue && !_textureSets.Any(ts => ts.Id == textureSetId.Value))
+            {
+                throw new InvalidOperationException($"Texture set {textureSetId.Value} is not associated with this model.");
+            }
+
+            DefaultTextureSetId = textureSetId;
+            UpdatedAt = updatedAt;
         }
 
         /// <summary>

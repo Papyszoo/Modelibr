@@ -700,6 +700,25 @@ class ApiClient {
     return response.data
   }
 
+  async setDefaultTextureSet(
+    modelId: number,
+    textureSetId: number | null
+  ): Promise<{ modelId: number; defaultTextureSetId: number | null }> {
+    const response = await this.client.put(
+      `/models/${modelId}/defaultTextureSet`,
+      null,
+      {
+        params: { textureSetId },
+      }
+    )
+
+    // Invalidate model cache when default texture set changes
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+
+    return response.data
+  }
+
   // Cache management methods
   refreshCache(type?: 'models' | 'textureSets' | 'packs'): void {
     const store = useApiCacheStore.getState()
