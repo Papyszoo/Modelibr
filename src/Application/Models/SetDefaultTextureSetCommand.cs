@@ -60,11 +60,19 @@ namespace Application.Models
                         await _thumbnailRepository.UpdateAsync(model.Thumbnail, cancellationToken);
                     }
 
-                    // Enqueue new thumbnail generation job
-                    await _thumbnailQueue.EnqueueAsync(
-                        command.ModelId,
-                        primaryFile.Sha256Hash,
-                        cancellationToken: cancellationToken);
+                    // Reset any existing job for this model and create new one
+                    var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
+                    if (existingJob != null)
+                    {
+                        await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
+                    }
+                    else
+                    {
+                        await _thumbnailQueue.EnqueueAsync(
+                            command.ModelId,
+                            primaryFile.Sha256Hash,
+                            cancellationToken: cancellationToken);
+                    }
                 }
 
                 return Result.Success(new SetDefaultTextureSetResponse(model.Id, model.DefaultTextureSetId));
