@@ -10,15 +10,18 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public AddTextureToPackCommandHandler(
         ITextureSetRepository textureSetRepository,
         IFileRepository fileRepository,
+        IBatchUploadRepository batchUploadRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _textureSetRepository = textureSetRepository;
         _fileRepository = fileRepository;
+        _batchUploadRepository = batchUploadRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -52,11 +55,22 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
             // Create the texture using domain factory method
             var texture = Domain.Models.Texture.Create(file, command.TextureType, _dateTimeProvider.UtcNow);
 
+            // Remove existing texture of the same type if it exists (for replacement)
+            textureSet.RemoveTextureOfType(command.TextureType, _dateTimeProvider.UtcNow);
+
             // Add texture to the set (domain will enforce business rules)
             textureSet.AddTexture(texture, _dateTimeProvider.UtcNow);
 
             // Update the texture set
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+
+            // Update batch upload record to associate with texture set
+            var batchUpload = await _batchUploadRepository.GetByFileIdAsync(command.FileId, cancellationToken);
+            if (batchUpload != null)
+            {
+                batchUpload.TextureSetId = command.TextureSetId;
+                await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
+            }
 
             return Result.Success(new AddTextureToPackResponse(texture.Id, texture.TextureType));
         }

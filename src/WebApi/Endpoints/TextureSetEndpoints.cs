@@ -30,6 +30,12 @@ public static class TextureSetEndpoints
             .WithSummary("Creates a new texture set")
             .WithOpenApi();
 
+        app.MapPost("/texture-sets/with-file", CreateTextureSetWithFile)
+            .WithName("Create Texture Set With File")
+            .WithSummary("Creates a new texture set and uploads a texture file in one operation")
+            .DisableAntiforgery()
+            .WithOpenApi();
+
         app.MapPut("/texture-sets/{id}", UpdateTextureSet)
             .WithName("Update Texture Set")
             .WithSummary("Updates an existing texture set")
@@ -49,6 +55,11 @@ public static class TextureSetEndpoints
         app.MapDelete("/texture-sets/{packId}/textures/{textureId}", RemoveTextureFromPack)
             .WithName("Remove Texture from Pack")
             .WithSummary("Removes a texture from the specified texture set")
+            .WithOpenApi();
+
+        app.MapPut("/texture-sets/{setId}/textures/{textureId}/type", ChangeTextureType)
+            .WithName("Change Texture Type")
+            .WithSummary("Changes the texture type of an existing texture in a set")
             .WithOpenApi();
 
         // Model association
@@ -128,6 +139,39 @@ public static class TextureSetEndpoints
         return Results.Created($"/texture-sets/{result.Value.Id}", result.Value);
     }
 
+    private static async Task<IResult> CreateTextureSetWithFile(
+        IFormFile file,
+        string? name,
+        TextureType? textureType,
+        string? batchId,
+        ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return Results.BadRequest(new { error = "InvalidInput", message = "File is required." });
+        }
+
+        // Use file name without extension as default texture set name
+        var textureSetName = name ?? Path.GetFileNameWithoutExtension(file.FileName);   
+        var texType = textureType ?? TextureType.Albedo;
+
+        var result = await commandHandler.Handle(
+            new CreateTextureSetWithFileCommand(
+                new WebApi.Files.FormFileUpload(file),
+                textureSetName,
+                texType,
+                batchId),
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Created($"/texture-sets/{result.Value.TextureSetId}", result.Value);
+    }
+
     private static async Task<IResult> UpdateTextureSet(
         int id,
         [FromBody] UpdateTextureSetRequest request,
@@ -200,6 +244,25 @@ public static class TextureSetEndpoints
         return Results.NoContent();
     }
 
+    private static async Task<IResult> ChangeTextureType(
+        int setId,
+        int textureId,
+        [FromBody] ChangeTextureTypeRequest request,
+        ICommandHandler<ChangeTextureTypeCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new ChangeTextureTypeCommand(setId, textureId, request.TextureType),
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
+
     private static async Task<IResult> AssociateTextureSetWithModel(
         int packId,
         int modelId,
@@ -241,3 +304,4 @@ public static class TextureSetEndpoints
 public record CreateTextureSetRequest(string Name);
 public record UpdateTextureSetRequest(string Name);
 public record AddTextureToPackRequest(int FileId, TextureType TextureType);
+public record ChangeTextureTypeRequest(TextureType TextureType);

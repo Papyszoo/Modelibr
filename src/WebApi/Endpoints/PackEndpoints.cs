@@ -51,6 +51,12 @@ public static class PackEndpoints
             .WithSummary("Adds a texture set to the specified pack")
             .WithOpenApi();
 
+        app.MapPost("/packs/{packId}/textures/with-file", AddTextureToPackWithFile)
+            .WithName("Add Texture to Pack with File")
+            .WithSummary("Uploads a file, creates a texture set, and adds it to the pack in one operation")
+            .DisableAntiforgery()
+            .WithOpenApi();
+
         app.MapDelete("/packs/{packId}/texture-sets/{textureSetId}", RemoveTextureSetFromPack)
             .WithName("Remove Texture Set from Pack")
             .WithSummary("Removes a texture set from the specified pack")
@@ -175,6 +181,32 @@ public static class PackEndpoints
 
         return result.IsSuccess
             ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddTextureToPackWithFile(
+        int packId,
+        [FromForm] IFormFile file,
+        [FromForm] string name,
+        [FromForm] int textureType,
+        [FromQuery] string? batchId,
+        [FromQuery] string? uploadType,
+        ICommandHandler<AddTextureToPackWithFileCommand, int> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new AddTextureToPackWithFileCommand(
+            packId,
+            new Files.FormFileUpload(file),
+            name,
+            (Domain.ValueObjects.TextureType)textureType,
+            batchId,
+            uploadType
+        );
+
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.Ok(new { textureSetId = result.Value })
             : Results.BadRequest(result.Error);
     }
 }

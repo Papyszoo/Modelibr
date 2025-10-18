@@ -104,11 +104,8 @@ function TextureSetList() {
   const handleFileDrop = async (files: File[] | FileList) => {
     const fileArray = Array.from(files)
 
-    // Create batch for multiple files
-    const batchId =
-      uploadProgressContext && fileArray.length > 1
-        ? uploadProgressContext.createBatch()
-        : undefined
+    // Create batch for all files (even single file uploads)
+    const batchId = uploadProgressContext?.createBatch() || undefined
 
     for (const file of fileArray) {
       let uploadId: string | null = null
@@ -117,34 +114,25 @@ function TextureSetList() {
         uploadId =
           uploadProgressContext?.addUpload(file, 'texture', batchId) || null
 
-        // 2. Upload the file with progress tracking
+        // 2. Update progress
         if (uploadId && uploadProgressContext) {
           uploadProgressContext.updateUploadProgress(uploadId, 50)
         }
 
-        const uploadResult = await ApiClient.uploadFile(file)
-
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 75)
-        }
-
-        // 3. Create a new texture set with the file name (without extension)
+        // 3. Use the new consolidated endpoint that handles file upload + texture set creation + texture addition
         const fileName = file.name.replace(/\.[^/.]+$/, '')
-        const createResult = await textureSetsApi.createTextureSet({
+        const result = await ApiClient.createTextureSetWithFile(file, {
           name: fileName,
+          textureType: 'Albedo',
+          batchId: batchId,
         })
 
-        // 4. Add the uploaded file as an albedo texture to the new set
-        await ApiClient.addTextureToSetEndpoint(createResult.id, {
-          fileId: uploadResult.fileId,
-          textureType: TextureType.Albedo,
-        })
-
-        // 5. Complete the upload with texture set ID
+        // 4. Complete the upload with texture set ID
         if (uploadId && uploadProgressContext) {
+          uploadProgressContext.updateUploadProgress(uploadId, 100)
           uploadProgressContext.completeUpload(uploadId, {
-            ...uploadResult,
-            textureSetId: createResult.id,
+            fileId: result.fileId,
+            textureSetId: result.textureSetId,
           })
         }
 
@@ -196,6 +184,7 @@ function TextureSetList() {
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
+        onTextureSetUpdated={loadTextureSets}
       />
 
       {showCreateDialog && (
