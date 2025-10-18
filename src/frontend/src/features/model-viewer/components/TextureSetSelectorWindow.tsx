@@ -94,10 +94,23 @@ function TextureSetSelectorWindow({
         textureSetId,
         parseInt(model.id)
       )
+      
+      // If this was the default texture set, clear or update the default
+      if (model.defaultTextureSetId === textureSetId) {
+        // Find another linked texture set to set as default, or clear if none
+        const remainingTextureSets = textureSets.filter(
+          ts => ts.id !== textureSetId
+        )
+        const newDefaultId =
+          remainingTextureSets.length > 0 ? remainingTextureSets[0].id : null
+        await ApiClient.setDefaultTextureSet(parseInt(model.id), newDefaultId)
+      }
+      
       // If this was the selected texture set, clear selection
       if (selectedTextureSetId === textureSetId) {
         onTextureSetSelect(null)
       }
+      
       // Refresh model data and reload texture sets
       onModelUpdated()
       loadTextureSets()
