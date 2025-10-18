@@ -1,5 +1,6 @@
+/* eslint-disable no-undef */
+// Note: 'window' is used within page.evaluate() calls which run in browser context
 import { config } from './config.js'
-import logger from './logger.js'
 
 /**
  * Service to render multiple views of a 3D model for image classification
