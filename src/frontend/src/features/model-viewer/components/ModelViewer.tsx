@@ -10,7 +10,7 @@ import UVMapWindow from './UVMapWindow'
 import TextureSetSelectorWindow from './TextureSetSelectorWindow'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
-import { getModelFileFormat, Model } from '../../../utils/fileUtils'
+import { getModelFileFormat, getFileExtension, Model } from '../../../utils/fileUtils'
 import { TextureSetDto } from '../../../types'
 // eslint-disable-next-line no-restricted-imports -- ModelViewer needs direct API access for fetching model data
 import ApiClient from '../../../services/ApiClient'
@@ -163,9 +163,17 @@ function ModelViewer({
       <header className="viewer-header-tab">
         <h1>Model #{model.id}</h1>
         <div className="model-info-summary">
-          <span className="model-format">{getModelFileFormat(model)}</span>
+          {model.files && model.files.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {model.files.map((file, index) => (
+                <span key={index} className="model-format">
+                  {getFileExtension(file.originalFileName).toUpperCase()}
+                </span>
+              ))}
+            </div>
+          )}
           <span className="model-name">
-            {model.files?.[0]?.originalFileName || `Model ${model.id}`}
+            {model.name || `Model ${model.id}`}
           </span>
         </div>
       </header>
