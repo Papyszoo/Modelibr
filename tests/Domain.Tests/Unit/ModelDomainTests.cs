@@ -291,4 +291,95 @@ public class ModelDomainTests
     }
 
     #endregion
+
+    #region Geometry Metadata Tests
+
+    [Fact]
+    public void SetGeometryMetadata_WithValidData_SetsMetadataAndPolyCount()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        var vertices = 5000;
+        var faces = 3000;
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act
+        model.SetGeometryMetadata(vertices, faces, updatedAt);
+
+        // Assert
+        Assert.Equal(vertices, model.Vertices);
+        Assert.Equal(faces, model.Faces);
+        Assert.Equal(PolyCount.LowPoly, model.PolyCount);
+        Assert.Equal(updatedAt, model.UpdatedAt);
+    }
+
+    [Fact]
+    public void SetGeometryMetadata_WithHighPolyCount_SetsDetailedCategory()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        var vertices = 50000;
+        var faces = 30000;
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act
+        model.SetGeometryMetadata(vertices, faces, updatedAt);
+
+        // Assert
+        Assert.Equal(vertices, model.Vertices);
+        Assert.Equal(faces, model.Faces);
+        Assert.Equal(PolyCount.Detailed, model.PolyCount);
+    }
+
+    [Fact]
+    public void SetGeometryMetadata_WithNullFaces_SetsUnknownCategory()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        var vertices = 5000;
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act
+        model.SetGeometryMetadata(vertices, null, updatedAt);
+
+        // Assert
+        Assert.Equal(vertices, model.Vertices);
+        Assert.Null(model.Faces);
+        Assert.Equal(PolyCount.Unknown, model.PolyCount);
+    }
+
+    [Theory]
+    [InlineData(1000, PolyCount.LowPoly)]
+    [InlineData(5000, PolyCount.LowPoly)]
+    [InlineData(10000, PolyCount.LowPoly)]
+    [InlineData(10001, PolyCount.Detailed)]
+    [InlineData(50000, PolyCount.Detailed)]
+    [InlineData(100000, PolyCount.Detailed)]
+    public void SetGeometryMetadata_WithVariousFaceCounts_CalculatesCorrectPolyCount(int faces, PolyCount expectedPolyCount)
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        var vertices = faces * 2;
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act
+        model.SetGeometryMetadata(vertices, faces, updatedAt);
+
+        // Assert
+        Assert.Equal(expectedPolyCount, model.PolyCount);
+    }
+
+    [Fact]
+    public void Create_InitializesPolyCountToUnknown()
+    {
+        // Arrange & Act
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+
+        // Assert
+        Assert.Equal(PolyCount.Unknown, model.PolyCount);
+        Assert.Null(model.Vertices);
+        Assert.Null(model.Faces);
+    }
+
+    #endregion
 }
