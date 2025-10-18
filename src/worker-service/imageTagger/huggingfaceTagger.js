@@ -1,4 +1,4 @@
-import { pipeline, env } from '@xenova/transformers'
+import { pipeline, env, RawImage } from '@xenova/transformers'
 import logger from '../logger.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -76,8 +76,12 @@ export class HuggingFaceTagger {
     try {
       const startTime = Date.now()
 
+      // Convert Buffer to RawImage for Transformers.js
+      // The pipeline expects RawImage, not a raw Buffer
+      const image = await RawImage.fromBuffer(imageBuffer)
+
       // Run image captioning locally (offline)
-      const result = await this.captioner(imageBuffer)
+      const result = await this.captioner(image)
 
       const inferenceTime = Date.now() - startTime
 
