@@ -14,6 +14,8 @@ interface BatchUploadHistory {
   fileName: string
   packId: number | null
   packName: string | null
+  projectId: number | null
+  projectName: string | null
   modelId: number | null
   modelName: string | null
   textureSetId: number | null
@@ -69,6 +71,7 @@ const getFileTypeIcon = (fileType: string): string => {
     texture: 'pi-image',
     textureSet: 'pi-image',
     pack: 'pi-inbox',
+    project: 'pi-briefcase',
     file: 'pi-file',
   }
   return typeIconMap[fileType] || 'pi-file'
@@ -78,7 +81,7 @@ export default function History() {
   const [history, setHistory] = useState<BatchUploadHistory[]>([])
   const [loading, setLoading] = useState(true)
   const [batchGroups, setBatchGroups] = useState<BatchGroup[]>([])
-  const { openModelDetailsTab, openTextureSetDetailsTab, openPackDetailsTab } =
+  const { openModelDetailsTab, openTextureSetDetailsTab, openPackDetailsTab, openProjectDetailsTab } =
     useTabContext()
 
   useEffect(() => {
@@ -138,9 +141,12 @@ export default function History() {
   }
 
   const getUploadedToText = (upload: BatchUploadHistory): string => {
-    // Priority: Pack > Model > TextureSet > Default
+    // Priority: Pack > Project > Model > TextureSet > Default
     if (upload.packId && upload.packName) {
       return `Pack: ${upload.packName}`
+    }
+    if (upload.projectId && upload.projectName) {
+      return `Project: ${upload.projectName}`
     }
     if (upload.modelId) {
       return 'Models List'
@@ -234,6 +240,16 @@ export default function History() {
               rounded
               title="Open Pack"
               onClick={() => openPackDetailsTab(upload.packId!.toString())}
+            />
+          )}
+          {upload.projectId && (
+            <Button
+              icon="pi pi-briefcase"
+              size="small"
+              text
+              rounded
+              title="Open Project"
+              onClick={() => openProjectDetailsTab(upload.projectId!.toString())}
             />
           )}
         </div>

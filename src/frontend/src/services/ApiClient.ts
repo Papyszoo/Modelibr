@@ -806,6 +806,8 @@ class ApiClient {
       fileName: string
       packId: number | null
       packName: string | null
+      projectId: number | null
+      projectName: string | null
       modelId: number | null
       modelName: string | null
       textureSetId: number | null
