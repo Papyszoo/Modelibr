@@ -143,10 +143,12 @@ function MergeTextureSetDialog({
             <div className="merge-error">
               <p>Error: Unable to load texture set information.</p>
               <p>
-                Source: {sourceTextureSet ? sourceTextureSet.name : 'Not loaded'}
+                Source:{' '}
+                {sourceTextureSet ? sourceTextureSet.name : 'Not loaded'}
               </p>
               <p>
-                Target: {targetTextureSet ? targetTextureSet.name : 'Not loaded'}
+                Target:{' '}
+                {targetTextureSet ? targetTextureSet.name : 'Not loaded'}
               </p>
             </div>
           ) : (

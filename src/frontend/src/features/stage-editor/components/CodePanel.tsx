@@ -12,13 +12,9 @@ function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
   const [copied, setCopied] = useState(false)
 
   const generateCode = (): string => {
-    const imports = `import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
-
-function Scene() {
+    const header = `function Scene() {
   return (
-    <Canvas shadows camera={{ position: [10, 10, 10], fov: 50 }}>
-      {/* Lights */}`
+    <group>`
 
     const lights = stageConfig.lights
       .map(light => {
@@ -63,22 +59,13 @@ function Scene() {
       .join('\n')
 
     const footer = `
-      
-      {/* Your 3D objects here */}
-      <mesh position={[0, 1, 0]}>
-        <sphereGeometry args={[1, 32, 32]} />
-        <meshStandardMaterial color="#4a9eff" />
-      </mesh>
-
-      {/* Controls */}
-      <OrbitControls />
-    </Canvas>
+    </group>
   )
 }
 
 export default Scene`
 
-    return `${imports}
+    return `${header}
 ${lights}${footer}`
   }
 

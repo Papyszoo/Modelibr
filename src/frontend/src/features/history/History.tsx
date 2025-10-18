@@ -88,7 +88,7 @@ export default function History() {
   useEffect(() => {
     // Group uploads by batchId
     const grouped = new Map<string, BatchUploadHistory[]>()
-    
+
     history.forEach(upload => {
       if (!grouped.has(upload.batchId)) {
         grouped.set(upload.batchId, [])
