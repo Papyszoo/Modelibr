@@ -20,18 +20,6 @@ jest.mock('primereact/button', () => ({
   ),
 }))
 
-jest.mock('primereact/accordion', () => ({
-  Accordion: ({ children }: any) => (
-    <div data-testid="accordion">{children}</div>
-  ),
-  AccordionTab: ({ children, header }: any) => (
-    <div data-testid="accordion-tab">
-      <div data-testid="accordion-header">{header}</div>
-      <div data-testid="accordion-content">{children}</div>
-    </div>
-  ),
-}))
-
 describe('CodePanel', () => {
   const mockStageConfig: StageConfig = {
     lights: [],
@@ -45,8 +33,8 @@ describe('CodePanel', () => {
   })
 
   it('should render without crashing', () => {
-    render(<CodePanel stageConfig={mockStageConfig} />)
-    expect(screen.getByTestId('accordion')).toBeInTheDocument()
+    const { container } = render(<CodePanel stageConfig={mockStageConfig} />)
+    expect(container.querySelector('.code-panel')).toBeInTheDocument()
   })
 
   it('should generate code with empty lights array', () => {

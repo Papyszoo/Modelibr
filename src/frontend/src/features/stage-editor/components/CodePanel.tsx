@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Button } from 'primereact/button'
-import { Accordion, AccordionTab } from 'primereact/accordion'
 import { StageConfig } from './SceneEditor'
 import './CodePanel.css'
 
@@ -91,31 +90,18 @@ ${lights}${footer}`
 
   return (
     <div className="code-panel">
-      <Accordion>
-        <AccordionTab
-          header={
-            <div className="code-panel-header">
-              <span>
-                <i className="pi pi-code" /> Generated Code
-              </span>
-              <Button
-                icon={copied ? 'pi pi-check' : 'pi pi-copy'}
-                label={copied ? 'Copied!' : 'Copy'}
-                className="p-button-sm p-button-text"
-                onClick={e => {
-                  e.stopPropagation()
-                  handleCopyCode()
-                }}
-                severity={copied ? 'success' : undefined}
-              />
-            </div>
-          }
-        >
-          <pre className="code-content">
-            <code>{code}</code>
-          </pre>
-        </AccordionTab>
-      </Accordion>
+      <div className="code-panel-header">
+        <Button
+          icon={copied ? 'pi pi-check' : 'pi pi-copy'}
+          label={copied ? 'Copied!' : 'Copy'}
+          className="p-button-sm"
+          onClick={handleCopyCode}
+          severity={copied ? 'success' : undefined}
+        />
+      </div>
+      <pre className="code-content">
+        <code>{code}</code>
+      </pre>
     </div>
   )
 }
