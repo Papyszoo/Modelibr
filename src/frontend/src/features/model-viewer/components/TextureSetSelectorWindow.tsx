@@ -109,9 +109,8 @@ function TextureSetSelectorWindow({
         onTextureSetSelect(null)
       }
 
-      // Refresh model data and reload texture sets
+      // Refresh model data, which will trigger the useEffect to reload texture sets
       onModelUpdated()
-      loadTextureSets()
     } catch (error) {
       console.error('Failed to unlink texture set:', error)
     } finally {
