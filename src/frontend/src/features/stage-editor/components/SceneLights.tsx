@@ -1,7 +1,7 @@
-import { SceneLight } from './SceneEditor'
+import { StageLight } from './SceneEditor'
 
 interface SceneLightsProps {
-  lights: SceneLight[]
+  lights: StageLight[]
   selectedId: string | null
   onSelectLight: (id: string) => void
 }
@@ -112,6 +112,16 @@ function SceneLights({
                   </mesh>
                 )}
               </group>
+            )
+
+          case 'hemisphere':
+            return (
+              <hemisphereLight
+                key={light.id}
+                color={light.color}
+                groundColor={light.groundColor || '#080820'}
+                intensity={light.intensity}
+              />
             )
 
           default:
