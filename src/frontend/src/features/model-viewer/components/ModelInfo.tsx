@@ -96,6 +96,22 @@ function ModelInfo({ model, onModelUpdated }) {
             <label>Format:</label>
             <span>{getModelFileFormat(model)}</span>
           </div>
+          <div className="info-item">
+            <label>Vertices:</label>
+            <span>{model.vertices?.toLocaleString() || 'N/A'}</span>
+          </div>
+          <div className="info-item">
+            <label>Faces:</label>
+            <span>{model.faces?.toLocaleString() || 'N/A'}</span>
+          </div>
+          <div className="info-item">
+            <label>Poly Count:</label>
+            <span>
+              {model.polyCount === 'LowPoly' && 'Low Poly'}
+              {model.polyCount === 'Detailed' && 'Detailed'}
+              {model.polyCount === 'Unknown' && 'Unknown'}
+            </span>
+          </div>
         </div>
       </div>
 
