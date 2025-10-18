@@ -19,6 +19,15 @@ Modelibr is a .NET 9.0 C# Web API application built using Clean Architecture pri
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
+## Code Style Guidelines
+
+### Keep Code Simple
+- Code should be as simple as possible without unnecessary clutter
+- Only implement what is specifically requested in the issue or PR comments
+- Avoid excessive comments, documentation, or examples unless explicitly requested
+- Do not add JSDoc comments or extensive inline documentation
+- Focus on clean, readable code that speaks for itself
+
 ## Working Effectively
 
 ### Prerequisites and Setup
