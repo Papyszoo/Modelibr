@@ -45,6 +45,15 @@ public class ThumbnailJobRepository : IThumbnailJobRepository
             .FirstOrDefaultAsync(tj => tj.ModelHash == modelHash, cancellationToken);
     }
 
+    public async Task<IEnumerable<ThumbnailJob>> GetActiveJobsByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ThumbnailJobs
+            .Include(tj => tj.Model)
+            .Where(tj => tj.ModelId == modelId && 
+                        (tj.Status == ThumbnailJobStatus.Pending || tj.Status == ThumbnailJobStatus.Processing))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default)
     {
         // Use a database transaction to ensure atomicity when claiming jobs
