@@ -15,6 +15,10 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-inbox'
     case 'packViewer':
       return 'pi pi-folder-open'
+    case 'projects':
+      return 'pi pi-briefcase'
+    case 'projectViewer':
+      return 'pi pi-briefcase'
     case 'animation':
       return 'pi pi-play'
     case 'settings':
@@ -46,6 +50,10 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Packs'
     case 'packViewer':
       return `Pack: ${tab.packId || 'Unknown'}`
+    case 'projects':
+      return 'Projects'
+    case 'projectViewer':
+      return `Project: ${tab.projectId || 'Unknown'}`
     case 'animation':
       return 'Animations List'
     case 'settings':

@@ -106,6 +106,31 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openProjectDetailsTab = (projectId: string): void => {
+    // Check if tab already exists
+    const existingTab = tabs.find(
+      tab => tab.type === 'projectViewer' && tab.projectId === projectId
+    )
+
+    if (existingTab) {
+      // Switch to existing tab
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    // Create new tab
+    const newTab: Tab = {
+      id: `project-${projectId}`,
+      type: 'projectViewer',
+      label: `Project ${projectId}`,
+      projectId: projectId,
+    }
+
+    const newTabs = [...tabs, newTab]
+    setTabs(newTabs)
+    setActiveTab(newTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -173,6 +198,7 @@ export const TabProvider = ({
     openModelDetailsTab,
     openTextureSetDetailsTab,
     openPackDetailsTab,
+    openProjectDetailsTab,
     openTab,
   }
 
