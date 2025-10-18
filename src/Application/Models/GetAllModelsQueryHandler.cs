@@ -43,6 +43,14 @@ namespace Application.Models
                 Vertices = m.Vertices,
                 Faces = m.Faces,
                 PolyCount = m.PolyCount,
+                Thumbnail = m.Thumbnail != null ? new ThumbnailDto
+                {
+                    Id = m.Thumbnail.Id,
+                    Status = m.Thumbnail.Status.ToString(),
+                    ThumbnailPath = m.Thumbnail.ThumbnailPath,
+                    Width = m.Thumbnail.Width,
+                    Height = m.Thumbnail.Height
+                } : null,
                 Files = m.Files.Select(f => new FileDto
                 {
                     Id = f.Id,
@@ -84,9 +92,19 @@ namespace Application.Models
         public int? Vertices { get; init; }
         public int? Faces { get; init; }
         public PolyCount PolyCount { get; init; }
+        public ThumbnailDto? Thumbnail { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
         public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();
+    }
+
+    public record ThumbnailDto
+    {
+        public int Id { get; init; }
+        public string Status { get; init; } = string.Empty;
+        public string? ThumbnailPath { get; init; }
+        public int? Width { get; init; }
+        public int? Height { get; init; }
     }
 
     public record FileDto

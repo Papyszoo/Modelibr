@@ -36,6 +36,14 @@ namespace Application.Models
                 Vertices = model.Vertices,
                 Faces = model.Faces,
                 PolyCount = model.PolyCount,
+                Thumbnail = model.Thumbnail != null ? new ThumbnailDto
+                {
+                    Id = model.Thumbnail.Id,
+                    Status = model.Thumbnail.Status.ToString(),
+                    ThumbnailPath = model.Thumbnail.ThumbnailPath,
+                    Width = model.Thumbnail.Width,
+                    Height = model.Thumbnail.Height
+                } : null,
                 Files = model.Files.Select(f => new FileDto
                 {
                     Id = f.Id,

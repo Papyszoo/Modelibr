@@ -112,6 +112,21 @@ function ModelInfo({ model, onModelUpdated }) {
               {model.polyCount === 'Unknown' && 'Unknown'}
             </span>
           </div>
+          <div className="info-item">
+            <label>Thumbnail:</label>
+            <span>
+              {model.thumbnail ? (
+                <>
+                  {model.thumbnail.status}
+                  {model.thumbnail.width && model.thumbnail.height && 
+                    ` (${model.thumbnail.width}×${model.thumbnail.height})`
+                  }
+                </>
+              ) : (
+                'Not Available'
+              )}
+            </span>
+          </div>
         </div>
       </div>
 
