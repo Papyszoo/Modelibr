@@ -4,7 +4,7 @@ import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import EditorCanvas from './EditorCanvas'
-import LightLibrary from './LightLibrary'
+import ComponentLibrary, { ComponentType } from './ComponentLibrary'
 import PropertyPanel from './PropertyPanel'
 import CodePanel from './CodePanel'
 // eslint-disable-next-line no-restricted-imports -- Stage editor needs API access for saving/loading stages
@@ -13,7 +13,7 @@ import './SceneEditor.css'
 
 export interface StageLight {
   id: string
-  type: 'ambient' | 'directional' | 'point' | 'spot'
+  type: 'ambient' | 'directional' | 'point' | 'spot' | 'hemisphere'
   color: string
   intensity: number
   position?: [number, number, number]
@@ -22,10 +22,63 @@ export interface StageLight {
   penumbra?: number
   distance?: number
   decay?: number
+  groundColor?: string
 }
+
+export interface StageMesh {
+  id: string
+  type:
+    | 'box'
+    | 'sphere'
+    | 'plane'
+    | 'cylinder'
+    | 'cone'
+    | 'torus'
+    | 'torusKnot'
+    | 'dodecahedron'
+    | 'icosahedron'
+    | 'octahedron'
+    | 'tetrahedron'
+  position: [number, number, number]
+  rotation: [number, number, number]
+  scale: [number, number, number]
+  color: string
+  wireframe?: boolean
+}
+
+export interface StageGroup {
+  id: string
+  type: 'group'
+  name: string
+  position: [number, number, number]
+  rotation: [number, number, number]
+  scale: [number, number, number]
+  children: string[]
+}
+
+export interface StageHelper {
+  id: string
+  type:
+    | 'stage'
+    | 'environment'
+    | 'contactShadows'
+    | 'accumulativeShadows'
+    | 'sky'
+    | 'stars'
+    | 'backdrop'
+    | 'grid'
+    | 'gizmoHelper'
+  enabled: boolean
+  properties?: Record<string, unknown>
+}
+
+export type StageObject = StageLight | StageMesh | StageGroup | StageHelper
 
 export interface StageConfig {
   lights: StageLight[]
+  meshes: StageMesh[]
+  groups: StageGroup[]
+  helpers: StageHelper[]
 }
 
 interface StageEditorProps {
@@ -35,6 +88,9 @@ interface StageEditorProps {
 function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   const [stageConfig, setStageConfig] = useState<StageConfig>({
     lights: [],
+    meshes: [],
+    groups: [],
+    helpers: [],
   })
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
   const [currentStageId, setCurrentStageId] = useState<number | null>(
@@ -77,11 +133,14 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         // Ensure config has valid structure
         setStageConfig({
           lights: Array.isArray(config.lights) ? config.lights : [],
+          meshes: Array.isArray(config.meshes) ? config.meshes : [],
+          groups: Array.isArray(config.groups) ? config.groups : [],
+          helpers: Array.isArray(config.helpers) ? config.helpers : [],
         })
       } catch (parseError) {
         console.error('Failed to parse stage configuration:', parseError)
         // Set default empty configuration
-        setStageConfig({ lights: [] })
+        setStageConfig({ lights: [], meshes: [], groups: [], helpers: [] })
         toast.current?.show({
           severity: 'warn',
           summary: 'Warning',
@@ -170,6 +229,9 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         // Ensure config has valid structure
         config = {
           lights: Array.isArray(parsed.lights) ? parsed.lights : [],
+          meshes: Array.isArray(parsed.meshes) ? parsed.meshes : [],
+          groups: Array.isArray(parsed.groups) ? parsed.groups : [],
+          helpers: Array.isArray(parsed.helpers) ? parsed.helpers : [],
         }
       } catch (parseError) {
         console.error('Failed to parse stage configuration:', parseError)
@@ -205,7 +267,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   }
 
   const handleNewStage = () => {
-    setStageConfig({ lights: [] })
+    setStageConfig({ lights: [], meshes: [], groups: [], helpers: [] })
     setSelectedObjectId(null)
     setCurrentStageId(null)
     setStageName('Untitled Stage')
@@ -217,52 +279,136 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     })
   }
 
-  const handleAddLight = (type: StageLight['type']) => {
-    const newLight: StageLight = {
-      id: `light-${Date.now()}`,
-      type,
-      color: '#ffffff',
-      intensity: type === 'ambient' ? 0.5 : 1.0,
-      ...(type !== 'ambient' && { position: [5, 5, 5] }),
-      ...(type === 'directional' && { target: [0, 0, 0] }),
-      ...(type === 'spot' && {
-        angle: Math.PI / 6,
-        penumbra: 0.1,
-        distance: 0,
-        decay: 2,
-      }),
-      ...(type === 'point' && { distance: 0, decay: 2 }),
+  const handleAddComponent = (category: ComponentType, type: string) => {
+    const timestamp = Date.now()
+    const id = `${category}-${timestamp}`
+
+    if (category === 'light') {
+      const newLight: StageLight = {
+        id,
+        type: type as StageLight['type'],
+        color: '#ffffff',
+        intensity: type === 'ambient' ? 0.5 : 1.0,
+        ...(type !== 'ambient' && { position: [5, 5, 5] }),
+        ...(type === 'directional' && { target: [0, 0, 0] }),
+        ...(type === 'spot' && {
+          angle: Math.PI / 6,
+          penumbra: 0.1,
+          distance: 0,
+          decay: 2,
+        }),
+        ...(type === 'point' && { distance: 0, decay: 2 }),
+        ...(type === 'hemisphere' && { groundColor: '#080820' }),
+      }
+
+      setStageConfig(prev => ({
+        ...prev,
+        lights: [...prev.lights, newLight],
+      }))
+      setSelectedObjectId(newLight.id)
+    } else if (category === 'mesh') {
+      const newMesh: StageMesh = {
+        id,
+        type: type as StageMesh['type'],
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        color: '#4a9eff',
+        wireframe: false,
+      }
+
+      setStageConfig(prev => ({
+        ...prev,
+        meshes: [...prev.meshes, newMesh],
+      }))
+      setSelectedObjectId(newMesh.id)
+    } else if (category === 'group') {
+      const newGroup: StageGroup = {
+        id,
+        type: 'group',
+        name: `Group ${timestamp}`,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        children: [],
+      }
+
+      setStageConfig(prev => ({
+        ...prev,
+        groups: [...prev.groups, newGroup],
+      }))
+      setSelectedObjectId(newGroup.id)
+    } else if (category === 'helper') {
+      const newHelper: StageHelper = {
+        id,
+        type: type as StageHelper['type'],
+        enabled: true,
+        properties: {},
+      }
+
+      setStageConfig(prev => ({
+        ...prev,
+        helpers: [...prev.helpers, newHelper],
+      }))
+      setSelectedObjectId(newHelper.id)
     }
-
-    setStageConfig(prev => ({
-      ...prev,
-      lights: [...prev.lights, newLight],
-    }))
-    setSelectedObjectId(newLight.id)
   }
 
-  const handleUpdateLight = (id: string, updates: Partial<StageLight>) => {
-    setStageConfig(prev => ({
-      ...prev,
-      lights: prev.lights.map(light =>
-        light.id === id ? { ...light, ...updates } : light
-      ),
-    }))
+  const handleUpdateObject = (id: string, updates: Partial<StageObject>) => {
+    setStageConfig(prev => {
+      // Check which array the object belongs to
+      if (prev.lights.some(light => light.id === id)) {
+        return {
+          ...prev,
+          lights: prev.lights.map(light =>
+            light.id === id ? { ...light, ...updates } : light
+          ),
+        }
+      } else if (prev.meshes.some(mesh => mesh.id === id)) {
+        return {
+          ...prev,
+          meshes: prev.meshes.map(mesh =>
+            mesh.id === id ? { ...mesh, ...updates } : mesh
+          ),
+        }
+      } else if (prev.groups.some(group => group.id === id)) {
+        return {
+          ...prev,
+          groups: prev.groups.map(group =>
+            group.id === id ? { ...group, ...updates } : group
+          ),
+        }
+      } else if (prev.helpers.some(helper => helper.id === id)) {
+        return {
+          ...prev,
+          helpers: prev.helpers.map(helper =>
+            helper.id === id ? { ...helper, ...updates } : helper
+          ),
+        }
+      }
+      return prev
+    })
   }
 
-  const handleDeleteLight = (id: string) => {
+  const handleDeleteObject = (id: string) => {
     setStageConfig(prev => ({
       ...prev,
       lights: prev.lights.filter(light => light.id !== id),
+      meshes: prev.meshes.filter(mesh => mesh.id !== id),
+      groups: prev.groups.filter(group => group.id !== id),
+      helpers: prev.helpers.filter(helper => helper.id !== id),
     }))
     if (selectedObjectId === id) {
       setSelectedObjectId(null)
     }
   }
 
-  const selectedObject = stageConfig.lights.find(
-    light => light.id === selectedObjectId
-  )
+  const selectedObject =
+    stageConfig.lights.find(light => light.id === selectedObjectId) ||
+    stageConfig.meshes.find(mesh => mesh.id === selectedObjectId) ||
+    stageConfig.groups.find(group => group.id === selectedObjectId) ||
+    stageConfig.helpers.find(helper => helper.id === selectedObjectId) ||
+    null
 
   if (isLoading) {
     return (
@@ -314,7 +460,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
 
       <div className="editor-content">
         <div className="editor-sidebar left">
-          <LightLibrary onAddLight={handleAddLight} />
+          <ComponentLibrary onAddComponent={handleAddComponent} />
         </div>
 
         <div className="editor-main">
@@ -329,8 +475,8 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         <div className="editor-sidebar right">
           <PropertyPanel
             selectedObject={selectedObject}
-            onUpdateObject={handleUpdateLight}
-            onDeleteObject={handleDeleteLight}
+            onUpdateObject={handleUpdateObject}
+            onDeleteObject={handleDeleteObject}
           />
         </div>
       </div>

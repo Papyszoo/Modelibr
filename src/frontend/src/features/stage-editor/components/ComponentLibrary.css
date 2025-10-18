@@ -1,0 +1,51 @@
+.component-library {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.component-library-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.component-library-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.component-library-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.component-library-section {
+  margin-bottom: 1.5rem;
+}
+
+.component-library-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.component-types {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.component-type-item {
+  width: 100%;
+}
+
+.component-type-item .p-button {
+  justify-content: flex-start;
+  text-align: left;
+}

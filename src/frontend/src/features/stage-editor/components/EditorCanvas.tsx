@@ -3,6 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid } from '@react-three/drei'
 import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 import SceneLights from './SceneLights'
+import SceneMeshes from './SceneMeshes'
+import SceneHelpers from './SceneHelpers'
 import { StageConfig } from './SceneEditor'
 import './EditorCanvas.css'
 
@@ -33,7 +35,7 @@ function EditorCanvas({
         dpr={Math.min(window.devicePixelRatio, 2)}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
-          {/* Grid helper */}
+          {/* Grid helper - default one, can be overridden by grid helper */}
           <Grid
             args={[20, 20]}
             cellSize={1}
@@ -48,6 +50,9 @@ function EditorCanvas({
             infiniteGrid={true}
           />
 
+          {/* Scene helpers (Drei components) */}
+          <SceneHelpers helpers={stageConfig.helpers} />
+
           {/* Stage lights */}
           <SceneLights
             lights={stageConfig.lights}
@@ -55,11 +60,20 @@ function EditorCanvas({
             onSelectLight={onSelectObject}
           />
 
-          {/* Reference sphere */}
-          <mesh position={[0, 1, 0]} onClick={() => onSelectObject(null)}>
-            <sphereGeometry args={[1, 32, 32]} />
-            <meshStandardMaterial color="#4a9eff" />
-          </mesh>
+          {/* Scene meshes */}
+          <SceneMeshes
+            meshes={stageConfig.meshes}
+            selectedId={selectedObjectId}
+            onSelectMesh={onSelectObject}
+          />
+
+          {/* Reference sphere for testing - only shown when no meshes */}
+          {stageConfig.meshes.length === 0 && (
+            <mesh position={[0, 1, 0]} onClick={() => onSelectObject(null)}>
+              <sphereGeometry args={[1, 32, 32]} />
+              <meshStandardMaterial color="#4a9eff" />
+            </mesh>
+          )}
         </Suspense>
 
         {/* Controls */}
