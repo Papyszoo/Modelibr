@@ -7,9 +7,11 @@ import ThumbnailWindow from './ThumbnailWindow'
 import ModelHierarchyWindow from './ModelHierarchyWindow'
 import ViewerSettingsWindow from './ViewerSettingsWindow'
 import UVMapWindow from './UVMapWindow'
+import TextureSetSelectorWindow from './TextureSetSelectorWindow'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
 import { getModelFileFormat, Model } from '../../../utils/fileUtils'
+import { TextureSetDto } from '../../../types'
 // eslint-disable-next-line no-restricted-imports -- ModelViewer needs direct API access for fetching model data
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
@@ -38,6 +40,14 @@ function ModelViewer({
   const [settingsWindowVisible, setSettingsWindowVisible] =
     useState<boolean>(false)
   const [uvMapWindowVisible, setUvMapWindowVisible] = useState<boolean>(false)
+  const [textureSetWindowVisible, setTextureSetWindowVisible] =
+    useState<boolean>(false)
+  const [selectedTextureSetId, setSelectedTextureSetId] = useState<
+    number | null
+  >(null)
+  const [selectedTextureSet, setSelectedTextureSet] =
+    useState<TextureSetDto | null>(null)
+  const [hasUserSelectedTexture, setHasUserSelectedTexture] = useState(false)
   const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
     orbitSpeed: 1,
     zoomSpeed: 1,
@@ -58,6 +68,27 @@ function ModelViewer({
     }
   }, [propModel, modelId])
 
+  // Set initial selected texture set to default if available
+  // Only auto-select if user hasn't made a manual selection yet
+  useEffect(() => {
+    if (
+      model?.defaultTextureSetId &&
+      selectedTextureSetId === null &&
+      !hasUserSelectedTexture
+    ) {
+      setSelectedTextureSetId(model.defaultTextureSetId)
+    }
+  }, [model?.defaultTextureSetId, selectedTextureSetId, hasUserSelectedTexture])
+
+  // Load selected texture set data
+  useEffect(() => {
+    if (selectedTextureSetId) {
+      loadTextureSet(selectedTextureSetId)
+    } else {
+      setSelectedTextureSet(null)
+    }
+  }, [selectedTextureSetId])
+
   const fetchModel = async (id: string): Promise<void> => {
     try {
       setLoading(true)
@@ -68,6 +99,16 @@ function ModelViewer({
       setError(err instanceof Error ? err.message : 'Failed to load model')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadTextureSet = async (textureSetId: number): Promise<void> => {
+    try {
+      const textureSet = await ApiClient.getTextureSetById(textureSetId)
+      setSelectedTextureSet(textureSet)
+    } catch (err) {
+      console.error('Failed to load texture set:', err)
+      setSelectedTextureSet(null)
     }
   }
 
@@ -96,6 +137,11 @@ function ModelViewer({
         life: 5000,
       })
     }
+  }
+
+  const handleTextureSetSelect = (textureSetId: number | null) => {
+    setSelectedTextureSetId(textureSetId)
+    setHasUserSelectedTexture(true)
   }
 
   if (loading) {
@@ -147,6 +193,17 @@ function ModelViewer({
               }}
             />
             <Button
+              icon="pi pi-palette"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() =>
+                setTextureSetWindowVisible(!textureSetWindowVisible)
+              }
+              tooltip="Texture Sets"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
+            <Button
               icon="pi pi-sitemap"
               className="p-button-rounded viewer-control-btn"
               onClick={() => setHierarchyWindowVisible(!hierarchyWindowVisible)}
@@ -184,6 +241,7 @@ function ModelViewer({
               </button>
             </div>
           ) : (
+
             <>
               <Canvas
                 key={`canvas-${model.id}-${side}`}
@@ -197,9 +255,10 @@ function ModelViewer({
                 dpr={Math.min(window.devicePixelRatio, 2)}
               >
                 <ModelPreviewScene
-                  key={`scene-${model.id}-${side}`}
+                  key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}`}
                   model={model}
                   settings={viewerSettings}
+                  textureSet={selectedTextureSet}
                 />
               </Canvas>
               {/* Stats container positioned in bottom-left corner of viewer */}
@@ -224,6 +283,15 @@ function ModelViewer({
           onClose={() => setInfoWindowVisible(false)}
           side={side}
           model={model}
+          onModelUpdated={handleModelUpdated}
+        />
+        <TextureSetSelectorWindow
+          visible={textureSetWindowVisible}
+          onClose={() => setTextureSetWindowVisible(false)}
+          side={side}
+          model={model}
+          selectedTextureSetId={selectedTextureSetId}
+          onTextureSetSelect={handleTextureSetSelect}
           onModelUpdated={handleModelUpdated}
         />
         <ThumbnailWindow

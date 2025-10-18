@@ -33,6 +33,7 @@ namespace Application.Models
                 UpdatedAt = m.UpdatedAt,
                 Tags = m.Tags,
                 Description = m.Description,
+                DefaultTextureSetId = m.DefaultTextureSetId,
                 Files = m.Files.Select(f => new FileDto
                 {
                     Id = f.Id,
@@ -70,6 +71,7 @@ namespace Application.Models
         public DateTime UpdatedAt { get; init; }
         public string? Tags { get; init; }
         public string? Description { get; init; }
+        public int? DefaultTextureSetId { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
         public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();

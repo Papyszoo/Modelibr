@@ -379,6 +379,20 @@ class ApiClient {
     useApiCacheStore.getState().invalidateTextureSetById(setId)
   }
 
+  async changeTextureType(
+    setId: number,
+    textureId: number,
+    newTextureType: number
+  ): Promise<void> {
+    await this.client.put(`/texture-sets/${setId}/textures/${textureId}/type`, {
+      textureType: newTextureType,
+    })
+
+    // Invalidate texture sets cache when texture types change
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
+  }
+
   async associateTextureSetWithModel(
     setId: number,
     modelId: number
@@ -683,6 +697,25 @@ class ApiClient {
     const response = await this.client.put(`/stages/${id}`, {
       configurationJson,
     })
+    return response.data
+  }
+
+  async setDefaultTextureSet(
+    modelId: number,
+    textureSetId: number | null
+  ): Promise<{ modelId: number; defaultTextureSetId: number | null }> {
+    const response = await this.client.put(
+      `/models/${modelId}/defaultTextureSet`,
+      null,
+      {
+        params: { textureSetId },
+      }
+    )
+
+    // Invalidate model cache when default texture set changes
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+
     return response.data
   }
 
