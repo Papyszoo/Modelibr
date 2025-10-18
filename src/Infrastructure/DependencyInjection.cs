@@ -35,6 +35,7 @@ namespace Infrastructure
             services.AddScoped<IThumbnailJobEventRepository, ThumbnailJobEventRepository>();
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
             services.AddScoped<IPackRepository, PackRepository>();
+            services.AddScoped<IProjectRepository, ProjectRepository>();
             services.AddScoped<IStageRepository, StageRepository>();
             services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();

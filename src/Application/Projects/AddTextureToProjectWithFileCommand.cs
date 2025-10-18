@@ -7,10 +7,10 @@ using Domain.Services;
 using Domain.ValueObjects;
 using SharedKernel;
 
-namespace Application.Packs;
+namespace Application.Projects;
 
-public sealed record AddTextureToPackWithFileCommand(
-    int PackId,
+public sealed record AddTextureToProjectWithFileCommand(
+    int ProjectId,
     IFileUpload File,
     string TextureSetName,
     TextureType TextureType,
@@ -18,24 +18,24 @@ public sealed record AddTextureToPackWithFileCommand(
     string? UploadType = null
 ) : ICommand<int>;
 
-internal sealed class AddTextureToPackWithFileCommandHandler
-    : ICommandHandler<AddTextureToPackWithFileCommand, int>
+internal sealed class AddTextureToProjectWithFileCommandHandler
+    : ICommandHandler<AddTextureToProjectWithFileCommand, int>
 {
-    private readonly IPackRepository _packRepository;
+    private readonly IProjectRepository _projectRepository;
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
 
-    public AddTextureToPackWithFileCommandHandler(
-        IPackRepository packRepository,
+    public AddTextureToProjectWithFileCommandHandler(
+        IProjectRepository projectRepository,
         ITextureSetRepository textureSetRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider
     )
     {
-        _packRepository = packRepository;
+        _projectRepository = projectRepository;
         _textureSetRepository = textureSetRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
@@ -43,16 +43,16 @@ internal sealed class AddTextureToPackWithFileCommandHandler
     }
 
     public async Task<Result<int>> Handle(
-        AddTextureToPackWithFileCommand request,
+        AddTextureToProjectWithFileCommand request,
         CancellationToken cancellationToken
     )
     {
-        // Validate pack exists
-        var pack = await _packRepository.GetByIdAsync(request.PackId, cancellationToken);
-        if (pack == null)
+        // Validate project exists
+        var project = await _projectRepository.GetByIdAsync(request.ProjectId, cancellationToken);
+        if (project == null)
         {
             return Result.Failure<int>(
-                new Error("Pack.NotFound", $"Pack with ID {request.PackId} not found")
+                new Error("Project.NotFound", $"Project with ID {request.ProjectId} not found")
             );
         }
 
@@ -99,21 +99,21 @@ internal sealed class AddTextureToPackWithFileCommandHandler
             textureSet.AddTexture(texture, now);
         }
 
-        // Add texture set to pack
-        pack.AddTextureSet(textureSet, now);
+        // Add texture set to project
+        project.AddTextureSet(textureSet, now);
 
-        await _packRepository.UpdateAsync(pack, cancellationToken);
+        await _projectRepository.UpdateAsync(project, cancellationToken);
 
         // Create batch upload record
         var batchId = request.BatchId ?? Guid.NewGuid().ToString();
-        var uploadType = request.UploadType ?? "pack";
+        var uploadType = request.UploadType ?? "project";
 
         var batchUpload = BatchUpload.Create(
             batchId,
             uploadType,
             file.Id,
             now,
-            packId: pack.Id,
+            projectId: project.Id,
             textureSetId: textureSet.Id
         );
 

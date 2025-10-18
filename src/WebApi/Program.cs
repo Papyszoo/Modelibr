@@ -81,6 +81,7 @@ namespace WebApi
             app.MapThumbnailJobEndpoints();
             app.MapTextureSetEndpoints();
             app.MapPackEndpoints();
+            app.MapProjectEndpoints();
             app.MapStageEndpoints();
             app.MapSettingsEndpoints();
             app.MapBatchUploadEndpoints();

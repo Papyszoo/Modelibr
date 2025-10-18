@@ -19,6 +19,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         return await _context.BatchUploads
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
+            .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
             .FirstOrDefaultAsync(bu => bu.Id == id, cancellationToken);
@@ -29,6 +30,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         return await _context.BatchUploads
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
+            .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
             .Where(bu => bu.BatchId == batchId)
@@ -41,6 +43,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         return await _context.BatchUploads
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
+            .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
             .Where(bu => bu.UploadType == uploadType)
@@ -53,6 +56,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         return await _context.BatchUploads
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
+            .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
             .Where(bu => bu.UploadedAt >= from && bu.UploadedAt <= to)
@@ -77,6 +81,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         return await _context.BatchUploads
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
+            .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
             .FirstOrDefaultAsync(bu => bu.FileId == fileId, cancellationToken);
@@ -87,6 +92,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         return await _context.BatchUploads
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
+            .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
             .Where(bu => bu.ModelId == modelId)
