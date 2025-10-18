@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
 using SharedKernel;
+using System.Linq;
 
 namespace Application.Models;
 
@@ -28,6 +29,7 @@ internal class UpdateModelMetadataCommandHandler : ICommandHandler<UpdateModelMe
                 new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
         }
 
+        // Set geometry metadata
         model.SetGeometryMetadata(command.Vertices, command.Faces, _dateTimeProvider.UtcNow);
         
         await _modelRepository.UpdateAsync(model, cancellationToken);
