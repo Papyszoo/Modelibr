@@ -3,7 +3,7 @@ import { Chip } from 'primereact/chip'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Button } from 'primereact/button'
-import { getModelFileFormat } from '../../../utils/fileUtils'
+import { getModelFileFormat, getFileExtension, formatFileSize } from '../../../utils/fileUtils'
 // eslint-disable-next-line no-restricted-imports -- ModelInfo needs direct API access
 import apiClient from '../../../services/ApiClient'
 import TextureSetAssociationDialog from './TextureSetAssociationDialog'
@@ -65,6 +65,12 @@ function ModelInfo({ model, onModelUpdated }) {
     }
   }
 
+  const handleDownloadFile = (fileId: string) => {
+    // Download the file using the API endpoint
+    const downloadUrl = `/api/files/${fileId}/download`
+    window.open(downloadUrl, '_blank')
+  }
+
   return (
     <>
       <div className="info-section">
@@ -73,6 +79,10 @@ function ModelInfo({ model, onModelUpdated }) {
           <div className="info-item">
             <label>ID:</label>
             <span>{model.id}</span>
+          </div>
+          <div className="info-item">
+            <label>Name:</label>
+            <span>{model.name}</span>
           </div>
           <div className="info-item">
             <label>Created:</label>
@@ -86,6 +96,49 @@ function ModelInfo({ model, onModelUpdated }) {
             <label>Format:</label>
             <span>{getModelFileFormat(model)}</span>
           </div>
+        </div>
+      </div>
+
+      <div className="info-section">
+        <h3>Model Files</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {model.files && model.files.length > 0 ? (
+            model.files.map((file, index) => (
+              <div
+                key={index}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
+                    {file.originalFileName}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                    {getFileExtension(file.originalFileName).toUpperCase()} •{' '}
+                    {formatFileSize(file.sizeBytes)}
+                  </div>
+                </div>
+                <Button
+                  icon="pi pi-download"
+                  className="p-button-rounded p-button-text"
+                  onClick={() => handleDownloadFile(file.id)}
+                  tooltip="Download file"
+                  tooltipOptions={{ position: 'left' }}
+                />
+              </div>
+            ))
+          ) : (
+            <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+              No files available
+            </span>
+          )}
         </div>
       </div>
 

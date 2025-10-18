@@ -71,10 +71,8 @@ export default function ModelGrid({
   }
 
   const getModelName = (model: Model) => {
-    // Get the first file's name or use the model name
-    return model.files && model.files.length > 0
-      ? model.files[0].originalFileName
-      : model.name || `Model ${model.id}`
+    // Use the model name, which doesn't include file extension
+    return model.name || `Model ${model.id}`
   }
 
   const filteredModels = models.filter(model => {
