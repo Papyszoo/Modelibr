@@ -170,9 +170,11 @@ export const TabProvider = ({
             ? `set-${(data as { id?: string }).id}`
             : type === 'packViewer' && (data as { id?: string })?.id
               ? `pack-${(data as { id?: string }).id}`
-              : type === 'stageEditor' && (data as { id?: string })?.id
-                ? `stage-${(data as { id?: string }).id}`
-                : type,
+              : type === 'projectViewer' && (data as { id?: string })?.id
+                ? `project-${(data as { id?: string }).id}`
+                : type === 'stageEditor' && (data as { id?: string })?.id
+                  ? `stage-${(data as { id?: string }).id}`
+                  : type,
       type,
       label: title,
       modelId:
@@ -180,6 +182,7 @@ export const TabProvider = ({
       setId:
         type === 'textureSetViewer' ? (data as { id?: string })?.id : undefined,
       packId: type === 'packViewer' ? (data as { id?: string })?.id : undefined,
+      projectId: type === 'projectViewer' ? (data as { id?: string })?.id : undefined,
       stageId:
         type === 'stageEditor' ? (data as { id?: string })?.id : undefined,
     }
