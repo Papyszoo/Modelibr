@@ -128,6 +128,15 @@ public class BatchUpload
     }
     
     /// <summary>
+    /// Updates the project association for this batch upload.
+    /// </summary>
+    /// <param name="projectId">The project ID to associate</param>
+    public void UpdateProjectAssociation(int projectId)
+    {
+        ProjectId = projectId;
+    }
+    
+    /// <summary>
     /// Updates the upload type.
     /// </summary>
     /// <param name="uploadType">The new upload type</param>

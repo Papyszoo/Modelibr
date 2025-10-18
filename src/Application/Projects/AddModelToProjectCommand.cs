@@ -9,15 +9,18 @@ internal class AddModelToProjectCommandHandler : ICommandHandler<AddModelToProje
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IModelRepository _modelRepository;
+    private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public AddModelToProjectCommandHandler(
         IProjectRepository projectRepository,
         IModelRepository modelRepository,
+        IBatchUploadRepository batchUploadRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _projectRepository = projectRepository;
         _modelRepository = modelRepository;
+        _batchUploadRepository = batchUploadRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -42,6 +45,15 @@ internal class AddModelToProjectCommandHandler : ICommandHandler<AddModelToProje
         project.AddModel(model, _dateTimeProvider.UtcNow);
 
         await _projectRepository.UpdateAsync(project, cancellationToken);
+
+        // Update batch upload records for this model to include project association
+        var batchUploads = await _batchUploadRepository.GetByModelIdAsync(model.Id, cancellationToken);
+        foreach (var batchUpload in batchUploads)
+        {
+            batchUpload.UpdateProjectAssociation(project.Id);
+            batchUpload.UpdateUploadType("project");
+            await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
+        }
 
         return Result.Success();
     }
