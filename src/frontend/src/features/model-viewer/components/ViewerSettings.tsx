@@ -8,6 +8,7 @@ export interface ViewerSettingsType {
   panSpeed: number
   modelRotationSpeed: number
   showShadows: boolean
+  showStats: boolean
 }
 
 interface ViewerSettingsProps {
@@ -109,6 +110,16 @@ function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
             <InputSwitch
               checked={settings.showShadows}
               onChange={e => handleChange('showShadows', e.value as boolean)}
+            />
+          </div>
+        </div>
+
+        <div className="setting-item">
+          <label>Show FPS Stats</label>
+          <div className="setting-control">
+            <InputSwitch
+              checked={settings.showStats}
+              onChange={e => handleChange('showStats', e.value as boolean)}
             />
           </div>
         </div>
