@@ -370,10 +370,12 @@
 }
 
 /* FPS counter positioning in bottom-left corner */
-.viewer-container :global(.stats-fps) {
+/* Note: Stats component appends to document.body, so we use a global selector */
+:global(.stats-fps) {
   position: absolute !important;
   bottom: 0 !important;
   left: 0 !important;
   top: auto !important;
   right: auto !important;
+  z-index: 9999 !important;
 }
