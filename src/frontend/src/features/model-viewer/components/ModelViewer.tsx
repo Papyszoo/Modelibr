@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { Stats } from '@react-three/drei'
 import ModelPreviewScene from './ModelPreviewScene'
 import ModelInfoWindow from './ModelInfoWindow'
 import ThumbnailWindow from './ThumbnailWindow'
@@ -43,8 +44,10 @@ function ModelViewer({
     panSpeed: 1,
     modelRotationSpeed: 0.002,
     showShadows: true,
+    showStats: false,
   })
   const toast = useRef<Toast>(null)
+  const statsContainerRef = useRef<HTMLDivElement>(null)
 
   // Determine which side for button positioning
   const buttonPosition = side === 'left' ? 'right' : 'left'
@@ -181,23 +184,30 @@ function ModelViewer({
               </button>
             </div>
           ) : (
-            <Canvas
-              key={`canvas-${model.id}-${side}`}
-              shadows
-              className="viewer-canvas"
-              gl={{
-                antialias: true,
-                alpha: true,
-                powerPreference: 'high-performance',
-              }}
-              dpr={Math.min(window.devicePixelRatio, 2)}
-            >
-              <ModelPreviewScene
-                key={`scene-${model.id}-${side}`}
-                model={model}
-                settings={viewerSettings}
-              />
-            </Canvas>
+            <>
+              <Canvas
+                key={`canvas-${model.id}-${side}`}
+                shadows
+                className="viewer-canvas"
+                gl={{
+                  antialias: true,
+                  alpha: true,
+                  powerPreference: 'high-performance',
+                }}
+                dpr={Math.min(window.devicePixelRatio, 2)}
+              >
+                <ModelPreviewScene
+                  key={`scene-${model.id}-${side}`}
+                  model={model}
+                  settings={viewerSettings}
+                />
+              </Canvas>
+              {/* Stats container positioned in bottom-left corner of viewer */}
+              <div ref={statsContainerRef} className="stats-container" />
+              {viewerSettings.showStats && statsContainerRef.current && (
+                <Stats showPanel={0} parent={statsContainerRef} />
+              )}
+            </>
           )}
         </div>
 

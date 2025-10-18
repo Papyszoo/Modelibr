@@ -369,13 +369,16 @@
   margin-bottom: 1.5rem;
 }
 
-/* FPS counter positioning in bottom-left corner */
-/* Note: Stats component appends to document.body, so we use a global selector */
-:global(.stats-fps) {
-  position: absolute !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  top: auto !important;
-  right: auto !important;
-  z-index: 9999 !important;
+/* Stats container positioning in bottom-left corner of viewer */
+.stats-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Ensure stats.js DOM element doesn't interfere with canvas interactions */
+.stats-container > div {
+  pointer-events: auto;
 }

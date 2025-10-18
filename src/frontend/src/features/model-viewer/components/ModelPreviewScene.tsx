@@ -1,5 +1,5 @@
 import { JSX, Suspense } from 'react'
-import { Stage, OrbitControls, Stats } from '@react-three/drei'
+import { Stage, OrbitControls } from '@react-three/drei'
 import Model from './Model'
 import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
 // eslint-disable-next-line no-restricted-imports
@@ -73,9 +73,6 @@ function Scene({ model, settings }: SceneProps): JSX.Element {
         zoomSpeed={zoomSpeed}
         panSpeed={panSpeed}
       />
-
-      {/* FPS counter in bottom-left corner */}
-      <Stats showPanel={0} className="stats-fps" />
     </>
   )
 }
