@@ -205,7 +205,7 @@ export class HuggingFaceTagger {
   /**
    * Save debug image for classification
    * @param {Buffer} imageBuffer - Image data
-   * @param {string} modelId - Model ID
+   * @param {number|string} modelId - Model ID
    * @param {Object} viewInfo - View information
    * @param {string} storagePath - Base storage path
    * @returns {Promise<string|null>} - Path to saved file or null on error
@@ -213,7 +213,7 @@ export class HuggingFaceTagger {
   async saveDebugImage(imageBuffer, modelId, viewInfo, storagePath) {
     try {
       const { mkdirSync, writeFileSync } = await import('fs')
-      const debugDir = path.join(storagePath, modelId, 'classification-views')
+      const debugDir = path.join(storagePath, String(modelId), 'classification-views')
       
       // Create directory if it doesn't exist
       mkdirSync(debugDir, { recursive: true })
