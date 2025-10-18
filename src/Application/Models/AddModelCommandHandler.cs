@@ -58,28 +58,27 @@ namespace Application.Models
             var modelName = command.ModelName ?? 
                            Path.GetFileNameWithoutExtension(command.File.FileName);
 
-            // Check for duplicate model by name and vertices count
-            // Note: vertices will be null initially, will be populated by worker service after thumbnail generation
-            var existingModelByMetadata = await _modelRepository.GetByNameAndVerticesAsync(
+            // Check for duplicate model by name only (vertices not available yet)
+            // After the worker extracts metadata, models with same name will be properly deduplicated
+            var existingModelByName = await _modelRepository.GetByNameAsync(
                 modelName, 
-                null, 
                 cancellationToken);
 
-            if (existingModelByMetadata != null)
+            if (existingModelByName != null)
             {
                 // Check if the file with this hash already exists on this model
-                if (!existingModelByMetadata.HasFile(fileEntity.Sha256Hash))
+                if (!existingModelByName.HasFile(fileEntity.Sha256Hash))
                 {
-                    // Same model (name + vertices), but different file format - add file to existing model
-                    await _modelRepository.AddFileAsync(existingModelByMetadata.Id, fileEntity, cancellationToken);
+                    // Same model name - add file to existing model
+                    await _modelRepository.AddFileAsync(existingModelByName.Id, fileEntity, cancellationToken);
                 }
 
                 // Raise domain event for existing model upload
-                existingModelByMetadata.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
+                existingModelByName.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
                 
                 // Publish domain events
-                await _domainEventDispatcher.PublishAsync(existingModelByMetadata.DomainEvents, cancellationToken);
-                existingModelByMetadata.ClearDomainEvents();
+                await _domainEventDispatcher.PublishAsync(existingModelByName.DomainEvents, cancellationToken);
+                existingModelByName.ClearDomainEvents();
                 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -88,11 +87,11 @@ namespace Application.Models
                     "model",
                     fileEntity.Id,
                     _dateTimeProvider.UtcNow,
-                    modelId: existingModelByMetadata.Id);
+                    modelId: existingModelByName.Id);
                 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 
-                return Result.Success(new AddModelCommandResponse(existingModelByMetadata.Id, true));
+                return Result.Success(new AddModelCommandResponse(existingModelByName.Id, true));
             }
 
             // Create new model

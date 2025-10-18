@@ -67,8 +67,8 @@ function ModelInfo({ model, onModelUpdated }) {
 
   const handleDownloadFile = (fileId: string) => {
     // Download the file using the API endpoint
-    const downloadUrl = `/api/files/${fileId}/download`
-    window.open(downloadUrl, '_blank')
+    const downloadUrl = `/files/${fileId}`
+    window.location.href = downloadUrl
   }
 
   return (
