@@ -145,7 +145,9 @@ export default function ProjectList() {
                 key={project.id}
                 className="project-grid-card"
                 onClick={() => {
-                  openTab('projectViewer', project.name, { id: project.id.toString() })
+                  openTab('projectViewer', project.name, {
+                    id: project.id.toString(),
+                  })
                 }}
               >
                 <div className="project-grid-card-image">

@@ -182,7 +182,8 @@ export const TabProvider = ({
       setId:
         type === 'textureSetViewer' ? (data as { id?: string })?.id : undefined,
       packId: type === 'packViewer' ? (data as { id?: string })?.id : undefined,
-      projectId: type === 'projectViewer' ? (data as { id?: string })?.id : undefined,
+      projectId:
+        type === 'projectViewer' ? (data as { id?: string })?.id : undefined,
       stageId:
         type === 'stageEditor' ? (data as { id?: string })?.id : undefined,
     }
