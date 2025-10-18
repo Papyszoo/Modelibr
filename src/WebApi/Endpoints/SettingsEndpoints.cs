@@ -22,6 +22,39 @@ public static class SettingsEndpoints
         .WithName("Get Settings")
         .WithTags("Settings");
 
+        app.MapGet("/settings/all", async (
+            IQueryHandler<GetAllSettingsQuery, GetAllSettingsQueryResponse> queryHandler) =>
+        {
+            var result = await queryHandler.Handle(new GetAllSettingsQuery(), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("Get All Settings")
+        .WithTags("Settings");
+
+        app.MapPut("/settings/{key}", async (
+            string key,
+            UpdateSettingRequest request,
+            ICommandHandler<UpdateSettingCommand, UpdateSettingResponse> commandHandler) =>
+        {
+            var command = new UpdateSettingCommand(key, request.Value);
+            var result = await commandHandler.Handle(command, CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("Update Setting")
+        .WithTags("Settings");
+
         app.MapPut("/settings", async (
             UpdateSettingsRequest request,
             ICommandHandler<UpdateSettingsCommand, UpdateSettingsResponse> commandHandler) =>
@@ -49,6 +82,8 @@ public static class SettingsEndpoints
         .WithTags("Settings");
     }
 }
+
+public record UpdateSettingRequest(string Value);
 
 public record UpdateSettingsRequest(
     long MaxFileSizeBytes,

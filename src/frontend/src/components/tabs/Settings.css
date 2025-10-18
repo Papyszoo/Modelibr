@@ -219,3 +219,28 @@
 .settings-checkbox-label span {
   user-select: none;
 }
+
+.settings-dirty-indicator {
+  color: #ffd700;
+  font-size: 1.1rem;
+  margin-left: 0.25rem;
+}
+
+.settings-input-error {
+  border-color: #ff6b6b !important;
+}
+
+.settings-error-message {
+  font-size: 0.85rem;
+  color: #ff6b6b;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+.settings-unsaved-changes {
+  display: flex;
+  align-items: center;
+  color: #ffd700;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
