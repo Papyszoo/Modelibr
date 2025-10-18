@@ -25,6 +25,12 @@ namespace Application.Models
                 models = models.Where(m => m.Packs.Any(p => p.Id == query.PackId.Value));
             }
             
+            // Filter by project if specified
+            if (query.ProjectId.HasValue)
+            {
+                models = models.Where(m => m.Projects.Any(p => p.Id == query.ProjectId.Value));
+            }
+            
             var modelDtos = models.Select(m => new ModelDto
             {
                 Id = m.Id,
@@ -33,6 +39,7 @@ namespace Application.Models
                 UpdatedAt = m.UpdatedAt,
                 Tags = m.Tags,
                 Description = m.Description,
+                DefaultTextureSetId = m.DefaultTextureSetId,
                 Files = m.Files.Select(f => new FileDto
                 {
                     Id = f.Id,
@@ -43,6 +50,11 @@ namespace Application.Models
                     SizeBytes = f.SizeBytes
                 }).ToList(),
                 Packs = m.Packs.Select(p => new PackSummaryDto
+                {
+                    Id = p.Id,
+                    Name = p.Name
+                }).ToList(),
+                Projects = m.Projects.Select(p => new ProjectSummaryDto
                 {
                     Id = p.Id,
                     Name = p.Name
@@ -58,7 +70,7 @@ namespace Application.Models
         }
     }
 
-    public record GetAllModelsQuery(int? PackId = null) : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelDto> Models);
     
@@ -70,8 +82,10 @@ namespace Application.Models
         public DateTime UpdatedAt { get; init; }
         public string? Tags { get; init; }
         public string? Description { get; init; }
+        public int? DefaultTextureSetId { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
+        public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();
         public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();
     }
 
@@ -86,6 +100,12 @@ namespace Application.Models
     }
 
     public record PackSummaryDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
+
+    public record ProjectSummaryDto
     {
         public int Id { get; init; }
         public string Name { get; init; } = string.Empty;

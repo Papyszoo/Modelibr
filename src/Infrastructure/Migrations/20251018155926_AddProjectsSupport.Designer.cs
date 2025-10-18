@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251016054533_InitialMigration")]
-    partial class InitialMigration
+    [Migration("20251018155926_AddProjectsSupport")]
+    partial class AddProjectsSupport
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -87,6 +87,9 @@ namespace Infrastructure.Migrations
                     b.Property<int?>("PackId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ProjectId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("TextureSetId")
                         .HasColumnType("integer");
 
@@ -107,6 +110,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("ModelId");
 
                     b.HasIndex("PackId");
+
+                    b.HasIndex("ProjectId");
 
                     b.HasIndex("TextureSetId");
 
@@ -174,6 +179,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("DefaultTextureSetId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
@@ -188,6 +196,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DefaultTextureSetId");
 
                     b.ToTable("Models");
                 });
@@ -220,6 +230,36 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("Packs");
+                });
+
+            modelBuilder.Entity("Domain.Models.Project", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("Projects");
                 });
 
             modelBuilder.Entity("Domain.Models.Stage", b =>
@@ -492,6 +532,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("PackModels", (string)null);
                 });
 
+            modelBuilder.Entity("ModelProject", b =>
+                {
+                    b.Property<int>("ModelsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectsId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ModelsId", "ProjectsId");
+
+                    b.HasIndex("ProjectsId");
+
+                    b.ToTable("ProjectModels", (string)null);
+                });
+
             modelBuilder.Entity("ModelTextureSet", b =>
                 {
                     b.Property<int>("ModelsId")
@@ -522,6 +577,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("PackTextureSets", (string)null);
                 });
 
+            modelBuilder.Entity("ProjectTextureSet", b =>
+                {
+                    b.Property<int>("ProjectsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TextureSetsId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ProjectsId", "TextureSetsId");
+
+                    b.HasIndex("TextureSetsId");
+
+                    b.ToTable("ProjectTextureSets", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Models.BatchUpload", b =>
                 {
                     b.HasOne("Domain.Models.File", "File")
@@ -540,6 +610,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("PackId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Domain.Models.TextureSet", "TextureSet")
                         .WithMany()
                         .HasForeignKey("TextureSetId")
@@ -551,7 +626,17 @@ namespace Infrastructure.Migrations
 
                     b.Navigation("Pack");
 
+                    b.Navigation("Project");
+
                     b.Navigation("TextureSet");
+                });
+
+            modelBuilder.Entity("Domain.Models.Model", b =>
+                {
+                    b.HasOne("Domain.Models.TextureSet", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultTextureSetId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>
@@ -633,6 +718,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ModelProject", b =>
+                {
+                    b.HasOne("Domain.Models.Model", null)
+                        .WithMany()
+                        .HasForeignKey("ModelsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ModelTextureSet", b =>
                 {
                     b.HasOne("Domain.Models.Model", null)
@@ -653,6 +753,21 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Models.Pack", null)
                         .WithMany()
                         .HasForeignKey("PacksId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.TextureSet", null)
+                        .WithMany()
+                        .HasForeignKey("TextureSetsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ProjectTextureSet", b =>
+                {
+                    b.HasOne("Domain.Models.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

@@ -8,9 +8,9 @@ public static class ModelsEndpoints
 {
     public static void MapModelsEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/models", async (int? packId, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
+        app.MapGet("/models", async (int? packId, int? projectId, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
         {
-            var result = await queryHandler.Handle(new GetAllModelsQuery(packId), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId), CancellationToken.None);
             
             if (!result.IsSuccess)
             {
@@ -49,5 +49,18 @@ public static class ModelsEndpoints
             return Results.File(fileStream, contentType, result.Value.OriginalFileName, enableRangeProcessing: true);
         })
         .WithName("Get Model File");
+
+        app.MapPut("/models/{id}/defaultTextureSet", async (int id, int? textureSetId, ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(new SetDefaultTextureSetCommand(id, textureSetId), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+            
+            return Results.Ok(result.Value);
+        })
+        .WithName("Set Default Texture Set");
     }
 }

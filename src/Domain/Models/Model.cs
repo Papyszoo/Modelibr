@@ -7,6 +7,7 @@ namespace Domain.Models
         private readonly List<File> _files = new();
         private readonly List<TextureSet> _textureSets = new();
         private readonly List<Pack> _packs = new();
+        private readonly List<Project> _projects = new();
 
         public int Id { get; set; }
         public string Name { get; private set; } = string.Empty;
@@ -14,6 +15,7 @@ namespace Domain.Models
         public DateTime UpdatedAt { get; private set; }
         public string? Tags { get; private set; }
         public string? Description { get; private set; }
+        public int? DefaultTextureSetId { get; private set; }
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
         public ICollection<File> Files 
@@ -48,6 +50,18 @@ namespace Domain.Models
                 _packs.Clear();
                 if (value != null)
                     _packs.AddRange(value);
+            }
+        }
+
+        // Navigation property for many-to-many relationship with Projects - EF Core requires this to be settable
+        public ICollection<Project> Projects 
+        { 
+            get => _projects; 
+            set 
+            {
+                _projects.Clear();
+                if (value != null)
+                    _projects.AddRange(value);
             }
         }
 
@@ -166,6 +180,23 @@ namespace Domain.Models
         public IReadOnlyList<TextureSet> GetTextureSets()
         {
             return _textureSets.AsReadOnly();
+        }
+
+        /// <summary>
+        /// Sets the default texture set for this model.
+        /// </summary>
+        /// <param name="textureSetId">The ID of the texture set to set as default, or null to clear</param>
+        /// <param name="updatedAt">When the default was set</param>
+        /// <exception cref="InvalidOperationException">Thrown when the texture set is not associated with this model</exception>
+        public void SetDefaultTextureSet(int? textureSetId, DateTime updatedAt)
+        {
+            if (textureSetId.HasValue && !_textureSets.Any(ts => ts.Id == textureSetId.Value))
+            {
+                throw new InvalidOperationException($"Texture set {textureSetId.Value} is not associated with this model.");
+            }
+
+            DefaultTextureSetId = textureSetId;
+            UpdatedAt = updatedAt;
         }
 
         /// <summary>
