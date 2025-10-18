@@ -126,6 +126,7 @@ function PropertyPanel({
       </div>
 
       {light.type !== 'ambient' &&
+        light.type !== 'hemisphere' &&
         light.position &&
         renderVectorInput('Position', light.position, position =>
           onUpdateObject(light.id, { position })

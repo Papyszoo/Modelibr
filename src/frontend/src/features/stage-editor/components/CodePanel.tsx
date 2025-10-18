@@ -57,7 +57,6 @@ function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
         color="${light.color}"
         groundColor="${light.groundColor || '#080820'}"
         intensity={${light.intensity}}
-        position={[${light.position?.join(', ') || '0, 10, 0'}]}
       />`
 
           default:

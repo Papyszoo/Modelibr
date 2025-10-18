@@ -121,7 +121,6 @@ function SceneLights({
                 color={light.color}
                 groundColor={light.groundColor || '#080820'}
                 intensity={light.intensity}
-                position={light.position || [0, 10, 0]}
               />
             )
 
