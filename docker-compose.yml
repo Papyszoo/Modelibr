@@ -56,8 +56,11 @@ services:
             - RENDER_FORMAT=${RENDER_FORMAT:-png}
             - LOG_LEVEL=${LOG_LEVEL:-info}
             - NODE_TLS_REJECT_UNAUTHORIZED=1
+            - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
         ports:
             - "${WORKER_PORT:-3001}:3001"
+        volumes:
+            - ./data/thumbnails:/var/lib/modelibr/thumbnails
         depends_on:
             - webapi
         networks:
