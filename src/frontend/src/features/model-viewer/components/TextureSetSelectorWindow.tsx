@@ -77,10 +77,8 @@ function TextureSetSelectorWindow({
 
   const handleLinkDialogClose = () => {
     setLinkDialogVisible(false)
-    // Refresh model data and reload texture sets after linking
+    // Refresh model data, which will trigger the useEffect to reload texture sets
     onModelUpdated()
-    // Also reload the texture sets to show newly linked ones
-    loadTextureSets()
   }
 
   const handleUnlinkTextureSet = async (
@@ -94,7 +92,7 @@ function TextureSetSelectorWindow({
         textureSetId,
         parseInt(model.id)
       )
-      
+
       // If this was the default texture set, clear or update the default
       if (model.defaultTextureSetId === textureSetId) {
         // Find another linked texture set to set as default, or clear if none
@@ -105,12 +103,12 @@ function TextureSetSelectorWindow({
           remainingTextureSets.length > 0 ? remainingTextureSets[0].id : null
         await ApiClient.setDefaultTextureSet(parseInt(model.id), newDefaultId)
       }
-      
+
       // If this was the selected texture set, clear selection
       if (selectedTextureSetId === textureSetId) {
         onTextureSetSelect(null)
       }
-      
+
       // Refresh model data and reload texture sets
       onModelUpdated()
       loadTextureSets()
@@ -208,9 +206,7 @@ function TextureSetSelectorWindow({
                       )}
                     </div>
                     <div className="tswindow-info">
-                      <div className="tswindow-name">
-                        {textureSet.name}
-                      </div>
+                      <div className="tswindow-name">{textureSet.name}</div>
                       <div className="tswindow-meta">
                         {textureSet.textureCount} texture
                         {textureSet.textureCount !== 1 ? 's' : ''}
@@ -239,9 +235,7 @@ function TextureSetSelectorWindow({
                       <Button
                         icon="pi pi-times"
                         className="p-button-text p-button-sm p-button-danger tswindow-btn-unlink"
-                        onClick={e =>
-                          handleUnlinkTextureSet(textureSet.id, e)
-                        }
+                        onClick={e => handleUnlinkTextureSet(textureSet.id, e)}
                         disabled={unlinking === textureSet.id}
                         tooltip="Unlink texture set"
                         tooltipOptions={{ position: 'left' }}
