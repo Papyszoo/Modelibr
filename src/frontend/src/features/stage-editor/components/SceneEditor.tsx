@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from 'primereact/button'
-import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import EditorCanvas from './EditorCanvas'
@@ -8,6 +7,7 @@ import { ComponentType } from './ComponentLibrary'
 import ComponentLibraryWindow from './ComponentLibraryWindow'
 import PropertyPanelWindow from './PropertyPanelWindow'
 import CodePanelWindow from './CodePanelWindow'
+import { useTabContext } from '../../../hooks/useTabContext'
 // eslint-disable-next-line no-restricted-imports -- Stage editor needs API access for saving/loading stages
 import apiClient from '../../../services/ApiClient'
 import './SceneEditor.css'
@@ -87,6 +87,7 @@ interface StageEditorProps {
 }
 
 function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
+  const { side } = useTabContext()
   const [stageConfig, setStageConfig] = useState<StageConfig>({
     lights: [],
     meshes: [],
@@ -98,16 +99,6 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     stageId ? parseInt(stageId, 10) : null
   )
   const [stageName, setStageName] = useState<string>('Untitled Stage')
-  const [saveDialogVisible, setSaveDialogVisible] = useState(false)
-  const [loadDialogVisible, setLoadDialogVisible] = useState(false)
-  const [savedStages, setSavedStages] = useState<
-    Array<{
-      id: number
-      name: string
-      createdAt: string
-      updatedAt: string
-    }>
-  >([])
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [componentsWindowVisible, setComponentsWindowVisible] = useState(false)
@@ -115,9 +106,8 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   const [codeWindowVisible, setCodeWindowVisible] = useState(false)
   const toast = useRef<Toast>(null)
 
-  useEffect(() => {
-    loadSavedStages()
-  }, [])
+  // Determine which side for button positioning (opposite of panel side)
+  const buttonPosition = side === 'left' ? 'right' : 'left'
 
   useEffect(() => {
     if (stageId) {
@@ -166,21 +156,6 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     }
   }
 
-  const loadSavedStages = async () => {
-    try {
-      const response = await apiClient.getAllStages()
-      setSavedStages(response.stages)
-    } catch (error) {
-      console.error('Failed to load stages:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load saved stages',
-        life: 3000,
-      })
-    }
-  }
-
   const handleSaveStage = async () => {
     setIsSaving(true)
     try {
@@ -206,9 +181,6 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
           life: 3000,
         })
       }
-
-      setSaveDialogVisible(false)
-      await loadSavedStages()
     } catch (error) {
       console.error('Failed to save stage:', error)
       toast.current?.show({
@@ -220,67 +192,6 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     } finally {
       setIsSaving(false)
     }
-  }
-
-  const handleLoadStage = async (stageId: number) => {
-    try {
-      const stage = await apiClient.getStageById(stageId)
-
-      // Parse JSON with error handling
-      let config: StageConfig
-      try {
-        const parsed = JSON.parse(stage.configurationJson)
-        // Ensure config has valid structure
-        config = {
-          lights: Array.isArray(parsed.lights) ? parsed.lights : [],
-          meshes: Array.isArray(parsed.meshes) ? parsed.meshes : [],
-          groups: Array.isArray(parsed.groups) ? parsed.groups : [],
-          helpers: Array.isArray(parsed.helpers) ? parsed.helpers : [],
-        }
-      } catch (parseError) {
-        console.error('Failed to parse stage configuration:', parseError)
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'Stage configuration is corrupted',
-          life: 3000,
-        })
-        return
-      }
-
-      setStageConfig(config)
-      setCurrentStageId(stage.id)
-      setStageName(stage.name)
-      setSelectedObjectId(null)
-      setLoadDialogVisible(false)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Stage loaded successfully',
-        life: 3000,
-      })
-    } catch (error) {
-      console.error('Failed to load stage:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load stage',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleNewStage = () => {
-    setStageConfig({ lights: [], meshes: [], groups: [], helpers: [] })
-    setSelectedObjectId(null)
-    setCurrentStageId(null)
-    setStageName('Untitled Stage')
-    toast.current?.show({
-      severity: 'info',
-      summary: 'New Stage',
-      detail: 'Started new stage',
-      life: 2000,
-    })
   }
 
   const handleAddComponent = (category: ComponentType, type: string) => {
@@ -431,80 +342,66 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     <div className="stage-editor">
       <Toast ref={toast} />
 
-      <div className="editor-toolbar">
-        <div className="toolbar-left">
-          <h3>{stageName}</h3>
-        </div>
-        <div className="toolbar-right">
+      <div className="editor-container">
+        {/* Floating control buttons */}
+        <div className={`editor-controls editor-controls-${buttonPosition}`}>
           <Button
             icon="pi pi-th-large"
-            label="Components"
-            className="p-button-text"
+            className="p-button-rounded editor-control-btn"
             onClick={() => setComponentsWindowVisible(!componentsWindowVisible)}
             tooltip="Components Library"
+            tooltipOptions={{
+              position: buttonPosition === 'left' ? 'right' : 'left',
+            }}
           />
           <Button
             icon="pi pi-sliders-h"
-            label="Properties"
-            className="p-button-text"
+            className="p-button-rounded editor-control-btn"
             onClick={() => setPropertiesWindowVisible(!propertiesWindowVisible)}
             tooltip="Properties"
+            tooltipOptions={{
+              position: buttonPosition === 'left' ? 'right' : 'left',
+            }}
           />
           <Button
             icon="pi pi-code"
-            label="Code"
-            className="p-button-text"
+            className="p-button-rounded editor-control-btn"
             onClick={() => setCodeWindowVisible(!codeWindowVisible)}
             tooltip="Generated Code"
-          />
-          <Button
-            icon="pi pi-file"
-            label="New"
-            className="p-button-text"
-            onClick={handleNewStage}
-            tooltip="New Stage"
+            tooltipOptions={{
+              position: buttonPosition === 'left' ? 'right' : 'left',
+            }}
           />
           <Button
             icon="pi pi-save"
-            label="Save"
-            className="p-button-text"
-            onClick={() => setSaveDialogVisible(true)}
-            tooltip="Save Stage"
-          />
-          <Button
-            icon="pi pi-folder-open"
-            label="Load"
-            className="p-button-text"
-            onClick={() => {
-              setLoadDialogVisible(true)
-              loadSavedStages()
+            className="p-button-rounded editor-control-btn"
+            onClick={handleSaveStage}
+            disabled={isSaving}
+            tooltip={isSaving ? 'Saving...' : 'Save Stage'}
+            tooltipOptions={{
+              position: buttonPosition === 'left' ? 'right' : 'left',
             }}
-            tooltip="Load Stage"
           />
         </div>
-      </div>
 
-      <div className="editor-content">
-        <div className="editor-main">
-          <EditorCanvas
-            stageConfig={stageConfig}
-            selectedObjectId={selectedObjectId}
-            onSelectObject={setSelectedObjectId}
-          />
-        </div>
+        <EditorCanvas
+          stageConfig={stageConfig}
+          selectedObjectId={selectedObjectId}
+          onSelectObject={setSelectedObjectId}
+        />
       </div>
 
       {/* Floating Windows */}
       <ComponentLibraryWindow
         visible={componentsWindowVisible}
         onClose={() => setComponentsWindowVisible(false)}
-        side="left"
+        side={side}
         onAddComponent={handleAddComponent}
       />
       <PropertyPanelWindow
         visible={propertiesWindowVisible}
         onClose={() => setPropertiesWindowVisible(false)}
-        side="right"
+        side={side}
         selectedObject={selectedObject}
         onUpdateObject={handleUpdateObject}
         onDeleteObject={handleDeleteObject}
@@ -515,71 +412,6 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         side="none"
         stageConfig={stageConfig}
       />
-
-      {/* Save Dialog */}
-      <Dialog
-        header="Save Stage"
-        visible={saveDialogVisible}
-        style={{ width: '400px' }}
-        onHide={() => setSaveDialogVisible(false)}
-      >
-        <div className="p-fluid">
-          <div className="field">
-            <label htmlFor="stageName">Stage Name</label>
-            <InputText
-              id="stageName"
-              value={stageName}
-              onChange={e => setStageName(e.target.value)}
-              disabled={!!currentStageId}
-              aria-describedby={currentStageId ? 'stage-name-help' : undefined}
-            />
-            {currentStageId && (
-              <small id="stage-name-help">
-                Stage name cannot be changed after creation
-              </small>
-            )}
-          </div>
-          <div className="field" style={{ marginTop: '1rem' }}>
-            <Button
-              label={isSaving ? 'Saving...' : 'Save'}
-              icon="pi pi-save"
-              onClick={handleSaveStage}
-              disabled={!stageName.trim() || isSaving}
-            />
-          </div>
-        </div>
-      </Dialog>
-
-      {/* Load Dialog */}
-      <Dialog
-        header="Load Stage"
-        visible={loadDialogVisible}
-        style={{ width: '500px' }}
-        onHide={() => setLoadDialogVisible(false)}
-      >
-        <div className="saved-stages-list">
-          {savedStages.length === 0 ? (
-            <p className="no-stages">No saved stages found</p>
-          ) : (
-            savedStages.map(stage => (
-              <div key={stage.id} className="saved-stage-item">
-                <div className="stage-info">
-                  <h4>{stage.name}</h4>
-                  <small>
-                    Updated: {new Date(stage.updatedAt).toLocaleString()}
-                  </small>
-                </div>
-                <Button
-                  icon="pi pi-folder-open"
-                  label="Load"
-                  className="p-button-sm"
-                  onClick={() => handleLoadStage(stage.id)}
-                />
-              </div>
-            ))
-          )}
-        </div>
-      </Dialog>
     </div>
   )
 }
