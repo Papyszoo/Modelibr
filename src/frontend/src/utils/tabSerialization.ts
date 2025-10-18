@@ -62,93 +62,118 @@ export function parseCompactTabFormat(
 
   // Parse compact format: tab IDs separated by commas
   try {
-    return value.split(',').map(tabId => {
+    const seen = new Set<string>()
+    const tabs: Tab[] = []
+
+    for (const tabId of value.split(',')) {
+      // Skip if already seen (deduplicate)
+      if (seen.has(tabId)) {
+        continue
+      }
+      seen.add(tabId)
+
+      let tab: Tab
+
       // Handle model viewer tabs (e.g., "model-123")
       if (tabId.startsWith('model-')) {
         const modelId = tabId.substring(6)
-        return {
+        tab = {
           id: tabId,
           type: 'modelViewer',
           label: getTabLabel('modelViewer', modelId),
           modelId,
         }
       }
-
       // Handle texture set viewer tabs (e.g., "set-123")
-      if (tabId.startsWith('set-')) {
+      else if (tabId.startsWith('set-')) {
         const setId = tabId.substring(4)
-        return {
+        tab = {
           id: tabId,
           type: 'textureSetViewer',
           label: getTabLabel('textureSetViewer', undefined, setId),
           setId,
         }
       }
-
       // Handle pack viewer tabs (e.g., "pack-123")
-      if (tabId.startsWith('pack-')) {
+      else if (tabId.startsWith('pack-')) {
         const packId = tabId.substring(5)
-        return {
+        tab = {
           id: tabId,
           type: 'packViewer',
           label: getTabLabel('packViewer', undefined, undefined, packId),
           packId,
         }
       }
-
       // Handle project viewer tabs (e.g., "project-123")
-      if (tabId.startsWith('project-')) {
+      else if (tabId.startsWith('project-')) {
         const projectId = tabId.substring(8)
-        return {
+        tab = {
           id: tabId,
           type: 'projectViewer',
-          label: getTabLabel('projectViewer', undefined, undefined, undefined, projectId),
+          label: getTabLabel(
+            'projectViewer',
+            undefined,
+            undefined,
+            undefined,
+            projectId
+          ),
           projectId,
         }
       }
-
       // Handle stage editor tabs (e.g., "stage-123")
-      if (tabId.startsWith('stage-')) {
+      else if (tabId.startsWith('stage-')) {
         const stageId = tabId.substring(6)
-        return {
+        tab = {
           id: tabId,
           type: 'stageEditor',
-          label: getTabLabel('stageEditor', undefined, undefined, undefined, stageId),
+          label: getTabLabel(
+            'stageEditor',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            stageId
+          ),
           stageId,
         }
       }
-
       // Handle simple tabs (use tabId as type)
-      const tabType = tabId as Tab['type']
-      
-      // Validate tab type
-      if (
-        ![
-          'modelList',
-          'modelViewer',
-          'texture',
-          'animation',
-          'textureSets',
-          'textureSetViewer',
-          'packs',
-          'packViewer',
-          'projects',
-          'projectViewer',
-          'stageList',
-          'stageEditor',
-          'history',
-          'settings',
-        ].includes(tabType)
-      ) {
-        throw new Error(`Invalid tab type: ${tabId}`)
+      else {
+        const tabType = tabId as Tab['type']
+
+        // Validate tab type
+        if (
+          ![
+            'modelList',
+            'modelViewer',
+            'texture',
+            'animation',
+            'textureSets',
+            'textureSetViewer',
+            'packs',
+            'packViewer',
+            'projects',
+            'projectViewer',
+            'stageList',
+            'stageEditor',
+            'history',
+            'settings',
+          ].includes(tabType)
+        ) {
+          throw new Error(`Invalid tab type: ${tabId}`)
+        }
+
+        tab = {
+          id: tabId,
+          type: tabType,
+          label: getTabLabel(tabType),
+        }
       }
 
-      return {
-        id: tabId,
-        type: tabType,
-        label: getTabLabel(tabType),
-      }
-    })
+      tabs.push(tab)
+    }
+
+    return tabs
   } catch {
     return defaultValue
   }
@@ -164,7 +189,5 @@ export function serializeToCompactFormat(tabs: Tab[]): string {
     return true
   })
 
-  return uniqueTabs
-    .map(tab => tab.id)
-    .join(',')
+  return uniqueTabs.map(tab => tab.id).join(',')
 }

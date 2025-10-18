@@ -85,6 +85,24 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(parseCompactTabFormat('invalidType')).toEqual([])
       expect(parseCompactTabFormat('')).toEqual([])
     })
+
+    it('should deduplicate tabs with same id when parsing', () => {
+      // This tests the fix for the bug where duplicate tabs appear in the UI
+      // If the URL somehow contains duplicates (e.g., modelList,textureSets,set-1,model-1,model-1)
+      // the parser should deduplicate them to prevent rendering duplicate tabs
+      const result = parseCompactTabFormat(
+        'modelList,model-123,model-123,texture'
+      )
+      expect(result).toHaveLength(3)
+      expect(result[0].id).toBe('modelList')
+      expect(result[1].id).toBe('model-123')
+      expect(result[2].id).toBe('texture')
+
+      // Ensure no duplicates exist
+      const ids = result.map(tab => tab.id)
+      const uniqueIds = new Set(ids)
+      expect(ids.length).toBe(uniqueIds.size)
+    })
   })
 
   describe('serializeToCompactFormat', () => {
@@ -130,9 +148,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
         }, // duplicate
         { id: 'texture', type: 'texture', label: 'Textures' },
       ]
-      expect(serializeToCompactFormat(tabs)).toBe(
-        'modelList,model-123,texture'
-      )
+      expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123,texture')
     })
 
     it('should keep first occurrence when deduplicating', () => {

@@ -289,7 +289,8 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         type: type as StageLight['type'],
         color: '#ffffff',
         intensity: type === 'ambient' ? 0.5 : 1.0,
-        ...(type !== 'ambient' && type !== 'hemisphere' && { position: [5, 5, 5] }),
+        ...(type !== 'ambient' &&
+          type !== 'hemisphere' && { position: [5, 5, 5] }),
         ...(type === 'directional' && { target: [0, 0, 0] }),
         ...(type === 'spot' && {
           angle: Math.PI / 6,
