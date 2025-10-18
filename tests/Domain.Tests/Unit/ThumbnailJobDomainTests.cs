@@ -267,6 +267,79 @@ public class ThumbnailJobDomainTests
         Assert.False(isExpired);
     }
 
+    [Fact]
+    public void Cancel_WithPendingJob_ShouldCancelSuccessfully()
+    {
+        // Arrange
+        var job = CreateTestJob();
+        var cancelledAt = DateTime.UtcNow;
+
+        // Act
+        job.Cancel(cancelledAt);
+
+        // Assert
+        Assert.Equal(ThumbnailJobStatus.Dead, job.Status);
+        Assert.Equal("Job cancelled due to model configuration change", job.ErrorMessage);
+        Assert.Equal(cancelledAt, job.CompletedAt);
+        Assert.Equal(cancelledAt, job.UpdatedAt);
+        Assert.Null(job.LockedBy);
+        Assert.Null(job.LockedAt);
+    }
+
+    [Fact]
+    public void Cancel_WithProcessingJob_ShouldCancelSuccessfully()
+    {
+        // Arrange
+        var job = CreateTestJob();
+        var workerId = "worker-1";
+        var claimedAt = DateTime.UtcNow;
+        var cancelledAt = claimedAt.AddMinutes(5);
+
+        job.TryClaim(workerId, claimedAt);
+
+        // Act
+        job.Cancel(cancelledAt);
+
+        // Assert
+        Assert.Equal(ThumbnailJobStatus.Dead, job.Status);
+        Assert.Equal("Job cancelled due to model configuration change", job.ErrorMessage);
+        Assert.Equal(cancelledAt, job.CompletedAt);
+        Assert.Equal(cancelledAt, job.UpdatedAt);
+        Assert.Null(job.LockedBy);
+        Assert.Null(job.LockedAt);
+    }
+
+    [Fact]
+    public void Cancel_WithCompletedJob_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var job = CreateTestJob();
+        var workerId = "worker-1";
+        var claimedAt = DateTime.UtcNow;
+        var completedAt = claimedAt.AddMinutes(5);
+        var cancelledAt = completedAt.AddMinutes(5);
+
+        job.TryClaim(workerId, claimedAt);
+        job.MarkAsCompleted(completedAt);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => job.Cancel(cancelledAt));
+    }
+
+    [Fact]
+    public void Cancel_WithDeadJob_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var job = CreateTestJob();
+        var cancelledAt = DateTime.UtcNow;
+
+        // First cancellation should succeed
+        job.Cancel(cancelledAt);
+
+        // Act & Assert - Second cancellation should fail
+        Assert.Throws<InvalidOperationException>(() => job.Cancel(cancelledAt.AddMinutes(1)));
+    }
+
     private static ThumbnailJob CreateTestJob()
     {
         return ThumbnailJob.Create(
