@@ -4,9 +4,10 @@ import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import EditorCanvas from './EditorCanvas'
-import ComponentLibrary, { ComponentType } from './ComponentLibrary'
-import PropertyPanel from './PropertyPanel'
-import CodePanel from './CodePanel'
+import { ComponentType } from './ComponentLibrary'
+import ComponentLibraryWindow from './ComponentLibraryWindow'
+import PropertyPanelWindow from './PropertyPanelWindow'
+import CodePanelWindow from './CodePanelWindow'
 // eslint-disable-next-line no-restricted-imports -- Stage editor needs API access for saving/loading stages
 import apiClient from '../../../services/ApiClient'
 import './SceneEditor.css'
@@ -109,6 +110,9 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   >([])
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [componentsWindowVisible, setComponentsWindowVisible] = useState(false)
+  const [propertiesWindowVisible, setPropertiesWindowVisible] = useState(false)
+  const [codeWindowVisible, setCodeWindowVisible] = useState(false)
   const toast = useRef<Toast>(null)
 
   useEffect(() => {
@@ -289,7 +293,8 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         type: type as StageLight['type'],
         color: '#ffffff',
         intensity: type === 'ambient' ? 0.5 : 1.0,
-        ...(type !== 'ambient' && type !== 'hemisphere' && { position: [5, 5, 5] }),
+        ...(type !== 'ambient' &&
+          type !== 'hemisphere' && { position: [5, 5, 5] }),
         ...(type === 'directional' && { target: [0, 0, 0] }),
         ...(type === 'spot' && {
           angle: Math.PI / 6,
@@ -432,6 +437,27 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         </div>
         <div className="toolbar-right">
           <Button
+            icon="pi pi-th-large"
+            label="Components"
+            className="p-button-text"
+            onClick={() => setComponentsWindowVisible(!componentsWindowVisible)}
+            tooltip="Components Library"
+          />
+          <Button
+            icon="pi pi-sliders-h"
+            label="Properties"
+            className="p-button-text"
+            onClick={() => setPropertiesWindowVisible(!propertiesWindowVisible)}
+            tooltip="Properties"
+          />
+          <Button
+            icon="pi pi-code"
+            label="Code"
+            className="p-button-text"
+            onClick={() => setCodeWindowVisible(!codeWindowVisible)}
+            tooltip="Generated Code"
+          />
+          <Button
             icon="pi pi-file"
             label="New"
             className="p-button-text"
@@ -459,27 +485,36 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
       </div>
 
       <div className="editor-content">
-        <div className="editor-sidebar left">
-          <ComponentLibrary onAddComponent={handleAddComponent} />
-        </div>
-
         <div className="editor-main">
           <EditorCanvas
             stageConfig={stageConfig}
             selectedObjectId={selectedObjectId}
             onSelectObject={setSelectedObjectId}
           />
-          <CodePanel stageConfig={stageConfig} />
-        </div>
-
-        <div className="editor-sidebar right">
-          <PropertyPanel
-            selectedObject={selectedObject}
-            onUpdateObject={handleUpdateObject}
-            onDeleteObject={handleDeleteObject}
-          />
         </div>
       </div>
+
+      {/* Floating Windows */}
+      <ComponentLibraryWindow
+        visible={componentsWindowVisible}
+        onClose={() => setComponentsWindowVisible(false)}
+        side="left"
+        onAddComponent={handleAddComponent}
+      />
+      <PropertyPanelWindow
+        visible={propertiesWindowVisible}
+        onClose={() => setPropertiesWindowVisible(false)}
+        side="right"
+        selectedObject={selectedObject}
+        onUpdateObject={handleUpdateObject}
+        onDeleteObject={handleDeleteObject}
+      />
+      <CodePanelWindow
+        visible={codeWindowVisible}
+        onClose={() => setCodeWindowVisible(false)}
+        side="none"
+        stageConfig={stageConfig}
+      />
 
       {/* Save Dialog */}
       <Dialog
