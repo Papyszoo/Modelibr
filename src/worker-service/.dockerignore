@@ -3,6 +3,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Model cache (will be created during build)
+.model-cache/
+
 # Runtime data
 pids
 *.pid

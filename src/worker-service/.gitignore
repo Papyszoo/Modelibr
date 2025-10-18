@@ -1,0 +1,24 @@
+# Model cache directory (downloaded during npm install)
+.model-cache/
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+
+# Test coverage
+coverage/

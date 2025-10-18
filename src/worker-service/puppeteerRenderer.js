@@ -150,12 +150,14 @@ export class PuppeteerRenderer {
         try {
           await this.browser.close()
         } catch (e) {
-          logger.debug('Error closing browser during reinit', { error: e.message })
+          logger.debug('Error closing browser during reinit', {
+            error: e.message,
+          })
         }
         this.browser = null
       }
       this.page = null
-      
+
       // Reinitialize
       try {
         await this.initialize()

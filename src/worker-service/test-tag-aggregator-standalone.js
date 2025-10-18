@@ -48,9 +48,7 @@ class TagAggregator {
     const topTags = aggregatedTags.slice(0, maxTags)
 
     // Format tags as comma-separated string (simple, searchable)
-    const tagsString = topTags
-      .map(tag => tag.className)
-      .join(', ')
+    const tagsString = topTags.map(tag => tag.className).join(', ')
 
     // Generate description with percentages and occurrences
     const description = topTags
@@ -91,8 +89,14 @@ const result1 = TagAggregator.aggregateTags(predictions1, {
 
 console.log('Result:', result1)
 console.assert(result1.tags.includes('table'), 'Should include "table" tag')
-console.assert(result1.tags === 'table, chair, furniture, wooden object', 'Tags should be comma-separated names')
-console.assert(result1.description.includes('75.0%'), 'Description should include percentages')
+console.assert(
+  result1.tags === 'table, chair, furniture, wooden object',
+  'Tags should be comma-separated names'
+)
+console.assert(
+  result1.description.includes('75.0%'),
+  'Description should include percentages'
+)
 console.log('✓ Test 1 passed\n')
 
 // Test 2: Low confidence filtering
@@ -177,10 +181,7 @@ const result5 = TagAggregator.aggregateTags(predictions5, {
 
 console.log('Result:', result5)
 console.assert(result5.tags === '', 'Tags should be empty')
-console.assert(
-  result5.description === '',
-  'Description should be empty too'
-)
+console.assert(result5.description === '', 'Description should be empty too')
 console.log('✓ Test 5 passed\n')
 
 // Test 6: Duplicate aggregation with occurrence count
@@ -198,8 +199,14 @@ const result6 = TagAggregator.aggregateTags(predictions6, {
 })
 
 console.log('Result:', result6)
-console.assert(result6.description.includes('3x'), 'Description should show 3 occurrences for cube')
-console.assert(result6.description.includes('1x'), 'Description should show 1 occurrence for box')
+console.assert(
+  result6.description.includes('3x'),
+  'Description should show 3 occurrences for cube'
+)
+console.assert(
+  result6.description.includes('1x'),
+  'Description should show 1 occurrence for box'
+)
 console.log('✓ Test 6 passed\n')
 
 console.log('All tests passed! ✓')
