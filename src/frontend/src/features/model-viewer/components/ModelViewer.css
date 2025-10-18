@@ -371,7 +371,7 @@
 
 /* Stats container positioning in bottom-left corner of viewer */
 .stats-container {
-  position: absolute;
+  position: relative;
   bottom: 0;
   left: 0;
   pointer-events: none;
@@ -380,5 +380,8 @@
 
 /* Ensure stats.js DOM element doesn't interfere with canvas interactions */
 .stats-container > div {
+  position: relative !important;
+  bottom: 40px;
+  top: initial !important;
   pointer-events: auto;
 }
