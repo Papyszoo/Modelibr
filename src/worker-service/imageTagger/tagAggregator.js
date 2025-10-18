@@ -58,9 +58,7 @@ export class TagAggregator {
     const topTags = aggregatedTags.slice(0, maxTags)
 
     // Format tags as comma-separated string (simple, searchable)
-    const tagsString = topTags
-      .map(tag => tag.className)
-      .join(', ')
+    const tagsString = topTags.map(tag => tag.className).join(', ')
 
     // Generate description with percentages and occurrences
     const description = topTags

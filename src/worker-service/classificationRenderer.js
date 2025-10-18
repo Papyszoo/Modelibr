@@ -12,7 +12,7 @@ export class ClassificationRenderer {
   /**
    * Render classification views of the loaded model
    * @param {Object} jobLogger - Logger with job context
-   * @returns {Promise<Array<Buffer>>} Array of image buffers for classification
+   * @returns {Promise<Array<{buffer: Buffer, view: Object}>>} Array of image buffers with view info for classification
    */
   async renderClassificationViews(jobLogger) {
     if (!this.renderer || !this.renderer.page) {
@@ -30,7 +30,7 @@ export class ClassificationRenderer {
       { name: 'view4', elevation: 20, azimuth: 210 },
     ]
 
-    const imageBuffers = []
+    const imageResults = []
 
     try {
       // Calculate optimal camera distance
@@ -79,7 +79,14 @@ export class ClassificationRenderer {
           ''
         )
         const buffer = Buffer.from(base64Data, 'base64')
-        imageBuffers.push(buffer)
+        imageResults.push({
+          buffer,
+          view: {
+            name: view.name,
+            elevation: view.elevation,
+            azimuth: view.azimuth,
+          },
+        })
 
         jobLogger.debug('Rendered classification view', {
           view: view.name,
@@ -90,10 +97,10 @@ export class ClassificationRenderer {
       }
 
       jobLogger.info('Classification view rendering completed', {
-        imageCount: imageBuffers.length,
+        imageCount: imageResults.length,
       })
 
-      return imageBuffers
+      return imageResults
     } catch (error) {
       jobLogger.error('Failed to render classification views', {
         error: error.message,

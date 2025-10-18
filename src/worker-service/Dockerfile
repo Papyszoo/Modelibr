@@ -14,16 +14,24 @@ WORKDIR /app
 # Copy package files and .npmrc
 COPY package*.json .npmrc ./
 
+# Copy scripts directory (needed for download-model.js)
+COPY scripts ./scripts
+
 # Install dependencies with proper SSL configuration
 # The allowlist proxy uses a self-signed certificate, so we need to disable strict SSL
 # Also, .npmrc tells Puppeteer to skip Chromium download
+# Skip model download during npm install - we'll do it separately
 RUN npm config set strict-ssl false && \
     npm config set fetch-timeout 300000 && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
-    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || \
-    PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
+    SKIP_MODEL_DOWNLOAD=true PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || \
+    SKIP_MODEL_DOWNLOAD=true PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
+
+# Download the BLIP model after dependencies are installed
+# This runs separately so it doesn't fail the npm install if it times out
+RUN node scripts/download-model.js || echo "Model download failed, will download on first use"
 
 # Runtime stage - only copy what's needed
 FROM node:20-bookworm-slim AS runtime
@@ -76,6 +84,9 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 # Copy node_modules from builder stage
 COPY --from=builder /app/node_modules ./node_modules
+
+# Copy .model-cache from builder stage (if it exists)
+COPY --from=builder /app/.model-cache ./.model-cache
 
 # Copy package files
 COPY package*.json ./

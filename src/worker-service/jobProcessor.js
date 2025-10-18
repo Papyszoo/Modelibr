@@ -6,7 +6,7 @@ import { FrameEncoderService } from './frameEncoderService.js'
 import { ThumbnailStorageService } from './thumbnailStorageService.js'
 import { JobEventService } from './jobEventService.js'
 import { ClassificationRenderer } from './classificationRenderer.js'
-import { getTaggerInstance } from './imageTagger/mobilenetTagger.js'
+import { getTaggerInstance } from './imageTagger/huggingfaceTagger.js'
 import { TagAggregator } from './imageTagger/tagAggregator.js'
 import { ThumbnailApiService } from './thumbnailApiService.js'
 import { config } from './config.js'
@@ -438,23 +438,41 @@ export class JobProcessor {
                 }
 
                 // Render classification views
-                const viewImages = await this.classificationRenderer.renderClassificationViews(
-                  jobLogger
-                )
+                const viewImages =
+                  await this.classificationRenderer.renderClassificationViews(
+                    jobLogger
+                  )
 
                 // Initialize image tagger
                 await this.imageTagger.initialize()
 
-                // Classify each view image
+                // Get storage path for debug images (use thumbnailStorage path or a fallback)
+                const storagePath = config.thumbnailStorage?.basePath || '/tmp/modelibr'
+
+                // Classify each view image and save debug images
                 const allPredictions = []
                 for (let i = 0; i < viewImages.length; i++) {
+                  const { buffer, view } = viewImages[i]
+                  
+                  // Save debug image for frontend display
+                  await this.imageTagger.saveDebugImage(
+                    buffer,
+                    job.modelId,
+                    view,
+                    storagePath
+                  )
+                  
+                  // Classify the image with view information
                   const predictions = await this.imageTagger.describeImage(
-                    viewImages[i],
-                    config.imageClassification.topKPerImage
+                    buffer,
+                    config.imageClassification.topKPerImage,
+                    view
                   )
                   allPredictions.push(predictions)
                   jobLogger.debug('Classified view image', {
-                    viewIndex: i,
+                    view: view.name,
+                    azimuth: view.azimuth,
+                    elevation: view.elevation,
                     topPrediction: predictions[0]?.className,
                     confidence: predictions[0]?.probability,
                   })
