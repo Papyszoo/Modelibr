@@ -84,6 +84,17 @@ internal sealed class ModelRepository : IModelRepository
             .FirstOrDefaultAsync(m => m.Files.Any(f => f.Sha256Hash == sha256Hash), cancellationToken);
     }
 
+    public async Task<Model?> GetByNameAndVerticesAsync(string name, int? vertices, CancellationToken cancellationToken = default)
+    {
+        return await _context.Models
+            .Include(m => m.Files)
+            .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
+            .Include(m => m.Thumbnail)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(m => m.Name == name && m.Vertices == vertices, cancellationToken);
+    }
+
     public async Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
     {
         _context.Models.Update(model);

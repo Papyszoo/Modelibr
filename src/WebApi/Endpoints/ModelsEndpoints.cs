@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Models;
+using Domain.ValueObjects;
 using WebApi.Services;
 
 namespace WebApi.Endpoints;
@@ -8,9 +9,9 @@ public static class ModelsEndpoints
 {
     public static void MapModelsEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/models", async (int? packId, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
+        app.MapGet("/models", async (int? packId, PolyCount? polyCount, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler) =>
         {
-            var result = await queryHandler.Handle(new GetAllModelsQuery(packId), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, polyCount), CancellationToken.None);
             
             if (!result.IsSuccess)
             {

@@ -25,6 +25,12 @@ namespace Application.Models
                 models = models.Where(m => m.Packs.Any(p => p.Id == query.PackId.Value));
             }
             
+            // Filter by PolyCount if specified
+            if (query.PolyCount.HasValue)
+            {
+                models = models.Where(m => m.PolyCount == query.PolyCount.Value);
+            }
+            
             var modelDtos = models.Select(m => new ModelDto
             {
                 Id = m.Id,
@@ -34,6 +40,9 @@ namespace Application.Models
                 Tags = m.Tags,
                 Description = m.Description,
                 DefaultTextureSetId = m.DefaultTextureSetId,
+                Vertices = m.Vertices,
+                Faces = m.Faces,
+                PolyCount = m.PolyCount,
                 Files = m.Files.Select(f => new FileDto
                 {
                     Id = f.Id,
@@ -59,7 +68,7 @@ namespace Application.Models
         }
     }
 
-    public record GetAllModelsQuery(int? PackId = null) : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(int? PackId = null, PolyCount? PolyCount = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelDto> Models);
     
@@ -72,6 +81,9 @@ namespace Application.Models
         public string? Tags { get; init; }
         public string? Description { get; init; }
         public int? DefaultTextureSetId { get; init; }
+        public int? Vertices { get; init; }
+        public int? Faces { get; init; }
+        public PolyCount PolyCount { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
         public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();
