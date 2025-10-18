@@ -457,7 +457,7 @@ export class JobProcessor {
                   // Save debug image for frontend display
                   await this.imageTagger.saveDebugImage(
                     buffer,
-                    modelId,
+                    job.modelId,
                     view,
                     storagePath
                   )
