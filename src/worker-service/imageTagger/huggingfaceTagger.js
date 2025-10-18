@@ -69,9 +69,10 @@ export class HuggingFaceTagger {
    * Describe an image using local BLIP model (no API calls)
    * @param {Buffer} imageBuffer - Image data as Buffer
    * @param {number} _topK - Not used, kept for API compatibility
+   * @param {Object} viewInfo - Optional view information for better file naming and debugging
    * @returns {Promise<Array<{className: string, probability: number}>>}
    */
-  async describeImage(imageBuffer, _topK = 5) {
+  async describeImage(imageBuffer, _topK = 5, viewInfo = {}) {
     if (!this.isInitialized) {
       await this.initialize()
     }
@@ -83,9 +84,20 @@ export class HuggingFaceTagger {
 
       // Write buffer to a temporary file
       // Transformers.js works best with file paths
-      const tempFileName = `img-${randomUUID()}.png`
+      // Include view information in filename for better debugging
+      const viewName = viewInfo.name || 'unknown'
+      const azimuth = viewInfo.azimuth !== undefined ? `_az${viewInfo.azimuth}` : ''
+      const elevation = viewInfo.elevation !== undefined ? `_el${viewInfo.elevation}` : ''
+      const tempFileName = `classification_${viewName}${azimuth}${elevation}_${randomUUID()}.png`
       tempFilePath = path.join(tmpdir(), tempFileName)
       await writeFile(tempFilePath, imageBuffer)
+
+      logger.debug('Wrote temp file for classification', {
+        path: tempFilePath,
+        view: viewName,
+        azimuth: viewInfo.azimuth,
+        elevation: viewInfo.elevation,
+      })
 
       // Run image captioning locally (offline) using the temp file path
       const result = await this.captioner(tempFilePath)
@@ -188,6 +200,46 @@ export class HuggingFaceTagger {
     // Limit to reasonable number of tags
     const maxTags = 10
     return words.slice(0, maxTags)
+  }
+
+  /**
+   * Save debug image for classification
+   * @param {Buffer} imageBuffer - Image data
+   * @param {string} modelId - Model ID
+   * @param {Object} viewInfo - View information
+   * @param {string} storagePath - Base storage path
+   * @returns {Promise<string|null>} - Path to saved file or null on error
+   */
+  async saveDebugImage(imageBuffer, modelId, viewInfo, storagePath) {
+    try {
+      const { mkdirSync, writeFileSync } = await import('fs')
+      const debugDir = path.join(storagePath, modelId, 'classification-views')
+      
+      // Create directory if it doesn't exist
+      mkdirSync(debugDir, { recursive: true })
+      
+      const viewName = viewInfo.name || 'unknown'
+      const azimuth = viewInfo.azimuth !== undefined ? `_az${viewInfo.azimuth}` : ''
+      const elevation = viewInfo.elevation !== undefined ? `_el${viewInfo.elevation}` : ''
+      const fileName = `${viewName}${azimuth}${elevation}.png`
+      const filePath = path.join(debugDir, fileName)
+      
+      writeFileSync(filePath, imageBuffer)
+      
+      logger.debug('Saved debug classification image', {
+        path: filePath,
+        view: viewName,
+      })
+      
+      return filePath
+    } catch (error) {
+      logger.warn('Failed to save debug image', {
+        error: error.message,
+        modelId,
+        view: viewInfo.name,
+      })
+      return null
+    }
   }
 
   /**
