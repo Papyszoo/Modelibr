@@ -17,19 +17,22 @@ namespace Application.Models
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IDomainEventDispatcher _domainEventDispatcher;
         private readonly IBatchUploadRepository _batchUploadRepository;
+        private readonly IModelMetadataExtractionService _metadataExtractionService;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository, 
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
             IDomainEventDispatcher domainEventDispatcher,
-            IBatchUploadRepository batchUploadRepository)
+            IBatchUploadRepository batchUploadRepository,
+            IModelMetadataExtractionService metadataExtractionService)
         {
             _modelRepository = modelRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
             _domainEventDispatcher = domainEventDispatcher;
             _batchUploadRepository = batchUploadRepository;
+            _metadataExtractionService = metadataExtractionService;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -54,16 +57,36 @@ namespace Application.Models
 
             var fileEntity = fileResult.Value;
 
-            // Check if a model already exists with this file hash
-            var existingModel = await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
-            if (existingModel != null)
+            // Extract model metadata (vertices and faces count)
+            var metadata = await _metadataExtractionService.ExtractMetadataAsync(
+                fileEntity.FilePath, 
+                cancellationToken);
+
+            // Determine model name from command or file name
+            var modelName = command.ModelName ?? 
+                           Path.GetFileNameWithoutExtension(command.File.FileName);
+
+            // Check for duplicate model by name and vertices count
+            var existingModelByMetadata = await _modelRepository.GetByNameAndVerticesAsync(
+                modelName, 
+                metadata?.Vertices, 
+                cancellationToken);
+
+            if (existingModelByMetadata != null)
             {
+                // Check if the file with this hash already exists on this model
+                if (!existingModelByMetadata.HasFile(fileEntity.Sha256Hash))
+                {
+                    // Same model (name + vertices), but different file format - add file to existing model
+                    await _modelRepository.AddFileAsync(existingModelByMetadata.Id, fileEntity, cancellationToken);
+                }
+
                 // Raise domain event for existing model upload
-                existingModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
+                existingModelByMetadata.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
                 
                 // Publish domain events
-                await _domainEventDispatcher.PublishAsync(existingModel.DomainEvents, cancellationToken);
-                existingModel.ClearDomainEvents();
+                await _domainEventDispatcher.PublishAsync(existingModelByMetadata.DomainEvents, cancellationToken);
+                existingModelByMetadata.ClearDomainEvents();
                 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -72,20 +95,23 @@ namespace Application.Models
                     "model",
                     fileEntity.Id,
                     _dateTimeProvider.UtcNow,
-                    modelId: existingModel.Id);
+                    modelId: existingModelByMetadata.Id);
                 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 
-                return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
+                return Result.Success(new AddModelCommandResponse(existingModelByMetadata.Id, true));
             }
 
             // Create new model
-            var modelName = command.ModelName ?? 
-                           Path.GetFileNameWithoutExtension(command.File.FileName);
-
             try
             {
                 var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
+                
+                // Set geometry metadata if available
+                if (metadata != null)
+                {
+                    model.SetGeometryMetadata(metadata.Vertices, metadata.Faces, _dateTimeProvider.UtcNow);
+                }
                 
                 // Save the model first to get an ID
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);

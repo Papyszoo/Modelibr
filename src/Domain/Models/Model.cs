@@ -1,4 +1,5 @@
 ﻿using Domain.Events;
+using Domain.ValueObjects;
 
 namespace Domain.Models
 {
@@ -15,6 +16,9 @@ namespace Domain.Models
         public string? Tags { get; private set; }
         public string? Description { get; private set; }
         public int? DefaultTextureSetId { get; private set; }
+        public int? Vertices { get; private set; }
+        public int? Faces { get; private set; }
+        public PolyCount PolyCount { get; private set; } = PolyCount.Unknown;
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
         public ICollection<File> Files 
@@ -211,6 +215,31 @@ namespace Domain.Models
             Tags = tags;
             Description = description;
             UpdatedAt = updatedAt;
+        }
+
+        /// <summary>
+        /// Sets the model's geometry metadata (vertices and faces count).
+        /// Automatically calculates and sets the PolyCount category based on face count.
+        /// </summary>
+        /// <param name="vertices">Number of vertices in the model</param>
+        /// <param name="faces">Number of faces/polygons in the model</param>
+        /// <param name="updatedAt">When the metadata was set</param>
+        public void SetGeometryMetadata(int? vertices, int? faces, DateTime updatedAt)
+        {
+            Vertices = vertices;
+            Faces = faces;
+            PolyCount = CalculatePolyCount(faces);
+            UpdatedAt = updatedAt;
+        }
+
+        private static PolyCount CalculatePolyCount(int? faces)
+        {
+            if (!faces.HasValue || faces.Value <= 0)
+                return PolyCount.Unknown;
+
+            // Low poly: up to 10,000 faces
+            // Detailed: more than 10,000 faces
+            return faces.Value <= 10_000 ? PolyCount.LowPoly : PolyCount.Detailed;
         }
     }
 }
