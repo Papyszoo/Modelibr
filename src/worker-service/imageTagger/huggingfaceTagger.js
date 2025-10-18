@@ -2,6 +2,9 @@ import { pipeline, env } from '@xenova/transformers'
 import logger from '../logger.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { writeFile, unlink } from 'fs/promises'
+import { tmpdir } from 'os'
+import { randomUUID } from 'crypto'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -73,17 +76,19 @@ export class HuggingFaceTagger {
       await this.initialize()
     }
 
+    let tempFilePath = null
+
     try {
       const startTime = Date.now()
 
-      // Convert Buffer to base64 data URL for Transformers.js
-      // The pipeline can accept data URLs which RawImage.read() can parse
-      const base64Image = imageBuffer.toString('base64')
-      const dataUrl = `data:image/png;base64,${base64Image}`
+      // Write buffer to a temporary file
+      // Transformers.js works best with file paths
+      const tempFileName = `img-${randomUUID()}.png`
+      tempFilePath = path.join(tmpdir(), tempFileName)
+      await writeFile(tempFilePath, imageBuffer)
 
-      // Run image captioning locally (offline)
-      // The pipeline will internally use RawImage.read() to parse the data URL
-      const result = await this.captioner(dataUrl)
+      // Run image captioning locally (offline) using the temp file path
+      const result = await this.captioner(tempFilePath)
 
       const inferenceTime = Date.now() - startTime
 
@@ -115,6 +120,19 @@ export class HuggingFaceTagger {
 
       // Return empty array to allow job to continue
       return []
+    } finally {
+      // Clean up temp file
+      if (tempFilePath) {
+        try {
+          await unlink(tempFilePath)
+        } catch (unlinkError) {
+          // Ignore cleanup errors
+          logger.debug('Failed to clean up temp file', {
+            path: tempFilePath,
+            error: unlinkError.message,
+          })
+        }
+      }
     }
   }
 
