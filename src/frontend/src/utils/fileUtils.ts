@@ -34,6 +34,13 @@ export interface Model {
   vertices?: number
   faces?: number
   polyCount?: 'Unknown' | 'LowPoly' | 'Detailed'
+  thumbnail?: {
+    id: number
+    status: string
+    thumbnailPath?: string
+    width?: number
+    height?: number
+  }
 }
 
 /**
