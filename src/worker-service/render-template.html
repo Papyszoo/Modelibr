@@ -42,6 +42,7 @@
             camera: null,
             renderer: null,
             model: null,
+            modelContainer: null, // Container for model rotation
             isReady: false,
             error: null,
             useWebGPU: false
@@ -231,6 +232,25 @@
             model.position.x = -scaledCenter.x;
             model.position.z = -scaledCenter.z;
             model.position.y = -scaledBox.min.y;
+            
+            // Create a container group for rotation
+            // The container will be at the center of the model for proper rotation
+            const container = new THREE.Group();
+            
+            // Calculate the center Y position of the model for rotation pivot
+            const centerY = (scaledBox.max.y + scaledBox.min.y) / 2;
+            
+            // Adjust model position within container so rotation happens around center
+            model.position.y = model.position.y - centerY;
+            
+            // Position container at center height
+            container.position.y = centerY;
+            
+            // Add model to container
+            container.add(model);
+            
+            // Store reference to container for rotation
+            window.modelRenderer.modelContainer = container;
 
             return {
                 center,
@@ -239,20 +259,31 @@
             };
         }
 
-        // Position camera for rendering
+        // Position camera for rendering (now rotates model instead of camera)
         function positionCamera(azimuthAngle, distance, elevationAngle = 0) {
-            // Convert angles to radians
-            const azimuthRad = (azimuthAngle * Math.PI) / 180;
-            const elevationRad = (elevationAngle * Math.PI) / 180;
-            
-            // Calculate camera position using spherical coordinates
-            // X-Z plane rotation (azimuth) and vertical angle (elevation)
-            const horizontalDistance = Math.cos(elevationRad) * distance;
-            window.modelRenderer.camera.position.x = Math.cos(azimuthRad) * horizontalDistance;
-            window.modelRenderer.camera.position.z = Math.sin(azimuthRad) * horizontalDistance;
-            window.modelRenderer.camera.position.y = Math.sin(elevationRad) * distance;
-            
+            // Set camera to fixed position based on distance
+            // Camera is positioned in front of the model along the Z-axis
+            window.modelRenderer.camera.position.set(0, 0, distance);
             window.modelRenderer.camera.lookAt(0, 0, 0);
+            
+            // Rotate the model container instead of moving the camera
+            if (window.modelRenderer.modelContainer) {
+                // Convert angles to radians
+                const azimuthRad = (azimuthAngle * Math.PI) / 180;
+                const elevationRad = (elevationAngle * Math.PI) / 180;
+                
+                // Reset rotation first to avoid accumulation
+                window.modelRenderer.modelContainer.rotation.set(0, 0, 0);
+                
+                // Apply rotations
+                // Azimuth rotates around Y-axis (horizontal rotation)
+                window.modelRenderer.modelContainer.rotation.y = azimuthRad;
+                
+                // Elevation rotates around X-axis (vertical tilt)
+                // Note: We use negative elevation to maintain the same viewing angle
+                // as the old camera-orbit approach
+                window.modelRenderer.modelContainer.rotation.x = -elevationRad;
+            }
         }
 
         // Render the scene
@@ -295,44 +326,47 @@
 
         // Clear the scene by removing the previous model
         function clearScene() {
-            if (window.modelRenderer.model && window.modelRenderer.scene) {
+            if (window.modelRenderer.modelContainer && window.modelRenderer.scene) {
                 try {
-                    // Remove the model from the scene
-                    window.modelRenderer.scene.remove(window.modelRenderer.model);
+                    // Remove the container (which includes the model) from the scene
+                    window.modelRenderer.scene.remove(window.modelRenderer.modelContainer);
                     
                     // Dispose of geometries and materials to free memory
-                    window.modelRenderer.model.traverse((child) => {
-                        if (child.isMesh) {
-                            try {
-                                if (child.geometry) {
-                                    child.geometry.dispose();
-                                }
-                            } catch (e) {
-                                console.warn('Failed to dispose geometry:', e);
-                            }
-                            
-                            try {
-                                if (child.material) {
-                                    if (Array.isArray(child.material)) {
-                                        child.material.forEach(material => {
-                                            try {
-                                                material.dispose();
-                                            } catch (e) {
-                                                console.warn('Failed to dispose material:', e);
-                                            }
-                                        });
-                                    } else {
-                                        child.material.dispose();
+                    if (window.modelRenderer.model) {
+                        window.modelRenderer.model.traverse((child) => {
+                            if (child.isMesh) {
+                                try {
+                                    if (child.geometry) {
+                                        child.geometry.dispose();
                                     }
+                                } catch (e) {
+                                    console.warn('Failed to dispose geometry:', e);
                                 }
-                            } catch (e) {
-                                console.warn('Failed to dispose material:', e);
+                                
+                                try {
+                                    if (child.material) {
+                                        if (Array.isArray(child.material)) {
+                                            child.material.forEach(material => {
+                                                try {
+                                                    material.dispose();
+                                                } catch (e) {
+                                                    console.warn('Failed to dispose material:', e);
+                                                }
+                                            });
+                                        } else {
+                                            child.material.dispose();
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn('Failed to dispose material:', e);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                     
-                    // Clear the model reference
+                    // Clear the references
                     window.modelRenderer.model = null;
+                    window.modelRenderer.modelContainer = null;
                     window.modelRenderer.isReady = false;
                     
                     console.log('Scene cleared successfully');
@@ -341,6 +375,7 @@
                     console.error('Error clearing scene:', error);
                     // Still clear the references even if disposal fails
                     window.modelRenderer.model = null;
+                    window.modelRenderer.modelContainer = null;
                     window.modelRenderer.isReady = false;
                     return false;
                 }
