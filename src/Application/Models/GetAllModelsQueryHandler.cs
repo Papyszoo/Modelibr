@@ -25,6 +25,12 @@ namespace Application.Models
                 models = models.Where(m => m.Packs.Any(p => p.Id == query.PackId.Value));
             }
             
+            // Filter by project if specified
+            if (query.ProjectId.HasValue)
+            {
+                models = models.Where(m => m.Projects.Any(p => p.Id == query.ProjectId.Value));
+            }
+            
             var modelDtos = models.Select(m => new ModelDto
             {
                 Id = m.Id,
@@ -48,6 +54,11 @@ namespace Application.Models
                     Id = p.Id,
                     Name = p.Name
                 }).ToList(),
+                Projects = m.Projects.Select(p => new ProjectSummaryDto
+                {
+                    Id = p.Id,
+                    Name = p.Name
+                }).ToList(),
                 TextureSets = m.TextureSets.Select(ts => new TextureSetSummaryDto
                 {
                     Id = ts.Id,
@@ -59,7 +70,7 @@ namespace Application.Models
         }
     }
 
-    public record GetAllModelsQuery(int? PackId = null) : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelDto> Models);
     
@@ -74,6 +85,7 @@ namespace Application.Models
         public int? DefaultTextureSetId { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
+        public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();
         public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();
     }
 
@@ -88,6 +100,12 @@ namespace Application.Models
     }
 
     public record PackSummaryDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
+
+    public record ProjectSummaryDto
     {
         public int Id { get; init; }
         public string Name { get; init; } = string.Empty;
