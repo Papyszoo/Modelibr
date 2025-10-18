@@ -368,3 +368,12 @@
 .model-viewer-sidebar .info-section {
   margin-bottom: 1.5rem;
 }
+
+/* FPS counter positioning in bottom-left corner */
+.viewer-container :global(.stats-fps) {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  top: auto !important;
+  right: auto !important;
+}
