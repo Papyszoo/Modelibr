@@ -250,6 +250,169 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Apply textures to the loaded model
+   * @param {Object} texturePaths - Map of texture types to file paths
+   * @returns {Promise<boolean>} Success status
+   */
+  async applyTextures(texturePaths) {
+    if (!texturePaths || Object.keys(texturePaths).length === 0) {
+      logger.info('No textures to apply')
+      return true
+    }
+
+    logger.info('Applying textures to model', {
+      textureTypes: Object.keys(texturePaths),
+    })
+
+    try {
+      // Read texture files and convert to base64 data URLs
+      const textureDataUrls = {}
+      for (const [textureType, filePath] of Object.entries(texturePaths)) {
+        try {
+          const fileBuffer = fs.readFileSync(filePath)
+          const base64Data = fileBuffer.toString('base64')
+          // Detect image format from file extension
+          const ext = path.extname(filePath).toLowerCase()
+          const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg'
+          textureDataUrls[textureType] = `data:${mimeType};base64,${base64Data}`
+          logger.debug('Prepared texture data URL', {
+            textureType,
+            filePath,
+            dataUrlLength: textureDataUrls[textureType].length,
+          })
+        } catch (error) {
+          logger.warn('Failed to read texture file, skipping', {
+            textureType,
+            filePath,
+            error: error.message,
+          })
+        }
+      }
+
+      // Apply textures in the browser
+      const result = await this.page.evaluate(async textureUrls => {
+        try {
+          if (!window.modelRenderer.model) {
+            return { success: false, error: 'No model loaded' }
+          }
+
+          const THREE = window.THREE
+          const model = window.modelRenderer.model
+          const textureLoader = new THREE.TextureLoader()
+
+          // Load textures asynchronously
+          const loadTexture = url => {
+            return new Promise((resolve, reject) => {
+              textureLoader.load(
+                url,
+                texture => {
+                  texture.colorSpace = THREE.SRGBColorSpace
+                  resolve(texture)
+                },
+                undefined,
+                error => reject(error)
+              )
+            })
+          }
+
+          const loadedTextures = {}
+          for (const [type, url] of Object.entries(textureUrls)) {
+            try {
+              loadedTextures[type] = await loadTexture(url)
+              console.log(`Loaded ${type} texture`)
+            } catch (error) {
+              console.warn(`Failed to load ${type} texture:`, error)
+            }
+          }
+
+          // Apply textures to all meshes in the model
+          let meshCount = 0
+          model.traverse(child => {
+            if (child.isMesh) {
+              meshCount++
+
+              // Create or update material
+              if (!child.material || !(child.material instanceof THREE.MeshStandardMaterial)) {
+                child.material = new THREE.MeshStandardMaterial()
+              }
+
+              // Apply textures based on type
+              if (loadedTextures.BaseColor || loadedTextures.Diffuse) {
+                child.material.map = loadedTextures.BaseColor || loadedTextures.Diffuse
+                child.material.needsUpdate = true
+                console.log('Applied base color/diffuse texture to mesh')
+              }
+
+              if (loadedTextures.Normal) {
+                child.material.normalMap = loadedTextures.Normal
+                child.material.needsUpdate = true
+                console.log('Applied normal texture to mesh')
+              }
+
+              if (loadedTextures.Metallic) {
+                child.material.metalnessMap = loadedTextures.Metallic
+                child.material.needsUpdate = true
+                console.log('Applied metallic texture to mesh')
+              }
+
+              if (loadedTextures.Roughness) {
+                child.material.roughnessMap = loadedTextures.Roughness
+                child.material.needsUpdate = true
+                console.log('Applied roughness texture to mesh')
+              }
+
+              if (loadedTextures.Emissive) {
+                child.material.emissiveMap = loadedTextures.Emissive
+                child.material.emissive = new THREE.Color(0xffffff)
+                child.material.needsUpdate = true
+                console.log('Applied emissive texture to mesh')
+              }
+
+              if (loadedTextures.AmbientOcclusion) {
+                child.material.aoMap = loadedTextures.AmbientOcclusion
+                child.material.needsUpdate = true
+                console.log('Applied AO texture to mesh')
+              }
+            }
+          })
+
+          return {
+            success: true,
+            meshCount,
+            appliedTextures: Object.keys(loadedTextures),
+          }
+        } catch (error) {
+          console.error('Texture application error:', error)
+          return {
+            success: false,
+            error: error.message,
+          }
+        }
+      }, textureDataUrls)
+
+      if (!result.success) {
+        logger.warn('Failed to apply textures in browser', {
+          error: result.error,
+        })
+        return false
+      }
+
+      logger.info('Textures applied successfully', {
+        meshCount: result.meshCount,
+        appliedTextures: result.appliedTextures,
+      })
+
+      return true
+    } catch (error) {
+      logger.error('Failed to apply textures', {
+        error: error.message,
+        stack: error.stack,
+      })
+      return false
+    }
+  }
+
+  /**
    * Render orbit frames for the loaded model
    * @param {Object} jobLogger - Logger with job context
    * @returns {Promise<Array>} Array of rendered frame data
