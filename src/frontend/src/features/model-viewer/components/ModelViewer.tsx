@@ -89,11 +89,11 @@ function ModelViewer({
     }
   }, [selectedTextureSetId])
 
-  const fetchModel = async (id: string): Promise<void> => {
+  const fetchModel = async (id: string, skipCache = false): Promise<void> => {
     try {
       setLoading(true)
       setError('')
-      const model = await ApiClient.getModelById(id)
+      const model = await ApiClient.getModelById(id, { skipCache })
       setModel(model)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model')
@@ -114,7 +114,7 @@ function ModelViewer({
 
   const handleModelUpdated = () => {
     if (modelId) {
-      fetchModel(modelId)
+      fetchModel(modelId, true)
     }
   }
 
@@ -241,7 +241,6 @@ function ModelViewer({
               </button>
             </div>
           ) : (
-
             <>
               <Canvas
                 key={`canvas-${model.id}-${side}`}
