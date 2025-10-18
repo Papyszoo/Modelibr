@@ -20,7 +20,9 @@ env.cacheDir = cacheDir
 // Skip download if SKIP_MODEL_DOWNLOAD is set (e.g., in Docker builds)
 if (process.env.SKIP_MODEL_DOWNLOAD === 'true') {
   console.log('⏭️  Skipping model download (SKIP_MODEL_DOWNLOAD=true)')
-  console.log('   Run this script manually or let the model download on first use.')
+  console.log(
+    '   Run this script manually or let the model download on first use.'
+  )
   process.exit(0)
 }
 
@@ -39,7 +41,7 @@ async function downloadModel() {
     // Initialize the pipeline - this will download the model
     const captioner = await pipeline(
       'image-to-text',
-      'Xenova/vit-gpt2-image-captioning',
+      'Xenova/vit-gpt2-image-captioning'
     )
 
     console.log('✅ Model downloaded successfully!')

@@ -86,8 +86,10 @@ export class HuggingFaceTagger {
       // Transformers.js works best with file paths
       // Include view information in filename for better debugging
       const viewName = viewInfo.name || 'unknown'
-      const azimuth = viewInfo.azimuth !== undefined ? `_az${viewInfo.azimuth}` : ''
-      const elevation = viewInfo.elevation !== undefined ? `_el${viewInfo.elevation}` : ''
+      const azimuth =
+        viewInfo.azimuth !== undefined ? `_az${viewInfo.azimuth}` : ''
+      const elevation =
+        viewInfo.elevation !== undefined ? `_el${viewInfo.elevation}` : ''
       const tempFileName = `classification_${viewName}${azimuth}${elevation}_${randomUUID()}.png`
       tempFilePath = path.join(tmpdir(), tempFileName)
       await writeFile(tempFilePath, imageBuffer)
@@ -213,24 +215,30 @@ export class HuggingFaceTagger {
   async saveDebugImage(imageBuffer, modelId, viewInfo, storagePath) {
     try {
       const { mkdirSync, writeFileSync } = await import('fs')
-      const debugDir = path.join(storagePath, String(modelId), 'classification-views')
-      
+      const debugDir = path.join(
+        storagePath,
+        String(modelId),
+        'classification-views'
+      )
+
       // Create directory if it doesn't exist
       mkdirSync(debugDir, { recursive: true })
-      
+
       const viewName = viewInfo.name || 'unknown'
-      const azimuth = viewInfo.azimuth !== undefined ? `_az${viewInfo.azimuth}` : ''
-      const elevation = viewInfo.elevation !== undefined ? `_el${viewInfo.elevation}` : ''
+      const azimuth =
+        viewInfo.azimuth !== undefined ? `_az${viewInfo.azimuth}` : ''
+      const elevation =
+        viewInfo.elevation !== undefined ? `_el${viewInfo.elevation}` : ''
       const fileName = `${viewName}${azimuth}${elevation}.png`
       const filePath = path.join(debugDir, fileName)
-      
+
       writeFileSync(filePath, imageBuffer)
-      
+
       logger.debug('Saved debug classification image', {
         path: filePath,
         view: viewName,
       })
-      
+
       return filePath
     } catch (error) {
       logger.warn('Failed to save debug image', {
