@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.Models
@@ -32,6 +33,9 @@ namespace Application.Models
                 Tags = model.Tags,
                 Description = model.Description,
                 DefaultTextureSetId = model.DefaultTextureSetId,
+                Vertices = model.Vertices,
+                Faces = model.Faces,
+                PolyCount = model.PolyCount,
                 Files = model.Files.Select(f => new FileDto
                 {
                     Id = f.Id,
