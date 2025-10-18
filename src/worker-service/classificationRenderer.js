@@ -21,6 +21,21 @@ export class ClassificationRenderer {
 
     jobLogger.info('Starting classification view rendering')
 
+    // Store original viewport size
+    const originalWidth = config.rendering.outputWidth
+    const originalHeight = config.rendering.outputHeight
+
+    // Set viewport to classification resolution (512x512)
+    const classificationWidth = config.imageClassification.imageWidth
+    const classificationHeight = config.imageClassification.imageHeight
+
+    jobLogger.info('Setting viewport for classification rendering', {
+      width: classificationWidth,
+      height: classificationHeight,
+    })
+
+    await this.renderer.setViewport(classificationWidth, classificationHeight)
+
     // Define the 4 camera positions with rotation pairs (elevation, azimuth)
     // Elevation: 20 degrees, Azimuth: 30, 330, 150, 210 degrees
     const views = [
@@ -98,6 +113,7 @@ export class ClassificationRenderer {
 
       jobLogger.info('Classification view rendering completed', {
         imageCount: imageResults.length,
+        resolution: `${classificationWidth}x${classificationHeight}`,
       })
 
       return imageResults
@@ -107,6 +123,13 @@ export class ClassificationRenderer {
         stack: error.stack,
       })
       throw error
+    } finally {
+      // Restore original viewport size for subsequent thumbnail rendering
+      jobLogger.debug('Restoring original viewport size', {
+        width: originalWidth,
+        height: originalHeight,
+      })
+      await this.renderer.setViewport(originalWidth, originalHeight)
     }
   }
 }
