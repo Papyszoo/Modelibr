@@ -26,7 +26,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     })
 
     it('should parse tab type with modelId', () => {
-      const result = parseCompactTabFormat('modelViewer:123')
+      const result = parseCompactTabFormat('model-123')
       expect(result).toHaveLength(1)
       expect(result[0].type).toBe('modelViewer')
       expect(result[0].label).toBe('Model 123')
@@ -34,7 +34,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     })
 
     it('should parse multiple tabs', () => {
-      const result = parseCompactTabFormat('modelList,texture,modelViewer:456')
+      const result = parseCompactTabFormat('modelList,texture,model-456')
       expect(result).toHaveLength(3)
       expect(result[0].type).toBe('modelList')
       expect(result[1].type).toBe('texture')
@@ -51,15 +51,15 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     })
 
     it('should generate deterministic IDs for tabs with modelId', () => {
-      const result1 = parseCompactTabFormat('modelViewer:123')
-      const result2 = parseCompactTabFormat('modelViewer:123')
+      const result1 = parseCompactTabFormat('model-123')
+      const result2 = parseCompactTabFormat('model-123')
 
       expect(result1[0].id).toBe(result2[0].id)
     })
 
     it('should handle legacy JSON format', () => {
       const legacyFormat = JSON.stringify([
-        { id: 'models', type: 'modelList' },
+        { id: 'modelList', type: 'modelList' },
         { id: 'model-123', type: 'modelViewer', modelId: '123' },
       ])
       const result = parseCompactTabFormat(legacyFormat)
@@ -90,15 +90,15 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
   describe('serializeToCompactFormat', () => {
     it('should serialize basic tabs without modelId', () => {
       const tabs: Tab[] = [
-        { id: 'models', type: 'modelList', label: 'Models' },
-        { id: 'textures', type: 'texture', label: 'Textures' },
+        { id: 'modelList', type: 'modelList', label: 'Models' },
+        { id: 'texture', type: 'texture', label: 'Textures' },
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList,texture')
     })
 
     it('should serialize tabs with modelId', () => {
       const tabs: Tab[] = [
-        { id: 'models', type: 'modelList', label: 'Models' },
+        { id: 'modelList', type: 'modelList', label: 'Models' },
         {
           id: 'model-123',
           type: 'modelViewer',
@@ -106,11 +106,52 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           modelId: '123',
         },
       ]
-      expect(serializeToCompactFormat(tabs)).toBe('modelList,modelViewer:123')
+      expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123')
     })
 
     it('should handle empty array', () => {
       expect(serializeToCompactFormat([])).toBe('')
+    })
+
+    it('should deduplicate tabs with same id', () => {
+      const tabs: Tab[] = [
+        { id: 'modelList', type: 'modelList', label: 'Models' },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Model 123',
+          modelId: '123',
+        },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Model 123',
+          modelId: '123',
+        }, // duplicate
+        { id: 'texture', type: 'texture', label: 'Textures' },
+      ]
+      expect(serializeToCompactFormat(tabs)).toBe(
+        'modelList,model-123,texture'
+      )
+    })
+
+    it('should keep first occurrence when deduplicating', () => {
+      const tabs: Tab[] = [
+        { id: 'modelList', type: 'modelList', label: 'Models' },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'First',
+          modelId: '123',
+        },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Second',
+          modelId: '123',
+        }, // duplicate with different label
+      ]
+      expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123')
     })
   })
 
@@ -129,7 +170,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
       // Serialize tabs to URL format
       const serialized = serializeToCompactFormat(originalTabs)
-      expect(serialized).toBe('modelList,texture,modelViewer:123')
+      expect(serialized).toBe('modelList,texture,model-123')
 
       // Parse back from URL format (simulating browser refresh)
       const parsedTabs = parseCompactTabFormat(serialized)
