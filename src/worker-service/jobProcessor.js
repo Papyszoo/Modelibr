@@ -228,6 +228,7 @@ export class JobProcessor {
    */
   async processModel(job, jobLogger) {
     let tempFilePath = null
+    let texturePaths = null
 
     try {
       jobLogger.info('Starting model processing', {
@@ -316,7 +317,6 @@ export class JobProcessor {
       )
 
       // Step 3.5: Fetch and apply textures if default texture set is configured
-      let texturePaths = null
       try {
         const modelInfo = await this.modelDataService.getModelInfo(job.modelId)
         if (modelInfo && modelInfo.defaultTextureSetId) {
