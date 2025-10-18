@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import ApiClient from '../../services/ApiClient'
 import {
   isSupportedModelFormat,
@@ -267,14 +267,15 @@ export function useDragAndDrop(onFilesDropped) {
   const dragTargetRef = useRef(null)
 
   // Clear drag state helper function
-  const clearDragState = () => {
+  // Wrapped in useCallback to ensure stable reference across renders
+  const clearDragState = useCallback(() => {
     dragCounterRef.current = 0
     document.body.classList.remove('dragging-file')
     if (dragTargetRef.current) {
       dragTargetRef.current.classList.remove('drag-over')
       dragTargetRef.current = null
     }
-  }
+  }, [])
 
   // Set up global event listeners to handle edge cases where drag leaves the window
   useEffect(() => {
@@ -298,7 +299,7 @@ export function useDragAndDrop(onFilesDropped) {
       // Clean up any lingering drag state on unmount
       clearDragState()
     }
-  }, [])
+  }, [clearDragState])
 
   const onDrop = e => {
     e.preventDefault()
