@@ -21,6 +21,13 @@ internal class UpdateSettingCommandHandler : ICommandHandler<UpdateSettingComman
 
     public async Task<Result<UpdateSettingResponse>> Handle(UpdateSettingCommand command, CancellationToken cancellationToken)
     {
+        // Validate the setting value based on its key
+        var validationResult = SettingValidator.ValidateSetting(command.Key, command.Value);
+        if (!validationResult.IsSuccess)
+        {
+            return Result.Failure<UpdateSettingResponse>(validationResult.Error);
+        }
+
         try
         {
             var now = _dateTimeProvider.UtcNow;
