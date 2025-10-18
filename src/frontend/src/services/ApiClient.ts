@@ -379,6 +379,20 @@ class ApiClient {
     useApiCacheStore.getState().invalidateTextureSetById(setId)
   }
 
+  async changeTextureType(
+    setId: number,
+    textureId: number,
+    newTextureType: number
+  ): Promise<void> {
+    await this.client.put(`/texture-sets/${setId}/textures/${textureId}/type`, {
+      textureType: newTextureType,
+    })
+
+    // Invalidate texture sets cache when texture types change
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
+  }
+
   async associateTextureSetWithModel(
     setId: number,
     modelId: number

@@ -27,6 +27,7 @@ function TextureCard({
 }: TextureCardProps) {
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [isDraggingTexture, setIsDraggingTexture] = useState(false)
   const [showInfoDialog, setShowInfoDialog] = useState(false)
   const toast = useRef<Toast>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -105,6 +106,117 @@ function TextureCard({
     setIsDragging(false)
   }
 
+  // Handle dragging a texture FROM this card to another
+  const handleTextureDragStart = (e: React.DragEvent) => {
+    if (!texture) return
+
+    // Store texture data in drag event
+    e.dataTransfer.setData(
+      'texture',
+      JSON.stringify({
+        textureId: texture.id,
+        textureType: texture.textureType,
+        setId: setId,
+      })
+    )
+    e.dataTransfer.effectAllowed = 'move'
+    setIsDraggingTexture(true)
+  }
+
+  const handleTextureDragEnd = () => {
+    setIsDraggingTexture(false)
+  }
+
+  // Handle texture being dragged over this card
+  const handleTextureDragOver = (e: React.DragEvent) => {
+    // Check if this is a texture drag (not a file drag)
+    const hasTextureData = e.dataTransfer.types.includes('texture')
+
+    if (hasTextureData) {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(true)
+    } else {
+      // It's a file drag, use the normal handler
+      onDragOver(e)
+    }
+  }
+
+  const handleTextureDragEnterEnhanced = (e: React.DragEvent) => {
+    const hasTextureData = e.dataTransfer.types.includes('texture')
+
+    if (hasTextureData) {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(true)
+    } else {
+      handleDragEnter(e)
+    }
+  }
+
+  const handleTextureDropEnhanced = async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const textureData = e.dataTransfer.getData('texture')
+
+    if (textureData) {
+      // This is a texture drop from another card
+      setIsDragging(false)
+
+      try {
+        const draggedTexture = JSON.parse(textureData)
+
+        // Don't do anything if dropping on the same texture type
+        if (draggedTexture.textureType === textureType) {
+          return
+        }
+
+        // Don't do anything if it's from a different set
+        if (draggedTexture.setId !== setId) {
+          toast.current?.show({
+            severity: 'warn',
+            summary: 'Not Allowed',
+            detail: 'Cannot move textures between different texture sets',
+            life: 3000,
+          })
+          return
+        }
+
+        setUploading(true)
+
+        // Call the API to change texture type
+        await textureSetsApi.changeTextureType(
+          setId,
+          draggedTexture.textureId,
+          textureType
+        )
+
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: `Texture type changed to ${typeInfo.label}`,
+          life: 3000,
+        })
+
+        onTextureUpdated()
+      } catch (error) {
+        console.error('Failed to change texture type:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to change texture type',
+          life: 3000,
+        })
+      } finally {
+        setUploading(false)
+      }
+    } else {
+      // This is a file drop, use the normal handler
+      handleDrop(e)
+    }
+  }
+
   const handleRemoveTexture = async () => {
     if (!texture) return
 
@@ -174,10 +286,10 @@ function TextureCard({
       <Toast ref={toast} />
       <Card
         title={cardTitle}
-        className={`texture-card ${isDragging ? 'dragging' : ''} ${texture ? 'has-texture' : 'empty'}`}
-        onDrop={handleDrop}
-        onDragOver={onDragOver}
-        onDragEnter={handleDragEnter}
+        className={`texture-card ${isDragging ? 'dragging' : ''} ${texture ? 'has-texture' : 'empty'} ${isDraggingTexture ? 'dragging-source' : ''}`}
+        onDrop={handleTextureDropEnhanced}
+        onDragOver={handleTextureDragOver}
+        onDragEnter={handleTextureDragEnterEnhanced}
         onDragLeave={handleDragLeave}
         style={{ borderColor: typeInfo.color }}
       >
@@ -199,7 +311,12 @@ function TextureCard({
               <p>Uploading...</p>
             </div>
           ) : texture ? (
-            <div className="texture-card-with-preview">
+            <div
+              className="texture-card-with-preview"
+              draggable
+              onDragStart={handleTextureDragStart}
+              onDragEnd={handleTextureDragEnd}
+            >
               <img
                 src={ApiClient.getFileUrl(texture.fileId.toString())}
                 alt={texture.fileName || typeInfo.label}
