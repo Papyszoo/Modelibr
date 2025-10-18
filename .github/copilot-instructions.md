@@ -1,3 +1,19 @@
+# ⚠️ CRITICAL: NO DOCUMENTATION GENERATION ⚠️
+
+**NEVER CREATE, GENERATE, OR ADD ANY DOCUMENTATION FILES (*.md, *.txt, *.doc, README, CHANGELOG, etc.) TO THIS REPOSITORY.**
+
+**DO NOT:**
+- Create implementation documentation
+- Generate architecture documents  
+- Write setup guides or tutorials
+- Add API documentation files
+- Create summary or overview documents
+- Generate any standalone documentation files
+
+**EXCEPTIONS:**
+- Only update existing documentation if explicitly requested
+- Only modify .github/copilot-instructions.md when necessary for configuration
+
 # Modelibr
 Modelibr is a .NET 9.0 C# Web API application built using Clean Architecture principles. It provides a file upload service for 3D models with hash-based storage and deduplication. The application is containerized using Docker and includes database integration with PostgreSQL.
 

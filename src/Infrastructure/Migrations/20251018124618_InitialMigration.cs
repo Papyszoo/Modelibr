@@ -55,23 +55,6 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Models",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    Tags = table.Column<string>(type: "text", nullable: true),
-                    Description = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Models", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Packs",
                 columns: table => new
                 {
@@ -119,6 +102,126 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Models",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Tags = table.Column<string>(type: "text", nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    DefaultTextureSetId = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Models", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Models_TextureSets_DefaultTextureSetId",
+                        column: x => x.DefaultTextureSetId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PackTextureSets",
+                columns: table => new
+                {
+                    PacksId = table.Column<int>(type: "integer", nullable: false),
+                    TextureSetsId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PackTextureSets", x => new { x.PacksId, x.TextureSetsId });
+                    table.ForeignKey(
+                        name: "FK_PackTextureSets_Packs_PacksId",
+                        column: x => x.PacksId,
+                        principalTable: "Packs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PackTextureSets_TextureSets_TextureSetsId",
+                        column: x => x.TextureSetsId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Textures",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    FileId = table.Column<int>(type: "integer", nullable: false),
+                    TextureType = table.Column<int>(type: "integer", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    TextureSetId = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Textures", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Textures_Files_FileId",
+                        column: x => x.FileId,
+                        principalTable: "Files",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Textures_TextureSets_TextureSetId",
+                        column: x => x.TextureSetId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "BatchUploads",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    BatchId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    UploadType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    UploadedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    PackId = table.Column<int>(type: "integer", nullable: true),
+                    ModelId = table.Column<int>(type: "integer", nullable: true),
+                    TextureSetId = table.Column<int>(type: "integer", nullable: true),
+                    FileId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BatchUploads", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_BatchUploads_Files_FileId",
+                        column: x => x.FileId,
+                        principalTable: "Files",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_BatchUploads_Models_ModelId",
+                        column: x => x.ModelId,
+                        principalTable: "Models",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_BatchUploads_Packs_PackId",
+                        column: x => x.PackId,
+                        principalTable: "Packs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_BatchUploads_TextureSets_TextureSetId",
+                        column: x => x.TextureSetId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ModelFiles",
                 columns: table => new
                 {
@@ -138,6 +241,54 @@ namespace Infrastructure.Migrations
                         name: "FK_ModelFiles_Models_ModelsId",
                         column: x => x.ModelsId,
                         principalTable: "Models",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ModelTextureSets",
+                columns: table => new
+                {
+                    ModelsId = table.Column<int>(type: "integer", nullable: false),
+                    TextureSetsId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ModelTextureSets", x => new { x.ModelsId, x.TextureSetsId });
+                    table.ForeignKey(
+                        name: "FK_ModelTextureSets_Models_ModelsId",
+                        column: x => x.ModelsId,
+                        principalTable: "Models",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ModelTextureSets_TextureSets_TextureSetsId",
+                        column: x => x.TextureSetsId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PackModels",
+                columns: table => new
+                {
+                    ModelsId = table.Column<int>(type: "integer", nullable: false),
+                    PacksId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PackModels", x => new { x.ModelsId, x.PacksId });
+                    table.ForeignKey(
+                        name: "FK_PackModels_Models_ModelsId",
+                        column: x => x.ModelsId,
+                        principalTable: "Models",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PackModels_Packs_PacksId",
+                        column: x => x.PacksId,
+                        principalTable: "Packs",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -198,150 +349,6 @@ namespace Infrastructure.Migrations
                         principalTable: "Models",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "PackModels",
-                columns: table => new
-                {
-                    ModelsId = table.Column<int>(type: "integer", nullable: false),
-                    PacksId = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PackModels", x => new { x.ModelsId, x.PacksId });
-                    table.ForeignKey(
-                        name: "FK_PackModels_Models_ModelsId",
-                        column: x => x.ModelsId,
-                        principalTable: "Models",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_PackModels_Packs_PacksId",
-                        column: x => x.PacksId,
-                        principalTable: "Packs",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "BatchUploads",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    BatchId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    UploadType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    UploadedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    PackId = table.Column<int>(type: "integer", nullable: true),
-                    ModelId = table.Column<int>(type: "integer", nullable: true),
-                    TextureSetId = table.Column<int>(type: "integer", nullable: true),
-                    FileId = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_BatchUploads", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_BatchUploads_Files_FileId",
-                        column: x => x.FileId,
-                        principalTable: "Files",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_BatchUploads_Models_ModelId",
-                        column: x => x.ModelId,
-                        principalTable: "Models",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_BatchUploads_Packs_PackId",
-                        column: x => x.PackId,
-                        principalTable: "Packs",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_BatchUploads_TextureSets_TextureSetId",
-                        column: x => x.TextureSetId,
-                        principalTable: "TextureSets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ModelTextureSets",
-                columns: table => new
-                {
-                    ModelsId = table.Column<int>(type: "integer", nullable: false),
-                    TextureSetsId = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ModelTextureSets", x => new { x.ModelsId, x.TextureSetsId });
-                    table.ForeignKey(
-                        name: "FK_ModelTextureSets_Models_ModelsId",
-                        column: x => x.ModelsId,
-                        principalTable: "Models",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ModelTextureSets_TextureSets_TextureSetsId",
-                        column: x => x.TextureSetsId,
-                        principalTable: "TextureSets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "PackTextureSets",
-                columns: table => new
-                {
-                    PacksId = table.Column<int>(type: "integer", nullable: false),
-                    TextureSetsId = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PackTextureSets", x => new { x.PacksId, x.TextureSetsId });
-                    table.ForeignKey(
-                        name: "FK_PackTextureSets_Packs_PacksId",
-                        column: x => x.PacksId,
-                        principalTable: "Packs",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_PackTextureSets_TextureSets_TextureSetsId",
-                        column: x => x.TextureSetsId,
-                        principalTable: "TextureSets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Textures",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    FileId = table.Column<int>(type: "integer", nullable: false),
-                    TextureType = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    TextureSetId = table.Column<int>(type: "integer", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Textures", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Textures_Files_FileId",
-                        column: x => x.FileId,
-                        principalTable: "Files",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Textures_TextureSets_TextureSetId",
-                        column: x => x.TextureSetId,
-                        principalTable: "TextureSets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -407,6 +414,11 @@ namespace Infrastructure.Migrations
                 name: "IX_ModelFiles_ModelsId",
                 table: "ModelFiles",
                 column: "ModelsId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Models_DefaultTextureSetId",
+                table: "Models",
+                column: "DefaultTextureSetId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ModelTextureSets_TextureSetsId",
@@ -524,13 +536,13 @@ namespace Infrastructure.Migrations
                 name: "Files");
 
             migrationBuilder.DropTable(
-                name: "TextureSets");
-
-            migrationBuilder.DropTable(
                 name: "ThumbnailJobs");
 
             migrationBuilder.DropTable(
                 name: "Models");
+
+            migrationBuilder.DropTable(
+                name: "TextureSets");
         }
     }
 }

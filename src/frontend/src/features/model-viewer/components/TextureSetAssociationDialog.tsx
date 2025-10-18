@@ -25,7 +25,6 @@ interface TextureSetAssociation {
   textureSet: TextureSetDto
   isAssociated: boolean
   originallyAssociated: boolean
-  recentlyUnlinked?: boolean
 }
 
 function TextureSetAssociationDialog({
@@ -42,9 +41,6 @@ function TextureSetAssociationDialog({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>([])
   const [availablePacks, setAvailablePacks] = useState<PackSummaryDto[]>([])
-  const [recentlyUnlinkedIds, setRecentlyUnlinkedIds] = useState<Set<number>>(
-    new Set()
-  )
   const toast = useRef<Toast>(null)
 
   useEffect(() => {
@@ -80,7 +76,6 @@ function TextureSetAssociationDialog({
           textureSet,
           isAssociated: associatedTextureSetIds.has(textureSet.id),
           originallyAssociated: associatedTextureSetIds.has(textureSet.id),
-          recentlyUnlinked: false,
         })
       )
 
@@ -105,20 +100,9 @@ function TextureSetAssociationDialog({
     setTextureSetAssociations(prev =>
       prev.map(assoc => {
         if (assoc.textureSet.id === textureSetId) {
-          // Track recently unlinked
-          if (assoc.originallyAssociated && !isAssociated) {
-            setRecentlyUnlinkedIds(prev => new Set(prev).add(textureSetId))
-          } else if (!isAssociated && assoc.originallyAssociated) {
-            setRecentlyUnlinkedIds(prev => {
-              const newSet = new Set(prev)
-              newSet.delete(textureSetId)
-              return newSet
-            })
-          }
           return {
             ...assoc,
             isAssociated,
-            recentlyUnlinked: !isAssociated && assoc.originallyAssociated,
           }
         }
         return assoc
@@ -180,8 +164,6 @@ function TextureSetAssociationDialog({
         life: 3000,
       })
 
-      // Clear recently unlinked
-      setRecentlyUnlinkedIds(new Set())
       onAssociationsChanged()
     } catch (error) {
       console.error('Failed to update texture set associations:', error)
@@ -202,10 +184,8 @@ function TextureSetAssociationDialog({
       prev.map(assoc => ({
         ...assoc,
         isAssociated: assoc.originallyAssociated,
-        recentlyUnlinked: false,
       }))
     )
-    setRecentlyUnlinkedIds(new Set())
     setSearchQuery('')
     setSelectedPackIds([])
     onHide()
@@ -224,16 +204,6 @@ function TextureSetAssociationDialog({
 
     return matchesSearch && matchesPack
   })
-
-  // Split into recently unlinked and others
-  const recentlyUnlinkedTextureSets = filteredTextureSets.filter(
-    assoc =>
-      assoc.recentlyUnlinked && recentlyUnlinkedIds.has(assoc.textureSet.id)
-  )
-  const otherTextureSets = filteredTextureSets.filter(
-    assoc =>
-      !assoc.recentlyUnlinked || !recentlyUnlinkedIds.has(assoc.textureSet.id)
-  )
 
   const handlePackFilterToggle = (packId: number) => {
     setSelectedPackIds(prev =>
@@ -315,52 +285,29 @@ function TextureSetAssociationDialog({
             <p>Loading texture sets...</p>
           </div>
         ) : (
-          <>
-            {/* Recently Unlinked Section */}
-            {recentlyUnlinkedTextureSets.length > 0 && (
-              <div className="association-section">
-                <h4 className="section-header">
-                  <i className="pi pi-history" />
-                  Recently Unlinked ({recentlyUnlinkedTextureSets.length})
-                </h4>
-                <div className="texture-sets-card-grid">
-                  {recentlyUnlinkedTextureSets.map(assoc => (
-                    <TextureSetCard
-                      key={assoc.textureSet.id}
-                      textureSet={assoc.textureSet}
-                      isAssociated={assoc.isAssociated}
-                      onToggle={handleToggleAssociation}
-                    />
-                  ))}
-                </div>
+          <div className="association-section">
+            <h4 className="section-header">
+              <i className="pi pi-image" />
+              All Texture Sets ({filteredTextureSets.length})
+            </h4>
+            {filteredTextureSets.length === 0 ? (
+              <div className="no-results">
+                <i className="pi pi-inbox" />
+                <p>No texture sets found</p>
+              </div>
+            ) : (
+              <div className="texture-sets-card-grid">
+                {filteredTextureSets.map(assoc => (
+                  <TextureSetCard
+                    key={assoc.textureSet.id}
+                    textureSet={assoc.textureSet}
+                    isAssociated={assoc.isAssociated}
+                    onToggle={handleToggleAssociation}
+                  />
+                ))}
               </div>
             )}
-
-            {/* All Texture Sets Section */}
-            <div className="association-section">
-              <h4 className="section-header">
-                <i className="pi pi-image" />
-                All Texture Sets ({otherTextureSets.length})
-              </h4>
-              {otherTextureSets.length === 0 ? (
-                <div className="no-results">
-                  <i className="pi pi-inbox" />
-                  <p>No texture sets found</p>
-                </div>
-              ) : (
-                <div className="texture-sets-card-grid">
-                  {otherTextureSets.map(assoc => (
-                    <TextureSetCard
-                      key={assoc.textureSet.id}
-                      textureSet={assoc.textureSet}
-                      isAssociated={assoc.isAssociated}
-                      onToggle={handleToggleAssociation}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
+          </div>
         )}
       </div>
     </Dialog>

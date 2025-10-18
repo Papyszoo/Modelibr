@@ -49,5 +49,18 @@ public static class ModelsEndpoints
             return Results.File(fileStream, contentType, result.Value.OriginalFileName, enableRangeProcessing: true);
         })
         .WithName("Get Model File");
+
+        app.MapPut("/models/{id}/defaultTextureSet", async (int id, int? textureSetId, ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(new SetDefaultTextureSetCommand(id, textureSetId), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+            
+            return Results.Ok(result.Value);
+        })
+        .WithName("Set Default Texture Set");
     }
 }

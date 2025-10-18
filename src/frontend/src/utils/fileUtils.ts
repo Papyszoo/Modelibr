@@ -28,6 +28,7 @@ export interface Model {
   files: ModelFile[]
   createdAt: string
   updatedAt: string
+  defaultTextureSetId?: number
   textureSets?: { id: number; name: string }[]
   packs?: { id: number; name: string }[]
 }

@@ -57,6 +57,12 @@ namespace Infrastructure.Persistence
                     .WithOne(t => t.Model)
                     .HasForeignKey<Thumbnail>(t => t.ModelId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure optional relationship with default TextureSet
+                entity.HasOne<TextureSet>()
+                    .WithMany()
+                    .HasForeignKey(m => m.DefaultTextureSetId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // Configure File entity
