@@ -79,13 +79,25 @@ internal sealed class AddTextureToProjectWithFileCommandHandler
 
         var file = fileResult.Value;
 
-        // Create texture set
-        var textureSet = TextureSet.Create(request.TextureSetName, now);
-        await _textureSetRepository.AddAsync(textureSet, cancellationToken);
+        // Check if a texture set already exists with this file hash
+        var existingTextureSet = await _textureSetRepository.GetByFileHashAsync(file.Sha256Hash, cancellationToken);
+        
+        TextureSet textureSet;
+        if (existingTextureSet != null)
+        {
+            // Use existing texture set
+            textureSet = existingTextureSet;
+        }
+        else
+        {
+            // Create new texture set
+            textureSet = TextureSet.Create(request.TextureSetName, now);
+            await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 
-        // Add texture to set
-        var texture = Texture.Create(file, request.TextureType, now);
-        textureSet.AddTexture(texture, now);
+            // Add texture to set
+            var texture = Texture.Create(file, request.TextureType, now);
+            textureSet.AddTexture(texture, now);
+        }
 
         // Add texture set to project
         project.AddTextureSet(textureSet, now);
