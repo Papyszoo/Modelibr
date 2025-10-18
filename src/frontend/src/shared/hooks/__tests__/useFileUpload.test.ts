@@ -183,9 +183,15 @@ describe('useDragAndDrop', () => {
     document.body.classList.remove('dragging-file')
   })
 
+  afterEach(() => {
+    // Clean up any drag state after each test
+    document.body.classList.remove('dragging-file')
+  })
+
   it('should clear drag state properly on drop', () => {
     const onFilesDropped = jest.fn()
-    const handlers = useDragAndDrop(onFilesDropped)
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
 
     // Simulate drag enter to add classes
     const mockDragEnterEvent = {
@@ -196,7 +202,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'], // This is required for files to be detected
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(true)
     expect(
@@ -213,7 +221,9 @@ describe('useDragAndDrop', () => {
       currentTarget: document.createElement('div'),
       dataTransfer: { files: [mockFile] },
     }
-    handlers.onDrop(mockDropEvent)
+    act(() => {
+      handlers.onDrop(mockDropEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(false)
     expect(mockDropEvent.currentTarget.classList.contains('drag-over')).toBe(
@@ -224,7 +234,8 @@ describe('useDragAndDrop', () => {
 
   it('should clear drag state properly on drop even with empty files', () => {
     const onFilesDropped = jest.fn()
-    const handlers = useDragAndDrop(onFilesDropped)
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
 
     // Simulate drag enter to add classes
     const mockDragEnterEvent = {
@@ -235,7 +246,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'], // This is required for files to be detected
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(true)
 
@@ -246,7 +259,9 @@ describe('useDragAndDrop', () => {
       currentTarget: document.createElement('div'),
       dataTransfer: { files: [] },
     }
-    handlers.onDrop(mockDropEvent)
+    act(() => {
+      handlers.onDrop(mockDropEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(false)
     expect(onFilesDropped).not.toHaveBeenCalled() // No files, so callback not called
@@ -256,7 +271,8 @@ describe('useDragAndDrop', () => {
     const onFilesDropped = jest.fn(() => {
       throw new Error('Upload failed')
     })
-    const handlers = useDragAndDrop(onFilesDropped)
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
 
     // Simulate drag enter to add classes
     const mockDragEnterEvent = {
@@ -267,7 +283,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'], // This is required for files to be detected
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(true)
     expect(
@@ -285,7 +303,11 @@ describe('useDragAndDrop', () => {
       dataTransfer: { files: [mockFile] },
     }
 
-    expect(() => handlers.onDrop(mockDropEvent)).toThrow('Upload failed')
+    expect(() => {
+      act(() => {
+        handlers.onDrop(mockDropEvent)
+      })
+    }).toThrow('Upload failed')
 
     // Even though the callback threw an error, drag state should be cleared
     expect(document.body.classList.contains('dragging-file')).toBe(false)
@@ -297,7 +319,8 @@ describe('useDragAndDrop', () => {
 
   it('should handle drag leave with null relatedTarget', () => {
     const onFilesDropped = jest.fn()
-    const handlers = useDragAndDrop(onFilesDropped)
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
 
     const mockElement = document.createElement('div')
 
@@ -310,7 +333,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'], // This is required for files to be detected
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(true)
     expect(mockElement.classList.contains('drag-over')).toBe(true)
@@ -325,7 +350,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'],
       },
     }
-    handlers.onDragLeave(mockDragLeaveEvent)
+    act(() => {
+      handlers.onDragLeave(mockDragLeaveEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(false)
     expect(mockElement.classList.contains('drag-over')).toBe(false)
@@ -333,7 +360,8 @@ describe('useDragAndDrop', () => {
 
   it('should handle drag leave with relatedTarget outside document', () => {
     const onFilesDropped = jest.fn()
-    const handlers = useDragAndDrop(onFilesDropped)
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
 
     const mockElement = document.createElement('div')
     document.body.appendChild(mockElement)
@@ -347,7 +375,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'], // This is required for files to be detected
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(true)
     expect(mockElement.classList.contains('drag-over')).toBe(true)
@@ -365,7 +395,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'],
       },
     }
-    handlers.onDragLeave(mockDragLeaveEvent)
+    act(() => {
+      handlers.onDragLeave(mockDragLeaveEvent)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(false)
     expect(mockElement.classList.contains('drag-over')).toBe(false)
@@ -376,7 +408,8 @@ describe('useDragAndDrop', () => {
 
   it('should not add drag styles for non-file drags (like tab drags)', () => {
     const onFilesDropped = jest.fn()
-    const handlers = useDragAndDrop(onFilesDropped)
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
 
     // Simulate drag enter with a tab drag (text/plain type, no Files)
     const mockDragEnterEvent = {
@@ -387,7 +420,9 @@ describe('useDragAndDrop', () => {
         types: ['text/plain'], // Tab drags typically use text/plain
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
 
     // Should not add any drag styles for non-file drags
     expect(document.body.classList.contains('dragging-file')).toBe(false)
@@ -402,7 +437,9 @@ describe('useDragAndDrop', () => {
       currentTarget: mockDragEnterEvent.currentTarget,
       dataTransfer: { files: [] }, // No files
     }
-    handlers.onDrop(mockDropEvent)
+    act(() => {
+      handlers.onDrop(mockDropEvent)
+    })
 
     expect(onFilesDropped).not.toHaveBeenCalled()
     expect(document.body.classList.contains('dragging-file')).toBe(false)
@@ -410,7 +447,8 @@ describe('useDragAndDrop', () => {
 
   it('should use drag counter to prevent flickering on child element enters/leaves', () => {
     const onFilesDropped = jest.fn()
-    const handlers = useDragAndDrop(onFilesDropped)
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
 
     const mockElement = document.createElement('div')
 
@@ -423,7 +461,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'],
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent1)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent1)
+    })
 
     expect(document.body.classList.contains('dragging-file')).toBe(true)
     expect(mockElement.classList.contains('drag-over')).toBe(true)
@@ -437,7 +477,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'],
       },
     }
-    handlers.onDragEnter(mockDragEnterEvent2)
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent2)
+    })
 
     // Styles should still be present
     expect(document.body.classList.contains('dragging-file')).toBe(true)
@@ -452,7 +494,9 @@ describe('useDragAndDrop', () => {
         types: ['Files'],
       },
     }
-    handlers.onDragLeave(mockDragLeaveEvent1)
+    act(() => {
+      handlers.onDragLeave(mockDragLeaveEvent1)
+    })
 
     // Styles should still be present (counter is 1, not 0)
     expect(document.body.classList.contains('dragging-file')).toBe(true)
@@ -467,9 +511,110 @@ describe('useDragAndDrop', () => {
         types: ['Files'],
       },
     }
-    handlers.onDragLeave(mockDragLeaveEvent2)
+    act(() => {
+      handlers.onDragLeave(mockDragLeaveEvent2)
+    })
 
     // Styles should now be removed
+    expect(document.body.classList.contains('dragging-file')).toBe(false)
+    expect(mockElement.classList.contains('drag-over')).toBe(false)
+  })
+
+  it('should clear drag state when component unmounts', () => {
+    const onFilesDropped = jest.fn()
+    const { result, unmount } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
+
+    const mockElement = document.createElement('div')
+
+    // Simulate drag enter to add classes
+    const mockDragEnterEvent = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
+    }
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
+
+    expect(document.body.classList.contains('dragging-file')).toBe(true)
+    expect(mockElement.classList.contains('drag-over')).toBe(true)
+
+    // Unmount the hook
+    unmount()
+
+    // Drag state should be cleared
+    expect(document.body.classList.contains('dragging-file')).toBe(false)
+    expect(mockElement.classList.contains('drag-over')).toBe(false)
+  })
+
+  it('should handle global dragend event to clear drag state', () => {
+    const onFilesDropped = jest.fn()
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
+
+    const mockElement = document.createElement('div')
+
+    // Simulate drag enter to add classes
+    const mockDragEnterEvent = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
+    }
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
+
+    expect(document.body.classList.contains('dragging-file')).toBe(true)
+    expect(mockElement.classList.contains('drag-over')).toBe(true)
+
+    // Simulate global dragend event (e.g., when user drops file outside browser)
+    act(() => {
+      const dragEndEvent = new Event('dragend')
+      window.dispatchEvent(dragEndEvent)
+    })
+
+    // Drag state should be cleared
+    expect(document.body.classList.contains('dragging-file')).toBe(false)
+    expect(mockElement.classList.contains('drag-over')).toBe(false)
+  })
+
+  it('should handle global drop event to clear drag state', () => {
+    const onFilesDropped = jest.fn()
+    const { result } = renderHook(() => useDragAndDrop(onFilesDropped))
+    const handlers = result.current
+
+    const mockElement = document.createElement('div')
+
+    // Simulate drag enter to add classes
+    const mockDragEnterEvent = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      currentTarget: mockElement,
+      dataTransfer: {
+        types: ['Files'],
+      },
+    }
+    act(() => {
+      handlers.onDragEnter(mockDragEnterEvent)
+    })
+
+    expect(document.body.classList.contains('dragging-file')).toBe(true)
+    expect(mockElement.classList.contains('drag-over')).toBe(true)
+
+    // Simulate global drop event (e.g., when user drops file on another element)
+    act(() => {
+      const dropEvent = new Event('drop')
+      window.dispatchEvent(dropEvent)
+    })
+
+    // Drag state should be cleared
     expect(document.body.classList.contains('dragging-file')).toBe(false)
     expect(mockElement.classList.contains('drag-over')).toBe(false)
   })

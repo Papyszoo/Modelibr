@@ -130,9 +130,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
         }, // duplicate
         { id: 'texture', type: 'texture', label: 'Textures' },
       ]
-      expect(serializeToCompactFormat(tabs)).toBe(
-        'modelList,model-123,texture'
-      )
+      expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123,texture')
     })
 
     it('should keep first occurrence when deduplicating', () => {

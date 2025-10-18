@@ -241,7 +241,6 @@ function ModelViewer({
               </button>
             </div>
           ) : (
-
             <>
               <Canvas
                 key={`canvas-${model.id}-${side}`}
