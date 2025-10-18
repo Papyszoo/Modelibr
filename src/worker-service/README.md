@@ -73,11 +73,12 @@ The service uses a local BLIP (Bootstrapping Language-Image Pre-training) model 
 
 **How it works:**
 
-1. On first use, the model (~200MB) is automatically downloaded and cached locally
-2. When a model is uploaded, the worker renders 4 different views
-3. Each view is processed locally by BLIP to generate captions
-4. Tags are extracted from the captions and aggregated
-5. The final tags and description are saved to the model metadata
+1. During `npm install`, the model (~200MB) is automatically pre-downloaded to `.model-cache/`
+2. The application starts instantly with no download delays - model is ready immediately
+3. When a model is uploaded, the worker renders 4 different views
+4. Each view is processed locally by BLIP to generate captions (completely offline)
+5. Tags are extracted from the captions and aggregated
+6. The final tags and description are saved to the model metadata
 
 **Example output:**
 ```

@@ -1,9 +1,19 @@
-import { pipeline } from '@xenova/transformers'
+import { pipeline, env } from '@xenova/transformers'
 import logger from '../logger.js'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Set cache directory to use pre-downloaded models
+const cacheDir = path.join(__dirname, '..', '.model-cache')
+env.cacheDir = cacheDir
 
 /**
  * Local BLIP image captioning tagger using Transformers.js
  * Runs completely offline with no external API calls
+ * Uses pre-downloaded models from .model-cache directory
  * Uses ONNX Runtime for cross-platform compatibility (works on macOS, Linux, Windows)
  */
 export class HuggingFaceTagger {
@@ -22,11 +32,13 @@ export class HuggingFaceTagger {
     }
 
     try {
-      logger.info('Loading local BLIP image captioning model...')
+      logger.info('Loading local BLIP image captioning model...', {
+        cacheDir,
+      })
       const startTime = Date.now()
 
-      // Load BLIP model locally using Transformers.js
-      // Model will be downloaded once and cached locally (~200MB)
+      // Load BLIP model from local cache (pre-downloaded during npm install)
+      // Model is cached in .model-cache directory (~200MB)
       // Uses ONNX Runtime - much lighter than TensorFlow.js
       this.captioner = await pipeline(
         'image-to-text',
@@ -39,7 +51,7 @@ export class HuggingFaceTagger {
       logger.info('Local BLIP model loaded successfully', {
         loadTimeMs: this.modelLoadTimeMs,
         model: 'Xenova/vit-gpt2-image-captioning',
-        note: 'Model runs completely offline',
+        note: 'Model loaded from local cache (offline)',
       })
     } catch (error) {
       logger.error('Failed to load local BLIP model', {

@@ -34,9 +34,7 @@ async function testTagger() {
   console.log('Tagger initialized\n')
 
   // Test image description
-  console.log(
-    'Describing image (first run downloads ~200MB model, may take a few minutes)...'
-  )
+  console.log('Describing image using pre-downloaded model (should be fast)...')
   const startTime = Date.now()
 
   try {
@@ -50,15 +48,16 @@ async function testTagger() {
     if (predictions.length === 0) {
       console.log('\nNote: Empty predictions may indicate an error occurred.')
       console.log('Check the logs above for details.')
+      console.log(
+        'Make sure the model was downloaded during npm install (check .model-cache/ directory).'
+      )
     } else {
       console.log('\n=== Success! ===')
       console.log(
         'Tags extracted:',
         predictions.map(p => p.className).join(', ')
       )
-      console.log(
-        '\nThe model is now cached locally and will be faster on subsequent runs.'
-      )
+      console.log('\nThe model is running completely offline from local cache.')
     }
 
     // Test cleanup
