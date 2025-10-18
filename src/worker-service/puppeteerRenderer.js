@@ -240,9 +240,10 @@ export class PuppeteerRenderer {
       logger.info('Model loaded successfully in browser', {
         polygonCount: result.polygonCount,
         maxDimension: result.maxDimension,
+        metadata: result.metadata,
       })
 
-      return result.polygonCount
+      return result
     } catch (error) {
       logger.error('Failed to load model', {
         error: error.message,

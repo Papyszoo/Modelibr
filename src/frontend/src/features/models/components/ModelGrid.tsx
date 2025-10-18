@@ -28,6 +28,7 @@ export default function ModelGrid({
   onDragLeave,
 }: ModelGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [polyCountFilter, setPolyCountFilter] = useState<string>('all')
   const [packs, setPacks] = useState<PackDto[]>([])
   const [selectedModel, setSelectedModel] = useState<Model | null>(null)
   const [showPackDialog, setShowPackDialog] = useState(false)
@@ -77,7 +78,14 @@ export default function ModelGrid({
 
   const filteredModels = models.filter(model => {
     const modelName = getModelName(model).toLowerCase()
-    return modelName.includes(searchQuery.toLowerCase())
+    const matchesSearch = modelName.includes(searchQuery.toLowerCase())
+    
+    const matchesPolyCount =
+      polyCountFilter === 'all' ||
+      (polyCountFilter === 'lowpoly' && model.polyCount === 'LowPoly') ||
+      (polyCountFilter === 'detailed' && model.polyCount === 'Detailed')
+    
+    return matchesSearch && matchesPolyCount
   })
 
   const contextMenuItems: MenuItem[] = [
@@ -115,7 +123,24 @@ export default function ModelGrid({
           />
         </div>
         <div className="filter-bar">
-          <span className="filter-placeholder">Filters (Coming Soon)</span>
+          <label style={{ marginRight: '0.5rem', fontWeight: 500 }}>
+            Poly Count:
+          </label>
+          <select
+            value={polyCountFilter}
+            onChange={e => setPolyCountFilter(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '4px',
+              border: '1px solid #cbd5e1',
+              backgroundColor: 'white',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="all">All Models</option>
+            <option value="lowpoly">Low Poly</option>
+            <option value="detailed">Detailed</option>
+          </select>
         </div>
       </div>
 

@@ -31,6 +31,9 @@ export interface Model {
   defaultTextureSetId?: number
   textureSets?: { id: number; name: string }[]
   packs?: { id: number; name: string }[]
+  vertices?: number
+  faces?: number
+  polyCount?: 'Unknown' | 'LowPoly' | 'Detailed'
 }
 
 /**
