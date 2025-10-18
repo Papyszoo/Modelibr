@@ -24,6 +24,12 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             textureSets = textureSets.Where(ts => ts.Packs.Any(p => p.Id == query.PackId.Value));
         }
 
+        // Filter by project if specified
+        if (query.ProjectId.HasValue)
+        {
+            textureSets = textureSets.Where(ts => ts.Projects.Any(p => p.Id == query.ProjectId.Value));
+        }
+
         var textureSetDtos = textureSets.Select(tp => new TextureSetDto
         {
             Id = tp.Id,
@@ -49,6 +55,11 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             {
                 Id = p.Id,
                 Name = p.Name
+            }).ToList(),
+            Projects = tp.Projects.Select(p => new ProjectSummaryDto
+            {
+                Id = p.Id,
+                Name = p.Name
             }).ToList()
         }).ToList();
 
@@ -56,7 +67,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
     }
 }
 
-public record GetAllTextureSetsQuery(int? PackId = null) : IQuery<GetAllTextureSetsResponse>;
+public record GetAllTextureSetsQuery(int? PackId = null, int? ProjectId = null) : IQuery<GetAllTextureSetsResponse>;
 public record GetAllTextureSetsResponse(IEnumerable<TextureSetDto> TextureSets);
 
 public record TextureSetDto
@@ -70,6 +81,7 @@ public record TextureSetDto
     public ICollection<TextureDto> Textures { get; init; } = new List<TextureDto>();
     public ICollection<ModelSummaryDto> AssociatedModels { get; init; } = new List<ModelSummaryDto>();
     public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
+    public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();
 }
 
 public record TextureDto
@@ -88,6 +100,12 @@ public record ModelSummaryDto
 }
 
 public record PackSummaryDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record ProjectSummaryDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;

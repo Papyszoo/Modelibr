@@ -28,6 +28,11 @@ public class BatchUpload
     public int? PackId { get; set; }
     
     /// <summary>
+    /// Optional reference to the project if this was a direct upload to a project.
+    /// </summary>
+    public int? ProjectId { get; set; }
+    
+    /// <summary>
     /// Optional reference to the model if this was a direct upload to a model.
     /// </summary>
     public int? ModelId { get; set; }
@@ -53,6 +58,11 @@ public class BatchUpload
     public Pack? Pack { get; set; }
     
     /// <summary>
+    /// Navigation property to the project.
+    /// </summary>
+    public Project? Project { get; set; }
+    
+    /// <summary>
     /// Navigation property to the model.
     /// </summary>
     public Model? Model { get; set; }
@@ -66,10 +76,11 @@ public class BatchUpload
     /// Creates a new batch upload record.
     /// </summary>
     /// <param name="batchId">Unique batch identifier</param>
-    /// <param name="uploadType">Type of upload (pack, model, textureSet)</param>
+    /// <param name="uploadType">Type of upload (pack, project, model, textureSet)</param>
     /// <param name="fileId">ID of the uploaded file</param>
     /// <param name="uploadedAt">Timestamp of the upload</param>
     /// <param name="packId">Optional pack ID</param>
+    /// <param name="projectId">Optional project ID</param>
     /// <param name="modelId">Optional model ID</param>
     /// <param name="textureSetId">Optional texture set ID</param>
     /// <returns>New BatchUpload instance</returns>
@@ -79,6 +90,7 @@ public class BatchUpload
         int fileId,
         DateTime uploadedAt,
         int? packId = null,
+        int? projectId = null,
         int? modelId = null,
         int? textureSetId = null)
     {
@@ -89,7 +101,7 @@ public class BatchUpload
             throw new ArgumentException("Upload type cannot be null or empty.", nameof(uploadType));
         
         // Validate upload type
-        var validTypes = new[] { "pack", "model", "textureSet", "texture", "file" };
+        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file" };
         if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
         
@@ -100,6 +112,7 @@ public class BatchUpload
             FileId = fileId,
             UploadedAt = uploadedAt,
             PackId = packId,
+            ProjectId = projectId,
             ModelId = modelId,
             TextureSetId = textureSetId
         };
@@ -115,12 +128,21 @@ public class BatchUpload
     }
     
     /// <summary>
+    /// Updates the project association for this batch upload.
+    /// </summary>
+    /// <param name="projectId">The project ID to associate</param>
+    public void UpdateProjectAssociation(int projectId)
+    {
+        ProjectId = projectId;
+    }
+    
+    /// <summary>
     /// Updates the upload type.
     /// </summary>
     /// <param name="uploadType">The new upload type</param>
     public void UpdateUploadType(string uploadType)
     {
-        var validTypes = new[] { "pack", "model", "textureSet", "texture", "file" };
+        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file" };
         if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
         

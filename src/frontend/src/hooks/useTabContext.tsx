@@ -106,6 +106,31 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openProjectDetailsTab = (projectId: string): void => {
+    // Check if tab already exists
+    const existingTab = tabs.find(
+      tab => tab.type === 'projectViewer' && tab.projectId === projectId
+    )
+
+    if (existingTab) {
+      // Switch to existing tab
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    // Create new tab
+    const newTab: Tab = {
+      id: `project-${projectId}`,
+      type: 'projectViewer',
+      label: `Project ${projectId}`,
+      projectId: projectId,
+    }
+
+    const newTabs = [...tabs, newTab]
+    setTabs(newTabs)
+    setActiveTab(newTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -145,9 +170,11 @@ export const TabProvider = ({
             ? `set-${(data as { id?: string }).id}`
             : type === 'packViewer' && (data as { id?: string })?.id
               ? `pack-${(data as { id?: string }).id}`
-              : type === 'stageEditor' && (data as { id?: string })?.id
-                ? `stage-${(data as { id?: string }).id}`
-                : type,
+              : type === 'projectViewer' && (data as { id?: string })?.id
+                ? `project-${(data as { id?: string }).id}`
+                : type === 'stageEditor' && (data as { id?: string })?.id
+                  ? `stage-${(data as { id?: string }).id}`
+                  : type,
       type,
       label: title,
       modelId:
@@ -155,6 +182,7 @@ export const TabProvider = ({
       setId:
         type === 'textureSetViewer' ? (data as { id?: string })?.id : undefined,
       packId: type === 'packViewer' ? (data as { id?: string })?.id : undefined,
+      projectId: type === 'projectViewer' ? (data as { id?: string })?.id : undefined,
       stageId:
         type === 'stageEditor' ? (data as { id?: string })?.id : undefined,
     }
@@ -173,6 +201,7 @@ export const TabProvider = ({
     openModelDetailsTab,
     openTextureSetDetailsTab,
     openPackDetailsTab,
+    openProjectDetailsTab,
     openTab,
   }
 

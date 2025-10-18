@@ -9,6 +9,8 @@ export interface Tab {
     | 'textureSetViewer'
     | 'packs'
     | 'packViewer'
+    | 'projects'
+    | 'projectViewer'
     | 'stageList'
     | 'stageEditor'
     | 'settings'
@@ -17,6 +19,7 @@ export interface Tab {
   modelId?: string
   setId?: string
   packId?: string
+  projectId?: string
   stageId?: string
 }
 
@@ -149,6 +152,50 @@ export interface CreatePackResponse {
 }
 
 export interface UpdatePackRequest {
+  name: string
+  description?: string
+}
+
+// Project related types
+export interface ProjectModelDto {
+  id: number
+  name: string
+}
+
+export interface ProjectTextureSetDto {
+  id: number
+  name: string
+}
+
+export interface ProjectDto {
+  id: number
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+  modelCount: number
+  textureSetCount: number
+  isEmpty: boolean
+  models: ProjectModelDto[]
+  textureSets: ProjectTextureSetDto[]
+}
+
+export interface GetAllProjectsResponse {
+  projects: ProjectDto[]
+}
+
+export interface CreateProjectRequest {
+  name: string
+  description?: string
+}
+
+export interface CreateProjectResponse {
+  id: number
+  name: string
+  description?: string
+}
+
+export interface UpdateProjectRequest {
   name: string
   description?: string
 }

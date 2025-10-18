@@ -2,6 +2,7 @@ import { ModelList } from '../../features/models'
 import { ModelViewer } from '../../features/model-viewer'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
 import { PackList, PackViewer } from '../../features/pack'
+import { ProjectList, ProjectViewer } from '../../features/project'
 import { History } from '../../features/history'
 import { StageEditor, StageList } from '../../features/stage-editor'
 import AnimationList from '../tabs/AnimationList'
@@ -60,6 +61,20 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
           )
         }
         return <PackViewer packId={parseInt(tab.packId)} />
+
+      case 'projects':
+        return <ProjectList />
+
+      case 'projectViewer':
+        if (!tab.projectId) {
+          return (
+            <div className="tab-error">
+              <h3>Project data not available</h3>
+              <p>The project information could not be loaded.</p>
+            </div>
+          )
+        }
+        return <ProjectViewer projectId={parseInt(tab.projectId)} />
 
       case 'stageList':
         return <StageList />

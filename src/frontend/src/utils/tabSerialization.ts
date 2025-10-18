@@ -6,6 +6,7 @@ export function getTabLabel(
   modelId?: string,
   setId?: string,
   packId?: string,
+  projectId?: string,
   stageId?: string
 ): string {
   switch (type) {
@@ -23,6 +24,10 @@ export function getTabLabel(
       return 'Packs'
     case 'packViewer':
       return packId ? `Pack ${packId}` : 'Pack Viewer'
+    case 'projects':
+      return 'Projects'
+    case 'projectViewer':
+      return projectId ? `Project ${projectId}` : 'Project Viewer'
     case 'stageList':
       return 'Stages'
     case 'stageEditor':
@@ -91,6 +96,17 @@ export function parseCompactTabFormat(
         }
       }
 
+      // Handle project viewer tabs (e.g., "project-123")
+      if (tabId.startsWith('project-')) {
+        const projectId = tabId.substring(8)
+        return {
+          id: tabId,
+          type: 'projectViewer',
+          label: getTabLabel('projectViewer', undefined, undefined, undefined, projectId),
+          projectId,
+        }
+      }
+
       // Handle stage editor tabs (e.g., "stage-123")
       if (tabId.startsWith('stage-')) {
         const stageId = tabId.substring(6)
@@ -116,6 +132,8 @@ export function parseCompactTabFormat(
           'textureSetViewer',
           'packs',
           'packViewer',
+          'projects',
+          'projectViewer',
           'stageList',
           'stageEditor',
           'history',

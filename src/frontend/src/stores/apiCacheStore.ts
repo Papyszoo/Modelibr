@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { Model } from '../utils/fileUtils'
-import { TextureSetDto, PackDto } from '../types'
+import { TextureSetDto, PackDto, ProjectDto } from '../types'
 
 // Cache entry with timestamp for freshness tracking
 interface CacheEntry<T> {
@@ -29,6 +29,8 @@ interface ApiCacheStore {
   textureSetsById: Map<number, CacheEntry<TextureSetDto>>
   packs: CacheEntry<PackDto[]> | null
   packsById: Map<number, CacheEntry<PackDto>>
+  projects: CacheEntry<ProjectDto[]> | null
+  projectsById: Map<number, CacheEntry<ProjectDto>>
   thumbnailStatusById: Map<string, CacheEntry<ThumbnailStatus>>
   thumbnailBlobById: Map<string, CacheEntry<Blob>>
 
@@ -42,6 +44,8 @@ interface ApiCacheStore {
   setTextureSetById: (id: number, set: TextureSetDto) => void
   setPacks: (packs: PackDto[]) => void
   setPackById: (id: number, pack: PackDto) => void
+  setProjects: (projects: ProjectDto[]) => void
+  setProjectById: (id: number, project: ProjectDto) => void
   setThumbnailStatus: (modelId: string, status: ThumbnailStatus) => void
   setThumbnailBlob: (modelId: string, blob: Blob) => void
 
@@ -52,6 +56,8 @@ interface ApiCacheStore {
   getTextureSetById: (id: number) => TextureSetDto | null
   getPacks: () => PackDto[] | null
   getPackById: (id: number) => PackDto | null
+  getProjects: () => ProjectDto[] | null
+  getProjectById: (id: number) => ProjectDto | null
   getThumbnailStatus: (modelId: string) => ThumbnailStatus | null
   getThumbnailBlob: (modelId: string) => Blob | null
 
@@ -62,6 +68,8 @@ interface ApiCacheStore {
   invalidateTextureSetById: (id: number) => void
   invalidatePacks: () => void
   invalidatePackById: (id: number) => void
+  invalidateProjects: () => void
+  invalidateProjectById: (id: number) => void
   invalidateThumbnails: () => void
   invalidateThumbnailById: (modelId: string) => void
   invalidateAll: () => void
@@ -70,6 +78,7 @@ interface ApiCacheStore {
   refreshModels: () => void
   refreshTextureSets: () => void
   refreshPacks: () => void
+  refreshProjects: () => void
 }
 
 export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
@@ -80,6 +89,8 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
   textureSetsById: new Map(),
   packs: null,
   packsById: new Map(),
+  projects: null,
+  projectsById: new Map(),
   thumbnailStatusById: new Map(),
   thumbnailBlobById: new Map(),
   defaultTTL: 5 * 60 * 1000, // 5 minutes
@@ -134,6 +145,22 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
     const packsById = new Map(get().packsById)
     packsById.set(id, { data: pack, timestamp: Date.now() })
     set({ packsById })
+  },
+
+  setProjects: (projects: ProjectDto[]) => {
+    set({ projects: { data: projects, timestamp: Date.now() } })
+    // Also update individual project cache
+    const projectsById = new Map(get().projectsById)
+    projects.forEach(project => {
+      projectsById.set(project.id, { data: project, timestamp: Date.now() })
+    })
+    set({ projectsById })
+  },
+
+  setProjectById: (id: number, project: ProjectDto) => {
+    const projectsById = new Map(get().projectsById)
+    projectsById.set(id, { data: project, timestamp: Date.now() })
+    set({ projectsById })
   },
 
   setThumbnailStatus: (modelId: string, status: ThumbnailStatus) => {
@@ -197,6 +224,22 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
     return entry.data
   },
 
+  getProjects: () => {
+    const entry = get().projects
+    if (!entry) return null
+    const age = Date.now() - entry.timestamp
+    if (age > get().defaultTTL) return null
+    return entry.data
+  },
+
+  getProjectById: (id: number) => {
+    const entry = get().projectsById.get(id)
+    if (!entry) return null
+    const age = Date.now() - entry.timestamp
+    if (age > get().defaultTTL) return null
+    return entry.data
+  },
+
   getThumbnailStatus: (modelId: string) => {
     const entry = get().thumbnailStatusById.get(modelId)
     if (!entry) return null
@@ -238,6 +281,14 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
     set({ packsById })
   },
 
+  invalidateProjects: () => set({ projects: null }),
+
+  invalidateProjectById: (id: number) => {
+    const projectsById = new Map(get().projectsById)
+    projectsById.delete(id)
+    set({ projectsById })
+  },
+
   invalidateThumbnails: () =>
     set({
       thumbnailStatusById: new Map(),
@@ -260,6 +311,8 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
       textureSetsById: new Map(),
       packs: null,
       packsById: new Map(),
+      projects: null,
+      projectsById: new Map(),
       thumbnailStatusById: new Map(),
       thumbnailBlobById: new Map(),
     }),
@@ -268,4 +321,5 @@ export const useApiCacheStore = create<ApiCacheStore>((set, get) => ({
   refreshModels: () => get().invalidateModels(),
   refreshTextureSets: () => get().invalidateTextureSets(),
   refreshPacks: () => get().invalidatePacks(),
+  refreshProjects: () => get().invalidateProjects(),
 }))
