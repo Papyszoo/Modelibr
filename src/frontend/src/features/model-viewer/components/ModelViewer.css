@@ -368,3 +368,20 @@
 .model-viewer-sidebar .info-section {
   margin-bottom: 1.5rem;
 }
+
+/* Stats container positioning in bottom-left corner of viewer */
+.stats-container {
+  position: relative;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Ensure stats.js DOM element doesn't interfere with canvas interactions */
+.stats-container > div {
+  position: relative !important;
+  bottom: 40px;
+  top: initial !important;
+  pointer-events: auto;
+}
