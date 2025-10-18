@@ -58,10 +58,7 @@ public class ModelPersistenceTests
         // Create a fake batch upload repository for testing
         var batchUploadRepository = new FakeBatchUploadRepository();
         
-        // Create a fake metadata extraction service for testing
-        var metadataExtractionService = new FakeModelMetadataExtractionService();
-        
-        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider, domainEventDispatcher, batchUploadRepository, metadataExtractionService);
+        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider, domainEventDispatcher, batchUploadRepository);
         
         Assert.NotNull(handler);
     }
@@ -225,17 +222,5 @@ internal class FakeBatchUploadRepository : IBatchUploadRepository
     {
         // Do nothing for tests
         return Task.FromResult(Enumerable.Empty<BatchUpload>());
-    }
-}
-
-/// <summary>
-/// Fake model metadata extraction service for testing that returns null.
-/// </summary>
-internal class FakeModelMetadataExtractionService : IModelMetadataExtractionService
-{
-    public Task<ModelMetadata?> ExtractMetadataAsync(string filePath, CancellationToken cancellationToken = default)
-    {
-        // Return null for tests (metadata not available)
-        return Task.FromResult<ModelMetadata?>(null);
     }
 }

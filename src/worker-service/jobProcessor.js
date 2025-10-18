@@ -297,13 +297,17 @@ export class JobProcessor {
       }
 
       // Load model in browser
-      const polygonCount = await this.puppeteerRenderer.loadModel(
+      const loadResult = await this.puppeteerRenderer.loadModel(
         fileInfo.filePath,
         fileInfo.fileType
       )
 
+      const polygonCount = loadResult.polygonCount || loadResult
+      const modelMetadata = loadResult.metadata || null
+
       jobLogger.info('Model loaded successfully in browser', {
         polygonCount,
+        metadata: modelMetadata,
         fileType: fileInfo.fileType,
       })
 
@@ -312,6 +316,40 @@ export class JobProcessor {
         polygonCount,
         fileInfo.fileType
       )
+
+      // Update model metadata in the API if available
+      if (modelMetadata && modelMetadata.vertices && modelMetadata.faces) {
+        jobLogger.info('Sending model metadata to API', {
+          modelId: job.modelId,
+          vertices: modelMetadata.vertices,
+          faces: modelMetadata.faces,
+        })
+
+        try {
+          const metadataResult = await this.thumbnailApiService.updateModelMetadata(
+            job.modelId,
+            modelMetadata.vertices,
+            modelMetadata.faces
+          )
+
+          if (metadataResult.success) {
+            jobLogger.info('Model metadata updated successfully', {
+              modelId: job.modelId,
+            })
+          } else {
+            jobLogger.warn('Failed to update model metadata', {
+              modelId: job.modelId,
+              error: metadataResult.error,
+            })
+          }
+        } catch (error) {
+          jobLogger.error('Error updating model metadata', {
+            modelId: job.modelId,
+            error: error.message,
+          })
+          // Don't fail the job if metadata update fails
+        }
+      }
 
       // Step 4: Generate orbit frames using Puppeteer renderer
       if (config.orbit.enabled) {

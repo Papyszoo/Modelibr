@@ -293,6 +293,33 @@
             return Math.floor(count);
         }
 
+        // Extract model geometry metadata (vertices and faces count)
+        function extractModelMetadata(model) {
+            let totalVertices = 0;
+            let totalFaces = 0;
+            
+            model.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    // Count vertices
+                    if (child.geometry.attributes.position) {
+                        totalVertices += child.geometry.attributes.position.count;
+                    }
+                    
+                    // Count faces
+                    if (child.geometry.index !== null) {
+                        totalFaces += child.geometry.index.count / 3;
+                    } else if (child.geometry.attributes.position) {
+                        totalFaces += child.geometry.attributes.position.count / 3;
+                    }
+                }
+            });
+            
+            return {
+                vertices: Math.floor(totalVertices),
+                faces: Math.floor(totalFaces)
+            };
+        }
+
         // Clear the scene by removing the previous model
         function clearScene() {
             if (window.modelRenderer.model && window.modelRenderer.scene) {
@@ -357,6 +384,7 @@
         window.renderScene = renderScene;
         window.getCanvasDataURL = getCanvasDataURL;
         window.countPolygons = countPolygons;
+        window.extractModelMetadata = extractModelMetadata;
         window.clearScene = clearScene;
 
         console.log('3D Renderer initialized and ready');

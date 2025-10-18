@@ -40,7 +40,6 @@ namespace Infrastructure
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
-            services.AddScoped<IModelMetadataExtractionService, ModelMetadataExtractionService>();
 
             return services;
         }

@@ -288,4 +288,53 @@ export class ThumbnailApiService {
       }
     }
   }
+
+  /**
+   * Update model geometry metadata via backend API
+   * @param {number} modelId - The model ID to update
+   * @param {number} vertices - Number of vertices in the model
+   * @param {number} faces - Number of faces in the model
+   * @returns {Promise<Object>} Update result
+   */
+  async updateModelMetadata(modelId, vertices, faces) {
+    try {
+      logger.info('Updating model metadata via API', {
+        modelId,
+        vertices,
+        faces,
+      })
+
+      const response = await this.client.put(`/models/${modelId}/metadata`, {
+        vertices,
+        faces,
+      })
+
+      logger.info('Model metadata updated successfully', {
+        modelId,
+        vertices,
+        faces,
+        responseData: response.data,
+      })
+
+      return {
+        success: true,
+        data: response.data,
+      }
+    } catch (error) {
+      logger.error('Failed to update model metadata via API', {
+        modelId,
+        vertices,
+        faces,
+        error: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+      })
+
+      return {
+        success: false,
+        error: error.message,
+        details: error.response?.data,
+      }
+    }
+  }
 }

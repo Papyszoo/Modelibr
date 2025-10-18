@@ -211,11 +211,15 @@ export class PuppeteerRenderer {
             // Count polygons
             const polygonCount = window.countPolygons(model)
 
+            // Extract model metadata (vertices and faces)
+            const metadata = window.extractModelMetadata(model)
+
             return {
               success: true,
               polygonCount,
               modelSize: normInfo.size,
               maxDimension: normInfo.maxDimension,
+              metadata: metadata,
             }
           } catch (error) {
             console.error('Model loading error:', error)
