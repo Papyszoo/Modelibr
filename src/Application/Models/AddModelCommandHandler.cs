@@ -17,22 +17,19 @@ namespace Application.Models
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IDomainEventDispatcher _domainEventDispatcher;
         private readonly IBatchUploadRepository _batchUploadRepository;
-        private readonly IModelMetadataExtractionService _metadataExtractionService;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository, 
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
             IDomainEventDispatcher domainEventDispatcher,
-            IBatchUploadRepository batchUploadRepository,
-            IModelMetadataExtractionService metadataExtractionService)
+            IBatchUploadRepository batchUploadRepository)
         {
             _modelRepository = modelRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
             _domainEventDispatcher = domainEventDispatcher;
             _batchUploadRepository = batchUploadRepository;
-            _metadataExtractionService = metadataExtractionService;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -57,19 +54,15 @@ namespace Application.Models
 
             var fileEntity = fileResult.Value;
 
-            // Extract model metadata (vertices and faces count)
-            var metadata = await _metadataExtractionService.ExtractMetadataAsync(
-                fileEntity.FilePath, 
-                cancellationToken);
-
             // Determine model name from command or file name
             var modelName = command.ModelName ?? 
                            Path.GetFileNameWithoutExtension(command.File.FileName);
 
             // Check for duplicate model by name and vertices count
+            // Note: vertices will be null initially, will be populated by worker service after thumbnail generation
             var existingModelByMetadata = await _modelRepository.GetByNameAndVerticesAsync(
                 modelName, 
-                metadata?.Vertices, 
+                null, 
                 cancellationToken);
 
             if (existingModelByMetadata != null)
@@ -107,11 +100,8 @@ namespace Application.Models
             {
                 var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
                 
-                // Set geometry metadata if available
-                if (metadata != null)
-                {
-                    model.SetGeometryMetadata(metadata.Vertices, metadata.Faces, _dateTimeProvider.UtcNow);
-                }
+                // Note: Geometry metadata (vertices, faces) will be populated by the worker service
+                // after it loads the model for thumbnail generation
                 
                 // Save the model first to get an ID
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);

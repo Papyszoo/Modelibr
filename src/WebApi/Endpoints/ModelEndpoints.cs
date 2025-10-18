@@ -21,6 +21,10 @@ public static class ModelEndpoints
         app.MapPost("/models/{modelId}/tags", UpdateModelTags)
         .WithName("Update Model Tags")
         .WithTags("Models");
+
+        app.MapPut("/models/{modelId}/metadata", UpdateModelMetadata)
+        .WithName("Update Model Metadata")
+        .WithTags("Models");
     }
 
     private static async Task<IResult> CreateModel(
@@ -110,6 +114,30 @@ public static class ModelEndpoints
 
         return Results.Ok(result.Value);
     }
+
+    private static async Task<IResult> UpdateModelMetadata(
+        int modelId,
+        UpdateModelMetadataRequest request,
+        ICommandHandler<UpdateModelMetadataCommand, UpdateModelMetadataResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new UpdateModelMetadataCommand(
+            modelId,
+            request.Vertices,
+            request.Faces
+        );
+
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
 }
 
 public record UpdateModelTagsRequest(string? Tags, string? Description);
+
+public record UpdateModelMetadataRequest(int? Vertices, int? Faces);
