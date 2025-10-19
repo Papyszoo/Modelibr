@@ -63,6 +63,8 @@ export const config = {
     minConfidence: parseFloat(process.env.CLASSIFICATION_MIN_CONFIDENCE) || 0.1,
     maxTags: parseInt(process.env.CLASSIFICATION_MAX_TAGS) || 10,
     topKPerImage: parseInt(process.env.CLASSIFICATION_TOP_K_PER_IMAGE) || 5,
+    imageWidth: parseInt(process.env.CLASSIFICATION_IMAGE_WIDTH) || 512,
+    imageHeight: parseInt(process.env.CLASSIFICATION_IMAGE_HEIGHT) || 512,
   },
 
   // Logging settings
