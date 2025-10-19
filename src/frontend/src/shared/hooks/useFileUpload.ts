@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import ApiClient from '../../services/ApiClient'
 import {
   isSupportedModelFormat,
@@ -261,20 +261,52 @@ export function useFileUpload(options = {}) {
  * @returns {Object} Drag and drop event handlers
  */
 export function useDragAndDrop(onFilesDropped) {
-  // Use a counter to track nested drag enter/leave events
+  // Use a ref to track nested drag enter/leave events
   // This prevents flickering when dragging over child elements
-  let dragCounter = 0
+  const dragCounterRef = useRef(0)
+  const dragTargetRef = useRef(null)
+
+  // Clear drag state helper function
+  // Wrapped in useCallback to ensure stable reference across renders
+  const clearDragState = useCallback(() => {
+    dragCounterRef.current = 0
+    document.body.classList.remove('dragging-file')
+    if (dragTargetRef.current) {
+      dragTargetRef.current.classList.remove('drag-over')
+      dragTargetRef.current = null
+    }
+  }, [])
+
+  // Set up global event listeners to handle edge cases where drag leaves the window
+  useEffect(() => {
+    const handleDragEnd = () => {
+      // When drag operation ends anywhere, clear the drag state
+      clearDragState()
+    }
+
+    const handleDrop = () => {
+      // When drop happens anywhere in the document, clear the drag state
+      clearDragState()
+    }
+
+    // Add listeners to window to catch drag operations that end outside our drop zones
+    window.addEventListener('dragend', handleDragEnd)
+    window.addEventListener('drop', handleDrop)
+
+    return () => {
+      window.removeEventListener('dragend', handleDragEnd)
+      window.removeEventListener('drop', handleDrop)
+      // Clean up any lingering drag state on unmount
+      clearDragState()
+    }
+  }, [clearDragState])
 
   const onDrop = e => {
     e.preventDefault()
     e.stopPropagation()
 
-    // Reset drag counter
-    dragCounter = 0
-
-    // Remove drag visual feedback immediately and unconditionally
-    document.body.classList.remove('dragging-file')
-    e.currentTarget.classList.remove('drag-over')
+    // Clear drag state immediately and unconditionally
+    clearDragState()
 
     // Only process files if they are actually present
     if (
@@ -290,9 +322,7 @@ export function useDragAndDrop(onFilesDropped) {
         onFilesDropped(files)
       } catch (error) {
         // Ensure drag state is cleared even if callback fails
-        dragCounter = 0
-        document.body.classList.remove('dragging-file')
-        e.currentTarget.classList.remove('drag-over')
+        clearDragState()
         throw error
       }
     }
@@ -309,10 +339,11 @@ export function useDragAndDrop(onFilesDropped) {
       e.dataTransfer.types &&
       e.dataTransfer.types.includes('Files')
     ) {
-      dragCounter++
+      dragCounterRef.current++
 
-      // Only add classes on the first drag enter (not on child element enters)
-      if (dragCounter === 1) {
+      // Store reference to the drag target
+      if (dragCounterRef.current === 1) {
+        dragTargetRef.current = e.currentTarget
         document.body.classList.add('dragging-file')
         e.currentTarget.classList.add('drag-over')
       }
@@ -329,17 +360,16 @@ export function useDragAndDrop(onFilesDropped) {
       e.dataTransfer.types &&
       e.dataTransfer.types.includes('Files')
     ) {
-      dragCounter--
+      dragCounterRef.current--
 
       // Only remove classes when we've left all nested elements (counter reaches 0)
-      if (dragCounter === 0) {
-        document.body.classList.remove('dragging-file')
-        e.currentTarget.classList.remove('drag-over')
+      if (dragCounterRef.current === 0) {
+        clearDragState()
       }
 
       // Safety check: prevent negative counter
-      if (dragCounter < 0) {
-        dragCounter = 0
+      if (dragCounterRef.current < 0) {
+        clearDragState()
       }
     }
   }
