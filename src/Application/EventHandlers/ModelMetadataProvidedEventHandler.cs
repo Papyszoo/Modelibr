@@ -90,10 +90,16 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                                 file.Id, file.Sha256Hash, modelToKeep.Id);
                         }
                     }
+                    
+                    // Delete the duplicate model after all files have been moved
+                    _logger.LogInformation(
+                        "Deleting duplicate model {MergeModelId} after file migration",
+                        modelToMerge.Id);
+                    await _modelRepository.DeleteAsync(modelToMerge.Id, cancellationToken);
                 }
 
                 _logger.LogInformation(
-                    "Successfully merged files into model {KeepModelId}. Merged models: {MergedModelIds}",
+                    "Successfully merged and deleted duplicate models. Kept model {KeepModelId}. Deleted models: {DeletedModelIds}",
                     modelToKeep.Id, string.Join(", ", modelsToMerge.Select(m => m.Id)));
             }
             else
