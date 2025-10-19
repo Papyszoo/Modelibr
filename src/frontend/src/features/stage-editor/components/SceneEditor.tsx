@@ -409,7 +409,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
       <CodePanelWindow
         visible={codeWindowVisible}
         onClose={() => setCodeWindowVisible(false)}
-        side="none"
+        side={side}
         stageConfig={stageConfig}
       />
     </div>
