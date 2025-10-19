@@ -264,11 +264,6 @@ function ComponentLibrary({
 
   return (
     <div className="component-library">
-      <div className="component-library-header">
-        <h3>
-          <i className="pi pi-th-large" /> Components
-        </h3>
-      </div>
       <div className="component-library-content">
         {renderSection('Lights', lightTypes, 'light')}
         {renderSection('Meshes', meshTypes, 'mesh')}

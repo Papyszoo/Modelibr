@@ -1,4 +1,4 @@
-.scene-editor {
+.stage-editor {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -30,84 +30,57 @@
   font-size: 1.1rem;
 }
 
-.editor-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  background: var(--surface-card);
-  border-bottom: 1px solid var(--surface-border);
+.editor-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-ground);
 }
 
-.editor-toolbar .toolbar-left h3 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.editor-toolbar .toolbar-right {
+/* Floating control buttons */
+.editor-controls {
+  position: absolute;
+  top: 1rem;
+  z-index: 100;
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.editor-content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+.editor-controls-left {
+  left: 1rem;
 }
 
-.editor-sidebar {
-  background: var(--surface-card);
-  border: 1px solid var(--surface-border);
-  overflow-y: auto;
+.editor-controls-right {
+  right: 1rem;
 }
 
-.editor-sidebar.left {
-  width: 250px;
-  border-right: 1px solid var(--surface-border);
+.editor-control-btn {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  background: white !important;
+  color: #3b82f6 !important;
+  width: 3rem !important;
+  height: 3rem !important;
+  border: none !important;
 }
 
-.editor-sidebar.right {
-  width: 300px;
-  border-left: 1px solid var(--surface-border);
+.editor-control-btn:hover {
+  background: #f0f9ff !important;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
 }
 
-.editor-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
+.editor-control-btn .pi {
+  font-size: 1.25rem !important;
+  color: #3b82f6 !important;
 }
 
-.saved-scenes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-height: 400px;
-  overflow-y: auto;
+.editor-control-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.saved-scene-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem;
-  background: var(--surface-ground);
-  border: 1px solid var(--surface-border);
-  border-radius: 4px;
-}
-
-.scene-info h4 {
-  margin: 0 0 0.25rem 0;
-  font-size: 1rem;
-}
-
-.scene-info small {
-  color: var(--text-color-secondary);
-}
-
-.no-scenes {
-  text-align: center;
-  padding: 2rem;
-  color: var(--text-color-secondary);
+.editor-control-btn:disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }

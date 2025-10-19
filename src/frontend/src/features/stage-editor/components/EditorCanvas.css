@@ -3,6 +3,7 @@
   position: relative;
   background: #1a1a1a;
   min-height: 400px;
+  height: 100%;
 }
 
 .editor-canvas-container canvas {
