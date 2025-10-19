@@ -19,6 +19,7 @@ namespace Domain.Models
         public int? Vertices { get; private set; }
         public int? Faces { get; private set; }
         public PolyCount PolyCount { get; private set; } = PolyCount.Unknown;
+        public bool IsHidden { get; private set; } = true; // Models are hidden by default until deduplication is complete
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
         public ICollection<File> Files 
@@ -59,7 +60,7 @@ namespace Domain.Models
         // Navigation property for one-to-one relationship with thumbnail
         public Thumbnail? Thumbnail { get; set; }
 
-        public static Model Create(string name, DateTime createdAt)
+        public static Model Create(string name, DateTime createdAt, bool isHidden = true)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Model name cannot be null or empty.", nameof(name));
@@ -71,7 +72,8 @@ namespace Domain.Models
             {
                 Name = name.Trim(),
                 CreatedAt = createdAt,
-                UpdatedAt = createdAt
+                UpdatedAt = createdAt,
+                IsHidden = isHidden
             };
         }
 
@@ -234,6 +236,21 @@ namespace Domain.Models
             
             // Raise domain event to trigger deduplication after metadata is available
             RaiseDomainEvent(new Events.ModelMetadataProvidedEvent(Id, Name, vertices, faces));
+        }
+
+        /// <summary>
+        /// Makes the model visible to users.
+        /// Called after deduplication is complete when model is confirmed to be unique.
+        /// Raises ModelShownEvent to trigger thumbnail generation.
+        /// </summary>
+        /// <param name="updatedAt">When the model was shown</param>
+        public void Show(DateTime updatedAt)
+        {
+            IsHidden = false;
+            UpdatedAt = updatedAt;
+            
+            // Raise domain event to trigger thumbnail generation now that model is visible
+            RaiseDomainEvent(new ModelShownEvent(Id));
         }
 
         private static PolyCount CalculatePolyCount(int? faces)

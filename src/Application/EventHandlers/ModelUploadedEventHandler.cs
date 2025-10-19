@@ -29,24 +29,21 @@ public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
             _logger.LogInformation("Handling ModelUploadedEvent for model {ModelId} with hash {ModelHash}, IsNewModel: {IsNewModel}",
                 domainEvent.ModelId, domainEvent.ModelHash, domainEvent.IsNewModel);
 
-            // Enqueue thumbnail generation job - the queue handles idempotency automatically
-            var job = await _thumbnailQueue.EnqueueAsync(
-                domainEvent.ModelId,
-                domainEvent.ModelHash,
-                cancellationToken: cancellationToken);
-
-            _logger.LogInformation("Successfully enqueued thumbnail job {JobId} for model {ModelId} with status {Status}",
-                job.Id, domainEvent.ModelId, job.Status);
+            // Note: We no longer enqueue thumbnail jobs here.
+            // Thumbnail generation is now triggered by ModelShownEvent after deduplication is complete.
+            // This prevents generating thumbnails for models that might be deleted during deduplication.
+            _logger.LogInformation("Skipping thumbnail generation for model {ModelId} - will be triggered after deduplication via ModelShownEvent",
+                domainEvent.ModelId);
 
             return Result.Success();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to enqueue thumbnail job for model {ModelId} with hash {ModelHash}",
+            _logger.LogError(ex, "Failed to handle ModelUploadedEvent for model {ModelId} with hash {ModelHash}",
                 domainEvent.ModelId, domainEvent.ModelHash);
 
-            return Result.Failure(new Error("ThumbnailJobEnqueueFailed", 
-                $"Failed to enqueue thumbnail job for model {domainEvent.ModelId}: {ex.Message}"));
+            return Result.Failure(new Error("ModelUploadedEventHandlingFailed", 
+                $"Failed to handle ModelUploadedEvent for model {domainEvent.ModelId}: {ex.Message}"));
         }
     }
 }

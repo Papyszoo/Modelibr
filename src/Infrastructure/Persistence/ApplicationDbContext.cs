@@ -70,6 +70,7 @@ namespace Infrastructure.Persistence
                 // Create indexes for filtering
                 entity.HasIndex(m => m.PolyCount);
                 entity.HasIndex(m => new { m.Name, m.Vertices });
+                entity.HasIndex(m => m.IsHidden);
             });
 
             // Configure File entity

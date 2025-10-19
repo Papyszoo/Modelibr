@@ -19,6 +19,9 @@ namespace Application.Models
         {
             var models = await _modelRepository.GetAllAsync(cancellationToken);
             
+            // Filter out hidden models (users should not see models that are pending deduplication)
+            models = models.Where(m => !m.IsHidden);
+            
             // Filter by pack if specified
             if (query.PackId.HasValue)
             {

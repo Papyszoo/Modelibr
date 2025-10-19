@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Events;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
@@ -16,17 +17,20 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
     private readonly IModelRepository _modelRepository;
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
+    private readonly IDomainEventDispatcher _domainEventDispatcher;
     private readonly ILogger<ModelMetadataProvidedEventHandler> _logger;
 
     public ModelMetadataProvidedEventHandler(
         IModelRepository modelRepository,
         IThumbnailJobRepository thumbnailJobRepository,
         IBatchUploadRepository batchUploadRepository,
+        IDomainEventDispatcher domainEventDispatcher,
         ILogger<ModelMetadataProvidedEventHandler> logger)
     {
         _modelRepository = modelRepository ?? throw new ArgumentNullException(nameof(modelRepository));
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _batchUploadRepository = batchUploadRepository ?? throw new ArgumentNullException(nameof(batchUploadRepository));
+        _domainEventDispatcher = domainEventDispatcher ?? throw new ArgumentNullException(nameof(domainEventDispatcher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -47,7 +51,7 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                 return Result.Success();
             }
 
-            // Find ALL models with same name and vertices count
+            // Find ALL models with same name and vertices count (including hidden ones for deduplication)
             var duplicateModels = await _modelRepository.GetAllByNameAndVerticesAsync(
                 domainEvent.ModelName,
                 domainEvent.Vertices.Value,
@@ -62,20 +66,21 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                     "Found {Count} models with name '{ModelName}' and {Vertices} vertices. Merging files...",
                     duplicatesList.Count, domainEvent.ModelName, domainEvent.Vertices);
 
-                // Keep the model with the lowest ID (created first)
-                var modelToKeep = duplicatesList.OrderBy(m => m.Id).First();
+                // Keep the VISIBLE model with the lowest ID if one exists, otherwise keep the first hidden one
+                var visibleModel = duplicatesList.Where(m => !m.IsHidden).OrderBy(m => m.Id).FirstOrDefault();
+                var modelToKeep = visibleModel ?? duplicatesList.OrderBy(m => m.Id).First();
                 var modelsToMerge = duplicatesList.Where(m => m.Id != modelToKeep.Id).ToList();
 
                 _logger.LogInformation(
-                    "Keeping model {KeepModelId} and merging {Count} duplicate models",
-                    modelToKeep.Id, modelsToMerge.Count);
+                    "Keeping model {KeepModelId} (IsHidden: {IsHidden}) and merging {Count} duplicate models",
+                    modelToKeep.Id, modelToKeep.IsHidden, modelsToMerge.Count);
 
                 // Merge files from all duplicate models into the one to keep
                 foreach (var modelToMerge in modelsToMerge)
                 {
                     _logger.LogInformation(
-                        "Merging files from model {MergeModelId} into model {KeepModelId}",
-                        modelToMerge.Id, modelToKeep.Id);
+                        "Merging files from model {MergeModelId} (IsHidden: {IsHidden}) into model {KeepModelId}",
+                        modelToMerge.Id, modelToMerge.IsHidden, modelToKeep.Id);
 
                     foreach (var file in modelToMerge.Files.ToList())
                     {
@@ -142,12 +147,56 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                     await _modelRepository.DeleteAsync(modelToMerge.Id, cancellationToken);
                 }
 
+                // If the kept model is still hidden, show it now (deduplication complete)
+                if (modelToKeep.IsHidden)
+                {
+                    _logger.LogInformation(
+                        "Showing model {KeepModelId} after deduplication complete",
+                        modelToKeep.Id);
+                    await _modelRepository.ShowModelAsync(modelToKeep.Id, cancellationToken);
+                    
+                    // Fetch the model again to get domain events and publish them (ModelShownEvent triggers thumbnail generation)
+                    var updatedModel = await _modelRepository.GetByIdAsync(modelToKeep.Id, cancellationToken);
+                    if (updatedModel != null && updatedModel.DomainEvents.Any())
+                    {
+                        _logger.LogInformation(
+                            "Publishing {Count} domain events for shown model {KeepModelId}",
+                            updatedModel.DomainEvents.Count(), modelToKeep.Id);
+                        await _domainEventDispatcher.PublishAsync(updatedModel.DomainEvents, cancellationToken);
+                        updatedModel.ClearDomainEvents();
+                        await _modelRepository.UpdateAsync(updatedModel, cancellationToken);
+                    }
+                }
+
                 _logger.LogInformation(
                     "Successfully merged and deleted duplicate models. Kept model {KeepModelId}. Deleted models: {DeletedModelIds}",
                     modelToKeep.Id, string.Join(", ", modelsToMerge.Select(m => m.Id)));
             }
             else
             {
+                // No duplicates found - this is a unique model
+                // Show the model to make it visible to users (deduplication complete)
+                var model = duplicatesList.FirstOrDefault();
+                if (model != null && model.IsHidden)
+                {
+                    _logger.LogInformation(
+                        "No duplicates found for model {ModelId}. Showing model to users (deduplication complete).",
+                        model.Id);
+                    await _modelRepository.ShowModelAsync(model.Id, cancellationToken);
+                    
+                    // Fetch the model again to get domain events and publish them (ModelShownEvent triggers thumbnail generation)
+                    var updatedModel = await _modelRepository.GetByIdAsync(model.Id, cancellationToken);
+                    if (updatedModel != null && updatedModel.DomainEvents.Any())
+                    {
+                        _logger.LogInformation(
+                            "Publishing {Count} domain events for shown model {ModelId}",
+                            updatedModel.DomainEvents.Count(), model.Id);
+                        await _domainEventDispatcher.PublishAsync(updatedModel.DomainEvents, cancellationToken);
+                        updatedModel.ClearDomainEvents();
+                        await _modelRepository.UpdateAsync(updatedModel, cancellationToken);
+                    }
+                }
+                
                 _logger.LogInformation(
                     "No duplicate models found for model {ModelId} with name '{ModelName}' and {Vertices} vertices",
                     domainEvent.ModelId, domainEvent.ModelName, domainEvent.Vertices);

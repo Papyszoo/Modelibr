@@ -180,6 +180,9 @@ namespace Infrastructure.Migrations
                     b.Property<int?>("Faces")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -199,6 +202,8 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DefaultTextureSetId");
+
+                    b.HasIndex("IsHidden");
 
                     b.HasIndex("PolyCount");
 
