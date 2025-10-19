@@ -80,7 +80,8 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                                 "Moving file {FileId} (hash: {FileHash}) from model {MergeModelId} to model {KeepModelId}",
                                 file.Id, file.Sha256Hash, modelToMerge.Id, modelToKeep.Id);
                             
-                            await _modelRepository.AddFileAsync(modelToKeep.Id, file, cancellationToken);
+                            // Link existing file to the model (don't try to insert it again)
+                            await _modelRepository.LinkExistingFileAsync(modelToKeep.Id, file, cancellationToken);
                         }
                         else
                         {
