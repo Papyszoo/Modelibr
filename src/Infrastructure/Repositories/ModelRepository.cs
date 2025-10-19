@@ -95,6 +95,18 @@ internal sealed class ModelRepository : IModelRepository
             .FirstOrDefaultAsync(m => m.Name == name && m.Vertices == vertices, cancellationToken);
     }
 
+    public async Task<IEnumerable<Model>> GetAllByNameAndVerticesAsync(string name, int vertices, CancellationToken cancellationToken = default)
+    {
+        return await _context.Models
+            .Include(m => m.Files)
+            .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
+            .Include(m => m.Thumbnail)
+            .AsSplitQuery()
+            .Where(m => m.Name == name && m.Vertices == vertices)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Model?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         return await _context.Models

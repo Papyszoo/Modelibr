@@ -41,68 +41,64 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                 return Result.Success();
             }
 
-            // Find existing model with same name and vertices count
-            var duplicateModel = await _modelRepository.GetByNameAndVerticesAsync(
+            // Find ALL models with same name and vertices count
+            var duplicateModels = await _modelRepository.GetAllByNameAndVerticesAsync(
                 domainEvent.ModelName,
                 domainEvent.Vertices.Value,
                 cancellationToken);
 
-            // If we found a duplicate and it's not the same model
-            if (duplicateModel != null && duplicateModel.Id != domainEvent.ModelId)
+            var duplicatesList = duplicateModels.ToList();
+            
+            // If we found multiple models with same name+vertices, we need to merge them
+            if (duplicatesList.Count > 1)
             {
                 _logger.LogInformation(
-                    "Found duplicate model {DuplicateModelId} for model {ModelId} with name '{ModelName}' and {Vertices} vertices. Merging files...",
-                    duplicateModel.Id, domainEvent.ModelId, domainEvent.ModelName, domainEvent.Vertices);
+                    "Found {Count} models with name '{ModelName}' and {Vertices} vertices. Merging files...",
+                    duplicatesList.Count, domainEvent.ModelName, domainEvent.Vertices);
 
-                // Get the current model to access its files
-                var currentModel = await _modelRepository.GetByIdAsync(domainEvent.ModelId, cancellationToken);
-                
-                if (currentModel == null)
-                {
-                    _logger.LogWarning("Model {ModelId} not found during deduplication", domainEvent.ModelId);
-                    return Result.Failure(new Error("ModelNotFound", $"Model {domainEvent.ModelId} not found"));
-                }
-
-                // Determine which model to keep (prefer the one created first - lower ID)
-                var modelToKeep = duplicateModel.Id < currentModel.Id ? duplicateModel : currentModel;
-                var modelToMerge = duplicateModel.Id < currentModel.Id ? currentModel : duplicateModel;
+                // Keep the model with the lowest ID (created first)
+                var modelToKeep = duplicatesList.OrderBy(m => m.Id).First();
+                var modelsToMerge = duplicatesList.Where(m => m.Id != modelToKeep.Id).ToList();
 
                 _logger.LogInformation(
-                    "Keeping model {KeepModelId} and merging files from model {MergeModelId}",
-                    modelToKeep.Id, modelToMerge.Id);
+                    "Keeping model {KeepModelId} and merging {Count} duplicate models",
+                    modelToKeep.Id, modelsToMerge.Count);
 
-                // Move all files from modelToMerge to modelToKeep
-                foreach (var file in modelToMerge.Files.ToList())
+                // Merge files from all duplicate models into the one to keep
+                foreach (var modelToMerge in modelsToMerge)
                 {
-                    // Check if the file doesn't already exist in the target model
-                    if (!modelToKeep.HasFile(file.Sha256Hash))
+                    _logger.LogInformation(
+                        "Merging files from model {MergeModelId} into model {KeepModelId}",
+                        modelToMerge.Id, modelToKeep.Id);
+
+                    foreach (var file in modelToMerge.Files.ToList())
                     {
-                        _logger.LogInformation(
-                            "Moving file {FileId} (hash: {FileHash}) from model {MergeModelId} to model {KeepModelId}",
-                            file.Id, file.Sha256Hash, modelToMerge.Id, modelToKeep.Id);
-                        
-                        await _modelRepository.AddFileAsync(modelToKeep.Id, file, cancellationToken);
-                    }
-                    else
-                    {
-                        _logger.LogInformation(
-                            "File {FileId} (hash: {FileHash}) already exists in model {KeepModelId}, skipping",
-                            file.Id, file.Sha256Hash, modelToKeep.Id);
+                        // Check if the file doesn't already exist in the target model
+                        if (!modelToKeep.HasFile(file.Sha256Hash))
+                        {
+                            _logger.LogInformation(
+                                "Moving file {FileId} (hash: {FileHash}) from model {MergeModelId} to model {KeepModelId}",
+                                file.Id, file.Sha256Hash, modelToMerge.Id, modelToKeep.Id);
+                            
+                            await _modelRepository.AddFileAsync(modelToKeep.Id, file, cancellationToken);
+                        }
+                        else
+                        {
+                            _logger.LogInformation(
+                                "File {FileId} (hash: {FileHash}) already exists in model {KeepModelId}, skipping",
+                                file.Id, file.Sha256Hash, modelToKeep.Id);
+                        }
                     }
                 }
 
-                // Note: We cannot delete the merged model here as we don't have a delete method
-                // The model will remain but with no files. This could be cleaned up separately
-                // or the repository could be extended with a delete method.
-                
                 _logger.LogInformation(
-                    "Successfully merged files from model {MergeModelId} into model {KeepModelId}. Model {MergeModelId} now has no files.",
-                    modelToMerge.Id, modelToKeep.Id, modelToMerge.Id);
+                    "Successfully merged files into model {KeepModelId}. Merged models: {MergedModelIds}",
+                    modelToKeep.Id, string.Join(", ", modelsToMerge.Select(m => m.Id)));
             }
             else
             {
                 _logger.LogInformation(
-                    "No duplicate model found for model {ModelId} with name '{ModelName}' and {Vertices} vertices",
+                    "No duplicate models found for model {ModelId} with name '{ModelName}' and {Vertices} vertices",
                     domainEvent.ModelId, domainEvent.ModelName, domainEvent.Vertices);
             }
 
