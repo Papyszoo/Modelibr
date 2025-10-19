@@ -38,6 +38,7 @@ namespace Infrastructure
             services.AddScoped<IProjectRepository, ProjectRepository>();
             services.AddScoped<IStageRepository, StageRepository>();
             services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
+            services.AddScoped<ISettingRepository, SettingRepository>();
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();

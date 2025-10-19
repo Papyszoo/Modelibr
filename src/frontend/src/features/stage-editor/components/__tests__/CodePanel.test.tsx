@@ -20,18 +20,6 @@ jest.mock('primereact/button', () => ({
   ),
 }))
 
-jest.mock('primereact/accordion', () => ({
-  Accordion: ({ children }: any) => (
-    <div data-testid="accordion">{children}</div>
-  ),
-  AccordionTab: ({ children, header }: any) => (
-    <div data-testid="accordion-tab">
-      <div data-testid="accordion-header">{header}</div>
-      <div data-testid="accordion-content">{children}</div>
-    </div>
-  ),
-}))
-
 describe('CodePanel', () => {
   const mockStageConfig: StageConfig = {
     lights: [],
@@ -45,8 +33,8 @@ describe('CodePanel', () => {
   })
 
   it('should render without crashing', () => {
-    render(<CodePanel stageConfig={mockStageConfig} />)
-    expect(screen.getByTestId('accordion')).toBeInTheDocument()
+    const { container } = render(<CodePanel stageConfig={mockStageConfig} />)
+    expect(container.querySelector('.code-panel')).toBeInTheDocument()
   })
 
   it('should generate code with empty lights array', () => {
@@ -217,11 +205,62 @@ describe('CodePanel', () => {
     expect(codeElement?.textContent).not.toContain('OrbitControls')
   })
 
-  it('should not include example objects in generated code', () => {
+  it('should not include meshes when meshes array is empty', () => {
     const { container } = render(<CodePanel stageConfig={mockStageConfig} />)
     const codeElement = container.querySelector('code')
     expect(codeElement?.textContent).not.toContain('<mesh')
-    expect(codeElement?.textContent).not.toContain('sphereGeometry')
+  })
+
+  it('should generate code with meshes', () => {
+    const configWithMesh: StageConfig = {
+      lights: [],
+      meshes: [
+        {
+          id: 'mesh-1',
+          type: 'box',
+          position: [0, 1, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          color: '#4a9eff',
+          wireframe: false,
+        },
+      ],
+      groups: [],
+      helpers: [],
+    }
+
+    const { container } = render(<CodePanel stageConfig={configWithMesh} />)
+    const codeElement = container.querySelector('code')
+    expect(codeElement?.textContent).toContain('<mesh')
+    expect(codeElement?.textContent).toContain('position={[0, 1, 0]}')
+    expect(codeElement?.textContent).toContain('boxGeometry')
+    expect(codeElement?.textContent).toContain('meshStandardMaterial')
+    expect(codeElement?.textContent).toContain('color="#4a9eff"')
+  })
+
+  it('should generate code with wireframe mesh', () => {
+    const configWithWireframeMesh: StageConfig = {
+      lights: [],
+      meshes: [
+        {
+          id: 'mesh-1',
+          type: 'sphere',
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          color: '#ff0000',
+          wireframe: true,
+        },
+      ],
+      groups: [],
+      helpers: [],
+    }
+
+    const { container } = render(
+      <CodePanel stageConfig={configWithWireframeMesh} />
+    )
+    const codeElement = container.querySelector('code')
+    expect(codeElement?.textContent).toContain('wireframe')
   })
 
   it('should wrap lights in a group element', () => {

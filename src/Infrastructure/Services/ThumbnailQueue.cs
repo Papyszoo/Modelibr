@@ -149,6 +149,39 @@ public class ThumbnailQueue : IThumbnailQueue
         return await _thumbnailJobRepository.GetByModelHashAsync(modelHash, cancellationToken);
     }
 
+    public async Task<int> CancelActiveJobsForModelAsync(int modelId, CancellationToken cancellationToken = default)
+    {
+        var activeJobs = await _thumbnailJobRepository.GetActiveJobsByModelIdAsync(modelId, cancellationToken);
+        var cancelledCount = 0;
+        var currentTime = DateTime.UtcNow;
+
+        foreach (var job in activeJobs)
+        {
+            try
+            {
+                job.Cancel(currentTime);
+                await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+                cancelledCount++;
+
+                _logger.LogInformation("Cancelled thumbnail job {JobId} for model {ModelId} due to configuration change", 
+                    job.Id, modelId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Failed to cancel thumbnail job {JobId} for model {ModelId}", 
+                    job.Id, modelId);
+            }
+        }
+
+        if (cancelledCount > 0)
+        {
+            _logger.LogInformation("Cancelled {CancelledCount} active thumbnail job(s) for model {ModelId}", 
+                cancelledCount, modelId);
+        }
+
+        return cancelledCount;
+    }
+
     public async Task<int> CleanupExpiredLocksAsync(CancellationToken cancellationToken = default)
     {
         var expiredJobs = await _thumbnailJobRepository.GetJobsWithExpiredLocksAsync(cancellationToken);

@@ -72,42 +72,46 @@ export function parseCompactTabFormat(
       }
       seen.add(tabId)
 
-      let tab: Tab
-
       // Handle model viewer tabs (e.g., "model-123")
       if (tabId.startsWith('model-')) {
         const modelId = tabId.substring(6)
-        tab = {
+        tabs.push({
           id: tabId,
           type: 'modelViewer',
           label: getTabLabel('modelViewer', modelId),
           modelId,
-        }
+        })
+        continue
       }
+
       // Handle texture set viewer tabs (e.g., "set-123")
-      else if (tabId.startsWith('set-')) {
+      if (tabId.startsWith('set-')) {
         const setId = tabId.substring(4)
-        tab = {
+        tabs.push({
           id: tabId,
           type: 'textureSetViewer',
           label: getTabLabel('textureSetViewer', undefined, setId),
           setId,
-        }
+        })
+        continue
       }
+
       // Handle pack viewer tabs (e.g., "pack-123")
-      else if (tabId.startsWith('pack-')) {
+      if (tabId.startsWith('pack-')) {
         const packId = tabId.substring(5)
-        tab = {
+        tabs.push({
           id: tabId,
           type: 'packViewer',
           label: getTabLabel('packViewer', undefined, undefined, packId),
           packId,
-        }
+        })
+        continue
       }
+
       // Handle project viewer tabs (e.g., "project-123")
-      else if (tabId.startsWith('project-')) {
+      if (tabId.startsWith('project-')) {
         const projectId = tabId.substring(8)
-        tab = {
+        tabs.push({
           id: tabId,
           type: 'projectViewer',
           label: getTabLabel(
@@ -118,12 +122,14 @@ export function parseCompactTabFormat(
             projectId
           ),
           projectId,
-        }
+        })
+        continue
       }
+
       // Handle stage editor tabs (e.g., "stage-123")
-      else if (tabId.startsWith('stage-')) {
+      if (tabId.startsWith('stage-')) {
         const stageId = tabId.substring(6)
-        tab = {
+        tabs.push({
           id: tabId,
           type: 'stageEditor',
           label: getTabLabel(
@@ -131,46 +137,43 @@ export function parseCompactTabFormat(
             undefined,
             undefined,
             undefined,
-            undefined,
             stageId
           ),
           stageId,
-        }
+        })
+        continue
       }
+
       // Handle simple tabs (use tabId as type)
-      else {
-        const tabType = tabId as Tab['type']
+      const tabType = tabId as Tab['type']
 
-        // Validate tab type
-        if (
-          ![
-            'modelList',
-            'modelViewer',
-            'texture',
-            'animation',
-            'textureSets',
-            'textureSetViewer',
-            'packs',
-            'packViewer',
-            'projects',
-            'projectViewer',
-            'stageList',
-            'stageEditor',
-            'history',
-            'settings',
-          ].includes(tabType)
-        ) {
-          throw new Error(`Invalid tab type: ${tabId}`)
-        }
-
-        tab = {
-          id: tabId,
-          type: tabType,
-          label: getTabLabel(tabType),
-        }
+      // Validate tab type
+      if (
+        ![
+          'modelList',
+          'modelViewer',
+          'texture',
+          'animation',
+          'textureSets',
+          'textureSetViewer',
+          'packs',
+          'packViewer',
+          'projects',
+          'projectViewer',
+          'stageList',
+          'stageEditor',
+          'history',
+          'settings',
+        ].includes(tabType)
+      ) {
+        throw new Error(`Invalid tab type: ${tabId}`)
       }
 
-      tabs.push(tab)
+      tabs.push({
+        id: tabId,
+        type: tabType,
+        label: getTabLabel(tabType),
+      })
     }
 
     return tabs

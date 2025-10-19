@@ -17,6 +17,7 @@ namespace Infrastructure.Persistence
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
+        public DbSet<Setting> Settings => Set<Setting>();
         public DbSet<BatchUpload> BatchUploads => Set<BatchUpload>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -257,6 +258,20 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
+            });
+
+            // Configure Setting entity
+            modelBuilder.Entity<Setting>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Key).IsRequired().HasMaxLength(100);
+                entity.Property(s => s.Value).IsRequired().HasMaxLength(1000);
+                entity.Property(s => s.Description).HasMaxLength(500);
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+
+                // Create unique index on Key to ensure no duplicate keys
+                entity.HasIndex(s => s.Key).IsUnique();
             });
 
             // Configure BatchUpload entity
