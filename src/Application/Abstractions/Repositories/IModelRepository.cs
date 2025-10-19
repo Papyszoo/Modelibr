@@ -14,4 +14,5 @@ public interface IModelRepository
     Task<IEnumerable<Model>> GetAllByNameAndVerticesAsync(string name, int vertices, CancellationToken cancellationToken = default);
     Task<Model?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task UpdateAsync(Model model, CancellationToken cancellationToken = default);
+    Task DeleteAsync(int modelId, CancellationToken cancellationToken = default);
 }

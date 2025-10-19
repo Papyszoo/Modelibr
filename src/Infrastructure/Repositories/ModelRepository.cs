@@ -146,4 +146,16 @@ internal sealed class ModelRepository : IModelRepository
         _context.Models.Update(model);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task DeleteAsync(int modelId, CancellationToken cancellationToken = default)
+    {
+        var model = await _context.Models
+            .FirstOrDefaultAsync(m => m.Id == modelId, cancellationToken);
+        
+        if (model != null)
+        {
+            _context.Models.Remove(model);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
 }
