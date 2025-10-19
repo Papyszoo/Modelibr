@@ -158,4 +158,18 @@ internal sealed class ModelRepository : IModelRepository
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
+
+    public async Task ShowModelAsync(int modelId, CancellationToken cancellationToken = default)
+    {
+        var model = await _context.Models
+            .FirstOrDefaultAsync(m => m.Id == modelId, cancellationToken);
+        
+        if (model == null)
+        {
+            throw new ArgumentException($"Model with ID {modelId} not found", nameof(modelId));
+        }
+
+        model.Show(_dateTimeProvider.UtcNow);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

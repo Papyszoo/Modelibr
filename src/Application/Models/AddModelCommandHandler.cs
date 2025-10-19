@@ -89,13 +89,15 @@ namespace Application.Models
                 return Result.Success(new AddModelCommandResponse(existingModelByHash.Id, true));
             }
 
-            // Create new model
+            // Create new model as HIDDEN (isHidden=true by default)
+            // Model will be shown after deduplication is complete
             try
             {
-                var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
+                var model = Model.Create(modelName, _dateTimeProvider.UtcNow, isHidden: true);
                 
                 // Note: Geometry metadata (vertices, faces) will be populated by the worker service
-                // after it loads the model for thumbnail generation
+                // after it extracts metadata from the file. Deduplication happens after metadata is available.
+                // The model will remain hidden until deduplication is complete.
                 
                 // Save the model first to get an ID
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
@@ -104,6 +106,7 @@ namespace Application.Models
                 await _modelRepository.AddFileAsync(savedModel.Id, fileEntity, cancellationToken);
                 
                 // Raise domain event for new model upload after both model and file are persisted
+                // Note: Thumbnail generation will be triggered later when model becomes visible
                 savedModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, true);
                 
                 // Publish domain events

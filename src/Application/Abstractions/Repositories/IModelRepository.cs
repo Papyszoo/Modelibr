@@ -15,4 +15,5 @@ public interface IModelRepository
     Task<Model?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task UpdateAsync(Model model, CancellationToken cancellationToken = default);
     Task DeleteAsync(int modelId, CancellationToken cancellationToken = default);
+    Task ShowModelAsync(int modelId, CancellationToken cancellationToken = default);
 }
