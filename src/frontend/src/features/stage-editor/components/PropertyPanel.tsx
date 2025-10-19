@@ -26,11 +26,6 @@ function PropertyPanel({
   if (!selectedObject) {
     return (
       <div className="property-panel">
-        <div className="property-panel-header">
-          <h3>
-            <i className="pi pi-sliders-h" /> Properties
-          </h3>
-        </div>
         <div className="property-panel-empty">
           <p>Select an object to edit its properties</p>
         </div>
@@ -317,15 +312,13 @@ function PropertyPanel({
   return (
     <div className="property-panel">
       <div className="property-panel-header">
-        <h3>
-          <i className="pi pi-sliders-h" /> Properties
-        </h3>
         <Button
           icon="pi pi-trash"
-          className="p-button-rounded p-button-text p-button-danger"
+          label="Delete"
+          className="p-button-danger p-button-sm"
           onClick={() => onDeleteObject(selectedObject.id)}
-          tooltip="Delete"
-          tooltipOptions={{ position: 'left' }}
+          tooltip="Delete Object"
+          tooltipOptions={{ position: 'bottom' }}
         />
       </div>
 

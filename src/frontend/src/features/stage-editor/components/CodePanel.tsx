@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Button } from 'primereact/button'
-import { Accordion, AccordionTab } from 'primereact/accordion'
 import { StageConfig } from './SceneEditor'
 import './CodePanel.css'
 
@@ -65,6 +64,68 @@ function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
       })
       .join('\n')
 
+    const meshes = stageConfig.meshes
+      .map(mesh => {
+        const geometryType =
+          mesh.type === 'torusKnot'
+            ? 'torusKnotGeometry'
+            : `${mesh.type}Geometry`
+        const wireframeProps = mesh.wireframe ? ' wireframe' : ''
+
+        return `      <mesh
+        position={[${mesh.position.join(', ')}]}
+        rotation={[${mesh.rotation.join(', ')}]}
+        scale={[${mesh.scale.join(', ')}]}
+      >
+        <${geometryType} />
+        <meshStandardMaterial color="${mesh.color}"${wireframeProps} />
+      </mesh>`
+      })
+      .join('\n')
+
+    const groups = stageConfig.groups
+      .map(group => {
+        return `      <group
+        name="${group.name}"
+        position={[${group.position.join(', ')}]}
+        rotation={[${group.rotation.join(', ')}]}
+        scale={[${group.scale.join(', ')}]}
+      >
+        {/* Add children here */}
+      </group>`
+      })
+      .join('\n')
+
+    const helpers = stageConfig.helpers
+      .filter(helper => helper.enabled)
+      .map(helper => {
+        switch (helper.type) {
+          case 'grid':
+            return `      <Grid infiniteGrid />`
+          case 'stage':
+            return `      <Stage shadows="contact" />`
+          case 'environment':
+            return `      <Environment preset="sunset" />`
+          case 'contactShadows':
+            return `      <ContactShadows position={[0, 0, 0]} opacity={0.5} scale={10} />`
+          case 'sky':
+            return `      <Sky sunPosition={[0, 1, 0]} />`
+          case 'stars':
+            return `      <Stars radius={100} depth={50} count={5000} factor={4} />`
+          case 'gizmoHelper':
+            return `      <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
+        <GizmoViewport />
+      </GizmoHelper>`
+          default:
+            return ''
+        }
+      })
+      .join('\n')
+
+    const allElements = [lights, meshes, groups, helpers]
+      .filter(section => section.length > 0)
+      .join('\n')
+
     const footer = `
     </group>
   )
@@ -73,7 +134,7 @@ function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
 export default Scene`
 
     return `${header}
-${lights}${footer}`
+${allElements}${footer}`
   }
 
   const handleCopyCode = async () => {
@@ -91,31 +152,18 @@ ${lights}${footer}`
 
   return (
     <div className="code-panel">
-      <Accordion>
-        <AccordionTab
-          header={
-            <div className="code-panel-header">
-              <span>
-                <i className="pi pi-code" /> Generated Code
-              </span>
-              <Button
-                icon={copied ? 'pi pi-check' : 'pi pi-copy'}
-                label={copied ? 'Copied!' : 'Copy'}
-                className="p-button-sm p-button-text"
-                onClick={e => {
-                  e.stopPropagation()
-                  handleCopyCode()
-                }}
-                severity={copied ? 'success' : undefined}
-              />
-            </div>
-          }
-        >
-          <pre className="code-content">
-            <code>{code}</code>
-          </pre>
-        </AccordionTab>
-      </Accordion>
+      <div className="code-panel-header">
+        <Button
+          icon={copied ? 'pi pi-check' : 'pi pi-copy'}
+          label={copied ? 'Copied!' : 'Copy'}
+          className="p-button-sm"
+          onClick={handleCopyCode}
+          severity={copied ? 'success' : undefined}
+        />
+      </div>
+      <pre className="code-content">
+        <code>{code}</code>
+      </pre>
     </div>
   )
 }
