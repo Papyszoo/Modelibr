@@ -54,6 +54,7 @@ namespace Infrastructure.Persistence
                 entity.Property(m => m.Vertices);
                 entity.Property(m => m.Faces);
                 entity.Property(m => m.PolyCount).IsRequired();
+                entity.Property(m => m.IsHidden).IsRequired().HasDefaultValue(true);
 
                 // Configure one-to-one relationship with Thumbnail
                 entity.HasOne(m => m.Thumbnail)
