@@ -4,6 +4,7 @@ import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Button } from 'primereact/button'
 import { getModelFileFormat, getFileExtension, formatFileSize } from '../../../utils/fileUtils'
+import { apiClient } from '../../../services/ApiClient'
 // eslint-disable-next-line no-restricted-imports -- ModelInfo needs direct API access
 import apiClient from '../../../services/ApiClient'
 import TextureSetAssociationDialog from './TextureSetAssociationDialog'
@@ -66,8 +67,8 @@ function ModelInfo({ model, onModelUpdated }) {
   }
 
   const handleDownloadFile = (fileId: string) => {
-    // Download the file using the API endpoint
-    const downloadUrl = `/files/${fileId}`
+    // Download the file using the API endpoint with full URL
+    const downloadUrl = apiClient.getFileUrl(fileId)
     window.location.href = downloadUrl
   }
 
