@@ -300,6 +300,31 @@ export class PuppeteerRenderer {
           const model = window.modelRenderer.model
           const textureLoader = new THREE.TextureLoader()
 
+          // Map texture type enum values to material properties
+          // TextureType enum: Albedo=1, Normal=2, Height=3, AO=4, Roughness=5, Metallic=6, Diffuse=7, Specular=8
+          const textureTypeMap = {
+            '1': 'map',           // Albedo -> base color map
+            '2': 'normalMap',     // Normal
+            '3': 'displacementMap', // Height
+            '4': 'aoMap',         // AO
+            '5': 'roughnessMap',  // Roughness
+            '6': 'metalnessMap',  // Metallic
+            '7': 'map',           // Diffuse -> base color map (legacy)
+            '8': 'specularMap',   // Specular
+            // Also support string names for backward compatibility
+            'Albedo': 'map',
+            'Normal': 'normalMap',
+            'Height': 'displacementMap',
+            'AO': 'aoMap',
+            'Roughness': 'roughnessMap',
+            'Metallic': 'metalnessMap',
+            'Diffuse': 'map',
+            'Specular': 'specularMap',
+            'BaseColor': 'map',
+            'AmbientOcclusion': 'aoMap',
+            'Emissive': 'emissiveMap'
+          }
+
           // Load textures asynchronously
           const loadTexture = url => {
             return new Promise((resolve, reject) => {
@@ -318,8 +343,10 @@ export class PuppeteerRenderer {
           const loadedTextures = {}
           for (const [type, url] of Object.entries(textureUrls)) {
             try {
-              loadedTextures[type] = await loadTexture(url)
-              console.log(`Loaded ${type} texture`)
+              const texture = await loadTexture(url)
+              const materialProperty = textureTypeMap[type] || type
+              loadedTextures[materialProperty] = texture
+              console.log(`Loaded ${type} texture -> ${materialProperty}`)
             } catch (error) {
               console.warn(`Failed to load ${type} texture:`, error)
             }
@@ -336,42 +363,18 @@ export class PuppeteerRenderer {
                 child.material = new THREE.MeshStandardMaterial()
               }
 
-              // Apply textures based on type
-              if (loadedTextures.BaseColor || loadedTextures.Diffuse) {
-                child.material.map = loadedTextures.BaseColor || loadedTextures.Diffuse
-                child.material.needsUpdate = true
-                console.log('Applied base color/diffuse texture to mesh')
-              }
-
-              if (loadedTextures.Normal) {
-                child.material.normalMap = loadedTextures.Normal
-                child.material.needsUpdate = true
-                console.log('Applied normal texture to mesh')
-              }
-
-              if (loadedTextures.Metallic) {
-                child.material.metalnessMap = loadedTextures.Metallic
-                child.material.needsUpdate = true
-                console.log('Applied metallic texture to mesh')
-              }
-
-              if (loadedTextures.Roughness) {
-                child.material.roughnessMap = loadedTextures.Roughness
-                child.material.needsUpdate = true
-                console.log('Applied roughness texture to mesh')
-              }
-
-              if (loadedTextures.Emissive) {
-                child.material.emissiveMap = loadedTextures.Emissive
-                child.material.emissive = new THREE.Color(0xffffff)
-                child.material.needsUpdate = true
-                console.log('Applied emissive texture to mesh')
-              }
-
-              if (loadedTextures.AmbientOcclusion) {
-                child.material.aoMap = loadedTextures.AmbientOcclusion
-                child.material.needsUpdate = true
-                console.log('Applied AO texture to mesh')
+              // Apply each loaded texture to the material
+              for (const [property, texture] of Object.entries(loadedTextures)) {
+                if (child.material[property] !== undefined) {
+                  child.material[property] = texture
+                  child.material.needsUpdate = true
+                  console.log(`Applied ${property} to mesh`)
+                  
+                  // Special handling for emissive
+                  if (property === 'emissiveMap' && !child.material.emissive) {
+                    child.material.emissive = new THREE.Color(0xffffff)
+                  }
+                }
               }
             }
           })

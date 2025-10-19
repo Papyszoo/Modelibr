@@ -185,7 +185,7 @@ export class ModelDataService {
       try {
         const filePath = await this.downloadTextureFile(
           texture.fileId,
-          texture.originalFileName || `texture_${texture.id}`
+          texture.fileName || `texture_${texture.id}`
         )
 
         if (filePath) {
