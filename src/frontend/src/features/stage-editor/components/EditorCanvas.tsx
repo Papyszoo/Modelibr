@@ -21,8 +21,15 @@ function EditorCanvas({
 }: EditorCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
+  const handleCanvasClick = (event: MouseEvent) => {
+    // Deselect when clicking on the canvas background
+    if ((event.target as HTMLElement).tagName === 'CANVAS') {
+      onSelectObject(null)
+    }
+  }
+
   return (
-    <div className="editor-canvas-container">
+    <div className="editor-canvas-container" onClick={handleCanvasClick}>
       <Canvas
         ref={canvasRef}
         shadows
@@ -69,7 +76,13 @@ function EditorCanvas({
 
           {/* Reference sphere for testing - only shown when no meshes */}
           {stageConfig.meshes.length === 0 && (
-            <mesh position={[0, 1, 0]} onClick={() => onSelectObject(null)}>
+            <mesh
+              position={[0, 1, 0]}
+              onClick={e => {
+                e.stopPropagation()
+                onSelectObject(null)
+              }}
+            >
               <sphereGeometry args={[1, 32, 32]} />
               <meshStandardMaterial color="#4a9eff" />
             </mesh>

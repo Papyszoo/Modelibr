@@ -102,7 +102,13 @@ export function parseCompactTabFormat(
         return {
           id: tabId,
           type: 'projectViewer',
-          label: getTabLabel('projectViewer', undefined, undefined, undefined, projectId),
+          label: getTabLabel(
+            'projectViewer',
+            undefined,
+            undefined,
+            undefined,
+            projectId
+          ),
           projectId,
         }
       }
@@ -113,14 +119,20 @@ export function parseCompactTabFormat(
         return {
           id: tabId,
           type: 'stageEditor',
-          label: getTabLabel('stageEditor', undefined, undefined, undefined, stageId),
+          label: getTabLabel(
+            'stageEditor',
+            undefined,
+            undefined,
+            undefined,
+            stageId
+          ),
           stageId,
         }
       }
 
       // Handle simple tabs (use tabId as type)
       const tabType = tabId as Tab['type']
-      
+
       // Validate tab type
       if (
         ![
@@ -164,7 +176,5 @@ export function serializeToCompactFormat(tabs: Tab[]): string {
     return true
   })
 
-  return uniqueTabs
-    .map(tab => tab.id)
-    .join(',')
+  return uniqueTabs.map(tab => tab.id).join(',')
 }
