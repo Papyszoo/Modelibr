@@ -58,27 +58,22 @@ namespace Application.Models
             var modelName = command.ModelName ?? 
                            Path.GetFileNameWithoutExtension(command.File.FileName);
 
-            // Check for duplicate model by name only (vertices not available yet)
-            // After the worker extracts metadata, models with same name will be properly deduplicated
-            var existingModelByName = await _modelRepository.GetByNameAsync(
-                modelName, 
+            // Check for existing model by file hash
+            var existingModelByHash = await _modelRepository.GetByFileHashAsync(
+                fileEntity.Sha256Hash, 
                 cancellationToken);
 
-            if (existingModelByName != null)
+            if (existingModelByHash != null)
             {
-                // Check if the file with this hash already exists on this model
-                if (!existingModelByName.HasFile(fileEntity.Sha256Hash))
-                {
-                    // Same model name - add file to existing model
-                    await _modelRepository.AddFileAsync(existingModelByName.Id, fileEntity, cancellationToken);
-                }
-
+                // File already exists - return existing model
+                // No need to add the file again
+                
                 // Raise domain event for existing model upload
-                existingModelByName.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
+                existingModelByHash.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
                 
                 // Publish domain events
-                await _domainEventDispatcher.PublishAsync(existingModelByName.DomainEvents, cancellationToken);
-                existingModelByName.ClearDomainEvents();
+                await _domainEventDispatcher.PublishAsync(existingModelByHash.DomainEvents, cancellationToken);
+                existingModelByHash.ClearDomainEvents();
                 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -87,11 +82,11 @@ namespace Application.Models
                     "model",
                     fileEntity.Id,
                     _dateTimeProvider.UtcNow,
-                    modelId: existingModelByName.Id);
+                    modelId: existingModelByHash.Id);
                 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 
-                return Result.Success(new AddModelCommandResponse(existingModelByName.Id, true));
+                return Result.Success(new AddModelCommandResponse(existingModelByHash.Id, true));
             }
 
             // Create new model
