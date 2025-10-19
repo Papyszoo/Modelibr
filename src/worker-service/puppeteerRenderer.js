@@ -207,7 +207,8 @@ export class PuppeteerRenderer {
             // Normalize and add to scene
             const normInfo = window.normalizeModel(model, 2.0)
             window.modelRenderer.model = model
-            window.modelRenderer.scene.add(model)
+            // Add the container (which holds the model) to the scene
+            window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
             window.modelRenderer.isReady = true
 
             // Count polygons
