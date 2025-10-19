@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Application.Tests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -83,7 +83,11 @@
   width: 60px;
   height: 60px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-color-text));
+  background: linear-gradient(
+    135deg,
+    var(--primary-color),
+    var(--primary-color-text)
+  );
   display: flex;
   align-items: center;
   justify-content: center;

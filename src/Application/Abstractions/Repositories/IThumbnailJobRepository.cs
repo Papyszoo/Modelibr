@@ -28,6 +28,11 @@ public interface IThumbnailJobRepository
     Task<ThumbnailJob?> GetByModelHashAsync(string modelHash, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets active (pending or processing) thumbnail jobs for a specific model.
+    /// </summary>
+    Task<IEnumerable<ThumbnailJob>> GetActiveJobsByModelIdAsync(int modelId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the next pending job for processing with proper locking.
     /// </summary>
     Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default);

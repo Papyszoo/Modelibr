@@ -81,8 +81,12 @@ export default function History() {
   const [history, setHistory] = useState<BatchUploadHistory[]>([])
   const [loading, setLoading] = useState(true)
   const [batchGroups, setBatchGroups] = useState<BatchGroup[]>([])
-  const { openModelDetailsTab, openTextureSetDetailsTab, openPackDetailsTab, openProjectDetailsTab } =
-    useTabContext()
+  const {
+    openModelDetailsTab,
+    openTextureSetDetailsTab,
+    openPackDetailsTab,
+    openProjectDetailsTab,
+  } = useTabContext()
 
   useEffect(() => {
     loadHistory()
@@ -249,7 +253,9 @@ export default function History() {
               text
               rounded
               title="Open Project"
-              onClick={() => openProjectDetailsTab(upload.projectId!.toString())}
+              onClick={() =>
+                openProjectDetailsTab(upload.projectId!.toString())
+              }
             />
           )}
         </div>

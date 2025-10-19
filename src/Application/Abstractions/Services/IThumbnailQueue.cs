@@ -68,6 +68,15 @@ public interface IThumbnailQueue
     Task<ThumbnailJob?> GetJobByModelHashAsync(string modelHash, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Cancels all active (pending or processing) thumbnail jobs for a specific model.
+    /// Used when model configuration changes require new thumbnail generation.
+    /// </summary>
+    /// <param name="modelId">The model ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Number of jobs cancelled</returns>
+    Task<int> CancelActiveJobsForModelAsync(int modelId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Cleans up expired locks and resets them to pending status.
     /// This method should be called periodically by a background service.
     /// </summary>

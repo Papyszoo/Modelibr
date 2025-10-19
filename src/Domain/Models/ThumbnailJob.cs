@@ -178,6 +178,24 @@ public class ThumbnailJob
     }
 
     /// <summary>
+    /// Cancels the job if it's pending or processing.
+    /// </summary>
+    public void Cancel(DateTime cancelledAt)
+    {
+        if (Status != ThumbnailJobStatus.Pending && Status != ThumbnailJobStatus.Processing)
+        {
+            throw new InvalidOperationException($"Cannot cancel job with status {Status}. Only Pending or Processing jobs can be cancelled.");
+        }
+
+        Status = ThumbnailJobStatus.Dead;
+        ErrorMessage = "Job cancelled due to model configuration change";
+        CompletedAt = cancelledAt;
+        UpdatedAt = cancelledAt;
+        LockedBy = null;
+        LockedAt = null;
+    }
+
+    /// <summary>
     /// Checks if the job lock has expired.
     /// </summary>
     public bool IsLockExpired(DateTime currentTime)

@@ -268,4 +268,82 @@ public class ThumbnailQueueTests
         _mockRepository.Verify(r => r.GetJobsWithExpiredLocksAsync(It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.UpdateAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
+
+    [Fact]
+    public async Task CancelActiveJobsForModelAsync_WithActiveJobs_ShouldCancelThem()
+    {
+        // Arrange
+        var modelId = 1;
+        var modelHash1 = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        var modelHash2 = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+        
+        var pendingJob = ThumbnailJob.Create(modelId, modelHash1, DateTime.UtcNow);
+        var processingJob = ThumbnailJob.Create(modelId, modelHash2, DateTime.UtcNow);
+        processingJob.TryClaim("worker-1", DateTime.UtcNow);
+
+        var activeJobs = new List<ThumbnailJob> { pendingJob, processingJob };
+
+        _mockRepository.Setup(r => r.GetActiveJobsByModelIdAsync(modelId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(activeJobs);
+
+        // Act
+        var result = await _thumbnailQueue.CancelActiveJobsForModelAsync(modelId);
+
+        // Assert
+        Assert.Equal(2, result);
+        Assert.Equal(ThumbnailJobStatus.Dead, pendingJob.Status);
+        Assert.Equal(ThumbnailJobStatus.Dead, processingJob.Status);
+        Assert.Equal("Job cancelled due to model configuration change", pendingJob.ErrorMessage);
+        Assert.Equal("Job cancelled due to model configuration change", processingJob.ErrorMessage);
+        Assert.NotNull(pendingJob.CompletedAt);
+        Assert.NotNull(processingJob.CompletedAt);
+
+        _mockRepository.Verify(r => r.GetActiveJobsByModelIdAsync(modelId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.UpdateAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task CancelActiveJobsForModelAsync_WithNoActiveJobs_ShouldReturnZero()
+    {
+        // Arrange
+        var modelId = 1;
+        var emptyList = new List<ThumbnailJob>();
+
+        _mockRepository.Setup(r => r.GetActiveJobsByModelIdAsync(modelId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(emptyList);
+
+        // Act
+        var result = await _thumbnailQueue.CancelActiveJobsForModelAsync(modelId);
+
+        // Assert
+        Assert.Equal(0, result);
+
+        _mockRepository.Verify(r => r.GetActiveJobsByModelIdAsync(modelId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.UpdateAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelActiveJobsForModelAsync_WithOnlyPendingJob_ShouldCancelIt()
+    {
+        // Arrange
+        var modelId = 1;
+        var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        var pendingJob = ThumbnailJob.Create(modelId, modelHash, DateTime.UtcNow);
+
+        var activeJobs = new List<ThumbnailJob> { pendingJob };
+
+        _mockRepository.Setup(r => r.GetActiveJobsByModelIdAsync(modelId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(activeJobs);
+
+        // Act
+        var result = await _thumbnailQueue.CancelActiveJobsForModelAsync(modelId);
+
+        // Assert
+        Assert.Equal(1, result);
+        Assert.Equal(ThumbnailJobStatus.Dead, pendingJob.Status);
+        Assert.Equal("Job cancelled due to model configuration change", pendingJob.ErrorMessage);
+
+        _mockRepository.Verify(r => r.GetActiveJobsByModelIdAsync(modelId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.UpdateAsync(pendingJob, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

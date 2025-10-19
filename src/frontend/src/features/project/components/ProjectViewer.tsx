@@ -757,7 +757,9 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                       </div>
                     )}
                     <div className="project-card-overlay">
-                      <span className="project-card-name">{textureSet.name}</span>
+                      <span className="project-card-name">
+                        {textureSet.name}
+                      </span>
                     </div>
                   </div>
                 </div>
