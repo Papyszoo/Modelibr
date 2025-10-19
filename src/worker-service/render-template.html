@@ -117,24 +117,28 @@
             
             container.appendChild(renderer.domElement);
 
-            // Setup lighting (matching frontend Scene.tsx)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            // Setup lighting with increased ambient light and distant directional lights
+            // Higher ambient light to reduce dark areas
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-            directionalLight.position.set(10, 10, 5);
+            // Main directional light from front-right, positioned further away
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(20, 15, 20);
             directionalLight.castShadow = true;
             directionalLight.shadow.mapSize.width = 2048;
             directionalLight.shadow.mapSize.height = 2048;
             scene.add(directionalLight);
 
-            const pointLight = new THREE.PointLight(0xffffff, 0.5);
-            pointLight.position.set(-10, -10, -10);
+            // Fill light from opposite side to reduce shadows
+            const pointLight = new THREE.PointLight(0xffffff, 0.4);
+            pointLight.position.set(-15, 5, -15);
             scene.add(pointLight);
 
-            const spotLight = new THREE.SpotLight(0xffffff, 0.8);
-            spotLight.position.set(0, 10, 0);
-            spotLight.angle = 0.3;
+            // Top light positioned higher for even illumination
+            const spotLight = new THREE.SpotLight(0xffffff, 0.6);
+            spotLight.position.set(0, 20, 0);
+            spotLight.angle = 0.4;
             spotLight.penumbra = 1;
             spotLight.castShadow = true;
             scene.add(spotLight);
