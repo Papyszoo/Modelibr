@@ -21,15 +21,8 @@ function EditorCanvas({
 }: EditorCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const handleCanvasClick = (event: MouseEvent) => {
-    // Deselect when clicking on the canvas background
-    if ((event.target as HTMLElement).tagName === 'CANVAS') {
-      onSelectObject(null)
-    }
-  }
-
   return (
-    <div className="editor-canvas-container" onClick={handleCanvasClick}>
+    <div className="editor-canvas-container">
       <Canvas
         ref={canvasRef}
         shadows
@@ -40,6 +33,7 @@ function EditorCanvas({
           powerPreference: 'high-performance',
         }}
         dpr={Math.min(window.devicePixelRatio, 2)}
+        onPointerMissed={() => onSelectObject(null)}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
           {/* Grid helper - default one, can be overridden by grid helper */}
