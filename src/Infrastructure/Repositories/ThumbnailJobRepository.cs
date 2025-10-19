@@ -97,4 +97,18 @@ public class ThumbnailJobRepository : IThumbnailJobRepository
     {
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task CancelJobForModelAsync(int modelId, CancellationToken cancellationToken = default)
+    {
+        var job = await _context.ThumbnailJobs
+            .FirstOrDefaultAsync(tj => tj.ModelId == modelId && 
+                                      (tj.Status == ThumbnailJobStatus.Pending || tj.Status == ThumbnailJobStatus.Processing), 
+                                 cancellationToken);
+
+        if (job != null)
+        {
+            job.MarkAsFailed("Model was deleted during deduplication", DateTime.UtcNow);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
 }
