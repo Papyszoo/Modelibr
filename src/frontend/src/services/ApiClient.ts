@@ -635,7 +635,9 @@ class ApiClient {
   }
 
   // Project API
-  async getAllProjects(options: { skipCache?: boolean } = {}): Promise<ProjectDto[]> {
+  async getAllProjects(
+    options: { skipCache?: boolean } = {}
+  ): Promise<ProjectDto[]> {
     // Check cache first unless skipCache is true
     if (!options.skipCache) {
       const cached = useApiCacheStore.getState().getProjects()
@@ -672,7 +674,9 @@ class ApiClient {
     return response.data
   }
 
-  async createProject(request: CreateProjectRequest): Promise<CreateProjectResponse> {
+  async createProject(
+    request: CreateProjectRequest
+  ): Promise<CreateProjectResponse> {
     const response = await this.client.post<CreateProjectResponse>(
       '/projects',
       request
@@ -684,7 +688,10 @@ class ApiClient {
     return response.data
   }
 
-  async updateProject(id: number, request: UpdateProjectRequest): Promise<void> {
+  async updateProject(
+    id: number,
+    request: UpdateProjectRequest
+  ): Promise<void> {
     await this.client.put(`/projects/${id}`, request)
 
     // Invalidate projects cache on successful update
@@ -710,7 +717,10 @@ class ApiClient {
     useApiCacheStore.getState().invalidateModelById(modelId.toString())
   }
 
-  async removeModelFromProject(projectId: number, modelId: number): Promise<void> {
+  async removeModelFromProject(
+    projectId: number,
+    modelId: number
+  ): Promise<void> {
     await this.client.delete(`/projects/${projectId}/models/${modelId}`)
 
     // Invalidate projects and models cache when associations change
@@ -724,7 +734,9 @@ class ApiClient {
     projectId: number,
     textureSetId: number
   ): Promise<void> {
-    await this.client.post(`/projects/${projectId}/texture-sets/${textureSetId}`)
+    await this.client.post(
+      `/projects/${projectId}/texture-sets/${textureSetId}`
+    )
 
     // Invalidate projects and texture sets cache when associations change
     useApiCacheStore.getState().invalidateProjects()
@@ -773,7 +785,9 @@ class ApiClient {
     projectId: number,
     textureSetId: number
   ): Promise<void> {
-    await this.client.delete(`/projects/${projectId}/texture-sets/${textureSetId}`)
+    await this.client.delete(
+      `/projects/${projectId}/texture-sets/${textureSetId}`
+    )
 
     // Invalidate projects and texture sets cache when associations change
     useApiCacheStore.getState().invalidateProjects()
@@ -783,7 +797,9 @@ class ApiClient {
   }
 
   async getModelsByProject(projectId: number): Promise<Model[]> {
-    const response = await this.client.get<Model[]>(`/models?projectId=${projectId}`)
+    const response = await this.client.get<Model[]>(
+      `/models?projectId=${projectId}`
+    )
     return response.data
   }
 
@@ -793,7 +809,6 @@ class ApiClient {
     )
     return response.data.textureSets
   }
-
 
   // Batch Upload History API
   async getBatchUploadHistory(): Promise<{
