@@ -220,6 +220,7 @@ namespace Domain.Models
         /// <summary>
         /// Sets the model's geometry metadata (vertices and faces count).
         /// Automatically calculates and sets the PolyCount category based on face count.
+        /// Raises ModelMetadataProvidedEvent to trigger deduplication logic.
         /// </summary>
         /// <param name="vertices">Number of vertices in the model</param>
         /// <param name="faces">Number of faces/polygons in the model</param>
@@ -230,6 +231,9 @@ namespace Domain.Models
             Faces = faces;
             PolyCount = CalculatePolyCount(faces);
             UpdatedAt = updatedAt;
+            
+            // Raise domain event to trigger deduplication after metadata is available
+            RaiseDomainEvent(new Events.ModelMetadataProvidedEvent(Id, Name, vertices, faces));
         }
 
         private static PolyCount CalculatePolyCount(int? faces)
