@@ -14,13 +14,19 @@ namespace Application.EventHandlers;
 public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetadataProvidedEvent>
 {
     private readonly IModelRepository _modelRepository;
+    private readonly IThumbnailJobRepository _thumbnailJobRepository;
+    private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly ILogger<ModelMetadataProvidedEventHandler> _logger;
 
     public ModelMetadataProvidedEventHandler(
         IModelRepository modelRepository,
+        IThumbnailJobRepository thumbnailJobRepository,
+        IBatchUploadRepository batchUploadRepository,
         ILogger<ModelMetadataProvidedEventHandler> logger)
     {
         _modelRepository = modelRepository ?? throw new ArgumentNullException(nameof(modelRepository));
+        _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
+        _batchUploadRepository = batchUploadRepository ?? throw new ArgumentNullException(nameof(batchUploadRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -91,9 +97,47 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                         }
                     }
                     
-                    // Delete the duplicate model after all files have been moved
+                    // Update batch upload history records to point to the kept model
                     _logger.LogInformation(
-                        "Deleting duplicate model {MergeModelId} after file migration",
+                        "Updating batch upload history records from model {MergeModelId} to model {KeepModelId}",
+                        modelToMerge.Id, modelToKeep.Id);
+                    
+                    try
+                    {
+                        await _batchUploadRepository.UpdateModelIdForModelAsync(modelToMerge.Id, modelToKeep.Id, cancellationToken);
+                        _logger.LogInformation(
+                            "Batch upload history records updated for model {MergeModelId}",
+                            modelToMerge.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex,
+                            "Failed to update batch upload history for model {MergeModelId}, continuing",
+                            modelToMerge.Id);
+                    }
+                    
+                    // Cancel thumbnail job for the duplicate model before deleting
+                    _logger.LogInformation(
+                        "Cancelling thumbnail job for duplicate model {MergeModelId} before deletion",
+                        modelToMerge.Id);
+                    
+                    try
+                    {
+                        await _thumbnailJobRepository.CancelJobForModelAsync(modelToMerge.Id, cancellationToken);
+                        _logger.LogInformation(
+                            "Thumbnail job cancelled for model {MergeModelId}",
+                            modelToMerge.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex,
+                            "Failed to cancel thumbnail job for model {MergeModelId}, continuing with deletion",
+                            modelToMerge.Id);
+                    }
+                    
+                    // Delete the duplicate model after all files have been moved and job cancelled
+                    _logger.LogInformation(
+                        "Deleting duplicate model {MergeModelId} after file migration and job cancellation",
                         modelToMerge.Id);
                     await _modelRepository.DeleteAsync(modelToMerge.Id, cancellationToken);
                 }

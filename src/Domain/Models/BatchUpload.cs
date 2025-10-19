@@ -126,4 +126,14 @@ public class BatchUpload
         
         UploadType = uploadType.ToLowerInvariant();
     }
+    
+    /// <summary>
+    /// Updates the model ID association for this batch upload.
+    /// Used during model deduplication to update history records.
+    /// </summary>
+    /// <param name="modelId">The new model ID to associate</param>
+    public void UpdateModelId(int modelId)
+    {
+        ModelId = modelId;
+    }
 }

@@ -41,4 +41,9 @@ public interface IThumbnailJobRepository
     /// Saves all changes to the repository.
     /// </summary>
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cancels a thumbnail job for a specific model ID.
+    /// </summary>
+    Task CancelJobForModelAsync(int modelId, CancellationToken cancellationToken = default);
 }

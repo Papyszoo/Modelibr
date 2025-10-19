@@ -13,4 +13,5 @@ public interface IBatchUploadRepository
     Task AddAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default);
     Task AddRangeAsync(IEnumerable<BatchUpload> batchUploads, CancellationToken cancellationToken = default);
     Task UpdateAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default);
+    Task UpdateModelIdForModelAsync(int oldModelId, int newModelId, CancellationToken cancellationToken = default);
 }

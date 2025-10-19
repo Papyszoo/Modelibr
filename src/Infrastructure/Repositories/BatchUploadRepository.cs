@@ -98,4 +98,18 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         _context.BatchUploads.Update(batchUpload);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task UpdateModelIdForModelAsync(int oldModelId, int newModelId, CancellationToken cancellationToken = default)
+    {
+        var batchUploads = await _context.BatchUploads
+            .Where(bu => bu.ModelId == oldModelId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var batchUpload in batchUploads)
+        {
+            batchUpload.UpdateModelId(newModelId);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }
