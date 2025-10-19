@@ -51,6 +51,29 @@ internal sealed class ModelRepository : IModelRepository
         return model;
     }
 
+    public async Task<Model> LinkExistingFileAsync(int modelId, Domain.Models.File file, CancellationToken cancellationToken = default)
+    {
+        var model = await _context.Models
+            .Include(m => m.Files)
+            .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
+            .Include(m => m.Thumbnail)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(m => m.Id == modelId, cancellationToken);
+        
+        if (model == null)
+        {
+            throw new ArgumentException($"Model with ID {modelId} not found", nameof(modelId));
+        }
+
+        // File already exists in database, just link it to this model
+        model.AddFile(file, _dateTimeProvider.UtcNow);
+        
+        await _context.SaveChangesAsync(cancellationToken);
+        
+        return model;
+    }
+
     public async Task<IEnumerable<Model>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Models
