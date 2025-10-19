@@ -12,7 +12,7 @@ import { useUploadProgress } from '../../hooks/useUploadProgress'
  * @param {boolean} options.requireThreeJSRenderable - Only allow Three.js renderable formats
  * @param {Function} options.onSuccess - Callback called on successful upload
  * @param {Function} options.onError - Callback called on upload error
- * @param {Object} options.toast - Toast reference for showing notifications
+ * @param {Object} options.toast - Toast reference for showing error notifications
  * @param {boolean} options.useGlobalProgress - Whether to use global upload progress window (default: true)
  * @param {string} options.fileType - Type of file being uploaded: 'model' | 'texture' | 'file' (default: 'model')
  * @returns {Object} Upload state and functions
@@ -144,15 +144,6 @@ export function useFileUpload(options = {}) {
         try {
           const result = await uploadSingleFile(file, uploadId, batchId)
           results.succeeded.push({ file, result })
-
-          // Show success notification if toast is provided
-          if (toast?.current) {
-            toast.current.show({
-              severity: 'success',
-              summary: 'Upload Successful',
-              detail: `${file.name} uploaded successfully`,
-            })
-          }
         } catch (error) {
           results.failed.push({ file, error })
 
