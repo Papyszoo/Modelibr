@@ -207,7 +207,8 @@ export class PuppeteerRenderer {
             // Normalize and add to scene
             const normInfo = window.normalizeModel(model, 2.0)
             window.modelRenderer.model = model
-            window.modelRenderer.scene.add(model)
+            // Add the container (which holds the model) to the scene
+            window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
             window.modelRenderer.isReady = true
 
             // Count polygons
@@ -248,6 +249,172 @@ export class PuppeteerRenderer {
         fileType,
       })
       throw error
+    }
+  }
+
+  /**
+   * Apply textures to the loaded model
+   * @param {Object} texturePaths - Map of texture types to file paths
+   * @returns {Promise<boolean>} Success status
+   */
+  async applyTextures(texturePaths) {
+    if (!texturePaths || Object.keys(texturePaths).length === 0) {
+      logger.info('No textures to apply')
+      return true
+    }
+
+    logger.info('Applying textures to model', {
+      textureTypes: Object.keys(texturePaths),
+    })
+
+    try {
+      // Read texture files and convert to base64 data URLs
+      const textureDataUrls = {}
+      for (const [textureType, filePath] of Object.entries(texturePaths)) {
+        try {
+          const fileBuffer = fs.readFileSync(filePath)
+          const base64Data = fileBuffer.toString('base64')
+          // Detect image format from file extension
+          const ext = path.extname(filePath).toLowerCase()
+          const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg'
+          textureDataUrls[textureType] = `data:${mimeType};base64,${base64Data}`
+          logger.debug('Prepared texture data URL', {
+            textureType,
+            filePath,
+            dataUrlLength: textureDataUrls[textureType].length,
+          })
+        } catch (error) {
+          logger.warn('Failed to read texture file, skipping', {
+            textureType,
+            filePath,
+            error: error.message,
+          })
+        }
+      }
+
+      // Apply textures in the browser
+      const result = await this.page.evaluate(async textureUrls => {
+        try {
+          if (!window.modelRenderer.model) {
+            return { success: false, error: 'No model loaded' }
+          }
+
+          const THREE = window.THREE
+          const model = window.modelRenderer.model
+          const textureLoader = new THREE.TextureLoader()
+
+          // Map texture type enum values to material properties
+          // TextureType enum: Albedo=1, Normal=2, Height=3, AO=4, Roughness=5, Metallic=6, Diffuse=7, Specular=8
+          const textureTypeMap = {
+            '1': 'map',           // Albedo -> base color map
+            '2': 'normalMap',     // Normal
+            '3': 'displacementMap', // Height
+            '4': 'aoMap',         // AO
+            '5': 'roughnessMap',  // Roughness
+            '6': 'metalnessMap',  // Metallic
+            '7': 'map',           // Diffuse -> base color map (legacy)
+            '8': 'specularMap',   // Specular
+            // Also support string names for backward compatibility
+            'Albedo': 'map',
+            'Normal': 'normalMap',
+            'Height': 'displacementMap',
+            'AO': 'aoMap',
+            'Roughness': 'roughnessMap',
+            'Metallic': 'metalnessMap',
+            'Diffuse': 'map',
+            'Specular': 'specularMap',
+            'BaseColor': 'map',
+            'AmbientOcclusion': 'aoMap',
+            'Emissive': 'emissiveMap'
+          }
+
+          // Load textures asynchronously
+          const loadTexture = url => {
+            return new Promise((resolve, reject) => {
+              textureLoader.load(
+                url,
+                texture => {
+                  texture.colorSpace = THREE.SRGBColorSpace
+                  resolve(texture)
+                },
+                undefined,
+                error => reject(error)
+              )
+            })
+          }
+
+          const loadedTextures = {}
+          for (const [type, url] of Object.entries(textureUrls)) {
+            try {
+              const texture = await loadTexture(url)
+              const materialProperty = textureTypeMap[type] || type
+              loadedTextures[materialProperty] = texture
+              console.log(`Loaded ${type} texture -> ${materialProperty}`)
+            } catch (error) {
+              console.warn(`Failed to load ${type} texture:`, error)
+            }
+          }
+
+          // Apply textures to all meshes in the model
+          let meshCount = 0
+          model.traverse(child => {
+            if (child.isMesh) {
+              meshCount++
+
+              // Create or update material
+              if (!child.material || !(child.material instanceof THREE.MeshStandardMaterial)) {
+                child.material = new THREE.MeshStandardMaterial()
+              }
+
+              // Apply each loaded texture to the material
+              for (const [property, texture] of Object.entries(loadedTextures)) {
+                if (child.material[property] !== undefined) {
+                  child.material[property] = texture
+                  child.material.needsUpdate = true
+                  console.log(`Applied ${property} to mesh`)
+                  
+                  // Special handling for emissive
+                  if (property === 'emissiveMap' && !child.material.emissive) {
+                    child.material.emissive = new THREE.Color(0xffffff)
+                  }
+                }
+              }
+            }
+          })
+
+          return {
+            success: true,
+            meshCount,
+            appliedTextures: Object.keys(loadedTextures),
+          }
+        } catch (error) {
+          console.error('Texture application error:', error)
+          return {
+            success: false,
+            error: error.message,
+          }
+        }
+      }, textureDataUrls)
+
+      if (!result.success) {
+        logger.warn('Failed to apply textures in browser', {
+          error: result.error,
+        })
+        return false
+      }
+
+      logger.info('Textures applied successfully', {
+        meshCount: result.meshCount,
+        appliedTextures: result.appliedTextures,
+      })
+
+      return true
+    } catch (error) {
+      logger.error('Failed to apply textures', {
+        error: error.message,
+        stack: error.stack,
+      })
+      return false
     }
   }
 
@@ -457,6 +624,38 @@ export class PuppeteerRenderer {
       averageFrameSizeKB: Math.round((averageFrameSize / 1024) * 100) / 100,
       processMemoryUsage: process.memoryUsage(),
     }
+  }
+
+  /**
+   * Set viewport size dynamically
+   * @param {number} width - Viewport width
+   * @param {number} height - Viewport height
+   */
+  async setViewport(width, height) {
+    if (!this.page) {
+      throw new Error('Renderer not initialized')
+    }
+
+    await this.page.setViewport({
+      width: width,
+      height: height,
+      deviceScaleFactor: 1,
+    })
+
+    // Update renderer size in the page
+    await this.page.evaluate(
+      async (w, h) => {
+        if (window.modelRenderer.renderer) {
+          window.modelRenderer.renderer.setSize(w, h)
+          window.modelRenderer.camera.aspect = w / h
+          window.modelRenderer.camera.updateProjectionMatrix()
+        }
+      },
+      width,
+      height
+    )
+
+    logger.debug('Viewport resized', { width, height })
   }
 
   /**

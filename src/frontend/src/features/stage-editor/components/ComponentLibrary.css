@@ -4,19 +4,6 @@
   flex-direction: column;
 }
 
-.component-library-header {
-  padding: 1rem;
-  border-bottom: 1px solid var(--surface-border);
-}
-
-.component-library-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .component-library-content {
   flex: 1;
   overflow-y: auto;
