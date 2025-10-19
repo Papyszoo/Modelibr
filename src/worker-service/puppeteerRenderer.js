@@ -626,6 +626,38 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Set viewport size dynamically
+   * @param {number} width - Viewport width
+   * @param {number} height - Viewport height
+   */
+  async setViewport(width, height) {
+    if (!this.page) {
+      throw new Error('Renderer not initialized')
+    }
+
+    await this.page.setViewport({
+      width: width,
+      height: height,
+      deviceScaleFactor: 1,
+    })
+
+    // Update renderer size in the page
+    await this.page.evaluate(
+      async (w, h) => {
+        if (window.modelRenderer.renderer) {
+          window.modelRenderer.renderer.setSize(w, h)
+          window.modelRenderer.camera.aspect = w / h
+          window.modelRenderer.camera.updateProjectionMatrix()
+        }
+      },
+      width,
+      height
+    )
+
+    logger.debug('Viewport resized', { width, height })
+  }
+
+  /**
    * Get MIME type for file type
    * @param {string} fileType - File extension
    * @returns {string} MIME type
