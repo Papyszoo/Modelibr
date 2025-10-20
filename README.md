@@ -9,16 +9,40 @@ A modern 3D model file upload service built with .NET 9.0 and React, featuring h
 
 ## 🌟 Features
 
+### Core Features
 - **Unified Upload & Library Interface**: Drag-and-drop 3D model uploads integrated directly into the library view
 - **Multi-Panel Tabbed Workspace**: Modern split-pane interface with configurable tabs for models, textures, and animations  
 - **3D Model Support**: Support for popular 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
 - **Hash-based Deduplication**: Intelligent storage system that prevents duplicate files
 - **Interactive 3D Viewer**: Real-time 3D model rendering with Three.js TSL (Three.js Shading Language)
-- **Real-time Thumbnail Processing**: SignalR-based queue system with Node.js worker service
+- **Real-time Thumbnail Processing**: SignalR-based queue system with Node.js worker service for automatic thumbnail generation
+- **Animated Thumbnails**: Orbit animations encoded as WebP with configurable quality and framerate
+
+### Organization & Management
+- **Projects**: Organize models and texture sets into logical projects/folders for better asset management
+- **Packs**: Group related models and texture sets together into distributable packs
+- **Batch Upload History**: Track and review all upload operations with detailed history
+- **Model Tagging**: Tag models with custom metadata for improved searchability and organization
+- **Settings Management**: Configurable application settings with persistent storage
+
+### Texture & Material System
+- **Texture Sets**: Create and manage PBR texture collections (Albedo, Normal, Metallic, Roughness, AO, Emissive, Height, Opacity)
+- **Real-time PBR Preview**: Physically based rendering with metalness and roughness controls
+- **Texture Preview Panel**: Interactive preview with geometry selector (sphere, cube, plane, cylinder, torus)
+- **Model-Texture Association**: Link texture sets to specific models with default texture set support
+- **Advanced Material Editor**: Control material properties with real-time preview updates
+
+### 3D Scene Features
+- **Stage Editor**: Save and load complete 3D scene configurations including camera position, lighting, and render settings
+- **Classification Views**: Specialized thumbnail views optimized for different model categories
+- **Interactive Controls**: Full orbit controls, zoom, and pan for detailed model inspection
+
+### Architecture & Development
 - **Clean Architecture**: Well-structured backend following SOLID principles and DDD patterns
+- **CQRS Pattern**: Separate command and query responsibilities for better scalability
 - **Modern React Frontend**: Responsive UI with PrimeReact components and advanced state management
 - **Containerized Deployment**: Full Docker support with multi-service orchestration
-- **Real-time PBR Materials**: Physically based rendering with metalness and roughness controls
+- **Component Documentation**: Storybook integration for interactive component development and documentation
 
 ## 📸 Screenshots
 
@@ -43,13 +67,24 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 ```
 ├── src/
 │   ├── Domain/           # Core business entities and rules
-│   ├── Application/      # Use cases and application services
+│   │   └── Models/       # Model, File, Thumbnail, TextureSet, Project, Pack, Stage
+│   ├── Application/      # Use cases and application services  
+│   │   └── Features/     # CQRS commands and queries by feature
 │   ├── Infrastructure/   # Data access and external services
-│   ├── SharedKernel/     # Shared domain primitives
+│   │   ├── Persistence/  # EF Core DbContext and configurations
+│   │   ├── Repositories/ # Repository implementations
+│   │   └── Storage/      # Hash-based file storage
+│   ├── SharedKernel/     # Shared domain primitives (Result pattern, Error types)
 │   ├── WebApi/          # REST API endpoints and presentation
-│   └── frontend/        # React frontend application
+│   │   └── Endpoints/    # Minimal API endpoint definitions
+│   ├── frontend/        # React frontend application
+│   │   └── features/     # Feature-based component organization
+│   └── worker-service/  # Node.js thumbnail generation service
 ├── tests/
-│   └── Infrastructure.Tests/  # Unit tests
+│   ├── Domain.Tests/         # Domain layer unit tests
+│   ├── Application.Tests/    # Application layer unit tests
+│   ├── Infrastructure.Tests/ # Infrastructure integration tests
+│   └── WebApi.Tests/         # API integration tests
 └── docker-compose.yml   # Multi-container orchestration
 ```
 
@@ -66,10 +101,16 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 - React 18+ with TypeScript
 - Modern split-pane tabbed interface  
 - Three.js with TSL for 3D rendering
+- React Three Fiber with Stage component for automatic scene setup
+- React Three Drei for advanced 3D helpers
 - PrimeReact UI component library
+- PrimeFlex CSS utilities
 - Vite for development and build
 - Drag-and-drop file upload integration
-- Advanced state management with URL persistence
+- Advanced state management with URL persistence (nuqs)
+- Zustand for global state management
+- SignalR for real-time updates
+- Leva for interactive controls
 - Storybook for component documentation and development
 
 **Infrastructure:**
@@ -82,6 +123,9 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
 - Node.js worker service with Three.js rendering
 - Real-time queue system with SignalR notifications
 - Multiple worker support with load balancing
+- Orbit animation generation with configurable angles
+- WebP encoding with animated thumbnails and poster images
+- Puppeteer-based browser rendering for 3D model processing
 
 ## 🚀 Getting Started
 
@@ -205,6 +249,40 @@ Storybook will be available at http://localhost:6006 with interactive component 
 
 The worker service will be available at http://localhost:3001 (health check)
 
+## 💡 Frontend Features
+
+### Component Organization
+
+The frontend is organized by features:
+
+- **models/** - Model library, grid view, and upload functionality
+- **texture-set/** - Texture set management and PBR preview
+- **model-viewer/** - Interactive 3D model viewer with orbit controls
+- **stage-editor/** - Save and load scene configurations
+- **project/** - Project management components
+- **pack/** - Pack management components  
+- **thumbnail/** - Thumbnail display with status states
+- **history/** - Upload history tracking
+
+### Key Components
+
+**ModelGrid** - Responsive grid of models with thumbnails and metadata
+
+**TextureSetViewer** - Interactive PBR material preview with geometry selection
+
+**Scene** - Three.js 3D viewer with automatic lighting and camera positioning
+
+**StageEditor** - UI for configuring and saving 3D scene states
+
+**UploadableGrid** - Drag-and-drop upload integration for models and textures
+
+### State Management
+
+- **URL State** - Tab configuration and navigation persisted in URL parameters
+- **Zustand Stores** - Global state for settings, projects, and packs
+- **React Context** - Tab management and shared component state
+- **Local State** - Component-specific state with React hooks
+
 ## 📁 Supported File Formats
 
 | Format | Extension | Description |
@@ -242,6 +320,13 @@ The worker service will be available at http://localhost:3001 (health check)
 | `RENDER_HEIGHT` | Thumbnail height | `256` |
 | `RENDER_FORMAT` | Thumbnail image format | `png` |
 | `LOG_LEVEL` | Worker logging level | `info` |
+| `ENABLE_ORBIT_ANIMATION` | Generate orbit animations | `true` |
+| `ORBIT_ANGLE_STEP` | Degrees per frame (360/step = frames) | `12` |
+| `CAMERA_HEIGHT_MULTIPLIER` | Camera height relative to distance | `0.75` |
+| `ENABLE_FRAME_ENCODING` | Encode to animated WebP | `true` |
+| `ENCODING_FRAMERATE` | Animation framerate (fps) | `10` |
+| `WEBP_QUALITY` | WebP quality (0-100) | `75` |
+| `JPEG_QUALITY` | JPEG quality for poster (0-100) | `85` |
 | **Thumbnail Storage** | | |
 | `THUMBNAIL_STORAGE_ENABLED` | Enable thumbnail storage | `true` |
 | `THUMBNAIL_STORAGE_PATH` | Thumbnail storage directory | `/var/lib/modelibr/thumbnails` |
@@ -253,12 +338,93 @@ The application uses PostgreSQL with Entity Framework Core. Connection strings a
 
 ## 🎮 API Endpoints
 
+### Model Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/models` | Get all uploaded models |
+| `GET` | `/models` | Get all uploaded models (supports filtering by packId or projectId) |
+| `GET` | `/models/{id}` | Get model details by ID |
 | `POST` | `/models` | Upload a new 3D model |
-| `POST` | `/models/{id}/files` | Add file to existing model |
-| `GET` | `/files/{id}` | Download/stream model file |
+| `POST` | `/models/{modelId}/files` | Add file to existing model |
+| `POST` | `/models/{modelId}/tags` | Update model tags |
+| `GET` | `/models/{id}/file` | Download/stream model file |
+| `PUT` | `/models/{id}/defaultTextureSet` | Set default texture set for model |
+
+### File Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/files` | Upload a standalone file |
+| `GET` | `/files/{id}` | Download/stream file by ID |
+
+### Thumbnail Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/models/{id}/thumbnail` | Get thumbnail status |
+| `POST` | `/models/{id}/thumbnail/regenerate` | Queue thumbnail regeneration |
+| `POST` | `/models/{id}/thumbnail/upload` | Upload custom thumbnail |
+| `GET` | `/models/{id}/thumbnail/file` | Download thumbnail image |
+| `GET` | `/models/{id}/classification-views/{viewName}` | Get classification-specific thumbnail view |
+
+### Texture Set Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/texture-sets` | List all texture sets |
+| `GET` | `/texture-sets/{id}` | Get texture set details |
+| `GET` | `/texture-sets/by-file/{fileId}` | Get texture set containing specific file |
+| `POST` | `/texture-sets` | Create new texture set |
+| `POST` | `/texture-sets/with-file` | Create texture set with initial file |
+| `PUT` | `/texture-sets/{id}` | Update texture set |
+| `DELETE` | `/texture-sets/{id}` | Delete texture set |
+
+### Project Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/projects` | List all projects |
+| `GET` | `/projects/{id}` | Get project details |
+| `POST` | `/projects` | Create new project |
+| `PUT` | `/projects/{id}` | Update project |
+| `DELETE` | `/projects/{id}` | Delete project |
+| `POST` | `/projects/{projectId}/models/{modelId}` | Add model to project |
+| `DELETE` | `/projects/{projectId}/models/{modelId}` | Remove model from project |
+| `POST` | `/projects/{projectId}/texture-sets/{textureSetId}` | Add texture set to project |
+| `DELETE` | `/projects/{projectId}/texture-sets/{textureSetId}` | Remove texture set from project |
+
+### Pack Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/packs` | List all packs |
+| `GET` | `/packs/{id}` | Get pack details |
+| `POST` | `/packs` | Create new pack |
+| `PUT` | `/packs/{id}` | Update pack |
+| `DELETE` | `/packs/{id}` | Delete pack |
+| `POST` | `/packs/{packId}/models/{modelId}` | Add model to pack |
+| `DELETE` | `/packs/{packId}/models/{modelId}` | Remove model from pack |
+| `POST` | `/packs/{packId}/texture-sets/{textureSetId}` | Add texture set to pack |
+| `DELETE` | `/packs/{packId}/texture-sets/{textureSetId}` | Remove texture set from pack |
+
+### Stage Management (Scene Configuration)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/stages` | List all saved stages |
+| `GET` | `/stages/{id}` | Get stage details |
+| `POST` | `/stages` | Create new stage |
+| `PUT` | `/stages/{id}` | Update stage configuration |
+
+### Settings & History
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/settings` | Get application settings |
+| `GET` | `/settings/all` | Get all settings |
+| `PUT` | `/settings/{key}` | Update specific setting |
+| `PUT` | `/settings` | Batch update settings |
+| `GET` | `/batch-uploads/history` | Get upload history |
+
+### Worker API (Internal)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/thumbnail-jobs/dequeue` | Dequeue next job (workers only) |
+| `POST` | `/api/thumbnail-jobs/{jobId}/complete` | Mark job complete (workers only) |
+| `POST` | `/api/thumbnail-jobs/{jobId}/fail` | Mark job failed (workers only) |
+| `POST` | `/api/thumbnail-jobs/{jobId}/events` | Send job events (workers only) |
 
 ### Example Usage
 
@@ -269,8 +435,35 @@ curl -X POST -F "file=@model.obj" http://localhost:8080/models
 # Get all models
 curl http://localhost:8080/models
 
+# Get models in a specific project
+curl http://localhost:8080/models?projectId=1
+
 # Download a file
 curl http://localhost:8080/files/1 -o downloaded-model.obj
+
+# Create a project
+curl -X POST http://localhost:8080/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Project", "description": "Project description"}'
+
+# Add model to project
+curl -X POST http://localhost:8080/projects/1/models/5
+
+# Create a texture set
+curl -X POST http://localhost:8080/texture-sets \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Wood Materials", "description": "Wooden textures"}'
+
+# Get thumbnail status
+curl http://localhost:8080/models/1/thumbnail
+
+# Download thumbnail
+curl http://localhost:8080/models/1/thumbnail/file -o thumbnail.webp
+
+# Save stage configuration
+curl -X POST http://localhost:8080/stages \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Studio Setup", "configurationJson": "{\"camera\":{...}}"}'
 ```
 
 ## 📚 Component Documentation (Storybook)
