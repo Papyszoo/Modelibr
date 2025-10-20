@@ -5,7 +5,37 @@
 [![Three.js](https://img.shields.io/badge/Three.js-Latest-orange)](https://threejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Supported-blue)](https://www.docker.com/)
 
-A modern 3D model file upload service built with .NET 9.0 and React, featuring hash-based storage deduplication and an interactive 3D model viewer.
+A modern 3D model file upload service built with .NET 9.0 and React, featuring hash-based storage deduplication, PBR texture management, and an interactive 3D model viewer with real-time thumbnail generation.
+
+## ✨ What's New
+
+This application now includes comprehensive asset management features:
+
+| Feature | Description |
+|---------|-------------|
+| **Projects & Packs** | Organize models and textures into projects or distributable packs |
+| **Texture Sets** | Full PBR texture support with 8 texture types and real-time preview |
+| **Stage Editor** | Save and load complete 3D scene configurations |
+| **Batch History** | Track all upload operations with detailed history |
+| **Model Tagging** | Tag models with custom metadata for better organization |
+| **Settings API** | Configurable application settings with persistent storage |
+| **Animated Thumbnails** | Orbit animations in WebP format with configurable quality |
+| **Enhanced API** | 60+ REST endpoints covering all features |
+
+## 📋 Quick Links
+
+| Topic | Description |
+|-------|-------------|
+| [Features](#-features) | Complete feature list including models, textures, projects, and packs |
+| [Getting Started](#-getting-started) | Quick setup with Docker or local development |
+| [API Reference](#-api-endpoints) | Complete REST API documentation with 60+ endpoints |
+| [Usage Examples](#-common-use-cases) | Real-world examples for common tasks |
+| [Key Concepts](#-key-concepts) | Understanding the domain model and workflows |
+| [Frontend Guide](#-frontend-features) | Component organization and state management |
+| [Development](#-development-workflow) | Backend, frontend, and full-stack development |
+| [Storybook](#-component-documentation-storybook) | Interactive component documentation |
+| [Configuration](#-configuration) | Environment variables and settings |
+| [Troubleshooting](#-troubleshooting) | Common issues and solutions |
 
 ## 🌟 Features
 
