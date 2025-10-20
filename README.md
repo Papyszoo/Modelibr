@@ -26,16 +26,16 @@ This application now includes comprehensive asset management features:
 
 | Topic | Description |
 |-------|-------------|
-| [Features](#-features) | Complete feature list including models, textures, projects, and packs |
-| [Getting Started](#-getting-started) | Quick setup with Docker or local development |
-| [API Reference](#-api-endpoints) | Complete REST API documentation with 60+ endpoints |
-| [Usage Examples](#-common-use-cases) | Real-world examples for common tasks |
-| [Key Concepts](#-key-concepts) | Understanding the domain model and workflows |
-| [Frontend Guide](#-frontend-features) | Component organization and state management |
-| [Development](#-development-workflow) | Backend, frontend, and full-stack development |
-| [Storybook](#-component-documentation-storybook) | Interactive component documentation |
-| [Configuration](#-configuration) | Environment variables and settings |
-| [Troubleshooting](#-troubleshooting) | Common issues and solutions |
+| [Features](#features) | Complete feature list including models, textures, projects, and packs |
+| [Getting Started](#getting-started) | Quick setup with Docker or local development |
+| [API Reference](#api-endpoints) | Complete REST API documentation with 60+ endpoints |
+| [Usage Examples](#common-use-cases) | Real-world examples for common tasks |
+| [Key Concepts](#key-concepts) | Understanding the domain model and workflows |
+| [Frontend Guide](#frontend-features) | Component organization and state management |
+| [Development](#development-workflow) | Backend, frontend, and full-stack development |
+| [Storybook](#component-documentation-storybook) | Interactive component documentation |
+| [Configuration](#configuration) | Environment variables and settings |
+| [Troubleshooting](#troubleshooting) | Common issues and solutions |
 
 ## 🌟 Features
 
