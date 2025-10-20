@@ -98,7 +98,7 @@ function Settings(): JSX.Element {
   // Check if field is dirty (changed from original)
   const isFieldDirty = (fieldName: string): boolean => {
     if (!originalValues) return false
-    
+
     switch (fieldName) {
       case 'maxFileSizeMB':
         return maxFileSizeMB !== originalValues.maxFileSizeMB
@@ -113,7 +113,9 @@ function Settings(): JSX.Element {
       case 'thumbnailHeight':
         return thumbnailHeight !== originalValues.thumbnailHeight
       case 'generateThumbnailOnUpload':
-        return generateThumbnailOnUpload !== originalValues.generateThumbnailOnUpload
+        return (
+          generateThumbnailOnUpload !== originalValues.generateThumbnailOnUpload
+        )
       default:
         return false
     }
@@ -147,7 +149,7 @@ function Settings(): JSX.Element {
       // Update form state with fetched values
       const fileSizeMB = Math.round(data.maxFileSizeBytes / 1_048_576)
       const thumbnailSizeMB = Math.round(data.maxThumbnailSizeBytes / 1_048_576)
-      
+
       setMaxFileSizeMB(fileSizeMB)
       setMaxThumbnailSizeMB(thumbnailSizeMB)
       setThumbnailFrameCount(data.thumbnailFrameCount)
@@ -175,7 +177,7 @@ function Settings(): JSX.Element {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Don't save if there are validation errors
     if (hasValidationErrors()) {
       setError('Please fix all validation errors before saving')
@@ -205,11 +207,11 @@ function Settings(): JSX.Element {
     try {
       const data = await apiClient.updateSettings(updatedSettings)
       setSettings(data)
-      
+
       // Update original values after successful save
       const fileSizeMB = Math.round(data.maxFileSizeBytes / 1_048_576)
       const thumbnailSizeMB = Math.round(data.maxThumbnailSizeBytes / 1_048_576)
-      
+
       setOriginalValues({
         maxFileSizeMB: fileSizeMB,
         maxThumbnailSizeMB: thumbnailSizeMB,
@@ -219,7 +221,7 @@ function Settings(): JSX.Element {
         thumbnailHeight: data.thumbnailHeight,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
       })
-      
+
       setSuccessMessage('Settings saved successfully!')
 
       // Clear success message after 3 seconds
@@ -280,7 +282,9 @@ function Settings(): JSX.Element {
                 <div className="settings-field">
                   <label htmlFor="maxFileSize">
                     Maximum File Size (MB)
-                    {isFieldDirty('maxFileSizeMB') && <span className="settings-dirty-indicator"> ★</span>}
+                    {isFieldDirty('maxFileSizeMB') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
                   </label>
                   <input
                     id="maxFileSize"
@@ -303,10 +307,16 @@ function Settings(): JSX.Element {
                       })
                     }}
                     disabled={isSaving}
-                    className={validationErrors.maxFileSizeMB ? 'settings-input-error' : ''}
+                    className={
+                      validationErrors.maxFileSizeMB
+                        ? 'settings-input-error'
+                        : ''
+                    }
                   />
                   {validationErrors.maxFileSizeMB && (
-                    <span className="settings-error-message">{validationErrors.maxFileSizeMB}</span>
+                    <span className="settings-error-message">
+                      {validationErrors.maxFileSizeMB}
+                    </span>
                   )}
                   <span className="settings-help">
                     Maximum size for 3D model files (1-10240 MB)
@@ -319,7 +329,9 @@ function Settings(): JSX.Element {
                 <div className="settings-field">
                   <label htmlFor="maxThumbnailSize">
                     Maximum Thumbnail Size (MB)
-                    {isFieldDirty('maxThumbnailSizeMB') && <span className="settings-dirty-indicator"> ★</span>}
+                    {isFieldDirty('maxThumbnailSizeMB') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
                   </label>
                   <input
                     id="maxThumbnailSize"
@@ -342,10 +354,16 @@ function Settings(): JSX.Element {
                       })
                     }}
                     disabled={isSaving}
-                    className={validationErrors.maxThumbnailSizeMB ? 'settings-input-error' : ''}
+                    className={
+                      validationErrors.maxThumbnailSizeMB
+                        ? 'settings-input-error'
+                        : ''
+                    }
                   />
                   {validationErrors.maxThumbnailSizeMB && (
-                    <span className="settings-error-message">{validationErrors.maxThumbnailSizeMB}</span>
+                    <span className="settings-error-message">
+                      {validationErrors.maxThumbnailSizeMB}
+                    </span>
                   )}
                   <span className="settings-help">
                     Maximum size for thumbnail images (1-100 MB)
@@ -390,7 +408,9 @@ function Settings(): JSX.Element {
                     />
                     <span>
                       Generate thumbnail on model upload
-                      {isFieldDirty('generateThumbnailOnUpload') && <span className="settings-dirty-indicator"> ★</span>}
+                      {isFieldDirty('generateThumbnailOnUpload') && (
+                        <span className="settings-dirty-indicator"> ★</span>
+                      )}
                     </span>
                   </label>
                   <span className="settings-help">
@@ -402,7 +422,9 @@ function Settings(): JSX.Element {
                 <div className="settings-field">
                   <label htmlFor="frameCount">
                     Frame Count
-                    {isFieldDirty('thumbnailFrameCount') && <span className="settings-dirty-indicator"> ★</span>}
+                    {isFieldDirty('thumbnailFrameCount') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
                   </label>
                   <input
                     id="frameCount"
@@ -425,10 +447,16 @@ function Settings(): JSX.Element {
                       })
                     }}
                     disabled={isSaving}
-                    className={validationErrors.thumbnailFrameCount ? 'settings-input-error' : ''}
+                    className={
+                      validationErrors.thumbnailFrameCount
+                        ? 'settings-input-error'
+                        : ''
+                    }
                   />
                   {validationErrors.thumbnailFrameCount && (
-                    <span className="settings-error-message">{validationErrors.thumbnailFrameCount}</span>
+                    <span className="settings-error-message">
+                      {validationErrors.thumbnailFrameCount}
+                    </span>
                   )}
                   <span className="settings-help">
                     Number of frames in thumbnail animation (1-360)
@@ -439,7 +467,9 @@ function Settings(): JSX.Element {
                 <div className="settings-field">
                   <label htmlFor="cameraAngle">
                     Camera Vertical Angle
-                    {isFieldDirty('thumbnailCameraAngle') && <span className="settings-dirty-indicator"> ★</span>}
+                    {isFieldDirty('thumbnailCameraAngle') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
                   </label>
                   <input
                     id="cameraAngle"
@@ -463,10 +493,16 @@ function Settings(): JSX.Element {
                       })
                     }}
                     disabled={isSaving}
-                    className={validationErrors.thumbnailCameraAngle ? 'settings-input-error' : ''}
+                    className={
+                      validationErrors.thumbnailCameraAngle
+                        ? 'settings-input-error'
+                        : ''
+                    }
                   />
                   {validationErrors.thumbnailCameraAngle && (
-                    <span className="settings-error-message">{validationErrors.thumbnailCameraAngle}</span>
+                    <span className="settings-error-message">
+                      {validationErrors.thumbnailCameraAngle}
+                    </span>
                   )}
                   <span className="settings-help">
                     Camera height multiplier (0-2)
@@ -477,7 +513,9 @@ function Settings(): JSX.Element {
                 <div className="settings-field">
                   <label htmlFor="thumbnailWidth">
                     Thumbnail Width (px)
-                    {isFieldDirty('thumbnailWidth') && <span className="settings-dirty-indicator"> ★</span>}
+                    {isFieldDirty('thumbnailWidth') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
                   </label>
                   <input
                     id="thumbnailWidth"
@@ -500,10 +538,16 @@ function Settings(): JSX.Element {
                       })
                     }}
                     disabled={isSaving}
-                    className={validationErrors.thumbnailWidth ? 'settings-input-error' : ''}
+                    className={
+                      validationErrors.thumbnailWidth
+                        ? 'settings-input-error'
+                        : ''
+                    }
                   />
                   {validationErrors.thumbnailWidth && (
-                    <span className="settings-error-message">{validationErrors.thumbnailWidth}</span>
+                    <span className="settings-error-message">
+                      {validationErrors.thumbnailWidth}
+                    </span>
                   )}
                   <span className="settings-help">
                     Width in pixels (64-2048)
@@ -514,7 +558,9 @@ function Settings(): JSX.Element {
                 <div className="settings-field">
                   <label htmlFor="thumbnailHeight">
                     Thumbnail Height (px)
-                    {isFieldDirty('thumbnailHeight') && <span className="settings-dirty-indicator"> ★</span>}
+                    {isFieldDirty('thumbnailHeight') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
                   </label>
                   <input
                     id="thumbnailHeight"
@@ -537,10 +583,16 @@ function Settings(): JSX.Element {
                       })
                     }}
                     disabled={isSaving}
-                    className={validationErrors.thumbnailHeight ? 'settings-input-error' : ''}
+                    className={
+                      validationErrors.thumbnailHeight
+                        ? 'settings-input-error'
+                        : ''
+                    }
                   />
                   {validationErrors.thumbnailHeight && (
-                    <span className="settings-error-message">{validationErrors.thumbnailHeight}</span>
+                    <span className="settings-error-message">
+                      {validationErrors.thumbnailHeight}
+                    </span>
                   )}
                   <span className="settings-help">
                     Height in pixels (64-2048)

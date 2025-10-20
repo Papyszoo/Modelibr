@@ -33,6 +33,7 @@ function EditorCanvas({
           powerPreference: 'high-performance',
         }}
         dpr={Math.min(window.devicePixelRatio, 2)}
+        onPointerMissed={() => onSelectObject(null)}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
           {/* Grid helper - default one, can be overridden by grid helper */}
@@ -69,7 +70,13 @@ function EditorCanvas({
 
           {/* Reference sphere for testing - only shown when no meshes */}
           {stageConfig.meshes.length === 0 && (
-            <mesh position={[0, 1, 0]} onClick={() => onSelectObject(null)}>
+            <mesh
+              position={[0, 1, 0]}
+              onClick={e => {
+                e.stopPropagation()
+                onSelectObject(null)
+              }}
+            >
               <sphereGeometry args={[1, 32, 32]} />
               <meshStandardMaterial color="#4a9eff" />
             </mesh>
