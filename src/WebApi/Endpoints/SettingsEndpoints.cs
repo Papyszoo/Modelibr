@@ -66,7 +66,8 @@ public static class SettingsEndpoints
                 request.ThumbnailCameraVerticalAngle,
                 request.ThumbnailWidth,
                 request.ThumbnailHeight,
-                request.GenerateThumbnailOnUpload
+                request.GenerateThumbnailOnUpload,
+                request.CleanRecycledFilesAfterDays
             );
 
             var result = await commandHandler.Handle(command, CancellationToken.None);
@@ -92,5 +93,6 @@ public record UpdateSettingsRequest(
     double ThumbnailCameraVerticalAngle,
     int ThumbnailWidth,
     int ThumbnailHeight,
-    bool GenerateThumbnailOnUpload
+    bool GenerateThumbnailOnUpload,
+    int CleanRecycledFilesAfterDays
 );

@@ -51,6 +51,11 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
                 command.GenerateThumbnailOnUpload,
                 now);
 
+            // Update recycle bin settings
+            settings.UpdateRecycleBinSettings(
+                command.CleanRecycledFilesAfterDays,
+                now);
+
             var updatedSettings = await _settingsRepository.SaveAsync(settings, cancellationToken);
 
             // Also update the new Settings table for forward compatibility
@@ -70,6 +75,7 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
                 updatedSettings.ThumbnailWidth,
                 updatedSettings.ThumbnailHeight,
                 updatedSettings.GenerateThumbnailOnUpload,
+                updatedSettings.CleanRecycledFilesAfterDays,
                 updatedSettings.UpdatedAt
             ));
         }

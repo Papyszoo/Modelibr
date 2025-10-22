@@ -12,6 +12,7 @@ public record GetSettingsQueryResponse(
     int ThumbnailWidth,
     int ThumbnailHeight,
     bool GenerateThumbnailOnUpload,
+    int CleanRecycledFilesAfterDays,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );
