@@ -19,6 +19,7 @@ namespace Infrastructure.Persistence
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
         public DbSet<Setting> Settings => Set<Setting>();
         public DbSet<BatchUpload> BatchUploads => Set<BatchUpload>();
+        public DbSet<RecycledFile> RecycledFiles => Set<RecycledFile>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -256,6 +257,7 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailCameraVerticalAngle).IsRequired();
                 entity.Property(s => s.ThumbnailWidth).IsRequired();
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
+                entity.Property(s => s.CleanRecycledFilesAfterDays).IsRequired();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
             });
@@ -321,6 +323,26 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(bu => bu.TextureSetId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // Configure RecycledFile entity
+            modelBuilder.Entity<RecycledFile>(entity =>
+            {
+                entity.HasKey(rf => rf.Id);
+                entity.Property(rf => rf.OriginalFileName).IsRequired().HasMaxLength(255);
+                entity.Property(rf => rf.StoredFileName).IsRequired().HasMaxLength(255);
+                entity.Property(rf => rf.FilePath).IsRequired().HasMaxLength(500);
+                entity.Property(rf => rf.Sha256Hash).IsRequired().HasMaxLength(64);
+                entity.Property(rf => rf.SizeBytes).IsRequired();
+                entity.Property(rf => rf.Reason).IsRequired().HasMaxLength(500);
+                entity.Property(rf => rf.RecycledAt).IsRequired();
+                entity.Property(rf => rf.ScheduledDeletionAt);
+
+                // Create index for efficient querying by scheduled deletion date
+                entity.HasIndex(rf => rf.ScheduledDeletionAt);
+                
+                // Create index for efficient querying by recycled date
+                entity.HasIndex(rf => rf.RecycledAt);
             });
 
             base.OnModelCreating(modelBuilder);

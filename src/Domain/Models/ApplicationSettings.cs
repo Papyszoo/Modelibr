@@ -18,6 +18,9 @@ public class ApplicationSettings : AggregateRoot
     public int ThumbnailHeight { get; private set; }
     public bool GenerateThumbnailOnUpload { get; private set; }
 
+    // Recycle bin settings
+    public int CleanRecycledFilesAfterDays { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -38,6 +41,7 @@ public class ApplicationSettings : AggregateRoot
             ThumbnailWidth = 256,
             ThumbnailHeight = 256,
             GenerateThumbnailOnUpload = true, // Generate thumbnails by default
+            CleanRecycledFilesAfterDays = 30, // Default: 30 days
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -79,6 +83,16 @@ public class ApplicationSettings : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
+    /// <summary>
+    /// Updates recycle bin settings.
+    /// </summary>
+    public void UpdateRecycleBinSettings(int cleanAfterDays, DateTime updatedAt)
+    {
+        ValidateCleanAfterDays(cleanAfterDays);
+        CleanRecycledFilesAfterDays = cleanAfterDays;
+        UpdatedAt = updatedAt;
+    }
+
     private static void ValidateFileSizeLimit(long sizeBytes, string paramName)
     {
         if (sizeBytes <= 0)
@@ -114,5 +128,14 @@ public class ApplicationSettings : AggregateRoot
 
         if (height < 64 || height > 2048)
             throw new ArgumentException("Thumbnail height must be between 64 and 2048 pixels.", nameof(height));
+    }
+
+    private static void ValidateCleanAfterDays(int days)
+    {
+        if (days < 1)
+            throw new ArgumentException("Clean after days must be at least 1.", nameof(days));
+
+        if (days > 3650)
+            throw new ArgumentException("Clean after days cannot exceed 3650 (10 years).", nameof(days));
     }
 }
