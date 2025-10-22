@@ -60,7 +60,7 @@ function TextureSetSelectorWindow({
       loadTextureSets()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, model.textureSets])
+  }, [visible, model])
 
   const handleSetDefault = async (textureSetId: number | null) => {
     try {
@@ -77,10 +77,8 @@ function TextureSetSelectorWindow({
 
   const handleLinkDialogClose = () => {
     setLinkDialogVisible(false)
-    // Refresh model data and reload texture sets after linking
+    // Refresh model data - texture sets will reload via useEffect when model updates
     onModelUpdated()
-    // Also reload the texture sets to show newly linked ones
-    loadTextureSets()
   }
 
   const handleUnlinkTextureSet = async (
@@ -111,9 +109,8 @@ function TextureSetSelectorWindow({
         onTextureSetSelect(null)
       }
 
-      // Refresh model data and reload texture sets
+      // Refresh model data - texture sets will reload via useEffect when model updates
       onModelUpdated()
-      loadTextureSets()
     } catch (error) {
       console.error('Failed to unlink texture set:', error)
     } finally {
