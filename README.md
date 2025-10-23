@@ -10,7 +10,7 @@ A comprehensive 3D model management platform that helps you organize, preview, a
 ## ✨ What Can Modelibr Do For You?
 
 **Manage Your 3D Assets**
-- Upload 3D models in popular formats (OBJ, FBX, GLTF, DAE, Blender, 3DS)
+- Upload 3D models in popular formats (OBJ, FBX, GLTF, GLB)
 - Get automatic animated thumbnails for quick preview
 - Never store the same file twice with intelligent deduplication
 - Tag and categorize models for easy searching
@@ -111,16 +111,16 @@ Modelibr is built with modern, proven technologies:
 
 ## 📁 Supported File Formats
 
-Upload 3D models in these popular formats:
+Upload and preview 3D models in these formats:
 
 | Format | Extension | Common Use |
 |--------|-----------|------------|
 | Wavefront OBJ | `.obj` | Most widely supported format |
 | Autodesk FBX | `.fbx` | Animation and rigging |
-| COLLADA | `.dae` | Universal interchange format |
-| glTF/GLB | `.gltf`, `.glb` | Web-optimized format |
-| 3D Studio Max | `.3ds` | Legacy 3D Studio files |
-| Blender | `.blend` | Native Blender format |
+| glTF | `.gltf` | Web-optimized JSON format |
+| glTF Binary | `.glb` | Web-optimized binary format |
+
+**Note:** Other formats like `.blend`, `.dae`, and `.3ds` can be stored but not previewed in the 3D viewer.
 
 ## 💡 Usage Tips
 
