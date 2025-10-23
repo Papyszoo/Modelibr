@@ -11,13 +11,13 @@
 .model-list-tab {
   height: 100%;
   padding: 0;
-  background: #f8fafc;
+  background: var(--surface-ground);
 }
 
 .model-list-header-tab {
-  background: white;
+  background: var(--surface-card);
   padding: 1.5rem 2rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--surface-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -25,7 +25,7 @@
 
 .model-list-header-tab h1 {
   margin: 0;
-  color: #1e293b;
+  color: var(--text-color);
   font-size: 1.5rem;
 }
 
@@ -39,7 +39,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #64748b;
+  color: var(--text-color-secondary);
   font-weight: 500;
 }
 
