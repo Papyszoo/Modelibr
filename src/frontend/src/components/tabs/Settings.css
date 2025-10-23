@@ -1,8 +1,8 @@
 .settings-container {
   padding: 2rem;
   width: 100%;
-  background: #1e1e1e;
-  color: #e0e0e0;
+  background: var(--surface-ground);
+  color: var(--text-color);
   height: 100%;
   box-sizing: border-box;
   display: flex;
@@ -13,8 +13,8 @@
 .settings-title {
   font-size: 2rem;
   margin-bottom: 1.5rem;
-  color: #fff;
-  border-bottom: 2px solid #3a3a3a;
+  color: var(--text-color);
+  border-bottom: 2px solid var(--surface-border);
   padding-bottom: 0.5rem;
   flex-shrink: 0;
 }
@@ -23,7 +23,7 @@
   text-align: center;
   padding: 3rem;
   font-size: 1.1rem;
-  color: #999;
+  color: var(--text-color-secondary);
 }
 
 .settings-error {
@@ -62,16 +62,16 @@
 }
 
 .settings-section {
-  background: #252525;
+  background: var(--surface-card);
   padding: 1.5rem;
   border-radius: 6px;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--surface-border);
 }
 
 .settings-section h3 {
   font-size: 1.3rem;
   margin-bottom: 1.5rem;
-  color: #fff;
+  color: var(--text-color);
 }
 
 .settings-field {
@@ -88,13 +88,13 @@
   font-size: 0.95rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
-  color: #ccc;
+  color: var(--text-color);
 }
 
 .settings-field input {
-  background: #1e1e1e;
-  border: 1px solid #4a4a4a;
-  color: #e0e0e0;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  color: var(--text-color);
   padding: 0.75rem;
   border-radius: 4px;
   font-size: 1rem;
@@ -103,7 +103,7 @@
 
 .settings-field input:focus {
   outline: none;
-  border-color: #007acc;
+  border-color: var(--primary-color);
 }
 
 .settings-field input:disabled {
@@ -112,9 +112,9 @@
 }
 
 .settings-select {
-  background: #1e1e1e;
-  border: 1px solid #4a4a4a;
-  color: #e0e0e0;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  color: var(--text-color);
   padding: 0.75rem;
   border-radius: 4px;
   font-size: 1rem;
@@ -124,23 +124,23 @@
 
 .settings-select:focus {
   outline: none;
-  border-color: #007acc;
+  border-color: var(--primary-color);
 }
 
 .settings-select option {
-  background: #1e1e1e;
-  color: #e0e0e0;
+  background: var(--surface-ground);
+  color: var(--text-color);
 }
 
 .settings-help {
   font-size: 0.85rem;
-  color: #888;
+  color: var(--text-color-secondary);
   margin-top: 0.25rem;
 }
 
 .settings-default {
   font-size: 0.85rem;
-  color: #6c9bd1;
+  color: var(--primary-color);
   margin-top: 0.25rem;
   font-style: italic;
 }
@@ -150,9 +150,9 @@
   gap: 1rem;
   justify-content: flex-end;
   padding-top: 1rem;
-  border-top: 1px solid #3a3a3a;
+  border-top: 1px solid var(--surface-border);
   flex-shrink: 0;
-  background: #1e1e1e;
+  background: var(--surface-ground);
 }
 
 .settings-button {
@@ -170,21 +170,21 @@
 }
 
 .settings-button-primary {
-  background: #007acc;
+  background: var(--primary-color);
   color: white;
 }
 
 .settings-button-primary:hover:not(:disabled) {
-  background: #005a9e;
+  background: var(--primary-600);
 }
 
 .settings-button-secondary {
-  background: #3a3a3a;
-  color: #e0e0e0;
+  background: var(--surface-border);
+  color: var(--text-color);
 }
 
 .settings-button-secondary:hover:not(:disabled) {
-  background: #4a4a4a;
+  background: var(--surface-hover);
 }
 
 .settings-section {
@@ -192,12 +192,12 @@
 }
 
 .settings-section-header {
-  background: #252525;
+  background: var(--surface-card);
   padding: 1rem 1.5rem;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--surface-border);
   border-radius: 6px;
   cursor: pointer;
-  color: #fff;
+  color: var(--text-color);
   font-size: 1.1rem;
   font-weight: 500;
   user-select: none;
@@ -205,7 +205,7 @@
 }
 
 .settings-section-header:hover {
-  background: #2a2a2a;
+  background: var(--surface-hover);
 }
 
 .settings-section-header span {
@@ -215,9 +215,9 @@
 }
 
 .settings-section-content {
-  background: #252525;
+  background: var(--surface-card);
   padding: 1.5rem;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--surface-border);
   border-top: none;
   border-radius: 0 0 6px 6px;
 }
@@ -229,7 +229,7 @@
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 500;
-  color: #ccc;
+  color: var(--text-color);
 }
 
 .settings-checkbox-label input[type='checkbox'] {
