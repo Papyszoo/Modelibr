@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Domain.Events;
+using Domain.Services;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
 
@@ -18,6 +19,7 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDomainEventDispatcher _domainEventDispatcher;
+    private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<ModelMetadataProvidedEventHandler> _logger;
 
     public ModelMetadataProvidedEventHandler(
@@ -25,12 +27,14 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
         IThumbnailJobRepository thumbnailJobRepository,
         IBatchUploadRepository batchUploadRepository,
         IDomainEventDispatcher domainEventDispatcher,
+        IDateTimeProvider dateTimeProvider,
         ILogger<ModelMetadataProvidedEventHandler> logger)
     {
         _modelRepository = modelRepository ?? throw new ArgumentNullException(nameof(modelRepository));
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _batchUploadRepository = batchUploadRepository ?? throw new ArgumentNullException(nameof(batchUploadRepository));
         _domainEventDispatcher = domainEventDispatcher ?? throw new ArgumentNullException(nameof(domainEventDispatcher));
+        _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -153,18 +157,27 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                     _logger.LogInformation(
                         "Showing model {KeepModelId} after deduplication complete",
                         modelToKeep.Id);
-                    await _modelRepository.ShowModelAsync(modelToKeep.Id, cancellationToken);
                     
-                    // Fetch the model again to get domain events and publish them (ModelShownEvent triggers thumbnail generation)
-                    var updatedModel = await _modelRepository.GetByIdAsync(modelToKeep.Id, cancellationToken);
-                    if (updatedModel != null && updatedModel.DomainEvents.Any())
+                    // Fetch the full model with all relationships to get domain events
+                    var modelToShow = await _modelRepository.GetByIdAsync(modelToKeep.Id, cancellationToken);
+                    if (modelToShow != null)
                     {
-                        _logger.LogInformation(
-                            "Publishing {Count} domain events for shown model {KeepModelId}",
-                            updatedModel.DomainEvents.Count(), modelToKeep.Id);
-                        await _domainEventDispatcher.PublishAsync(updatedModel.DomainEvents, cancellationToken);
-                        updatedModel.ClearDomainEvents();
-                        await _modelRepository.UpdateAsync(updatedModel, cancellationToken);
+                        // Call Show() to raise ModelShownEvent
+                        modelToShow.Show(_dateTimeProvider.UtcNow);
+                        
+                        // Save the model with IsHidden=false
+                        await _modelRepository.UpdateAsync(modelToShow, cancellationToken);
+                        
+                        // Publish domain events (ModelShownEvent triggers thumbnail generation)
+                        if (modelToShow.DomainEvents.Any())
+                        {
+                            _logger.LogInformation(
+                                "Publishing {Count} domain events for shown model {KeepModelId}",
+                                modelToShow.DomainEvents.Count(), modelToKeep.Id);
+                            await _domainEventDispatcher.PublishAsync(modelToShow.DomainEvents, cancellationToken);
+                            modelToShow.ClearDomainEvents();
+                            await _modelRepository.UpdateAsync(modelToShow, cancellationToken);
+                        }
                     }
                 }
 
@@ -182,18 +195,22 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                     _logger.LogInformation(
                         "No duplicates found for model {ModelId}. Showing model to users (deduplication complete).",
                         model.Id);
-                    await _modelRepository.ShowModelAsync(model.Id, cancellationToken);
                     
-                    // Fetch the model again to get domain events and publish them (ModelShownEvent triggers thumbnail generation)
-                    var updatedModel = await _modelRepository.GetByIdAsync(model.Id, cancellationToken);
-                    if (updatedModel != null && updatedModel.DomainEvents.Any())
+                    // Call Show() to raise ModelShownEvent
+                    model.Show(_dateTimeProvider.UtcNow);
+                    
+                    // Save the model with IsHidden=false
+                    await _modelRepository.UpdateAsync(model, cancellationToken);
+                    
+                    // Publish domain events (ModelShownEvent triggers thumbnail generation)
+                    if (model.DomainEvents.Any())
                     {
                         _logger.LogInformation(
                             "Publishing {Count} domain events for shown model {ModelId}",
-                            updatedModel.DomainEvents.Count(), model.Id);
-                        await _domainEventDispatcher.PublishAsync(updatedModel.DomainEvents, cancellationToken);
-                        updatedModel.ClearDomainEvents();
-                        await _modelRepository.UpdateAsync(updatedModel, cancellationToken);
+                            model.DomainEvents.Count(), model.Id);
+                        await _domainEventDispatcher.PublishAsync(model.DomainEvents, cancellationToken);
+                        model.ClearDomainEvents();
+                        await _modelRepository.UpdateAsync(model, cancellationToken);
                     }
                 }
                 
