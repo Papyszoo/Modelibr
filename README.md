@@ -5,104 +5,65 @@
 [![Three.js](https://img.shields.io/badge/Three.js-Latest-orange)](https://threejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Supported-blue)](https://www.docker.com/)
 
-A modern 3D model file upload service built with .NET 9.0 and React, featuring hash-based storage deduplication and an interactive 3D model viewer.
+A comprehensive 3D model management platform that helps you organize, preview, and manage your 3D assets with ease. Upload models, create texture sets, organize into projects, and preview everything in an interactive 3D viewer.
 
-## 🌟 Features
+## ✨ What Can Modelibr Do For You?
 
-- **Unified Upload & Library Interface**: Drag-and-drop 3D model uploads integrated directly into the library view
-- **Multi-Panel Tabbed Workspace**: Modern split-pane interface with configurable tabs for models, textures, and animations  
-- **3D Model Support**: Support for popular 3D file formats (OBJ, FBX, DAE, 3DS, Blender, glTF/GLB)
-- **Hash-based Deduplication**: Intelligent storage system that prevents duplicate files
-- **Interactive 3D Viewer**: Real-time 3D model rendering with Three.js TSL (Three.js Shading Language)
-- **Real-time Thumbnail Processing**: SignalR-based queue system with Node.js worker service
-- **Clean Architecture**: Well-structured backend following SOLID principles and DDD patterns
-- **Modern React Frontend**: Responsive UI with PrimeReact components and advanced state management
-- **Containerized Deployment**: Full Docker support with multi-service orchestration
-- **Real-time PBR Materials**: Physically based rendering with metalness and roughness controls
+**Manage Your 3D Assets**
+- Upload 3D models in popular formats (OBJ, FBX, GLTF, GLB)
+- Get automatic animated thumbnails for quick preview
+- Never store the same file twice with intelligent deduplication
+- Tag and categorize models for easy searching
+
+**Organize Your Work**
+- Create Projects to group related models and textures
+- Build Packs for distributing asset collections
+- Track your upload history
+- Save and reuse scene configurations
+
+**Work With Materials**
+- Create Texture Sets with PBR materials (Albedo, Normal, Metallic, Roughness, and more)
+- Preview materials in real-time on different shapes (sphere, cube, plane, etc.)
+- Link textures to models for consistent rendering
+- Adjust material properties with instant visual feedback
+
+**Interactive 3D Viewing**
+- View models in a full-featured 3D viewer
+- Orbit, zoom, and pan around your models
+- See models with applied materials and lighting
+- Save favorite camera angles and lighting setups
+
+## 🌟 Key Features
+
+- **Drag-and-Drop Upload** - Simply drag your 3D model files into the browser
+- **Animated Thumbnails** - Every model gets an automatic 360° rotating preview
+- **Project Organization** - Group your models and textures into logical projects
+- **Material Preview** - See exactly how your textures will look in real-time
+- **Smart Storage** - Duplicate files are automatically detected and shared
+- **Scene Presets** - Save your favorite camera and lighting configurations
+- **Multi-Format Support** - Works with all major 3D file formats
+- **Web-Based** - Access from any modern browser, no installation needed
 
 ## 📸 Screenshots
 
-> **📝 Note**: Screenshots are being updated. The previous screenshots showed error states from running the frontend without a backend. New screenshots showing the working application with uploaded models will be added soon.
-> 
-> To generate new screenshots:
-> 1. Run `docker compose up -d` 
-> 2. Access http://localhost:3000
-> 3. Upload a 3D model file (OBJ, FBX, GLTF, etc.)
-> 4. Take screenshots showing the working interface
-
-<!-- TODO: Add screenshots of:
-- Modern Split-Pane Interface: Modern tabbed workspace with integrated 3D model library, drag-and-drop upload, and multi-panel layout
-- Integrated Upload & Library: Unified interface combining model upload via drag-and-drop with library management and tabbed workspace  
-- 3D Model Viewer: Interactive 3D viewer showing a loaded model with PBR materials
--->
-
-## 🏗️ Architecture
-
-Modelibr follows Clean Architecture principles with clear separation of concerns:
-
-```
-├── src/
-│   ├── Domain/           # Core business entities and rules
-│   ├── Application/      # Use cases and application services
-│   ├── Infrastructure/   # Data access and external services
-│   ├── SharedKernel/     # Shared domain primitives
-│   ├── WebApi/          # REST API endpoints and presentation
-│   └── frontend/        # React frontend application
-├── tests/
-│   └── Infrastructure.Tests/  # Unit tests
-└── docker-compose.yml   # Multi-container orchestration
-```
-
-### Technology Stack
-
-**Backend:**
-- .NET 9.0 Web API
-- Entity Framework Core
-- PostgreSQL
-- Clean Architecture pattern
-- Minimal APIs with endpoint mapping
-
-**Frontend:**
-- React 18+ with TypeScript
-- Modern split-pane tabbed interface  
-- Three.js with TSL for 3D rendering
-- PrimeReact UI component library
-- Vite for development and build
-- Drag-and-drop file upload integration
-- Advanced state management with URL persistence
-- Storybook for component documentation and development
-
-**Infrastructure:**
-- Docker & Docker Compose
-- PostgreSQL 16
-- nginx for production frontend serving
-- SignalR for real-time worker coordination
-
-**Thumbnail Processing:**
-- Node.js worker service with Three.js rendering
-- Real-time queue system with SignalR notifications
-- Multiple worker support with load balancing
+> **📝 Note**: Screenshots are being updated to showcase the application features.
 
 ## 🚀 Getting Started
 
-### Prerequisites
-
-- [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
-- [Node.js 18+](https://nodejs.org/)
-- [Docker & Docker Compose](https://docs.docker.com/get-docker/) (for containerized setup)
-
 ### Quick Start with Docker
 
-1. **Clone the repository**
+The easiest way to run Modelibr is using Docker. You don't need to install any dependencies - Docker handles everything.
+
+1. **Get the code**
    ```bash
    git clone https://github.com/Papyszoo/Modelibr.git
    cd Modelibr
    ```
 
-2. **Configure environment**
+2. **Configure settings**
    ```bash
    cp .env.example .env
-   # Edit .env file with your settings
+   # Edit .env if you want to change default ports or passwords
    ```
 
 3. **Start the application**
@@ -110,245 +71,139 @@ Modelibr follows Clean Architecture principles with clear separation of concerns
    docker compose up -d
    ```
 
-4. **Access the application**
-   - Frontend: http://localhost:3000 (integrated upload/library interface)
-   - API: http://localhost:8080
-   - Thumbnail Worker: http://localhost:3001 (health check)
-   - PostgreSQL: localhost:5432
+4. **Open your browser**
+   - Go to http://localhost:3000 to access Modelibr
+   - Start uploading and managing your 3D models!
 
-### Development Setup
+That's it! The application is now running with all features enabled.
 
-#### Recommended: Docker Compose (Full Stack)
+### Stopping the Application
 
-1. **Clone and configure**
-   ```bash
-   git clone https://github.com/Papyszoo/Modelibr.git
-   cd Modelibr
-   cp .env.example .env
-   ```
+```bash
+docker compose down
+```
 
-2. **Start all services**
-   ```bash
-   docker compose up -d
-   ```
+### Updating to Latest Version
 
-This will start the complete application stack:
-- Frontend: http://localhost:3000 (integrated upload/library interface)
-- API: http://localhost:8080
-- Thumbnail Worker: http://localhost:3001 (health check)
-- PostgreSQL: localhost:5432
+```bash
+git pull
+docker compose up -d --build
+```
 
-#### Alternative: Local Development
+## 🛠️ Technology Stack
 
-##### Backend (.NET API)
+Modelibr is built with modern, proven technologies:
 
-1. **Install .NET 9.0 SDK**
-   - Download from [official .NET site](https://dotnet.microsoft.com/download/dotnet/9.0)
-   - Or use the installation script (see copilot instructions for details)
+**Backend**
+- .NET 9.0
+- PostgreSQL database
+- REST API
 
-2. **Build and test**
-   ```bash
-   dotnet restore Modelibr.sln
-   dotnet build Modelibr.sln
-   dotnet test Modelibr.sln --no-build
-   ```
+**Frontend**
+- React 18+
+- Three.js for 3D rendering
+- Modern responsive UI
 
-3. **Start the API**
-   ```bash
-   cd src/WebApi
-   export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads"
-   dotnet run
-   ```
-
-The API will be available at http://localhost:5009
-
-##### Frontend (React)
-
-1. **Install dependencies**
-   ```bash
-   cd src/frontend
-   npm install
-   ```
-
-2. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-The frontend will be available at http://localhost:3000
-
-3. **View component documentation (Storybook)**
-   ```bash
-   npm run storybook
-   ```
-
-Storybook will be available at http://localhost:6006 with interactive component examples.
-
-##### Thumbnail Worker (Node.js)
-
-1. **Install dependencies**
-   ```bash
-   cd src/worker-service
-   npm install
-   ```
-
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env file with API connection settings
-   ```
-
-3. **Start the worker**
-   ```bash
-   npm start
-   ```
-
-The worker service will be available at http://localhost:3001 (health check)
+**Infrastructure**
+- Docker for easy deployment
+- Automated thumbnail generation
+- Real-time updates
 
 ## 📁 Supported File Formats
 
-| Format | Extension | Description |
-|--------|-----------|-------------|
-| Wavefront OBJ | `.obj` | Popular 3D geometry format |
-| Autodesk FBX | `.fbx` | Industry standard for 3D assets |
-| COLLADA | `.dae` | Open standard for 3D asset exchange |
-| 3D Studio Max | `.3ds` | Legacy 3D Studio format |
-| Blender | `.blend` | Native Blender format |
-| glTF/GLB | `.gltf`, `.glb` | Modern web-optimized 3D format |
+Upload and preview 3D models in these formats:
+
+| Format | Extension | Common Use |
+|--------|-----------|------------|
+| Wavefront OBJ | `.obj` | Most widely supported format |
+| Autodesk FBX | `.fbx` | Animation and rigging |
+| glTF | `.gltf` | Web-optimized JSON format |
+| glTF Binary | `.glb` | Web-optimized binary format |
+
+**Note:** Other formats like `.blend`, `.dae`, and `.3ds` can be stored but not previewed in the 3D viewer.
+
+## 💡 Usage Tips
+
+**Getting the Most Out of Modelibr**
+
+1. **Upload Models** - Drag and drop your 3D files into the upload area
+2. **Create Projects** - Group related models together for better organization
+3. **Add Textures** - Upload texture images and create material sets
+4. **Preview Everything** - Use the 3D viewer to inspect models and materials
+5. **Save Presets** - Save your favorite camera angles and lighting for quick access
+6. **Tag Models** - Add descriptive tags to make models easy to find later
+
+**Working with Large Collections**
+
+- Use Projects to organize models by client, project, or category
+- Create Packs when you need to bundle assets for distribution
+- Let the system handle duplicates - it automatically shares identical files
+- Upload history helps you track when and what was uploaded
 
 ## 🔧 Configuration
 
-### Environment Variables
+The application uses environment variables for configuration. Edit the `.env` file to customize:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| **Web API** | | |
-| `ASPNETCORE_ENVIRONMENT` | ASP.NET Core environment | `Development` |
-| `WEBAPI_HTTP_PORT` | API HTTP port | `8080` |
-| `WEBAPI_HTTPS_PORT` | API HTTPS port (local dev only) | `8081` |
-| `UPLOAD_STORAGE_PATH` | Directory for uploaded files | `/var/lib/modelibr/uploads` |
-| **Frontend** | | |
-| `FRONTEND_PORT` | Frontend port mapping | `3000` |
-| `VITE_API_BASE_URL` | Frontend API base URL | `http://localhost:8080` |
-| **Database** | | |
-| `POSTGRES_USER` | PostgreSQL username | `modelibr` |
-| `POSTGRES_PASSWORD` | PostgreSQL password | `ChangeThisStrongPassword123!` |
-| `POSTGRES_PORT` | PostgreSQL port | `5432` |
-| **Thumbnail Worker** | | |
-| `WORKER_PORT` | Thumbnail worker port | `3001` |
-| `WORKER_ID` | Worker instance identifier | `worker-1` |
-| `MAX_CONCURRENT_JOBS` | Worker concurrent jobs | `3` |
-| `RENDER_WIDTH` | Thumbnail width | `256` |
-| `RENDER_HEIGHT` | Thumbnail height | `256` |
-| `RENDER_FORMAT` | Thumbnail image format | `png` |
-| `LOG_LEVEL` | Worker logging level | `info` |
-| **Thumbnail Storage** | | |
-| `THUMBNAIL_STORAGE_ENABLED` | Enable thumbnail storage | `true` |
-| `THUMBNAIL_STORAGE_PATH` | Thumbnail storage directory | `/var/lib/modelibr/thumbnails` |
-| `SKIP_DUPLICATE_THUMBNAILS` | Skip existing thumbnails | `true` |
-
-### Database Configuration
-
-The application uses PostgreSQL with Entity Framework Core. Connection strings are configured in `appsettings.json` and can be overridden via environment variables or user secrets.
-
-## 🎮 API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/models` | Get all uploaded models |
-| `POST` | `/models` | Upload a new 3D model |
-| `POST` | `/models/{id}/files` | Add file to existing model |
-| `GET` | `/files/{id}` | Download/stream model file |
-
-### Example Usage
-
+**Main Settings**
 ```bash
-# Upload a 3D model
-curl -X POST -F "file=@model.obj" http://localhost:8080/models
+# Ports
+FRONTEND_PORT=3000          # Web interface port
+WEBAPI_HTTP_PORT=8080      # API port
 
-# Get all models
-curl http://localhost:8080/models
+# Database
+POSTGRES_USER=modelibr
+POSTGRES_PASSWORD=ChangeThisStrongPassword123!
+POSTGRES_PORT=5432
 
-# Download a file
-curl http://localhost:8080/files/1 -o downloaded-model.obj
+# Storage
+UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
 ```
 
-## 📚 Component Documentation (Storybook)
+For advanced configuration options, see `.env.example` in the repository.
 
-The frontend includes Storybook for interactive component documentation and development. Storybook provides:
+## ❓ Common Questions
 
-- **Interactive component examples**: View and interact with UI components in isolation
-- **Props documentation**: See available props and their types with live editing
-- **Multiple component states**: Explore different states and variations of components
-- **Development playground**: Test components without running the full application
+**Q: Do I need to install anything besides Docker?**
+A: No! Docker includes everything needed to run Modelibr.
 
-### Available Stories
+**Q: Can I use this for commercial projects?**
+A: Yes, Modelibr is open source under the MIT license.
 
-- **Components/LoadingPlaceholder**: 3D loading indicator component
-- **Components/ModelInfo**: Model information display with TSL rendering features
-- **Components/ThumbnailDisplay**: Thumbnail display states (ready, processing, failed, placeholder)
-- **Components/Model List/EmptyState**: Empty state for model library
-- **Components/Model List/ErrorState**: Error handling component for testing different error scenarios
+**Q: How much disk space do I need?**
+A: It depends on your model collection size. The app uses smart deduplication to save space.
 
-### Screenshots
+**Q: Can multiple users access the same instance?**
+A: Yes, Modelibr works great for teams sharing the same server.
 
-**ModelInfo Component Documentation**
-![Storybook ModelInfo](https://github.com/user-attachments/assets/c191f88b-9b39-45c0-bfa9-8f8d34efe1ed)
-*Interactive documentation showing ModelInfo component with controls for different model types (OBJ, FBX, GLTF)*
-
-### Running Storybook
-
-```bash
-cd src/frontend
-npm run storybook
-```
-
-Access Storybook at http://localhost:6006
-
-### Building Storybook
-
-To build a static version of Storybook for deployment:
-
-```bash
-cd src/frontend
-npm run build-storybook
-```
-
-The static files will be generated in `src/frontend/storybook-static/`
-
-## 🏃‍♂️ Development Workflow
-
-1. **Make changes** to the codebase
-2. **Build**: `dotnet build Modelibr.sln`
-3. **Test**: `dotnet test Modelibr.sln --no-build`
-4. **Run**: Start both API and frontend for testing
-5. **Validate**: Ensure upload functionality works correctly
-
-## 🐳 Docker Development
-
-For development with hot reloading:
-
-```bash
-# Frontend development mode
-docker compose -f docker-compose.dev.yml up frontend
-
-# Full development stack
-docker compose -f docker-compose.dev.yml up
-```
+**Q: What if I need help?**
+A: Check the Troubleshooting section below or open an issue on GitHub.
 
 ## 🔧 Troubleshooting
 
-### Docker Health Check Issues
-If you encounter "container webapi is unhealthy" errors:
+### Docker Issues
 
-1. **Verify health endpoint**: Test manually with `curl http://localhost:8080/health`
-2. **Check logs**: Use `docker compose logs webapi` to see startup issues
+**Container won't start or is unhealthy**
+- Check if Docker is running: `docker ps`
+- View logs: `docker compose logs`
+- Restart containers: `docker compose restart`
 
-### Common Issues
-- **Database connection errors**: Ensure PostgreSQL container is running and healthy
-- **Port conflicts**: Make sure ports 3000, 8080, 5432, and 3001 are available (port 8081 only needed for local HTTPS development)
-- **Upload permission errors**: Set `UPLOAD_STORAGE_PATH` to a writable directory
-- **Thumbnail worker "no such file" error**: If you see `exec /app/docker-entrypoint.sh: no such file or directory`, this was caused by Windows line endings. **The issue is now fixed** - simply rebuild the container with `docker compose build thumbnail-worker`. The Dockerfile automatically converts line endings. See [docs/WORKER.md](docs/WORKER.md#troubleshooting) for details
+**Port already in use**
+- Change ports in `.env` file
+- Default ports: 3000 (web), 8080 (API), 5432 (database)
+
+**Can't upload files**
+- Check disk space
+- Verify upload directory permissions
+
+**Thumbnails not generating**
+- Check worker logs: `docker compose logs thumbnail-worker`
+- Restart worker: `docker compose restart thumbnail-worker`
+
+### Getting Help
+
+- Check existing [GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)
+- Review documentation in the `/docs` folder
+- Open a new issue with details about your problem
 
 ## 🤝 Contributing
 
@@ -372,4 +227,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-Made with ❤️ for the 3D development community
