@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251018161219_AddModelMetadataFields")]
-    partial class AddModelMetadataFields
+    [Migration("20251024220722_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -183,6 +183,11 @@ namespace Infrastructure.Migrations
                     b.Property<int?>("Faces")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsHidden")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -202,6 +207,8 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DefaultTextureSetId");
+
+                    b.HasIndex("IsHidden");
 
                     b.HasIndex("PolyCount");
 

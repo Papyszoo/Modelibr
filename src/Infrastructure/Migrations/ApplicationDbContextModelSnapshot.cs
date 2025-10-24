@@ -181,7 +181,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<bool>("IsHidden")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("Name")
                         .IsRequired()
