@@ -14,6 +14,7 @@ interface TextureSetGridProps {
   textureSets: TextureSetDto[]
   loading?: boolean
   onTextureSetSelect: (textureSet: TextureSetDto) => void
+  onTextureSetDelete?: (textureSet: TextureSetDto) => void
   onDrop: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
@@ -25,6 +26,7 @@ export default function TextureSetGrid({
   textureSets,
   loading = false,
   onTextureSetSelect,
+  onTextureSetDelete,
   onDrop,
   onDragOver,
   onDragEnter,
@@ -280,6 +282,23 @@ export default function TextureSetGrid({
         setShowPackDialog(true)
       },
     },
+    ...(onTextureSetDelete
+      ? [
+          {
+            separator: true,
+          },
+          {
+            label: 'Delete',
+            icon: 'pi pi-trash',
+            command: () => {
+              if (selectedTextureSet) {
+                onTextureSetDelete(selectedTextureSet)
+              }
+            },
+            className: 'p-menuitem-danger',
+          },
+        ]
+      : []),
   ]
 
   // Loading state
