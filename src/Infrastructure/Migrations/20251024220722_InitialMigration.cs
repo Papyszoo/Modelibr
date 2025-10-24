@@ -112,7 +112,11 @@ namespace Infrastructure.Migrations
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Tags = table.Column<string>(type: "text", nullable: true),
                     Description = table.Column<string>(type: "text", nullable: true),
-                    DefaultTextureSetId = table.Column<int>(type: "integer", nullable: true)
+                    DefaultTextureSetId = table.Column<int>(type: "integer", nullable: true),
+                    Vertices = table.Column<int>(type: "integer", nullable: true),
+                    Faces = table.Column<int>(type: "integer", nullable: true),
+                    PolyCount = table.Column<int>(type: "integer", nullable: false),
+                    IsHidden = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
                 {
@@ -419,6 +423,21 @@ namespace Infrastructure.Migrations
                 name: "IX_Models_DefaultTextureSetId",
                 table: "Models",
                 column: "DefaultTextureSetId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Models_IsHidden",
+                table: "Models",
+                column: "IsHidden");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Models_Name_Vertices",
+                table: "Models",
+                columns: new[] { "Name", "Vertices" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Models_PolyCount",
+                table: "Models",
+                column: "PolyCount");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ModelTextureSets_TextureSetsId",
