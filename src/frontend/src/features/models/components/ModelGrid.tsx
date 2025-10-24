@@ -82,6 +82,34 @@ export default function ModelGrid({
     return modelName.includes(searchQuery.toLowerCase())
   })
 
+  const handleDeleteModel = async () => {
+    if (!selectedModel) return
+
+    if (!confirm(`Are you sure you want to delete "${getModelName(selectedModel)}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await ApiClient.deleteModel(selectedModel.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Model deleted successfully',
+        life: 3000,
+      })
+      // Refresh models list (trigger parent component to reload)
+      window.location.reload()
+    } catch (error) {
+      console.error('Failed to delete model:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete model',
+        life: 3000,
+      })
+    }
+  }
+
   const contextMenuItems: MenuItem[] = [
     {
       label: 'Add to pack',
@@ -90,6 +118,15 @@ export default function ModelGrid({
         loadPacks()
         setShowPackDialog(true)
       },
+    },
+    {
+      separator: true,
+    },
+    {
+      label: 'Delete',
+      icon: 'pi pi-trash',
+      command: handleDeleteModel,
+      className: 'p-menuitem-danger',
     },
   ]
 

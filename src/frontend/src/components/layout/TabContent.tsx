@@ -5,6 +5,7 @@ import { PackList, PackViewer } from '../../features/pack'
 import { ProjectList, ProjectViewer } from '../../features/project'
 import { History } from '../../features/history'
 import { StageEditor, StageList } from '../../features/stage-editor'
+import RecycledFilesList from '../../features/recycled-files/components/RecycledFilesList'
 import AnimationList from '../tabs/AnimationList'
 import Settings from '../tabs/Settings'
 import { Tab } from '../../types'
@@ -87,6 +88,9 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'history':
         return <History />
+
+      case 'recycledFiles':
+        return <RecycledFilesList />
 
       default:
         return (

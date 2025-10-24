@@ -10,4 +10,5 @@ public interface IModelRepository
     Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Model?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
     Task UpdateAsync(Model model, CancellationToken cancellationToken = default);
+    Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }

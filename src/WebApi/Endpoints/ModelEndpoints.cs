@@ -21,6 +21,10 @@ public static class ModelEndpoints
         app.MapPost("/models/{modelId}/tags", UpdateModelTags)
         .WithName("Update Model Tags")
         .WithTags("Models");
+
+        app.MapDelete("/models/{modelId}", DeleteModel)
+        .WithName("Delete Model")
+        .WithTags("Models");
     }
 
     private static async Task<IResult> CreateModel(
@@ -102,6 +106,21 @@ public static class ModelEndpoints
         );
 
         var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> DeleteModel(
+        int modelId,
+        ICommandHandler<DeleteModelCommand, DeleteModelResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new DeleteModelCommand(modelId), cancellationToken);
 
         if (!result.IsSuccess)
         {

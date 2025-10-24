@@ -46,6 +46,11 @@ export const useTabMenuItems = ({
         command: () => onAddTab('history', 'History'),
       },
       {
+        label: 'Recycled Files',
+        icon: 'pi pi-trash',
+        command: () => onAddTab('recycledFiles', 'Recycled Files'),
+      },
+      {
         separator: true,
       },
       {
