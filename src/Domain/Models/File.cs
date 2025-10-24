@@ -17,6 +17,9 @@ public class File
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     
+    // Optional reference to model version for versioned files
+    public int? ModelVersionId { get; private set; }
+    
     // Navigation property for many-to-many relationship - EF Core requires this to be settable
     public ICollection<Model> Models 
     { 
@@ -28,6 +31,9 @@ public class File
                 _models.AddRange(value);
         }
     }
+
+    // Navigation property for optional model version
+    public ModelVersion? ModelVersion { get; set; }
 
     public static File Create(
         string originalFileName,
@@ -71,6 +77,11 @@ public class File
     public bool IsLinkedToModel(int modelId)
     {
         return _models.Any(m => m.Id == modelId);
+    }
+
+    public void SetModelVersion(int? modelVersionId)
+    {
+        ModelVersionId = modelVersionId;
     }
 
     private static void ValidateFileName(string fileName, string paramName)
