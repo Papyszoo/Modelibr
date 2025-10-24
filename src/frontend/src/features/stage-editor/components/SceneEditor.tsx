@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from 'primereact/button'
-import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import EditorCanvas from './EditorCanvas'
 import { ComponentType } from './ComponentLibrary'
 import ComponentLibraryWindow from './ComponentLibraryWindow'
 import PropertyPanelWindow from './PropertyPanelWindow'
 import CodePanelWindow from './CodePanelWindow'
+import StageHierarchyWindow from './StageHierarchyWindow'
 import { useTabContext } from '../../../hooks/useTabContext'
 // eslint-disable-next-line no-restricted-imports -- Stage editor needs API access for saving/loading stages
 import apiClient from '../../../services/ApiClient'
@@ -104,6 +104,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   const [componentsWindowVisible, setComponentsWindowVisible] = useState(false)
   const [propertiesWindowVisible, setPropertiesWindowVisible] = useState(false)
   const [codeWindowVisible, setCodeWindowVisible] = useState(false)
+  const [hierarchyWindowVisible, setHierarchyWindowVisible] = useState(false)
   const toast = useRef<Toast>(null)
 
   // Determine which side for button positioning (opposite of panel side)
@@ -306,6 +307,10 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     })
   }
 
+  const handleUpdateGroup = (groupId: string, updates: Partial<StageGroup>) => {
+    handleUpdateObject(groupId, updates)
+  }
+
   const handleDeleteObject = (id: string) => {
     setStageConfig(prev => ({
       ...prev,
@@ -355,6 +360,15 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
             }}
           />
           <Button
+            icon="pi pi-sitemap"
+            className="p-button-rounded editor-control-btn"
+            onClick={() => setHierarchyWindowVisible(!hierarchyWindowVisible)}
+            tooltip="Hierarchy"
+            tooltipOptions={{
+              position: buttonPosition === 'left' ? 'right' : 'left',
+            }}
+          />
+          <Button
             icon="pi pi-sliders-h"
             className="p-button-rounded editor-control-btn"
             onClick={() => setPropertiesWindowVisible(!propertiesWindowVisible)}
@@ -397,6 +411,16 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         onClose={() => setComponentsWindowVisible(false)}
         side={side}
         onAddComponent={handleAddComponent}
+      />
+      <StageHierarchyWindow
+        visible={hierarchyWindowVisible}
+        onClose={() => setHierarchyWindowVisible(false)}
+        side={side}
+        stageConfig={stageConfig}
+        selectedObjectId={selectedObjectId}
+        onSelectObject={setSelectedObjectId}
+        onDeleteObject={handleDeleteObject}
+        onUpdateGroup={handleUpdateGroup}
       />
       <PropertyPanelWindow
         visible={propertiesWindowVisible}
