@@ -1,12 +1,16 @@
 import { NuqsAdapter } from 'nuqs/adapters/react'
 import SplitterLayout from './components/layout/SplitterLayout'
 import { useGlobalDragPrevention } from './hooks/useGlobalDragPrevention'
+import { useTheme } from './hooks/useTheme'
 import { UploadProgressWindow } from './shared/components'
 import './App.css'
 
 function App(): JSX.Element {
   // Prevent global drag and drop of files from opening in browser
   useGlobalDragPrevention()
+
+  // Initialize theme
+  useTheme()
 
   return (
     <NuqsAdapter>

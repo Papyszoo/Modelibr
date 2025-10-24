@@ -2,7 +2,7 @@
   height: 100%;
   width: 100%;
   display: flex;
-  background: #f8fafc;
+  background: var(--surface-ground);
 }
 
 .dock-panel-left {
@@ -64,7 +64,7 @@
 /* Content Area */
 .dock-content {
   flex: 1;
-  background: white;
+  background: var(--surface-card);
   position: relative;
   overflow: hidden;
 }
@@ -75,7 +75,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   text-align: center;
   padding: 2rem;
 }
@@ -83,12 +83,12 @@
 .dock-empty h3 {
   margin: 1rem 0 0.5rem 0;
   font-size: 1.25rem;
-  color: #374151;
+  color: var(--text-color);
 }
 
 .dock-empty p {
   margin: 0;
-  color: #9ca3af;
+  color: var(--text-color-secondary);
 }
 
 /* Drag and drop feedback */

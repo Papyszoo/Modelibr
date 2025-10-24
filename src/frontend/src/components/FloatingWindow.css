@@ -1,7 +1,7 @@
 .floating-window {
   position: fixed;
   z-index: 1000;
-  background: white;
+  background: var(--surface-card);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   min-width: 320px;
@@ -76,17 +76,17 @@
 }
 
 .floating-window-content::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--surface-ground);
   border-radius: 4px;
 }
 
 .floating-window-content::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--surface-border);
   border-radius: 4px;
 }
 
 .floating-window-content::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--text-color-secondary);
 }
 
 /* Animation for window appearance */
