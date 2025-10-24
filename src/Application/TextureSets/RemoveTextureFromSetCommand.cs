@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -8,13 +9,19 @@ namespace Application.TextureSets;
 internal class RemoveTextureFromPackCommandHandler : ICommandHandler<RemoveTextureFromPackCommand>
 {
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly IFileRepository _fileRepository;
+    private readonly IFileRecyclingService _fileRecyclingService;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public RemoveTextureFromPackCommandHandler(
         ITextureSetRepository textureSetRepository,
+        IFileRepository fileRepository,
+        IFileRecyclingService fileRecyclingService,
         IDateTimeProvider dateTimeProvider)
     {
         _textureSetRepository = textureSetRepository;
+        _fileRepository = fileRepository;
+        _fileRecyclingService = fileRecyclingService;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -36,6 +43,16 @@ internal class RemoveTextureFromPackCommandHandler : ICommandHandler<RemoveTextu
             {
                 return Result.Failure(
                     new Error("TextureNotFound", $"Texture with ID {command.TextureId} was not found in the texture set."));
+            }
+
+            // Get the file associated with the texture and recycle it
+            var file = await _fileRepository.GetByIdAsync(texture.FileId, cancellationToken);
+            if (file != null)
+            {
+                await _fileRecyclingService.RecycleFileAsync(
+                    file,
+                    $"Texture removed from texture set '{textureSet.Name}' (ID: {textureSet.Id})",
+                    cancellationToken);
             }
 
             // Remove texture from the set

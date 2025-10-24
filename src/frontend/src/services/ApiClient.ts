@@ -945,6 +945,11 @@ class ApiClient {
     const response = await this.client.get('/recycledFiles')
     return response.data
   }
+
+  async restoreRecycledFile(id: number): Promise<{ message: string }> {
+    const response = await this.client.post(`/recycledFiles/${id}/restore`)
+    return response.data
+  }
 }
 
 export default new ApiClient()

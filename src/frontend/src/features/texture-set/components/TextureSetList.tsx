@@ -69,7 +69,7 @@ function TextureSetList() {
     }
   }
 
-  const _handleDeleteTextureSet = (textureSet: TextureSetDto) => {
+  const handleDeleteTextureSet = (textureSet: TextureSetDto) => {
     confirmDialog({
       message: `Are you sure you want to delete the texture set "${textureSet.name}"?`,
       header: 'Delete Confirmation',
@@ -180,6 +180,7 @@ function TextureSetList() {
         textureSets={textureSets}
         loading={loading}
         onTextureSetSelect={handleViewDetails}
+        onTextureSetDelete={handleDeleteTextureSet}
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}

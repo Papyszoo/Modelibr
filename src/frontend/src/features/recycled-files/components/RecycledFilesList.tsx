@@ -72,6 +72,39 @@ function RecycledFilesList() {
     return formatFileSize(rowData.sizeBytes)
   }
 
+  const handleRestoreFile = async (recycledFile: RecycledFileDto) => {
+    try {
+      await ApiClient.restoreRecycledFile(recycledFile.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: `File "${recycledFile.originalFileName}" restored successfully`,
+        life: 3000,
+      })
+      loadRecycledFiles()
+    } catch (error) {
+      console.error('Failed to restore file:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore file',
+        life: 3000,
+      })
+    }
+  }
+
+  const actionsBodyTemplate = (rowData: RecycledFileDto) => {
+    return (
+      <Button
+        label="Restore"
+        icon="pi pi-replay"
+        onClick={() => handleRestoreFile(rowData)}
+        className="p-button-sm p-button-success"
+        tooltip="Restore this file from recycle bin"
+      />
+    )
+  }
+
   const header = (
     <div className="recycled-files-header">
       <h2>Recycled Files</h2>
@@ -132,6 +165,11 @@ function RecycledFilesList() {
           body={scheduledDeletionBodyTemplate}
           sortable
           style={{ width: '200px' }}
+        />
+        <Column
+          header="Actions"
+          body={actionsBodyTemplate}
+          style={{ width: '150px' }}
         />
       </DataTable>
     </div>
