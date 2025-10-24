@@ -38,6 +38,8 @@ export function getTabLabel(
       return 'History'
     case 'settings':
       return 'Settings'
+    case 'recycledFiles':
+      return 'Recycled Files'
     default:
       return 'Unknown'
   }
@@ -164,6 +166,7 @@ export function parseCompactTabFormat(
           'stageEditor',
           'history',
           'settings',
+          'recycledFiles',
         ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${tabId}`)

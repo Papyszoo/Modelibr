@@ -1,0 +1,27 @@
+.recycled-files-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.recycled-files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.recycled-files-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.recycled-files-table {
+  flex: 1;
+}
+
+.recycled-files-table .p-datatable-wrapper {
+  max-height: calc(100vh - 200px);
+}

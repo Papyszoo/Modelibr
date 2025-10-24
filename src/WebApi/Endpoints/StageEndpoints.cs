@@ -69,6 +69,20 @@ public static class StageEndpoints
         })
         .WithName("Update Stage")
         .WithSummary("Update an existing stage");
+
+        app.MapDelete("/stages/{id}", async (int id, ICommandHandler<DeleteStageCommand, DeleteStageResponse> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(new DeleteStageCommand(id), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("Delete Stage")
+        .WithSummary("Delete a stage");
     }
 }
 

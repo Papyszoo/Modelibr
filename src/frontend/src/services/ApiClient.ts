@@ -910,6 +910,41 @@ class ApiClient {
       store.refreshPacks()
     }
   }
+
+  // Delete Model API
+  async deleteModel(modelId: number): Promise<{ modelId: number; success: boolean }> {
+    const response = await this.client.delete(`/models/${modelId}`)
+    
+    // Invalidate models cache on successful deletion
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+    
+    return response.data
+  }
+
+  // Delete Stage API
+  async deleteStage(stageId: number): Promise<{ stageId: number; success: boolean }> {
+    const response = await this.client.delete(`/stages/${stageId}`)
+    return response.data
+  }
+
+  // Recycled Files API
+  async getAllRecycledFiles(): Promise<{
+    recycledFiles: Array<{
+      id: number
+      originalFileName: string
+      storedFileName: string
+      filePath: string
+      sha256Hash: string
+      sizeBytes: number
+      reason: string
+      recycledAt: string
+      scheduledDeletionAt: string | null
+    }>
+  }> {
+    const response = await this.client.get('/recycledFiles')
+    return response.data
+  }
 }
 
 export default new ApiClient()

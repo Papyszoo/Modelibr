@@ -82,13 +82,14 @@ function StageList() {
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          // TODO: Add delete endpoint to API
+          await ApiClient.deleteStage(stage.id)
           toast.current?.show({
-            severity: 'info',
-            summary: 'Info',
-            detail: 'Delete functionality coming soon',
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Stage deleted successfully',
             life: 3000,
           })
+          loadStages()
         } catch (error) {
           console.error('Failed to delete stage:', error)
           toast.current?.show({
