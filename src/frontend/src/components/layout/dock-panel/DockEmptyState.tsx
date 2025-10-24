@@ -61,10 +61,7 @@ export default function DockEmptyState({
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
     >
-      <i
-        className="pi pi-plus"
-        style={{ fontSize: '3rem', color: '#6b7280' }}
-      ></i>
+      <i className="pi pi-plus" style={{ fontSize: '3rem' }}></i>
       <h3>No tabs open</h3>
       <p>Click the + button to add a new tab</p>
       <ContextMenu
