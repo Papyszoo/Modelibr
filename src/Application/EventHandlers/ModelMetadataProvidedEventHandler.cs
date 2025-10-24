@@ -172,8 +172,8 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
                         if (modelToShow.DomainEvents.Any())
                         {
                             _logger.LogInformation(
-                                "Publishing {Count} domain events for shown model {KeepModelId}",
-                                modelToShow.DomainEvents.Count(), modelToKeep.Id);
+                                "Publishing {Count} domain events for shown model {ModelId}",
+                                modelToShow.DomainEvents.Count(), modelToShow.Id);
                             await _domainEventDispatcher.PublishAsync(modelToShow.DomainEvents, cancellationToken);
                             modelToShow.ClearDomainEvents();
                             await _modelRepository.UpdateAsync(modelToShow, cancellationToken);
