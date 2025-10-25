@@ -13,19 +13,22 @@ namespace Application.Models
     internal class AddModelCommandHandler : ICommandHandler<AddModelCommand, AddModelCommandResponse>
     {
         private readonly IModelRepository _modelRepository;
+        private readonly IModelVersionRepository _versionRepository;
         private readonly IFileCreationService _fileCreationService;
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IDomainEventDispatcher _domainEventDispatcher;
         private readonly IBatchUploadRepository _batchUploadRepository;
 
         public AddModelCommandHandler(
-            IModelRepository modelRepository, 
+            IModelRepository modelRepository,
+            IModelVersionRepository versionRepository,
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
             IDomainEventDispatcher domainEventDispatcher,
             IBatchUploadRepository batchUploadRepository)
         {
             _modelRepository = modelRepository;
+            _versionRepository = versionRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
             _domainEventDispatcher = domainEventDispatcher;
@@ -92,6 +95,15 @@ namespace Application.Models
                 
                 // Now add the file to the model (this properly persists the file entity to the database)
                 await _modelRepository.AddFileAsync(savedModel.Id, fileEntity, cancellationToken);
+                
+                // Create version 1 automatically for new models
+                var version1 = savedModel.CreateVersion("Initial version", _dateTimeProvider.UtcNow);
+                version1.AddFile(fileEntity);
+                await _versionRepository.AddAsync(version1, cancellationToken);
+                
+                // Link file to version
+                fileEntity.SetModelVersion(version1.Id);
+                await _modelRepository.UpdateAsync(savedModel, cancellationToken);
                 
                 // Raise domain event for new model upload after both model and file are persisted
                 savedModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, true);
