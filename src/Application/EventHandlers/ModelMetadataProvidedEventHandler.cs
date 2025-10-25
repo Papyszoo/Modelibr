@@ -50,8 +50,32 @@ public class ModelMetadataProvidedEventHandler : IDomainEventHandler<ModelMetada
             if (!domainEvent.Vertices.HasValue)
             {
                 _logger.LogInformation(
-                    "Skipping deduplication for model {ModelId} - no vertices count available",
+                    "Skipping deduplication for model {ModelId} - no vertices count available. Showing model anyway.",
                     domainEvent.ModelId);
+                
+                // Still show the model even without metadata - user should see their upload
+                var modelWithoutMetadata = await _modelRepository.GetByIdAsync(domainEvent.ModelId, cancellationToken);
+                if (modelWithoutMetadata != null && modelWithoutMetadata.IsHidden)
+                {
+                    _logger.LogInformation(
+                        "Showing model {ModelId} without metadata (no deduplication performed)",
+                        domainEvent.ModelId);
+                    
+                    modelWithoutMetadata.Show(_dateTimeProvider.UtcNow);
+                    await _modelRepository.UpdateAsync(modelWithoutMetadata, cancellationToken);
+                    
+                    // Publish ModelShownEvent to trigger thumbnail generation
+                    if (modelWithoutMetadata.DomainEvents.Any())
+                    {
+                        _logger.LogInformation(
+                            "Publishing {Count} domain events for model {ModelId} shown without metadata",
+                            modelWithoutMetadata.DomainEvents.Count(), modelWithoutMetadata.Id);
+                        await _domainEventDispatcher.PublishAsync(modelWithoutMetadata.DomainEvents, cancellationToken);
+                        modelWithoutMetadata.ClearDomainEvents();
+                        await _modelRepository.UpdateAsync(modelWithoutMetadata, cancellationToken);
+                    }
+                }
+                
                 return Result.Success();
             }
 
