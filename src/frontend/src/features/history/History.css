@@ -12,14 +12,14 @@
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--surface-border);
 }
 
 .history-toolbar h2 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-color);
 }
 
 .history-loading {
@@ -29,7 +29,7 @@
   justify-content: center;
   gap: 1rem;
   padding: 3rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
 }
 
 .history-empty {
@@ -39,12 +39,13 @@
   justify-content: center;
   gap: 1rem;
   padding: 3rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
 }
 
 .history-empty i {
   font-size: 3rem;
-  color: #d1d5db;
+  color: var(--text-color-secondary);
+  opacity: 0.5;
 }
 
 .history-list {
@@ -55,21 +56,21 @@
 
 /* Batch Styles */
 .history-batch {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--surface-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .history-batch-header {
   padding: 0.75rem;
-  background: #f9fafb;
+  background: var(--surface-ground);
   cursor: pointer;
   user-select: none;
   transition: background 0.2s;
 }
 
 .history-batch-header:hover {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .history-batch-info {
@@ -80,19 +81,19 @@
 
 .history-batch-toggle {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   transition: transform 0.2s;
 }
 
 .history-batch-title {
   font-weight: 600;
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--text-color);
 }
 
 .history-batch-timestamp {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   margin-left: auto;
 }
 
@@ -101,7 +102,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: white;
+  background: var(--surface-card);
 }
 
 /* History Item Styles */
@@ -111,12 +112,12 @@
   gap: 0.75rem;
   padding: 0.75rem;
   border-radius: 6px;
-  background: #f9fafb;
+  background: var(--surface-ground);
   transition: background 0.2s;
 }
 
 .history-item:hover {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .history-item-icons {
@@ -136,19 +137,19 @@
 
 .history-item-ext-icon {
   font-size: 1.25rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
 }
 
 .history-item-ext-name {
   font-size: 0.625rem;
-  color: #9ca3af;
+  color: var(--text-color-secondary);
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .history-item-type-icon {
   font-size: 0.875rem;
-  color: #9ca3af;
+  color: var(--text-color-secondary);
 }
 
 .history-item-details {
@@ -169,7 +170,7 @@
 .history-item-name {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -179,13 +180,13 @@
 
 .history-item-uploaded-to {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   white-space: nowrap;
 }
 
 .history-item-timestamp {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-color-secondary);
 }
 
 .history-item-actions {
@@ -200,15 +201,15 @@
 }
 
 .history-list::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--surface-ground);
   border-radius: 3px;
 }
 
 .history-list::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--surface-border);
   border-radius: 3px;
 }
 
 .history-list::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--text-color-secondary);
 }
