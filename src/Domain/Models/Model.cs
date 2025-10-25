@@ -8,6 +8,7 @@ namespace Domain.Models
         private readonly List<TextureSet> _textureSets = new();
         private readonly List<Pack> _packs = new();
         private readonly List<Project> _projects = new();
+        private readonly List<ModelVersion> _versions = new();
 
         public int Id { get; set; }
         public string Name { get; private set; } = string.Empty;
@@ -62,6 +63,18 @@ namespace Domain.Models
                 _projects.Clear();
                 if (value != null)
                     _projects.AddRange(value);
+            }
+        }
+
+        // Navigation property for one-to-many relationship with ModelVersion
+        public ICollection<ModelVersion> Versions 
+        { 
+            get => _versions; 
+            set 
+            {
+                _versions.Clear();
+                if (value != null)
+                    _versions.AddRange(value);
             }
         }
 
@@ -224,6 +237,50 @@ namespace Domain.Models
             Tags = tags;
             Description = description;
             UpdatedAt = updatedAt;
+        }
+
+        /// <summary>
+        /// Creates a new version for this model.
+        /// </summary>
+        /// <param name="description">Optional description for this version</param>
+        /// <param name="createdAt">When the version was created</param>
+        /// <returns>The created ModelVersion</returns>
+        public ModelVersion CreateVersion(string? description, DateTime createdAt)
+        {
+            var nextVersionNumber = _versions.Count == 0 ? 1 : _versions.Max(v => v.VersionNumber) + 1;
+            var version = ModelVersion.Create(Id, nextVersionNumber, description, createdAt);
+            _versions.Add(version);
+            UpdatedAt = createdAt;
+            return version;
+        }
+
+        /// <summary>
+        /// Gets all versions of this model ordered by version number.
+        /// </summary>
+        /// <returns>Read-only list of model versions</returns>
+        public IReadOnlyList<ModelVersion> GetVersions()
+        {
+            return _versions.OrderBy(v => v.VersionNumber).ToList().AsReadOnly();
+        }
+
+        /// <summary>
+        /// Gets a specific version by version number.
+        /// </summary>
+        /// <param name="versionNumber">The version number to retrieve</param>
+        /// <returns>The model version, or null if not found</returns>
+        public ModelVersion? GetVersion(int versionNumber)
+        {
+            return _versions.FirstOrDefault(v => v.VersionNumber == versionNumber);
+        }
+
+        /// <summary>
+        /// Checks if this model has a specific version.
+        /// </summary>
+        /// <param name="versionNumber">The version number to check</param>
+        /// <returns>True if the version exists</returns>
+        public bool HasVersion(int versionNumber)
+        {
+            return _versions.Any(v => v.VersionNumber == versionNumber);
         }
     }
 }
