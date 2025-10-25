@@ -38,7 +38,7 @@ internal class DeleteModelCommandHandler : ICommandHandler<DeleteModelCommand, D
         // Get all files associated with the model
         var files = await _fileRepository.GetFilesByModelIdAsync(command.ModelId, cancellationToken);
         
-        // Recycle each file (move to recycle bin)
+        // Recycle each file (soft delete with metadata tracking)
         foreach (var file in files)
         {
             await _fileRecyclingService.RecycleFileAsync(
@@ -47,8 +47,9 @@ internal class DeleteModelCommandHandler : ICommandHandler<DeleteModelCommand, D
                 cancellationToken);
         }
 
-        // Delete the model
-        await _modelRepository.DeleteAsync(command.ModelId, cancellationToken);
+        // Soft delete the model (mark as deleted, don't remove from database)
+        model.MarkAsDeleted(_dateTimeProvider.UtcNow);
+        await _modelRepository.UpdateAsync(model, cancellationToken);
 
         return Result.Success(new DeleteModelResponse(command.ModelId, true));
     }
