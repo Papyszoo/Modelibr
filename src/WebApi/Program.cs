@@ -76,6 +76,7 @@ namespace WebApi
             // Map endpoints
             app.MapModelEndpoints();
             app.MapModelsEndpoints();
+            app.MapModelVersionEndpoints();
             app.MapFilesEndpoints();
             app.MapThumbnailEndpoints();
             app.MapThumbnailJobEndpoints();

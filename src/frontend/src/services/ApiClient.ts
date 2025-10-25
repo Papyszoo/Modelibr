@@ -14,6 +14,8 @@ import {
   CreatePackRequest,
   CreatePackResponse,
   UpdatePackRequest,
+  ModelVersionDto,
+  CreateModelVersionResponse,
 } from '../types'
 import { useApiCacheStore } from '../stores/apiCacheStore'
 
@@ -949,6 +951,91 @@ class ApiClient {
   async restoreRecycledFile(id: number): Promise<{ message: string }> {
     const response = await this.client.post(`/recycledFiles/${id}/restore`)
     return response.data
+  }
+
+  // Model Version API methods
+  async getModelVersions(modelId: number): Promise<ModelVersionDto[]> {
+    const response = await this.client.get<ModelVersionDto[]>(
+      `/models/${modelId}/versions`
+    )
+    return response.data
+  }
+
+  async getModelVersion(
+    modelId: number,
+    versionId: number
+  ): Promise<ModelVersionDto> {
+    const response = await this.client.get<ModelVersionDto>(
+      `/models/${modelId}/versions/${versionId}`
+    )
+    return response.data
+  }
+
+  async createModelVersion(
+    modelId: number,
+    file: File,
+    description?: string
+  ): Promise<CreateModelVersionResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const params = new URLSearchParams()
+    if (description) {
+      params.append('description', description)
+    }
+
+    const url = `/models/${modelId}/versions${params.toString() ? `?${params.toString()}` : ''}`
+
+    const response = await this.client.post<CreateModelVersionResponse>(
+      url,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    // Invalidate model cache when new version is created
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+
+    return response.data
+  }
+
+  async addFileToVersion(
+    modelId: number,
+    versionId: number,
+    file: File
+  ): Promise<CreateModelVersionResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const url = `/models/${modelId}/versions/${versionId}/files`
+
+    const response = await this.client.post<CreateModelVersionResponse>(
+      url,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    // Invalidate model cache when file is added to version
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+
+    return response.data
+  }
+
+  getVersionFileUrl(
+    modelId: number,
+    versionId: number,
+    fileId: number
+  ): string {
+    return `${this.baseURL}/models/${modelId}/versions/${versionId}/files/${fileId}`
   }
 }
 

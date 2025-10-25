@@ -200,3 +200,32 @@ export interface UpdateProjectRequest {
   name: string
   description?: string
 }
+
+// Model Version related types
+export interface ModelVersionDto {
+  id: number
+  modelId: number
+  versionNumber: number
+  description?: string
+  createdAt: string
+  files: VersionFileDto[]
+}
+
+export interface VersionFileDto {
+  id: number
+  originalFileName: string
+  mimeType: string
+  fileType: string
+  sizeBytes: number
+  isRenderable: boolean
+}
+
+export interface GetModelVersionsResponse {
+  versions: ModelVersionDto[]
+}
+
+export interface CreateModelVersionResponse {
+  versionId: number
+  versionNumber: number
+  fileId: number
+}

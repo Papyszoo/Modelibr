@@ -290,5 +290,120 @@ public class ModelDomainTests
         Assert.IsAssignableFrom<IReadOnlyList<TextureSet>>(textureSets);
     }
 
+    [Fact]
+    public void CreateVersion_CreatesNewVersionWithNumber1()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 1; // Simulate persisted model
+        var description = "Version 1";
+        var createdAt = DateTime.UtcNow;
+
+        // Act
+        var version = model.CreateVersion(description, createdAt);
+
+        // Assert
+        Assert.Equal(1, version.VersionNumber);
+        Assert.Equal(description, version.Description);
+        Assert.Equal(model.Id, version.ModelId);
+        Assert.Single(model.Versions);
+    }
+
+    [Fact]
+    public void CreateVersion_WithExistingVersion_IncrementsVersionNumber()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 1;
+        model.CreateVersion("Version 1", DateTime.UtcNow);
+
+        // Act
+        var version2 = model.CreateVersion("Version 2", DateTime.UtcNow.AddMinutes(1));
+
+        // Assert
+        Assert.Equal(2, version2.VersionNumber);
+        Assert.Equal(2, model.Versions.Count);
+    }
+
+    [Fact]
+    public void GetVersions_ReturnsOrderedVersions()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 1;
+        model.CreateVersion("V1", DateTime.UtcNow);
+        model.CreateVersion("V2", DateTime.UtcNow.AddMinutes(1));
+        model.CreateVersion("V3", DateTime.UtcNow.AddMinutes(2));
+
+        // Act
+        var versions = model.GetVersions();
+
+        // Assert
+        Assert.Equal(3, versions.Count);
+        Assert.Equal(1, versions[0].VersionNumber);
+        Assert.Equal(2, versions[1].VersionNumber);
+        Assert.Equal(3, versions[2].VersionNumber);
+        Assert.IsAssignableFrom<IReadOnlyList<ModelVersion>>(versions);
+    }
+
+    [Fact]
+    public void GetVersion_WithExistingVersionNumber_ReturnsVersion()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 1;
+        model.CreateVersion("V1", DateTime.UtcNow);
+        model.CreateVersion("V2", DateTime.UtcNow.AddMinutes(1));
+
+        // Act
+        var version = model.GetVersion(2);
+
+        // Assert
+        Assert.NotNull(version);
+        Assert.Equal(2, version.VersionNumber);
+    }
+
+    [Fact]
+    public void GetVersion_WithNonExistingVersionNumber_ReturnsNull()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 1;
+
+        // Act
+        var version = model.GetVersion(999);
+
+        // Assert
+        Assert.Null(version);
+    }
+
+    [Fact]
+    public void HasVersion_WithExistingVersionNumber_ReturnsTrue()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+        model.Id = 1;
+        model.CreateVersion("V1", DateTime.UtcNow);
+
+        // Act
+        var hasVersion = model.HasVersion(1);
+
+        // Assert
+        Assert.True(hasVersion);
+    }
+
+    [Fact]
+    public void HasVersion_WithNonExistingVersionNumber_ReturnsFalse()
+    {
+        // Arrange
+        var model = Model.Create("Test Model", DateTime.UtcNow);
+
+        // Act
+        var hasVersion = model.HasVersion(999);
+
+        // Assert
+        Assert.False(hasVersion);
+    }
+
     #endregion
 }

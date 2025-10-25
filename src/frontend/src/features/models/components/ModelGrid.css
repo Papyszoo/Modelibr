@@ -27,7 +27,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  background: white;
+  background: var(--surface-card);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -38,20 +38,20 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
   border-radius: 8px;
   transition: all 0.2s ease;
 }
 
 .search-bar:focus-within {
-  border-color: #3182ce;
-  background: white;
-  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+  border-color: var(--primary-color);
+  background: var(--surface-card);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.1);
 }
 
 .search-bar .pi-search {
-  color: #64748b;
+  color: var(--text-color-secondary);
   font-size: 1rem;
 }
 
@@ -61,11 +61,11 @@
   background: transparent;
   outline: none;
   font-size: 1rem;
-  color: #1e293b;
+  color: var(--text-color);
 }
 
 .search-input::placeholder {
-  color: #94a3b8;
+  color: var(--text-color-secondary);
 }
 
 .filter-bar {
@@ -75,7 +75,7 @@
 }
 
 .filter-placeholder {
-  color: #64748b;
+  color: var(--text-color-secondary);
   font-size: 0.875rem;
   font-style: italic;
 }
@@ -90,7 +90,7 @@
 
 /* Model Card */
 .model-card {
-  background: white;
+  background: var(--surface-card);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -108,7 +108,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  background: #f8fafc;
+  background: var(--surface-ground);
   overflow: hidden;
 }
 
@@ -160,7 +160,7 @@
 .no-results {
   text-align: center;
   padding: 4rem 2rem;
-  color: #64748b;
+  color: var(--text-color-secondary);
 }
 
 .no-results .pi {
@@ -184,51 +184,7 @@
   background: transparent;
 }
 
-/* Dark theme support for non-tab view */
-.model-list:not(.model-list-tab) .model-grid-controls {
-  background: #2a2a2a;
-  border: 1px solid #4a4a4a;
-}
-
-.model-list:not(.model-list-tab) .search-bar {
-  background: #3a3a3a;
-  border-color: #4a4a4a;
-}
-
-.model-list:not(.model-list-tab) .search-bar:focus-within {
-  border-color: #3182ce;
-  background: #2a2a2a;
-}
-
-.model-list:not(.model-list-tab) .search-input {
-  color: #e2e8f0;
-}
-
-.model-list:not(.model-list-tab) .search-input::placeholder {
-  color: #64748b;
-}
-
-.model-list:not(.model-list-tab) .filter-placeholder {
-  color: #94a3b8;
-}
-
-.model-list:not(.model-list-tab) .model-card {
-  background: #2a2a2a;
-  border: 1px solid #4a4a4a;
-}
-
-.model-list:not(.model-list-tab) .model-card:hover {
-  border-color: #3182ce;
-  background: #3a3a3a;
-}
-
-.model-list:not(.model-list-tab) .model-card-thumbnail {
-  background: #3a3a3a;
-}
-
-.model-list:not(.model-list-tab) .no-results {
-  color: #94a3b8;
-}
+/* Remove dark theme overrides as we now use CSS variables */
 
 /* Responsive adjustments */
 @media (max-width: 1200px) {
