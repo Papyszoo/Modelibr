@@ -233,12 +233,12 @@ function ModelViewer({
         // Create new version
         await ApiClient.createModelVersion(parseInt(model.id), file, description)
       } else {
-        // Add to current version - for now we'll create a new version
-        // In a real implementation, you'd need a backend endpoint to add file to existing version
-        await ApiClient.createModelVersion(
+        // Add to current/selected version
+        const currentVersion = selectedVersion || versions[versions.length - 1]
+        await ApiClient.addFileToVersion(
           parseInt(model.id),
-          file,
-          description || 'Added file to existing version'
+          currentVersion.id,
+          file
         )
       }
 
@@ -500,6 +500,7 @@ function ModelViewer({
         file={droppedFile}
         modelId={model?.id ? parseInt(model.id) : 0}
         versions={versions}
+        selectedVersion={selectedVersion}
         onUpload={handleFileUpload}
       />
     </div>

@@ -13,6 +13,10 @@ public static class ModelVersionEndpoints
             .WithName("Create Model Version")
             .DisableAntiforgery();
 
+        app.MapPost("/models/{modelId}/versions/{versionId}/files", AddFileToVersion)
+            .WithName("Add File To Version")
+            .DisableAntiforgery();
+
         app.MapGet("/models/{modelId}/versions", GetModelVersions)
             .WithName("Get Model Versions");
 
@@ -39,6 +43,33 @@ public static class ModelVersionEndpoints
             modelId,
             new FormFileUpload(file),
             description);
+
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> AddFileToVersion(
+        int modelId,
+        int versionId,
+        IFormFile file,
+        ICommandHandler<AddFileToVersionCommand, AddFileToVersionResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (file.Length <= 0)
+        {
+            return Results.BadRequest(new { error = "InvalidFile", message = "File is empty or invalid." });
+        }
+
+        var command = new AddFileToVersionCommand(
+            modelId,
+            versionId,
+            new FormFileUpload(file));
 
         var result = await commandHandler.Handle(command, cancellationToken);
 
