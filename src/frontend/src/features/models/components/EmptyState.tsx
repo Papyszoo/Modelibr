@@ -23,10 +23,7 @@ export default function EmptyState({
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
     >
-      <i
-        className="pi pi-box"
-        style={{ fontSize: '4rem', color: 'var(--surface-500)' }}
-      ></i>
+      <i className="pi pi-box" style={{ fontSize: '4rem' }}></i>
       <h3>No models found</h3>
       <p>Drag and drop 3D model files here to get started!</p>
     </div>

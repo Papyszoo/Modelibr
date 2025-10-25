@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 // eslint-disable-next-line no-restricted-imports -- Settings component needs direct API access for system configuration
 import apiClient from '../../services/ApiClient'
+import { useTheme } from '../../hooks/useTheme'
 import './Settings.css'
 
 interface SettingsData {
@@ -20,8 +21,11 @@ function Settings(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
+  // Theme hook
+  const { theme, setTheme } = useTheme()
+
   // Accordion state
-  const [activeIndex, setActiveIndex] = useState<number | number[]>([0, 1])
+  const [activeIndex, setActiveIndex] = useState<number | number[]>([0, 1, 2])
 
   // Original values from server (for dirty tracking)
   const [originalValues, setOriginalValues] = useState<{
@@ -274,10 +278,52 @@ function Settings(): JSX.Element {
                 {Array.isArray(activeIndex) && activeIndex.includes(0)
                   ? '▼'
                   : '▶'}{' '}
-                File Upload Settings
+                Appearance
               </span>
             </div>
             {Array.isArray(activeIndex) && activeIndex.includes(0) && (
+              <div className="settings-section-content">
+                <div className="settings-field">
+                  <label htmlFor="colorTheme">Color Theme</label>
+                  <select
+                    id="colorTheme"
+                    value={theme}
+                    onChange={e => setTheme(e.target.value as 'light' | 'dark')}
+                    className="settings-select"
+                  >
+                    <option value="light">Light Theme</option>
+                    <option value="dark">Dark Theme</option>
+                  </select>
+                  <span className="settings-help">
+                    Choose between light and dark color themes
+                  </span>
+                  <span className="settings-default">Default: Light Theme</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="settings-section">
+            <div
+              className="settings-section-header"
+              onClick={() =>
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(1)
+                      ? prev.filter(i => i !== 1)
+                      : [...prev, 1]
+                    : [1]
+                )
+              }
+            >
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(1)
+                  ? '▼'
+                  : '▶'}{' '}
+                File Upload Settings
+              </span>
+            </div>
+            {Array.isArray(activeIndex) && activeIndex.includes(1) && (
               <div className="settings-section-content">
                 <div className="settings-field">
                   <label htmlFor="maxFileSize">
@@ -380,21 +426,21 @@ function Settings(): JSX.Element {
               onClick={() =>
                 setActiveIndex(prev =>
                   Array.isArray(prev)
-                    ? prev.includes(1)
-                      ? prev.filter(i => i !== 1)
-                      : [...prev, 1]
-                    : [1]
+                    ? prev.includes(2)
+                      ? prev.filter(i => i !== 2)
+                      : [...prev, 2]
+                    : [2]
                 )
               }
             >
               <span>
-                {Array.isArray(activeIndex) && activeIndex.includes(1)
+                {Array.isArray(activeIndex) && activeIndex.includes(2)
                   ? '▼'
                   : '▶'}{' '}
                 Thumbnail Generation Settings
               </span>
             </div>
-            {Array.isArray(activeIndex) && activeIndex.includes(1) && (
+            {Array.isArray(activeIndex) && activeIndex.includes(2) && (
               <div className="settings-section-content">
                 <div className="settings-field">
                   <label className="settings-checkbox-label">

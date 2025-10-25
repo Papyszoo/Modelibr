@@ -7,6 +7,7 @@ namespace Infrastructure.Persistence
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
     {
         public DbSet<Model> Models => Set<Model>();
+        public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
@@ -77,6 +78,31 @@ namespace Infrastructure.Persistence
                 entity.HasOne<TextureSet>()
                     .WithMany()
                     .HasForeignKey(m => m.DefaultTextureSetId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Configure one-to-many relationship with ModelVersions
+                entity.HasMany(m => m.Versions)
+                    .WithOne(v => v.Model)
+                    .HasForeignKey(v => v.ModelId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure ModelVersion entity
+            modelBuilder.Entity<ModelVersion>(entity =>
+            {
+                entity.HasKey(v => v.Id);
+                entity.Property(v => v.ModelId).IsRequired();
+                entity.Property(v => v.VersionNumber).IsRequired();
+                entity.Property(v => v.Description).HasMaxLength(1000);
+                entity.Property(v => v.CreatedAt).IsRequired();
+
+                // Create unique index on ModelId and VersionNumber
+                entity.HasIndex(v => new { v.ModelId, v.VersionNumber }).IsUnique();
+
+                // Configure many-to-many relationship with Files
+                entity.HasMany(v => v.Files)
+                    .WithOne(f => f.ModelVersion)
+                    .HasForeignKey(f => f.ModelVersionId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
 
