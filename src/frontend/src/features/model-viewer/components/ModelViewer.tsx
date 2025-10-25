@@ -66,11 +66,22 @@ function ModelViewer({
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
   const [versionModel, setVersionModel] = useState<Model | null>(null)
+  const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
 
   // Determine which side for button positioning
   const buttonPosition = side === 'left' ? 'right' : 'left'
+
+  // Load default file preference from localStorage
+  useEffect(() => {
+    if (model) {
+      const stored = localStorage.getItem(`model-${model.id}-default-file`)
+      if (stored) {
+        setDefaultFileId(parseInt(stored))
+      }
+    }
+  }, [model])
 
   useEffect(() => {
     if (!propModel && modelId) {
@@ -192,6 +203,17 @@ function ModelViewer({
         }))
       }
       setVersionModel(versionModelData)
+    }
+  }
+
+  const handleDefaultFileChange = (fileId: number) => {
+    setDefaultFileId(fileId)
+    // If this file is in the current model or version, trigger a re-render
+    if (model) {
+      setModel({ ...model })
+    }
+    if (versionModel) {
+      setVersionModel({ ...versionModel })
     }
   }
 
@@ -434,7 +456,7 @@ function ModelViewer({
           ) : (
             <>
               <Canvas
-                key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}`}
+                key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
                 shadows
                 className="viewer-canvas"
                 gl={{
@@ -445,10 +467,11 @@ function ModelViewer({
                 dpr={Math.min(window.devicePixelRatio, 2)}
               >
                 <ModelPreviewScene
-                  key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}`}
+                  key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
                   model={versionModel || model}
                   settings={viewerSettings}
                   textureSet={selectedTextureSet}
+                  defaultFileId={defaultFileId}
                 />
               </Canvas>
               {/* Stats container positioned in bottom-left corner of viewer */}
@@ -508,6 +531,7 @@ function ModelViewer({
           side={side}
           model={model}
           onVersionSelect={handleVersionSelect}
+          onDefaultFileChange={handleDefaultFileChange}
         />
       </ModelProvider>
 

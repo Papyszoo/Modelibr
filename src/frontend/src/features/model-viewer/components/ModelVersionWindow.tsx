@@ -13,6 +13,7 @@ interface ModelVersionWindowProps {
   side?: 'left' | 'right'
   model: Model | null
   onVersionSelect?: (version: ModelVersionDto) => void
+  onDefaultFileChange?: (fileId: number) => void
 }
 
 function ModelVersionWindow({
@@ -21,10 +22,22 @@ function ModelVersionWindow({
   side = 'left',
   model,
   onVersionSelect,
+  onDefaultFileChange,
 }: ModelVersionWindowProps) {
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
   const [loading, setLoading] = useState(false)
+  const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
+
+  // Load default file preference from localStorage
+  useEffect(() => {
+    if (model) {
+      const stored = localStorage.getItem(`model-${model.id}-default-file`)
+      if (stored) {
+        setDefaultFileId(parseInt(stored))
+      }
+    }
+  }, [model])
 
   useEffect(() => {
     if (visible && model) {
@@ -81,11 +94,15 @@ function ModelVersionWindow({
     // Try to open with blender:// protocol
     const blenderUrl = `blender://${url}`
     window.location.href = blenderUrl
-    
-    // Also open download as fallback after a short delay
-    setTimeout(() => {
-      window.open(url, '_blank')
-    }, 500)
+  }
+
+  const handleSetDefaultFile = (fileId: number) => {
+    if (!model) return
+    setDefaultFileId(fileId)
+    localStorage.setItem(`model-${model.id}-default-file`, fileId.toString())
+    if (onDefaultFileChange) {
+      onDefaultFileChange(fileId)
+    }
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -157,6 +174,9 @@ function ModelVersionWindow({
                         {file.isRenderable && (
                           <span className="renderable-badge">Renderable</span>
                         )}
+                        {file.isRenderable && file.id === defaultFileId && (
+                          <span className="default-file-badge">Default Preview</span>
+                        )}
                       </div>
                     </div>
                     <div className="file-actions">
@@ -173,6 +193,15 @@ function ModelVersionWindow({
                           size="small"
                           severity="success"
                           onClick={() => handleOpenInBlender(file.id, file.originalFileName)}
+                        />
+                      )}
+                      {file.isRenderable && file.id !== defaultFileId && (
+                        <Button
+                          label="Set as Default"
+                          icon="pi pi-star"
+                          size="small"
+                          outlined
+                          onClick={() => handleSetDefaultFile(file.id)}
                         />
                       )}
                     </div>

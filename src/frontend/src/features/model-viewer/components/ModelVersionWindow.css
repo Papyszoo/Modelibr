@@ -154,3 +154,70 @@
   flex: 1;
   min-width: 120px;
 }
+
+.default-file-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .version-list h4,
+  .version-files-section h4 {
+    color: rgba(255, 255, 255, 0.87);
+  }
+
+  .version-item {
+    background: #2a2a2a;
+    border-color: #404040;
+  }
+
+  .version-item:hover {
+    border-color: #525252;
+    background: #333333;
+  }
+
+  .version-item.selected {
+    border-color: #3b82f6;
+    background: #1e3a5f;
+  }
+
+  .version-number {
+    color: rgba(255, 255, 255, 0.87);
+  }
+
+  .version-description {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .version-date {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .version-files-section {
+    border-top-color: #404040;
+  }
+
+  .file-card {
+    background: #2a2a2a;
+    border-color: #404040;
+  }
+
+  .file-name {
+    color: rgba(255, 255, 255, 0.87);
+  }
+
+  .file-type-badge {
+    background: #404040;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .file-size {
+    color: rgba(255, 255, 255, 0.6);
+  }
+}
