@@ -1,0 +1,156 @@
+.version-window-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.version-list h4 {
+  margin: 0 0 0.75rem 0;
+  color: #1e293b;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.version-item {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.version-item:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.version-item.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.version-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.version-number {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.latest-badge {
+  background: #22c55e;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.version-description {
+  font-size: 0.875rem;
+  color: #475569;
+  margin-bottom: 0.25rem;
+  font-style: italic;
+}
+
+.version-date {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.version-files-section {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
+
+.version-files-section h4 {
+  margin: 0 0 0.75rem 0;
+  color: #1e293b;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.file-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.file-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.file-name {
+  font-weight: 500;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.file-meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.file-type-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.file-size {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.renderable-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #22c55e;
+  color: white;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.file-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.file-actions button {
+  flex: 1;
+  min-width: 120px;
+}

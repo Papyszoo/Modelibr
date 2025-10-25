@@ -8,6 +8,7 @@ import ModelHierarchyWindow from './ModelHierarchyWindow'
 import ViewerSettingsWindow from './ViewerSettingsWindow'
 import UVMapWindow from './UVMapWindow'
 import TextureSetSelectorWindow from './TextureSetSelectorWindow'
+import ModelVersionWindow from './ModelVersionWindow'
 import { FileUploadModal } from './FileUploadModal'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
@@ -43,6 +44,8 @@ function ModelViewer({
   const [uvMapWindowVisible, setUvMapWindowVisible] = useState<boolean>(false)
   const [textureSetWindowVisible, setTextureSetWindowVisible] =
     useState<boolean>(false)
+  const [versionWindowVisible, setVersionWindowVisible] =
+    useState<boolean>(false)
   const [selectedTextureSetId, setSelectedTextureSetId] = useState<
     number | null
   >(null)
@@ -61,6 +64,8 @@ function ModelViewer({
   const [uploadModalVisible, setUploadModalVisible] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
+  const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
+  const [versionModel, setVersionModel] = useState<Model | null>(null)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
 
@@ -164,6 +169,30 @@ function ModelViewer({
   const handleTextureSetSelect = (textureSetId: number | null) => {
     setSelectedTextureSetId(textureSetId)
     setHasUserSelectedTexture(true)
+  }
+
+  const handleVersionSelect = (version: ModelVersionDto) => {
+    setSelectedVersion(version)
+    // Create a temporary model with the version's files for preview
+    if (model) {
+      const versionModelData: Model = {
+        ...model,
+        files: version.files.map(f => ({
+          id: f.id.toString(),
+          originalFileName: f.originalFileName,
+          storedFileName: f.originalFileName,
+          filePath: '',
+          mimeType: f.mimeType,
+          sizeBytes: f.sizeBytes,
+          sha256Hash: '',
+          fileType: f.fileType,
+          isRenderable: f.isRenderable,
+          createdAt: version.createdAt,
+          updatedAt: version.createdAt,
+        }))
+      }
+      setVersionModel(versionModelData)
+    }
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -336,6 +365,15 @@ function ModelViewer({
               }}
             />
             <Button
+              icon="pi pi-history"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() => setVersionWindowVisible(!versionWindowVisible)}
+              tooltip="Model Versions"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
+            <Button
               icon="pi pi-sitemap"
               className="p-button-rounded viewer-control-btn"
               onClick={() => setHierarchyWindowVisible(!hierarchyWindowVisible)}
@@ -375,7 +413,7 @@ function ModelViewer({
           ) : (
             <>
               <Canvas
-                key={`canvas-${model.id}-${side}`}
+                key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}`}
                 shadows
                 className="viewer-canvas"
                 gl={{
@@ -386,8 +424,8 @@ function ModelViewer({
                 dpr={Math.min(window.devicePixelRatio, 2)}
               >
                 <ModelPreviewScene
-                  key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}`}
-                  model={model}
+                  key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}`}
+                  model={versionModel || model}
                   settings={viewerSettings}
                   textureSet={selectedTextureSet}
                 />
@@ -442,6 +480,13 @@ function ModelViewer({
           onClose={() => setUvMapWindowVisible(false)}
           side={side}
           model={model}
+        />
+        <ModelVersionWindow
+          visible={versionWindowVisible}
+          onClose={() => setVersionWindowVisible(false)}
+          side={side}
+          model={model}
+          onVersionSelect={handleVersionSelect}
         />
       </ModelProvider>
 
