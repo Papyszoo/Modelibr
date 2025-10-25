@@ -220,4 +220,38 @@
   .file-size {
     color: rgba(255, 255, 255, 0.6);
   }
+
+  /* Fix PrimeReact button visibility in dark mode */
+  .file-actions .p-button {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+  }
+
+  .file-actions .p-button:hover {
+    background-color: #2563eb;
+    border-color: #2563eb;
+  }
+
+  .file-actions .p-button-outlined {
+    background-color: transparent;
+    border-color: #3b82f6;
+    color: #3b82f6;
+  }
+
+  .file-actions .p-button-outlined:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: #2563eb;
+    color: #2563eb;
+  }
+
+  .file-actions .p-button-success {
+    background-color: #22c55e;
+    border-color: #22c55e;
+  }
+
+  .file-actions .p-button-success:hover {
+    background-color: #16a34a;
+    border-color: #16a34a;
+  }
 }
