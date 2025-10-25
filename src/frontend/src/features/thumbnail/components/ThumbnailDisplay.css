@@ -43,7 +43,7 @@
   width: 24px;
   height: 24px;
   border: 2px solid var(--surface-border);
-  border-top: 2px solid #3182ce;
+  border-top: 2px solid var(--primary-color);
   border-radius: 50%;
   animation: thumbnail-spin 1s linear infinite;
 }

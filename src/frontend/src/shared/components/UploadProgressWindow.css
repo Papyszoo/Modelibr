@@ -122,21 +122,21 @@
 }
 
 .upload-item-completed {
-  background: #f0fdf4;
-  color: #166534;
+  background: var(--green-50);
+  color: var(--green-800);
 }
 
 .upload-item-completed:hover {
-  background: #dcfce7;
+  background: var(--green-100);
 }
 
 .upload-item-error {
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--red-50);
+  color: var(--red-800);
 }
 
 .upload-item-error:hover {
-  background: #fee2e2;
+  background: var(--red-100);
 }
 
 .upload-item-icons {
@@ -172,11 +172,11 @@
 }
 
 .upload-item-completed .upload-item-ext-icon {
-  color: #10b981;
+  color: var(--green-500);
 }
 
 .upload-item-error .upload-item-ext-icon {
-  color: #ef4444;
+  color: var(--red-500);
 }
 
 .upload-item-details {
@@ -219,7 +219,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #dc2626;
+  color: var(--red-600);
   font-size: 0.75rem;
 }
 
