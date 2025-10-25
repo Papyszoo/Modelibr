@@ -25,6 +25,9 @@ public static class ModelVersionEndpoints
 
         app.MapGet("/models/{modelId}/versions/{versionId}/files/{fileId}", GetVersionFile)
             .WithName("Get Version File");
+
+        app.MapPut("/models/{modelId}/versions/reorder", ReorderModelVersions)
+            .WithName("Reorder Model Versions");
     }
 
     private static async Task<IResult> CreateModelVersion(
@@ -129,4 +132,28 @@ public static class ModelVersionEndpoints
         var fileStream = System.IO.File.OpenRead(result.Value.FilePath);
         return Results.File(fileStream, result.Value.MimeType, result.Value.OriginalFileName, enableRangeProcessing: true);
     }
+
+    private static async Task<IResult> ReorderModelVersions(
+        int modelId,
+        [FromBody] ReorderVersionsRequest request,
+        ICommandHandler<ReorderModelVersionsCommand, ReorderModelVersionsResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (request.VersionIds == null || request.VersionIds.Count == 0)
+        {
+            return Results.BadRequest(new { error = "InvalidRequest", message = "Version IDs list cannot be empty." });
+        }
+
+        var command = new ReorderModelVersionsCommand(modelId, request.VersionIds);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    public record ReorderVersionsRequest(List<int> VersionIds);
 }

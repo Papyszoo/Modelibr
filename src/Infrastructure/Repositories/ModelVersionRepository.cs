@@ -38,7 +38,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Include(v => v.Files)
             .Where(v => v.ModelId == modelId)
-            .OrderBy(v => v.VersionNumber)
+            .OrderBy(v => v.DisplayOrder)
             .ToListAsync(cancellationToken);
     }
 

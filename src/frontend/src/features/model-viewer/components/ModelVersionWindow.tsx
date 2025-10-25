@@ -28,6 +28,7 @@ function ModelVersionWindow({
   const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
   const [loading, setLoading] = useState(false)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
+  const [draggedVersionId, setDraggedVersionId] = useState<number | null>(null)
 
   // Load default file preference from localStorage
   useEffect(() => {
@@ -52,12 +53,25 @@ function ModelVersionWindow({
       setLoading(true)
       const data = await ApiClient.getModelVersions(parseInt(model.id))
       setVersions(data)
-      // Select the latest version by default
+      // Select the first version in the list (ordered by DisplayOrder)
       if (data.length > 0) {
-        const latestVersion = data[data.length - 1]
-        setSelectedVersion(latestVersion)
+        const firstVersion = data[0]
+        setSelectedVersion(firstVersion)
         if (onVersionSelect) {
-          onVersionSelect(latestVersion)
+          onVersionSelect(firstVersion)
+        }
+
+        // Auto-set first renderable file as default if no default is set
+        const stored = localStorage.getItem(`model-${model.id}-default-file`)
+        if (!stored && firstVersion.files.length > 0) {
+          const firstRenderableFile = firstVersion.files.find(f => f.isRenderable)
+          if (firstRenderableFile) {
+            setDefaultFileId(firstRenderableFile.id)
+            localStorage.setItem(`model-${model.id}-default-file`, firstRenderableFile.id.toString())
+            if (onDefaultFileChange) {
+              onDefaultFileChange(firstRenderableFile.id)
+            }
+          }
         }
       }
     } catch (error) {
@@ -105,6 +119,49 @@ function ModelVersionWindow({
     }
   }
 
+  const handleDragStart = (versionId: number) => {
+    setDraggedVersionId(versionId)
+  }
+
+  const handleDragOver = (e: React.DragEvent, targetVersionId: number) => {
+    e.preventDefault()
+    if (!draggedVersionId || draggedVersionId === targetVersionId) return
+
+    const draggedIndex = versions.findIndex(v => v.id === draggedVersionId)
+    const targetIndex = versions.findIndex(v => v.id === targetVersionId)
+    
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    const newVersions = [...versions]
+    const [draggedVersion] = newVersions.splice(draggedIndex, 1)
+    newVersions.splice(targetIndex, 0, draggedVersion)
+    
+    setVersions(newVersions)
+  }
+
+  const handleDragEnd = async () => {
+    if (!model || !draggedVersionId) {
+      setDraggedVersionId(null)
+      return
+    }
+
+    try {
+      // Send new order to backend
+      const versionIds = versions.map(v => v.id)
+      await ApiClient.reorderModelVersions(parseInt(model.id), versionIds)
+    } catch (error) {
+      console.error('Failed to reorder versions:', error)
+      // Reload versions to restore correct order
+      await loadVersions()
+    }
+
+    setDraggedVersionId(null)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -142,8 +199,13 @@ function ModelVersionWindow({
             {versions.map((version) => (
               <div
                 key={version.id}
-                className={`version-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
+                className={`version-item ${selectedVersion?.id === version.id ? 'selected' : ''} ${draggedVersionId === version.id ? 'dragging' : ''}`}
                 onClick={() => handleVersionSelect(version)}
+                draggable
+                onDragStart={() => handleDragStart(version.id)}
+                onDragOver={(e) => handleDragOver(e, version.id)}
+                onDragEnd={handleDragEnd}
+                onDrop={handleDrop}
               >
                 <div className="version-header">
                   <span className="version-number">Version {version.versionNumber}</span>
