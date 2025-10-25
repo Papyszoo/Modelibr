@@ -59,6 +59,19 @@ function ModelVersionWindow({
         if (onVersionSelect) {
           onVersionSelect(latestVersion)
         }
+
+        // Auto-set first renderable file as default if no default is set
+        const stored = localStorage.getItem(`model-${model.id}-default-file`)
+        if (!stored && latestVersion.files.length > 0) {
+          const firstRenderableFile = latestVersion.files.find(f => f.isRenderable)
+          if (firstRenderableFile) {
+            setDefaultFileId(firstRenderableFile.id)
+            localStorage.setItem(`model-${model.id}-default-file`, firstRenderableFile.id.toString())
+            if (onDefaultFileChange) {
+              onDefaultFileChange(firstRenderableFile.id)
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load versions:', error)
