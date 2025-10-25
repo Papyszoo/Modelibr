@@ -16,6 +16,7 @@ public class File
     public string Sha256Hash { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    public bool Deleted { get; private set; } = false;
     
     // Navigation property for many-to-many relationship - EF Core requires this to be settable
     public ICollection<Model> Models 
@@ -57,7 +58,8 @@ public class File
             SizeBytes = sizeBytes,
             Sha256Hash = sha256Hash.ToLowerInvariant(),
             CreatedAt = createdAt,
-            UpdatedAt = createdAt
+            UpdatedAt = createdAt,
+            Deleted = false
         };
     }
 
@@ -65,6 +67,18 @@ public class File
     {
         ValidateSizeBytes(sizeBytes);
         SizeBytes = sizeBytes;
+        UpdatedAt = updatedAt;
+    }
+
+    public void MarkAsDeleted(DateTime updatedAt)
+    {
+        Deleted = true;
+        UpdatedAt = updatedAt;
+    }
+
+    public void Restore(DateTime updatedAt)
+    {
+        Deleted = false;
         UpdatedAt = updatedAt;
     }
 

@@ -9,6 +9,7 @@ public class RecycledFileDomainTests
     public void Create_WithValidData_ReturnsRecycledFile()
     {
         // Arrange
+        var fileId = 1;
         var originalFileName = "test.obj";
         var storedFileName = "stored_hash.obj";
         var filePath = "/path/to/file";
@@ -20,6 +21,7 @@ public class RecycledFileDomainTests
 
         // Act
         var recycledFile = RecycledFile.Create(
+            fileId,
             originalFileName,
             storedFileName,
             filePath,
@@ -31,6 +33,7 @@ public class RecycledFileDomainTests
         );
 
         // Assert
+        Assert.Equal(fileId, recycledFile.FileId);
         Assert.Equal(originalFileName, recycledFile.OriginalFileName);
         Assert.Equal(storedFileName, recycledFile.StoredFileName);
         Assert.Equal(filePath, recycledFile.FilePath);
@@ -45,6 +48,7 @@ public class RecycledFileDomainTests
     public void Create_WithoutScheduledDeletionAt_ReturnsRecycledFile()
     {
         // Arrange
+        var fileId = 1;
         var originalFileName = "test.obj";
         var storedFileName = "stored_hash.obj";
         var filePath = "/path/to/file";
@@ -55,6 +59,7 @@ public class RecycledFileDomainTests
 
         // Act
         var recycledFile = RecycledFile.Create(
+            fileId,
             originalFileName,
             storedFileName,
             filePath,
@@ -81,6 +86,7 @@ public class RecycledFileDomainTests
     public void Create_WithInvalidOriginalFileName_ThrowsArgumentException(string originalFileName)
     {
         // Arrange
+        var fileId = 1;
         var storedFileName = "stored_hash.obj";
         var filePath = "/path/to/file";
         var sha256Hash = "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890";
@@ -90,6 +96,7 @@ public class RecycledFileDomainTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RecycledFile.Create(
+            fileId,
             originalFileName,
             storedFileName,
             filePath,
@@ -106,6 +113,7 @@ public class RecycledFileDomainTests
     public void Create_WithInvalidReason_ThrowsArgumentException(string reason)
     {
         // Arrange
+        var fileId = 1;
         var originalFileName = "test.obj";
         var storedFileName = "stored_hash.obj";
         var filePath = "/path/to/file";
@@ -115,6 +123,7 @@ public class RecycledFileDomainTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RecycledFile.Create(
+            fileId,
             originalFileName,
             storedFileName,
             filePath,
@@ -129,6 +138,7 @@ public class RecycledFileDomainTests
     public void Create_WithInvalidHash_ThrowsArgumentException()
     {
         // Arrange
+        var fileId = 1;
         var originalFileName = "test.obj";
         var storedFileName = "stored_hash.obj";
         var filePath = "/path/to/file";
@@ -139,6 +149,7 @@ public class RecycledFileDomainTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RecycledFile.Create(
+            fileId,
             originalFileName,
             storedFileName,
             filePath,
@@ -153,6 +164,7 @@ public class RecycledFileDomainTests
     public void Create_WithNegativeSizeBytes_ThrowsArgumentException()
     {
         // Arrange
+        var fileId = 1;
         var originalFileName = "test.obj";
         var storedFileName = "stored_hash.obj";
         var filePath = "/path/to/file";
@@ -163,6 +175,7 @@ public class RecycledFileDomainTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RecycledFile.Create(
+            fileId,
             originalFileName,
             storedFileName,
             filePath,

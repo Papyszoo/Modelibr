@@ -43,6 +43,7 @@ namespace Infrastructure
             services.AddScoped<IRecycledFileRepository, RecycledFileRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+            services.AddScoped<IFileRecyclingService, FileRecyclingService>();
 
             return services;
         }

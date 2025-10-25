@@ -329,6 +329,7 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<RecycledFile>(entity =>
             {
                 entity.HasKey(rf => rf.Id);
+                entity.Property(rf => rf.FileId).IsRequired();
                 entity.Property(rf => rf.OriginalFileName).IsRequired().HasMaxLength(255);
                 entity.Property(rf => rf.StoredFileName).IsRequired().HasMaxLength(255);
                 entity.Property(rf => rf.FilePath).IsRequired().HasMaxLength(500);
@@ -337,6 +338,9 @@ namespace Infrastructure.Persistence
                 entity.Property(rf => rf.Reason).IsRequired().HasMaxLength(500);
                 entity.Property(rf => rf.RecycledAt).IsRequired();
                 entity.Property(rf => rf.ScheduledDeletionAt);
+
+                // Create index for efficient querying by FileId
+                entity.HasIndex(rf => rf.FileId);
 
                 // Create index for efficient querying by scheduled deletion date
                 entity.HasIndex(rf => rf.ScheduledDeletionAt);
