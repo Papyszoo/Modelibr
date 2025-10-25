@@ -207,6 +207,7 @@ export interface ModelVersionDto {
   versionNumber: number
   description?: string
   createdAt: string
+  displayOrder: number
   files: VersionFileDto[]
 }
 

@@ -997,6 +997,19 @@ class ApiClient {
   ): string {
     return `${this.baseURL}/models/${modelId}/versions/${versionId}/files/${fileId}`
   }
+
+  async reorderModelVersions(
+    modelId: number,
+    versionIds: number[]
+  ): Promise<void> {
+    await this.client.put(`/models/${modelId}/versions/reorder`, {
+      versionIds,
+    })
+
+    // Invalidate model cache when versions are reordered
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+  }
 }
 
 export default new ApiClient()

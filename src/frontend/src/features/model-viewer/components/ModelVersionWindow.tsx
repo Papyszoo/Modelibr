@@ -28,6 +28,7 @@ function ModelVersionWindow({
   const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
   const [loading, setLoading] = useState(false)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
+  const [draggedVersionId, setDraggedVersionId] = useState<number | null>(null)
 
   // Load default file preference from localStorage
   useEffect(() => {
@@ -118,6 +119,49 @@ function ModelVersionWindow({
     }
   }
 
+  const handleDragStart = (versionId: number) => {
+    setDraggedVersionId(versionId)
+  }
+
+  const handleDragOver = (e: React.DragEvent, targetVersionId: number) => {
+    e.preventDefault()
+    if (!draggedVersionId || draggedVersionId === targetVersionId) return
+
+    const draggedIndex = versions.findIndex(v => v.id === draggedVersionId)
+    const targetIndex = versions.findIndex(v => v.id === targetVersionId)
+    
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    const newVersions = [...versions]
+    const [draggedVersion] = newVersions.splice(draggedIndex, 1)
+    newVersions.splice(targetIndex, 0, draggedVersion)
+    
+    setVersions(newVersions)
+  }
+
+  const handleDragEnd = async () => {
+    if (!model || !draggedVersionId) {
+      setDraggedVersionId(null)
+      return
+    }
+
+    try {
+      // Send new order to backend
+      const versionIds = versions.map(v => v.id)
+      await ApiClient.reorderModelVersions(parseInt(model.id), versionIds)
+    } catch (error) {
+      console.error('Failed to reorder versions:', error)
+      // Reload versions to restore correct order
+      await loadVersions()
+    }
+
+    setDraggedVersionId(null)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -155,8 +199,13 @@ function ModelVersionWindow({
             {versions.map((version) => (
               <div
                 key={version.id}
-                className={`version-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
+                className={`version-item ${selectedVersion?.id === version.id ? 'selected' : ''} ${draggedVersionId === version.id ? 'dragging' : ''}`}
                 onClick={() => handleVersionSelect(version)}
+                draggable
+                onDragStart={() => handleDragStart(version.id)}
+                onDragOver={(e) => handleDragOver(e, version.id)}
+                onDragEnd={handleDragEnd}
+                onDrop={handleDrop}
               >
                 <div className="version-header">
                   <span className="version-number">Version {version.versionNumber}</span>

@@ -9,6 +9,7 @@ public class ModelVersion
     public int VersionNumber { get; private set; }
     public string? Description { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public int DisplayOrder { get; private set; }
     
     // Navigation properties
     public Model Model { get; set; } = null!;
@@ -33,13 +34,22 @@ public class ModelVersion
             ModelId = modelId,
             VersionNumber = versionNumber,
             Description = description?.Trim(),
-            CreatedAt = createdAt
+            CreatedAt = createdAt,
+            DisplayOrder = versionNumber // Initialize DisplayOrder to match VersionNumber
         };
     }
 
     public void UpdateDescription(string? description)
     {
         Description = description?.Trim();
+    }
+
+    public void UpdateDisplayOrder(int displayOrder)
+    {
+        if (displayOrder < 0)
+            throw new ArgumentException("Display order cannot be negative.", nameof(displayOrder));
+        
+        DisplayOrder = displayOrder;
     }
 
     public void AddFile(File file)
