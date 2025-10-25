@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Storage;
 using SharedKernel;
 
 namespace Application.Models;
@@ -8,13 +9,16 @@ internal class GetVersionFileQueryHandler : IQueryHandler<GetVersionFileQuery, G
 {
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IUploadPathProvider _pathProvider;
 
     public GetVersionFileQueryHandler(
         IModelVersionRepository versionRepository,
-        IFileRepository fileRepository)
+        IFileRepository fileRepository,
+        IUploadPathProvider pathProvider)
     {
         _versionRepository = versionRepository;
         _fileRepository = fileRepository;
+        _pathProvider = pathProvider;
     }
 
     public async Task<Result<GetVersionFileResponse>> Handle(
@@ -38,8 +42,11 @@ internal class GetVersionFileQueryHandler : IQueryHandler<GetVersionFileQuery, G
                 new Error("FileNotFound", $"File with ID {query.FileId} not found in version {query.VersionId}."));
         }
 
+        // Construct full path from relative path
+        var fullPath = Path.Combine(_pathProvider.UploadRootPath, file.FilePath);
+
         return Result.Success(new GetVersionFileResponse(
-            file.FilePath,
+            fullPath,
             file.OriginalFileName,
             file.MimeType));
     }
