@@ -34,11 +34,23 @@ internal class ReorderModelVersionsCommandHandler : ICommandHandler<ReorderModel
                 new Error("InvalidVersionIds", "One or more version IDs are invalid."));
         }
 
+        // Validate that all existing versions are included in the reorder list
+        if (command.VersionIds.Count != versions.Count)
+        {
+            return Result.Failure<ReorderModelVersionsResponse>(
+                new Error("IncompleteReorder", "All versions must be included in the reorder list."));
+        }
+
         // Update display order for each version
         for (int i = 0; i < command.VersionIds.Count; i++)
         {
             var version = versions.First(v => v.Id == command.VersionIds[i]);
             version.UpdateDisplayOrder(i);
+        }
+
+        // Save all changes in a single transaction
+        foreach (var version in versions)
+        {
             await _versionRepository.UpdateAsync(version, cancellationToken);
         }
 
