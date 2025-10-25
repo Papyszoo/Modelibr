@@ -20,7 +20,7 @@ export const config = {
     outputWidth: parseInt(process.env.RENDER_WIDTH) || 256,
     outputHeight: parseInt(process.env.RENDER_HEIGHT) || 256,
     outputFormat: process.env.RENDER_FORMAT || 'png',
-    backgroundColor: process.env.RENDER_BACKGROUND || '#f0f0f0',
+    backgroundColor: process.env.RENDER_BACKGROUND || 'transparent',
     cameraDistance: parseFloat(process.env.CAMERA_DISTANCE) || 5,
     enableAntialiasing: process.env.ENABLE_ANTIALIASING !== 'false',
   },
