@@ -31,12 +31,30 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         CreateModelVersionCommand command,
         CancellationToken cancellationToken)
     {
-        // Get the model
+        // Get the model with versions included
         var model = await _modelRepository.GetByIdAsync(command.ModelId, cancellationToken);
         if (model == null)
         {
             return Result.Failure<CreateModelVersionResponse>(
                 new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
+        }
+
+        // Check if this is the first version - if so, create version 1 with existing files
+        if (model.Versions.Count == 0 && model.Files.Any())
+        {
+            // Create version 1 with existing model files
+            var version1 = model.CreateVersion("Initial version (existing model)", _dateTimeProvider.UtcNow);
+            
+            // Add all existing model files to version 1
+            foreach (var existingFile in model.Files)
+            {
+                version1.AddFile(existingFile);
+                existingFile.SetModelVersion(version1.Id);
+            }
+            
+            // Save version 1
+            await _versionRepository.AddAsync(version1, cancellationToken);
+            await _modelRepository.UpdateAsync(model, cancellationToken);
         }
 
         // Validate file type - allow both renderable models and project files like .blend
@@ -61,7 +79,7 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
 
         var fileEntity = fileResult.Value;
 
-        // Create new version
+        // Create new version (this will be version 2 or higher now)
         var version = model.CreateVersion(command.Description, _dateTimeProvider.UtcNow);
         version.AddFile(fileEntity);
 

@@ -60,6 +60,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
+            .Include(m => m.Versions)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
@@ -72,6 +73,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
+            .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
@@ -84,6 +86,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
+            .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Files.Any(f => f.Sha256Hash == sha256Hash), cancellationToken);
     }
