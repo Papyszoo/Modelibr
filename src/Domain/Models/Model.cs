@@ -16,6 +16,7 @@ namespace Domain.Models
         public string? Tags { get; private set; }
         public string? Description { get; private set; }
         public int? DefaultTextureSetId { get; private set; }
+        public bool Deleted { get; private set; } = false;
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
         public ICollection<File> Files 
@@ -80,7 +81,8 @@ namespace Domain.Models
             {
                 Name = name.Trim(),
                 CreatedAt = createdAt,
-                UpdatedAt = createdAt
+                UpdatedAt = createdAt,
+                Deleted = false
             };
         }
 
@@ -223,6 +225,26 @@ namespace Domain.Models
         {
             Tags = tags;
             Description = description;
+            UpdatedAt = updatedAt;
+        }
+
+        /// <summary>
+        /// Marks this model as deleted (soft delete).
+        /// </summary>
+        /// <param name="updatedAt">When the model was marked as deleted</param>
+        public void MarkAsDeleted(DateTime updatedAt)
+        {
+            Deleted = true;
+            UpdatedAt = updatedAt;
+        }
+
+        /// <summary>
+        /// Restores this model from deleted state.
+        /// </summary>
+        /// <param name="updatedAt">When the model was restored</param>
+        public void Restore(DateTime updatedAt)
+        {
+            Deleted = false;
             UpdatedAt = updatedAt;
         }
     }

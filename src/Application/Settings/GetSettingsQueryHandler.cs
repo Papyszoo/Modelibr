@@ -48,6 +48,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
                     int.Parse(thumbnailWidthSetting?.Value ?? "256"),
                     int.Parse(thumbnailHeightSetting?.Value ?? "256"),
                     bool.Parse(generateThumbnailOnUploadSetting?.Value ?? "true"),
+                    30, // Default for CleanRecycledFilesAfterDays
                     maxFileSizeBytesSetting.CreatedAt,
                     maxFileSizeBytesSetting.UpdatedAt
                 );
@@ -67,6 +68,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             settings.ThumbnailWidth,
             settings.ThumbnailHeight,
             settings.GenerateThumbnailOnUpload,
+            settings.CleanRecycledFilesAfterDays,
             settings.CreatedAt,
             settings.UpdatedAt
         );

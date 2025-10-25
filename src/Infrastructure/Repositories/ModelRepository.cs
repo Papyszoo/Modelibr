@@ -33,7 +33,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(m => m.Id == modelId, cancellationToken);
+            .FirstOrDefaultAsync(m => m.Id == modelId && !m.Deleted, cancellationToken);
         
         if (model == null)
         {
@@ -60,11 +60,24 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
+            .Where(m => !m.Deleted)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
 
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Models
+            .Include(m => m.Files)
+            .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
+            .Include(m => m.Projects)
+            .Include(m => m.Thumbnail)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(m => m.Id == id && !m.Deleted, cancellationToken);
+    }
+
+    public async Task<Model?> GetByIdIncludingDeletedAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models
             .Include(m => m.Files)
@@ -85,12 +98,22 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(m => m.Files.Any(f => f.Sha256Hash == sha256Hash), cancellationToken);
+            .FirstOrDefaultAsync(m => m.Files.Any(f => f.Sha256Hash == sha256Hash) && !m.Deleted, cancellationToken);
     }
 
     public async Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
     {
         _context.Models.Update(model);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var model = await _context.Models.FindAsync(new object[] { id }, cancellationToken);
+        if (model != null)
+        {
+            _context.Models.Remove(model);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }
