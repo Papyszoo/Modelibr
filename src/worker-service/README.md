@@ -40,7 +40,7 @@ The service is configured via environment variables. See `.env.example` for all 
 - `RENDER_WIDTH`: Output image width in pixels (default: `256`)
 - `RENDER_HEIGHT`: Output image height in pixels (default: `256`)
 - `RENDER_FORMAT`: Output format: png, jpg, jpeg, webp (default: `png`)
-- `RENDER_BACKGROUND`: Background color (default: `#f0f0f0`)
+- `RENDER_BACKGROUND`: Background color or 'transparent' for transparent background (default: `transparent`)
 - `CAMERA_DISTANCE`: Camera distance from model (default: `5`)
 - `ENABLE_ANTIALIASING`: Enable antialiasing (default: `true`)
 
