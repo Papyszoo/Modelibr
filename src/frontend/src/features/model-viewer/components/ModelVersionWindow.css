@@ -37,6 +37,15 @@
   box-shadow: 0 0 0 1px #3b82f6;
 }
 
+.version-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.version-item[draggable='true'] {
+  cursor: grab;
+}
+
 .version-header {
   display: flex;
   justify-content: space-between;

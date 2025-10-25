@@ -26,6 +26,7 @@ internal class GetModelVersionsQueryHandler : IQueryHandler<GetModelVersionsQuer
             VersionNumber = v.VersionNumber,
             Description = v.Description,
             CreatedAt = v.CreatedAt,
+            DisplayOrder = v.DisplayOrder,
             Files = v.Files.Select(f => new VersionFileDto
             {
                 Id = f.Id,
@@ -52,6 +53,7 @@ public class ModelVersionDto
     public int VersionNumber { get; set; }
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int DisplayOrder { get; set; }
     public List<VersionFileDto> Files { get; set; } = new();
 }
 
