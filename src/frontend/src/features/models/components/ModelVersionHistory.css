@@ -214,3 +214,27 @@
   font-size: 11px;
   font-weight: 500;
 }
+
+/* Dark mode styles - ensure buttons are visible */
+@media (prefers-color-scheme: dark) {
+  .action-button {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+
+  .action-button:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+  }
+
+  .blender-button {
+    background: #22c55e;
+    border-color: #22c55e;
+  }
+
+  .blender-button:hover {
+    background: #16a34a;
+    border-color: #16a34a;
+  }
+}
