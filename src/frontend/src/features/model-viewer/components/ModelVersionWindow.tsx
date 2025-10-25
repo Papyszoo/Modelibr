@@ -53,18 +53,18 @@ function ModelVersionWindow({
       setLoading(true)
       const data = await ApiClient.getModelVersions(parseInt(model.id))
       setVersions(data)
-      // Select the latest version by default
+      // Select the first version in the list (ordered by DisplayOrder)
       if (data.length > 0) {
-        const latestVersion = data[data.length - 1]
-        setSelectedVersion(latestVersion)
+        const firstVersion = data[0]
+        setSelectedVersion(firstVersion)
         if (onVersionSelect) {
-          onVersionSelect(latestVersion)
+          onVersionSelect(firstVersion)
         }
 
         // Auto-set first renderable file as default if no default is set
         const stored = localStorage.getItem(`model-${model.id}-default-file`)
-        if (!stored && latestVersion.files.length > 0) {
-          const firstRenderableFile = latestVersion.files.find(f => f.isRenderable)
+        if (!stored && firstVersion.files.length > 0) {
+          const firstRenderableFile = firstVersion.files.find(f => f.isRenderable)
           if (firstRenderableFile) {
             setDefaultFileId(firstRenderableFile.id)
             localStorage.setItem(`model-${model.id}-default-file`, firstRenderableFile.id.toString())
