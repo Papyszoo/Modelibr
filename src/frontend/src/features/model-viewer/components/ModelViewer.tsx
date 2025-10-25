@@ -8,10 +8,11 @@ import ModelHierarchyWindow from './ModelHierarchyWindow'
 import ViewerSettingsWindow from './ViewerSettingsWindow'
 import UVMapWindow from './UVMapWindow'
 import TextureSetSelectorWindow from './TextureSetSelectorWindow'
+import { FileUploadModal } from './FileUploadModal'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
 import { getModelFileFormat, Model } from '../../../utils/fileUtils'
-import { TextureSetDto } from '../../../types'
+import { TextureSetDto, ModelVersionDto } from '../../../types'
 // eslint-disable-next-line no-restricted-imports -- ModelViewer needs direct API access for fetching model data
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
@@ -56,6 +57,10 @@ function ModelViewer({
     showShadows: true,
     showStats: false,
   })
+  const [dragOver, setDragOver] = useState(false)
+  const [uploadModalVisible, setUploadModalVisible] = useState(false)
+  const [droppedFile, setDroppedFile] = useState<File | null>(null)
+  const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
 
@@ -67,6 +72,23 @@ function ModelViewer({
       fetchModel(modelId)
     }
   }, [propModel, modelId])
+
+  // Load versions when model is loaded
+  useEffect(() => {
+    if (model?.id) {
+      loadVersions()
+    }
+  }, [model?.id])
+
+  const loadVersions = async () => {
+    if (!model?.id) return
+    try {
+      const data = await ApiClient.getModelVersions(parseInt(model.id))
+      setVersions(data)
+    } catch (error) {
+      console.error('Failed to load versions:', error)
+    }
+  }
 
   // Set initial selected texture set to default if available
   // Only auto-select if user hasn't made a manual selection yet
@@ -144,6 +166,77 @@ function ModelViewer({
     setHasUserSelectedTexture(true)
   }
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      setDroppedFile(file)
+      setUploadModalVisible(true)
+    }
+  }
+
+  const handleFileUpload = async (
+    file: File,
+    action: 'current' | 'new',
+    description?: string,
+    targetVersionNumber?: number
+  ) => {
+    if (!model) return
+
+    try {
+      if (action === 'new' || versions.length === 0) {
+        // Create new version
+        await ApiClient.createModelVersion(parseInt(model.id), file, description)
+      } else {
+        // Add to current version - for now we'll create a new version
+        // In a real implementation, you'd need a backend endpoint to add file to existing version
+        await ApiClient.createModelVersion(
+          parseInt(model.id),
+          file,
+          description || 'Added file to existing version'
+        )
+      }
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Upload Successful',
+        detail: `File "${file.name}" uploaded successfully`,
+        life: 3000,
+      })
+
+      // Reload versions and model
+      await loadVersions()
+      if (modelId) {
+        await fetchModel(modelId)
+      }
+      handleModelUpdated()
+    } catch (error) {
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Upload Failed',
+        detail: error instanceof Error ? error.message : 'Unknown error',
+        life: 5000,
+      })
+      throw error
+    }
+  }
+
   if (loading) {
     return <div className="model-viewer-loading">Loading model...</div>
   }
@@ -157,8 +250,47 @@ function ModelViewer({
   }
 
   return (
-    <div className="model-viewer model-viewer-tab">
+    <div 
+      className="model-viewer model-viewer-tab"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <Toast ref={toast} />
+
+      {dragOver && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(59, 130, 246, 0.1)',
+            border: '3px dashed #3b82f6',
+            borderRadius: '8px',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              background: '#3b82f6',
+              color: 'white',
+              padding: '2rem 3rem',
+              borderRadius: '8px',
+              fontSize: '1.5rem',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            }}
+          >
+            Drop file to upload
+          </div>
+        </div>
+      )}
 
       <header className="viewer-header-tab">
         <h1>Model #{model.id}</h1>
@@ -312,6 +444,19 @@ function ModelViewer({
           model={model}
         />
       </ModelProvider>
+
+      {/* File Upload Modal */}
+      <FileUploadModal
+        visible={uploadModalVisible}
+        onHide={() => {
+          setUploadModalVisible(false)
+          setDroppedFile(null)
+        }}
+        file={droppedFile}
+        modelId={model?.id ? parseInt(model.id) : 0}
+        versions={versions}
+        onUpload={handleFileUpload}
+      />
     </div>
   )
 }
