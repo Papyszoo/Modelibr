@@ -1,7 +1,7 @@
 .texture-card {
   height: 100%;
   min-height: 250px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--surface-border);
   transition: all 0.3s ease;
 }
 
@@ -45,7 +45,7 @@
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
 }
 
 .texture-card-empty {
@@ -60,18 +60,18 @@
 }
 
 .texture-card-empty:hover {
-  background-color: #f9fafb;
+  background-color: var(--surface-hover);
 }
 
 .texture-card-empty .drop-text {
   font-weight: 500;
-  color: #374151;
+  color: var(--text-color);
   margin: 0;
 }
 
 .texture-card-empty .texture-description {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   margin: 0;
   line-height: 1.4;
 }
@@ -192,7 +192,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--surface-border);
 }
 
 .texture-info-row:last-child {
@@ -200,12 +200,12 @@
 }
 
 .texture-info-row strong {
-  color: #374151;
+  color: var(--text-color);
   font-weight: 600;
 }
 
 .texture-info-row span {
-  color: #6b7280;
+  color: var(--text-color-secondary);
   text-align: right;
   word-break: break-word;
   max-width: 60%;
@@ -226,14 +226,14 @@
 
 .texture-filename {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--text-color);
   margin: 0 0 0.25rem 0;
   word-break: break-all;
 }
 
 .texture-date {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   margin: 0;
 }
 
