@@ -11,6 +11,7 @@ interface FileUploadModalProps {
   file: File | null
   modelId: number
   versions: ModelVersionDto[]
+  selectedVersion: ModelVersionDto | null
   onUpload: (file: File, action: 'current' | 'new', description?: string, targetVersionNumber?: number) => Promise<void>
 }
 
@@ -20,6 +21,7 @@ export function FileUploadModal({
   file,
   modelId,
   versions,
+  selectedVersion,
   onUpload,
 }: FileUploadModalProps) {
   const [uploadAction, setUploadAction] = useState<'current' | 'new'>('current')
@@ -86,7 +88,7 @@ export function FileUploadModal({
               checked={uploadAction === 'current'}
             />
             <label htmlFor="addToCurrent" style={{ marginLeft: '0.5rem' }}>
-              Add to current version (latest)
+              Add to {selectedVersion ? `Version ${selectedVersion.versionNumber}` : 'current version (latest)'}
             </label>
           </div>
 
@@ -153,7 +155,8 @@ export function FileUploadModal({
             fontSize: '0.875rem',
             color: '#92400e'
           }}>
-            <strong>Note:</strong> File will be added to Version {versions[versions.length - 1].versionNumber} (latest)
+            <strong>Note:</strong> File will be added to Version {selectedVersion?.versionNumber || versions[versions.length - 1].versionNumber}
+            {selectedVersion ? ` (currently selected)` : ` (latest)`}
           </div>
         )}
 

@@ -963,6 +963,33 @@ class ApiClient {
     return response.data
   }
 
+  async addFileToVersion(
+    modelId: number,
+    versionId: number,
+    file: File
+  ): Promise<CreateModelVersionResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const url = `/models/${modelId}/versions/${versionId}/files`
+
+    const response = await this.client.post<CreateModelVersionResponse>(
+      url,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    // Invalidate model cache when file is added to version
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+
+    return response.data
+  }
+
   getVersionFileUrl(
     modelId: number,
     versionId: number,
