@@ -58,7 +58,10 @@ public class ModelPersistenceTests
         // Create a fake batch upload repository for testing
         var batchUploadRepository = new FakeBatchUploadRepository();
         
-        var handler = new AddModelCommandHandler(modelRepository, fileCreationService, dateTimeProvider, domainEventDispatcher, batchUploadRepository);
+        // Create model version repository
+        var versionRepository = new ModelVersionRepository(context);
+        
+        var handler = new AddModelCommandHandler(modelRepository, versionRepository, fileCreationService, dateTimeProvider, domainEventDispatcher, batchUploadRepository);
         
         Assert.NotNull(handler);
     }
