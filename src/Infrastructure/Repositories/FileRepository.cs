@@ -18,6 +18,13 @@ internal sealed class FileRepository : IFileRepository
     {
         return await _context.Files
             .Include(f => f.Models)
+            .FirstOrDefaultAsync(f => f.Id == id && !f.Deleted, cancellationToken);
+    }
+
+    public async Task<Domain.Models.File?> GetByIdIncludingDeletedAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Files
+            .Include(f => f.Models)
             .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
     }
 
@@ -25,13 +32,14 @@ internal sealed class FileRepository : IFileRepository
     {
         return await _context.Files
             .Include(f => f.Models)
-            .FirstOrDefaultAsync(f => f.Sha256Hash == sha256Hash, cancellationToken);
+            .FirstOrDefaultAsync(f => f.Sha256Hash == sha256Hash && !f.Deleted, cancellationToken);
     }
 
     public async Task<IEnumerable<Domain.Models.File>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Files
             .Include(f => f.Models)
+            .Where(f => !f.Deleted)
             .ToListAsync(cancellationToken);
     }
 
@@ -39,7 +47,13 @@ internal sealed class FileRepository : IFileRepository
     {
         return await _context.Files
             .Include(f => f.Models)
-            .Where(f => f.Models.Any(m => m.Id == modelId))
+            .Where(f => f.Models.Any(m => m.Id == modelId) && !f.Deleted)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(Domain.Models.File file, CancellationToken cancellationToken = default)
+    {
+        _context.Files.Update(file);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

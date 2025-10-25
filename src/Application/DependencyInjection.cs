@@ -16,7 +16,6 @@ namespace Application
             services.AddScoped<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped<IFileCreationService, FileCreationService>();
             services.AddScoped<Application.Settings.ISettingsService, Application.Settings.SettingsService>();
-            services.AddScoped<IFileRecyclingService, FileRecyclingService>();
             return services;
         }
 

@@ -3,6 +3,7 @@ namespace Domain.Models;
 public class RecycledFile
 {
     public int Id { get; set; }
+    public int FileId { get; private set; }
     public string OriginalFileName { get; private set; } = string.Empty;
     public string StoredFileName { get; private set; } = string.Empty;
     public string FilePath { get; private set; } = string.Empty;
@@ -15,6 +16,7 @@ public class RecycledFile
     private RecycledFile() { }
 
     public static RecycledFile Create(
+        int fileId,
         string originalFileName,
         string storedFileName,
         string filePath,
@@ -24,6 +26,9 @@ public class RecycledFile
         DateTime recycledAt,
         DateTime? scheduledDeletionAt = null)
     {
+        if (fileId <= 0)
+            throw new ArgumentException("File ID must be greater than 0.", nameof(fileId));
+
         ValidateFileName(originalFileName, nameof(originalFileName));
         ValidateFileName(storedFileName, nameof(storedFileName));
         ValidateFilePath(filePath);
@@ -33,6 +38,7 @@ public class RecycledFile
 
         return new RecycledFile
         {
+            FileId = fileId,
             OriginalFileName = originalFileName.Trim(),
             StoredFileName = storedFileName.Trim(),
             FilePath = filePath.Trim(),
