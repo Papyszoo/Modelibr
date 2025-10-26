@@ -57,22 +57,22 @@
 
 .editor-control-btn {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-  background: white !important;
-  color: #3b82f6 !important;
+  background: var(--surface-card) !important;
+  color: var(--primary-color) !important;
   width: 3rem !important;
   height: 3rem !important;
   border: none !important;
 }
 
 .editor-control-btn:hover {
-  background: #f0f9ff !important;
+  background: var(--surface-hover) !important;
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
 }
 
 .editor-control-btn .pi {
   font-size: 1.25rem !important;
-  color: #3b82f6 !important;
+  color: var(--primary-color) !important;
 }
 
 .editor-control-btn:disabled {
