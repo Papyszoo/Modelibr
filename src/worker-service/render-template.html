@@ -57,9 +57,9 @@
             // Set background to null for transparency
             scene.background = null;
 
-            // Create camera
+            // Create camera with tighter field of view for better framing
             const camera = new THREE.PerspectiveCamera(
-                60, // field of view
+                45, // field of view - reduced from 60 to 45 for tighter framing
                 width / height, // aspect ratio
                 0.1, // near plane
                 1000 // far plane
@@ -205,8 +205,9 @@
             });
         }
 
-        // Normalize model to center and fit in view, with bottom aligned to floor
+        // Normalize model to center and fit in view, centered around bounding box
         function normalizeModel(model, scale = 2.0) {
+            // Calculate bounding box of the original model
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
@@ -221,35 +222,37 @@
             // Recalculate bounding box after scaling
             const scaledBox = new THREE.Box3().setFromObject(model);
             const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+            const scaledSize = scaledBox.getSize(new THREE.Vector3());
 
-            // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
+            // Center the model around its bounding box center (not origin)
+            // This ensures the model rotates correctly around its visual center
             model.position.x = -scaledCenter.x;
+            model.position.y = -scaledCenter.y;
             model.position.z = -scaledCenter.z;
-            model.position.y = -scaledBox.min.y;
             
-            // Create a container group for rotation
-            // The container will be at the center of the model for proper rotation
+            // Create a container group for rotation around the true center
             const container = new THREE.Group();
-            
-            // Calculate the center Y position of the model for rotation pivot
-            const centerY = (scaledBox.max.y + scaledBox.min.y) / 2;
-            
-            // Adjust model position within container so rotation happens around center
-            model.position.y -= centerY;
-            
-            // Position container at center height
-            container.position.y = centerY;
+            container.position.set(0, 0, 0);
             
             // Add model to container
             container.add(model);
             
             // Store reference to container for rotation
             window.modelRenderer.modelContainer = container;
+            
+            // Calculate the diagonal radius of the bounding box
+            // This ensures the entire model is visible when rotated in any direction
+            const diagonalRadius = Math.sqrt(
+                scaledSize.x * scaledSize.x + 
+                scaledSize.y * scaledSize.y + 
+                scaledSize.z * scaledSize.z
+            ) / 2;
 
             return {
                 center,
                 size,
-                maxDimension
+                maxDimension,
+                boundingSphereRadius: diagonalRadius
             };
         }
 

@@ -169,7 +169,11 @@ export class ModelDataService {
   async downloadTextureSetFiles(textureSet) {
     const texturePaths = {}
 
-    if (!textureSet || !textureSet.textures || textureSet.textures.length === 0) {
+    if (
+      !textureSet ||
+      !textureSet.textures ||
+      textureSet.textures.length === 0
+    ) {
       logger.info('No textures to download for texture set', {
         textureSetId: textureSet?.id,
       })
