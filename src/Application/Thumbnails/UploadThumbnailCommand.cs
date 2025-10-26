@@ -33,12 +33,20 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
 
     public async Task<Result<UploadThumbnailCommandResponse>> Handle(UploadThumbnailCommand command, CancellationToken cancellationToken)
     {
-        // Get the model
+        // Get the model with versions
         var model = await _modelRepository.GetByIdAsync(command.ModelId, cancellationToken);
         if (model == null)
         {
             return Result.Failure<UploadThumbnailCommandResponse>(
                 new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
+        }
+
+        // Get the latest version for the thumbnail
+        var latestVersion = model.GetVersions().OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+        if (latestVersion == null)
+        {
+            return Result.Failure<UploadThumbnailCommandResponse>(
+                new Error("NoVersionFound", "Model must have at least one version to upload a thumbnail."));
         }
 
         try
@@ -61,24 +69,24 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
             var width = command.Width ?? 256; // Default width if not provided
             var height = command.Height ?? 256; // Default height if not provided
 
-            // Update or create thumbnail
+            // Update or create thumbnail for the latest version
             var now = _dateTimeProvider.UtcNow;
             
-            if (model.Thumbnail == null)
+            if (latestVersion.Thumbnail == null)
             {
-                var thumbnail = Thumbnail.Create(model.Id, now);
-                model.SetThumbnail(await _thumbnailRepository.AddAsync(thumbnail, cancellationToken));
+                var thumbnail = Thumbnail.Create(model.Id, latestVersion.Id, now);
+                latestVersion.Thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
             }
 
             // Mark thumbnail as ready with the uploaded file details
-            model.Thumbnail!.MarkAsReady(
+            latestVersion.Thumbnail!.MarkAsReady(
                 fullPath,
                 storedFileResult.SizeBytes,
                 width,
                 height,
                 now);
 
-            await _thumbnailRepository.UpdateAsync(model.Thumbnail!, cancellationToken);
+            await _thumbnailRepository.UpdateAsync(latestVersion.Thumbnail!, cancellationToken);
 
             return Result.Success(new UploadThumbnailCommandResponse(
                 model.Id,

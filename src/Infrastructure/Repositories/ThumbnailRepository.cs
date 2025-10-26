@@ -44,6 +44,14 @@ public class ThumbnailRepository : IThumbnailRepository
             .FirstOrDefaultAsync(t => t.ModelId == modelId, cancellationToken);
     }
 
+    public async Task<Thumbnail?> GetByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Thumbnails
+            .Include(t => t.Model)
+            .Include(t => t.ModelVersion)
+            .FirstOrDefaultAsync(t => t.ModelVersionId == modelVersionId, cancellationToken);
+    }
+
     public async Task<Thumbnail?> GetByModelHashAsync(string modelHash, CancellationToken cancellationToken = default)
     {
         return await _context.Thumbnails

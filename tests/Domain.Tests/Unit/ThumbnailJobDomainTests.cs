@@ -11,17 +11,19 @@ public class ThumbnailJobDomainTests
     {
         // Arrange
         var modelId = 1;
+        var modelVersionId = 1;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         var createdAt = DateTime.UtcNow;
         var maxAttempts = 3;
         var lockTimeoutMinutes = 10;
 
         // Act
-        var job = ThumbnailJob.Create(modelId, modelHash, createdAt, maxAttempts, lockTimeoutMinutes);
+        var job = ThumbnailJob.Create(modelId, modelVersionId, modelHash, createdAt, maxAttempts, lockTimeoutMinutes);
 
         // Assert
         Assert.NotNull(job);
         Assert.Equal(modelId, job.ModelId);
+        Assert.Equal(modelVersionId, job.ModelVersionId);
         Assert.Equal(modelHash, job.ModelHash);
         Assert.Equal(ThumbnailJobStatus.Pending, job.Status);
         Assert.Equal(0, job.AttemptCount);
@@ -46,7 +48,7 @@ public class ThumbnailJobDomainTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            ThumbnailJob.Create(invalidModelId, modelHash, createdAt));
+            ThumbnailJob.Create(invalidModelId, 1, modelHash, createdAt));
     }
 
     [Theory]
@@ -62,7 +64,7 @@ public class ThumbnailJobDomainTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            ThumbnailJob.Create(modelId, invalidHash, createdAt));
+            ThumbnailJob.Create(modelId, 1, invalidHash, createdAt));
     }
 
     [Fact]
@@ -343,7 +345,8 @@ public class ThumbnailJobDomainTests
     private static ThumbnailJob CreateTestJob()
     {
         return ThumbnailJob.Create(
-            1, 
+            1,
+            1,
             "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
             DateTime.UtcNow);
     }
