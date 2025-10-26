@@ -270,21 +270,21 @@
 .model-list-tab .error-message,
 .model-list-tab .empty-state {
   margin: 1rem;
-  background: white;
-  border: 1px solid #e5e7eb;
-  color: #374151;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  color: var(--text-color);
 }
 
 .model-list-tab .loading p,
 .model-list-tab .empty-state h3,
 .model-list-tab .empty-state p {
-  color: #6b7280;
+  color: var(--text-color-secondary);
 }
 
 .model-list-tab .error-message {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #dc2626;
+  background: var(--red-50);
+  border-color: var(--red-200);
+  color: var(--red-700);
 }
 
 @media (max-width: 768px) {
