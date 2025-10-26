@@ -76,12 +76,12 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         fileEntity.SetModelVersion(savedVersion.Id);
         await _modelRepository.UpdateAsync(model, cancellationToken);
 
-        // If the uploaded file is renderable, trigger thumbnail generation for the model
-        // This ensures the model's thumbnail is always from the latest version
+        // If the uploaded file is renderable, trigger thumbnail generation for the version
         if (fileType.IsRenderable)
         {
             await _thumbnailQueue.EnqueueAsync(
                 command.ModelId,
+                savedVersion.Id,
                 fileEntity.Sha256Hash,
                 cancellationToken: cancellationToken);
         }

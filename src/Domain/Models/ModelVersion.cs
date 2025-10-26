@@ -13,6 +13,7 @@ public class ModelVersion
     
     // Navigation properties
     public Model Model { get; set; } = null!;
+    public Thumbnail? Thumbnail { get; set; }
     public ICollection<File> Files 
     { 
         get => _files; 
