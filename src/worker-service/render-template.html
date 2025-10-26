@@ -109,6 +109,8 @@
             renderer.setSize(width, height);
             // Set clear color with alpha 0 for transparency
             renderer.setClearColor(0x000000, 0);
+            // Ensure autoClear is enabled to clear canvas between frames
+            renderer.autoClear = true;
             
             // Shadow mapping (WebGL specific)
             if (!window.modelRenderer.useWebGPU && renderer.shadowMap) {
@@ -283,6 +285,10 @@
             if (!window.modelRenderer.renderer || !window.modelRenderer.scene || !window.modelRenderer.camera) {
                 return false;
             }
+            
+            // Explicitly clear the canvas before rendering to prevent ghosting
+            // This is necessary when using transparent backgrounds
+            window.modelRenderer.renderer.clear();
             
             // WebGPU renderer uses async render
             if (window.modelRenderer.useWebGPU) {
