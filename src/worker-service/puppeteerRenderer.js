@@ -219,6 +219,7 @@ export class PuppeteerRenderer {
               polygonCount,
               modelSize: normInfo.size,
               maxDimension: normInfo.maxDimension,
+              boundingSphereRadius: normInfo.boundingSphereRadius,
             }
           } catch (error) {
             console.error('Model loading error:', error)
@@ -239,6 +240,7 @@ export class PuppeteerRenderer {
       logger.info('Model loaded successfully in browser', {
         polygonCount: result.polygonCount,
         maxDimension: result.maxDimension,
+        boundingSphereRadius: result.boundingSphereRadius,
       })
 
       return result.polygonCount
@@ -306,26 +308,26 @@ export class PuppeteerRenderer {
           // Map texture type enum values to material properties
           // TextureType enum: Albedo=1, Normal=2, Height=3, AO=4, Roughness=5, Metallic=6, Diffuse=7, Specular=8
           const textureTypeMap = {
-            '1': 'map',           // Albedo -> base color map
-            '2': 'normalMap',     // Normal
-            '3': 'displacementMap', // Height
-            '4': 'aoMap',         // AO
-            '5': 'roughnessMap',  // Roughness
-            '6': 'metalnessMap',  // Metallic
-            '7': 'map',           // Diffuse -> base color map (legacy)
-            '8': 'specularMap',   // Specular
+            1: 'map', // Albedo -> base color map
+            2: 'normalMap', // Normal
+            3: 'displacementMap', // Height
+            4: 'aoMap', // AO
+            5: 'roughnessMap', // Roughness
+            6: 'metalnessMap', // Metallic
+            7: 'map', // Diffuse -> base color map (legacy)
+            8: 'specularMap', // Specular
             // Also support string names for backward compatibility
-            'Albedo': 'map',
-            'Normal': 'normalMap',
-            'Height': 'displacementMap',
-            'AO': 'aoMap',
-            'Roughness': 'roughnessMap',
-            'Metallic': 'metalnessMap',
-            'Diffuse': 'map',
-            'Specular': 'specularMap',
-            'BaseColor': 'map',
-            'AmbientOcclusion': 'aoMap',
-            'Emissive': 'emissiveMap'
+            Albedo: 'map',
+            Normal: 'normalMap',
+            Height: 'displacementMap',
+            AO: 'aoMap',
+            Roughness: 'roughnessMap',
+            Metallic: 'metalnessMap',
+            Diffuse: 'map',
+            Specular: 'specularMap',
+            BaseColor: 'map',
+            AmbientOcclusion: 'aoMap',
+            Emissive: 'emissiveMap',
           }
 
           // Load textures asynchronously
@@ -362,17 +364,22 @@ export class PuppeteerRenderer {
               meshCount++
 
               // Create or update material
-              if (!child.material || !(child.material instanceof THREE.MeshStandardMaterial)) {
+              if (
+                !child.material ||
+                !(child.material instanceof THREE.MeshStandardMaterial)
+              ) {
                 child.material = new THREE.MeshStandardMaterial()
               }
 
               // Apply each loaded texture to the material
-              for (const [property, texture] of Object.entries(loadedTextures)) {
+              for (const [property, texture] of Object.entries(
+                loadedTextures
+              )) {
                 if (child.material[property] !== undefined) {
                   child.material[property] = texture
                   child.material.needsUpdate = true
                   console.log(`Applied ${property} to mesh`)
-                  
+
                   // Special handling for emissive
                   if (property === 'emissiveMap' && !child.material.emissive) {
                     child.material.emissive = new THREE.Color(0xffffff)
@@ -578,6 +585,7 @@ export class PuppeteerRenderer {
 
   /**
    * Calculate optimal camera distance based on model bounds
+   * Uses bounding sphere to ensure entire model is visible when rotated
    * @returns {Promise<number>} Optimal camera distance
    */
   async calculateOptimalCameraDistance() {
@@ -590,13 +598,26 @@ export class PuppeteerRenderer {
         return baseDistance
       }
 
+      // Calculate bounding sphere radius that encompasses the entire model
       const box = new window.THREE.Box3().setFromObject(
         window.modelRenderer.model
       )
       const size = box.getSize(new window.THREE.Vector3())
-      const maxDimension = Math.max(size.x, size.y, size.z)
 
-      const calculatedDistance = baseDistance * (maxDimension / 2)
+      // Calculate diagonal radius - this ensures the entire model is visible
+      // even when rotated at any angle
+      const diagonalRadius =
+        Math.sqrt(size.x * size.x + size.y * size.y + size.z * size.z) / 2
+
+      // Calculate camera distance based on field of view and bounding sphere
+      // FOV is 45 degrees, so we need distance = radius / tan(FOV/2)
+      const fovRadians = (45 * Math.PI) / 180
+      const minDistance = diagonalRadius / Math.tan(fovRadians / 2)
+
+      // Add 10% padding to ensure model doesn't touch edges
+      const paddingFactor = 1.1
+      const calculatedDistance = minDistance * paddingFactor
+
       return Math.max(calculatedDistance, baseDistance)
     }, config.rendering.cameraDistance)
 

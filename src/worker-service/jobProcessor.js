@@ -334,25 +334,27 @@ export class JobProcessor {
             modelInfo.defaultTextureSetId
           )
 
-          if (textureSet && textureSet.textures && textureSet.textures.length > 0) {
+          if (
+            textureSet &&
+            textureSet.textures &&
+            textureSet.textures.length > 0
+          ) {
             jobLogger.info('Downloading texture files', {
               textureSetId: textureSet.id,
               textureSetName: textureSet.name,
               textureCount: textureSet.textures.length,
             })
 
-            texturePaths = await this.modelDataService.downloadTextureSetFiles(
-              textureSet
-            )
+            texturePaths =
+              await this.modelDataService.downloadTextureSetFiles(textureSet)
 
             if (Object.keys(texturePaths).length > 0) {
               jobLogger.info('Applying textures to model', {
                 textureTypes: Object.keys(texturePaths),
               })
 
-              const texturesApplied = await this.puppeteerRenderer.applyTextures(
-                texturePaths
-              )
+              const texturesApplied =
+                await this.puppeteerRenderer.applyTextures(texturePaths)
 
               if (texturesApplied) {
                 await this.jobEventService.logEvent(
@@ -362,21 +364,28 @@ export class JobProcessor {
                 )
                 jobLogger.info('Textures applied successfully')
               } else {
-                jobLogger.warn('Failed to apply textures, continuing without them')
+                jobLogger.warn(
+                  'Failed to apply textures, continuing without them'
+                )
               }
             } else {
               jobLogger.warn('No texture files could be downloaded')
             }
           } else {
-            jobLogger.info('Texture set has no textures or could not be fetched')
+            jobLogger.info(
+              'Texture set has no textures or could not be fetched'
+            )
           }
         } else {
           jobLogger.debug('No default texture set configured for this model')
         }
       } catch (textureError) {
-        jobLogger.warn('Failed to fetch or apply textures, continuing without them', {
-          error: textureError.message,
-        })
+        jobLogger.warn(
+          'Failed to fetch or apply textures, continuing without them',
+          {
+            error: textureError.message,
+          }
+        )
         // Don't fail the job if textures can't be applied, continue with rendering
       }
 
@@ -679,7 +688,7 @@ export class JobProcessor {
       if (tempFilePath) {
         await this.modelFileService.cleanupFile(tempFilePath)
       }
-      
+
       // Clean up temporary texture files
       if (texturePaths) {
         await this.modelDataService.cleanupTextureFiles(texturePaths)
@@ -724,7 +733,7 @@ export class JobProcessor {
         if (!this.isShuttingDown) {
           try {
             await this.modelFileService.cleanupOldFiles()
-            
+
             // Clean up old texture files
             await this.modelDataService.cleanupOldTextureFiles()
 
