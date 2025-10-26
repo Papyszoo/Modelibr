@@ -55,6 +55,7 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<IEnumerable<Model>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Models
+            .Where(m => !m.IsDeleted)
             .Include(m => m.Files)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
@@ -68,6 +69,7 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models
+            .Where(m => !m.IsDeleted)
             .Include(m => m.Files)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
@@ -81,6 +83,7 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<Model?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
     {
         return await _context.Models
+            .Where(m => !m.IsDeleted)
             .Include(m => m.Files)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
@@ -95,5 +98,19 @@ internal sealed class ModelRepository : IModelRepository
     {
         _context.Models.Update(model);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IEnumerable<Model>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Models
+            .Where(m => m.IsDeleted)
+            .Include(m => m.Files)
+            .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
+            .Include(m => m.Projects)
+            .Include(m => m.Thumbnail)
+            .Include(m => m.Versions)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
     }
 }

@@ -997,6 +997,55 @@ class ApiClient {
   ): string {
     return `${this.baseURL}/models/${modelId}/versions/${versionId}/files/${fileId}`
   }
+
+  // Recycled Files methods
+  async getAllRecycledFiles(): Promise<{
+    models: any[]
+    modelVersions: any[]
+    files: any[]
+    textureSets: any[]
+    textures: any[]
+  }> {
+    const response = await this.client.get('/recycled')
+    return response.data
+  }
+
+  async restoreEntity(entityType: string, entityId: number): Promise<void> {
+    await this.client.post(`/recycled/${entityType}/${entityId}/restore`)
+  }
+
+  async getDeletePreview(
+    entityType: string,
+    entityId: number
+  ): Promise<{
+    entityName: string
+    filesToDelete: Array<{
+      filePath: string
+      originalFileName: string
+      sizeBytes: number
+    }>
+    relatedEntities: string[]
+  }> {
+    const response = await this.client.get(
+      `/recycled/${entityType}/${entityId}/preview`
+    )
+    return response.data
+  }
+
+  async permanentlyDeleteEntity(
+    entityType: string,
+    entityId: number
+  ): Promise<void> {
+    await this.client.delete(`/recycled/${entityType}/${entityId}/permanent`)
+  }
+
+  async softDeleteModel(modelId: number): Promise<void> {
+    await this.client.delete(`/models/${modelId}`)
+  }
+
+  async softDeleteTextureSet(textureSetId: number): Promise<void> {
+    await this.client.delete(`/texture-sets/${textureSetId}`)
+  }
 }
 
 export default new ApiClient()

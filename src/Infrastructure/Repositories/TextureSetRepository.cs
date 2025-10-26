@@ -28,6 +28,21 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<IEnumerable<TextureSet>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
+            .Where(tp => !tp.IsDeleted)
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.File)
+            .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
+            .Include(tp => tp.Projects)
+            .AsSplitQuery()
+            .OrderBy(tp => tp.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IEnumerable<TextureSet>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.TextureSets
+            .Where(tp => tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
@@ -41,6 +56,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<TextureSet?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
+            .Where(tp => !tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
@@ -56,6 +72,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             return null;
 
         return await _context.TextureSets
+            .Where(tp => !tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)
@@ -71,6 +88,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             return null;
 
         return await _context.TextureSets
+            .Where(tp => !tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.Models)

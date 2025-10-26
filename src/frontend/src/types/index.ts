@@ -15,6 +15,7 @@ export interface Tab {
     | 'stageEditor'
     | 'settings'
     | 'history'
+    | 'recycledFiles'
   label?: string
   modelId?: string
   setId?: string

@@ -56,4 +56,17 @@ public sealed class HashBasedFileStorage : IFileStorage
         var relativePath = Path.Combine(relativeDir, storedName).Replace('\\', '/');
         return new StoredFileResult(relativePath, storedName, hashHex, size);
     }
+
+    public Task DeleteFileAsync(string filePath, CancellationToken ct)
+    {
+        var root = _pathProvider.UploadRootPath;
+        var fullPath = Path.Combine(root, filePath);
+        
+        if (File.Exists(fullPath))
+        {
+            File.Delete(fullPath);
+        }
+        
+        return Task.CompletedTask;
+    }
 }

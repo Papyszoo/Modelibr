@@ -17,6 +17,8 @@ namespace Domain.Models
         public string? Tags { get; private set; }
         public string? Description { get; private set; }
         public int? DefaultTextureSetId { get; private set; }
+        public bool IsDeleted { get; private set; }
+        public DateTime? DeletedAt { get; private set; }
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
         public ICollection<File> Files 
@@ -281,6 +283,28 @@ namespace Domain.Models
         public bool HasVersion(int versionNumber)
         {
             return _versions.Any(v => v.VersionNumber == versionNumber);
+        }
+
+        /// <summary>
+        /// Soft deletes this model by marking it as deleted.
+        /// </summary>
+        /// <param name="deletedAt">When the model was deleted</param>
+        public void SoftDelete(DateTime deletedAt)
+        {
+            IsDeleted = true;
+            DeletedAt = deletedAt;
+            UpdatedAt = deletedAt;
+        }
+
+        /// <summary>
+        /// Restores a soft-deleted model.
+        /// </summary>
+        /// <param name="restoredAt">When the model was restored</param>
+        public void Restore(DateTime restoredAt)
+        {
+            IsDeleted = false;
+            DeletedAt = null;
+            UpdatedAt = restoredAt;
         }
     }
 }

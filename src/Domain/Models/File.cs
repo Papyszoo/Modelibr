@@ -16,6 +16,8 @@ public class File
     public string Sha256Hash { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAt { get; private set; }
     
     // Optional reference to model version for versioned files
     public int? ModelVersionId { get; private set; }
@@ -137,5 +139,27 @@ public class File
         
         if (!System.Text.RegularExpressions.Regex.IsMatch(sha256Hash, "^[a-fA-F0-9]+$"))
             throw new ArgumentException("SHA256 hash must contain only hexadecimal characters.", nameof(sha256Hash));
+    }
+
+    /// <summary>
+    /// Soft deletes this file by marking it as deleted.
+    /// </summary>
+    /// <param name="deletedAt">When the file was deleted</param>
+    public void SoftDelete(DateTime deletedAt)
+    {
+        IsDeleted = true;
+        DeletedAt = deletedAt;
+        UpdatedAt = deletedAt;
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted file.
+    /// </summary>
+    /// <param name="restoredAt">When the file was restored</param>
+    public void Restore(DateTime restoredAt)
+    {
+        IsDeleted = false;
+        DeletedAt = null;
+        UpdatedAt = restoredAt;
     }
 }
