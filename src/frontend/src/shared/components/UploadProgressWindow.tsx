@@ -182,7 +182,7 @@ export default function UploadProgressWindow() {
           </div>
 
           {upload.status === 'error' ? (
-            <div className="upload-item-error">
+            <div className="upload-item-error-message">
               <i className="pi pi-exclamation-triangle" />
               <span>{upload.error?.message || 'Upload failed'}</span>
             </div>

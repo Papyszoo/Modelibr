@@ -11,7 +11,7 @@
   border-radius: 8px;
   overflow: hidden;
   background: var(--surface-card);
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--surface-border);
   transition: all 0.2s;
   aspect-ratio: 1;
 }
@@ -33,7 +33,7 @@
   top: 0.5rem;
   right: 0.5rem;
   z-index: 10;
-  background: white;
+  background: var(--surface-card);
   border-radius: 4px;
   padding: 0.25rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
