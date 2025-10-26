@@ -18,8 +18,9 @@ public class ModelUploadedEventHandlerTests
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
         var mockLogger = new Mock<ILogger<ModelUploadedEventHandler>>();
 
-        var job = ThumbnailJob.Create(1, "test-hash", DateTime.UtcNow);
+        var job = ThumbnailJob.Create(1, 1, "test-hash", DateTime.UtcNow);
         mockThumbnailQueue.Setup(x => x.EnqueueAsync(
+                It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<string>(),
                 It.IsAny<int>(),
@@ -28,7 +29,7 @@ public class ModelUploadedEventHandlerTests
             .ReturnsAsync(job);
 
         var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockLogger.Object);
-        var domainEvent = new ModelUploadedEvent(1, "test-hash", true);
+        var domainEvent = new ModelUploadedEvent(1, 1, "test-hash", true);
 
         // Act
         var result = await handler.Handle(domainEvent, CancellationToken.None);
@@ -36,6 +37,7 @@ public class ModelUploadedEventHandlerTests
         // Assert
         Assert.True(result.IsSuccess);
         mockThumbnailQueue.Verify(x => x.EnqueueAsync(
+            1,
             1,
             "test-hash",
             It.IsAny<int>(),
@@ -52,6 +54,7 @@ public class ModelUploadedEventHandlerTests
 
         mockThumbnailQueue.Setup(x => x.EnqueueAsync(
                 It.IsAny<int>(),
+                It.IsAny<int>(),
                 It.IsAny<string>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
@@ -59,7 +62,7 @@ public class ModelUploadedEventHandlerTests
             .ThrowsAsync(new Exception("Test exception"));
 
         var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockLogger.Object);
-        var domainEvent = new ModelUploadedEvent(1, "test-hash", true);
+        var domainEvent = new ModelUploadedEvent(1, 1, "test-hash", true);
 
         // Act
         var result = await handler.Handle(domainEvent, CancellationToken.None);
