@@ -136,10 +136,13 @@ export class FrameEncoderService {
           .webp({ quality })
           .toBuffer()
 
-        // Generate frame with delay
+        // Generate frame with delay and disposal method
+        // Set blend to false to prevent frame accumulation (no alpha blending with previous frame)
+        // This ensures each frame starts with a clean transparent canvas
         const webpFrame = await webpmux.Image.generateFrame({
           buffer: webpBuffer,
           delay: frameDuration,
+          blend: false, // Don't blend with previous frame
         })
 
         webpFrames.push(webpFrame)
@@ -169,7 +172,7 @@ export class FrameEncoderService {
       img.convertToAnim()
 
       // Set animation properties
-      img.anim.bgColor = [255, 255, 255, 255] // White background (RGBA)
+      img.anim.bgColor = [0, 0, 0, 0] // Transparent background (RGBA)
       img.anim.loops = 0 // 0 = infinite loop
 
       // Add all frames (the first frame from load is replaced by pushing all frames)
