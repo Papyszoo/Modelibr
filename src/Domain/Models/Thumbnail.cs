@@ -16,6 +16,11 @@ public class Thumbnail : AggregateRoot
     public int ModelId { get; private set; }
     
     /// <summary>
+    /// The ID of the model version this thumbnail was generated for.
+    /// </summary>
+    public int ModelVersionId { get; private set; }
+    
+    /// <summary>
     /// Current status of the thumbnail generation workflow.
     /// </summary>
     public ThumbnailStatus Status { get; private set; } = ThumbnailStatus.Pending;
@@ -60,19 +65,22 @@ public class Thumbnail : AggregateRoot
     /// </summary>
     public DateTime? ProcessedAt { get; private set; }
     
-    // Navigation property
+    // Navigation properties
     public Model Model { get; set; } = null!;
+    public ModelVersion ModelVersion { get; set; } = null!;
 
     /// <summary>
     /// Creates a new thumbnail record for processing.
     /// </summary>
-    public static Thumbnail Create(int modelId, DateTime createdAt)
+    public static Thumbnail Create(int modelId, int modelVersionId, DateTime createdAt)
     {
         ValidateModelId(modelId);
+        ValidateModelVersionId(modelVersionId);
 
         return new Thumbnail
         {
             ModelId = modelId,
+            ModelVersionId = modelVersionId,
             Status = ThumbnailStatus.Pending,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
@@ -142,6 +150,12 @@ public class Thumbnail : AggregateRoot
     {
         if (modelId <= 0)
             throw new ArgumentException("Model ID must be greater than 0.", nameof(modelId));
+    }
+
+    private static void ValidateModelVersionId(int modelVersionId)
+    {
+        if (modelVersionId <= 0)
+            throw new ArgumentException("Model Version ID must be greater than 0.", nameof(modelVersionId));
     }
 
     private static void ValidateThumbnailPath(string thumbnailPath)

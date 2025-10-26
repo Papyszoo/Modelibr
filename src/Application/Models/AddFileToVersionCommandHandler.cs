@@ -89,7 +89,7 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
         await _modelRepository.UpdateAsync(model, cancellationToken);
 
         // Check if this version is the latest and the file is renderable
-        // If so, trigger thumbnail generation to update the model's thumbnail
+        // If so, trigger thumbnail generation for this version
         var allVersions = await _versionRepository.GetByModelIdAsync(command.ModelId, cancellationToken);
         var latestVersion = allVersions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
         
@@ -97,6 +97,7 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
         {
             await _thumbnailQueue.EnqueueAsync(
                 command.ModelId,
+                version.Id,
                 fileEntity.Sha256Hash,
                 cancellationToken: cancellationToken);
         }

@@ -213,14 +213,18 @@ namespace Infrastructure.Persistence
             {
                 entity.HasKey(t => t.Id);
                 entity.Property(t => t.ModelId).IsRequired();
+                entity.Property(t => t.ModelVersionId).IsRequired();
                 entity.Property(t => t.Status).IsRequired();
                 entity.Property(t => t.ThumbnailPath).HasMaxLength(500);
                 entity.Property(t => t.ErrorMessage).HasMaxLength(1000);
                 entity.Property(t => t.CreatedAt).IsRequired();
                 entity.Property(t => t.UpdatedAt).IsRequired();
 
-                // Create unique index for ModelId to ensure one thumbnail per model
-                entity.HasIndex(t => t.ModelId).IsUnique();
+                // Create unique index for ModelVersionId to ensure one thumbnail per version
+                entity.HasIndex(t => t.ModelVersionId).IsUnique();
+                
+                // Create index for ModelId for efficient querying
+                entity.HasIndex(t => t.ModelId);
             });
 
             // Configure ThumbnailJob entity
@@ -228,6 +232,7 @@ namespace Infrastructure.Persistence
             {
                 entity.HasKey(tj => tj.Id);
                 entity.Property(tj => tj.ModelId).IsRequired();
+                entity.Property(tj => tj.ModelVersionId).IsRequired();
                 entity.Property(tj => tj.ModelHash).IsRequired().HasMaxLength(64);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
@@ -238,8 +243,8 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.CreatedAt).IsRequired();
                 entity.Property(tj => tj.UpdatedAt).IsRequired();
 
-                // Create unique index for ModelHash to prevent duplicate jobs
-                entity.HasIndex(tj => tj.ModelHash).IsUnique();
+                // Create unique index for ModelVersionId to prevent duplicate jobs per version
+                entity.HasIndex(tj => tj.ModelVersionId).IsUnique();
                 
                 // Create index for efficient job querying
                 entity.HasIndex(tj => new { tj.Status, tj.CreatedAt });

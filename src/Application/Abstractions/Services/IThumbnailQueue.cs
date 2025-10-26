@@ -9,16 +9,17 @@ namespace Application.Abstractions.Services;
 public interface IThumbnailQueue
 {
     /// <summary>
-    /// Enqueues a new thumbnail generation job for the given model.
-    /// Prevents duplicate jobs for the same model hash.
+    /// Enqueues a new thumbnail generation job for the given model version.
+    /// Prevents duplicate jobs for the same model version.
     /// </summary>
     /// <param name="modelId">The model ID</param>
+    /// <param name="modelVersionId">The model version ID</param>
     /// <param name="modelHash">The SHA256 hash of the model for deduplication</param>
     /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
     /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The created job or existing job if already exists</returns>
-    Task<ThumbnailJob> EnqueueAsync(int modelId, string modelHash, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+    Task<ThumbnailJob> EnqueueAsync(int modelId, int modelVersionId, string modelHash, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Attempts to dequeue and claim the next pending job for processing.
@@ -60,12 +61,12 @@ public interface IThumbnailQueue
     Task<ThumbnailJob?> GetJobAsync(int jobId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a job by model hash to check for duplicates.
+    /// Gets a job by model version ID to check for duplicates.
     /// </summary>
-    /// <param name="modelHash">The model hash</param>
+    /// <param name="modelVersionId">The model version ID</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The job or null if not found</returns>
-    Task<ThumbnailJob?> GetJobByModelHashAsync(string modelHash, CancellationToken cancellationToken = default);
+    Task<ThumbnailJob?> GetJobByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Cancels all active (pending or processing) thumbnail jobs for a specific model.

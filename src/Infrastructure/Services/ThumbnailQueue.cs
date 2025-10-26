@@ -26,26 +26,27 @@ public class ThumbnailQueue : IThumbnailQueue
     }
 
     public async Task<ThumbnailJob> EnqueueAsync(
-        int modelId, 
+        int modelId,
+        int modelVersionId,
         string modelHash, 
         int maxAttempts = 3, 
         int lockTimeoutMinutes = 10, 
         CancellationToken cancellationToken = default)
     {
-        // Check for existing job with same model hash to prevent duplicates
-        var existingJob = await _thumbnailJobRepository.GetByModelHashAsync(modelHash, cancellationToken);
+        // Check for existing job for same model version to prevent duplicates
+        var existingJob = await _thumbnailJobRepository.GetByModelVersionIdAsync(modelVersionId, cancellationToken);
         if (existingJob != null)
         {
-            _logger.LogInformation("Thumbnail job already exists for model hash {ModelHash}, returning existing job {JobId}", 
-                modelHash, existingJob.Id);
+            _logger.LogInformation("Thumbnail job already exists for model version {ModelVersionId}, returning existing job {JobId}", 
+                modelVersionId, existingJob.Id);
             return existingJob;
         }
 
-        var job = ThumbnailJob.Create(modelId, modelHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var job = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
 
-        _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} with hash {ModelHash}", 
-            createdJob.Id, modelId, modelHash);
+        _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId}, version {ModelVersionId} with hash {ModelHash}", 
+            createdJob.Id, modelId, modelVersionId, modelHash);
 
         // Send real-time notification to workers that a new job is available
         await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
@@ -144,9 +145,9 @@ public class ThumbnailQueue : IThumbnailQueue
         return await _thumbnailJobRepository.GetByIdAsync(jobId, cancellationToken);
     }
 
-    public async Task<ThumbnailJob?> GetJobByModelHashAsync(string modelHash, CancellationToken cancellationToken = default)
+    public async Task<ThumbnailJob?> GetJobByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default)
     {
-        return await _thumbnailJobRepository.GetByModelHashAsync(modelHash, cancellationToken);
+        return await _thumbnailJobRepository.GetByModelVersionIdAsync(modelVersionId, cancellationToken);
     }
 
     public async Task<int> CancelActiveJobsForModelAsync(int modelId, CancellationToken cancellationToken = default)
