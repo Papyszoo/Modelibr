@@ -133,6 +133,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("FilePath")
                         .IsRequired()
                         .HasColumnType("text");
@@ -186,6 +189,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<int?>("DefaultTextureSetId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
@@ -304,6 +310,9 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("FilePath")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -339,6 +348,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(255)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FileId");
 
                     b.HasIndex("RecycledAt");
 

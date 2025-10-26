@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251018222259_InitialMigration")]
+    [Migration("20251026002329_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -32,6 +32,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CleanRecycledFilesAfterDays")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -133,6 +136,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("FilePath")
                         .IsRequired()
                         .HasColumnType("text");
@@ -144,6 +150,9 @@ namespace Infrastructure.Migrations
                     b.Property<string>("MimeType")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int?>("ModelVersionId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
@@ -165,6 +174,8 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ModelVersionId");
+
                     b.ToTable("Files");
                 });
 
@@ -181,6 +192,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<int?>("DefaultTextureSetId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
@@ -200,6 +214,35 @@ namespace Infrastructure.Migrations
                     b.HasIndex("DefaultTextureSetId");
 
                     b.ToTable("Models");
+                });
+
+            modelBuilder.Entity("Domain.Models.ModelVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("ModelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModelId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("ModelVersions");
                 });
 
             modelBuilder.Entity("Domain.Models.Pack", b =>
@@ -260,6 +303,62 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("Domain.Models.RecycledFile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("RecycledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ScheduledDeletionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sha256Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("RecycledAt");
+
+                    b.HasIndex("ScheduledDeletionAt");
+
+                    b.ToTable("RecycledFiles");
                 });
 
             modelBuilder.Entity("Domain.Models.Setting", b =>
@@ -667,12 +766,33 @@ namespace Infrastructure.Migrations
                     b.Navigation("TextureSet");
                 });
 
+            modelBuilder.Entity("Domain.Models.File", b =>
+                {
+                    b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
+                        .WithMany("Files")
+                        .HasForeignKey("ModelVersionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ModelVersion");
+                });
+
             modelBuilder.Entity("Domain.Models.Model", b =>
                 {
                     b.HasOne("Domain.Models.TextureSet", null)
                         .WithMany()
                         .HasForeignKey("DefaultTextureSetId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Domain.Models.ModelVersion", b =>
+                {
+                    b.HasOne("Domain.Models.Model", "Model")
+                        .WithMany("Versions")
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Model");
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>
@@ -817,6 +937,13 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.Model", b =>
                 {
                     b.Navigation("Thumbnail");
+
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("Domain.Models.ModelVersion", b =>
+                {
+                    b.Navigation("Files");
                 });
 
             modelBuilder.Entity("Domain.Models.TextureSet", b =>
