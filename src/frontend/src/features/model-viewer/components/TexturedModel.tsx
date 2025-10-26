@@ -75,7 +75,9 @@ function buildTextureUrls(textureSet: TextureSetDto | null) {
   }
 
   // Bump map
-  const bump = textureSet.textures?.find(t => t.textureType === TextureType.Bump)
+  const bump = textureSet.textures?.find(
+    t => t.textureType === TextureType.Bump
+  )
   if (bump) {
     urls.bumpMap = ApiClient.getFileUrl(bump.fileId.toString())
   }
