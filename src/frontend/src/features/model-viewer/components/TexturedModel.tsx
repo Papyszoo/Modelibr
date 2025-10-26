@@ -66,6 +66,41 @@ function buildTextureUrls(textureSet: TextureSetDto | null) {
     urls.aoMap = ApiClient.getFileUrl(ao.fileId.toString())
   }
 
+  // Emissive map
+  const emissive = textureSet.textures?.find(
+    t => t.textureType === TextureType.Emissive
+  )
+  if (emissive) {
+    urls.emissiveMap = ApiClient.getFileUrl(emissive.fileId.toString())
+  }
+
+  // Bump map
+  const bump = textureSet.textures?.find(t => t.textureType === TextureType.Bump)
+  if (bump) {
+    urls.bumpMap = ApiClient.getFileUrl(bump.fileId.toString())
+  }
+
+  // Alpha map
+  const alpha = textureSet.textures?.find(
+    t => t.textureType === TextureType.Alpha
+  )
+  if (alpha) {
+    urls.alphaMap = ApiClient.getFileUrl(alpha.fileId.toString())
+  }
+
+  // Displacement map (also check Height for backwards compatibility)
+  const displacement = textureSet.textures?.find(
+    t => t.textureType === TextureType.Displacement
+  )
+  const height = textureSet.textures?.find(
+    t => t.textureType === TextureType.Height
+  )
+  if (displacement) {
+    urls.displacementMap = ApiClient.getFileUrl(displacement.fileId.toString())
+  } else if (height) {
+    urls.displacementMap = ApiClient.getFileUrl(height.fileId.toString())
+  }
+
   return urls
 }
 
@@ -135,6 +170,17 @@ function OBJModelWithTextures({
         if (textures.roughnessMap) material.roughnessMap = textures.roughnessMap
         if (textures.metalnessMap) material.metalnessMap = textures.metalnessMap
         if (textures.aoMap) material.aoMap = textures.aoMap
+        if (textures.emissiveMap) {
+          material.emissiveMap = textures.emissiveMap
+          material.emissive = new THREE.Color(0xffffff)
+        }
+        if (textures.bumpMap) material.bumpMap = textures.bumpMap
+        if (textures.alphaMap) {
+          material.alphaMap = textures.alphaMap
+          material.transparent = true
+        }
+        if (textures.displacementMap)
+          material.displacementMap = textures.displacementMap
       }
 
       clonedModel.traverse(child => {
@@ -239,6 +285,17 @@ function GLTFModelWithTextures({
         if (textures.roughnessMap) material.roughnessMap = textures.roughnessMap
         if (textures.metalnessMap) material.metalnessMap = textures.metalnessMap
         if (textures.aoMap) material.aoMap = textures.aoMap
+        if (textures.emissiveMap) {
+          material.emissiveMap = textures.emissiveMap
+          material.emissive = new THREE.Color(0xffffff)
+        }
+        if (textures.bumpMap) material.bumpMap = textures.bumpMap
+        if (textures.alphaMap) {
+          material.alphaMap = textures.alphaMap
+          material.transparent = true
+        }
+        if (textures.displacementMap)
+          material.displacementMap = textures.displacementMap
       }
 
       clonedModel.traverse(child => {
@@ -342,6 +399,17 @@ function FBXModelWithTextures({
         if (textures.roughnessMap) material.roughnessMap = textures.roughnessMap
         if (textures.metalnessMap) material.metalnessMap = textures.metalnessMap
         if (textures.aoMap) material.aoMap = textures.aoMap
+        if (textures.emissiveMap) {
+          material.emissiveMap = textures.emissiveMap
+          material.emissive = new THREE.Color(0xffffff)
+        }
+        if (textures.bumpMap) material.bumpMap = textures.bumpMap
+        if (textures.alphaMap) {
+          material.alphaMap = textures.alphaMap
+          material.transparent = true
+        }
+        if (textures.displacementMap)
+          material.displacementMap = textures.displacementMap
       }
 
       clonedModel.traverse(child => {
