@@ -88,6 +88,45 @@ function TexturedGeometry({
       urls.aoMap = ApiClient.getFileUrl(ao.fileId.toString())
     }
 
+    // Emissive map
+    const emissive = textureSet.textures.find(
+      t => t.textureType === TextureType.Emissive
+    )
+    if (emissive) {
+      urls.emissiveMap = ApiClient.getFileUrl(emissive.fileId.toString())
+    }
+
+    // Bump map
+    const bump = textureSet.textures.find(
+      t => t.textureType === TextureType.Bump
+    )
+    if (bump) {
+      urls.bumpMap = ApiClient.getFileUrl(bump.fileId.toString())
+    }
+
+    // Alpha map
+    const alpha = textureSet.textures.find(
+      t => t.textureType === TextureType.Alpha
+    )
+    if (alpha) {
+      urls.alphaMap = ApiClient.getFileUrl(alpha.fileId.toString())
+    }
+
+    // Displacement map (also check Height for backwards compatibility)
+    const displacement = textureSet.textures.find(
+      t => t.textureType === TextureType.Displacement
+    )
+    const height = textureSet.textures.find(
+      t => t.textureType === TextureType.Height
+    )
+    if (displacement) {
+      urls.displacementMap = ApiClient.getFileUrl(
+        displacement.fileId.toString()
+      )
+    } else if (height) {
+      urls.displacementMap = ApiClient.getFileUrl(height.fileId.toString())
+    }
+
     return urls
   }, [textureSet])
 
@@ -152,6 +191,15 @@ function TexturedGeometry({
           (loadedTextures as Record<string, THREE.Texture>).metalnessMap ||
           null,
         aoMap: (loadedTextures as Record<string, THREE.Texture>).aoMap || null,
+        emissiveMap:
+          (loadedTextures as Record<string, THREE.Texture>).emissiveMap || null,
+        bumpMap:
+          (loadedTextures as Record<string, THREE.Texture>).bumpMap || null,
+        alphaMap:
+          (loadedTextures as Record<string, THREE.Texture>).alphaMap || null,
+        displacementMap:
+          (loadedTextures as Record<string, THREE.Texture>).displacementMap ||
+          null,
       }
     : {
         map: null,
@@ -159,6 +207,10 @@ function TexturedGeometry({
         roughnessMap: null,
         metalnessMap: null,
         aoMap: null,
+        emissiveMap: null,
+        bumpMap: null,
+        alphaMap: null,
+        displacementMap: null,
       }
 
   return (
@@ -170,8 +222,14 @@ function TexturedGeometry({
         roughnessMap={textures.roughnessMap}
         metalnessMap={textures.metalnessMap}
         aoMap={textures.aoMap}
+        emissiveMap={textures.emissiveMap}
+        bumpMap={textures.bumpMap}
+        alphaMap={textures.alphaMap}
+        displacementMap={textures.displacementMap}
         roughness={textures.roughnessMap ? 1 : 0.5}
         metalness={textures.metalnessMap ? 1 : 0.3}
+        emissive={textures.emissiveMap ? '#ffffff' : '#000000'}
+        transparent={textures.alphaMap ? true : false}
         color={textures.map ? undefined : '#ffffff'}
         wireframe={geometryParams.wireframe || false}
       />
