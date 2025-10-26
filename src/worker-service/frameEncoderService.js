@@ -136,10 +136,13 @@ export class FrameEncoderService {
           .webp({ quality })
           .toBuffer()
 
-        // Generate frame with delay
+        // Generate frame with delay and disposal method
+        // Set blend to false to prevent frame accumulation (no alpha blending with previous frame)
+        // This ensures each frame starts with a clean transparent canvas
         const webpFrame = await webpmux.Image.generateFrame({
           buffer: webpBuffer,
           delay: frameDuration,
+          blend: false, // Don't blend with previous frame
         })
 
         webpFrames.push(webpFrame)
