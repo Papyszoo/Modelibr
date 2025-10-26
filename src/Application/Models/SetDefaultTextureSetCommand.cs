@@ -53,25 +53,31 @@ namespace Application.Models
                 {
                     var currentTime = _dateTimeProvider.UtcNow;
 
-                    // Reset existing thumbnail if it exists
-                    if (model.Thumbnail != null)
+                    // Get the latest version for thumbnail regeneration
+                    var latestVersion = model.GetVersions().OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+                    if (latestVersion != null)
                     {
-                        model.Thumbnail.Reset(currentTime);
-                        await _thumbnailRepository.UpdateAsync(model.Thumbnail, cancellationToken);
-                    }
+                        // Reset existing thumbnail if it exists
+                        if (latestVersion.Thumbnail != null)
+                        {
+                            latestVersion.Thumbnail.Reset(currentTime);
+                            await _thumbnailRepository.UpdateAsync(latestVersion.Thumbnail, cancellationToken);
+                        }
 
-                    // Reset any existing job for this model and create new one
-                    var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
-                    if (existingJob != null)
-                    {
-                        await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
-                    }
-                    else
-                    {
-                        await _thumbnailQueue.EnqueueAsync(
-                            command.ModelId,
-                            primaryFile.Sha256Hash,
-                            cancellationToken: cancellationToken);
+                        // Reset any existing job for this version and create new one
+                        var existingJob = await _thumbnailQueue.GetJobByModelVersionIdAsync(latestVersion.Id, cancellationToken);
+                        if (existingJob != null)
+                        {
+                            await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
+                        }
+                        else
+                        {
+                            await _thumbnailQueue.EnqueueAsync(
+                                command.ModelId,
+                                latestVersion.Id,
+                                primaryFile.Sha256Hash,
+                                cancellationToken: cancellationToken);
+                        }
                     }
                 }
 

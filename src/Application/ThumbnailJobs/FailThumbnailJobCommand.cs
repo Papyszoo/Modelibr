@@ -73,10 +73,10 @@ public class FailThumbnailJobCommandHandler : ICommandHandler<FailThumbnailJobCo
         try
         {
             // Get or create the thumbnail entity
-            var thumbnail = await _thumbnailRepository.GetByModelIdAsync(job.ModelId, cancellationToken);
+            var thumbnail = await _thumbnailRepository.GetByModelVersionIdAsync(job.ModelVersionId, cancellationToken);
             if (thumbnail == null)
             {
-                thumbnail = Thumbnail.Create(job.ModelId, now);
+                thumbnail = Thumbnail.Create(job.ModelId, job.ModelVersionId, now);
                 thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
             }
 
