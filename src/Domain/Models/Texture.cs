@@ -13,6 +13,8 @@ public class Texture
     public TextureType TextureType { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAt { get; private set; }
 
     // Foreign key for optional TextureSet relationship
     public int? TextureSetId { get; internal set; }
@@ -101,5 +103,27 @@ public class Texture
                 $"File type '{file.FileType.Description}' is not a texture. Only files with Texture category can be used for textures.",
                 nameof(file));
         }
+    }
+
+    /// <summary>
+    /// Soft deletes this texture by marking it as deleted.
+    /// </summary>
+    /// <param name="deletedAt">When the texture was deleted</param>
+    public void SoftDelete(DateTime deletedAt)
+    {
+        IsDeleted = true;
+        DeletedAt = deletedAt;
+        UpdatedAt = deletedAt;
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted texture.
+    /// </summary>
+    /// <param name="restoredAt">When the texture was restored</param>
+    public void Restore(DateTime restoredAt)
+    {
+        IsDeleted = false;
+        DeletedAt = null;
+        UpdatedAt = restoredAt;
     }
 }
