@@ -1,6 +1,7 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -14,17 +15,20 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IThumbnailQueue _thumbnailQueue;
 
     public AddFileToVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IThumbnailQueue thumbnailQueue)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _thumbnailQueue = thumbnailQueue;
     }
 
     public async Task<Result<AddFileToVersionResponse>> Handle(
@@ -83,6 +87,19 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
         // Update
         await _versionRepository.UpdateAsync(version, cancellationToken);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+
+        // Check if this version is the latest and the file is renderable
+        // If so, trigger thumbnail generation to update the model's thumbnail
+        var allVersions = await _versionRepository.GetByModelIdAsync(command.ModelId, cancellationToken);
+        var latestVersion = allVersions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+        
+        if (latestVersion?.Id == version.Id && fileType.IsRenderable)
+        {
+            await _thumbnailQueue.EnqueueAsync(
+                command.ModelId,
+                fileEntity.Sha256Hash,
+                cancellationToken: cancellationToken);
+        }
 
         return Result.Success(new AddFileToVersionResponse(
             version.Id,
