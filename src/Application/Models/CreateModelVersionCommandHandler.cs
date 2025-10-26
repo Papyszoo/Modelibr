@@ -1,6 +1,7 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -14,17 +15,20 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IThumbnailQueue _thumbnailQueue;
 
     public CreateModelVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IThumbnailQueue thumbnailQueue)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _thumbnailQueue = thumbnailQueue;
     }
 
     public async Task<Result<CreateModelVersionResponse>> Handle(
@@ -71,6 +75,16 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         // Link file to version
         fileEntity.SetModelVersion(savedVersion.Id);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+
+        // If the uploaded file is renderable, trigger thumbnail generation for the model
+        // This ensures the model's thumbnail is always from the latest version
+        if (fileType.IsRenderable)
+        {
+            await _thumbnailQueue.EnqueueAsync(
+                command.ModelId,
+                fileEntity.Sha256Hash,
+                cancellationToken: cancellationToken);
+        }
 
         return Result.Success(new CreateModelVersionResponse(
             savedVersion.Id,
