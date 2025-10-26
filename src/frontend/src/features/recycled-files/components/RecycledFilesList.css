@@ -1,0 +1,64 @@
+.recycled-files-list {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.recycled-files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.recycled-files-header h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.recycled-files-table {
+  flex: 1;
+}
+
+.delete-preview {
+  padding: 10px 0;
+}
+
+.warning-text {
+  color: #d32f2f;
+  font-weight: 500;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.related-entities,
+.files-to-delete {
+  margin-top: 15px;
+}
+
+.related-entities h5,
+.files-to-delete h5 {
+  margin: 0 0 10px 0;
+  color: #666;
+}
+
+.related-entities ul,
+.files-to-delete ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.related-entities li,
+.files-to-delete li {
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.related-entities li:last-child,
+.files-to-delete li:last-child {
+  border-bottom: none;
+}
