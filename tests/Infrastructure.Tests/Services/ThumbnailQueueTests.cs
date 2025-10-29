@@ -29,24 +29,26 @@ public class ThumbnailQueueTests
     {
         // Arrange
         var modelId = 1;
+        var modelVersionId = 1;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var expectedJob = ThumbnailJob.Create(modelId, modelHash, DateTime.UtcNow);
+        var expectedJob = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow);
 
-        _mockRepository.Setup(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()))
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ThumbnailJob?)null);
         _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedJob);
 
         // Act
-        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelHash);
+        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash);
 
         // Assert
         Assert.NotNull(result);
         Assert.Equal(modelId, result.ModelId);
+        Assert.Equal(modelVersionId, result.ModelVersionId);
         Assert.Equal(modelHash, result.ModelHash);
         Assert.Equal(ThumbnailJobStatus.Pending, result.Status);
 
-        _mockRepository.Verify(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -56,19 +58,20 @@ public class ThumbnailQueueTests
     {
         // Arrange
         var modelId = 1;
+        var modelVersionId = 1;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var existingJob = ThumbnailJob.Create(modelId, modelHash, DateTime.UtcNow);
+        var existingJob = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow);
 
-        _mockRepository.Setup(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()))
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingJob);
 
         // Act
-        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelHash);
+        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash);
 
         // Assert
         Assert.Same(existingJob, result);
 
-        _mockRepository.Verify(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
         _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -79,7 +82,7 @@ public class ThumbnailQueueTests
         // Arrange
         var workerId = "worker-1";
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var job = ThumbnailJob.Create(1, modelHash, DateTime.UtcNow);
+        var job = ThumbnailJob.Create(1, 1, modelHash, DateTime.UtcNow);
 
         _mockRepository.Setup(r => r.GetNextPendingJobAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(job);
@@ -123,7 +126,7 @@ public class ThumbnailQueueTests
         // Arrange
         var jobId = 1;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var job = ThumbnailJob.Create(1, modelHash, DateTime.UtcNow);
+        var job = ThumbnailJob.Create(1, 1, modelHash, DateTime.UtcNow);
         job.TryClaim("worker-1", DateTime.UtcNow);
 
         _mockRepository.Setup(r => r.GetByIdAsync(jobId, It.IsAny<CancellationToken>()))
@@ -147,7 +150,7 @@ public class ThumbnailQueueTests
         var jobId = 1;
         var errorMessage = "Processing failed";
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var job = ThumbnailJob.Create(1, modelHash, DateTime.UtcNow);
+        var job = ThumbnailJob.Create(1, 1, modelHash, DateTime.UtcNow);
         job.TryClaim("worker-1", DateTime.UtcNow);
 
         _mockRepository.Setup(r => r.GetByIdAsync(jobId, It.IsAny<CancellationToken>()))
@@ -172,7 +175,7 @@ public class ThumbnailQueueTests
         var jobId = 1;
         var errorMessage = "Processing failed";
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var job = ThumbnailJob.Create(1, modelHash, DateTime.UtcNow, maxAttempts: 1);
+        var job = ThumbnailJob.Create(1, 1, modelHash, DateTime.UtcNow, maxAttempts: 1);
         job.TryClaim("worker-1", DateTime.UtcNow);
 
         _mockRepository.Setup(r => r.GetByIdAsync(jobId, It.IsAny<CancellationToken>()))
@@ -196,7 +199,7 @@ public class ThumbnailQueueTests
         // Arrange
         var jobId = 1;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var job = ThumbnailJob.Create(1, modelHash, DateTime.UtcNow);
+        var job = ThumbnailJob.Create(1, 1, modelHash, DateTime.UtcNow);
         job.TryClaim("worker-1", DateTime.UtcNow);
         job.MarkAsFailed("Error", DateTime.UtcNow);
 
@@ -222,7 +225,7 @@ public class ThumbnailQueueTests
         // Arrange
         var jobId = 1;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var job = ThumbnailJob.Create(1, modelHash, DateTime.UtcNow);
+        var job = ThumbnailJob.Create(1, 1, modelHash, DateTime.UtcNow);
         job.TryClaim("worker-1", DateTime.UtcNow);
         job.MarkAsFailed("Error", DateTime.UtcNow);
 
@@ -243,8 +246,8 @@ public class ThumbnailQueueTests
         var modelHash1 = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         var modelHash2 = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
         
-        var expiredJob1 = ThumbnailJob.Create(1, modelHash1, DateTime.UtcNow);
-        var expiredJob2 = ThumbnailJob.Create(2, modelHash2, DateTime.UtcNow);
+        var expiredJob1 = ThumbnailJob.Create(1, 1, modelHash1, DateTime.UtcNow);
+        var expiredJob2 = ThumbnailJob.Create(2, 2, modelHash2, DateTime.UtcNow);
         
         // Simulate expired locks
         expiredJob1.TryClaim("worker-1", DateTime.UtcNow.AddMinutes(-15));
@@ -277,8 +280,8 @@ public class ThumbnailQueueTests
         var modelHash1 = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         var modelHash2 = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
         
-        var pendingJob = ThumbnailJob.Create(modelId, modelHash1, DateTime.UtcNow);
-        var processingJob = ThumbnailJob.Create(modelId, modelHash2, DateTime.UtcNow);
+        var pendingJob = ThumbnailJob.Create(modelId, 1, modelHash1, DateTime.UtcNow);
+        var processingJob = ThumbnailJob.Create(modelId, 1, modelHash2, DateTime.UtcNow);
         processingJob.TryClaim("worker-1", DateTime.UtcNow);
 
         var activeJobs = new List<ThumbnailJob> { pendingJob, processingJob };
@@ -328,7 +331,7 @@ public class ThumbnailQueueTests
         // Arrange
         var modelId = 1;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        var pendingJob = ThumbnailJob.Create(modelId, modelHash, DateTime.UtcNow);
+        var pendingJob = ThumbnailJob.Create(modelId, 1, modelHash, DateTime.UtcNow);
 
         var activeJobs = new List<ThumbnailJob> { pendingJob };
 

@@ -53,7 +53,7 @@ public class DomainEventDispatcherTests
             .Returns(new List<object>());
 
         var dispatcher = new DomainEventDispatcher(mockServiceProvider.Object, mockLogger.Object);
-        var domainEvent = new ModelUploadedEvent(1, "test-hash", true);
+        var domainEvent = new ModelUploadedEvent(1, 1, "test-hash", true);
 
         // Act
         var result = await dispatcher.PublishAsync(new[] { domainEvent }, CancellationToken.None);

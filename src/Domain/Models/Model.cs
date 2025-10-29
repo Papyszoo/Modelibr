@@ -216,14 +216,18 @@ namespace Domain.Models
         /// Raises a ModelUploaded domain event for this model.
         /// Should be called when a model upload is completed.
         /// </summary>
+        /// <param name="modelVersionId">The ID of the model version</param>
         /// <param name="modelHash">The SHA256 hash of the uploaded model file</param>
         /// <param name="isNewModel">Whether this is a new model or an existing one</param>
-        public void RaiseModelUploadedEvent(string modelHash, bool isNewModel)
+        public void RaiseModelUploadedEvent(int modelVersionId, string modelHash, bool isNewModel)
         {
+            if (modelVersionId <= 0)
+                throw new ArgumentException("Model version ID must be greater than 0.", nameof(modelVersionId));
+            
             if (string.IsNullOrWhiteSpace(modelHash))
                 throw new ArgumentException("Model hash cannot be null or empty.", nameof(modelHash));
 
-            RaiseDomainEvent(new ModelUploadedEvent(Id, modelHash, isNewModel));
+            RaiseDomainEvent(new ModelUploadedEvent(Id, modelVersionId, modelHash, isNewModel));
         }
 
         /// <summary>

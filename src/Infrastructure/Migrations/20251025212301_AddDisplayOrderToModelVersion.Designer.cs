@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251025212301_AddDisplayOrderToModelVersion")]
+    partial class AddDisplayOrderToModelVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -446,9 +449,6 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ModelId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ModelVersionId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -471,9 +471,6 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ModelId")
-                        .IsUnique();
-
-                    b.HasIndex("ModelVersionId")
                         .IsUnique();
 
                     b.ToTable("Thumbnails");
@@ -521,9 +518,6 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ModelId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ModelVersionId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -532,10 +526,10 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelId");
-
-                    b.HasIndex("ModelVersionId")
+                    b.HasIndex("ModelHash")
                         .IsUnique();
+
+                    b.HasIndex("ModelId");
 
                     b.HasIndex("Status", "CreatedAt");
 
@@ -763,15 +757,7 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
-                        .WithOne("Thumbnail")
-                        .HasForeignKey("Domain.Models.Thumbnail", "ModelVersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Model");
-
-                    b.Navigation("ModelVersion");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJob", b =>
@@ -896,8 +882,6 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.ModelVersion", b =>
                 {
                     b.Navigation("Files");
-
-                    b.Navigation("Thumbnail");
                 });
 
             modelBuilder.Entity("Domain.Models.TextureSet", b =>

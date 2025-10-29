@@ -38,11 +38,11 @@ public class ThumbnailJobRepository : IThumbnailJobRepository
             .FirstOrDefaultAsync(tj => tj.Id == id, cancellationToken);
     }
 
-    public async Task<ThumbnailJob?> GetByModelHashAsync(string modelHash, CancellationToken cancellationToken = default)
+    public async Task<ThumbnailJob?> GetByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default)
     {
         return await _context.ThumbnailJobs
             .Include(tj => tj.Model)
-            .FirstOrDefaultAsync(tj => tj.ModelHash == modelHash, cancellationToken);
+            .FirstOrDefaultAsync(tj => tj.ModelVersionId == modelVersionId, cancellationToken);
     }
 
     public async Task<IEnumerable<ThumbnailJob>> GetActiveJobsByModelIdAsync(int modelId, CancellationToken cancellationToken = default)

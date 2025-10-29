@@ -23,9 +23,9 @@ public interface IThumbnailJobRepository
     Task<ThumbnailJob?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a thumbnail job by model hash.
+    /// Gets a thumbnail job by model version ID.
     /// </summary>
-    Task<ThumbnailJob?> GetByModelHashAsync(string modelHash, CancellationToken cancellationToken = default);
+    Task<ThumbnailJob?> GetByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets active (pending or processing) thumbnail jobs for a specific model.
