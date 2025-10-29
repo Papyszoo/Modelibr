@@ -60,7 +60,7 @@ public class CompleteThumbnailJobCommandHandlerTests
     {
         // Arrange
         var command = new CompleteThumbnailJobCommand(1, "/path/thumb.jpg", 1024, 100, 100);
-        var job = ThumbnailJob.Create(1, "hash123", DateTime.UtcNow, 3, 10);
+        var job = ThumbnailJob.Create(1, 1, "hash123", DateTime.UtcNow, 3, 10);
         
         _mockThumbnailJobRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(job);
@@ -80,16 +80,16 @@ public class CompleteThumbnailJobCommandHandlerTests
     {
         // Arrange
         var command = new CompleteThumbnailJobCommand(1, "/path/thumb.jpg", 1024, 100, 100);
-        var job = ThumbnailJob.Create(1, "hash123", DateTime.UtcNow, 3, 10);
+        var job = ThumbnailJob.Create(1, 1, "hash123", DateTime.UtcNow, 3, 10);
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var now = DateTime.UtcNow;
-        var newThumbnail = Thumbnail.Create(1, now);
+        var newThumbnail = Thumbnail.Create(1, 1, now);
 
         _mockThumbnailJobRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(job);
         _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(model);
-        _mockThumbnailRepository.Setup(x => x.GetByModelIdAsync(1, It.IsAny<CancellationToken>()))
+        _mockThumbnailRepository.Setup(x => x.GetByModelVersionIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Thumbnail?)null);
         _mockThumbnailRepository.Setup(x => x.AddAsync(It.IsAny<Thumbnail>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(newThumbnail);
@@ -114,16 +114,16 @@ public class CompleteThumbnailJobCommandHandlerTests
     {
         // Arrange
         var command = new CompleteThumbnailJobCommand(1, "/path/thumb.jpg", 1024, 100, 100);
-        var job = ThumbnailJob.Create(1, "hash123", DateTime.UtcNow, 3, 10);
+        var job = ThumbnailJob.Create(1, 1, "hash123", DateTime.UtcNow, 3, 10);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var existingThumbnail = Thumbnail.Create(1, DateTime.UtcNow.AddMinutes(-10));
+        var existingThumbnail = Thumbnail.Create(1, 1, DateTime.UtcNow.AddMinutes(-10));
         var now = DateTime.UtcNow;
 
         _mockThumbnailJobRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(job);
         _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(model);
-        _mockThumbnailRepository.Setup(x => x.GetByModelIdAsync(1, It.IsAny<CancellationToken>()))
+        _mockThumbnailRepository.Setup(x => x.GetByModelVersionIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingThumbnail);
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
 

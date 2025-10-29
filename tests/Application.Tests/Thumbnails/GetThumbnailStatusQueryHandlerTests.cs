@@ -61,7 +61,7 @@ public class GetThumbnailStatusQueryHandlerTests
         // Arrange
         var query = new GetThumbnailStatusQuery(1);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var thumbnail = Thumbnail.Create(1, DateTime.UtcNow);
+        var thumbnail = Thumbnail.Create(1, 1, DateTime.UtcNow);
         thumbnail.MarkAsReady("/path/to/thumbnail.png", 1024, 256, 256, DateTime.UtcNow);
         model.Thumbnail = thumbnail;
 
