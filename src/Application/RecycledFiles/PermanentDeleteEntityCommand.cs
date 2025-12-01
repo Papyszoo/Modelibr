@@ -61,7 +61,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
         switch (request.EntityType.ToLowerInvariant())
         {
             case "model":
-                var model = await _modelRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var model = await _modelRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (model == null)
                     return Result.Failure<GetDeletePreviewResponse>(new Error("ModelNotFound", "Model not found"));
                 
@@ -75,7 +75,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 break;
 
             case "modelversion":
-                var version = await _modelVersionRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var version = await _modelVersionRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (version == null)
                     return Result.Failure<GetDeletePreviewResponse>(new Error("VersionNotFound", "Model version not found"));
                 
@@ -84,7 +84,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 break;
 
             case "file":
-                var file = await _fileRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var file = await _fileRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (file == null)
                     return Result.Failure<GetDeletePreviewResponse>(new Error("FileNotFound", "File not found"));
                 
@@ -93,7 +93,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 break;
 
             case "textureset":
-                var textureSet = await _textureSetRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var textureSet = await _textureSetRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (textureSet == null)
                     return Result.Failure<GetDeletePreviewResponse>(new Error("TextureSetNotFound", "Texture set not found"));
                 
@@ -140,7 +140,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         switch (request.EntityType.ToLowerInvariant())
         {
             case "model":
-                var model = await _modelRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var model = await _modelRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (model == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("ModelNotFound", "Model not found"));
                 
@@ -156,7 +156,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Model permanently deleted", deletedFiles));
 
             case "modelversion":
-                var version = await _modelVersionRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var version = await _modelVersionRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (version == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("VersionNotFound", "Model version not found"));
                 
@@ -171,7 +171,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Model version permanently deleted", deletedFiles));
 
             case "file":
-                var fileToDelete = await _fileRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var fileToDelete = await _fileRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (fileToDelete == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("FileNotFound", "File not found"));
                 
@@ -183,7 +183,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 return Result.Success(new PermanentDeleteEntityResponse(true, "File permanently deleted", deletedFiles));
 
             case "textureset":
-                var textureSet = await _textureSetRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var textureSet = await _textureSetRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (textureSet == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("TextureSetNotFound", "Texture set not found"));
                 
