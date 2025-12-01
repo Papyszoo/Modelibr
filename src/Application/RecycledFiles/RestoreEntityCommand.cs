@@ -41,7 +41,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         switch (request.EntityType.ToLowerInvariant())
         {
             case "model":
-                var model = await _modelRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var model = await _modelRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (model == null)
                     return Result.Failure<RestoreEntityResponse>(new Error("ModelNotFound", "Model not found"));
                 
@@ -50,7 +50,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 return Result.Success(new RestoreEntityResponse(true, "Model restored successfully"));
 
             case "modelversion":
-                var version = await _modelVersionRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var version = await _modelVersionRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (version == null)
                     return Result.Failure<RestoreEntityResponse>(new Error("VersionNotFound", "Model version not found"));
                 
@@ -59,18 +59,16 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 return Result.Success(new RestoreEntityResponse(true, "Model version restored successfully"));
 
             case "file":
-                var file = await _fileRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var file = await _fileRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (file == null)
                     return Result.Failure<RestoreEntityResponse>(new Error("FileNotFound", "File not found"));
                 
                 file.Restore(now);
-                // Note: We need to add an UpdateAsync method to IFileRepository
-                // For now, we can use the context directly through ModelRepository.UpdateAsync
-                // or add it to the repository interface
+                await _fileRepository.UpdateAsync(file, cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "File restored successfully"));
 
             case "textureset":
-                var textureSet = await _textureSetRepository.GetByIdAsync(request.EntityId, cancellationToken);
+                var textureSet = await _textureSetRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (textureSet == null)
                     return Result.Failure<RestoreEntityResponse>(new Error("TextureSetNotFound", "Texture set not found"));
                 

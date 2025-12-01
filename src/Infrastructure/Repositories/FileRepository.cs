@@ -46,6 +46,20 @@ internal sealed class FileRepository : IFileRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Domain.Models.File?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Files
+            .Where(f => f.IsDeleted)
+            .Include(f => f.Models)
+            .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+    }
+
+    public async Task UpdateAsync(Domain.Models.File file, CancellationToken cancellationToken = default)
+    {
+        _context.Files.Update(file);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<Domain.Models.File>> GetFilesByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
     {
         return await _context.Files

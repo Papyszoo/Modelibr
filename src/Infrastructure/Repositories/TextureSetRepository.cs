@@ -53,6 +53,19 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<TextureSet?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.TextureSets
+            .Where(tp => tp.IsDeleted)
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.File)
+            .Include(tp => tp.Models)
+            .Include(tp => tp.Packs)
+            .Include(tp => tp.Projects)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
+    }
+
     public async Task<TextureSet?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets

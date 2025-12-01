@@ -113,4 +113,18 @@ internal sealed class ModelRepository : IModelRepository
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<Model?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Models
+            .Where(m => m.IsDeleted)
+            .Include(m => m.Files)
+            .Include(m => m.TextureSets)
+            .Include(m => m.Packs)
+            .Include(m => m.Projects)
+            .Include(m => m.Thumbnail)
+            .Include(m => m.Versions)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+    }
 }

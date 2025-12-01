@@ -55,6 +55,14 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<ModelVersion?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.ModelVersions
+            .Where(v => v.IsDeleted)
+            .Include(v => v.Files)
+            .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+    }
+
     public async Task<ModelVersion> AddAsync(ModelVersion version, CancellationToken cancellationToken = default)
     {
         _context.ModelVersions.Add(version);
