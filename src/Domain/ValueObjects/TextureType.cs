@@ -30,7 +30,19 @@ public enum TextureType
     Diffuse = 7,
     
     /// <summary>Specular map - reflectivity and highlight intensity</summary>
-    Specular = 8
+    Specular = 8,
+    
+    /// <summary>Emissive map - areas where the mesh emits light</summary>
+    Emissive = 9,
+    
+    /// <summary>Bump map - simulates surface details by altering normals</summary>
+    Bump = 10,
+    
+    /// <summary>Alpha map - defines transparency across the surface</summary>
+    Alpha = 11,
+    
+    /// <summary>Displacement map - actual geometric displacement of vertices</summary>
+    Displacement = 12
 }
 
 /// <summary>
@@ -47,7 +59,11 @@ public static class TextureTypeExtensions
         TextureType.Roughness,
         TextureType.Metallic,
         TextureType.Diffuse,
-        TextureType.Specular
+        TextureType.Specular,
+        TextureType.Emissive,
+        TextureType.Bump,
+        TextureType.Alpha,
+        TextureType.Displacement
     };
 
     /// <summary>
@@ -89,6 +105,10 @@ public static class TextureTypeExtensions
             TextureType.Metallic => "Metallic surface map",
             TextureType.Diffuse => "Diffuse color map (legacy)",
             TextureType.Specular => "Specular reflectivity map",
+            TextureType.Emissive => "Emissive map for glowing areas",
+            TextureType.Bump => "Bump map for surface detail",
+            TextureType.Alpha => "Alpha map for transparency",
+            TextureType.Displacement => "Displacement map for vertex displacement",
             _ => "Unknown texture type"
         };
     }

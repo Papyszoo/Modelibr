@@ -46,6 +46,10 @@ function MergeTextureSetDialog({
       TextureType.Metallic,
       TextureType.Diffuse,
       TextureType.Specular,
+      TextureType.Emissive,
+      TextureType.Bump,
+      TextureType.Alpha,
+      TextureType.Displacement,
     ]
 
     return allTypes.map(type => ({

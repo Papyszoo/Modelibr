@@ -15,6 +15,10 @@ public class TextureTypeTests
     [InlineData(TextureType.Metallic)]
     [InlineData(TextureType.Diffuse)]
     [InlineData(TextureType.Specular)]
+    [InlineData(TextureType.Emissive)]
+    [InlineData(TextureType.Bump)]
+    [InlineData(TextureType.Alpha)]
+    [InlineData(TextureType.Displacement)]
     public void ValidateForStorage_WithSupportedTypes_ReturnsSuccess(TextureType textureType)
     {
         // Act
@@ -47,7 +51,7 @@ public class TextureTypeTests
         var supportedTypes = TextureTypeExtensions.GetSupportedTypes();
 
         // Assert
-        Assert.Equal(8, supportedTypes.Count);
+        Assert.Equal(12, supportedTypes.Count);
         Assert.Contains(TextureType.Albedo, supportedTypes);
         Assert.Contains(TextureType.Normal, supportedTypes);
         Assert.Contains(TextureType.Height, supportedTypes);
@@ -56,6 +60,10 @@ public class TextureTypeTests
         Assert.Contains(TextureType.Metallic, supportedTypes);
         Assert.Contains(TextureType.Diffuse, supportedTypes);
         Assert.Contains(TextureType.Specular, supportedTypes);
+        Assert.Contains(TextureType.Emissive, supportedTypes);
+        Assert.Contains(TextureType.Bump, supportedTypes);
+        Assert.Contains(TextureType.Alpha, supportedTypes);
+        Assert.Contains(TextureType.Displacement, supportedTypes);
     }
 
     [Theory]
@@ -67,6 +75,10 @@ public class TextureTypeTests
     [InlineData(TextureType.Metallic, "Metallic surface map")]
     [InlineData(TextureType.Diffuse, "Diffuse color map (legacy)")]
     [InlineData(TextureType.Specular, "Specular reflectivity map")]
+    [InlineData(TextureType.Emissive, "Emissive map for glowing areas")]
+    [InlineData(TextureType.Bump, "Bump map for surface detail")]
+    [InlineData(TextureType.Alpha, "Alpha map for transparency")]
+    [InlineData(TextureType.Displacement, "Displacement map for vertex displacement")]
     public void GetDescription_ReturnsCorrectDescription(TextureType textureType, string expectedDescription)
     {
         // Act

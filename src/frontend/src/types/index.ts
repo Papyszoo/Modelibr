@@ -37,6 +37,10 @@ export enum TextureType {
   Metallic = 6,
   Diffuse = 7,
   Specular = 8,
+  Emissive = 9,
+  Bump = 10,
+  Alpha = 11,
+  Displacement = 12,
 }
 
 export interface TextureDto {

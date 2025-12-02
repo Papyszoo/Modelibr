@@ -10,7 +10,7 @@ export interface TextureTypeInfo {
 // Texture type definitions with visual indicators
 export const TEXTURE_TYPE_INFO: Record<TextureType, TextureTypeInfo> = {
   [TextureType.Albedo]: {
-    label: 'Albedo',
+    label: 'Albedo (Color)',
     description: 'Base color or diffuse map - the main surface color',
     color: '#3b82f6', // Blue
     icon: 'pi-palette',
@@ -57,6 +57,30 @@ export const TEXTURE_TYPE_INFO: Record<TextureType, TextureTypeInfo> = {
     description: 'Specular map - reflectivity and highlight intensity',
     color: '#06b6d4', // Cyan
     icon: 'pi-sparkles',
+  },
+  [TextureType.Emissive]: {
+    label: 'Emissive',
+    description: 'Emissive map - areas where the mesh emits light',
+    color: '#fbbf24', // Yellow
+    icon: 'pi-sun',
+  },
+  [TextureType.Bump]: {
+    label: 'Bump',
+    description: 'Bump map - simulates surface details by altering normals',
+    color: '#a78bfa', // Light purple
+    icon: 'pi-chart-bar',
+  },
+  [TextureType.Alpha]: {
+    label: 'Alpha',
+    description: 'Alpha map - defines transparency across the surface',
+    color: '#9ca3af', // Light gray
+    icon: 'pi-filter',
+  },
+  [TextureType.Displacement]: {
+    label: 'Displacement',
+    description: 'Displacement map - actual geometric displacement of vertices',
+    color: '#7c3aed', // Deep purple
+    icon: 'pi-arrows-v',
   },
 }
 
