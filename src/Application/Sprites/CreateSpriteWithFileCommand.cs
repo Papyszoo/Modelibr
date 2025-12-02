@@ -71,6 +71,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                     file.Id,
                     _dateTimeProvider.UtcNow,
                     packId: null,
+                    projectId: null,
                     modelId: null,
                     textureSetId: null,
                     spriteId: createdSprite.Id);
