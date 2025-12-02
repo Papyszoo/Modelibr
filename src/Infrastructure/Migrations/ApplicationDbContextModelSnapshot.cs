@@ -90,6 +90,9 @@ namespace Infrastructure.Migrations
                     b.Property<int?>("ProjectId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("SpriteId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("TextureSetId")
                         .HasColumnType("integer");
 
@@ -112,6 +115,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("PackId");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("SpriteId");
 
                     b.HasIndex("TextureSetId");
 
@@ -354,6 +359,89 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Settings");
+                });
+
+            modelBuilder.Entity("Domain.Models.Sprite", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("SpriteCategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SpriteType")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ThumbnailId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("Name");
+
+                    b.HasIndex("SpriteCategoryId");
+
+                    b.HasIndex("ThumbnailId");
+
+                    b.ToTable("Sprites");
+                });
+
+            modelBuilder.Entity("Domain.Models.SpriteCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("SpriteCategories");
                 });
 
             modelBuilder.Entity("Domain.Models.Stage", b =>
@@ -672,6 +760,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("ModelTextureSets", (string)null);
                 });
 
+            modelBuilder.Entity("PackSprite", b =>
+                {
+                    b.Property<int>("PacksId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SpritesId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PacksId", "SpritesId");
+
+                    b.HasIndex("SpritesId");
+
+                    b.ToTable("PackSprites", (string)null);
+                });
+
             modelBuilder.Entity("PackTextureSet", b =>
                 {
                     b.Property<int>("PacksId")
@@ -685,6 +788,21 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TextureSetsId");
 
                     b.ToTable("PackTextureSets", (string)null);
+                });
+
+            modelBuilder.Entity("ProjectSprite", b =>
+                {
+                    b.Property<int>("ProjectsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SpritesId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ProjectsId", "SpritesId");
+
+                    b.HasIndex("SpritesId");
+
+                    b.ToTable("ProjectSprites", (string)null);
                 });
 
             modelBuilder.Entity("ProjectTextureSet", b =>
@@ -725,6 +843,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Domain.Models.Sprite", "Sprite")
+                        .WithMany()
+                        .HasForeignKey("SpriteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Domain.Models.TextureSet", "TextureSet")
                         .WithMany()
                         .HasForeignKey("TextureSetId")
@@ -737,6 +860,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Pack");
 
                     b.Navigation("Project");
+
+                    b.Navigation("Sprite");
 
                     b.Navigation("TextureSet");
                 });
@@ -768,6 +893,30 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Model");
+                });
+
+            modelBuilder.Entity("Domain.Models.Sprite", b =>
+                {
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.SpriteCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("SpriteCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Thumbnail", "Thumbnail")
+                        .WithMany()
+                        .HasForeignKey("ThumbnailId");
+
+                    b.Navigation("Category");
+
+                    b.Navigation("File");
+
+                    b.Navigation("Thumbnail");
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>
@@ -879,6 +1028,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PackSprite", b =>
+                {
+                    b.HasOne("Domain.Models.Pack", null)
+                        .WithMany()
+                        .HasForeignKey("PacksId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Sprite", null)
+                        .WithMany()
+                        .HasForeignKey("SpritesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PackTextureSet", b =>
                 {
                     b.HasOne("Domain.Models.Pack", null)
@@ -890,6 +1054,21 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Models.TextureSet", null)
                         .WithMany()
                         .HasForeignKey("TextureSetsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ProjectSprite", b =>
+                {
+                    b.HasOne("Domain.Models.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Sprite", null)
+                        .WithMany()
+                        .HasForeignKey("SpritesId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
