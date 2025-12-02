@@ -156,12 +156,10 @@ internal sealed class ModelRepository : IModelRepository
             // Get version files that are only associated with this model's versions
             foreach (var version in model.Versions)
             {
-                var versionFilesToDelete = version.Files
-                    .Where(f => f.ModelVersionId == version.Id)
-                    .ToList();
-                if (versionFilesToDelete.Any())
+                // Version files have direct FK to version, so they're not shared
+                if (version.Files.Any())
                 {
-                    _context.Files.RemoveRange(versionFilesToDelete);
+                    _context.Files.RemoveRange(version.Files);
                 }
             }
             

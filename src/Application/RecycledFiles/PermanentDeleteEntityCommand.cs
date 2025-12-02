@@ -155,7 +155,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     }
                 }
                 
-                // Delete version files from disk
+                // Delete version files from disk (version files have direct FK to version, not shared)
                 foreach (var version in model.Versions)
                 {
                     foreach (var versionFile in version.Files)
