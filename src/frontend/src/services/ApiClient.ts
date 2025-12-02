@@ -1134,6 +1134,58 @@ class ApiClient {
     const response = await this.client.get('/sprite-categories')
     return response.data
   }
+
+  async createSpriteCategory(
+    name: string,
+    description?: string
+  ): Promise<{
+    id: number
+    name: string
+    description: string | null
+  }> {
+    const response = await this.client.post('/sprite-categories', {
+      name,
+      description,
+    })
+    return response.data
+  }
+
+  async updateSpriteCategory(
+    id: number,
+    name: string,
+    description?: string
+  ): Promise<{
+    id: number
+    name: string
+    description: string | null
+  }> {
+    const response = await this.client.put(`/sprite-categories/${id}`, {
+      name,
+      description,
+    })
+    return response.data
+  }
+
+  async deleteSpriteCategory(id: number): Promise<void> {
+    await this.client.delete(`/sprite-categories/${id}`)
+  }
+
+  async updateSprite(
+    id: number,
+    updates: {
+      name?: string
+      spriteType?: number
+      categoryId?: number | null
+    }
+  ): Promise<{
+    id: number
+    name: string
+    spriteType: number
+    categoryId: number | null
+  }> {
+    const response = await this.client.put(`/sprites/${id}`, updates)
+    return response.data
+  }
 }
 
 export default new ApiClient()

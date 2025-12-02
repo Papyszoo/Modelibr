@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Toast } from 'primereact/toast'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Button } from 'primereact/button'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
+import { InputTextarea } from 'primereact/inputtextarea'
+import { Dropdown } from 'primereact/dropdown'
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
@@ -20,13 +25,25 @@ interface SpriteDto {
   updatedAt: string
 }
 
-interface GetAllSpritesResponse {
-  sprites: SpriteDto[]
+interface SpriteCategoryDto {
+  id: number
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 function SpriteList() {
   const [sprites, setSprites] = useState<SpriteDto[]>([])
+  const [categories, setCategories] = useState<SpriteCategoryDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false)
+  const [showAssignDialog, setShowAssignDialog] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<SpriteCategoryDto | null>(null)
+  const [categoryName, setCategoryName] = useState('')
+  const [categoryDescription, setCategoryDescription] = useState('')
+  const [selectedSprite, setSelectedSprite] = useState<SpriteDto | null>(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const toast = useRef<Toast>(null)
   const uploadProgressContext = useUploadProgress()
 
@@ -49,9 +66,20 @@ function SpriteList() {
     }
   }, [])
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const response = await ApiClient.getAllSpriteCategories()
+      setCategories(response.categories || [])
+    } catch (error) {
+      console.error('Failed to load categories:', error)
+      setCategories([])
+    }
+  }, [])
+
   useEffect(() => {
     loadSprites()
-  }, [loadSprites])
+    loadCategories()
+  }, [loadSprites, loadCategories])
 
   const handleFileDrop = async (files: File[] | FileList) => {
     const fileArray = Array.from(files)
@@ -155,6 +183,139 @@ function SpriteList() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
+  // Category management
+  const openCreateCategoryDialog = () => {
+    setEditingCategory(null)
+    setCategoryName('')
+    setCategoryDescription('')
+    setShowCategoryDialog(true)
+  }
+
+  const openEditCategoryDialog = (category: SpriteCategoryDto) => {
+    setEditingCategory(category)
+    setCategoryName(category.name)
+    setCategoryDescription(category.description || '')
+    setShowCategoryDialog(true)
+  }
+
+  const handleSaveCategory = async () => {
+    if (!categoryName.trim()) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Validation Error',
+        detail: 'Category name is required',
+        life: 3000,
+      })
+      return
+    }
+
+    try {
+      if (editingCategory) {
+        await ApiClient.updateSpriteCategory(
+          editingCategory.id,
+          categoryName.trim(),
+          categoryDescription.trim() || undefined
+        )
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Category updated successfully',
+          life: 3000,
+        })
+      } else {
+        await ApiClient.createSpriteCategory(
+          categoryName.trim(),
+          categoryDescription.trim() || undefined
+        )
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Category created successfully',
+          life: 3000,
+        })
+      }
+      setShowCategoryDialog(false)
+      loadCategories()
+      loadSprites() // Refresh to update category names
+    } catch (error) {
+      console.error('Failed to save category:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to save category',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleDeleteCategory = (category: SpriteCategoryDto) => {
+    confirmDialog({
+      message: `Are you sure you want to delete the category "${category.name}"? Sprites in this category will become uncategorized.`,
+      header: 'Delete Category',
+      icon: 'pi pi-exclamation-triangle',
+      acceptClassName: 'p-button-danger',
+      accept: async () => {
+        try {
+          await ApiClient.deleteSpriteCategory(category.id)
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Category deleted successfully',
+            life: 3000,
+          })
+          loadCategories()
+          loadSprites()
+        } catch (error) {
+          console.error('Failed to delete category:', error)
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to delete category',
+            life: 3000,
+          })
+        }
+      },
+    })
+  }
+
+  // Assign sprite to category
+  const openAssignDialog = (sprite: SpriteDto) => {
+    setSelectedSprite(sprite)
+    setSelectedCategoryId(sprite.categoryId)
+    setShowAssignDialog(true)
+  }
+
+  const handleAssignCategory = async () => {
+    if (!selectedSprite) return
+
+    try {
+      await ApiClient.updateSprite(selectedSprite.id, {
+        categoryId: selectedCategoryId,
+      })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Sprite category updated successfully',
+        life: 3000,
+      })
+      setShowAssignDialog(false)
+      loadSprites()
+    } catch (error) {
+      console.error('Failed to update sprite category:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to update sprite category',
+        life: 3000,
+      })
+    }
+  }
+
+  const categoryOptions = [
+    { label: 'No Category', value: null },
+    ...categories.map(cat => ({ label: cat.name, value: cat.id }))
+  ]
+
   if (loading) {
     return (
       <div className="sprite-list-loading">
@@ -172,11 +333,44 @@ function SpriteList() {
       onDragLeave={onDragLeave}
     >
       <Toast ref={toast} />
+      <ConfirmDialog />
 
       <div className="sprite-list-header">
-        <h2>Sprites</h2>
-        <span className="sprite-count">{sprites.length} sprites</span>
+        <div className="sprite-list-title">
+          <h2>Sprites</h2>
+          <span className="sprite-count">{sprites.length} sprites</span>
+        </div>
+        <div className="sprite-list-actions">
+          <Button
+            label="Manage Categories"
+            icon="pi pi-folder"
+            className="p-button-outlined"
+            onClick={openCreateCategoryDialog}
+          />
+        </div>
       </div>
+
+      {categories.length > 0 && (
+        <div className="sprite-categories-bar">
+          {categories.map(category => (
+            <div key={category.id} className="category-chip">
+              <span>{category.name}</span>
+              <Button
+                icon="pi pi-pencil"
+                className="p-button-text p-button-sm"
+                onClick={() => openEditCategoryDialog(category)}
+                tooltip="Edit category"
+              />
+              <Button
+                icon="pi pi-trash"
+                className="p-button-text p-button-sm p-button-danger"
+                onClick={() => handleDeleteCategory(category)}
+                tooltip="Delete category"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {sprites.length === 0 ? (
         <div className="sprite-list-empty">
@@ -187,7 +381,7 @@ function SpriteList() {
       ) : (
         <div className="sprite-grid">
           {sprites.map(sprite => (
-            <div key={sprite.id} className="sprite-card">
+            <div key={sprite.id} className="sprite-card" onClick={() => openAssignDialog(sprite)}>
               <div className="sprite-preview">
                 <img
                   src={ApiClient.getFileUrl(sprite.fileId.toString())}
@@ -216,6 +410,86 @@ function SpriteList() {
         <i className="pi pi-upload" />
         <span>Drop images here</span>
       </div>
+
+      {/* Create/Edit Category Dialog */}
+      <Dialog
+        header={editingCategory ? 'Edit Category' : 'Create Category'}
+        visible={showCategoryDialog}
+        onHide={() => setShowCategoryDialog(false)}
+        style={{ width: '400px' }}
+        footer={
+          <div>
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              className="p-button-text"
+              onClick={() => setShowCategoryDialog(false)}
+            />
+            <Button
+              label="Save"
+              icon="pi pi-check"
+              onClick={handleSaveCategory}
+            />
+          </div>
+        }
+      >
+        <div className="p-fluid">
+          <div className="field">
+            <label htmlFor="categoryName">Name *</label>
+            <InputText
+              id="categoryName"
+              value={categoryName}
+              onChange={(e) => setCategoryName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="categoryDescription">Description</label>
+            <InputTextarea
+              id="categoryDescription"
+              value={categoryDescription}
+              onChange={(e) => setCategoryDescription(e.target.value)}
+              rows={3}
+            />
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Assign Category Dialog */}
+      <Dialog
+        header={`Assign Category to "${selectedSprite?.name}"`}
+        visible={showAssignDialog}
+        onHide={() => setShowAssignDialog(false)}
+        style={{ width: '400px' }}
+        footer={
+          <div>
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              className="p-button-text"
+              onClick={() => setShowAssignDialog(false)}
+            />
+            <Button
+              label="Save"
+              icon="pi pi-check"
+              onClick={handleAssignCategory}
+            />
+          </div>
+        }
+      >
+        <div className="p-fluid">
+          <div className="field">
+            <label htmlFor="spriteCategory">Category</label>
+            <Dropdown
+              id="spriteCategory"
+              value={selectedCategoryId}
+              options={categoryOptions}
+              onChange={(e) => setSelectedCategoryId(e.value)}
+              placeholder="Select a category"
+            />
+          </div>
+        </div>
+      </Dialog>
     </div>
   )
 }

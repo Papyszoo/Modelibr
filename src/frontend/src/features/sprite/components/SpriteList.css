@@ -56,14 +56,52 @@
   border-bottom: 1px solid var(--surface-border);
 }
 
-.sprite-list-header h2 {
+.sprite-list-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sprite-list-title h2 {
   margin: 0;
   font-size: 1.25rem;
+}
+
+.sprite-list-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .sprite-count {
   color: var(--text-color-secondary);
   font-size: 0.875rem;
+}
+
+.sprite-categories-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--surface-ground);
+  border-radius: 6px;
+}
+
+.category-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.category-chip .p-button {
+  padding: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .sprite-list-empty {
@@ -93,6 +131,7 @@
   border-radius: 8px;
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
 }
 
 .sprite-card:hover {
@@ -153,4 +192,15 @@
 .sprite-size {
   font-size: 0.75rem;
   color: var(--text-color-secondary);
+}
+
+/* Dialog styling */
+.field {
+  margin-bottom: 1rem;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
 }
