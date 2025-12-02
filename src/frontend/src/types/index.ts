@@ -11,6 +11,8 @@ export interface Tab {
     | 'packViewer'
     | 'projects'
     | 'projectViewer'
+    | 'sprites'
+    | 'spriteViewer'
     | 'stageList'
     | 'stageEditor'
     | 'settings'
@@ -21,6 +23,7 @@ export interface Tab {
   setId?: string
   packId?: string
   projectId?: string
+  spriteId?: string
   stageId?: string
 }
 

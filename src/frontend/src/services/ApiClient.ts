@@ -1046,6 +1046,55 @@ class ApiClient {
   async softDeleteTextureSet(textureSetId: number): Promise<void> {
     await this.client.delete(`/texture-sets/${textureSetId}`)
   }
+
+  // Sprite methods
+  async getAllSprites(): Promise<{
+    sprites: Array<{
+      id: number
+      name: string
+      fileId: number
+      spriteType: number
+      categoryId: number | null
+      categoryName: string | null
+      fileName: string
+      fileSizeBytes: number
+      createdAt: string
+      updatedAt: string
+    }>
+  }> {
+    const response = await this.client.get('/sprites')
+    return response.data
+  }
+
+  async getSpriteById(id: number): Promise<{
+    id: number
+    name: string
+    fileId: number
+    spriteType: number
+    categoryId: number | null
+    categoryName: string | null
+    fileName: string
+    fileSizeBytes: number
+    createdAt: string
+    updatedAt: string
+  }> {
+    const response = await this.client.get(`/sprites/${id}`)
+    return response.data
+  }
+
+  // Sprite Category methods
+  async getAllSpriteCategories(): Promise<{
+    categories: Array<{
+      id: number
+      name: string
+      description: string | null
+      createdAt: string
+      updatedAt: string
+    }>
+  }> {
+    const response = await this.client.get('/sprite-categories')
+    return response.data
+  }
 }
 
 export default new ApiClient()
