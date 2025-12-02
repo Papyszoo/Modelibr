@@ -35,6 +35,13 @@ public sealed class FileType : IEquatable<FileType>
     public static readonly FileType Texture = new("texture", "Texture Image", false, FileTypeCategory.Texture);
     public static readonly FileType Material = new("material", "Material Definition", false, FileTypeCategory.Material);
     public static readonly FileType Other = new("other", "Other file type", false, FileTypeCategory.Other);
+    
+    // Sprite types
+    public static readonly FileType Sprite = new("sprite", "Sprite Image", false, FileTypeCategory.Sprite);
+    public static readonly FileType SpriteSheet = new("spritesheet", "Sprite Sheet", false, FileTypeCategory.Sprite);
+    public static readonly FileType Gif = new("gif", "Animated GIF", false, FileTypeCategory.Sprite);
+    public static readonly FileType Apng = new("apng", "Animated PNG", false, FileTypeCategory.Sprite);
+    public static readonly FileType WebP = new("webp", "WebP Image", false, FileTypeCategory.Sprite);
 
     private static readonly Dictionary<string, FileType> ExtensionMapping = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -51,10 +58,13 @@ public sealed class FileType : IEquatable<FileType>
         { ".png", Texture },
         { ".tga", Texture },
         { ".bmp", Texture },
-        { ".mtl", Material }
+        { ".mtl", Material },
+        { ".gif", Gif },
+        { ".webp", WebP }
     };
 
     private static readonly FileType[] RenderableTypes = { Obj, Fbx, Gltf, Glb };
+    private static readonly FileType[] SpriteTypes = { Sprite, SpriteSheet, Gif, Apng, WebP, Texture };
 
     public static Result<FileType> FromExtension(string extension)
     {
@@ -111,6 +121,24 @@ public sealed class FileType : IEquatable<FileType>
     }
 
     public static IReadOnlyList<FileType> GetRenderableTypes() => RenderableTypes;
+    
+    public static IReadOnlyList<FileType> GetSpriteTypes() => SpriteTypes;
+    
+    public static Result<FileType> ValidateForSpriteUpload(string fileName)
+    {
+        var fileTypeResult = FromFileName(fileName);
+        if (!fileTypeResult.IsSuccess)
+            return fileTypeResult;
+
+        var fileType = fileTypeResult.Value;
+        if (fileType.Category != FileTypeCategory.Sprite && fileType.Category != FileTypeCategory.Texture)
+        {
+            return Result.Failure<FileType>(
+                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for sprite upload. Only image files (.png, .jpg, .gif, .webp, etc.) are allowed."));
+        }
+
+        return Result.Success(fileType);
+    }
 
     public bool Equals(FileType? other)
     {
@@ -152,8 +180,13 @@ public sealed class FileType : IEquatable<FileType>
             "blend" => "application/x-blender",
             "max" => "application/octet-stream",
             "maya" => "application/octet-stream",
-            "texture" => "image/*", // This would need more specific logic based on actual extension
+            "texture" => "image/*",
             "material" => "text/plain",
+            "sprite" => "image/*",
+            "spritesheet" => "image/*",
+            "gif" => "image/gif",
+            "apng" => "image/apng",
+            "webp" => "image/webp",
             _ => "application/octet-stream"
         };
     }
@@ -165,5 +198,6 @@ public enum FileTypeCategory
     Project,
     Texture,
     Material,
+    Sprite,
     Other
 }
