@@ -68,4 +68,14 @@ internal sealed class FileRepository : IFileRepository
             .Where(f => f.Models.Any(m => m.Id == modelId))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var file = await _context.Files.FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+        if (file != null)
+        {
+            _context.Files.Remove(file);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
 }

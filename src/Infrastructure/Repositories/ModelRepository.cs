@@ -127,4 +127,39 @@ internal sealed class ModelRepository : IModelRepository
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
+
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var model = await _context.Models
+            .Include(m => m.Files)
+            .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.Thumbnail)
+            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+
+        if (model != null)
+        {
+            // Remove all files associated with the model
+            _context.Files.RemoveRange(model.Files);
+            
+            // Remove all version files
+            foreach (var version in model.Versions)
+            {
+                _context.Files.RemoveRange(version.Files);
+            }
+            
+            // Remove all versions
+            _context.ModelVersions.RemoveRange(model.Versions);
+            
+            // Remove thumbnail if exists
+            if (model.Thumbnail != null)
+            {
+                _context.Thumbnails.Remove(model.Thumbnail);
+            }
+            
+            // Remove the model
+            _context.Models.Remove(model);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
 }

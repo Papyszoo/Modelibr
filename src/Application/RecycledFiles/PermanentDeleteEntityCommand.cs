@@ -151,23 +151,39 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     deletedFiles.Add(new DeletedFileInfo(file.FilePath, file.OriginalFileName, file.SizeBytes));
                 }
                 
-                // Database cascade delete will handle related entities
-                // For now, we'll leave this as a TODO since we need to implement hard delete in repository
+                // Delete version files from disk
+                foreach (var version in model.Versions)
+                {
+                    foreach (var versionFile in version.Files)
+                    {
+                        await _fileStorage.DeleteFileAsync(versionFile.FilePath, cancellationToken);
+                        deletedFiles.Add(new DeletedFileInfo(versionFile.FilePath, versionFile.OriginalFileName, versionFile.SizeBytes));
+                    }
+                }
+                
+                // Delete thumbnail from disk if exists
+                if (model.Thumbnail != null && !string.IsNullOrEmpty(model.Thumbnail.ThumbnailPath))
+                {
+                    await _fileStorage.DeleteFileAsync(model.Thumbnail.ThumbnailPath, cancellationToken);
+                }
+                
+                // Delete model and related entities from database
+                await _modelRepository.DeleteAsync(request.EntityId, cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Model permanently deleted", deletedFiles));
 
             case "modelversion":
-                var version = await _modelVersionRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
-                if (version == null)
+                var version2 = await _modelVersionRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (version2 == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("VersionNotFound", "Model version not found"));
                 
                 // Delete files from disk
-                foreach (var versionFile in version.Files)
+                foreach (var versionFile in version2.Files)
                 {
                     await _fileStorage.DeleteFileAsync(versionFile.FilePath, cancellationToken);
                     deletedFiles.Add(new DeletedFileInfo(versionFile.FilePath, versionFile.OriginalFileName, versionFile.SizeBytes));
                 }
                 
-                await _modelVersionRepository.DeleteAsync(version, cancellationToken);
+                await _modelVersionRepository.DeleteAsync(version2, cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Model version permanently deleted", deletedFiles));
 
             case "file":
@@ -179,7 +195,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 await _fileStorage.DeleteFileAsync(fileToDelete.FilePath, cancellationToken);
                 deletedFiles.Add(new DeletedFileInfo(fileToDelete.FilePath, fileToDelete.OriginalFileName, fileToDelete.SizeBytes));
                 
-                // Hard delete from database - need to add to repository
+                // Delete file from database
+                await _fileRepository.DeleteAsync(request.EntityId, cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "File permanently deleted", deletedFiles));
 
             case "textureset":
