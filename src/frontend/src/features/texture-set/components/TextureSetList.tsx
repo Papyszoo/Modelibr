@@ -101,6 +101,11 @@ function TextureSetList() {
     openTextureSetDetailsTab(textureSet)
   }
 
+  const handleTextureSetRecycled = (textureSetId: number) => {
+    // Remove the recycled texture set from the list without making a new request
+    setTextureSets(prevSets => prevSets.filter(ts => ts.id !== textureSetId))
+  }
+
   const handleFileDrop = async (files: File[] | FileList) => {
     const fileArray = Array.from(files)
 
@@ -184,6 +189,7 @@ function TextureSetList() {
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
+        onTextureSetRecycled={handleTextureSetRecycled}
         onTextureSetUpdated={loadTextureSets}
       />
 
