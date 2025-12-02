@@ -52,7 +52,7 @@ export default {
     },
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(three|@react-three|.*\\.mjs$)/)',
+    'node_modules/(?!(three|@react-three|.*\\.mjs$))',
   ],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
 }

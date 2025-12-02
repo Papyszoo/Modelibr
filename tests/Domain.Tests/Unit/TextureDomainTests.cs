@@ -162,7 +162,7 @@ public class TextureDomainTests
             "model/obj",
             FileType.Obj,
             2048L,
-            "b2c3d4e5f6789012345678901234567890123456789012345678901234a1b2",
+            "b2c3d4e5f6789012345678901234567890123456789012345678901234a1b2c3",
             DateTime.UtcNow
         );
     }
