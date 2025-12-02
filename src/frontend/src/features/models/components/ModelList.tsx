@@ -120,6 +120,11 @@ function ModelListContent({
     })
   }
 
+  const handleModelRecycled = (modelId: number) => {
+    // Remove the recycled model from the list without making a new request
+    setModels(prevModels => prevModels.filter(m => m.id !== modelId))
+  }
+
   const handleModelSelect = (model: Model) => {
     if (isTabContent && tabContext) {
       // Open model details in new tab
@@ -167,7 +172,7 @@ function ModelListContent({
           onDragOver={onDragOver}
           onDragEnter={onDragEnter}
           onDragLeave={onDragLeave}
-          onModelUpdated={fetchModels}
+          onModelRecycled={handleModelRecycled}
         />
       )}
     </div>

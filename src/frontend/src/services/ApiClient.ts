@@ -1012,6 +1012,18 @@ class ApiClient {
 
   async restoreEntity(entityType: string, entityId: number): Promise<void> {
     await this.client.post(`/recycled/${entityType}/${entityId}/restore`)
+
+    // Invalidate cache based on entity type so restored items appear in lists
+    switch (entityType.toLowerCase()) {
+      case 'model':
+        useApiCacheStore.getState().invalidateModels()
+        useApiCacheStore.getState().invalidateModelById(entityId.toString())
+        break
+      case 'textureset':
+        useApiCacheStore.getState().invalidateTextureSets()
+        useApiCacheStore.getState().invalidateTextureSetById(entityId)
+        break
+    }
   }
 
   async getDeletePreview(

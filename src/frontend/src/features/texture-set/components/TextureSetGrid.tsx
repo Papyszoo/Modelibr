@@ -18,6 +18,7 @@ interface TextureSetGridProps {
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
   onDragLeave: (e: React.DragEvent) => void
+  onTextureSetRecycled?: (textureSetId: number) => void
   onTextureSetUpdated?: () => void
 }
 
@@ -29,6 +30,7 @@ export default function TextureSetGrid({
   onDragOver,
   onDragEnter,
   onDragLeave,
+  onTextureSetRecycled,
   onTextureSetUpdated,
 }: TextureSetGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -93,9 +95,9 @@ export default function TextureSetGrid({
         detail: 'Texture set moved to recycled files',
         life: 3000,
       })
-      // Call the callback to refresh the texture sets list
-      if (onTextureSetUpdated) {
-        onTextureSetUpdated()
+      // Call the callback to remove the texture set from the list without making a new request
+      if (onTextureSetRecycled) {
+        onTextureSetRecycled(selectedTextureSet.id)
       }
     } catch (error) {
       console.error('Failed to recycle texture set:', error)
