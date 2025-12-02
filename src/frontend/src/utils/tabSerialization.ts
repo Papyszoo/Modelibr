@@ -14,8 +14,6 @@ export function getTabLabel(
       return 'Models'
     case 'modelViewer':
       return modelId ? `Model ${modelId}` : 'Model Viewer'
-    case 'texture':
-      return 'Textures'
     case 'textureSets':
       return 'Texture Sets'
     case 'textureSetViewer':
@@ -32,12 +30,12 @@ export function getTabLabel(
       return 'Stages'
     case 'stageEditor':
       return stageId ? `Stage ${stageId}` : 'Stage Editor'
-    case 'animation':
-      return 'Animations'
     case 'history':
       return 'History'
     case 'settings':
       return 'Settings'
+    case 'recycledFiles':
+      return 'Recycled Files'
     default:
       return 'Unknown'
   }
@@ -152,8 +150,6 @@ export function parseCompactTabFormat(
         ![
           'modelList',
           'modelViewer',
-          'texture',
-          'animation',
           'textureSets',
           'textureSetViewer',
           'packs',
@@ -164,6 +160,7 @@ export function parseCompactTabFormat(
           'stageEditor',
           'history',
           'settings',
+          'recycledFiles',
         ].includes(tabType)
       ) {
         throw new Error(`Invalid tab type: ${tabId}`)

@@ -66,6 +66,8 @@ namespace Infrastructure.Persistence
                 entity.Property(m => m.Name).IsRequired();
                 entity.Property(m => m.CreatedAt).IsRequired();
                 entity.Property(m => m.UpdatedAt).IsRequired();
+                entity.Property(m => m.IsDeleted).IsRequired();
+                entity.Property(m => m.DeletedAt);
 
                 // Configure one-to-one relationship with Thumbnail
                 entity.HasOne(m => m.Thumbnail)
@@ -84,6 +86,9 @@ namespace Infrastructure.Persistence
                     .WithOne(v => v.Model)
                     .HasForeignKey(v => v.ModelId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(m => m.IsDeleted);
             });
 
             // Configure ModelVersion entity
@@ -94,9 +99,14 @@ namespace Infrastructure.Persistence
                 entity.Property(v => v.VersionNumber).IsRequired();
                 entity.Property(v => v.Description).HasMaxLength(1000);
                 entity.Property(v => v.CreatedAt).IsRequired();
+                entity.Property(v => v.IsDeleted).IsRequired();
+                entity.Property(v => v.DeletedAt);
 
                 // Create unique index on ModelId and VersionNumber
                 entity.HasIndex(v => new { v.ModelId, v.VersionNumber }).IsUnique();
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(v => v.IsDeleted);
 
                 // Configure many-to-many relationship with Files
                 entity.HasMany(v => v.Files)
@@ -114,6 +124,8 @@ namespace Infrastructure.Persistence
                 entity.Property(f => f.FilePath).IsRequired();
                 entity.Property(f => f.MimeType).IsRequired();
                 entity.Property(f => f.Sha256Hash).IsRequired();
+                entity.Property(f => f.IsDeleted).IsRequired();
+                entity.Property(f => f.DeletedAt);
                 
                 // Configure FileType Value Object to be stored as string
                 entity.Property(f => f.FileType)
@@ -121,6 +133,9 @@ namespace Infrastructure.Persistence
                         v => v.Value,
                         v => MapFromDatabaseValue(v))
                     .IsRequired();
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(f => f.IsDeleted);
             });
 
             // Configure Texture entity
@@ -132,6 +147,8 @@ namespace Infrastructure.Persistence
                 entity.Property(t => t.CreatedAt).IsRequired();
                 entity.Property(t => t.UpdatedAt).IsRequired();
                 entity.Property(t => t.TextureSetId).IsRequired(false); // Optional relationship
+                entity.Property(t => t.IsDeleted).IsRequired();
+                entity.Property(t => t.DeletedAt);
 
                 // Configure relationship with File
                 entity.HasOne(t => t.File)
@@ -149,6 +166,9 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(t => new { t.TextureSetId, t.TextureType })
                     .IsUnique()
                     .HasFilter("\"TextureSetId\" IS NOT NULL");
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(t => t.IsDeleted);
             });
 
             // Configure TextureSet entity
@@ -158,6 +178,8 @@ namespace Infrastructure.Persistence
                 entity.Property(tp => tp.Name).IsRequired().HasMaxLength(200);
                 entity.Property(tp => tp.CreatedAt).IsRequired();
                 entity.Property(tp => tp.UpdatedAt).IsRequired();
+                entity.Property(tp => tp.IsDeleted).IsRequired();
+                entity.Property(tp => tp.DeletedAt);
 
                 // Configure one-to-many relationship with Textures
                 entity.HasMany(tp => tp.Textures)
@@ -167,6 +189,9 @@ namespace Infrastructure.Persistence
 
                 // Create index for efficient querying by name
                 entity.HasIndex(tp => tp.Name);
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(tp => tp.IsDeleted);
             });
 
             // Configure Pack entity
@@ -282,6 +307,7 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailCameraVerticalAngle).IsRequired();
                 entity.Property(s => s.ThumbnailWidth).IsRequired();
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
+                entity.Property(s => s.CleanRecycledFilesAfterDays).IsRequired();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
             });

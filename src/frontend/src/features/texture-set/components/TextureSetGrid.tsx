@@ -82,6 +82,32 @@ export default function TextureSetGrid({
     }
   }
 
+  const handleSoftDelete = async () => {
+    if (!selectedTextureSet) return
+
+    try {
+      await ApiClient.softDeleteTextureSet(selectedTextureSet.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Recycled',
+        detail: 'Texture set moved to recycled files',
+        life: 3000,
+      })
+      // Call the callback to refresh the texture sets list
+      if (onTextureSetUpdated) {
+        onTextureSetUpdated()
+      }
+    } catch (error) {
+      console.error('Failed to recycle texture set:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to recycle texture set',
+        life: 3000,
+      })
+    }
+  }
+
   const handleCardDragStart = (
     e: React.DragEvent,
     textureSet: TextureSetDto
@@ -278,6 +304,13 @@ export default function TextureSetGrid({
       command: () => {
         loadPacks()
         setShowPackDialog(true)
+      },
+    },
+    {
+      label: 'Recycle',
+      icon: 'pi pi-trash',
+      command: () => {
+        handleSoftDelete()
       },
     },
   ]

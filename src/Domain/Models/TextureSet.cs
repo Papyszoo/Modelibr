@@ -17,6 +17,8 @@ public class TextureSet : AggregateRoot
     public string Name { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAt { get; private set; }
 
     // Navigation property for the collection of textures - EF Core requires this to be settable
     public ICollection<Texture> Textures
@@ -273,5 +275,27 @@ public class TextureSet : AggregateRoot
 
         if (name.Length > 200)
             throw new ArgumentException("Texture set name cannot exceed 200 characters.", nameof(name));
+    }
+
+    /// <summary>
+    /// Soft deletes this texture set by marking it as deleted.
+    /// </summary>
+    /// <param name="deletedAt">When the texture set was deleted</param>
+    public void SoftDelete(DateTime deletedAt)
+    {
+        IsDeleted = true;
+        DeletedAt = deletedAt;
+        UpdatedAt = deletedAt;
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted texture set.
+    /// </summary>
+    /// <param name="restoredAt">When the texture set was restored</param>
+    public void Restore(DateTime restoredAt)
+    {
+        IsDeleted = false;
+        DeletedAt = null;
+        UpdatedAt = restoredAt;
     }
 }

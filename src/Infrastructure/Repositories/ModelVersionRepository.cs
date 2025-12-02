@@ -17,6 +17,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     public async Task<ModelVersion?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.ModelVersions
+            .Where(v => !v.IsDeleted)
             .Include(v => v.Files)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
@@ -27,6 +28,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.ModelVersions
+            .Where(v => !v.IsDeleted)
             .Include(v => v.Files)
             .FirstOrDefaultAsync(v => v.ModelId == modelId && v.VersionNumber == versionNumber, cancellationToken);
     }
@@ -36,10 +38,29 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.ModelVersions
+            .Where(v => !v.IsDeleted)
             .Include(v => v.Files)
             .Where(v => v.ModelId == modelId)
             .OrderBy(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModelVersion>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.ModelVersions
+            .Where(v => v.IsDeleted)
+            .Include(v => v.Files)
+            .OrderBy(v => v.ModelId)
+            .ThenBy(v => v.VersionNumber)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<ModelVersion?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.ModelVersions
+            .Where(v => v.IsDeleted)
+            .Include(v => v.Files)
+            .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
     public async Task<ModelVersion> AddAsync(ModelVersion version, CancellationToken cancellationToken = default)
@@ -65,6 +86,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     public async Task<int> GetLatestVersionNumberAsync(int modelId, CancellationToken cancellationToken = default)
     {
         var latestVersion = await _context.ModelVersions
+            .Where(v => !v.IsDeleted)
             .Where(v => v.ModelId == modelId)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(cancellationToken);

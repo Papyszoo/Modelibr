@@ -15,4 +15,6 @@ public interface IFileStorage
         IFileUpload upload,
         FileType fileType,
         CancellationToken ct);
+    
+    Task DeleteFileAsync(string filePath, CancellationToken ct);
 }
