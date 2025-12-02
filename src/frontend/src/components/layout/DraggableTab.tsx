@@ -25,6 +25,8 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-cog'
     case 'history':
       return 'pi pi-history'
+    case 'recycledFiles':
+      return 'pi pi-trash'
     default:
       return 'pi pi-file'
   }
@@ -60,6 +62,8 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Settings'
     case 'history':
       return 'Upload History'
+    case 'recycledFiles':
+      return 'Recycled Files'
     default:
       return 'Unknown Tab'
   }

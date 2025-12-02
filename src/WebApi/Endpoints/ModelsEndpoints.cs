@@ -62,5 +62,22 @@ public static class ModelsEndpoints
             return Results.Ok(result.Value);
         })
         .WithName("Set Default Texture Set");
+
+        app.MapDelete("/models/{id}", async (
+            int id,
+            ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new SoftDeleteModelCommand(id), cancellationToken);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+            
+            return Results.Ok(result.Value);
+        })
+        .WithName("Soft Delete Model")
+        .WithTags("Models");
     }
 }

@@ -18,6 +18,9 @@ public class ApplicationSettings : AggregateRoot
     public int ThumbnailHeight { get; private set; }
     public bool GenerateThumbnailOnUpload { get; private set; }
 
+    // Soft delete settings
+    public int CleanRecycledFilesAfterDays { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -38,6 +41,7 @@ public class ApplicationSettings : AggregateRoot
             ThumbnailWidth = 256,
             ThumbnailHeight = 256,
             GenerateThumbnailOnUpload = true, // Generate thumbnails by default
+            CleanRecycledFilesAfterDays = 30, // Default: 30 days
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -114,5 +118,20 @@ public class ApplicationSettings : AggregateRoot
 
         if (height < 64 || height > 2048)
             throw new ArgumentException("Thumbnail height must be between 64 and 2048 pixels.", nameof(height));
+    }
+
+    /// <summary>
+    /// Updates the recycled files cleanup setting.
+    /// </summary>
+    public void UpdateCleanRecycledFilesAfterDays(int days, DateTime updatedAt)
+    {
+        if (days < 1)
+            throw new ArgumentException("Clean recycled files after days must be at least 1.", nameof(days));
+
+        if (days > 365)
+            throw new ArgumentException("Clean recycled files after days cannot exceed 365.", nameof(days));
+
+        CleanRecycledFilesAfterDays = days;
+        UpdatedAt = updatedAt;
     }
 }

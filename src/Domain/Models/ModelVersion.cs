@@ -9,6 +9,8 @@ public class ModelVersion
     public int VersionNumber { get; private set; }
     public string? Description { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAt { get; private set; }
     
     // Navigation properties
     public Model Model { get; set; } = null!;
@@ -64,5 +66,25 @@ public class ModelVersion
     public IReadOnlyList<File> GetFiles()
     {
         return _files.AsReadOnly();
+    }
+
+    /// <summary>
+    /// Soft deletes this model version by marking it as deleted.
+    /// </summary>
+    /// <param name="deletedAt">When the version was deleted</param>
+    public void SoftDelete(DateTime deletedAt)
+    {
+        IsDeleted = true;
+        DeletedAt = deletedAt;
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted model version.
+    /// </summary>
+    /// <param name="restoredAt">When the version was restored</param>
+    public void Restore(DateTime restoredAt)
+    {
+        IsDeleted = false;
+        DeletedAt = null;
     }
 }

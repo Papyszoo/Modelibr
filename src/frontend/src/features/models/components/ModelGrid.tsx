@@ -70,6 +70,30 @@ export default function ModelGrid({
     }
   }
 
+  const handleSoftDelete = async () => {
+    if (!selectedModel) return
+
+    try {
+      await ApiClient.softDeleteModel(selectedModel.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Recycled',
+        detail: 'Model moved to recycled files',
+        life: 3000,
+      })
+      // Refresh the models list
+      window.location.reload()
+    } catch (error) {
+      console.error('Failed to recycle model:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to recycle model',
+        life: 3000,
+      })
+    }
+  }
+
   const getModelName = (model: Model) => {
     // Get the first file's name or use the model name
     return model.files && model.files.length > 0
@@ -89,6 +113,13 @@ export default function ModelGrid({
       command: () => {
         loadPacks()
         setShowPackDialog(true)
+      },
+    },
+    {
+      label: 'Recycle',
+      icon: 'pi pi-trash',
+      command: () => {
+        handleSoftDelete()
       },
     },
   ]
