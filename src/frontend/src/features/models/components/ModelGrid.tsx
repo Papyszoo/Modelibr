@@ -17,6 +17,7 @@ interface ModelGridProps {
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
   onDragLeave: (e: React.DragEvent) => void
+  onModelUpdated?: () => void
 }
 
 export default function ModelGrid({
@@ -26,6 +27,7 @@ export default function ModelGrid({
   onDragOver,
   onDragEnter,
   onDragLeave,
+  onModelUpdated,
 }: ModelGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [packs, setPacks] = useState<PackDto[]>([])
@@ -81,8 +83,10 @@ export default function ModelGrid({
         detail: 'Model moved to recycled files',
         life: 3000,
       })
-      // Refresh the models list
-      window.location.reload()
+      // Call the callback to refresh the models list
+      if (onModelUpdated) {
+        onModelUpdated()
+      }
     } catch (error) {
       console.error('Failed to recycle model:', error)
       toast.current?.show({

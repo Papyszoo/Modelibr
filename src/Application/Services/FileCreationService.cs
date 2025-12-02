@@ -66,7 +66,7 @@ internal sealed class FileCreationService : IFileCreationService
                 stored.RelativePath,
                 fileType.GetMimeType(),
                 fileType,
-                0, // We'll set this properly later
+                stored.SizeBytes,
                 stored.Sha256,
                 _dateTimeProvider.UtcNow
             );

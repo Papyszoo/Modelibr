@@ -167,6 +167,7 @@ function ModelListContent({
           onDragOver={onDragOver}
           onDragEnter={onDragEnter}
           onDragLeave={onDragLeave}
+          onModelUpdated={fetchModels}
         />
       )}
     </div>
