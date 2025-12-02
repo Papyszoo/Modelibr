@@ -92,7 +92,8 @@ export default function RecycledFilesList() {
         detail: `${item.name} has been restored`,
         life: 3000,
       })
-      loadRecycledFiles()
+      // Remove the restored item from the list without re-fetching
+      setItems(prevItems => prevItems.filter(i => !(i.id === item.id && i.type === item.type)))
     } catch (error) {
       console.error('Failed to restore:', error)
       toast.current?.show({
@@ -135,8 +136,10 @@ export default function RecycledFilesList() {
         life: 3000,
       })
       setShowPreviewDialog(false)
+      // Remove the deleted item from the list without re-fetching
+      const deletedItem = deletePreview.item
+      setItems(prevItems => prevItems.filter(i => !(i.id === deletedItem.id && i.type === deletedItem.type)))
       setDeletePreview(null)
-      loadRecycledFiles()
     } catch (error) {
       console.error('Failed to permanently delete:', error)
       toast.current?.show({
