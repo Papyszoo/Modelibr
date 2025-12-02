@@ -119,11 +119,13 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Where(m => m.IsDeleted)
             .Include(m => m.Files)
+                .ThenInclude(f => f.Models)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
             .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
@@ -132,6 +134,7 @@ internal sealed class ModelRepository : IModelRepository
     {
         var model = await _context.Models
             .Include(m => m.Files)
+                .ThenInclude(f => f.Models)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .Include(m => m.Thumbnail)
@@ -139,13 +142,27 @@ internal sealed class ModelRepository : IModelRepository
 
         if (model != null)
         {
-            // Remove all files associated with the model
-            _context.Files.RemoveRange(model.Files);
+            // Get files that are only associated with this model (not shared with others)
+            var filesToDelete = model.Files
+                .Where(f => f.Models.Count == 1 && f.Models.First().Id == model.Id)
+                .ToList();
             
-            // Remove all version files
+            // Remove files that are not shared
+            if (filesToDelete.Any())
+            {
+                _context.Files.RemoveRange(filesToDelete);
+            }
+            
+            // Get version files that are only associated with this model's versions
             foreach (var version in model.Versions)
             {
-                _context.Files.RemoveRange(version.Files);
+                var versionFilesToDelete = version.Files
+                    .Where(f => f.ModelVersionId == version.Id)
+                    .ToList();
+                if (versionFilesToDelete.Any())
+                {
+                    _context.Files.RemoveRange(versionFilesToDelete);
+                }
             }
             
             // Remove all versions
@@ -157,7 +174,7 @@ internal sealed class ModelRepository : IModelRepository
                 _context.Thumbnails.Remove(model.Thumbnail);
             }
             
-            // Remove the model
+            // Remove the model (this will also remove the many-to-many join table entries)
             _context.Models.Remove(model);
             await _context.SaveChangesAsync(cancellationToken);
         }

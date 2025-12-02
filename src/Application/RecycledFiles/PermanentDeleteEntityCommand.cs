@@ -144,11 +144,15 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (model == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("ModelNotFound", "Model not found"));
                 
-                // Delete files from disk
+                // Delete files from disk (only if not shared with other models)
                 foreach (var file in model.Files)
                 {
-                    await _fileStorage.DeleteFileAsync(file.FilePath, cancellationToken);
-                    deletedFiles.Add(new DeletedFileInfo(file.FilePath, file.OriginalFileName, file.SizeBytes));
+                    // Only delete from disk if this file is only associated with this model
+                    if (file.Models.Count == 1 && file.Models.First().Id == model.Id)
+                    {
+                        await _fileStorage.DeleteFileAsync(file.FilePath, cancellationToken);
+                        deletedFiles.Add(new DeletedFileInfo(file.FilePath, file.OriginalFileName, file.SizeBytes));
+                    }
                 }
                 
                 // Delete version files from disk
