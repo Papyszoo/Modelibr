@@ -148,7 +148,7 @@ public class TextureDomainTests
             "image/jpeg",
             FileType.Texture,
             1024L,
-            "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
+            "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd",
             DateTime.UtcNow
         );
     }
@@ -162,7 +162,7 @@ public class TextureDomainTests
             "model/obj",
             FileType.Obj,
             2048L,
-            "b2c3d4e5f6789012345678901234567890123456789012345678901234567890a1",
+            "b2c3d4e5f6789012345678901234567890123456789012345678901234a1b2",
             DateTime.UtcNow
         );
     }
