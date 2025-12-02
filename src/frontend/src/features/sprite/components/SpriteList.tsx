@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Toast } from 'primereact/toast'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Button } from 'primereact/button'
+import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
+import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
 import './SpriteList.css'
 
@@ -26,6 +28,7 @@ function SpriteList() {
   const [sprites, setSprites] = useState<SpriteDto[]>([])
   const [loading, setLoading] = useState(true)
   const toast = useRef<Toast>(null)
+  const uploadProgressContext = useUploadProgress()
 
   const loadSprites = useCallback(async () => {
     try {
@@ -49,6 +52,85 @@ function SpriteList() {
   useEffect(() => {
     loadSprites()
   }, [loadSprites])
+
+  const handleFileDrop = async (files: File[] | FileList) => {
+    const fileArray = Array.from(files)
+
+    // Filter to only image files
+    const imageFiles = fileArray.filter(file =>
+      file.type.startsWith('image/') ||
+      /\.(png|jpg|jpeg|gif|webp|apng|bmp|svg)$/i.test(file.name)
+    )
+
+    if (imageFiles.length === 0) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Invalid Files',
+        detail: 'Please drop image files only',
+        life: 3000,
+      })
+      return
+    }
+
+    // Create batch for all files
+    const batchId = uploadProgressContext?.createBatch() || undefined
+
+    for (const file of imageFiles) {
+      let uploadId: string | null = null
+      try {
+        // Track the upload
+        uploadId = uploadProgressContext?.addUpload(file, 'sprite', batchId) || null
+
+        // Update progress
+        if (uploadId && uploadProgressContext) {
+          uploadProgressContext.updateUploadProgress(uploadId, 50)
+        }
+
+        // Use the sprite upload endpoint
+        const fileName = file.name.replace(/\.[^/.]+$/, '')
+        const result = await ApiClient.createSpriteWithFile(file, {
+          name: fileName,
+          spriteType: file.type === 'image/gif' ? 3 : 1, // GIF = 3, Static = 1
+          batchId: batchId,
+        })
+
+        // Complete the upload
+        if (uploadId && uploadProgressContext) {
+          uploadProgressContext.updateUploadProgress(uploadId, 100)
+          uploadProgressContext.completeUpload(uploadId, {
+            fileId: result.fileId,
+            spriteId: result.spriteId,
+          })
+        }
+
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: `Sprite "${fileName}" created successfully`,
+          life: 3000,
+        })
+      } catch (error) {
+        // Mark upload as failed
+        if (uploadId && uploadProgressContext) {
+          uploadProgressContext.failUpload(uploadId, error as Error)
+        }
+
+        console.error('Failed to create sprite from file:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: `Failed to create sprite from ${file.name}`,
+          life: 3000,
+        })
+      }
+    }
+
+    // Refresh the sprites list
+    loadSprites()
+  }
+
+  // Use drag and drop hook
+  const { onDrop, onDragOver, onDragEnter, onDragLeave } = useDragAndDrop(handleFileDrop)
 
   const getSpriteTypeName = (type: number): string => {
     switch (type) {
@@ -82,7 +164,13 @@ function SpriteList() {
   }
 
   return (
-    <div className="sprite-list">
+    <div
+      className="sprite-list"
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+    >
       <Toast ref={toast} />
 
       <div className="sprite-list-header">
@@ -94,7 +182,7 @@ function SpriteList() {
         <div className="sprite-list-empty">
           <i className="pi pi-image" style={{ fontSize: '3rem', marginBottom: '1rem' }} />
           <p>No sprites found</p>
-          <p className="hint">Upload sprite images to get started</p>
+          <p className="hint">Drag and drop image files here to upload</p>
         </div>
       ) : (
         <div className="sprite-grid">
@@ -123,6 +211,11 @@ function SpriteList() {
           ))}
         </div>
       )}
+
+      <div className="sprite-drop-overlay">
+        <i className="pi pi-upload" />
+        <span>Drop images here</span>
+      </div>
     </div>
   )
 }

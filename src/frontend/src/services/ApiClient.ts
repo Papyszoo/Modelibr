@@ -1082,6 +1082,45 @@ class ApiClient {
     return response.data
   }
 
+  async createSpriteWithFile(
+    file: File,
+    options?: {
+      name?: string
+      spriteType?: number
+      categoryId?: number
+      batchId?: string
+    }
+  ): Promise<{
+    spriteId: number
+    name: string
+    fileId: number
+    spriteType: number
+    fileSizeBytes: number
+  }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const params = new URLSearchParams()
+    if (options?.name) params.append('name', options.name)
+    if (options?.spriteType !== undefined)
+      params.append('spriteType', options.spriteType.toString())
+    if (options?.categoryId !== undefined)
+      params.append('categoryId', options.categoryId.toString())
+    if (options?.batchId) params.append('batchId', options.batchId)
+
+    const response = await this.client.post(
+      `/sprites/with-file?${params.toString()}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    return response.data
+  }
+
   // Sprite Category methods
   async getAllSpriteCategories(): Promise<{
     categories: Array<{
