@@ -9,7 +9,10 @@ interface TabLabelOptions {
 }
 
 // Helper function to generate tab labels
-export function getTabLabel(type: Tab['type'], options: TabLabelOptions = {}): string {
+export function getTabLabel(
+  type: Tab['type'],
+  options: TabLabelOptions = {}
+): string {
   const { modelId, setId, packId, projectId, stageId } = options
   switch (type) {
     case 'modelList':
