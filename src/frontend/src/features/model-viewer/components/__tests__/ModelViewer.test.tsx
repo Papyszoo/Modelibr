@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import ModelViewer from '../ModelViewer'
 import { ModelProvider } from '../../../../contexts/ModelContext'
 
@@ -9,6 +9,8 @@ jest.mock('../../../../services/ApiClient', () => ({
     getModelById: jest.fn(),
     regenerateThumbnail: jest.fn(),
     getFileUrl: jest.fn((id: string) => `http://api.test/files/${id}`),
+    getModelVersions: jest.fn().mockResolvedValue([]),
+    getTextureSetById: jest.fn(),
   },
 }))
 
@@ -24,7 +26,7 @@ jest.mock('@react-three/fiber', () => ({
 // Mock child components
 jest.mock('../ModelPreviewScene', () => {
   return function MockModelPreviewScene(props: any) {
-    return <div data-testid="model-preview-scene" {...props} />
+    return <div data-testid="model-preview-scene" data-model-id={props.model?.id} />
   }
 })
 
@@ -58,6 +60,22 @@ jest.mock('../UVMapWindow', () => {
   }
 })
 
+jest.mock('../TextureSetSelectorWindow', () => {
+  return function MockTextureSetSelectorWindow() {
+    return <div data-testid="texture-set-selector-window" />
+  }
+})
+
+jest.mock('../ModelVersionWindow', () => {
+  return function MockModelVersionWindow() {
+    return <div data-testid="model-version-window" />
+  }
+})
+
+jest.mock('../FileUploadModal', () => ({
+  FileUploadModal: () => <div data-testid="file-upload-modal" />,
+}))
+
 // Mock Toast
 jest.mock('primereact/toast', () => ({
   Toast: () => <div data-testid="toast" />,
@@ -65,8 +83,8 @@ jest.mock('primereact/toast', () => ({
 
 // Mock Button
 jest.mock('primereact/button', () => ({
-  Button: ({ onClick, ...props }: any) => (
-    <button onClick={onClick} {...props} data-testid="button" />
+  Button: ({ onClick, tooltip, ...props }: any) => (
+    <button onClick={onClick} {...props} data-testid="button" title={tooltip} />
   ),
 }))
 
@@ -83,68 +101,90 @@ describe('ModelViewer', () => {
     ],
   }
 
-  it('should render with unique Canvas key based on model id and side', () => {
-    const { container } = render(
+  it('should render Canvas and scene when model is provided', () => {
+    render(
       <ModelProvider>
         <ModelViewer model={mockModel} side="left" />
       </ModelProvider>
     )
 
-    const canvas = container.querySelector('[data-testid="canvas"]')
-    expect(canvas).toHaveAttribute('key', 'canvas-1-left')
+    expect(screen.getByTestId('canvas')).toBeInTheDocument()
+    expect(screen.getByTestId('model-preview-scene')).toBeInTheDocument()
   })
 
-  it('should render with different Canvas key for different side', () => {
-    const { container } = render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="right" />
-      </ModelProvider>
-    )
-
-    const canvas = container.querySelector('[data-testid="canvas"]')
-    expect(canvas).toHaveAttribute('key', 'canvas-1-right')
-  })
-
-  it('should render with unique scene key based on model id and side', () => {
-    const { container } = render(
+  it('should display model ID in header', () => {
+    render(
       <ModelProvider>
         <ModelViewer model={mockModel} side="left" />
       </ModelProvider>
     )
 
-    const scene = container.querySelector('[data-testid="model-preview-scene"]')
-    expect(scene).toHaveAttribute('key', 'scene-1-left')
+    expect(screen.getByText('Model #1')).toBeInTheDocument()
   })
 
-  it('should render Canvas and scene when model is loaded', () => {
-    const { getByTestId } = render(
+  it('should display model filename', () => {
+    render(
       <ModelProvider>
         <ModelViewer model={mockModel} side="left" />
       </ModelProvider>
     )
 
+    expect(screen.getByText('test.obj')).toBeInTheDocument()
+  })
+
+  it('should render viewer control buttons', () => {
+    render(
+      <ModelProvider>
+        <ModelViewer model={mockModel} side="left" />
+      </ModelProvider>
+    )
+
+    const buttons = screen.getAllByTestId('button')
+    // There should be multiple control buttons (settings, info, texture, versions, hierarchy, thumbnail, uv)
+    expect(buttons.length).toBeGreaterThanOrEqual(7)
+  })
+
+  it('should pass model to ModelPreviewScene', () => {
+    render(
+      <ModelProvider>
+        <ModelViewer model={mockModel} side="left" />
+      </ModelProvider>
+    )
+
+    const scene = screen.getByTestId('model-preview-scene')
+    expect(scene).toHaveAttribute('data-model-id', '1')
+  })
+
+  it('should render correctly when model prop changes', () => {
+    const { rerender, getByTestId } = render(
+      <ModelProvider>
+        <ModelViewer model={mockModel} side="left" />
+      </ModelProvider>
+    )
+
+    // Initial render should show the canvas and scene
     expect(getByTestId('canvas')).toBeInTheDocument()
     expect(getByTestId('model-preview-scene')).toBeInTheDocument()
-  })
 
-  it('should handle different models with different keys', () => {
-    const { container, rerender } = render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="left" />
-      </ModelProvider>
-    )
-
-    const canvas1 = container.querySelector('[data-testid="canvas"]')
-    expect(canvas1).toHaveAttribute('key', 'canvas-1-left')
-
-    const mockModel2 = { ...mockModel, id: 2 }
+    const mockModel2 = { ...mockModel, id: 2, name: 'Another Model' }
     rerender(
       <ModelProvider>
         <ModelViewer model={mockModel2} side="left" />
       </ModelProvider>
     )
 
-    const canvas2 = container.querySelector('[data-testid="canvas"]')
-    expect(canvas2).toHaveAttribute('key', 'canvas-2-left')
+    // After rerender, the component should still be functional
+    expect(getByTestId('canvas')).toBeInTheDocument()
+    expect(getByTestId('model-preview-scene')).toBeInTheDocument()
+  })
+
+  it('should show error message when no model data is available', () => {
+    render(
+      <ModelProvider>
+        <ModelViewer model={undefined} side="left" />
+      </ModelProvider>
+    )
+
+    expect(screen.getByText('No model data available')).toBeInTheDocument()
   })
 })
