@@ -54,7 +54,6 @@ function SpriteList() {
     null
   )
   const [draggedSpriteId, setDraggedSpriteId] = useState<number | null>(null)
-  const [modalDragOver, setModalDragOver] = useState(false)
   const toast = useRef<Toast>(null)
   const uploadProgressContext = useUploadProgress()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -320,57 +319,6 @@ function SpriteList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to download sprite',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleModalFileDrop = async (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setModalDragOver(false)
-
-    if (!selectedSprite) return
-
-    const files = e.dataTransfer?.files
-    if (!files || files.length === 0) return
-
-    const file = files[0]
-    if (
-      !file.type.startsWith('image/') &&
-      !/\.(png|jpg|jpeg|gif|webp|apng|bmp|svg)$/i.test(file.name)
-    ) {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Invalid File',
-        detail: 'Please drop an image file',
-        life: 3000,
-      })
-      return
-    }
-
-    try {
-      const fileName = file.name.replace(/\.[^/.]+$/, '')
-      await ApiClient.createSpriteWithFile(file, {
-        name: `${selectedSprite.name}_${fileName}`,
-        spriteType:
-          file.type === 'image/gif' ? SPRITE_TYPE_GIF : SPRITE_TYPE_STATIC,
-        categoryId: selectedSprite.categoryId ?? undefined,
-      })
-
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'New sprite size uploaded successfully',
-        life: 3000,
-      })
-      loadSprites()
-    } catch (error) {
-      console.error('Failed to upload new sprite size:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to upload new sprite size',
         life: 3000,
       })
     }
@@ -654,22 +602,7 @@ function SpriteList() {
         className="sprite-detail-modal"
       >
         {selectedSprite && (
-          <div
-            className={`sprite-modal-content ${modalDragOver ? 'drag-over' : ''}`}
-            onDrop={handleModalFileDrop}
-            onDragOver={e => {
-              e.preventDefault()
-              setModalDragOver(true)
-            }}
-            onDragEnter={e => {
-              e.preventDefault()
-              setModalDragOver(true)
-            }}
-            onDragLeave={e => {
-              e.preventDefault()
-              setModalDragOver(false)
-            }}
-          >
+          <div className="sprite-modal-content">
             <div className="sprite-modal-preview">
               <img
                 src={ApiClient.getFileUrl(selectedSprite.fileId.toString())}
@@ -694,10 +627,6 @@ function SpriteList() {
                   {selectedSprite.categoryName || 'Unassigned'}
                 </p>
               </div>
-              <div className="sprite-modal-upload-hint">
-                <i className="pi pi-upload" />
-                <span>Drop image here to upload a different sprite size</span>
-              </div>
               <div className="sprite-modal-download">
                 <Button
                   label="Download"
@@ -707,12 +636,6 @@ function SpriteList() {
                 />
               </div>
             </div>
-            {modalDragOver && (
-              <div className="sprite-modal-drop-overlay">
-                <i className="pi pi-upload" />
-                <span>Drop to upload new size</span>
-              </div>
-            )}
           </div>
         )}
       </Dialog>

@@ -257,12 +257,7 @@
 .sprite-modal-content {
   display: flex;
   flex-direction: column;
-  position: relative;
   padding: 1rem;
-}
-
-.sprite-modal-content.drag-over {
-  background: rgba(var(--primary-color-rgb), 0.05);
 }
 
 .sprite-modal-preview {
@@ -298,56 +293,9 @@
   font-size: 0.9rem;
 }
 
-.sprite-modal-upload-hint {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: var(--surface-100);
-  border: 1px dashed var(--surface-border);
-  border-radius: 6px;
-  color: var(--text-color-secondary);
-  font-size: 0.875rem;
-}
-
-.sprite-modal-upload-hint i {
-  font-size: 1rem;
-}
-
 .sprite-modal-download {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--surface-border);
-}
-
-.sprite-modal-drop-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(var(--primary-color-rgb), 0.1);
-  border: 2px dashed var(--primary-color);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  z-index: 10;
-}
-
-.sprite-modal-drop-overlay i {
-  font-size: 2rem;
-  color: var(--primary-color);
-}
-
-.sprite-modal-drop-overlay span {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--primary-color);
 }
 
 .w-full {
