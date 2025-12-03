@@ -26,6 +26,11 @@ export const useTabMenuItems = ({
         command: () => onAddTab('textureSets', 'Texture Sets'),
       },
       {
+        label: 'Sprites',
+        icon: 'pi pi-image',
+        command: () => onAddTab('sprites', 'Sprites'),
+      },
+      {
         label: 'Packs',
         icon: 'pi pi-inbox',
         command: () => onAddTab('packs', 'Packs'),

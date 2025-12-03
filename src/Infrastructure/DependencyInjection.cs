@@ -41,6 +41,8 @@ namespace Infrastructure
             services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
             services.AddScoped<ISettingRepository, SettingRepository>();
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();
+            services.AddScoped<ISpriteRepository, SpriteRepository>();
+            services.AddScoped<ISpriteCategoryRepository, SpriteCategoryRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 

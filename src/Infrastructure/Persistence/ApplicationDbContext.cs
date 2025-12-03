@@ -20,6 +20,8 @@ namespace Infrastructure.Persistence
         public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
         public DbSet<Setting> Settings => Set<Setting>();
         public DbSet<BatchUpload> BatchUploads => Set<BatchUpload>();
+        public DbSet<Sprite> Sprites => Set<Sprite>();
+        public DbSet<SpriteCategory> SpriteCategories => Set<SpriteCategory>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -58,6 +60,18 @@ namespace Infrastructure.Persistence
                 .HasMany(ts => ts.Projects)
                 .WithMany(p => p.TextureSets)
                 .UsingEntity(j => j.ToTable("ProjectTextureSets"));
+
+            // Configure many-to-many relationship between Sprite and Pack
+            modelBuilder.Entity<Sprite>()
+                .HasMany(s => s.Packs)
+                .WithMany(p => p.Sprites)
+                .UsingEntity(j => j.ToTable("PackSprites"));
+
+            // Configure many-to-many relationship between Sprite and Project
+            modelBuilder.Entity<Sprite>()
+                .HasMany(s => s.Projects)
+                .WithMany(p => p.Sprites)
+                .UsingEntity(j => j.ToTable("ProjectSprites"));
 
             // Configure Model entity
             modelBuilder.Entity<Model>(entity =>
@@ -373,6 +387,56 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(bu => bu.TextureSetId)
                     .OnDelete(DeleteBehavior.SetNull);
+                
+                // Configure optional relationship with Sprite
+                entity.HasOne(bu => bu.Sprite)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.SpriteId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // Configure Sprite entity
+            modelBuilder.Entity<Sprite>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.FileId).IsRequired();
+                entity.Property(s => s.SpriteType).IsRequired();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+                entity.Property(s => s.IsDeleted).IsRequired();
+                entity.Property(s => s.DeletedAt);
+
+                // Configure relationship with File
+                entity.HasOne(s => s.File)
+                    .WithMany()
+                    .HasForeignKey(s => s.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure optional relationship with SpriteCategory
+                entity.HasOne(s => s.Category)
+                    .WithMany()
+                    .HasForeignKey(s => s.SpriteCategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Create index for efficient querying by name
+                entity.HasIndex(s => s.Name);
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(s => s.IsDeleted);
+            });
+
+            // Configure SpriteCategory entity
+            modelBuilder.Entity<SpriteCategory>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.Description).HasMaxLength(500);
+                entity.Property(c => c.CreatedAt).IsRequired();
+                entity.Property(c => c.UpdatedAt).IsRequired();
+
+                // Create unique index on Name
+                entity.HasIndex(c => c.Name).IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);
@@ -391,6 +455,11 @@ namespace Infrastructure.Persistence
                 "maya" => FileType.Maya,
                 "texture" => FileType.Texture,
                 "material" => FileType.Material,
+                "sprite" => FileType.Sprite,
+                "spritesheet" => FileType.SpriteSheet,
+                "gif" => FileType.Gif,
+                "apng" => FileType.Apng,
+                "webp" => FileType.WebP,
                 "other" => FileType.Other,
                 _ => FileType.Unknown
             };

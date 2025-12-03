@@ -43,6 +43,11 @@ public class BatchUpload
     public int? TextureSetId { get; set; }
     
     /// <summary>
+    /// Optional reference to the sprite if this was a direct upload to a sprite.
+    /// </summary>
+    public int? SpriteId { get; set; }
+    
+    /// <summary>
     /// Reference to the file that was uploaded in this batch.
     /// </summary>
     public int FileId { get; set; }
@@ -73,6 +78,11 @@ public class BatchUpload
     public TextureSet? TextureSet { get; set; }
     
     /// <summary>
+    /// Navigation property to the sprite.
+    /// </summary>
+    public Sprite? Sprite { get; set; }
+    
+    /// <summary>
     /// Creates a new batch upload record.
     /// </summary>
     /// <param name="batchId">Unique batch identifier</param>
@@ -83,6 +93,7 @@ public class BatchUpload
     /// <param name="projectId">Optional project ID</param>
     /// <param name="modelId">Optional model ID</param>
     /// <param name="textureSetId">Optional texture set ID</param>
+    /// <param name="spriteId">Optional sprite ID</param>
     /// <returns>New BatchUpload instance</returns>
     public static BatchUpload Create(
         string batchId,
@@ -92,7 +103,8 @@ public class BatchUpload
         int? packId = null,
         int? projectId = null,
         int? modelId = null,
-        int? textureSetId = null)
+        int? textureSetId = null,
+        int? spriteId = null)
     {
         if (string.IsNullOrWhiteSpace(batchId))
             throw new ArgumentException("Batch ID cannot be null or empty.", nameof(batchId));
@@ -101,7 +113,7 @@ public class BatchUpload
             throw new ArgumentException("Upload type cannot be null or empty.", nameof(uploadType));
         
         // Validate upload type
-        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file" };
+        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file", "sprite" };
         if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
         
@@ -114,7 +126,8 @@ public class BatchUpload
             PackId = packId,
             ProjectId = projectId,
             ModelId = modelId,
-            TextureSetId = textureSetId
+            TextureSetId = textureSetId,
+            SpriteId = spriteId
         };
     }
     
@@ -142,10 +155,19 @@ public class BatchUpload
     /// <param name="uploadType">The new upload type</param>
     public void UpdateUploadType(string uploadType)
     {
-        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file" };
+        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file", "sprite" };
         if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
         
         UploadType = uploadType.ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Updates the sprite association for this batch upload.
+    /// </summary>
+    /// <param name="spriteId">The sprite ID to associate</param>
+    public void UpdateSpriteAssociation(int spriteId)
+    {
+        SpriteId = spriteId;
     }
 }

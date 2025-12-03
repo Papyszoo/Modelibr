@@ -3,6 +3,7 @@ import { ModelViewer } from '../../features/model-viewer'
 import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
 import { PackList, PackViewer } from '../../features/pack'
 import { ProjectList, ProjectViewer } from '../../features/project'
+import { SpriteList } from '../../features/sprite'
 import { History } from '../../features/history'
 import { StageEditor, StageList } from '../../features/stage-editor'
 import { RecycledFilesList } from '../../features/recycled-files'
@@ -75,6 +76,25 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
           )
         }
         return <ProjectViewer projectId={parseInt(tab.projectId)} />
+
+      case 'sprites':
+        return <SpriteList />
+
+      case 'spriteViewer':
+        if (!tab.spriteId) {
+          return (
+            <div className="tab-error">
+              <h3>Sprite data not available</h3>
+              <p>The sprite information could not be loaded.</p>
+            </div>
+          )
+        }
+        return (
+          <div className="tab-error">
+            <h3>Sprite Viewer</h3>
+            <p>Sprite viewer coming soon.</p>
+          </div>
+        )
 
       case 'stageList':
         return <StageList />
