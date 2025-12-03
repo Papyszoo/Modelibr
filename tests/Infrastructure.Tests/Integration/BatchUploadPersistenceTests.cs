@@ -10,6 +10,11 @@ namespace Infrastructure.Tests.Integration;
 
 public class BatchUploadPersistenceTests
 {
+    // Valid 64-character SHA256 hashes for testing
+    private const string TestHash1 = "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd";
+    private const string TestHash2 = "b2c3d4e5f6789012345678901234567890123456789012345678901234a1b2cd";
+    private const string TestHash3 = "c3d4e5f6789012345678901234567890123456789012345678901234a1b2c3d4";
+    
     [Fact]
     public async Task CanPersistBatchUpload()
     {
@@ -30,7 +35,7 @@ public class BatchUploadPersistenceTests
             "model/obj",
             FileType.Obj,
             1024,
-            "abc123hash",
+            TestHash1,
             now);
         
         context.Files.Add(file);
@@ -67,8 +72,8 @@ public class BatchUploadPersistenceTests
 
         // Create files
         var now = DateTime.UtcNow;
-        var file1 = Domain.Models.File.Create("test1.obj", "stored1.obj", "/tmp/test1.obj", "model/obj", FileType.Obj, 1024, "hash1", now);
-        var file2 = Domain.Models.File.Create("test2.obj", "stored2.obj", "/tmp/test2.obj", "model/obj", FileType.Obj, 2048, "hash2", now);
+        var file1 = Domain.Models.File.Create("test1.obj", "stored1.obj", "/tmp/test1.obj", "model/obj", FileType.Obj, 1024, TestHash1, now);
+        var file2 = Domain.Models.File.Create("test2.obj", "stored2.obj", "/tmp/test2.obj", "model/obj", FileType.Obj, 2048, TestHash2, now);
         
         context.Files.AddRange(file1, file2);
         await context.SaveChangesAsync();
@@ -102,8 +107,8 @@ public class BatchUploadPersistenceTests
 
         // Create files
         var now = DateTime.UtcNow;
-        var file1 = Domain.Models.File.Create("test1.obj", "stored1.obj", "/tmp/test1.obj", "model/obj", FileType.Obj, 1024, "hash1", now);
-        var file2 = Domain.Models.File.Create("test2.png", "stored2.png", "/tmp/test2.png", "image/png", FileType.Texture, 2048, "hash2", now);
+        var file1 = Domain.Models.File.Create("test1.obj", "stored1.obj", "/tmp/test1.obj", "model/obj", FileType.Obj, 1024, TestHash1, now);
+        var file2 = Domain.Models.File.Create("test2.png", "stored2.png", "/tmp/test2.png", "image/png", FileType.Texture, 2048, TestHash2, now);
         
         context.Files.AddRange(file1, file2);
         await context.SaveChangesAsync();
@@ -136,7 +141,7 @@ public class BatchUploadPersistenceTests
 
         // Create file
         var now = DateTime.UtcNow;
-        var file = Domain.Models.File.Create("test.obj", "stored.obj", "/tmp/test.obj", "model/obj", FileType.Obj, 1024, "hash", now);
+        var file = Domain.Models.File.Create("test.obj", "stored.obj", "/tmp/test.obj", "model/obj", FileType.Obj, 1024, TestHash3, now);
         context.Files.Add(file);
         await context.SaveChangesAsync();
 

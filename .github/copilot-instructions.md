@@ -612,6 +612,98 @@ cp .env.example .env
 4. Run: `cd src/WebApi && export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads" && dotnet run`
 5. Validate application starts and responds on http://localhost:5009
 
+## Full Environment Setup for Integration Testing
+
+### IMPORTANT: Test Changes Before Creating Pull Requests
+
+**All changes MUST be tested in the full environment before creating a pull request.** This ensures frontend, backend, database, and worker services work together correctly.
+
+### Starting All Services
+
+#### 1. Start PostgreSQL Database
+```bash
+docker run --name modelibr-postgres -d \
+  -e POSTGRES_USER=modelibr \
+  -e POSTGRES_PASSWORD=ChangeThisStrongPassword123! \
+  -e POSTGRES_DB=Modelibr \
+  -p 5432:5432 \
+  postgres:16-alpine
+```
+
+#### 2. Build and Start WebApi Backend
+```bash
+cd /home/runner/work/Modelibr/Modelibr
+dotnet build src/WebApi/WebApi.csproj
+
+# Start the WebApi
+cd src/WebApi
+mkdir -p /tmp/modelibr/uploads
+export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads"
+export ASPNETCORE_ENVIRONMENT=Development
+export ASPNETCORE_URLS="http://0.0.0.0:8080"
+export ConnectionStrings__Default="Host=localhost;Port=5432;Database=Modelibr;Username=modelibr;******"
+./bin/Debug/net9.0/WebApi
+```
+
+#### 3. Start Frontend Dev Server
+```bash
+cd /home/runner/work/Modelibr/Modelibr/src/frontend
+npm install
+VITE_API_BASE_URL="http://localhost:8080" npm run dev
+```
+
+#### 4. Start Worker Service
+```bash
+cd /home/runner/work/Modelibr/Modelibr/src/worker-service
+npm install
+WORKER_ID=worker-1 \
+WORKER_PORT=3001 \
+API_BASE_URL=http://localhost:8080 \
+npm start
+```
+
+### Service Ports
+| Service | Port | URL |
+|---------|------|-----|
+| PostgreSQL | 5432 | localhost:5432 |
+| WebApi | 8080 | http://localhost:8080 |
+| Frontend | 3000 | http://localhost:3000 |
+| Worker | 3001 | http://localhost:3001 |
+
+### Verification Commands
+```bash
+# Check WebApi is running
+curl -s http://localhost:8080/openapi/v1.json | head -10
+
+# Check Frontend is serving
+curl -s http://localhost:3000 | head -5
+
+# Check Worker health
+curl -s http://localhost:3001/health
+
+# Check Database container
+docker ps --filter name=modelibr-postgres
+```
+
+### Testing the Full Workflow
+1. **Upload a model via API:**
+   ```bash
+   curl -X POST http://localhost:8080/models -F "file=@your-model.glb"
+   ```
+
+2. **Verify in UI:** Open http://localhost:3000 and check if the model appears in the grid
+
+3. **Check thumbnail generation:** The worker should process thumbnail jobs automatically
+
+### Pre-Pull Request Checklist
+Before creating a pull request, verify:
+- [ ] All services start without errors
+- [ ] Frontend can fetch and display models from backend
+- [ ] Model upload works via API and UI
+- [ ] .NET tests pass: `dotnet test Modelibr.sln --no-build`
+- [ ] Frontend tests pass: `cd src/frontend && npm test`
+- [ ] No regression in existing functionality
+
 ## Documentation Maintenance
 
 ### Documentation Structure
