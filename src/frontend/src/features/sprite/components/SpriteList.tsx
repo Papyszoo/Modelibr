@@ -34,6 +34,8 @@ interface SpriteCategoryDto {
 }
 
 const UNASSIGNED_CATEGORY_ID = -1
+const SPRITE_TYPE_STATIC = 1
+const SPRITE_TYPE_GIF = 3
 
 function SpriteList() {
   const [sprites, setSprites] = useState<SpriteDto[]>([])
@@ -53,8 +55,6 @@ function SpriteList() {
     null
   )
   const [draggedSpriteId, setDraggedSpriteId] = useState<number | null>(null)
-  const [selectedDownloadSize, setSelectedDownloadSize] =
-    useState<string>('original')
   const [modalDragOver, setModalDragOver] = useState(false)
   const toast = useRef<Toast>(null)
   const uploadProgressContext = useUploadProgress()
@@ -132,7 +132,8 @@ function SpriteList() {
         const fileName = file.name.replace(/\.[^/.]+$/, '')
         const result = await ApiClient.createSpriteWithFile(file, {
           name: fileName,
-          spriteType: file.type === 'image/gif' ? 3 : 1,
+          spriteType:
+            file.type === 'image/gif' ? SPRITE_TYPE_GIF : SPRITE_TYPE_STATIC,
           categoryId: categoryIdToAssign,
           batchId: batchId,
         })
@@ -295,7 +296,6 @@ function SpriteList() {
 
   const openSpriteModal = (sprite: SpriteDto) => {
     setSelectedSprite(sprite)
-    setSelectedDownloadSize('original')
     setShowSpriteModal(true)
   }
 
@@ -310,7 +310,7 @@ function SpriteList() {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       const extension = selectedSprite.fileName.split('.').pop() || 'png'
-      link.download = `${selectedSprite.name}${selectedDownloadSize !== 'original' ? `_${selectedDownloadSize}` : ''}.${extension}`
+      link.download = `${selectedSprite.name}.${extension}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -354,7 +354,8 @@ function SpriteList() {
       const fileName = file.name.replace(/\.[^/.]+$/, '')
       await ApiClient.createSpriteWithFile(file, {
         name: `${selectedSprite.name}_${fileName}`,
-        spriteType: file.type === 'image/gif' ? 3 : 1,
+        spriteType:
+          file.type === 'image/gif' ? SPRITE_TYPE_GIF : SPRITE_TYPE_STATIC,
         categoryId: selectedSprite.categoryId ?? undefined,
       })
 
@@ -432,10 +433,15 @@ function SpriteList() {
       await ApiClient.updateSprite(draggedSpriteId, {
         categoryId: newCategoryId,
       })
+      const categoryName =
+        newCategoryId === null
+          ? 'Unassigned'
+          : categories.find(c => c.id === newCategoryId)?.name ||
+            'Unknown Category'
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: `Sprite moved to ${newCategoryId === null ? 'Unassigned' : categories.find(c => c.id === newCategoryId)?.name}`,
+        detail: `Sprite moved to ${categoryName}`,
         life: 3000,
       })
       loadSprites()
@@ -451,13 +457,6 @@ function SpriteList() {
 
     setDraggedSpriteId(null)
   }
-
-  const downloadSizeOptions = [
-    { label: 'Original', value: 'original' },
-    { label: 'Small (256px)', value: 'small' },
-    { label: 'Medium (512px)', value: 'medium' },
-    { label: 'Large (1024px)', value: 'large' },
-  ]
 
   const filteredSprites = sprites.filter(sprite => {
     if (activeCategoryId === UNASSIGNED_CATEGORY_ID) {
@@ -577,7 +576,8 @@ function SpriteList() {
                   src={ApiClient.getFileUrl(sprite.fileId.toString())}
                   alt={sprite.name}
                   onError={e => {
-                    ;(e.target as HTMLImageElement).style.display = 'none'
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
                   }}
                 />
               </div>
@@ -700,16 +700,6 @@ function SpriteList() {
                 <span>Drop image here to upload a different sprite size</span>
               </div>
               <div className="sprite-modal-download">
-                <div className="field">
-                  <label htmlFor="downloadSize">Download Size</label>
-                  <Dropdown
-                    id="downloadSize"
-                    value={selectedDownloadSize}
-                    options={downloadSizeOptions}
-                    onChange={e => setSelectedDownloadSize(e.value)}
-                    className="w-full"
-                  />
-                </div>
                 <Button
                   label="Download"
                   icon="pi pi-download"
