@@ -30,6 +30,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
   const [showAddModelDialog, setShowAddModelDialog] = useState(false)
   const [showAddTextureSetDialog, setShowAddTextureSetDialog] = useState(false)
   const [showAddSpriteDialog, setShowAddSpriteDialog] = useState(false)
+  const [showSpriteModal, setShowSpriteModal] = useState(false)
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [textureSetSearchQuery, setTextureSetSearchQuery] = useState('')
   const [spriteSearchQuery, setSpriteSearchQuery] = useState('')
@@ -596,6 +597,61 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     return null
   }
 
+  const getSpriteTypeName = (type: number): string => {
+    switch (type) {
+      case 1:
+        return 'Static'
+      case 2:
+        return 'Sprite Sheet'
+      case 3:
+        return 'GIF'
+      case 4:
+        return 'APNG'
+      case 5:
+        return 'Animated WebP'
+      default:
+        return 'Unknown'
+    }
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const openSpriteModal = (sprite: SpriteDto) => {
+    setSelectedSprite(sprite)
+    setShowSpriteModal(true)
+  }
+
+  const handleDownloadSprite = async () => {
+    if (!selectedSprite) return
+
+    try {
+      const url = ApiClient.getFileUrl(selectedSprite.fileId.toString())
+      const response = await fetch(url)
+      const blob = await response.blob()
+
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      const extension = selectedSprite.fileName.split('.').pop() || 'png'
+      link.download = `${selectedSprite.name}.${extension}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(link.href)
+    } catch (error) {
+      console.error('Failed to download sprite:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to download sprite',
+        life: 3000,
+      })
+    }
+  }
+
   const modelContextMenuItems: MenuItem[] = [
     {
       label: 'Remove from project',
@@ -809,6 +865,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                   <div
                     key={sprite.id}
                     className="project-card"
+                    onClick={() => openSpriteModal(sprite)}
                     onContextMenu={e => {
                       e.preventDefault()
                       setSelectedSprite(sprite)
@@ -1106,6 +1163,53 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
             </div>
           )}
         </div>
+      </Dialog>
+
+      {/* Sprite Detail Modal */}
+      <Dialog
+        header={selectedSprite?.name || 'Sprite'}
+        visible={showSpriteModal}
+        onHide={() => setShowSpriteModal(false)}
+        style={{ width: '600px' }}
+        className="sprite-detail-modal"
+      >
+        {selectedSprite && (
+          <div className="sprite-modal-content">
+            <div className="sprite-modal-preview">
+              <img
+                src={ApiClient.getFileUrl(selectedSprite.fileId.toString())}
+                alt={selectedSprite.name}
+              />
+            </div>
+            <div className="sprite-modal-info">
+              <div className="sprite-modal-details">
+                <p>
+                  <strong>Type:</strong>{' '}
+                  {getSpriteTypeName(selectedSprite.spriteType)}
+                </p>
+                <p>
+                  <strong>File:</strong> {selectedSprite.fileName}
+                </p>
+                <p>
+                  <strong>Size:</strong>{' '}
+                  {formatFileSize(selectedSprite.fileSizeBytes)}
+                </p>
+                <p>
+                  <strong>Category:</strong>{' '}
+                  {selectedSprite.categoryName || 'Unassigned'}
+                </p>
+              </div>
+              <div className="sprite-modal-download">
+                <Button
+                  label="Download"
+                  icon="pi pi-download"
+                  onClick={handleDownloadSprite}
+                  className="p-button-success w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </Dialog>
     </div>
   )
