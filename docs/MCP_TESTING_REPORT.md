@@ -132,7 +132,7 @@ All four services have been verified to work together:
 3. **Frontend** → Running on port 3000, communicates with WebApi
 4. **Worker** → Running on port 3001, connects to WebApi via SignalR
 
-### Verification
+### Verification Commands
 ```bash
 # WebApi
 curl -s http://localhost:8080/openapi/v1.json | head -20
@@ -149,6 +149,43 @@ docker ps --filter name=modelibr-postgres
 
 ---
 
+## UI Testing - Model Upload Workflow
+
+### Tested Workflow
+1. **Upload Model via API**:
+   ```bash
+   curl -X POST http://localhost:8080/models -F "file=@/tmp/duck.glb"
+   # Response: {"id":2,"alreadyExists":false}
+   ```
+
+2. **Verify Model in Grid**: Frontend displays models with count and cards
+
+3. **Thumbnail Generation**: Jobs created with "Pending" status
+
+### Screenshots
+
+**Models Grid (2 models uploaded):**
+![Models Grid](https://github.com/user-attachments/assets/b23adda1-ea7b-4b83-a2d3-7baf8facbad4)
+
+### Notes
+- Frontend successfully fetches and displays models from backend
+- Thumbnail jobs are queued but worker requires SignalR push or manual polling
+- WebGL 3D viewer loads but may show blank if HDR environment files are blocked
+
+---
+
 ## Conclusion
 
 **All four services CAN be tested by the Copilot agent.** The test framework issues have been resolved by upgrading packages and improving Jest configuration.
+
+### What Works
+- ✅ All services start and run correctly
+- ✅ Frontend communicates with WebApi
+- ✅ Models can be uploaded and displayed in UI
+- ✅ Database migrations run automatically
+- ✅ Worker service health checks pass
+
+### Limitations in Sandbox
+- ⚠️ Docker Compose build fails (SSL certificate validation)
+- ⚠️ SignalR push notifications may not reach worker
+- ⚠️ Some external resources (HDR files) may be blocked
