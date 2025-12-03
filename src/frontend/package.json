@@ -22,7 +22,6 @@
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
     "axios": "^1.12.2",
-    "leva": "^0.10.0",
     "nuqs": "^2.6.0",
     "primeicons": "^7.0.0",
     "primereact": "^10.9.7",
