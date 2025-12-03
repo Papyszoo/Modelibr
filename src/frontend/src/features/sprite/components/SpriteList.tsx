@@ -379,13 +379,14 @@ function SpriteList() {
 
   const handleGridMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     if (!isAreaSelecting || !selectionBox || !spriteGridRef.current) return
-    const rect = spriteGridRef.current.getBoundingClientRect()
+    const gridRef = spriteGridRef.current
+    const rect = gridRef.getBoundingClientRect()
     setSelectionBox(prev =>
       prev
         ? {
             ...prev,
-            currentX: e.clientX - rect.left + spriteGridRef.current!.scrollLeft,
-            currentY: e.clientY - rect.top + spriteGridRef.current!.scrollTop,
+            currentX: e.clientX - rect.left + gridRef.scrollLeft,
+            currentY: e.clientY - rect.top + gridRef.scrollTop,
           }
         : null
     )
@@ -676,7 +677,7 @@ function SpriteList() {
                 >
                   <Checkbox
                     checked={selectedSpriteIds.has(sprite.id)}
-                    onChange={() => {}}
+                    readOnly
                   />
                 </div>
                 <div className="sprite-preview">
