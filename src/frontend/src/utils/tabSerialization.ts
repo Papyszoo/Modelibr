@@ -7,7 +7,8 @@ export function getTabLabel(
   setId?: string,
   packId?: string,
   projectId?: string,
-  stageId?: string
+  stageId?: string,
+  spriteId?: string
 ): string {
   switch (type) {
     case 'modelList':
@@ -26,6 +27,10 @@ export function getTabLabel(
       return 'Projects'
     case 'projectViewer':
       return projectId ? `Project ${projectId}` : 'Project Viewer'
+    case 'sprites':
+      return 'Sprites'
+    case 'spriteViewer':
+      return spriteId ? `Sprite ${spriteId}` : 'Sprite Viewer'
     case 'stageList':
       return 'Stages'
     case 'stageEditor':
@@ -135,9 +140,30 @@ export function parseCompactTabFormat(
             undefined,
             undefined,
             undefined,
+            undefined,
             stageId
           ),
           stageId,
+        })
+        continue
+      }
+
+      // Handle sprite viewer tabs (e.g., "sprite-123")
+      if (tabId.startsWith('sprite-')) {
+        const spriteId = tabId.substring(7)
+        tabs.push({
+          id: tabId,
+          type: 'spriteViewer',
+          label: getTabLabel(
+            'spriteViewer',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            spriteId
+          ),
+          spriteId,
         })
         continue
       }
@@ -156,6 +182,8 @@ export function parseCompactTabFormat(
           'packViewer',
           'projects',
           'projectViewer',
+          'sprites',
+          'spriteViewer',
           'stageList',
           'stageEditor',
           'history',
