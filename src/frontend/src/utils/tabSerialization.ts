@@ -1,15 +1,16 @@
 import { Tab } from '../types'
 
+interface TabLabelOptions {
+  modelId?: string
+  setId?: string
+  packId?: string
+  projectId?: string
+  stageId?: string
+}
+
 // Helper function to generate tab labels
-export function getTabLabel(
-  type: Tab['type'],
-  modelId?: string,
-  setId?: string,
-  packId?: string,
-  projectId?: string,
-  stageId?: string,
-  spriteId?: string
-): string {
+export function getTabLabel(type: Tab['type'], options: TabLabelOptions = {}): string {
+  const { modelId, setId, packId, projectId, stageId } = options
   switch (type) {
     case 'modelList':
       return 'Models'
@@ -29,8 +30,6 @@ export function getTabLabel(
       return projectId ? `Project ${projectId}` : 'Project Viewer'
     case 'sprites':
       return 'Sprites'
-    case 'spriteViewer':
-      return spriteId ? `Sprite ${spriteId}` : 'Sprite Viewer'
     case 'stageList':
       return 'Stages'
     case 'stageEditor':
@@ -81,7 +80,7 @@ export function parseCompactTabFormat(
         tabs.push({
           id: tabId,
           type: 'modelViewer',
-          label: getTabLabel('modelViewer', modelId),
+          label: getTabLabel('modelViewer', { modelId }),
           modelId,
         })
         continue
@@ -93,7 +92,7 @@ export function parseCompactTabFormat(
         tabs.push({
           id: tabId,
           type: 'textureSetViewer',
-          label: getTabLabel('textureSetViewer', undefined, setId),
+          label: getTabLabel('textureSetViewer', { setId }),
           setId,
         })
         continue
@@ -105,7 +104,7 @@ export function parseCompactTabFormat(
         tabs.push({
           id: tabId,
           type: 'packViewer',
-          label: getTabLabel('packViewer', undefined, undefined, packId),
+          label: getTabLabel('packViewer', { packId }),
           packId,
         })
         continue
@@ -117,13 +116,7 @@ export function parseCompactTabFormat(
         tabs.push({
           id: tabId,
           type: 'projectViewer',
-          label: getTabLabel(
-            'projectViewer',
-            undefined,
-            undefined,
-            undefined,
-            projectId
-          ),
+          label: getTabLabel('projectViewer', { projectId }),
           projectId,
         })
         continue
@@ -135,35 +128,8 @@ export function parseCompactTabFormat(
         tabs.push({
           id: tabId,
           type: 'stageEditor',
-          label: getTabLabel(
-            'stageEditor',
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            stageId
-          ),
+          label: getTabLabel('stageEditor', { stageId }),
           stageId,
-        })
-        continue
-      }
-
-      // Handle sprite viewer tabs (e.g., "sprite-123")
-      if (tabId.startsWith('sprite-')) {
-        const spriteId = tabId.substring(7)
-        tabs.push({
-          id: tabId,
-          type: 'spriteViewer',
-          label: getTabLabel(
-            'spriteViewer',
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            spriteId
-          ),
-          spriteId,
         })
         continue
       }
@@ -183,7 +149,6 @@ export function parseCompactTabFormat(
           'projects',
           'projectViewer',
           'sprites',
-          'spriteViewer',
           'stageList',
           'stageEditor',
           'history',

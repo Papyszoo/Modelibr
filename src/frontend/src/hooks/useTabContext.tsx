@@ -153,8 +153,6 @@ export const TabProvider = ({
             tab.setId === (data as { id?: string })?.id) ||
           (type === 'packViewer' &&
             tab.packId === (data as { id?: string })?.id) ||
-          (type === 'spriteViewer' &&
-            tab.spriteId === (data as { id?: string })?.id) ||
           (type === 'stageEditor' &&
             tab.stageId === (data as { id?: string })?.id))
     )
@@ -175,11 +173,9 @@ export const TabProvider = ({
               ? `pack-${(data as { id?: string }).id}`
               : type === 'projectViewer' && (data as { id?: string })?.id
                 ? `project-${(data as { id?: string }).id}`
-                : type === 'spriteViewer' && (data as { id?: string })?.id
-                  ? `sprite-${(data as { id?: string }).id}`
-                  : type === 'stageEditor' && (data as { id?: string })?.id
-                    ? `stage-${(data as { id?: string }).id}`
-                    : type,
+                : type === 'stageEditor' && (data as { id?: string })?.id
+                  ? `stage-${(data as { id?: string }).id}`
+                  : type,
       type,
       label: title,
       modelId:
@@ -189,8 +185,6 @@ export const TabProvider = ({
       packId: type === 'packViewer' ? (data as { id?: string })?.id : undefined,
       projectId:
         type === 'projectViewer' ? (data as { id?: string })?.id : undefined,
-      spriteId:
-        type === 'spriteViewer' ? (data as { id?: string })?.id : undefined,
       stageId:
         type === 'stageEditor' ? (data as { id?: string })?.id : undefined,
     }
