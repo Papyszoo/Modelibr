@@ -247,8 +247,8 @@ export default function TextureSetGrid({
         textureType: textureType,
       })
 
-      // Delete the source texture set after successful merge
-      await ApiClient.deleteTextureSet(draggedTextureSet.id)
+      // Hard delete the source texture set after successful merge (keeps the file)
+      await ApiClient.hardDeleteTextureSet(draggedTextureSet.id)
 
       toast.current?.show({
         severity: 'success',

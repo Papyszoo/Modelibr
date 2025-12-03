@@ -42,7 +42,8 @@ public record RecycledTextureSetDto(
     int Id,
     string Name,
     DateTime DeletedAt,
-    int TextureCount
+    int TextureCount,
+    int? PreviewFileId
 );
 
 public record RecycledTextureDto(
@@ -82,7 +83,8 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             m.Id,
             m.Name,
             m.DeletedAt!.Value,
-            m.Files.Count
+            // Count unique files from versions - files are shared between model.Files and version.Files
+            m.Versions.SelectMany(v => v.Files).DistinctBy(f => f.Id).Count()
         )).ToList();
 
         var modelVersionDtos = modelVersions.Select(v => new RecycledModelVersionDto(
@@ -102,12 +104,19 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             f.DeletedAt!.Value
         )).ToList();
 
-        var textureSetDtos = textureSets.Select(ts => new RecycledTextureSetDto(
-            ts.Id,
-            ts.Name,
-            ts.DeletedAt!.Value,
-            ts.Textures.Count
-        )).ToList();
+        var textureSetDtos = textureSets.Select(ts => {
+            // Find albedo texture first, then fallback to diffuse for preview
+            var previewTexture = ts.Textures.FirstOrDefault(t => t.TextureType == Domain.ValueObjects.TextureType.Albedo)
+                              ?? ts.Textures.FirstOrDefault(t => t.TextureType == Domain.ValueObjects.TextureType.Diffuse);
+            
+            return new RecycledTextureSetDto(
+                ts.Id,
+                ts.Name,
+                ts.DeletedAt!.Value,
+                ts.Textures.Count,
+                previewTexture?.FileId
+            );
+        }).ToList();
 
         // Get deleted textures from deleted texture sets
         var textureDtos = textureSets
