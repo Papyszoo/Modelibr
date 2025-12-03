@@ -21,6 +21,7 @@ interface RecycledTextureSet {
   name: string
   deletedAt: string
   textureCount: number
+  previewFileId: number | null
 }
 
 interface DeletePreviewItem {
@@ -74,6 +75,7 @@ export default function RecycledFilesList() {
           name: ts.name,
           deletedAt: ts.deletedAt,
           textureCount: ts.textureCount,
+          previewFileId: ts.previewFileId ?? null,
         }))
       )
     } catch (error) {
@@ -217,8 +219,11 @@ export default function RecycledFilesList() {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
+  const getTexturePreviewUrl = (textureSet: RecycledTextureSet) => {
+    if (textureSet.previewFileId) {
+      return ApiClient.getFileUrl(textureSet.previewFileId.toString())
+    }
+    return null
   }
 
   if (loading) {
@@ -272,36 +277,31 @@ export default function RecycledFilesList() {
                   <div key={model.id} className="recycled-card">
                     <div className="recycled-card-thumbnail">
                       <ThumbnailDisplay modelId={model.id.toString()} />
-                    </div>
-                    <div className="recycled-card-content">
-                      <div className="recycled-card-name" title={model.name}>
-                        {model.name}
+                      <div className="recycled-card-actions">
+                        <Button
+                          icon="pi pi-replay"
+                          className="p-button-success p-button-rounded"
+                          onClick={() => handleRestoreModel(model)}
+                          tooltip="Restore"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-danger p-button-rounded"
+                          onClick={() => handleDeletePreviewModel(model)}
+                          tooltip="Delete Forever"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
                       </div>
-                      <div className="recycled-card-info">
+                      <div className="recycled-card-overlay">
+                        <span className="recycled-card-name" title={model.name}>
+                          {model.name}
+                        </span>
                         <span className="recycled-card-meta">
                           {model.fileCount} file
                           {model.fileCount !== 1 ? 's' : ''}
                         </span>
-                        <span className="recycled-card-date">
-                          Deleted: {formatDate(model.deletedAt)}
-                        </span>
                       </div>
-                    </div>
-                    <div className="recycled-card-actions">
-                      <Button
-                        icon="pi pi-replay"
-                        className="p-button-success p-button-sm"
-                        onClick={() => handleRestoreModel(model)}
-                        tooltip="Restore"
-                        tooltipOptions={{ position: 'top' }}
-                      />
-                      <Button
-                        icon="pi pi-trash"
-                        className="p-button-danger p-button-sm"
-                        onClick={() => handleDeletePreviewModel(model)}
-                        tooltip="Delete Forever"
-                        tooltipOptions={{ position: 'top' }}
-                      />
                     </div>
                   </div>
                 ))}
@@ -317,50 +317,56 @@ export default function RecycledFilesList() {
                 Texture Sets ({textureSets.length})
               </h3>
               <div className="recycled-cards-grid">
-                {textureSets.map(textureSet => (
-                  <div key={textureSet.id} className="recycled-card">
-                    <div className="recycled-card-thumbnail texture-set-thumbnail">
-                      <div className="texture-set-placeholder">
-                        <i className="pi pi-images" />
+                {textureSets.map(textureSet => {
+                  const previewUrl = getTexturePreviewUrl(textureSet)
+                  return (
+                    <div key={textureSet.id} className="recycled-card">
+                      <div className="recycled-card-thumbnail">
+                        {previewUrl ? (
+                          <img
+                            src={previewUrl}
+                            alt={textureSet.name}
+                            className="recycled-card-image"
+                          />
+                        ) : (
+                          <div className="texture-set-placeholder">
+                            <i className="pi pi-images" />
+                          </div>
+                        )}
+                        <div className="recycled-card-actions">
+                          <Button
+                            icon="pi pi-replay"
+                            className="p-button-success p-button-rounded"
+                            onClick={() => handleRestoreTextureSet(textureSet)}
+                            tooltip="Restore"
+                            tooltipOptions={{ position: 'bottom' }}
+                          />
+                          <Button
+                            icon="pi pi-trash"
+                            className="p-button-danger p-button-rounded"
+                            onClick={() =>
+                              handleDeletePreviewTextureSet(textureSet)
+                            }
+                            tooltip="Delete Forever"
+                            tooltipOptions={{ position: 'bottom' }}
+                          />
+                        </div>
+                        <div className="recycled-card-overlay">
+                          <span
+                            className="recycled-card-name"
+                            title={textureSet.name}
+                          >
+                            {textureSet.name}
+                          </span>
+                          <span className="recycled-card-meta">
+                            {textureSet.textureCount} texture
+                            {textureSet.textureCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="recycled-card-content">
-                      <div
-                        className="recycled-card-name"
-                        title={textureSet.name}
-                      >
-                        {textureSet.name}
-                      </div>
-                      <div className="recycled-card-info">
-                        <span className="recycled-card-meta">
-                          {textureSet.textureCount} texture
-                          {textureSet.textureCount !== 1 ? 's' : ''}
-                        </span>
-                        <span className="recycled-card-date">
-                          Deleted: {formatDate(textureSet.deletedAt)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="recycled-card-actions">
-                      <Button
-                        icon="pi pi-replay"
-                        className="p-button-success p-button-sm"
-                        onClick={() => handleRestoreTextureSet(textureSet)}
-                        tooltip="Restore"
-                        tooltipOptions={{ position: 'top' }}
-                      />
-                      <Button
-                        icon="pi pi-trash"
-                        className="p-button-danger p-button-sm"
-                        onClick={() =>
-                          handleDeletePreviewTextureSet(textureSet)
-                        }
-                        tooltip="Delete Forever"
-                        tooltipOptions={{ position: 'top' }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

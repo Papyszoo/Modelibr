@@ -93,19 +93,19 @@
 /* Cards grid */
 .recycled-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1.5rem;
 }
 
 /* Card styling */
 .recycled-card {
-  display: flex;
-  flex-direction: column;
   background: var(--surface-card);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
 }
 
 .recycled-card:hover {
@@ -113,11 +113,11 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Card thumbnail */
+/* Card thumbnail - takes full space */
 .recycled-card-thumbnail {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
+  aspect-ratio: 1;
   background: var(--surface-ground);
   overflow: hidden;
 }
@@ -133,10 +133,27 @@
 
 .recycled-card-thumbnail .thumbnail-image {
   object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.recycled-card:hover .thumbnail-image {
+  transform: scale(1.1);
+}
+
+/* Card image for texture sets */
+.recycled-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.recycled-card:hover .recycled-card-image {
+  transform: scale(1.1);
 }
 
 /* Texture set placeholder */
-.texture-set-thumbnail .texture-set-placeholder {
+.texture-set-placeholder {
   width: 100%;
   height: 100%;
   display: flex;
@@ -147,57 +164,64 @@
   background: linear-gradient(135deg, var(--surface-ground), var(--surface-hover));
 }
 
-.texture-set-thumbnail .texture-set-placeholder .pi {
+.texture-set-placeholder .pi {
   font-size: 3rem;
   opacity: 0.6;
 }
 
-/* Card content */
-.recycled-card-content {
-  padding: 1rem;
+/* Action buttons - positioned in top right corner */
+.recycled-card-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
   display: flex;
-  flex-direction: column;
   gap: 0.5rem;
-  flex: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 2;
 }
 
-.recycled-card-name {
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--text-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.recycled-card:hover .recycled-card-actions {
+  opacity: 1;
 }
 
-.recycled-card-info {
+.recycled-card-actions .p-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Overlay with name at bottom */
+.recycled-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  padding: 2rem 0.75rem 0.75rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.recycled-card-meta {
+.recycled-card:hover .recycled-card-overlay {
+  opacity: 1;
+}
+
+.recycled-card-name {
+  color: white;
   font-size: 0.875rem;
-  color: var(--text-color-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.recycled-card-date {
+.recycled-card-meta {
+  color: rgba(255, 255, 255, 0.8);
   font-size: 0.75rem;
-  color: var(--text-color-secondary);
-  opacity: 0.8;
-}
-
-/* Card actions */
-.recycled-card-actions {
-  display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface-ground);
-  border-top: 1px solid var(--surface-border);
-}
-
-.recycled-card-actions .p-button {
-  flex: 1;
 }
 
 /* Delete preview dialog */
@@ -245,12 +269,17 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .recycled-cards-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
 
   .recycled-files-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .recycled-card-actions .p-button {
+    width: 2rem;
+    height: 2rem;
   }
 }
