@@ -359,6 +359,14 @@ class ApiClient {
     useApiCacheStore.getState().invalidateTextureSetById(id)
   }
 
+  async hardDeleteTextureSet(id: number): Promise<void> {
+    await this.client.delete(`/texture-sets/${id}/hard`)
+
+    // Invalidate texture sets cache on successful deletion
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(id)
+  }
+
   async addTextureToSetEndpoint(
     setId: number,
     request: AddTextureToSetRequest

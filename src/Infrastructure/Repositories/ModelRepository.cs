@@ -110,6 +110,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Projects)
             .Include(m => m.Thumbnail)
             .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }

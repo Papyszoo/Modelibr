@@ -133,4 +133,20 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
+
+    public async Task HardDeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var textureSet = await _context.TextureSets
+            .Include(tp => tp.Textures)
+            .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
+
+        if (textureSet != null)
+        {
+            // Remove textures first (but keep the files - they're referenced by another texture set now)
+            _context.Textures.RemoveRange(textureSet.Textures);
+            // Remove the texture set
+            _context.TextureSets.Remove(textureSet);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
 }
