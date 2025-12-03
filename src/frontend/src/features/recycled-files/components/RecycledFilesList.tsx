@@ -250,7 +250,7 @@ export default function RecycledFilesList() {
 
       <div className="recycled-files-header">
         <h2>
-          <i className="pi pi-trash mr-2" />
+          <i className="pi pi-trash" />
           Recycled Files
         </h2>
         <Button
@@ -273,7 +273,7 @@ export default function RecycledFilesList() {
           {models.length > 0 && (
             <div className="recycled-section">
               <h3 className="recycled-section-title">
-                <i className="pi pi-box mr-2" />
+                <i className="pi pi-box" />
                 Models ({models.length})
               </h3>
               <div className="recycled-cards-grid">
@@ -318,7 +318,7 @@ export default function RecycledFilesList() {
           {textureSets.length > 0 && (
             <div className="recycled-section">
               <h3 className="recycled-section-title">
-                <i className="pi pi-images mr-2" />
+                <i className="pi pi-images" />
                 Texture Sets ({textureSets.length})
               </h3>
               <div className="recycled-cards-grid">

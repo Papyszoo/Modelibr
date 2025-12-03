@@ -66,7 +66,13 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                     return Result.Failure<GetDeletePreviewResponse>(new Error("ModelNotFound", "Model not found"));
                 
                 entityName = model.Name;
+                // Include model files
                 filesToDelete.AddRange(model.Files.Select(f => new DeletedFileInfo(f.FilePath, f.OriginalFileName, f.SizeBytes)));
+                // Include version files
+                foreach (var modelVersion in model.Versions)
+                {
+                    filesToDelete.AddRange(modelVersion.Files.Select(f => new DeletedFileInfo(f.FilePath, f.OriginalFileName, f.SizeBytes)));
+                }
                 
                 if (model.Versions.Any())
                     relatedEntities.Add($"{model.Versions.Count} model version(s)");

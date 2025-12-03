@@ -46,6 +46,11 @@ public static class TextureSetEndpoints
             .WithSummary("Deletes a texture set")
             .WithOpenApi();
 
+        app.MapDelete("/texture-sets/{id}/hard", HardDeleteTextureSet)
+            .WithName("Hard Delete Texture Set")
+            .WithSummary("Hard deletes a texture set but keeps the underlying files")
+            .WithOpenApi();
+
         // Texture management
         app.MapPost("/texture-sets/{id}/textures", AddTextureToPackEndpoint)
             .WithName("Add Texture to Pack")
@@ -200,6 +205,21 @@ public static class TextureSetEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(new DeleteTextureSetCommand(id), cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> HardDeleteTextureSet(
+        int id,
+        ICommandHandler<HardDeleteTextureSetCommand, HardDeleteTextureSetResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new HardDeleteTextureSetCommand(id), cancellationToken);
 
         if (!result.IsSuccess)
         {
