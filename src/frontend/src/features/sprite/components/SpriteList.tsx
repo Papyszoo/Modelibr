@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback, useRef, DragEvent } from 'react'
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  DragEvent,
+  MouseEvent,
+} from 'react'
 import { Toast } from 'primereact/toast'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Button } from 'primereact/button'
@@ -6,6 +13,7 @@ import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { Checkbox } from 'primereact/checkbox'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
@@ -54,6 +62,17 @@ function SpriteList() {
     null
   )
   const [draggedSpriteId, setDraggedSpriteId] = useState<number | null>(null)
+  const [selectedSpriteIds, setSelectedSpriteIds] = useState<Set<number>>(
+    new Set()
+  )
+  const [isAreaSelecting, setIsAreaSelecting] = useState(false)
+  const [selectionBox, setSelectionBox] = useState<{
+    startX: number
+    startY: number
+    currentX: number
+    currentY: number
+  } | null>(null)
+  const spriteGridRef = useRef<HTMLDivElement>(null)
   const toast = useRef<Toast>(null)
   const uploadProgressContext = useUploadProgress()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -324,13 +343,115 @@ function SpriteList() {
     }
   }
 
+  const toggleSpriteSelection = (spriteId: number, e: MouseEvent) => {
+    e.stopPropagation()
+    setSelectedSpriteIds(prev => {
+      const next = new Set(prev)
+      if (next.has(spriteId)) {
+        next.delete(spriteId)
+      } else {
+        next.add(spriteId)
+      }
+      return next
+    })
+  }
+
+  const clearSelection = () => {
+    setSelectedSpriteIds(new Set())
+  }
+
+  const handleGridMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    if (target.closest('.sprite-card')) {
+      return
+    }
+    if (spriteGridRef.current) {
+      const rect = spriteGridRef.current.getBoundingClientRect()
+      setIsAreaSelecting(true)
+      setSelectionBox({
+        startX: e.clientX - rect.left + spriteGridRef.current.scrollLeft,
+        startY: e.clientY - rect.top + spriteGridRef.current.scrollTop,
+        currentX: e.clientX - rect.left + spriteGridRef.current.scrollLeft,
+        currentY: e.clientY - rect.top + spriteGridRef.current.scrollTop,
+      })
+    }
+  }
+
+  const handleGridMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (!isAreaSelecting || !selectionBox || !spriteGridRef.current) return
+    const gridRef = spriteGridRef.current
+    const rect = gridRef.getBoundingClientRect()
+    setSelectionBox(prev =>
+      prev
+        ? {
+            ...prev,
+            currentX: e.clientX - rect.left + gridRef.scrollLeft,
+            currentY: e.clientY - rect.top + gridRef.scrollTop,
+          }
+        : null
+    )
+  }
+
+  const handleGridMouseUp = () => {
+    if (isAreaSelecting && selectionBox && spriteGridRef.current) {
+      const rect = spriteGridRef.current.getBoundingClientRect()
+      const selectionLeft = Math.min(selectionBox.startX, selectionBox.currentX)
+      const selectionTop = Math.min(selectionBox.startY, selectionBox.currentY)
+      const selectionRight = Math.max(
+        selectionBox.startX,
+        selectionBox.currentX
+      )
+      const selectionBottom = Math.max(
+        selectionBox.startY,
+        selectionBox.currentY
+      )
+
+      const cards = spriteGridRef.current.querySelectorAll('.sprite-card')
+      const newSelected = new Set<number>()
+
+      cards.forEach(card => {
+        const cardRect = card.getBoundingClientRect()
+        const cardLeft =
+          cardRect.left - rect.left + spriteGridRef.current!.scrollLeft
+        const cardTop =
+          cardRect.top - rect.top + spriteGridRef.current!.scrollTop
+        const cardRight = cardLeft + cardRect.width
+        const cardBottom = cardTop + cardRect.height
+
+        if (
+          cardRight >= selectionLeft &&
+          cardLeft <= selectionRight &&
+          cardBottom >= selectionTop &&
+          cardTop <= selectionBottom
+        ) {
+          const spriteId = card.getAttribute('data-sprite-id')
+          if (spriteId) {
+            newSelected.add(parseInt(spriteId, 10))
+          }
+        }
+      })
+
+      if (newSelected.size > 0) {
+        setSelectedSpriteIds(newSelected)
+      }
+    }
+    setIsAreaSelecting(false)
+    setSelectionBox(null)
+  }
+
   const handleSpriteDragStart = (
     e: DragEvent<HTMLDivElement>,
     sprite: SpriteDto
   ) => {
+    if (!selectedSpriteIds.has(sprite.id)) {
+      setSelectedSpriteIds(new Set([sprite.id]))
+    }
     setDraggedSpriteId(sprite.id)
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', sprite.id.toString())
+    const spriteIdsToMove = selectedSpriteIds.has(sprite.id)
+      ? Array.from(selectedSpriteIds)
+      : [sprite.id]
+    e.dataTransfer.setData('text/plain', spriteIdsToMove.join(','))
   }
 
   const handleSpriteDragEnd = () => {
@@ -365,32 +486,44 @@ function SpriteList() {
 
     if (draggedSpriteId === null) return
 
-    const sprite = sprites.find(s => s.id === draggedSpriteId)
-    if (!sprite) return
-
     const newCategoryId =
       targetCategoryId === UNASSIGNED_CATEGORY_ID ? null : targetCategoryId
 
-    if (sprite.categoryId === newCategoryId) {
+    const spriteIdsToMove = selectedSpriteIds.has(draggedSpriteId)
+      ? Array.from(selectedSpriteIds)
+      : [draggedSpriteId]
+
+    const spritesToMove = sprites.filter(
+      s => spriteIdsToMove.includes(s.id) && s.categoryId !== newCategoryId
+    )
+
+    if (spritesToMove.length === 0) {
       setDraggedSpriteId(null)
       return
     }
 
     try {
-      await ApiClient.updateSprite(draggedSpriteId, {
-        categoryId: newCategoryId,
-      })
-      const categoryName =
+      await Promise.all(
+        spritesToMove.map(sprite =>
+          ApiClient.updateSprite(sprite.id, { categoryId: newCategoryId })
+        )
+      )
+      const targetCategoryName =
         newCategoryId === null
           ? 'Unassigned'
           : categories.find(c => c.id === newCategoryId)?.name ||
             'Unknown Category'
+      const message =
+        spritesToMove.length === 1
+          ? `Sprite moved to ${targetCategoryName}`
+          : `${spritesToMove.length} sprites moved to ${targetCategoryName}`
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: `Sprite moved to ${categoryName}`,
+        detail: message,
         life: 3000,
       })
+      setSelectedSpriteIds(new Set())
       loadSprites()
     } catch (error) {
       console.error('Failed to update sprite category:', error)
@@ -435,6 +568,17 @@ function SpriteList() {
         <div className="sprite-list-title">
           <h2>Sprites</h2>
           <span className="sprite-count">{filteredSprites.length} sprites</span>
+          {selectedSpriteIds.size > 0 && (
+            <span className="selection-count">
+              ({selectedSpriteIds.size} selected)
+              <Button
+                icon="pi pi-times"
+                className="p-button-text p-button-sm clear-selection-btn"
+                onClick={clearSelection}
+                tooltip="Clear selection"
+              />
+            </span>
+          )}
         </div>
         <div className="sprite-list-actions">
           <Button
@@ -508,39 +652,69 @@ function SpriteList() {
           <p className="hint">Drag and drop image files here to upload</p>
         </div>
       ) : (
-        <div className="sprite-grid">
-          {filteredSprites.map(sprite => (
-            <div
-              key={sprite.id}
-              className={`sprite-card ${draggedSpriteId === sprite.id ? 'dragging' : ''}`}
-              onClick={() => openSpriteModal(sprite)}
-              draggable
-              onDragStart={e => handleSpriteDragStart(e, sprite)}
-              onDragEnd={handleSpriteDragEnd}
-            >
-              <div className="sprite-preview">
-                <img
-                  src={ApiClient.getFileUrl(sprite.fileId.toString())}
-                  alt={sprite.name}
-                  onError={e => {
-                    const target = e.target as HTMLImageElement
-                    target.style.display = 'none'
-                  }}
-                />
-              </div>
-              <div className="sprite-info">
-                <h3 className="sprite-name">{sprite.name}</h3>
-                <div className="sprite-meta">
-                  <span className="sprite-type">
-                    {getSpriteTypeName(sprite.spriteType)}
+        <div
+          className="sprite-grid-container"
+          ref={spriteGridRef}
+          onMouseDown={handleGridMouseDown}
+          onMouseMove={handleGridMouseMove}
+          onMouseUp={handleGridMouseUp}
+          onMouseLeave={handleGridMouseUp}
+        >
+          <div className="sprite-grid">
+            {filteredSprites.map(sprite => (
+              <div
+                key={sprite.id}
+                data-sprite-id={sprite.id}
+                className={`sprite-card ${draggedSpriteId === sprite.id ? 'dragging' : ''} ${selectedSpriteIds.has(sprite.id) ? 'selected' : ''}`}
+                onClick={() => openSpriteModal(sprite)}
+                draggable
+                onDragStart={e => handleSpriteDragStart(e, sprite)}
+                onDragEnd={handleSpriteDragEnd}
+              >
+                <div
+                  className="sprite-select-checkbox"
+                  onClick={e => toggleSpriteSelection(sprite.id, e)}
+                >
+                  <Checkbox
+                    checked={selectedSpriteIds.has(sprite.id)}
+                    readOnly
+                  />
+                </div>
+                <div className="sprite-preview">
+                  <img
+                    src={ApiClient.getFileUrl(sprite.fileId.toString())}
+                    alt={sprite.name}
+                    onError={e => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                  />
+                </div>
+                <div className="sprite-info">
+                  <h3 className="sprite-name">{sprite.name}</h3>
+                  <div className="sprite-meta">
+                    <span className="sprite-type">
+                      {getSpriteTypeName(sprite.spriteType)}
+                    </span>
+                  </div>
+                  <span className="sprite-size">
+                    {formatFileSize(sprite.fileSizeBytes)}
                   </span>
                 </div>
-                <span className="sprite-size">
-                  {formatFileSize(sprite.fileSizeBytes)}
-                </span>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          {isAreaSelecting && selectionBox && (
+            <div
+              className="selection-box"
+              style={{
+                left: Math.min(selectionBox.startX, selectionBox.currentX),
+                top: Math.min(selectionBox.startY, selectionBox.currentY),
+                width: Math.abs(selectionBox.currentX - selectionBox.startX),
+                height: Math.abs(selectionBox.currentY - selectionBox.startY),
+              }}
+            />
+          )}
         </div>
       )}
 
