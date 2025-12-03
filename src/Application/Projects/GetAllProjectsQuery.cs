@@ -26,6 +26,7 @@ internal class GetAllProjectsQueryHandler : IQueryHandler<GetAllProjectsQuery, G
             UpdatedAt = p.UpdatedAt,
             ModelCount = p.ModelCount,
             TextureSetCount = p.TextureSetCount,
+            SpriteCount = p.SpriteCount,
             IsEmpty = p.IsEmpty,
             Models = p.Models.Select(m => new ProjectModelDto
             {
@@ -36,6 +37,11 @@ internal class GetAllProjectsQueryHandler : IQueryHandler<GetAllProjectsQuery, G
             {
                 Id = ts.Id,
                 Name = ts.Name
+            }).ToList(),
+            Sprites = p.Sprites.Select(s => new ProjectSpriteDto
+            {
+                Id = s.Id,
+                Name = s.Name
             }).ToList()
         }).ToList();
 
@@ -55,9 +61,11 @@ public record ProjectDto
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
     public int TextureSetCount { get; init; }
+    public int SpriteCount { get; init; }
     public bool IsEmpty { get; init; }
     public ICollection<ProjectModelDto> Models { get; init; } = new List<ProjectModelDto>();
     public ICollection<ProjectTextureSetDto> TextureSets { get; init; } = new List<ProjectTextureSetDto>();
+    public ICollection<ProjectSpriteDto> Sprites { get; init; } = new List<ProjectSpriteDto>();
 }
 
 public record ProjectModelDto
@@ -67,6 +75,12 @@ public record ProjectModelDto
 }
 
 public record ProjectTextureSetDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record ProjectSpriteDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;

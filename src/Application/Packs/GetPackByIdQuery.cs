@@ -32,6 +32,7 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDto
             UpdatedAt = pack.UpdatedAt,
             ModelCount = pack.ModelCount,
             TextureSetCount = pack.TextureSetCount,
+            SpriteCount = pack.SpriteCount,
             IsEmpty = pack.IsEmpty,
             Models = pack.Models.Select(m => new PackModelDto
             {
@@ -42,6 +43,11 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDto
             {
                 Id = ts.Id,
                 Name = ts.Name
+            }).ToList(),
+            Sprites = pack.Sprites.Select(s => new PackSpriteDto
+            {
+                Id = s.Id,
+                Name = s.Name
             }).ToList()
         };
 
