@@ -83,7 +83,8 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             m.Id,
             m.Name,
             m.DeletedAt!.Value,
-            m.Files.Count + m.Versions.Sum(v => v.Files.Count)
+            // Count unique files - version files include all files associated with the model
+            m.Versions.SelectMany(v => v.Files).Select(f => f.Id).Distinct().Count()
         )).ToList();
 
         var modelVersionDtos = modelVersions.Select(v => new RecycledModelVersionDto(
