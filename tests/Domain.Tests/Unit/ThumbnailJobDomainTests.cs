@@ -185,24 +185,20 @@ public class ThumbnailJobDomainTests
         var job = CreateTestJob();
         var errorMessage = "Processing failed";
 
-        // Simulate multiple failed attempts
+        // Simulate max number of failed attempts (MaxAttempts = 3)
         for (int i = 0; i < 3; i++)
         {
             job.TryClaim($"worker-{i}", DateTime.UtcNow);
             job.MarkAsFailed(errorMessage, DateTime.UtcNow);
         }
 
-        // Act - Final attempt
-        job.TryClaim("worker-final", DateTime.UtcNow);
-        job.MarkAsFailed(errorMessage, DateTime.UtcNow);
-
-        // Assert
+        // Assert - job should be dead after reaching MaxAttempts
         Assert.Equal(ThumbnailJobStatus.Dead, job.Status);
         Assert.Equal(errorMessage, job.ErrorMessage);
         Assert.NotNull(job.CompletedAt);
         Assert.Null(job.LockedBy);
         Assert.Null(job.LockedAt);
-        Assert.Equal(4, job.AttemptCount); // 4 attempts (3 max + 1 final)
+        Assert.Equal(3, job.AttemptCount); // 3 attempts = MaxAttempts
     }
 
     [Fact]

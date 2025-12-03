@@ -5,6 +5,13 @@ export default {
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
+  globals: {
+    'import.meta': {
+      env: {
+        VITE_API_BASE_URL: 'http://localhost:5009',
+      },
+    },
+  },
   transform: {
     '^.+\\.(ts|tsx)$': [
       'ts-jest',
@@ -15,7 +22,7 @@ export default {
         },
       },
     ],
-    '^.+\\.(js|jsx)$': [
+    '^.+\\.(js|jsx|mjs)$': [
       'babel-jest',
       {
         presets: [
@@ -25,7 +32,7 @@ export default {
       },
     ],
   },
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'mjs'],
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.(ts|tsx|js|jsx)',
     '<rootDir>/src/**/*.(test|spec).(ts|tsx|js|jsx)',
@@ -44,6 +51,8 @@ export default {
       statements: 60,
     },
   },
-  transformIgnorePatterns: ['node_modules/(?!(.*\\.mjs$))'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(three|@react-three|.*\\.mjs$))',
+  ],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
 }
