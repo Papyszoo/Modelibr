@@ -1,13 +1,14 @@
 namespace Domain.Models;
 
 /// <summary>
-/// Represents a project/folder that groups models and texture sets together.
+/// Represents a project/folder that groups models, texture sets, and sprites together.
 /// Provides organization and categorization for 3D assets.
 /// </summary>
 public class Project : AggregateRoot
 {
     private readonly List<Model> _models = new();
     private readonly List<TextureSet> _textureSets = new();
+    private readonly List<Sprite> _sprites = new();
 
     public int Id { get; set; }
     public string Name { get; private set; } = string.Empty;
@@ -36,6 +37,18 @@ public class Project : AggregateRoot
             _textureSets.Clear();
             if (value != null)
                 _textureSets.AddRange(value);
+        }
+    }
+
+    // Navigation property for many-to-many relationship with Sprites - EF Core requires this to be settable
+    public ICollection<Sprite> Sprites
+    {
+        get => _sprites;
+        set
+        {
+            _sprites.Clear();
+            if (value != null)
+                _sprites.AddRange(value);
         }
     }
 
@@ -191,6 +204,60 @@ public class Project : AggregateRoot
     }
 
     /// <summary>
+    /// Adds a sprite to this project.
+    /// </summary>
+    /// <param name="sprite">The sprite to add</param>
+    /// <param name="updatedAt">When the association was made</param>
+    /// <exception cref="ArgumentNullException">Thrown when sprite is null</exception>
+    public void AddSprite(Sprite sprite, DateTime updatedAt)
+    {
+        if (sprite == null)
+            throw new ArgumentNullException(nameof(sprite));
+
+        if (_sprites.Any(s => s.Id == sprite.Id))
+            return; // Sprite already in project
+
+        _sprites.Add(sprite);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a sprite from this project.
+    /// </summary>
+    /// <param name="sprite">The sprite to remove</param>
+    /// <param name="updatedAt">When the association was removed</param>
+    /// <exception cref="ArgumentNullException">Thrown when sprite is null</exception>
+    public void RemoveSprite(Sprite sprite, DateTime updatedAt)
+    {
+        if (sprite == null)
+            throw new ArgumentNullException(nameof(sprite));
+
+        if (_sprites.Remove(sprite))
+        {
+            UpdatedAt = updatedAt;
+        }
+    }
+
+    /// <summary>
+    /// Checks if this project contains a sprite with the specified ID.
+    /// </summary>
+    /// <param name="spriteId">The sprite ID to check</param>
+    /// <returns>True if the sprite is in this project</returns>
+    public bool HasSprite(int spriteId)
+    {
+        return _sprites.Any(s => s.Id == spriteId);
+    }
+
+    /// <summary>
+    /// Gets all sprites in this project.
+    /// </summary>
+    /// <returns>Read-only list of sprites</returns>
+    public IReadOnlyList<Sprite> GetSprites()
+    {
+        return _sprites.AsReadOnly();
+    }
+
+    /// <summary>
     /// Gets the count of models in this project.
     /// </summary>
     public int ModelCount => _models.Count;
@@ -201,9 +268,14 @@ public class Project : AggregateRoot
     public int TextureSetCount => _textureSets.Count;
 
     /// <summary>
-    /// Checks if the project is empty (contains no models or texture sets).
+    /// Gets the count of sprites in this project.
     /// </summary>
-    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0;
+    public int SpriteCount => _sprites.Count;
+
+    /// <summary>
+    /// Checks if the project is empty (contains no models, texture sets, or sprites).
+    /// </summary>
+    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0 && _sprites.Count == 0;
 
     /// <summary>
     /// Gets a human-readable description of the project.
@@ -211,7 +283,7 @@ public class Project : AggregateRoot
     /// <returns>Description including name and content counts</returns>
     public string GetSummary()
     {
-        return $"{Name} ({_models.Count} models, {_textureSets.Count} texture sets)";
+        return $"{Name} ({_models.Count} models, {_textureSets.Count} texture sets, {_sprites.Count} sprites)";
     }
 
     private static void ValidateName(string name)
