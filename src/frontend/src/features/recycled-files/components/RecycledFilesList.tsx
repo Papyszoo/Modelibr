@@ -219,6 +219,10 @@ export default function RecycledFilesList() {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
   }
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString()
+  }
+
   const getTexturePreviewUrl = (textureSet: RecycledTextureSet) => {
     if (textureSet.previewFileId) {
       return ApiClient.getFileUrl(textureSet.previewFileId.toString())
@@ -299,7 +303,8 @@ export default function RecycledFilesList() {
                         </span>
                         <span className="recycled-card-meta">
                           {model.fileCount} file
-                          {model.fileCount !== 1 ? 's' : ''}
+                          {model.fileCount !== 1 ? 's' : ''} • Deleted{' '}
+                          {formatDate(model.deletedAt)}
                         </span>
                       </div>
                     </div>
@@ -360,7 +365,8 @@ export default function RecycledFilesList() {
                           </span>
                           <span className="recycled-card-meta">
                             {textureSet.textureCount} texture
-                            {textureSet.textureCount !== 1 ? 's' : ''}
+                            {textureSet.textureCount !== 1 ? 's' : ''} • Deleted{' '}
+                            {formatDate(textureSet.deletedAt)}
                           </span>
                         </div>
                       </div>
