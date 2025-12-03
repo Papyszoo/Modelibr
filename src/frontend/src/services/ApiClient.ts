@@ -1066,6 +1066,146 @@ class ApiClient {
     useApiCacheStore.getState().invalidateTextureSets()
     useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
   }
+
+  // Sprite methods
+  async getAllSprites(): Promise<{
+    sprites: Array<{
+      id: number
+      name: string
+      fileId: number
+      spriteType: number
+      categoryId: number | null
+      categoryName: string | null
+      fileName: string
+      fileSizeBytes: number
+      createdAt: string
+      updatedAt: string
+    }>
+  }> {
+    const response = await this.client.get('/sprites')
+    return response.data
+  }
+
+  async getSpriteById(id: number): Promise<{
+    id: number
+    name: string
+    fileId: number
+    spriteType: number
+    categoryId: number | null
+    categoryName: string | null
+    fileName: string
+    fileSizeBytes: number
+    createdAt: string
+    updatedAt: string
+  }> {
+    const response = await this.client.get(`/sprites/${id}`)
+    return response.data
+  }
+
+  async createSpriteWithFile(
+    file: File,
+    options?: {
+      name?: string
+      spriteType?: number
+      categoryId?: number
+      batchId?: string
+    }
+  ): Promise<{
+    spriteId: number
+    name: string
+    fileId: number
+    spriteType: number
+    fileSizeBytes: number
+  }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const params = new URLSearchParams()
+    if (options?.name) params.append('name', options.name)
+    if (options?.spriteType !== undefined)
+      params.append('spriteType', options.spriteType.toString())
+    if (options?.categoryId !== undefined)
+      params.append('categoryId', options.categoryId.toString())
+    if (options?.batchId) params.append('batchId', options.batchId)
+
+    const response = await this.client.post(
+      `/sprites/with-file?${params.toString()}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    return response.data
+  }
+
+  // Sprite Category methods
+  async getAllSpriteCategories(): Promise<{
+    categories: Array<{
+      id: number
+      name: string
+      description: string | null
+      createdAt: string
+      updatedAt: string
+    }>
+  }> {
+    const response = await this.client.get('/sprite-categories')
+    return response.data
+  }
+
+  async createSpriteCategory(
+    name: string,
+    description?: string
+  ): Promise<{
+    id: number
+    name: string
+    description: string | null
+  }> {
+    const response = await this.client.post('/sprite-categories', {
+      name,
+      description,
+    })
+    return response.data
+  }
+
+  async updateSpriteCategory(
+    id: number,
+    name: string,
+    description?: string
+  ): Promise<{
+    id: number
+    name: string
+    description: string | null
+  }> {
+    const response = await this.client.put(`/sprite-categories/${id}`, {
+      name,
+      description,
+    })
+    return response.data
+  }
+
+  async deleteSpriteCategory(id: number): Promise<void> {
+    await this.client.delete(`/sprite-categories/${id}`)
+  }
+
+  async updateSprite(
+    id: number,
+    updates: {
+      name?: string
+      spriteType?: number
+      categoryId?: number | null
+    }
+  ): Promise<{
+    id: number
+    name: string
+    spriteType: number
+    categoryId: number | null
+  }> {
+    const response = await this.client.put(`/sprites/${id}`, updates)
+    return response.data
+  }
 }
 
 export default new ApiClient()
