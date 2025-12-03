@@ -80,22 +80,6 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
       case 'sprites':
         return <SpriteList />
 
-      case 'spriteViewer':
-        if (!tab.spriteId) {
-          return (
-            <div className="tab-error">
-              <h3>Sprite data not available</h3>
-              <p>The sprite information could not be loaded.</p>
-            </div>
-          )
-        }
-        return (
-          <div className="tab-error">
-            <h3>Sprite Viewer</h3>
-            <p>Sprite viewer coming soon.</p>
-          </div>
-        )
-
       case 'stageList':
         return <StageList />
 
