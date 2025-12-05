@@ -29,6 +29,7 @@ public static class ThumbnailEndpoints
             var thumbnailInfo = new
             {
                 Status = response.Status.ToString(),
+                ActiveVersionId = response.ActiveVersionId,
                 FileUrl = response.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(response.ThumbnailPath) 
                     ? $"/models/{id}/thumbnail/file" 
                     : null,
@@ -40,14 +41,15 @@ public static class ThumbnailEndpoints
                 ProcessedAt = response.ProcessedAt
             };
 
-            // Add cache headers for ready thumbnails
+            // Add cache headers for ready thumbnails - include version ID for proper cache invalidation
             if (response.Status == ThumbnailStatus.Ready)
             {
                 var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
                 if (httpContext != null)
                 {
                     httpContext.Response.Headers.CacheControl = "public, max-age=3600"; // Cache for 1 hour
-                    httpContext.Response.Headers.ETag = $"\"{id}-{response.ProcessedAt?.Ticks}\"";
+                    // Include version ID in ETag to ensure cache invalidation when active version changes
+                    httpContext.Response.Headers.ETag = $"\"{id}-v{response.ActiveVersionId}-{response.ProcessedAt?.Ticks}\"";
                 }
             }
 
@@ -143,12 +145,13 @@ public static class ThumbnailEndpoints
             var fileStream = System.IO.File.OpenRead(response.ThumbnailPath);
             var contentType = ContentTypeProvider.GetContentType(response.ThumbnailPath);
             
-            // Add cache headers for thumbnail files
+            // Add cache headers for thumbnail files - include version ID for proper cache invalidation
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
             if (httpContext != null)
             {
                 httpContext.Response.Headers.CacheControl = "public, max-age=86400"; // Cache for 24 hours
-                httpContext.Response.Headers.ETag = $"\"{id}-{response.ProcessedAt?.Ticks}\"";
+                // Include version ID in ETag to ensure cache invalidation when active version changes
+                httpContext.Response.Headers.ETag = $"\"{id}-v{response.ActiveVersionId}-{response.ProcessedAt?.Ticks}\"";
             }
             
             return Results.File(fileStream, contentType, enableRangeProcessing: true);

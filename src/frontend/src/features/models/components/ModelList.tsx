@@ -11,6 +11,7 @@ import { useTabContext } from '../../../hooks/useTabContext'
 import { TabContextValue } from '../../../contexts/TabContext'
 import { Model } from '../../../utils/fileUtils'
 import { useApiCache } from '../../../hooks/useApiCache'
+import { useThumbnailSignalR } from '../../thumbnail/hooks/useThumbnailSignalR'
 import ModelListHeader from './ModelListHeader'
 import UploadProgress from './UploadProgress'
 import LoadingState from './LoadingState'
@@ -76,6 +77,10 @@ function ModelListContent({
   const [error, setError] = useState<string>('')
   const toast = useRef<Toast>(null)
   const { refreshModels } = useApiCache()
+
+  // Initialize SignalR connection for real-time thumbnail updates
+  const modelIds = models.map(m => m.id)
+  useThumbnailSignalR(modelIds)
 
   // Use the file upload hook with Three.js renderability requirement
   const { uploading, uploadProgress, uploadMultipleFiles } = useFileUpload({

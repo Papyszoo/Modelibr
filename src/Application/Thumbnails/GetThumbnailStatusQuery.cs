@@ -24,11 +24,13 @@ public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQu
                 new Error("ModelNotFound", $"Model with ID {query.ModelId} was not found."));
         }
 
+        var activeVersionId = model.ActiveVersionId;
         var thumbnail = model.ActiveVersion?.Thumbnail;
         if (thumbnail == null)
         {
             return Result.Success(new GetThumbnailStatusQueryResponse(
                 ThumbnailStatus.Pending,
+                activeVersionId,
                 null,
                 null,
                 null,
@@ -40,6 +42,7 @@ public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQu
 
         return Result.Success(new GetThumbnailStatusQueryResponse(
             thumbnail.Status,
+            activeVersionId,
             thumbnail.ThumbnailPath,
             thumbnail.SizeBytes,
             thumbnail.Width,
@@ -54,6 +57,7 @@ public record GetThumbnailStatusQuery(int ModelId) : IQuery<GetThumbnailStatusQu
 
 public record GetThumbnailStatusQueryResponse(
     ThumbnailStatus Status,
+    int? ActiveVersionId,
     string? ThumbnailPath,
     long? SizeBytes,
     int? Width,
