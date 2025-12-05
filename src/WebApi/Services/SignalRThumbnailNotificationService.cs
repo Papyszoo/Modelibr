@@ -33,5 +33,33 @@ public class SignalRThumbnailNotificationService : IThumbnailNotificationService
         // Send notification to all clients in the model version group
         await _hubContext.Clients.Group(groupName)
             .SendAsync("ThumbnailStatusChanged", notification, cancellationToken);
+
+        // Also send to the all-models group for models list view
+        // This allows the models list to update thumbnails when they become ready
+        await _hubContext.Clients.Group(ThumbnailHub.AllModelsGroupName)
+            .SendAsync("ThumbnailStatusChanged", notification, cancellationToken);
+    }
+
+    public async Task SendActiveVersionChangedAsync(int modelId, int newActiveVersionId, int? previousActiveVersionId, bool hasThumbnail, string? thumbnailUrl = null, CancellationToken cancellationToken = default)
+    {
+        // Create the notification payload
+        var notification = new
+        {
+            ModelId = modelId,
+            NewActiveVersionId = newActiveVersionId,
+            PreviousActiveVersionId = previousActiveVersionId,
+            HasThumbnail = hasThumbnail,
+            ThumbnailUrl = thumbnailUrl,
+            Timestamp = DateTime.UtcNow
+        };
+
+        // Send to model-specific group
+        var modelGroupName = ThumbnailHub.GetModelActiveVersionGroupName(modelId.ToString());
+        await _hubContext.Clients.Group(modelGroupName)
+            .SendAsync("ActiveVersionChanged", notification, cancellationToken);
+
+        // Also send to the all-models group for models list view
+        await _hubContext.Clients.Group(ThumbnailHub.AllModelsGroupName)
+            .SendAsync("ActiveVersionChanged", notification, cancellationToken);
     }
 }

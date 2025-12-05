@@ -16,18 +16,25 @@ interface SceneProps {
   defaultFileId?: number | null
 }
 
-function Scene({ model, settings, textureSet, defaultFileId }: SceneProps): JSX.Element {
+function Scene({
+  model,
+  settings,
+  textureSet,
+  defaultFileId,
+}: SceneProps): JSX.Element {
   // Find the renderable file - prioritize defaultFileId if set
   let renderableFile = model.files?.find(f => f.isRenderable)
-  
+
   // If defaultFileId is set and exists in the files, use it
   if (defaultFileId) {
-    const defaultFile = model.files?.find(f => f.id === defaultFileId.toString() && f.isRenderable)
+    const defaultFile = model.files?.find(
+      f => f.id === defaultFileId.toString() && f.isRenderable
+    )
     if (defaultFile) {
       renderableFile = defaultFile
     }
   }
-  
+
   // Fallback to first file if no renderable found
   if (!renderableFile) {
     renderableFile = model.files?.[0]

@@ -44,7 +44,7 @@ export const useTheme = () => {
     // Normalize URLs for comparison by converting to absolute paths
     const currentHref = new URL(themeLink.href, window.location.origin).href
     const targetHref = new URL(newHref, window.location.origin).href
-    
+
     if (currentHref !== targetHref) {
       themeLink.href = newHref
     }

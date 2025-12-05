@@ -88,8 +88,11 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         if (fileType.IsRenderable)
         {
             model.RaiseModelUploadedEvent(savedVersion.Id, fileEntity.Sha256Hash, true);
-            
-            // Publish domain events
+        }
+        
+        // Always publish domain events (includes ActiveVersionChangedEvent if SetAsActive was true)
+        if (model.DomainEvents.Any())
+        {
             await _domainEventDispatcher.PublishAsync(model.DomainEvents, cancellationToken);
             model.ClearDomainEvents();
         }

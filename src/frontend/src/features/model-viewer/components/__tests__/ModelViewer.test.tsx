@@ -27,7 +27,9 @@ jest.mock('@react-three/fiber', () => ({
 // Mock child components
 jest.mock('../ModelPreviewScene', () => {
   return function MockModelPreviewScene(props: any) {
-    return <div data-testid="model-preview-scene" data-model-id={props.model?.id} />
+    return (
+      <div data-testid="model-preview-scene" data-model-id={props.model?.id} />
+    )
   }
 })
 
