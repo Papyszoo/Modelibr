@@ -37,7 +37,9 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
     }
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -45,7 +47,11 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
 
     try {
       setUploading(true)
-      await ApiClient.createModelVersion(modelId, file, description || undefined)
+      await ApiClient.createModelVersion(
+        modelId,
+        file,
+        description || undefined
+      )
       await loadVersions()
     } catch (err) {
       alert('Failed to create new version')
@@ -65,7 +71,7 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
     // Try to open with blender:// protocol, fallback to download
     const blenderUrl = `blender://${url}`
     window.location.href = blenderUrl
-    
+
     // Also open download as fallback after a short delay
     setTimeout(() => {
       window.open(url, '_blank')
@@ -90,7 +96,9 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
       <div className="model-version-history">
         <div className="version-header">
           <h2>Model Version History</h2>
-          <button onClick={onClose} className="close-button">×</button>
+          <button onClick={onClose} className="close-button">
+            ×
+          </button>
         </div>
         <div className="loading">Loading versions...</div>
       </div>
@@ -102,7 +110,9 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
       <div className="model-version-history">
         <div className="version-header">
           <h2>Model Version History</h2>
-          <button onClick={onClose} className="close-button">×</button>
+          <button onClick={onClose} className="close-button">
+            ×
+          </button>
         </div>
         <div className="error">{error}</div>
       </div>
@@ -124,7 +134,9 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
               style={{ display: 'none' }}
             />
           </label>
-          <button onClick={onClose} className="close-button">×</button>
+          <button onClick={onClose} className="close-button">
+            ×
+          </button>
         </div>
       </div>
 
@@ -135,31 +147,39 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
         </div>
       ) : (
         <div className="versions-list">
-          {versions.map((version) => (
+          {versions.map(version => (
             <div
               key={version.id}
               className="version-card"
               onClick={() => onVersionSelect?.(version)}
             >
               <div className="version-info">
-                <div className="version-number">Version {version.versionNumber}</div>
-                <div className="version-date">{formatDate(version.createdAt)}</div>
+                <div className="version-number">
+                  Version {version.versionNumber}
+                </div>
+                <div className="version-date">
+                  {formatDate(version.createdAt)}
+                </div>
                 {version.description && (
-                  <div className="version-description">{version.description}</div>
+                  <div className="version-description">
+                    {version.description}
+                  </div>
                 )}
               </div>
 
               <div className="version-files">
-                {version.files.map((file) => (
+                {version.files.map(file => (
                   <div key={file.id} className="file-item">
                     <div className="file-info">
                       <span className="file-name">{file.originalFileName}</span>
                       <span className="file-type">{file.fileType}</span>
-                      <span className="file-size">{formatFileSize(file.sizeBytes)}</span>
+                      <span className="file-size">
+                        {formatFileSize(file.sizeBytes)}
+                      </span>
                     </div>
                     <div className="file-actions">
                       <button
-                        onClick={(e) => {
+                        onClick={e => {
                           e.stopPropagation()
                           handleDownload(version, file)
                         }}
@@ -169,7 +189,7 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
                       </button>
                       {file.fileType === 'blend' && (
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation()
                             handleOpenInBlender(version, file)
                           }}

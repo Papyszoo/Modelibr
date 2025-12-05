@@ -64,7 +64,8 @@ function ModelViewer({
   const [uploadModalVisible, setUploadModalVisible] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
-  const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
+  const [selectedVersion, setSelectedVersion] =
+    useState<ModelVersionDto | null>(null)
   const [versionModel, setVersionModel] = useState<Model | null>(null)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
   const toast = useRef<Toast>(null)
@@ -127,7 +128,10 @@ function ModelViewer({
     }
   }, [selectedTextureSetId])
 
-  const fetchModel = async (id: string, skipCache: boolean = true): Promise<void> => {
+  const fetchModel = async (
+    id: string,
+    skipCache: boolean = true
+  ): Promise<void> => {
     try {
       setLoading(true)
       setError('')
@@ -201,7 +205,7 @@ function ModelViewer({
           isRenderable: f.isRenderable,
           createdAt: version.createdAt,
           updatedAt: version.createdAt,
-        }))
+        })),
       }
       setVersionModel(versionModelData)
     }
@@ -255,15 +259,22 @@ function ModelViewer({
     try {
       if (action === 'new') {
         // Always create new version when explicitly requested
-        await ApiClient.createModelVersion(parseInt(model.id), file, description, setAsActive ?? true)
+        await ApiClient.createModelVersion(
+          parseInt(model.id),
+          file,
+          description,
+          setAsActive ?? true
+        )
       } else {
         // Add to current/selected version
         // If no versions are loaded yet, reload them first to check if version 1 exists
         if (versions.length === 0) {
           await loadVersions()
           // After loading, check again
-          const currentVersions = await ApiClient.getModelVersions(parseInt(model.id))
-          
+          const currentVersions = await ApiClient.getModelVersions(
+            parseInt(model.id)
+          )
+
           if (currentVersions.length > 0) {
             // Version 1 exists (auto-created), add file to it
             const latestVersion = currentVersions[currentVersions.length - 1]
@@ -274,11 +285,17 @@ function ModelViewer({
             )
           } else {
             // No versions exist at all, create first version
-            await ApiClient.createModelVersion(parseInt(model.id), file, description, setAsActive ?? true)
+            await ApiClient.createModelVersion(
+              parseInt(model.id),
+              file,
+              description,
+              setAsActive ?? true
+            )
           }
         } else {
           // Versions are already loaded, use selected or latest
-          const currentVersion = selectedVersion || versions[versions.length - 1]
+          const currentVersion =
+            selectedVersion || versions[versions.length - 1]
           await ApiClient.addFileToVersion(
             parseInt(model.id),
             currentVersion.id,
@@ -324,7 +341,7 @@ function ModelViewer({
   }
 
   return (
-    <div 
+    <div
       className="model-viewer model-viewer-tab"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
