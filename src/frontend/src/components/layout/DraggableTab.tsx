@@ -1,3 +1,4 @@
+import { Tooltip } from 'primereact/tooltip'
 import { Tab } from '../../types'
 import './DraggableTab.css'
 
@@ -6,7 +7,7 @@ const getTabIcon = (tabType: Tab['type']): string => {
     case 'modelList':
       return 'pi pi-list'
     case 'modelViewer':
-      return 'pi pi-eye'
+      return 'pi pi-box'
     case 'textureSets':
       return 'pi pi-folder'
     case 'textureSetViewer':
@@ -19,53 +20,53 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-briefcase'
     case 'projectViewer':
       return 'pi pi-briefcase'
-    case 'animation':
-      return 'pi pi-play'
     case 'settings':
       return 'pi pi-cog'
     case 'history':
       return 'pi pi-history'
     case 'recycledFiles':
       return 'pi pi-trash'
+    case 'sprites':
+      return 'pi pi-image'
     default:
       return 'pi pi-file'
   }
 }
 
 const getTabTooltip = (tab: Tab): string => {
-  if (tab.label) {
-    return tab.label
-  }
-
   switch (tab.type) {
     case 'modelList':
       return 'Models List'
     case 'modelViewer':
-      return `Model: ${tab.modelId || 'Unknown'}`
-    case 'texture':
-      return 'Textures List'
+      return `Model: ${tab.label || tab.modelId || 'Unknown'}`
     case 'textureSets':
       return 'Texture Sets'
-    case 'textureSetViewer':
-      return `Texture Set: ${tab.setId || 'Unknown'}`
+    case 'textureSetViewer': {
+      return `Texture Set: ${tab.label || tab.modelId || 'Unknown'}`
+    }
     case 'packs':
       return 'Packs'
-    case 'packViewer':
-      return `Pack: ${tab.packId || 'Unknown'}`
+    case 'packViewer': {
+      return `Pack: ${tab.label || tab.modelId || 'Unknown'}`
+    }
     case 'projects':
       return 'Projects'
     case 'projectViewer':
-      return `Project: ${tab.projectId || 'Unknown'}`
-    case 'animation':
-      return 'Animations List'
+      return `Project: ${tab.label || tab.projectId || 'Unknown'}`
     case 'settings':
       return 'Settings'
     case 'history':
       return 'Upload History'
     case 'recycledFiles':
       return 'Recycled Files'
+    case 'sprites':
+      return 'Sprites'
+    case 'stageEditor':
+      return 'Stage Editor'
+    case 'stageList':
+      return 'Stages List'
     default:
-      return 'Unknown Tab'
+      return tab.label || 'Unknown Tab'
   }
 }
 
@@ -86,7 +87,7 @@ function DraggableTab({
   onClose,
   onDragStart,
   onDragEnd,
-  side: _side, // prefix with underscore to indicate intentionally unused
+  side,
 }: DraggableTabProps): JSX.Element {
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
@@ -119,28 +120,41 @@ function DraggableTab({
     }
   }
 
-  return (
-    <div
-      className={`draggable-tab ${isActive ? 'active' : ''}`}
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      title={getTabTooltip(tab)}
-    >
-      {/* Tab content - always show icon for now */}
-      <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
+  const tooltipId = `tab-tooltip-${tab.id}`
+  // Position tooltip on the opposite side of the tab panel to avoid covering the icon
+  const tooltipPosition = side === 'left' ? 'right' : 'left'
 
-      {/* Close button in top right corner */}
-      <button
-        className="tab-close-btn"
-        onClick={handleCloseClick}
-        aria-label="Close tab"
+  return (
+    <>
+      <Tooltip
+        target={`#${CSS.escape(tooltipId)}`}
+        showDelay={0}
+        hideDelay={0}
+      />
+      <div
+        id={tooltipId}
+        className={`draggable-tab ${isActive ? 'active' : ''}`}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        data-pr-tooltip={getTabTooltip(tab)}
+        data-pr-position={tooltipPosition}
       >
-        <i className="pi pi-times"></i>
-      </button>
-    </div>
+        {/* Tab content - always show icon for now */}
+        <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
+
+        {/* Close button in top right corner */}
+        <button
+          className="tab-close-btn p-component"
+          onClick={handleCloseClick}
+          aria-label="Close tab"
+        >
+          ×
+        </button>
+      </div>
+    </>
   )
 }
 
