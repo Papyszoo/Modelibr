@@ -7,7 +7,7 @@ const getTabIcon = (tabType: Tab['type']): string => {
     case 'modelList':
       return 'pi pi-list'
     case 'modelViewer':
-      return 'pi pi-eye'
+      return 'pi pi-box'
     case 'textureSets':
       return 'pi pi-folder'
     case 'textureSetViewer':
@@ -20,14 +20,14 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-briefcase'
     case 'projectViewer':
       return 'pi pi-briefcase'
-    case 'animation':
-      return 'pi pi-play'
     case 'settings':
       return 'pi pi-cog'
     case 'history':
       return 'pi pi-history'
     case 'recycledFiles':
       return 'pi pi-trash'
+    case 'sprites':
+      return 'pi pi-image'
     default:
       return 'pi pi-file'
   }
@@ -37,49 +37,34 @@ const getTabTooltip = (tab: Tab): string => {
   switch (tab.type) {
     case 'modelList':
       return 'Models List'
-    case 'modelViewer': {
-      // If label exists and is not just "Model {id}", use it as the name
-      // Otherwise fall back to showing the ID
-      const modelName =
-        tab.label && !tab.label.match(/^Model \d+$/) ? tab.label : tab.modelId
-      return `Model: ${modelName || 'Unknown'}`
-    }
-    case 'texture':
-      return 'Textures List'
+    case 'modelViewer':
+      return `Model: ${tab.label || tab.modelId || 'Unknown'}`
     case 'textureSets':
       return 'Texture Sets'
     case 'textureSetViewer': {
-      // If label exists and is not just "Set {id}", use it as the name
-      const setName =
-        tab.label && !tab.label.match(/^Set \d+$/) ? tab.label : tab.setId
-      return `Texture Set: ${setName || 'Unknown'}`
+      return `Texture Set: ${tab.label || tab.modelId || 'Unknown'}`
     }
     case 'packs':
       return 'Packs'
     case 'packViewer': {
-      // If label exists and is not just "Pack {id}", use it as the name
-      const packName =
-        tab.label && !tab.label.match(/^Pack \d+$/) ? tab.label : tab.packId
-      return `Pack: ${packName || 'Unknown'}`
+      return `Pack: ${tab.label || tab.modelId || 'Unknown'}`
     }
     case 'projects':
       return 'Projects'
-    case 'projectViewer': {
-      // If label exists and is not just "Project {id}", use it as the name
-      const projectName =
-        tab.label && !tab.label.match(/^Project \d+$/)
-          ? tab.label
-          : tab.projectId
-      return `Project: ${projectName || 'Unknown'}`
-    }
-    case 'animation':
-      return 'Animations List'
+    case 'projectViewer':
+      return `Project: ${tab.label || tab.projectId || 'Unknown'}`
     case 'settings':
       return 'Settings'
     case 'history':
       return 'Upload History'
     case 'recycledFiles':
       return 'Recycled Files'
+    case 'sprites':
+      return 'Sprites'
+    case 'stageEditor':
+      return 'Stage Editor'
+    case 'stageList':
+      return 'Stages List'
     default:
       return tab.label || 'Unknown Tab'
   }
