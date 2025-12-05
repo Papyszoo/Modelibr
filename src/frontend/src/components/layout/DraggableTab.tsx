@@ -162,7 +162,7 @@ function DraggableTab({
 
         {/* Close button in top right corner */}
         <button
-          className="tab-close-btn"
+          className="tab-close-btn p-component"
           onClick={handleCloseClick}
           aria-label="Close tab"
         >
