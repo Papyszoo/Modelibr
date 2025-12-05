@@ -23,6 +23,7 @@ import {
   DIALOG_WIDTH_SM,
   SPRITE_TYPE_STATIC,
   SPRITE_TYPE_GIF,
+  UNASSIGNED_CATEGORY_ID,
 } from '../../../utils/constants'
 import './SpriteList.css'
 
@@ -46,8 +47,6 @@ interface SpriteCategoryDto {
   createdAt: string
   updatedAt: string
 }
-
-const UNASSIGNED_CATEGORY_ID = -1
 
 function SpriteList() {
   const [sprites, setSprites] = useState<SpriteDto[]>([])
