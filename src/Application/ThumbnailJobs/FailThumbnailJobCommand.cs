@@ -30,6 +30,7 @@ public class FailThumbnailJobCommandHandler : ICommandHandler<FailThumbnailJobCo
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IDomainEventDispatcher _domainEventDispatcher;
     private readonly ILogger<FailThumbnailJobCommandHandler> _logger;
 
     public FailThumbnailJobCommandHandler(
@@ -38,6 +39,7 @@ public class FailThumbnailJobCommandHandler : ICommandHandler<FailThumbnailJobCo
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
+        IDomainEventDispatcher domainEventDispatcher,
         ILogger<FailThumbnailJobCommandHandler> logger)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
@@ -45,6 +47,7 @@ public class FailThumbnailJobCommandHandler : ICommandHandler<FailThumbnailJobCo
         _thumbnailRepository = thumbnailRepository ?? throw new ArgumentNullException(nameof(thumbnailRepository));
         _thumbnailQueue = thumbnailQueue ?? throw new ArgumentNullException(nameof(thumbnailQueue));
         _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
+        _domainEventDispatcher = domainEventDispatcher ?? throw new ArgumentNullException(nameof(domainEventDispatcher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -86,8 +89,12 @@ public class FailThumbnailJobCommandHandler : ICommandHandler<FailThumbnailJobCo
             // Mark the job as failed (handles retry logic and dead letter queue)
             await _thumbnailQueue.MarkFailedAsync(command.JobId, command.ErrorMessage, cancellationToken);
 
-            // Save changes - the domain event will be dispatched automatically
+            // Save changes
             await _thumbnailRepository.UpdateAsync(thumbnail, cancellationToken);
+
+            // Dispatch domain events (including ThumbnailStatusChangedEvent)
+            await _domainEventDispatcher.PublishAsync(thumbnail.DomainEvents, cancellationToken);
+            thumbnail.ClearDomainEvents();
 
             _logger.LogInformation("Successfully marked thumbnail job {JobId} as failed for model {ModelId} version {ModelVersionId}: {ErrorMessage}", 
                 command.JobId, job.ModelId, job.ModelVersionId, command.ErrorMessage);

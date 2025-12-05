@@ -18,6 +18,7 @@ public class CompleteThumbnailJobCommandHandlerTests
     private readonly Mock<IThumbnailRepository> _mockThumbnailRepository;
     private readonly Mock<IThumbnailQueue> _mockThumbnailQueue;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
+    private readonly Mock<IDomainEventDispatcher> _mockDomainEventDispatcher;
     private readonly Mock<ILogger<CompleteThumbnailJobCommandHandler>> _mockLogger;
     private readonly CompleteThumbnailJobCommandHandler _handler;
 
@@ -28,7 +29,12 @@ public class CompleteThumbnailJobCommandHandlerTests
         _mockThumbnailRepository = new Mock<IThumbnailRepository>();
         _mockThumbnailQueue = new Mock<IThumbnailQueue>();
         _mockDateTimeProvider = new Mock<IDateTimeProvider>();
+        _mockDomainEventDispatcher = new Mock<IDomainEventDispatcher>();
         _mockLogger = new Mock<ILogger<CompleteThumbnailJobCommandHandler>>();
+        
+        // Setup domain event dispatcher to return success
+        _mockDomainEventDispatcher.Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
         
         _handler = new CompleteThumbnailJobCommandHandler(
             _mockThumbnailJobRepository.Object,
@@ -36,6 +42,7 @@ public class CompleteThumbnailJobCommandHandlerTests
             _mockThumbnailRepository.Object,
             _mockThumbnailQueue.Object,
             _mockDateTimeProvider.Object,
+            _mockDomainEventDispatcher.Object,
             _mockLogger.Object);
     }
 
