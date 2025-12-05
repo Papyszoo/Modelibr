@@ -26,6 +26,7 @@ public class PackRepository : IPackRepository
         return await _context.Packs
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
+            .Include(p => p.Sprites)
             .ToListAsync(cancellationToken);
     }
 
@@ -34,6 +35,7 @@ public class PackRepository : IPackRepository
         return await _context.Packs
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
+            .Include(p => p.Sprites)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
@@ -42,6 +44,7 @@ public class PackRepository : IPackRepository
         return await _context.Packs
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
+            .Include(p => p.Sprites)
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }
 

@@ -32,6 +32,7 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             UpdatedAt = project.UpdatedAt,
             ModelCount = project.ModelCount,
             TextureSetCount = project.TextureSetCount,
+            SpriteCount = project.SpriteCount,
             IsEmpty = project.IsEmpty,
             Models = project.Models.Select(m => new ProjectModelDto
             {
@@ -42,6 +43,11 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             {
                 Id = ts.Id,
                 Name = ts.Name
+            }).ToList(),
+            Sprites = project.Sprites.Select(s => new ProjectSpriteDto
+            {
+                Id = s.Id,
+                Name = s.Name
             }).ToList()
         };
 

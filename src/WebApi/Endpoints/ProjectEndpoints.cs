@@ -61,6 +61,17 @@ public static class ProjectEndpoints
             .WithName("Remove Texture Set from Project")
             .WithSummary("Removes a texture set from the specified project")
             .WithOpenApi();
+
+        // Project-Sprite association
+        app.MapPost("/projects/{projectId}/sprites/{spriteId}", AddSpriteToProject)
+            .WithName("Add Sprite to Project")
+            .WithSummary("Adds a sprite to the specified project")
+            .WithOpenApi();
+
+        app.MapDelete("/projects/{projectId}/sprites/{spriteId}", RemoveSpriteFromProject)
+            .WithName("Remove Sprite from Project")
+            .WithSummary("Removes a sprite from the specified project")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> GetAllProjects(
@@ -207,6 +218,34 @@ public static class ProjectEndpoints
 
         return result.IsSuccess
             ? Results.Ok(new { textureSetId = result.Value })
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddSpriteToProject(
+        int projectId,
+        int spriteId,
+        ICommandHandler<AddSpriteToProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new AddSpriteToProjectCommand(projectId, spriteId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveSpriteFromProject(
+        int projectId,
+        int spriteId,
+        ICommandHandler<RemoveSpriteFromProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new RemoveSpriteFromProjectCommand(projectId, spriteId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
             : Results.BadRequest(result.Error);
     }
 }

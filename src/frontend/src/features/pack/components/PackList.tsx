@@ -171,6 +171,9 @@ export default function PackList() {
                     <span>
                       <i className="pi pi-palette" /> {pack.textureSetCount}
                     </span>
+                    <span>
+                      <i className="pi pi-image" /> {pack.spriteCount}
+                    </span>
                   </div>
                 </div>
                 <div className="pack-grid-card-actions">

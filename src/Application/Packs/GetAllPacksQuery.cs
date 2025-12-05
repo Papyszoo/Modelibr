@@ -26,6 +26,7 @@ internal class GetAllPacksQueryHandler : IQueryHandler<GetAllPacksQuery, GetAllP
             UpdatedAt = p.UpdatedAt,
             ModelCount = p.ModelCount,
             TextureSetCount = p.TextureSetCount,
+            SpriteCount = p.SpriteCount,
             IsEmpty = p.IsEmpty,
             Models = p.Models.Select(m => new PackModelDto
             {
@@ -36,6 +37,11 @@ internal class GetAllPacksQueryHandler : IQueryHandler<GetAllPacksQuery, GetAllP
             {
                 Id = ts.Id,
                 Name = ts.Name
+            }).ToList(),
+            Sprites = p.Sprites.Select(s => new PackSpriteDto
+            {
+                Id = s.Id,
+                Name = s.Name
             }).ToList()
         }).ToList();
 
@@ -55,9 +61,11 @@ public record PackDto
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
     public int TextureSetCount { get; init; }
+    public int SpriteCount { get; init; }
     public bool IsEmpty { get; init; }
     public ICollection<PackModelDto> Models { get; init; } = new List<PackModelDto>();
     public ICollection<PackTextureSetDto> TextureSets { get; init; } = new List<PackTextureSetDto>();
+    public ICollection<PackSpriteDto> Sprites { get; init; } = new List<PackSpriteDto>();
 }
 
 public record PackModelDto
@@ -67,6 +75,12 @@ public record PackModelDto
 }
 
 public record PackTextureSetDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record PackSpriteDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;

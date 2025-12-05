@@ -61,6 +61,17 @@ public static class PackEndpoints
             .WithName("Remove Texture Set from Pack")
             .WithSummary("Removes a texture set from the specified pack")
             .WithOpenApi();
+
+        // Pack-Sprite association
+        app.MapPost("/packs/{packId}/sprites/{spriteId}", AddSpriteToPack)
+            .WithName("Add Sprite to Pack")
+            .WithSummary("Adds a sprite to the specified pack")
+            .WithOpenApi();
+
+        app.MapDelete("/packs/{packId}/sprites/{spriteId}", RemoveSpriteFromPack)
+            .WithName("Remove Sprite from Pack")
+            .WithSummary("Removes a sprite from the specified pack")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> GetAllPacks(
@@ -207,6 +218,34 @@ public static class PackEndpoints
 
         return result.IsSuccess
             ? Results.Ok(new { textureSetId = result.Value })
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddSpriteToPack(
+        int packId,
+        int spriteId,
+        ICommandHandler<AddSpriteToPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new AddSpriteToPackCommand(packId, spriteId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveSpriteFromPack(
+        int packId,
+        int spriteId,
+        ICommandHandler<RemoveSpriteFromPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new RemoveSpriteFromPackCommand(packId, spriteId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
             : Results.BadRequest(result.Error);
     }
 }

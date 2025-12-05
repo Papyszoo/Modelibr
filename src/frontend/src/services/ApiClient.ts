@@ -16,6 +16,8 @@ import {
   UpdatePackRequest,
   ModelVersionDto,
   CreateModelVersionResponse,
+  SpriteDto,
+  GetAllSpritesResponse,
 } from '../types'
 import { useApiCacheStore } from '../stores/apiCacheStore'
 
@@ -818,6 +820,57 @@ class ApiClient {
       `/texture-sets?projectId=${projectId}`
     )
     return response.data.textureSets
+  }
+
+  // Project-Sprite methods
+  async addSpriteToProject(projectId: number, spriteId: number): Promise<void> {
+    await this.client.post(`/projects/${projectId}/sprites/${spriteId}`)
+
+    // Invalidate projects cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+  }
+
+  async removeSpriteFromProject(
+    projectId: number,
+    spriteId: number
+  ): Promise<void> {
+    await this.client.delete(`/projects/${projectId}/sprites/${spriteId}`)
+
+    // Invalidate projects cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+  }
+
+  async getSpritesByProject(projectId: number): Promise<SpriteDto[]> {
+    const response = await this.client.get<GetAllSpritesResponse>(
+      `/sprites?projectId=${projectId}`
+    )
+    return response.data.sprites
+  }
+
+  // Pack-Sprite methods
+  async addSpriteToPack(packId: number, spriteId: number): Promise<void> {
+    await this.client.post(`/packs/${packId}/sprites/${spriteId}`)
+
+    // Invalidate packs cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+  }
+
+  async removeSpriteFromPack(packId: number, spriteId: number): Promise<void> {
+    await this.client.delete(`/packs/${packId}/sprites/${spriteId}`)
+
+    // Invalidate packs cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+  }
+
+  async getSpritesByPack(packId: number): Promise<SpriteDto[]> {
+    const response = await this.client.get<GetAllSpritesResponse>(
+      `/sprites?packId=${packId}`
+    )
+    return response.data.sprites
   }
 
   // Batch Upload History API

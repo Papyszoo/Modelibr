@@ -173,6 +173,9 @@ export default function ProjectList() {
                     <span>
                       <i className="pi pi-palette" /> {project.textureSetCount}
                     </span>
+                    <span>
+                      <i className="pi pi-image" /> {project.spriteCount}
+                    </span>
                   </div>
                 </div>
                 <div className="project-grid-card-actions">

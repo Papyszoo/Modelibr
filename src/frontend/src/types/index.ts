@@ -129,6 +129,11 @@ export interface PackTextureSetDto {
   name: string
 }
 
+export interface PackSpriteDto {
+  id: number
+  name: string
+}
+
 export interface PackDto {
   id: number
   name: string
@@ -137,9 +142,11 @@ export interface PackDto {
   updatedAt: string
   modelCount: number
   textureSetCount: number
+  spriteCount: number
   isEmpty: boolean
   models: PackModelDto[]
   textureSets: PackTextureSetDto[]
+  sprites: PackSpriteDto[]
 }
 
 export interface GetAllPacksResponse {
@@ -173,6 +180,11 @@ export interface ProjectTextureSetDto {
   name: string
 }
 
+export interface ProjectSpriteDto {
+  id: number
+  name: string
+}
+
 export interface ProjectDto {
   id: number
   name: string
@@ -181,9 +193,11 @@ export interface ProjectDto {
   updatedAt: string
   modelCount: number
   textureSetCount: number
+  spriteCount: number
   isEmpty: boolean
   models: ProjectModelDto[]
   textureSets: ProjectTextureSetDto[]
+  sprites: ProjectSpriteDto[]
 }
 
 export interface GetAllProjectsResponse {
@@ -233,4 +247,22 @@ export interface CreateModelVersionResponse {
   versionId: number
   versionNumber: number
   fileId: number
+}
+
+// Sprite related types
+export interface SpriteDto {
+  id: number
+  name: string
+  fileId: number
+  spriteType: number
+  categoryId: number | null
+  categoryName: string | null
+  fileName: string
+  fileSizeBytes: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface GetAllSpritesResponse {
+  sprites: SpriteDto[]
 }
