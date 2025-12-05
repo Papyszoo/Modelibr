@@ -56,7 +56,8 @@ internal class GetModelFileQueryHandler : IQueryHandler<GetModelFileQuery, GetMo
             fullPath,
             renderableFile.MimeType,
             renderableFile.FileType.Value,
-            renderableFile.SizeBytes));
+            renderableFile.SizeBytes,
+            renderableFile.Sha256Hash));
     }
 }
 
@@ -69,4 +70,5 @@ public record GetModelFileQueryResponse(
     string FullPath,
     string MimeType,
     string FileType,
-    long SizeBytes);
+    long SizeBytes,
+    string Sha256Hash);

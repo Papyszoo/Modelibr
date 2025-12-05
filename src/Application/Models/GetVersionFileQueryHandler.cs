@@ -48,7 +48,8 @@ internal class GetVersionFileQueryHandler : IQueryHandler<GetVersionFileQuery, G
         return Result.Success(new GetVersionFileResponse(
             fullPath,
             file.OriginalFileName,
-            file.MimeType));
+            file.MimeType,
+            file.Sha256Hash));
     }
 }
 
@@ -57,4 +58,5 @@ public record GetVersionFileQuery(int VersionId, int FileId) : IQuery<GetVersion
 public record GetVersionFileResponse(
     string FilePath,
     string OriginalFileName,
-    string MimeType);
+    string MimeType,
+    string Sha256Hash);
