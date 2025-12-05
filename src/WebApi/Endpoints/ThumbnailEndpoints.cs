@@ -197,6 +197,97 @@ public static class ThumbnailEndpoints
         })
         .WithName("Get Classification View")
         .WithTags("Thumbnails");
+
+        // Version-specific thumbnail endpoints
+        app.MapGet("/model-versions/{versionId}/thumbnail", async (
+            int versionId, 
+            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler) =>
+        {
+            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.NotFound(result.Error.Message);
+            }
+
+            var response = result.Value;
+            
+            // Create response object with file URL if thumbnail is ready
+            var thumbnailInfo = new
+            {
+                Status = response.Status.ToString(),
+                FileUrl = response.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(response.ThumbnailPath) 
+                    ? $"/model-versions/{versionId}/thumbnail/file" 
+                    : null,
+                SizeBytes = response.SizeBytes,
+                Width = response.Width,
+                Height = response.Height,
+                ErrorMessage = response.ErrorMessage,
+                CreatedAt = response.CreatedAt,
+                ProcessedAt = response.ProcessedAt
+            };
+
+            // Add cache headers for ready thumbnails
+            if (response.Status == ThumbnailStatus.Ready)
+            {
+                var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
+                if (httpContext != null)
+                {
+                    httpContext.Response.Headers.CacheControl = "public, max-age=3600"; // Cache for 1 hour
+                    httpContext.Response.Headers.ETag = $"\"{versionId}-{response.ProcessedAt?.Ticks}\"";
+                }
+            }
+
+            return Results.Ok(thumbnailInfo);
+        })
+        .WithName("Get Version Thumbnail Status")
+        .WithTags("Thumbnails");
+
+        app.MapGet("/model-versions/{versionId}/thumbnail/file", async (
+            int versionId,
+            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler) =>
+        {
+            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.NotFound(result.Error.Message);
+            }
+
+            var response = result.Value;
+            
+            if (response.Status != ThumbnailStatus.Ready || string.IsNullOrEmpty(response.ThumbnailPath))
+            {
+                return Results.NotFound("Thumbnail not ready or not found");
+            }
+
+            // Ensure the directory exists before checking file existence
+            var directory = Path.GetDirectoryName(response.ThumbnailPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
+            if (!System.IO.File.Exists(response.ThumbnailPath))
+            {
+                return Results.NotFound("Thumbnail file not found on disk");
+            }
+
+            var fileStream = System.IO.File.OpenRead(response.ThumbnailPath);
+            var contentType = ContentTypeProvider.GetContentType(response.ThumbnailPath);
+            
+            // Add cache headers for thumbnail files
+            var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
+            if (httpContext != null)
+            {
+                httpContext.Response.Headers.CacheControl = "public, max-age=86400"; // Cache for 24 hours
+                httpContext.Response.Headers.ETag = $"\"{versionId}-{response.ProcessedAt?.Ticks}\"";
+            }
+            
+            return Results.File(fileStream, contentType, enableRangeProcessing: true);
+        })
+        .WithName("Get Version Thumbnail File")
+        .WithTags("Thumbnails");
     }
 
     private static Result ValidateThumbnailFile(IFormFile file, long maxThumbnailSizeBytes)

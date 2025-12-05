@@ -11,6 +11,7 @@ jest.mock('../../../../services/ApiClient', () => ({
     getFileUrl: jest.fn((id: string) => `http://api.test/files/${id}`),
     getModelVersions: jest.fn().mockResolvedValue([]),
     getTextureSetById: jest.fn(),
+    getThumbnailUrl: jest.fn((id: string) => `http://api.test/models/${id}/thumbnail`),
   },
 }))
 
@@ -76,6 +77,12 @@ jest.mock('../FileUploadModal', () => ({
   FileUploadModal: () => <div data-testid="file-upload-modal" />,
 }))
 
+jest.mock('../VersionStrip', () => {
+  return function MockVersionStrip() {
+    return <div data-testid="version-strip" />
+  }
+})
+
 // Mock Toast
 jest.mock('primereact/toast', () => ({
   Toast: () => <div data-testid="toast" />,
@@ -112,24 +119,14 @@ describe('ModelViewer', () => {
     expect(screen.getByTestId('model-preview-scene')).toBeInTheDocument()
   })
 
-  it('should display model ID in header', () => {
+  it('should display model name in header', () => {
     render(
       <ModelProvider>
         <ModelViewer model={mockModel} side="left" />
       </ModelProvider>
     )
 
-    expect(screen.getByText('Model #1')).toBeInTheDocument()
-  })
-
-  it('should display model filename', () => {
-    render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="left" />
-      </ModelProvider>
-    )
-
-    expect(screen.getByText('test.obj')).toBeInTheDocument()
+    expect(screen.getByText('Test Model')).toBeInTheDocument()
   })
 
   it('should render viewer control buttons', () => {
@@ -140,8 +137,9 @@ describe('ModelViewer', () => {
     )
 
     const buttons = screen.getAllByTestId('button')
-    // There should be multiple control buttons (settings, info, texture, versions, hierarchy, thumbnail, uv)
-    expect(buttons.length).toBeGreaterThanOrEqual(7)
+    // There should be multiple control buttons (settings, info, texture, hierarchy, thumbnail, uv)
+    // Note: Version button was removed since versions are now in header strip
+    expect(buttons.length).toBeGreaterThanOrEqual(6)
   })
 
   it('should pass model to ModelPreviewScene', () => {

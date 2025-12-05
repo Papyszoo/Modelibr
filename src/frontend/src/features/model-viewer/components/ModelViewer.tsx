@@ -9,10 +9,11 @@ import ViewerSettingsWindow from './ViewerSettingsWindow'
 import UVMapWindow from './UVMapWindow'
 import TextureSetSelectorWindow from './TextureSetSelectorWindow'
 import ModelVersionWindow from './ModelVersionWindow'
+import VersionStrip from './VersionStrip'
 import { FileUploadModal } from './FileUploadModal'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
-import { getModelFileFormat, Model } from '../../../utils/fileUtils'
+import { Model } from '../../../utils/fileUtils'
 import { TextureSetDto, ModelVersionDto } from '../../../types'
 // eslint-disable-next-line no-restricted-imports -- ModelViewer needs direct API access for fetching model data
 import ApiClient from '../../../services/ApiClient'
@@ -102,6 +103,18 @@ function ModelViewer({
     try {
       const data = await ApiClient.getModelVersions(parseInt(model.id))
       setVersions(data)
+      
+      // Auto-select the active version if no version is currently selected
+      if (data.length > 0 && !selectedVersion) {
+        const activeVersion = data.find(v => v.id === model.activeVersionId) || data[data.length - 1]
+        handleVersionSelect(activeVersion)
+      } else if (selectedVersion) {
+        // If a version is already selected, refresh its data from the new versions list
+        const updatedVersion = data.find(v => v.id === selectedVersion.id)
+        if (updatedVersion) {
+          handleVersionSelect(updatedVersion)
+        }
+      }
     } catch (error) {
       console.error('Failed to load versions:', error)
     }
@@ -208,17 +221,52 @@ function ModelViewer({
         })),
       }
       setVersionModel(versionModelData)
+      
+      // Auto-select first renderable file if no file is currently selected
+      // or if the currently selected file is not in this version
+      const renderableFiles = version.files.filter(f => f.isRenderable)
+      if (renderableFiles.length > 0) {
+        const currentFileInVersion = version.files.find(f => f.id === defaultFileId)
+        if (!currentFileInVersion || !currentFileInVersion.isRenderable) {
+          setDefaultFileId(renderableFiles[0].id)
+        }
+      }
     }
   }
 
   const handleDefaultFileChange = (fileId: number) => {
     setDefaultFileId(fileId)
+    // Save preference to localStorage
+    if (model) {
+      localStorage.setItem(`model-${model.id}-default-file`, fileId.toString())
+    }
     // If this file is in the current model or version, trigger a re-render
     if (model) {
       setModel({ ...model })
     }
     if (versionModel) {
       setVersionModel({ ...versionModel })
+    }
+  }
+
+  const handleSetActiveVersion = async (versionId: number) => {
+    if (!model) return
+    try {
+      await ApiClient.setActiveVersion(parseInt(model.id), versionId)
+      // Reload versions to update badges
+      await loadVersions()
+      // Notify parent to refresh model data so UI updates immediately
+      if (modelId) {
+        await fetchModel(modelId, true) // Skip cache to get fresh data
+      }
+    } catch (error) {
+      console.error('Failed to set active version:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to set active version',
+        life: 3000,
+      })
     }
   }
 
@@ -383,15 +431,24 @@ function ModelViewer({
         </div>
       )}
 
-      <header className="viewer-header-tab">
-        <h1>{model.name}</h1>
-        <div className="model-info-summary">
-          <span className="model-format">{getModelFileFormat(model)}</span>
-        </div>
+      <header className="viewer-header-tab viewer-header-compact">
+        <VersionStrip
+          model={model}
+          versions={versions}
+          selectedVersion={selectedVersion}
+          onVersionSelect={handleVersionSelect}
+          onSetActiveVersion={handleSetActiveVersion}
+          defaultFileId={defaultFileId}
+          onDefaultFileChange={handleDefaultFileChange}
+        />
       </header>
 
       <ModelProvider>
         <div className="viewer-container">
+          {/* Model name overlay */}
+          <div className="viewer-model-name-overlay">
+            <span>{model.name}</span>
+          </div>
           {/* Floating action buttons for sidebar controls */}
           <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
             <Button
@@ -423,15 +480,7 @@ function ModelViewer({
                 position: buttonPosition === 'left' ? 'right' : 'left',
               }}
             />
-            <Button
-              icon="pi pi-history"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => setVersionWindowVisible(!versionWindowVisible)}
-              tooltip="Model Versions"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
+            {/* Model Versions button removed - versions now in header strip */}
             <Button
               icon="pi pi-sitemap"
               className="p-button-rounded viewer-control-btn"
