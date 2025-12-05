@@ -1,5 +1,13 @@
 // Utility functions for file handling
 
+import {
+  SPRITE_TYPE_STATIC,
+  SPRITE_TYPE_SPRITE_SHEET,
+  SPRITE_TYPE_GIF,
+  SPRITE_TYPE_APNG,
+  SPRITE_TYPE_ANIMATED_WEBP,
+} from './constants'
+
 /**
  * Interface representing a file in a model
  */
@@ -122,7 +130,7 @@ export function isSupportedModelFormat(fileExtension: string): boolean {
  */
 export function getModelDisplayName(model: Model): string {
   return model.files && model.files.length > 0
-    ? model.files[0].originalFileName
+    ? model.files[0]?.originalFileName ?? model.name ?? `Model ${model.id}`
     : model.name || `Model ${model.id}`
 }
 
@@ -131,15 +139,15 @@ export function getModelDisplayName(model: Model): string {
  */
 export function getSpriteTypeName(type: number): string {
   switch (type) {
-    case 1:
+    case SPRITE_TYPE_STATIC:
       return 'Static'
-    case 2:
+    case SPRITE_TYPE_SPRITE_SHEET:
       return 'Sprite Sheet'
-    case 3:
+    case SPRITE_TYPE_GIF:
       return 'GIF'
-    case 4:
+    case SPRITE_TYPE_APNG:
       return 'APNG'
-    case 5:
+    case SPRITE_TYPE_ANIMATED_WEBP:
       return 'Animated WebP'
     default:
       return 'Unknown'

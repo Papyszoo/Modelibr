@@ -11,6 +11,7 @@ import {
   SPRITE_TYPE_GIF,
   SPRITE_TYPE_APNG,
   SPRITE_TYPE_ANIMATED_WEBP,
+  UNASSIGNED_CATEGORY_ID,
 } from '../constants'
 
 describe('constants', () => {
@@ -53,6 +54,12 @@ describe('constants', () => {
       expect(SPRITE_TYPE_GIF).toBe(3)
       expect(SPRITE_TYPE_APNG).toBe(4)
       expect(SPRITE_TYPE_ANIMATED_WEBP).toBe(5)
+    })
+  })
+
+  describe('category constants', () => {
+    it('should have correct unassigned category value', () => {
+      expect(UNASSIGNED_CATEGORY_ID).toBe(-1)
     })
   })
 })

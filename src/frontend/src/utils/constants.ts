@@ -17,3 +17,6 @@ export const SPRITE_TYPE_SPRITE_SHEET = 2
 export const SPRITE_TYPE_GIF = 3
 export const SPRITE_TYPE_APNG = 4
 export const SPRITE_TYPE_ANIMATED_WEBP = 5
+
+// Sprite category constants
+export const UNASSIGNED_CATEGORY_ID = -1
