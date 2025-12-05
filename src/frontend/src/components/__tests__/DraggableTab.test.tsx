@@ -2,6 +2,17 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import DraggableTab from '../layout/DraggableTab'
 import { Tab } from '../../types'
 
+// Helper function to find element by data-pr-tooltip attribute
+const getByTooltip = (tooltip: string): HTMLElement => {
+  const element = document.querySelector(`[data-pr-tooltip="${tooltip}"]`)
+  if (!element) {
+    throw new Error(
+      `Unable to find an element with data-pr-tooltip: ${tooltip}`
+    )
+  }
+  return element as HTMLElement
+}
+
 describe('DraggableTab', () => {
   const mockTab: Tab = {
     id: 'test-tab-1',
@@ -26,7 +37,7 @@ describe('DraggableTab', () => {
   it('should render tab with correct icon', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
     expect(tabElement).toBeInTheDocument()
     expect(tabElement).toHaveClass('draggable-tab')
 
@@ -37,14 +48,14 @@ describe('DraggableTab', () => {
   it('should apply active class when isActive is true', () => {
     render(<DraggableTab {...defaultProps} isActive={true} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
     expect(tabElement).toHaveClass('active')
   })
 
   it('should call onSelect when clicked', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
     fireEvent.click(tabElement)
 
     expect(defaultProps.onSelect).toHaveBeenCalledTimes(1)
@@ -62,10 +73,10 @@ describe('DraggableTab', () => {
     expect(defaultProps.onSelect).not.toHaveBeenCalled() // Should not trigger select
   })
 
-  it('should display correct tooltip for different tab types', () => {
+  it('should handle drag start correctly', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
 
     // Create a mock dataTransfer object
     const mockDataTransfer = {
@@ -89,13 +100,13 @@ describe('DraggableTab', () => {
   it('should handle drag end correctly', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
     fireEvent.dragEnd(tabElement)
 
     expect(defaultProps.onDragEnd).toHaveBeenCalledTimes(1)
   })
 
-  it('should display correct tooltip for different tab types', () => {
+  it('should display correct tooltip for modelViewer tab type', () => {
     const modelViewerTab: Tab = {
       id: 'test-tab-2',
       type: 'modelViewer',
@@ -104,7 +115,7 @@ describe('DraggableTab', () => {
 
     render(<DraggableTab {...defaultProps} tab={modelViewerTab} />)
 
-    const tabElement = screen.getByTitle('Model: model-123')
+    const tabElement = getByTooltip('Model: model-123')
     expect(tabElement).toBeInTheDocument()
   })
 
@@ -119,7 +130,7 @@ describe('DraggableTab', () => {
   it('should close tab when middle mouse button is clicked', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
 
     // Simulate middle button click (button: 1)
     fireEvent.mouseDown(tabElement, { button: 1 })
@@ -131,7 +142,7 @@ describe('DraggableTab', () => {
   it('should not close tab when left mouse button is clicked', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
 
     // Simulate left button click (button: 0)
     fireEvent.mouseDown(tabElement, { button: 0 })
@@ -142,7 +153,7 @@ describe('DraggableTab', () => {
   it('should not close tab when right mouse button is clicked', () => {
     render(<DraggableTab {...defaultProps} />)
 
-    const tabElement = screen.getByTitle('Test Tab')
+    const tabElement = getByTooltip('Models List')
 
     // Simulate right button click (button: 2)
     fireEvent.mouseDown(tabElement, { button: 2 })
@@ -150,7 +161,7 @@ describe('DraggableTab', () => {
     expect(defaultProps.onClose).not.toHaveBeenCalled()
   })
 
-  it('should render textureSets tab with palette icon', () => {
+  it('should render textureSets tab with folder icon', () => {
     const textureSetsTab: Tab = {
       id: 'test-tab-3',
       type: 'textureSets',
@@ -159,14 +170,14 @@ describe('DraggableTab', () => {
 
     render(<DraggableTab {...defaultProps} tab={textureSetsTab} />)
 
-    const tabElement = screen.getByTitle('Texture Sets')
+    const tabElement = getByTooltip('Texture Sets')
     expect(tabElement).toBeInTheDocument()
 
     const icon = tabElement.querySelector('.tab-icon')
-    expect(icon).toHaveClass('pi', 'pi-palette')
+    expect(icon).toHaveClass('pi', 'pi-folder')
   })
 
-  it('should render textureSetViewer tab with images icon', () => {
+  it('should render textureSetViewer tab with image icon', () => {
     const textureSetViewerTab: Tab = {
       id: 'test-tab-4',
       type: 'textureSetViewer',
@@ -175,10 +186,10 @@ describe('DraggableTab', () => {
 
     render(<DraggableTab {...defaultProps} tab={textureSetViewerTab} />)
 
-    const tabElement = screen.getByTitle('Texture Set: set-123')
+    const tabElement = getByTooltip('Texture Set: set-123')
     expect(tabElement).toBeInTheDocument()
 
     const icon = tabElement.querySelector('.tab-icon')
-    expect(icon).toHaveClass('pi', 'pi-images')
+    expect(icon).toHaveClass('pi', 'pi-image')
   })
 })

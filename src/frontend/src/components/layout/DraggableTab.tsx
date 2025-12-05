@@ -1,3 +1,4 @@
+import { Tooltip } from 'primereact/tooltip'
 import { Tab } from '../../types'
 import './DraggableTab.css'
 
@@ -33,29 +34,25 @@ const getTabIcon = (tabType: Tab['type']): string => {
 }
 
 const getTabTooltip = (tab: Tab): string => {
-  if (tab.label) {
-    return tab.label
-  }
-
   switch (tab.type) {
     case 'modelList':
       return 'Models List'
     case 'modelViewer':
-      return `Model: ${tab.modelId || 'Unknown'}`
+      return `Model: ${tab.label || tab.modelId || 'Unknown'}`
     case 'texture':
       return 'Textures List'
     case 'textureSets':
       return 'Texture Sets'
     case 'textureSetViewer':
-      return `Texture Set: ${tab.setId || 'Unknown'}`
+      return `Texture Set: ${tab.label || tab.setId || 'Unknown'}`
     case 'packs':
       return 'Packs'
     case 'packViewer':
-      return `Pack: ${tab.packId || 'Unknown'}`
+      return `Pack: ${tab.label || tab.packId || 'Unknown'}`
     case 'projects':
       return 'Projects'
     case 'projectViewer':
-      return `Project: ${tab.projectId || 'Unknown'}`
+      return `Project: ${tab.label || tab.projectId || 'Unknown'}`
     case 'animation':
       return 'Animations List'
     case 'settings':
@@ -65,7 +62,7 @@ const getTabTooltip = (tab: Tab): string => {
     case 'recycledFiles':
       return 'Recycled Files'
     default:
-      return 'Unknown Tab'
+      return tab.label || 'Unknown Tab'
   }
 }
 
@@ -119,28 +116,39 @@ function DraggableTab({
     }
   }
 
-  return (
-    <div
-      className={`draggable-tab ${isActive ? 'active' : ''}`}
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      title={getTabTooltip(tab)}
-    >
-      {/* Tab content - always show icon for now */}
-      <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
+  const tooltipId = `tab-tooltip-${tab.id}`
 
-      {/* Close button in top right corner */}
-      <button
-        className="tab-close-btn"
-        onClick={handleCloseClick}
-        aria-label="Close tab"
+  return (
+    <>
+      <Tooltip
+        target={`#${CSS.escape(tooltipId)}`}
+        showDelay={0}
+        hideDelay={0}
+      />
+      <div
+        id={tooltipId}
+        className={`draggable-tab ${isActive ? 'active' : ''}`}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        data-pr-tooltip={getTabTooltip(tab)}
+        data-pr-position="right"
       >
-        <i className="pi pi-times"></i>
-      </button>
-    </div>
+        {/* Tab content - always show icon for now */}
+        <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
+
+        {/* Close button in top right corner */}
+        <button
+          className="tab-close-btn"
+          onClick={handleCloseClick}
+          aria-label="Close tab"
+        >
+          <i className="pi pi-times"></i>
+        </button>
+      </div>
+    </>
   )
 }
 
