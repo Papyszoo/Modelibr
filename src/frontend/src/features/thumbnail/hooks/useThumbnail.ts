@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import ApiClient, { ThumbnailStatus } from '../../../services/ApiClient'
 import thumbnailSignalRService, {
   ThumbnailStatusChangedEvent,
@@ -10,6 +10,8 @@ export function useThumbnail(modelId: string) {
     useState<ThumbnailStatus | null>(null)
   const [imgSrc, setImgSrc] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  // Use a ref to store the cache-busting timestamp that only updates on SignalR events
+  const cacheBustTimestamp = useRef(Date.now())
 
   const fetchThumbnailDetails = useCallback(async () => {
     try {
@@ -19,11 +21,11 @@ export function useThumbnail(modelId: string) {
       setThumbnailDetails(details)
 
       // Use direct URL to leverage browser caching instead of fetching blob
-      // Add a cache-busting parameter when thumbnail is updated
+      // Add a cache-busting parameter only when thumbnail is updated via SignalR
       if (details?.status === 'Ready') {
         const baseUrl = ApiClient.getThumbnailUrl(modelId)
-        // Add timestamp to bust browser cache when thumbnail changes
-        setImgSrc(`${baseUrl}?t=${Date.now()}`)
+        // Use the stable timestamp that only changes on SignalR events
+        setImgSrc(`${baseUrl}?t=${cacheBustTimestamp.current}`)
       } else {
         setImgSrc(null)
       }
@@ -47,6 +49,8 @@ export function useThumbnail(modelId: string) {
       // The ThumbnailStatusChangedEvent contains modelVersionId, not modelId
       // So we need to refresh to check if this affects our model
       if (event.status === 'Ready' || event.status === 'Failed') {
+        // Update cache bust timestamp when we receive a SignalR event
+        cacheBustTimestamp.current = Date.now()
         setRefreshKey(prev => prev + 1)
       }
     }
@@ -54,6 +58,8 @@ export function useThumbnail(modelId: string) {
     const handleActiveVersionChanged = (event: ActiveVersionChangedEvent) => {
       // When active version changes for our model, refresh thumbnail
       if (event.modelId.toString() === modelId) {
+        // Update cache bust timestamp when we receive a SignalR event
+        cacheBustTimestamp.current = Date.now()
         setRefreshKey(prev => prev + 1)
       }
     }

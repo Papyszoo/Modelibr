@@ -31,10 +31,6 @@ class ThumbnailSignalRService {
   private reconnectAttempts: number = 0
   private maxReconnectAttempts: number = 5
 
-  constructor() {
-    this.connection = null
-  }
-
   private getHubUrl(): string {
     const baseUrl =
       import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
