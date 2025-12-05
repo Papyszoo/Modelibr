@@ -11,7 +11,9 @@ jest.mock('../../../../services/ApiClient', () => ({
     getFileUrl: jest.fn((id: string) => `http://api.test/files/${id}`),
     getModelVersions: jest.fn().mockResolvedValue([]),
     getTextureSetById: jest.fn(),
-    getThumbnailUrl: jest.fn((id: string) => `http://api.test/models/${id}/thumbnail`),
+    getThumbnailUrl: jest.fn(
+      (id: string) => `http://api.test/models/${id}/thumbnail`
+    ),
   },
 }))
 
@@ -27,7 +29,9 @@ jest.mock('@react-three/fiber', () => ({
 // Mock child components
 jest.mock('../ModelPreviewScene', () => {
   return function MockModelPreviewScene(props: any) {
-    return <div data-testid="model-preview-scene" data-model-id={props.model?.id} />
+    return (
+      <div data-testid="model-preview-scene" data-model-id={props.model?.id} />
+    )
   }
 })
 

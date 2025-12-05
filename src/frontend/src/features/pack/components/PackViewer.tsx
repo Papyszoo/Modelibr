@@ -7,7 +7,13 @@ import { MenuItem } from 'primereact/menuitem'
 import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
 import ApiClient from '../../../services/ApiClient'
-import { PackDto, Model, TextureSetDto, TextureType, SpriteDto } from '../../../types'
+import {
+  PackDto,
+  Model,
+  TextureSetDto,
+  TextureType,
+  SpriteDto,
+} from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
@@ -126,7 +132,9 @@ export default function PackViewer({ packId }: PackViewerProps) {
       const response = await ApiClient.getAllSprites()
       // Filter out sprites already in this pack
       const spriteIds = sprites.map(s => s.id)
-      const available = (response.sprites || []).filter(s => !spriteIds.includes(s.id))
+      const available = (response.sprites || []).filter(
+        s => !spriteIds.includes(s.id)
+      )
       setAllSprites(available)
     } catch (error) {
       console.error('Failed to load sprites:', error)
