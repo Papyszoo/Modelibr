@@ -9,10 +9,11 @@ import ViewerSettingsWindow from './ViewerSettingsWindow'
 import UVMapWindow from './UVMapWindow'
 import TextureSetSelectorWindow from './TextureSetSelectorWindow'
 import ModelVersionWindow from './ModelVersionWindow'
+import VersionStrip from './VersionStrip'
 import { FileUploadModal } from './FileUploadModal'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '../../../contexts/ModelContext'
-import { getModelFileFormat, Model } from '../../../utils/fileUtils'
+import { Model } from '../../../utils/fileUtils'
 import { TextureSetDto, ModelVersionDto } from '../../../types'
 // eslint-disable-next-line no-restricted-imports -- ModelViewer needs direct API access for fetching model data
 import ApiClient from '../../../services/ApiClient'
@@ -64,7 +65,8 @@ function ModelViewer({
   const [uploadModalVisible, setUploadModalVisible] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
-  const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
+  const [selectedVersion, setSelectedVersion] =
+    useState<ModelVersionDto | null>(null)
   const [versionModel, setVersionModel] = useState<Model | null>(null)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
   const toast = useRef<Toast>(null)
@@ -101,6 +103,18 @@ function ModelViewer({
     try {
       const data = await ApiClient.getModelVersions(parseInt(model.id))
       setVersions(data)
+      
+      // Auto-select the active version if no version is currently selected
+      if (data.length > 0 && !selectedVersion) {
+        const activeVersion = data.find(v => v.id === model.activeVersionId) || data[data.length - 1]
+        handleVersionSelect(activeVersion)
+      } else if (selectedVersion) {
+        // If a version is already selected, refresh its data from the new versions list
+        const updatedVersion = data.find(v => v.id === selectedVersion.id)
+        if (updatedVersion) {
+          handleVersionSelect(updatedVersion)
+        }
+      }
     } catch (error) {
       console.error('Failed to load versions:', error)
     }
@@ -127,7 +141,10 @@ function ModelViewer({
     }
   }, [selectedTextureSetId])
 
-  const fetchModel = async (id: string, skipCache: boolean = true): Promise<void> => {
+  const fetchModel = async (
+    id: string,
+    skipCache: boolean = true
+  ): Promise<void> => {
     try {
       setLoading(true)
       setError('')
@@ -201,20 +218,55 @@ function ModelViewer({
           isRenderable: f.isRenderable,
           createdAt: version.createdAt,
           updatedAt: version.createdAt,
-        }))
+        })),
       }
       setVersionModel(versionModelData)
+      
+      // Auto-select first renderable file if no file is currently selected
+      // or if the currently selected file is not in this version
+      const renderableFiles = version.files.filter(f => f.isRenderable)
+      if (renderableFiles.length > 0) {
+        const currentFileInVersion = version.files.find(f => f.id === defaultFileId)
+        if (!currentFileInVersion || !currentFileInVersion.isRenderable) {
+          setDefaultFileId(renderableFiles[0].id)
+        }
+      }
     }
   }
 
   const handleDefaultFileChange = (fileId: number) => {
     setDefaultFileId(fileId)
+    // Save preference to localStorage
+    if (model) {
+      localStorage.setItem(`model-${model.id}-default-file`, fileId.toString())
+    }
     // If this file is in the current model or version, trigger a re-render
     if (model) {
       setModel({ ...model })
     }
     if (versionModel) {
       setVersionModel({ ...versionModel })
+    }
+  }
+
+  const handleSetActiveVersion = async (versionId: number) => {
+    if (!model) return
+    try {
+      await ApiClient.setActiveVersion(parseInt(model.id), versionId)
+      // Reload versions to update badges
+      await loadVersions()
+      // Notify parent to refresh model data so UI updates immediately
+      if (modelId) {
+        await fetchModel(modelId, true) // Skip cache to get fresh data
+      }
+    } catch (error) {
+      console.error('Failed to set active version:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to set active version',
+        life: 3000,
+      })
     }
   }
 
@@ -255,15 +307,22 @@ function ModelViewer({
     try {
       if (action === 'new') {
         // Always create new version when explicitly requested
-        await ApiClient.createModelVersion(parseInt(model.id), file, description, setAsActive ?? true)
+        await ApiClient.createModelVersion(
+          parseInt(model.id),
+          file,
+          description,
+          setAsActive ?? true
+        )
       } else {
         // Add to current/selected version
         // If no versions are loaded yet, reload them first to check if version 1 exists
         if (versions.length === 0) {
           await loadVersions()
           // After loading, check again
-          const currentVersions = await ApiClient.getModelVersions(parseInt(model.id))
-          
+          const currentVersions = await ApiClient.getModelVersions(
+            parseInt(model.id)
+          )
+
           if (currentVersions.length > 0) {
             // Version 1 exists (auto-created), add file to it
             const latestVersion = currentVersions[currentVersions.length - 1]
@@ -274,11 +333,17 @@ function ModelViewer({
             )
           } else {
             // No versions exist at all, create first version
-            await ApiClient.createModelVersion(parseInt(model.id), file, description, setAsActive ?? true)
+            await ApiClient.createModelVersion(
+              parseInt(model.id),
+              file,
+              description,
+              setAsActive ?? true
+            )
           }
         } else {
           // Versions are already loaded, use selected or latest
-          const currentVersion = selectedVersion || versions[versions.length - 1]
+          const currentVersion =
+            selectedVersion || versions[versions.length - 1]
           await ApiClient.addFileToVersion(
             parseInt(model.id),
             currentVersion.id,
@@ -324,7 +389,7 @@ function ModelViewer({
   }
 
   return (
-    <div 
+    <div
       className="model-viewer model-viewer-tab"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -366,18 +431,24 @@ function ModelViewer({
         </div>
       )}
 
-      <header className="viewer-header-tab">
-        <h1>Model #{model.id}</h1>
-        <div className="model-info-summary">
-          <span className="model-format">{getModelFileFormat(model)}</span>
-          <span className="model-name">
-            {model.files?.[0]?.originalFileName || `Model ${model.id}`}
-          </span>
-        </div>
+      <header className="viewer-header-tab viewer-header-compact">
+        <VersionStrip
+          model={model}
+          versions={versions}
+          selectedVersion={selectedVersion}
+          onVersionSelect={handleVersionSelect}
+          onSetActiveVersion={handleSetActiveVersion}
+          defaultFileId={defaultFileId}
+          onDefaultFileChange={handleDefaultFileChange}
+        />
       </header>
 
       <ModelProvider>
         <div className="viewer-container">
+          {/* Model name overlay */}
+          <div className="viewer-model-name-overlay">
+            <span>{model.name}</span>
+          </div>
           {/* Floating action buttons for sidebar controls */}
           <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
             <Button
@@ -409,15 +480,7 @@ function ModelViewer({
                 position: buttonPosition === 'left' ? 'right' : 'left',
               }}
             />
-            <Button
-              icon="pi pi-history"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => setVersionWindowVisible(!versionWindowVisible)}
-              tooltip="Model Versions"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
+            {/* Model Versions button removed - versions now in header strip */}
             <Button
               icon="pi pi-sitemap"
               className="p-button-rounded viewer-control-btn"
