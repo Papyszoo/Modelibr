@@ -42,8 +42,10 @@
   position: absolute;
   top: -4px;
   right: -4px;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  max-width: 14px;
   background: #ef4444;
   border: none;
   border-radius: 50%;
@@ -52,13 +54,13 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  margin: 0;
   transition: all 0.2s ease;
   z-index: 10;
-}
-
-.tab-close-btn i {
+  line-height: 14px;
+  font-size: 10px;
   color: white;
-  font-size: 0.6rem;
+  font-weight: bold;
 }
 
 .tab-close-btn:hover {
