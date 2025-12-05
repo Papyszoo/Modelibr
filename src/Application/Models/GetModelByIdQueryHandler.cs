@@ -32,7 +32,8 @@ namespace Application.Models
                 Tags = model.Tags,
                 Description = model.Description,
                 DefaultTextureSetId = model.DefaultTextureSetId,
-                Files = model.Files.Select(f => new FileDto
+                ActiveVersionId = model.ActiveVersionId,
+                Files = (model.ActiveVersion?.Files ?? Array.Empty<Domain.Models.File>()).Select(f => new FileDto
                 {
                     Id = f.Id,
                     OriginalFileName = f.OriginalFileName,

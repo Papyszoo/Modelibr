@@ -27,28 +27,28 @@ public class ThumbnailStatusChangedEventHandler : IDomainEventHandler<ThumbnailS
     {
         try
         {
-            _logger.LogInformation("Handling ThumbnailStatusChangedEvent for model {ModelId} with status {Status}",
-                domainEvent.ModelId, domainEvent.Status);
+            _logger.LogInformation("Handling ThumbnailStatusChangedEvent for model version {ModelVersionId} with status {Status}",
+                domainEvent.ModelVersionId, domainEvent.Status);
 
             await _notificationService.SendThumbnailStatusChangedAsync(
-                domainEvent.ModelId,
+                domainEvent.ModelVersionId,
                 domainEvent.Status.ToString(),
                 domainEvent.ThumbnailUrl,
                 domainEvent.ErrorMessage,
                 cancellationToken);
 
-            _logger.LogInformation("Successfully sent thumbnail status notification for model {ModelId}",
-                domainEvent.ModelId);
+            _logger.LogInformation("Successfully sent thumbnail status notification for model version {ModelVersionId}",
+                domainEvent.ModelVersionId);
 
             return Result.Success();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send thumbnail status notification for model {ModelId}",
-                domainEvent.ModelId);
+            _logger.LogError(ex, "Failed to send thumbnail status notification for model version {ModelVersionId}",
+                domainEvent.ModelVersionId);
 
             return Result.Failure(new Error("ThumbnailNotificationFailed", 
-                $"Failed to send thumbnail status notification for model {domainEvent.ModelId}: {ex.Message}"));
+                $"Failed to send thumbnail status notification for model version {domainEvent.ModelVersionId}: {ex.Message}"));
         }
     }
 }

@@ -194,6 +194,9 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("ActiveVersionId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -205,6 +208,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<int?>("FileId")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -221,7 +227,12 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ActiveVersionId")
+                        .IsUnique();
+
                     b.HasIndex("DefaultTextureSetId");
+
+                    b.HasIndex("FileId");
 
                     b.HasIndex("IsDeleted");
 
@@ -251,6 +262,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("ModelId")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("VersionNumber")
                         .HasColumnType("integer");
@@ -571,7 +585,7 @@ namespace Infrastructure.Migrations
                     b.Property<int?>("Height")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ModelId")
+                    b.Property<int>("ModelVersionId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("ProcessedAt")
@@ -595,7 +609,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelId")
+                    b.HasIndex("ModelVersionId")
                         .IsUnique();
 
                     b.ToTable("Thumbnails");
@@ -643,6 +657,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ModelId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("ModelVersionId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -655,6 +672,8 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("ModelId");
+
+                    b.HasIndex("ModelVersionId");
 
                     b.HasIndex("Status", "CreatedAt");
 
@@ -698,21 +717,6 @@ namespace Infrastructure.Migrations
                     b.HasIndex("ThumbnailJobId", "OccurredAt");
 
                     b.ToTable("ThumbnailJobEvents");
-                });
-
-            modelBuilder.Entity("FileModel", b =>
-                {
-                    b.Property<int>("FilesId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ModelsId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("FilesId", "ModelsId");
-
-                    b.HasIndex("ModelsId");
-
-                    b.ToTable("ModelFiles", (string)null);
                 });
 
             modelBuilder.Entity("ModelPack", b =>
@@ -878,10 +882,21 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.Model", b =>
                 {
+                    b.HasOne("Domain.Models.ModelVersion", "ActiveVersion")
+                        .WithOne()
+                        .HasForeignKey("Domain.Models.Model", "ActiveVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Models.TextureSet", null)
                         .WithMany()
                         .HasForeignKey("DefaultTextureSetId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.File", null)
+                        .WithMany("Models")
+                        .HasForeignKey("FileId");
+
+                    b.Navigation("ActiveVersion");
                 });
 
             modelBuilder.Entity("Domain.Models.ModelVersion", b =>
@@ -937,13 +952,13 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.Thumbnail", b =>
                 {
-                    b.HasOne("Domain.Models.Model", "Model")
+                    b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
                         .WithOne("Thumbnail")
-                        .HasForeignKey("Domain.Models.Thumbnail", "ModelId")
+                        .HasForeignKey("Domain.Models.Thumbnail", "ModelVersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Model");
+                    b.Navigation("ModelVersion");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJob", b =>
@@ -954,7 +969,15 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
+                        .WithMany()
+                        .HasForeignKey("ModelVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Model");
+
+                    b.Navigation("ModelVersion");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJobEvent", b =>
@@ -966,21 +989,6 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ThumbnailJob");
-                });
-
-            modelBuilder.Entity("FileModel", b =>
-                {
-                    b.HasOne("Domain.Models.File", null)
-                        .WithMany()
-                        .HasForeignKey("FilesId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Models.Model", null)
-                        .WithMany()
-                        .HasForeignKey("ModelsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("ModelPack", b =>
@@ -1088,16 +1096,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Models.File", b =>
+                {
+                    b.Navigation("Models");
+                });
+
             modelBuilder.Entity("Domain.Models.Model", b =>
                 {
-                    b.Navigation("Thumbnail");
-
                     b.Navigation("Versions");
                 });
 
             modelBuilder.Entity("Domain.Models.ModelVersion", b =>
                 {
                     b.Navigation("Files");
+
+                    b.Navigation("Thumbnail");
                 });
 
             modelBuilder.Entity("Domain.Models.TextureSet", b =>

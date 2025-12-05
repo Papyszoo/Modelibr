@@ -40,7 +40,8 @@ namespace Application.Models
                 Tags = m.Tags,
                 Description = m.Description,
                 DefaultTextureSetId = m.DefaultTextureSetId,
-                Files = m.Files.Select(f => new FileDto
+                ActiveVersionId = m.ActiveVersionId,
+                Files = (m.ActiveVersion?.Files ?? Array.Empty<Domain.Models.File>()).Select(f => new FileDto
                 {
                     Id = f.Id,
                     OriginalFileName = f.OriginalFileName,
@@ -83,6 +84,7 @@ namespace Application.Models
         public string? Tags { get; init; }
         public string? Description { get; init; }
         public int? DefaultTextureSetId { get; init; }
+        public int? ActiveVersionId { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
         public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();

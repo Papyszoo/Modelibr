@@ -61,8 +61,8 @@ namespace Application.Models
             var existingModel = await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
             if (existingModel != null)
             {
-                // Raise domain event for existing model upload
-                existingModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, false);
+            // Raise domain event for existing model upload
+                existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false);
                 
                 // Publish domain events
                 await _domainEventDispatcher.PublishAsync(existingModel.DomainEvents, cancellationToken);
@@ -93,9 +93,6 @@ namespace Application.Models
                 // Save the model first to get an ID
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
                 
-                // Now add the file to the model (this properly persists the file entity to the database)
-                await _modelRepository.AddFileAsync(savedModel.Id, fileEntity, cancellationToken);
-                
                 // Create version 1 automatically for new models
                 var version1 = savedModel.CreateVersion("Initial version", _dateTimeProvider.UtcNow);
                 version1.AddFile(fileEntity);
@@ -106,7 +103,7 @@ namespace Application.Models
                 await _modelRepository.UpdateAsync(savedModel, cancellationToken);
                 
                 // Raise domain event for new model upload after both model and file are persisted
-                savedModel.RaiseModelUploadedEvent(fileEntity.Sha256Hash, true);
+                savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true);
                 
                 // Publish domain events
                 await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);

@@ -54,7 +54,22 @@ namespace Application.Models
 
             try
             {
-                await _modelRepository.AddFileAsync(command.ModelId, fileEntity, cancellationToken);
+                var model = await _modelRepository.GetByIdAsync(command.ModelId, cancellationToken);
+                if (model == null)
+                {
+                    return Result.Failure<AddFileToModelCommandResponse>(new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
+                }
+
+                if (model.ActiveVersion == null)
+                {
+                    return Result.Failure<AddFileToModelCommandResponse>(new Error("NoActiveVersion", $"Model {command.ModelId} has no active version."));
+                }
+
+                // Add file to the active version
+                fileEntity.SetModelVersion(model.ActiveVersion.Id);
+                model.ActiveVersion.AddFile(fileEntity);
+                
+                await _modelRepository.UpdateAsync(model, cancellationToken);
                 return Result.Success(new AddFileToModelCommandResponse(fileEntity.Id, false));
             }
             catch (ArgumentException ex)

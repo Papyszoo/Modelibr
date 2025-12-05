@@ -16,6 +16,11 @@ public class ThumbnailJob
     public int ModelId { get; private set; }
     
     /// <summary>
+    /// The ID of the model version this thumbnail job is for.
+    /// </summary>
+    public int ModelVersionId { get; private set; }
+    
+    /// <summary>
     /// The SHA256 hash of the model for deduplication.
     /// </summary>
     public string ModelHash { get; private set; } = string.Empty;
@@ -70,15 +75,17 @@ public class ThumbnailJob
     /// </summary>
     public DateTime? CompletedAt { get; private set; }
     
-    // Navigation property
+    // Navigation properties
     public Model Model { get; set; } = null!;
+    public ModelVersion ModelVersion { get; set; } = null!;
 
     /// <summary>
     /// Creates a new thumbnail job for processing.
     /// </summary>
-    public static ThumbnailJob Create(int modelId, string modelHash, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
+    public static ThumbnailJob Create(int modelId, int modelVersionId, string modelHash, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
     {
         ValidateModelId(modelId);
+        ValidateModelVersionId(modelVersionId);
         ValidateModelHash(modelHash);
         ValidateMaxAttempts(maxAttempts);
         ValidateLockTimeoutMinutes(lockTimeoutMinutes);
@@ -86,6 +93,7 @@ public class ThumbnailJob
         return new ThumbnailJob
         {
             ModelId = modelId,
+            ModelVersionId = modelVersionId,
             ModelHash = modelHash.Trim(),
             Status = ThumbnailJobStatus.Pending,
             MaxAttempts = maxAttempts,
@@ -210,6 +218,12 @@ public class ThumbnailJob
     {
         if (modelId <= 0)
             throw new ArgumentException("Model ID must be greater than 0.", nameof(modelId));
+    }
+
+    private static void ValidateModelVersionId(int modelVersionId)
+    {
+        if (modelVersionId <= 0)
+            throw new ArgumentException("Model version ID must be greater than 0.", nameof(modelVersionId));
     }
 
     private static void ValidateModelHash(string modelHash)

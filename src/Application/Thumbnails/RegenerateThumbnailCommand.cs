@@ -36,27 +36,33 @@ public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumb
                 new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
         }
 
+        if (model.ActiveVersion == null)
+        {
+             return Result.Failure<RegenerateThumbnailCommandResponse>(
+                new Error("NoActiveVersion", $"Model {command.ModelId} has no active version."));
+        }
+
         // Get the model's primary file hash (needed for job deduplication)
-        var primaryFile = model.Files.FirstOrDefault();
+        var primaryFile = model.ActiveVersion.Files.FirstOrDefault();
         if (primaryFile == null)
         {
             return Result.Failure<RegenerateThumbnailCommandResponse>(
-                new Error("NoFilesFound", $"Model {command.ModelId} has no files to generate thumbnail from."));
+                new Error("NoFilesFound", $"Active version of model {command.ModelId} has no files to generate thumbnail from."));
         }
 
         var currentTime = _dateTimeProvider.UtcNow;
 
         // Reset existing thumbnail if it exists
-        if (model.Thumbnail != null)
+        if (model.ActiveVersion.Thumbnail != null)
         {
-            model.Thumbnail.Reset(currentTime);
-            await _thumbnailRepository.UpdateAsync(model.Thumbnail, cancellationToken);
+            model.ActiveVersion.Thumbnail.Reset(currentTime);
+            await _thumbnailRepository.UpdateAsync(model.ActiveVersion.Thumbnail, cancellationToken);
         }
         else
         {
             // Create new thumbnail record
-            var newThumbnail = Thumbnail.Create(model.Id, currentTime);
-            model.Thumbnail = await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken);
+            var newThumbnail = Thumbnail.Create(model.ActiveVersion.Id, currentTime);
+            model.ActiveVersion.SetThumbnail(await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken));
         }
 
         // Reset any existing job for this model and create new one
@@ -67,7 +73,7 @@ public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumb
         }
         else
         {
-            await _thumbnailQueue.EnqueueAsync(model.Id, primaryFile.Sha256Hash, cancellationToken: cancellationToken);
+            await _thumbnailQueue.EnqueueAsync(model.Id, model.ActiveVersion.Id, primaryFile.Sha256Hash, cancellationToken: cancellationToken);
         }
 
         return Result.Success(new RegenerateThumbnailCommandResponse(model.Id));

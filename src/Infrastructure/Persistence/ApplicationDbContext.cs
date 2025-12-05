@@ -25,12 +25,6 @@ namespace Infrastructure.Persistence
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Configure many-to-many relationship between Model and File
-            modelBuilder.Entity<Model>()
-                .HasMany(m => m.Files)
-                .WithMany(f => f.Models)
-                .UsingEntity(j => j.ToTable("ModelFiles"));
-
             // Configure many-to-many relationship between Model and TextureSet
             modelBuilder.Entity<Model>()
                 .HasMany(m => m.TextureSets)
@@ -83,11 +77,11 @@ namespace Infrastructure.Persistence
                 entity.Property(m => m.IsDeleted).IsRequired();
                 entity.Property(m => m.DeletedAt);
 
-                // Configure one-to-one relationship with Thumbnail
-                entity.HasOne(m => m.Thumbnail)
-                    .WithOne(t => t.Model)
-                    .HasForeignKey<Thumbnail>(t => t.ModelId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                // Configure one-to-one relationship with ActiveVersion
+                entity.HasOne(m => m.ActiveVersion)
+                    .WithOne()
+                    .HasForeignKey<Model>(m => m.ActiveVersionId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 // Configure optional relationship with default TextureSet
                 entity.HasOne<TextureSet>()
@@ -127,6 +121,12 @@ namespace Infrastructure.Persistence
                     .WithOne(f => f.ModelVersion)
                     .HasForeignKey(f => f.ModelVersionId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                // Configure one-to-one relationship with Thumbnail
+                entity.HasOne(v => v.Thumbnail)
+                    .WithOne(t => t.ModelVersion)
+                    .HasForeignKey<Thumbnail>(t => t.ModelVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Configure File entity
@@ -251,15 +251,15 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<Thumbnail>(entity =>
             {
                 entity.HasKey(t => t.Id);
-                entity.Property(t => t.ModelId).IsRequired();
+                entity.Property(t => t.ModelVersionId).IsRequired();
                 entity.Property(t => t.Status).IsRequired();
                 entity.Property(t => t.ThumbnailPath).HasMaxLength(500);
                 entity.Property(t => t.ErrorMessage).HasMaxLength(1000);
                 entity.Property(t => t.CreatedAt).IsRequired();
                 entity.Property(t => t.UpdatedAt).IsRequired();
 
-                // Create unique index for ModelId to ensure one thumbnail per model
-                entity.HasIndex(t => t.ModelId).IsUnique();
+                // Create unique index for ModelVersionId to ensure one thumbnail per version
+                entity.HasIndex(t => t.ModelVersionId).IsUnique();
             });
 
             // Configure ThumbnailJob entity

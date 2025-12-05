@@ -14,7 +14,7 @@ public class ModelDomainEventTests
         var modelHash = "abcd1234567890abcd1234567890abcd1234567890abcd1234567890abcd1234";
 
         // Act
-        model.RaiseModelUploadedEvent(modelHash, true);
+        model.RaiseModelUploadedEvent(10, modelHash, true);
 
         // Assert
         Assert.Single(model.DomainEvents);
@@ -23,6 +23,7 @@ public class ModelDomainEventTests
         
         var uploadedEvent = (ModelUploadedEvent)domainEvent;
         Assert.Equal(model.Id, uploadedEvent.ModelId);
+        Assert.Equal(10, uploadedEvent.ModelVersionId);
         Assert.Equal(modelHash, uploadedEvent.ModelHash);
         Assert.True(uploadedEvent.IsNewModel);
     }
@@ -35,7 +36,7 @@ public class ModelDomainEventTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            model.RaiseModelUploadedEvent(null!, true));
+            model.RaiseModelUploadedEvent(10, null!, true));
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public class ModelDomainEventTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            model.RaiseModelUploadedEvent("", true));
+            model.RaiseModelUploadedEvent(10, "", true));
     }
 
     [Fact]
@@ -55,7 +56,7 @@ public class ModelDomainEventTests
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var modelHash = "abcd1234567890abcd1234567890abcd1234567890abcd1234567890abcd1234";
-        model.RaiseModelUploadedEvent(modelHash, true);
+        model.RaiseModelUploadedEvent(10, modelHash, true);
 
         // Act
         model.ClearDomainEvents();

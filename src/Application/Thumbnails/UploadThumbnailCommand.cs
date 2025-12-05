@@ -41,6 +41,13 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
                 new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
         }
 
+        // Check if model has an active version
+        if (model.ActiveVersion == null)
+        {
+            return Result.Failure<UploadThumbnailCommandResponse>(
+                new Error("NoActiveVersion", $"Model {command.ModelId} has no active version."));
+        }
+
         try
         {
             // Validate file is an image
@@ -64,21 +71,21 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
             // Update or create thumbnail
             var now = _dateTimeProvider.UtcNow;
             
-            if (model.Thumbnail == null)
+            if (model.ActiveVersion.Thumbnail == null)
             {
-                var thumbnail = Thumbnail.Create(model.Id, now);
-                model.SetThumbnail(await _thumbnailRepository.AddAsync(thumbnail, cancellationToken));
+                var thumbnail = Thumbnail.Create(model.ActiveVersion.Id, now);
+                model.ActiveVersion.SetThumbnail(await _thumbnailRepository.AddAsync(thumbnail, cancellationToken));
             }
 
             // Mark thumbnail as ready with the uploaded file details
-            model.Thumbnail!.MarkAsReady(
+            model.ActiveVersion.Thumbnail!.MarkAsReady(
                 fullPath,
                 storedFileResult.SizeBytes,
                 width,
                 height,
                 now);
 
-            await _thumbnailRepository.UpdateAsync(model.Thumbnail!, cancellationToken);
+            await _thumbnailRepository.UpdateAsync(model.ActiveVersion.Thumbnail!, cancellationToken);
 
             return Result.Success(new UploadThumbnailCommandResponse(
                 model.Id,

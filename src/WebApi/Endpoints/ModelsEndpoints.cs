@@ -63,6 +63,19 @@ public static class ModelsEndpoints
         })
         .WithName("Set Default Texture Set");
 
+        app.MapPost("/models/{id}/active-version/{versionId}", async (int id, int versionId, ICommandHandler<SetActiveVersionCommand> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(new SetActiveVersionCommand(id, versionId), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+            
+            return Results.Ok();
+        })
+        .WithName("Set Active Version");
+
         app.MapDelete("/models/{id}", async (
             int id,
             ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse> commandHandler,

@@ -23,9 +23,9 @@ public interface IThumbnailRepository
     Task<Thumbnail?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get thumbnail by model ID.
+    /// Get thumbnail by model version ID.
     /// </summary>
-    Task<Thumbnail?> GetByModelIdAsync(int modelId, CancellationToken cancellationToken = default);
+    Task<Thumbnail?> GetByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get thumbnail by model hash.

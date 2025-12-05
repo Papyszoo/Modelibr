@@ -3,6 +3,7 @@ import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { RadioButton } from 'primereact/radiobutton'
 import { InputText } from 'primereact/inputtext'
+import { Checkbox } from 'primereact/checkbox'
 import { ModelVersionDto } from '../../../types'
 
 interface FileUploadModalProps {
@@ -12,7 +13,7 @@ interface FileUploadModalProps {
   modelId: number
   versions: ModelVersionDto[]
   selectedVersion: ModelVersionDto | null
-  onUpload: (file: File, action: 'current' | 'new', description?: string, targetVersionNumber?: number) => Promise<void>
+  onUpload: (file: File, action: 'current' | 'new', description?: string, targetVersionNumber?: number, setAsActive?: boolean) => Promise<void>
 }
 
 export function FileUploadModal({
@@ -27,6 +28,7 @@ export function FileUploadModal({
   const [uploadAction, setUploadAction] = useState<'current' | 'new'>('current')
   const [description, setDescription] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [setAsActive, setSetAsActive] = useState(true)
   const [targetVersionNumber, setTargetVersionNumber] = useState<number>(
     versions.length > 0 ? versions[versions.length - 1].versionNumber : 1
   )
@@ -36,10 +38,11 @@ export function FileUploadModal({
 
     setUploading(true)
     try {
-      await onUpload(file, uploadAction, description || undefined, targetVersionNumber)
+      await onUpload(file, uploadAction, description || undefined, targetVersionNumber, uploadAction === 'new' ? setAsActive : undefined)
       onHide()
       setDescription('')
       setUploadAction('current')
+      setSetAsActive(true)
     } catch (error) {
       console.error('Upload failed:', error)
       alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
@@ -143,6 +146,17 @@ export function FileUploadModal({
                 </div>
               </div>
             )}
+
+            <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.5rem' }}>
+              <Checkbox
+                inputId="setAsActive"
+                checked={setAsActive}
+                onChange={(e) => setSetAsActive(e.checked ?? false)}
+              />
+              <label htmlFor="setAsActive" style={{ marginLeft: '0.5rem' }}>
+                Set new version as active
+              </label>
+            </div>
           </>
         )}
 

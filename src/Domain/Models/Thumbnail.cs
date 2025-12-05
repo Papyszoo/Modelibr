@@ -11,9 +11,9 @@ public class Thumbnail : AggregateRoot
     public int Id { get; set; }
     
     /// <summary>
-    /// The ID of the model this thumbnail was generated for.
+    /// The ID of the model version this thumbnail was generated for.
     /// </summary>
-    public int ModelId { get; private set; }
+    public int ModelVersionId { get; private set; }
     
     /// <summary>
     /// Current status of the thumbnail generation workflow.
@@ -61,18 +61,18 @@ public class Thumbnail : AggregateRoot
     public DateTime? ProcessedAt { get; private set; }
     
     // Navigation property
-    public Model Model { get; set; } = null!;
+    public ModelVersion ModelVersion { get; set; } = null!;
 
     /// <summary>
     /// Creates a new thumbnail record for processing.
     /// </summary>
-    public static Thumbnail Create(int modelId, DateTime createdAt)
+    public static Thumbnail Create(int modelVersionId, DateTime createdAt)
     {
-        ValidateModelId(modelId);
+        ValidateModelVersionId(modelVersionId);
 
         return new Thumbnail
         {
-            ModelId = modelId,
+            ModelVersionId = modelVersionId,
             Status = ThumbnailStatus.Pending,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
@@ -87,7 +87,7 @@ public class Thumbnail : AggregateRoot
         Status = ThumbnailStatus.Processing;
         UpdatedAt = updatedAt;
         
-        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, Status));
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status));
     }
 
     /// <summary>
@@ -108,8 +108,8 @@ public class Thumbnail : AggregateRoot
         ProcessedAt = processedAt;
         UpdatedAt = processedAt;
         
-        var thumbnailUrl = $"/models/{ModelId}/thumbnail/file";
-        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, Status, thumbnailUrl));
+        var thumbnailUrl = $"/model-versions/{ModelVersionId}/thumbnail/file";
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status, thumbnailUrl));
     }
 
     /// <summary>
@@ -124,7 +124,7 @@ public class Thumbnail : AggregateRoot
         ProcessedAt = processedAt;
         UpdatedAt = processedAt;
         
-        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, Status, null, ErrorMessage));
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status, null, ErrorMessage));
     }
 
     /// <summary>
@@ -138,10 +138,10 @@ public class Thumbnail : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
-    private static void ValidateModelId(int modelId)
+    private static void ValidateModelVersionId(int modelVersionId)
     {
-        if (modelId <= 0)
-            throw new ArgumentException("Model ID must be greater than 0.", nameof(modelId));
+        if (modelVersionId <= 0)
+            throw new ArgumentException("Model version ID must be greater than 0.", nameof(modelVersionId));
     }
 
     private static void ValidateThumbnailPath(string thumbnailPath)

@@ -24,7 +24,7 @@ public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQu
                 new Error("ModelNotFound", $"Model with ID {query.ModelId} was not found."));
         }
 
-        var thumbnail = model.Thumbnail;
+        var thumbnail = model.ActiveVersion?.Thumbnail;
         if (thumbnail == null)
         {
             return Result.Success(new GetThumbnailStatusQueryResponse(

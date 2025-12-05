@@ -942,7 +942,8 @@ class ApiClient {
   async createModelVersion(
     modelId: number,
     file: File,
-    description?: string
+    description?: string,
+    setAsActive: boolean = true
   ): Promise<CreateModelVersionResponse> {
     const formData = new FormData()
     formData.append('file', file)
@@ -951,6 +952,7 @@ class ApiClient {
     if (description) {
       params.append('description', description)
     }
+    params.append('setAsActive', setAsActive.toString())
 
     const url = `/models/${modelId}/versions${params.toString() ? `?${params.toString()}` : ''}`
 
@@ -1004,6 +1006,14 @@ class ApiClient {
     fileId: number
   ): string {
     return `${this.baseURL}/models/${modelId}/versions/${versionId}/files/${fileId}`
+  }
+
+  async setActiveVersion(modelId: number, versionId: number): Promise<void> {
+    await this.client.post(`/models/${modelId}/active-version/${versionId}`)
+
+    // Invalidate model cache when active version changes
+    useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
   }
 
   // Recycled Files methods

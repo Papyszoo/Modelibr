@@ -36,12 +36,12 @@ public class GetThumbnailStatusQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenModelHasNoThumbnail_ReturnsPendingStatus()
+    public async Task Handle_WhenModelHasNoActiveVersion_ReturnsPendingStatus()
     {
         // Arrange
         var query = new GetThumbnailStatusQuery(1);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Thumbnail = null;
+        // Model has no active version set
 
         _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(model);
@@ -56,14 +56,18 @@ public class GetThumbnailStatusQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenModelHasReadyThumbnail_ReturnsCompleteStatus()
+    public async Task Handle_WhenActiveVersionHasReadyThumbnail_ReturnsCompleteStatus()
     {
         // Arrange
         var query = new GetThumbnailStatusQuery(1);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var thumbnail = Thumbnail.Create(1, DateTime.UtcNow);
+        model.Id = 1;
+        
+        // Create a version with thumbnail
+        var version = model.CreateVersion("v1", DateTime.UtcNow);
+        var thumbnail = Thumbnail.Create(version.Id, DateTime.UtcNow);
         thumbnail.MarkAsReady("/path/to/thumbnail.png", 1024, 256, 256, DateTime.UtcNow);
-        model.Thumbnail = thumbnail;
+        version.SetThumbnail(thumbnail);
 
         _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(model);
