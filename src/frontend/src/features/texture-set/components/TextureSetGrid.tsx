@@ -9,6 +9,8 @@ import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import MergeTextureSetDialog from '../dialogs/MergeTextureSetDialog'
+import { getAlbedoTextureUrl } from '../../../utils/textureTypeUtils'
+import { TOAST_LIFE_MS, DIALOG_WIDTH_MD } from '../../../utils/constants'
 
 interface TextureSetGridProps {
   textureSets: TextureSetDto[]
@@ -70,7 +72,7 @@ export default function TextureSetGrid({
         severity: 'success',
         summary: 'Success',
         detail: 'Texture set added to pack',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       setShowPackDialog(false)
     } catch (error) {
@@ -79,7 +81,7 @@ export default function TextureSetGrid({
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to add texture set to pack',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -93,7 +95,7 @@ export default function TextureSetGrid({
         severity: 'success',
         summary: 'Recycled',
         detail: 'Texture set moved to recycled files',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       // Call the callback to remove the texture set from the list without making a new request
       if (onTextureSetRecycled) {
@@ -105,7 +107,7 @@ export default function TextureSetGrid({
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to recycle texture set',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -172,7 +174,7 @@ export default function TextureSetGrid({
           severity: 'warn',
           summary: 'Warning',
           detail: 'Cannot merge a texture set with itself',
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
         setDraggedTextureSet(null)
         setDragOverCardId(null)
@@ -189,7 +191,7 @@ export default function TextureSetGrid({
           severity: 'warn',
           summary: 'Warning',
           detail: 'Source texture set does not have an Albedo texture to merge',
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
         setDraggedTextureSet(null)
         setDragOverCardId(null)
@@ -207,7 +209,7 @@ export default function TextureSetGrid({
           summary: 'Warning',
           detail:
             'Source texture set has other textures besides Albedo. Only texture sets with Albedo only can be merged.',
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
         setDraggedTextureSet(null)
         setDragOverCardId(null)
@@ -254,7 +256,7 @@ export default function TextureSetGrid({
         severity: 'success',
         summary: 'Success',
         detail: `Texture merged successfully as ${textureType}`,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
 
       // Refresh the texture sets if callback provided
@@ -278,20 +280,8 @@ export default function TextureSetGrid({
     isShowingMergeDialog.current = false
   }
 
-  const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
-    // Find albedo texture first, then fallback to diffuse
-    const albedo = textureSet.textures?.find(
-      t => t.textureType === TextureType.Albedo
-    )
-    const diffuse = textureSet.textures?.find(
-      t => t.textureType === TextureType.Diffuse
-    )
-
-    const texture = albedo || diffuse
-    if (texture) {
-      return ApiClient.getFileUrl(texture.fileId.toString())
-    }
-    return null
+  const getTextureSetAlbedoUrl = (textureSet: TextureSetDto) => {
+    return getAlbedoTextureUrl(textureSet, ApiClient.getFileUrl.bind(ApiClient))
   }
 
   const filteredTextureSets = textureSets.filter(textureSet => {
@@ -378,7 +368,7 @@ export default function TextureSetGrid({
       {/* Grid of texture set cards */}
       <div className="texture-set-grid">
         {filteredTextureSets.map(textureSet => {
-          const albedoUrl = getAlbedoTextureUrl(textureSet)
+          const albedoUrl = getTextureSetAlbedoUrl(textureSet)
           const isDraggedOver = dragOverCardId === textureSet.id
 
           return (
@@ -440,7 +430,7 @@ export default function TextureSetGrid({
       <Dialog
         header="Add to Pack"
         visible={showPackDialog}
-        style={{ width: '500px' }}
+        style={{ width: DIALOG_WIDTH_MD }}
         onHide={() => setShowPackDialog(false)}
       >
         <div className="pack-selection-dialog">

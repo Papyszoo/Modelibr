@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
-import { useRef } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import { ProjectDto } from '../../../types'
 import { useTabContext } from '../../../hooks/useTabContext'
+import { TOAST_LIFE_MS, DIALOG_WIDTH_MD } from '../../../utils/constants'
 import './ProjectList.css'
 
 export default function ProjectList() {
@@ -34,7 +34,7 @@ export default function ProjectList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load projects',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setLoading(false)
@@ -47,7 +47,7 @@ export default function ProjectList() {
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Project name is required',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       return
     }
@@ -62,7 +62,7 @@ export default function ProjectList() {
         severity: 'success',
         summary: 'Success',
         detail: 'Project created successfully',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
 
       setShowCreateDialog(false)
@@ -75,7 +75,7 @@ export default function ProjectList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to create project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -87,7 +87,7 @@ export default function ProjectList() {
         severity: 'success',
         summary: 'Success',
         detail: 'Project deleted successfully',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadProjects()
     } catch (error) {
@@ -96,7 +96,7 @@ export default function ProjectList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to delete project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -198,7 +198,7 @@ export default function ProjectList() {
       <Dialog
         header="Create New Project"
         visible={showCreateDialog}
-        style={{ width: '500px' }}
+        style={{ width: DIALOG_WIDTH_MD }}
         onHide={() => {
           setShowCreateDialog(false)
           setNewProjectName('')

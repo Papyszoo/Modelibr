@@ -116,3 +116,32 @@ export function isSupportedModelFormat(fileExtension: string): boolean {
 
   return (ALL_SUPPORTED_FORMATS as readonly string[]).includes(ext)
 }
+
+/**
+ * Get display name for a model (uses first file's original name or model name)
+ */
+export function getModelDisplayName(model: Model): string {
+  return model.files && model.files.length > 0
+    ? model.files[0].originalFileName
+    : model.name || `Model ${model.id}`
+}
+
+/**
+ * Get sprite type display name
+ */
+export function getSpriteTypeName(type: number): string {
+  switch (type) {
+    case 1:
+      return 'Static'
+    case 2:
+      return 'Sprite Sheet'
+    case 3:
+      return 'GIF'
+    case 4:
+      return 'APNG'
+    case 5:
+      return 'Animated WebP'
+    default:
+      return 'Unknown'
+  }
+}

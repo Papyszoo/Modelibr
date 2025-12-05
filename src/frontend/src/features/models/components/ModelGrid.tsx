@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { Dialog } from 'primereact/dialog'
-import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import './ModelGrid.css'
 import { ThumbnailDisplay } from '../../thumbnail'
-import { Model } from '../../../utils/fileUtils'
+import { Model, getModelDisplayName } from '../../../utils/fileUtils'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto } from '../../../types'
+import { TOAST_LIFE_MS, DIALOG_WIDTH_MD } from '../../../utils/constants'
 
 interface ModelGridProps {
   models: Model[]
@@ -58,7 +58,7 @@ export default function ModelGrid({
         severity: 'success',
         summary: 'Success',
         detail: 'Model added to pack',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       setShowPackDialog(false)
     } catch (error) {
@@ -67,7 +67,7 @@ export default function ModelGrid({
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to add model to pack',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -81,7 +81,7 @@ export default function ModelGrid({
         severity: 'success',
         summary: 'Recycled',
         detail: 'Model moved to recycled files',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       // Call the callback to remove the model from the list without making a new request
       if (onModelRecycled) {
@@ -93,20 +93,13 @@ export default function ModelGrid({
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to recycle model',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
 
-  const getModelName = (model: Model) => {
-    // Get the first file's name or use the model name
-    return model.files && model.files.length > 0
-      ? model.files[0].originalFileName
-      : model.name || `Model ${model.id}`
-  }
-
   const filteredModels = models.filter(model => {
-    const modelName = getModelName(model).toLowerCase()
+    const modelName = getModelDisplayName(model).toLowerCase()
     return modelName.includes(searchQuery.toLowerCase())
   })
 
@@ -172,7 +165,9 @@ export default function ModelGrid({
             <div className="model-card-thumbnail">
               <ThumbnailDisplay modelId={model.id} />
               <div className="model-card-overlay">
-                <span className="model-card-name">{getModelName(model)}</span>
+                <span className="model-card-name">
+                  {getModelDisplayName(model)}
+                </span>
               </div>
             </div>
           </div>
@@ -190,7 +185,7 @@ export default function ModelGrid({
       <Dialog
         header="Add to Pack"
         visible={showPackDialog}
-        style={{ width: '500px' }}
+        style={{ width: DIALOG_WIDTH_MD }}
         onHide={() => setShowPackDialog(false)}
       >
         <div className="pack-selection-dialog">

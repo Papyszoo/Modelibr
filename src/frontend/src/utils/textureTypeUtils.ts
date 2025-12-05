@@ -114,3 +114,26 @@ export function getTextureTypeOptions() {
     icon: getTextureTypeIcon(type),
   }))
 }
+
+/**
+ * Get the albedo (or diffuse as fallback) texture URL for a texture set
+ * Used for displaying texture set previews
+ */
+export function getAlbedoTextureUrl(
+  textureSet: {
+    textures?: Array<{ textureType: TextureType; fileId: number }>
+  },
+  getFileUrl: (fileId: string) => string
+): string | null {
+  const albedo = textureSet.textures?.find(
+    t => t.textureType === TextureType.Albedo
+  )
+  const diffuse = textureSet.textures?.find(
+    t => t.textureType === TextureType.Diffuse
+  )
+  const texture = albedo || diffuse
+  if (texture) {
+    return getFileUrl(texture.fileId.toString())
+  }
+  return null
+}

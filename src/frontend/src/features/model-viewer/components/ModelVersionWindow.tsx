@@ -27,7 +27,8 @@ function ModelVersionWindow({
   onModelUpdate,
 }: ModelVersionWindowProps) {
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
-  const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
+  const [selectedVersion, setSelectedVersion] =
+    useState<ModelVersionDto | null>(null)
   const [loading, setLoading] = useState(false)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
 
@@ -49,7 +50,7 @@ function ModelVersionWindow({
 
   const loadVersions = async () => {
     if (!model) return
-    
+
     try {
       setLoading(true)
       const data = await ApiClient.getModelVersions(parseInt(model.id))
@@ -146,9 +147,13 @@ function ModelVersionWindow({
       {!model ? (
         <p style={{ color: '#64748b', fontStyle: 'italic' }}>No model loaded</p>
       ) : loading ? (
-        <p style={{ color: '#64748b', fontStyle: 'italic' }}>Loading versions...</p>
+        <p style={{ color: '#64748b', fontStyle: 'italic' }}>
+          Loading versions...
+        </p>
       ) : versions.length === 0 ? (
-        <div style={{ color: '#64748b', fontStyle: 'italic', padding: '1rem 0' }}>
+        <div
+          style={{ color: '#64748b', fontStyle: 'italic', padding: '1rem 0' }}
+        >
           No versions available. Upload files to create versions.
         </div>
       ) : (
@@ -156,14 +161,16 @@ function ModelVersionWindow({
           {/* Version List */}
           <div className="version-list">
             <h4>Select Version:</h4>
-            {versions.map((version) => (
+            {versions.map(version => (
               <div
                 key={version.id}
                 className={`version-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
                 onClick={() => handleVersionSelect(version)}
               >
                 <div className="version-header">
-                  <span className="version-number">Version {version.versionNumber}</span>
+                  <span className="version-number">
+                    Version {version.versionNumber}
+                  </span>
                   <div className="version-badges">
                     {model?.activeVersionId === version.id && (
                       <span className="active-badge">Active</span>
@@ -174,9 +181,13 @@ function ModelVersionWindow({
                   </div>
                 </div>
                 {version.description && (
-                  <div className="version-description">{version.description}</div>
+                  <div className="version-description">
+                    {version.description}
+                  </div>
                 )}
-                <div className="version-date">{formatDate(version.createdAt)}</div>
+                <div className="version-date">
+                  {formatDate(version.createdAt)}
+                </div>
                 {model?.activeVersionId !== version.id && (
                   <Button
                     label="Set as Active"
@@ -185,7 +196,7 @@ function ModelVersionWindow({
                     severity="success"
                     outlined
                     className="set-active-button"
-                    onClick={(e) => {
+                    onClick={e => {
                       e.stopPropagation()
                       handleSetActiveVersion(version.id)
                     }}
@@ -200,18 +211,22 @@ function ModelVersionWindow({
             <div className="version-files-section">
               <h4>Files in Version {selectedVersion.versionNumber}:</h4>
               <div className="file-list">
-                {selectedVersion.files.map((file) => (
+                {selectedVersion.files.map(file => (
                   <div key={file.id} className="file-card">
                     <div className="file-info-section">
                       <div className="file-name">{file.originalFileName}</div>
                       <div className="file-meta">
                         <span className="file-type-badge">{file.fileType}</span>
-                        <span className="file-size">{formatFileSize(file.sizeBytes)}</span>
+                        <span className="file-size">
+                          {formatFileSize(file.sizeBytes)}
+                        </span>
                         {file.isRenderable && (
                           <span className="renderable-badge">Renderable</span>
                         )}
                         {file.isRenderable && file.id === defaultFileId && (
-                          <span className="default-file-badge">Default Preview</span>
+                          <span className="default-file-badge">
+                            Default Preview
+                          </span>
                         )}
                       </div>
                     </div>
@@ -220,7 +235,9 @@ function ModelVersionWindow({
                         label="Download"
                         icon="pi pi-download"
                         size="small"
-                        onClick={() => handleDownloadFile(file.id, file.originalFileName)}
+                        onClick={() =>
+                          handleDownloadFile(file.id, file.originalFileName)
+                        }
                       />
                       {file.fileType === 'blend' && (
                         <Button
@@ -228,7 +245,9 @@ function ModelVersionWindow({
                           icon="pi pi-external-link"
                           size="small"
                           severity="success"
-                          onClick={() => handleOpenInBlender(file.id, file.originalFileName)}
+                          onClick={() =>
+                            handleOpenInBlender(file.id, file.originalFileName)
+                          }
                         />
                       )}
                       {file.isRenderable && file.id !== defaultFileId && (

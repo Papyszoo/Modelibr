@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
-import { useRef } from 'react'
-import { TextureSetDto, TextureType } from '../../../types'
+import { TextureSetDto } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
@@ -12,6 +11,7 @@ import ApiClient from '../../../services/ApiClient'
 import CreateTextureSetDialog from '../dialogs/CreateTextureSetDialog'
 import TextureSetListHeader from './TextureSetListHeader'
 import TextureSetGrid from './TextureSetGrid'
+import { TOAST_LIFE_MS } from '../../../utils/constants'
 import './TextureSetList.css'
 
 function TextureSetList() {
@@ -35,7 +35,7 @@ function TextureSetList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load texture sets',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setLoading(false)
@@ -54,7 +54,7 @@ function TextureSetList() {
         severity: 'success',
         summary: 'Success',
         detail: 'Texture set created successfully',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadTextureSets()
       setShowCreateDialog(false)
@@ -64,7 +64,7 @@ function TextureSetList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to create texture set',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -81,7 +81,7 @@ function TextureSetList() {
             severity: 'success',
             summary: 'Success',
             detail: 'Texture set deleted successfully',
-            life: 3000,
+            life: TOAST_LIFE_MS,
           })
           loadTextureSets()
         } catch (error) {
@@ -90,7 +90,7 @@ function TextureSetList() {
             severity: 'error',
             summary: 'Error',
             detail: 'Failed to delete texture set',
-            life: 3000,
+            life: TOAST_LIFE_MS,
           })
         }
       },
@@ -145,7 +145,7 @@ function TextureSetList() {
           severity: 'success',
           summary: 'Success',
           detail: `Texture set "${fileName}" created with albedo texture`,
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
       } catch (error) {
         // Mark upload as failed
@@ -158,7 +158,7 @@ function TextureSetList() {
           severity: 'error',
           summary: 'Error',
           detail: `Failed to create texture set from ${file.name}`,
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
       }
     }

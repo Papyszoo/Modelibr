@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
-import { useRef } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto } from '../../../types'
 import { useTabContext } from '../../../hooks/useTabContext'
+import { TOAST_LIFE_MS, DIALOG_WIDTH_MD } from '../../../utils/constants'
 import './PackList.css'
 
 export default function PackList() {
@@ -34,7 +34,7 @@ export default function PackList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load packs',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setLoading(false)
@@ -47,7 +47,7 @@ export default function PackList() {
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Pack name is required',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       return
     }
@@ -62,7 +62,7 @@ export default function PackList() {
         severity: 'success',
         summary: 'Success',
         detail: 'Pack created successfully',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
 
       setShowCreateDialog(false)
@@ -75,7 +75,7 @@ export default function PackList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to create pack',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -87,7 +87,7 @@ export default function PackList() {
         severity: 'success',
         summary: 'Success',
         detail: 'Pack deleted successfully',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadPacks()
     } catch (error) {
@@ -96,7 +96,7 @@ export default function PackList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to delete pack',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -196,7 +196,7 @@ export default function PackList() {
       <Dialog
         header="Create New Pack"
         visible={showCreateDialog}
-        style={{ width: '500px' }}
+        style={{ width: DIALOG_WIDTH_MD }}
         onHide={() => {
           setShowCreateDialog(false)
           setNewPackName('')
