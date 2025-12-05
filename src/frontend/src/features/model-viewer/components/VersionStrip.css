@@ -1,0 +1,332 @@
+.version-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--surface-ground);
+  border-radius: 6px;
+  padding: 0.5rem;
+  min-height: 80px;
+  max-height: 120px;
+}
+
+.version-strip-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text-color-secondary);
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+/* Version List Section */
+.version-strip-versions {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  max-width: 180px;
+}
+
+.version-strip-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+  padding: 0 0.25rem;
+}
+
+.version-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  padding-right: 0.25rem;
+}
+
+.version-list-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.version-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.version-list-scroll::-webkit-scrollbar-thumb {
+  background: var(--surface-border);
+  border-radius: 2px;
+}
+
+.version-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-color-secondary);
+}
+
+/* Version Item */
+.version-strip-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.version-strip-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-color);
+}
+
+.version-strip-item.selected {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.version-strip-item.selected .version-strip-number {
+  color: white;
+}
+
+.version-strip-item.selected .version-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.version-strip-item-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.version-strip-number {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-color);
+}
+
+.version-strip-badges {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.version-badge {
+  font-size: 0.6rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.version-badge.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.version-badge.latest {
+  background: #22c55e;
+  color: white;
+}
+
+.version-set-active-btn {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  padding: 0 !important;
+}
+
+.version-set-active-btn .pi {
+  font-size: 0.75rem !important;
+}
+
+/* Thumbnail Tooltip */
+.version-thumbnail-tooltip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1000;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  width: 140px;
+}
+
+.version-thumbnail-image {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  background: var(--surface-ground);
+}
+
+.version-thumbnail-info {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: 0.75rem;
+  color: var(--text-color);
+}
+
+.version-thumbnail-files {
+  color: var(--text-color-secondary);
+}
+
+/* Divider */
+.version-strip-divider {
+  width: 1px;
+  background: var(--surface-border);
+  margin: 0 0.75rem;
+  align-self: stretch;
+}
+
+/* Files Section */
+.version-strip-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-list-scroll {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+  padding-bottom: 0.25rem;
+}
+
+.file-list-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.file-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-list-scroll::-webkit-scrollbar-thumb {
+  background: var(--surface-border);
+  border-radius: 2px;
+}
+
+.file-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-color-secondary);
+}
+
+.file-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text-color-secondary);
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+/* File Card */
+.file-strip-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  min-width: 150px;
+  max-width: 200px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.file-strip-card.renderable {
+  cursor: pointer;
+}
+
+.file-strip-card.renderable:hover {
+  border-color: var(--primary-color);
+  background: var(--surface-hover);
+}
+
+.file-strip-card.selected {
+  border-color: var(--primary-color);
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.file-strip-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-ground);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.file-strip-icon .pi {
+  font-size: 1rem;
+  color: var(--primary-color);
+}
+
+.file-strip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-strip-format {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  text-transform: uppercase;
+}
+
+.file-strip-name {
+  font-size: 0.7rem;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.file-download-btn {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  padding: 0 !important;
+}
+
+.file-download-btn .pi {
+  font-size: 0.875rem !important;
+}
+
+.file-selected-icon {
+  color: #f59e0b;
+  font-size: 0.875rem;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .version-thumbnail-tooltip {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .file-strip-card.selected {
+    background: rgba(59, 130, 246, 0.15);
+  }
+}
