@@ -2,12 +2,14 @@ import './ThumbnailDisplay.css'
 import { useThumbnail } from '../hooks/useThumbnail'
 
 interface ThumbnailDisplayProps {
-  modelId: string
+  modelId: number | string
   className?: string
 }
 
 function ThumbnailDisplay({ modelId }: ThumbnailDisplayProps) {
-  const { thumbnailDetails, imgSrc } = useThumbnail(modelId)
+  // Normalize modelId to string for consistency
+  const modelIdStr = modelId.toString()
+  const { thumbnailDetails, imgSrc } = useThumbnail(modelIdStr)
 
   // Show thumbnail image when ready
   if (thumbnailDetails?.status === 'Ready' && imgSrc) {

@@ -63,13 +63,20 @@ class ThumbnailSignalRService {
             )
           },
         })
-        .configureLogging(signalR.LogLevel.Warning)
+        .configureLogging(signalR.LogLevel.Information)
         .build()
 
       // Set up event handlers
       this.connection.on(
         'ThumbnailStatusChanged',
         (event: ThumbnailStatusChangedEvent) => {
+          console.log(
+            'ThumbnailSignalR: Received ThumbnailStatusChanged event',
+            event
+          )
+          console.log(
+            `ThumbnailSignalR: Notifying ${this.thumbnailStatusCallbacks.size} callback(s)`
+          )
           this.thumbnailStatusCallbacks.forEach(callback => callback(event))
         }
       )
@@ -77,6 +84,13 @@ class ThumbnailSignalRService {
       this.connection.on(
         'ActiveVersionChanged',
         (event: ActiveVersionChangedEvent) => {
+          console.log(
+            'ThumbnailSignalR: Received ActiveVersionChanged event',
+            event
+          )
+          console.log(
+            `ThumbnailSignalR: Notifying ${this.activeVersionCallbacks.size} callback(s)`
+          )
           this.activeVersionCallbacks.forEach(callback => callback(event))
         }
       )
@@ -164,15 +178,27 @@ class ThumbnailSignalRService {
     callback: ThumbnailStatusChangedCallback
   ): () => void {
     this.thumbnailStatusCallbacks.add(callback)
+    console.log(
+      `ThumbnailSignalR: Registered ThumbnailStatusChanged callback. Total: ${this.thumbnailStatusCallbacks.size}`
+    )
     return () => {
       this.thumbnailStatusCallbacks.delete(callback)
+      console.log(
+        `ThumbnailSignalR: Unregistered ThumbnailStatusChanged callback. Total: ${this.thumbnailStatusCallbacks.size}`
+      )
     }
   }
 
   onActiveVersionChanged(callback: ActiveVersionChangedCallback): () => void {
     this.activeVersionCallbacks.add(callback)
+    console.log(
+      `ThumbnailSignalR: Registered ActiveVersionChanged callback. Total: ${this.activeVersionCallbacks.size}`
+    )
     return () => {
       this.activeVersionCallbacks.delete(callback)
+      console.log(
+        `ThumbnailSignalR: Unregistered ActiveVersionChanged callback. Total: ${this.activeVersionCallbacks.size}`
+      )
     }
   }
 
