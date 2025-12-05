@@ -241,9 +241,23 @@ namespace Domain.Models
                 throw new InvalidOperationException($"Version with ID {versionId} does not belong to this model.");
             }
 
+            var previousActiveVersionId = ActiveVersionId;
+            
             ActiveVersionId = versionId;
             ActiveVersion = version;
             UpdatedAt = updatedAt;
+            
+            // Raise domain event for active version change
+            var thumbnail = version.Thumbnail;
+            var hasThumbnail = thumbnail?.Status == ValueObjects.ThumbnailStatus.Ready;
+            var thumbnailUrl = hasThumbnail ? $"/model-versions/{versionId}/thumbnail/file" : null;
+            
+            RaiseDomainEvent(new ActiveVersionChangedEvent(
+                Id, 
+                versionId, 
+                previousActiveVersionId, 
+                hasThumbnail, 
+                thumbnailUrl));
         }
 
         /// <summary>
