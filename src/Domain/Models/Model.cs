@@ -250,7 +250,7 @@ namespace Domain.Models
             // Raise domain event for active version change
             var thumbnail = version.Thumbnail;
             var hasThumbnail = thumbnail?.Status == ValueObjects.ThumbnailStatus.Ready;
-            var thumbnailUrl = hasThumbnail ? $"/model-versions/{versionId}/thumbnail/file" : null;
+            var thumbnailUrl = hasThumbnail ? $"/models/{Id}/thumbnail/file" : null;
             
             RaiseDomainEvent(new ActiveVersionChangedEvent(
                 Id, 
