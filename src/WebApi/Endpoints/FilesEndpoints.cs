@@ -29,10 +29,13 @@ public static class FilesEndpoints
             var etag = new EntityTagHeaderValue($"\"{response.Sha256Hash}\"");
             
             // Check If-None-Match header for cache validation
-            if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch) &&
-                ifNoneMatch.ToString().Contains(response.Sha256Hash))
+            if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch))
             {
-                return Results.StatusCode(StatusCodes.Status304NotModified);
+                if (EntityTagHeaderValue.TryParse(ifNoneMatch.ToString(), out var clientEtag) &&
+                    clientEtag.Tag.Equals(etag.Tag))
+                {
+                    return Results.StatusCode(StatusCodes.Status304NotModified);
+                }
             }
 
             var fileStream = System.IO.File.OpenRead(response.FullPath);
