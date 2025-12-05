@@ -18,8 +18,27 @@ internal class GetAllSpritesQueryHandler : IQueryHandler<GetAllSpritesQuery, Get
     {
         var sprites = await _spriteRepository.GetAllAsync(cancellationToken);
 
-        var spriteDtos = sprites
-            .Where(s => !s.IsDeleted)
+        var filteredSprites = sprites.Where(s => !s.IsDeleted);
+
+        // Filter by packId if provided
+        if (query.PackId.HasValue)
+        {
+            filteredSprites = filteredSprites.Where(s => s.Packs.Any(p => p.Id == query.PackId.Value));
+        }
+
+        // Filter by projectId if provided
+        if (query.ProjectId.HasValue)
+        {
+            filteredSprites = filteredSprites.Where(s => s.Projects.Any(p => p.Id == query.ProjectId.Value));
+        }
+
+        // Filter by categoryId if provided
+        if (query.CategoryId.HasValue)
+        {
+            filteredSprites = filteredSprites.Where(s => s.SpriteCategoryId == query.CategoryId.Value);
+        }
+
+        var spriteDtos = filteredSprites
             .Select(s => new SpriteDto(
                 s.Id,
                 s.Name,
