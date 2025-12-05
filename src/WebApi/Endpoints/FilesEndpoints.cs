@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Files;
+using Microsoft.Net.Http.Headers;
 using SharedKernel;
 using WebApi.Files;
 using WebApi.Services;
@@ -15,7 +16,7 @@ public static class FilesEndpoints
             .WithSummary("Uploads a file (texture, model, etc.) without associating it to a model")
             .DisableAntiforgery();
 
-        app.MapGet("/files/{id}", async (int id, IQueryHandler<GetFileQuery, GetFileQueryResponse> queryHandler) =>
+        app.MapGet("/files/{id}", async (int id, HttpContext httpContext, IQueryHandler<GetFileQuery, GetFileQueryResponse> queryHandler) =>
         {
             var result = await queryHandler.Handle(new GetFileQuery(id), CancellationToken.None);
             
@@ -24,10 +25,24 @@ public static class FilesEndpoints
                 return Results.NotFound(result.Error.Message);
             }
 
-            var fileStream = System.IO.File.OpenRead(result.Value.FullPath);
-            var contentType = ContentTypeProvider.GetContentType(result.Value.OriginalFileName);
+            var response = result.Value;
+            var etag = new EntityTagHeaderValue($"\"{response.Sha256Hash}\"");
             
-            return Results.File(fileStream, contentType, result.Value.OriginalFileName, enableRangeProcessing: true);
+            // Check If-None-Match header for cache validation
+            if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch) &&
+                ifNoneMatch.ToString().Contains(response.Sha256Hash))
+            {
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            }
+
+            var fileStream = System.IO.File.OpenRead(response.FullPath);
+            var contentType = ContentTypeProvider.GetContentType(response.OriginalFileName);
+            
+            // Set cache headers - require revalidation with ETag
+            httpContext.Response.Headers.CacheControl = "no-cache";
+            httpContext.Response.Headers.ETag = etag.ToString();
+            
+            return Results.File(fileStream, contentType, response.OriginalFileName, enableRangeProcessing: true);
         })
         .WithName("Get File");
     }

@@ -39,11 +39,11 @@ namespace Application.Files
                 return Result.Failure<GetFileQueryResponse>(new Error("FileNotFoundOnDisk", "File not found on disk"));
             }
 
-            return Result.Success(new GetFileQueryResponse(file.Id, file.OriginalFileName, file.MimeType, fullPath));
+            return Result.Success(new GetFileQueryResponse(file.Id, file.OriginalFileName, file.MimeType, fullPath, file.Sha256Hash));
         }
     }
 
     public record GetFileQuery(int Id) : IQuery<GetFileQueryResponse>;
     
-    public record GetFileQueryResponse(int Id, string OriginalFileName, string MimeType, string FullPath);
+    public record GetFileQueryResponse(int Id, string OriginalFileName, string MimeType, string FullPath, string Sha256Hash);
 }

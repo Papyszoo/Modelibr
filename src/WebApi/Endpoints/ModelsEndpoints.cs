@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Models;
+using Microsoft.Net.Http.Headers;
 using WebApi.Services;
 
 namespace WebApi.Endpoints;
@@ -34,7 +35,7 @@ public static class ModelsEndpoints
         })
         .WithName("Get Model By Id");
 
-        app.MapGet("/models/{id}/file", async (int id, IQueryHandler<GetModelFileQuery, GetModelFileQueryResponse> queryHandler) =>
+        app.MapGet("/models/{id}/file", async (int id, HttpContext httpContext, IQueryHandler<GetModelFileQuery, GetModelFileQueryResponse> queryHandler) =>
         {
             var result = await queryHandler.Handle(new GetModelFileQuery(id), CancellationToken.None);
             
@@ -43,10 +44,24 @@ public static class ModelsEndpoints
                 return Results.NotFound(result.Error.Message);
             }
 
-            var fileStream = System.IO.File.OpenRead(result.Value.FullPath);
-            var contentType = ContentTypeProvider.GetContentType(result.Value.OriginalFileName);
+            var response = result.Value;
+            var etag = new EntityTagHeaderValue($"\"{response.Sha256Hash}\"");
             
-            return Results.File(fileStream, contentType, result.Value.OriginalFileName, enableRangeProcessing: true);
+            // Check If-None-Match header for cache validation
+            if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch) &&
+                ifNoneMatch.ToString().Contains(response.Sha256Hash))
+            {
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            }
+
+            var fileStream = System.IO.File.OpenRead(response.FullPath);
+            var contentType = ContentTypeProvider.GetContentType(response.OriginalFileName);
+            
+            // Set cache headers - require revalidation with ETag
+            httpContext.Response.Headers.CacheControl = "no-cache";
+            httpContext.Response.Headers.ETag = etag.ToString();
+            
+            return Results.File(fileStream, contentType, response.OriginalFileName, enableRangeProcessing: true);
         })
         .WithName("Get Model File");
 

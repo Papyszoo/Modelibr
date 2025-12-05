@@ -46,7 +46,7 @@ public static class ThumbnailEndpoints
                 var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
                 if (httpContext != null)
                 {
-                    httpContext.Response.Headers.CacheControl = "public, max-age=3600"; // Cache for 1 hour
+                    httpContext.Response.Headers.CacheControl = "no-cache"; // Require revalidation with ETag
                     httpContext.Response.Headers.ETag = $"\"{id}-{response.ProcessedAt?.Ticks}\"";
                 }
             }
@@ -147,7 +147,7 @@ public static class ThumbnailEndpoints
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
             if (httpContext != null)
             {
-                httpContext.Response.Headers.CacheControl = "public, max-age=86400"; // Cache for 24 hours
+                httpContext.Response.Headers.CacheControl = "no-cache"; // Require revalidation with ETag
                 httpContext.Response.Headers.ETag = $"\"{id}-{response.ProcessedAt?.Ticks}\"";
             }
             
@@ -189,7 +189,7 @@ public static class ThumbnailEndpoints
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
             if (httpContext != null)
             {
-                httpContext.Response.Headers.CacheControl = "public, max-age=86400"; // Cache for 24 hours
+                httpContext.Response.Headers.CacheControl = "no-cache"; // Require revalidation with ETag
                 httpContext.Response.Headers.ETag = $"\"{id}-{viewName}\"";
             }
             
@@ -233,7 +233,7 @@ public static class ThumbnailEndpoints
                 var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
                 if (httpContext != null)
                 {
-                    httpContext.Response.Headers.CacheControl = "public, max-age=3600"; // Cache for 1 hour
+                    httpContext.Response.Headers.CacheControl = "no-cache"; // Require revalidation with ETag
                     httpContext.Response.Headers.ETag = $"\"{versionId}-{response.ProcessedAt?.Ticks}\"";
                 }
             }
@@ -280,7 +280,7 @@ public static class ThumbnailEndpoints
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
             if (httpContext != null)
             {
-                httpContext.Response.Headers.CacheControl = "public, max-age=86400"; // Cache for 24 hours
+                httpContext.Response.Headers.CacheControl = "no-cache"; // Require revalidation with ETag
                 httpContext.Response.Headers.ETag = $"\"{versionId}-{response.ProcessedAt?.Ticks}\"";
             }
             

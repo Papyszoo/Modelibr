@@ -118,6 +118,7 @@ public static class ModelVersionEndpoints
         int modelId,
         int versionId,
         int fileId,
+        HttpContext httpContext,
         IQueryHandler<GetVersionFileQuery, GetVersionFileResponse> queryHandler,
         CancellationToken cancellationToken)
     {
@@ -128,7 +129,22 @@ public static class ModelVersionEndpoints
             return Results.NotFound(result.Error.Message);
         }
 
-        var fileStream = System.IO.File.OpenRead(result.Value.FilePath);
-        return Results.File(fileStream, result.Value.MimeType, result.Value.OriginalFileName, enableRangeProcessing: true);
+        var response = result.Value;
+        var etag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{response.Sha256Hash}\"");
+        
+        // Check If-None-Match header for cache validation
+        if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch) &&
+            ifNoneMatch.ToString().Contains(response.Sha256Hash))
+        {
+            return Results.StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        var fileStream = System.IO.File.OpenRead(response.FilePath);
+        
+        // Set cache headers - require revalidation with ETag
+        httpContext.Response.Headers.CacheControl = "no-cache";
+        httpContext.Response.Headers.ETag = etag.ToString();
+        
+        return Results.File(fileStream, response.MimeType, response.OriginalFileName, enableRangeProcessing: true);
     }
 }
