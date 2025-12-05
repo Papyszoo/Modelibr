@@ -4,7 +4,6 @@ namespace Domain.Models
 {
     public class Model : AggregateRoot
     {
-        private readonly List<File> _files = new();
         private readonly List<TextureSet> _textureSets = new();
         private readonly List<Pack> _packs = new();
         private readonly List<Project> _projects = new();
@@ -16,21 +15,16 @@ namespace Domain.Models
         public DateTime UpdatedAt { get; private set; }
         public string? Tags { get; private set; }
         public string? Description { get; private set; }
+
         public int? DefaultTextureSetId { get; private set; }
+        public int? ActiveVersionId { get; private set; }
         public bool IsDeleted { get; private set; }
         public DateTime? DeletedAt { get; private set; }
         
         // Navigation property for many-to-many relationship - EF Core requires this to be settable
-        public ICollection<File> Files 
-        { 
-            get => _files; 
-            set 
-            {
-                _files.Clear();
-                if (value != null)
-                    _files.AddRange(value);
-            }
-        }
+        
+        // Navigation property for active version
+        public ModelVersion? ActiveVersion { get; private set; }
 
         // Navigation property for many-to-many relationship with TextureSets - EF Core requires this to be settable
         public ICollection<TextureSet> TextureSets 
@@ -80,9 +74,6 @@ namespace Domain.Models
             }
         }
 
-        // Navigation property for one-to-one relationship with thumbnail
-        public Thumbnail? Thumbnail { get; set; }
-
         public static Model Create(string name, DateTime createdAt)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -111,37 +102,7 @@ namespace Domain.Models
             UpdatedAt = updatedAt;
         }
 
-        public void AddFile(File file, DateTime updatedAt)
-        {
-            if (file == null)
-                throw new ArgumentNullException(nameof(file));
 
-            if (_files.Any(f => f.Sha256Hash == file.Sha256Hash))
-                return; // File already exists, do nothing
-
-            _files.Add(file);
-            UpdatedAt = updatedAt;
-        }
-
-        public bool HasFile(string sha256Hash)
-        {
-            if (string.IsNullOrWhiteSpace(sha256Hash))
-                return false;
-
-            return _files.Any(f => f.Sha256Hash == sha256Hash);
-        }
-
-        /// <summary>
-        /// Sets the thumbnail for this model.
-        /// </summary>
-        /// <param name="thumbnail">The thumbnail to associate with this model</param>
-        public void SetThumbnail(Thumbnail thumbnail)
-        {
-            if (thumbnail == null)
-                throw new ArgumentNullException(nameof(thumbnail));
-
-            Thumbnail = thumbnail;
-        }
 
         /// <summary>
         /// Associates a texture set with this model.
@@ -218,14 +179,17 @@ namespace Domain.Models
         /// Raises a ModelUploaded domain event for this model.
         /// Should be called when a model upload is completed.
         /// </summary>
+        /// <param name="modelVersionId">The ID of the model version the file was added to</param>
         /// <param name="modelHash">The SHA256 hash of the uploaded model file</param>
         /// <param name="isNewModel">Whether this is a new model or an existing one</param>
-        public void RaiseModelUploadedEvent(string modelHash, bool isNewModel)
+        public void RaiseModelUploadedEvent(int modelVersionId, string modelHash, bool isNewModel)
         {
+            if (modelVersionId <= 0)
+                throw new ArgumentException("Model version ID must be greater than 0.", nameof(modelVersionId));
             if (string.IsNullOrWhiteSpace(modelHash))
                 throw new ArgumentException("Model hash cannot be null or empty.", nameof(modelHash));
 
-            RaiseDomainEvent(new ModelUploadedEvent(Id, modelHash, isNewModel));
+            RaiseDomainEvent(new ModelUploadedEvent(Id, modelVersionId, modelHash, isNewModel));
         }
 
         /// <summary>
@@ -252,8 +216,61 @@ namespace Domain.Models
             var nextVersionNumber = _versions.Count == 0 ? 1 : _versions.Max(v => v.VersionNumber) + 1;
             var version = ModelVersion.Create(Id, nextVersionNumber, description, createdAt);
             _versions.Add(version);
+            
+            // If this is the first version, set it as active
+            if (_versions.Count == 1)
+            {
+                ActiveVersion = version;
+                // Note: ActiveVersionId will be set when saved to DB, but for in-memory operations we set the navigation property
+            }
+            
             UpdatedAt = createdAt;
             return version;
+        }
+
+        /// <summary>
+        /// Sets the active version for this model.
+        /// </summary>
+        /// <param name="versionId">The ID of the version to set as active</param>
+        /// <param name="updatedAt">When the active version was set</param>
+        public void SetActiveVersion(int versionId, DateTime updatedAt)
+        {
+            var version = _versions.FirstOrDefault(v => v.Id == versionId);
+            if (version == null)
+            {
+                throw new InvalidOperationException($"Version with ID {versionId} does not belong to this model.");
+            }
+
+            ActiveVersionId = versionId;
+            ActiveVersion = version;
+            UpdatedAt = updatedAt;
+        }
+
+        /// <summary>
+        /// Gets the thumbnail from the active version.
+        /// </summary>
+        /// <returns>The active version's thumbnail, or null if no active version or no thumbnail</returns>
+        public Thumbnail? GetActiveVersionThumbnail()
+        {
+            return ActiveVersion?.Thumbnail;
+        }
+
+        /// <summary>
+        /// Gets the files from the active version.
+        /// </summary>
+        /// <returns>Read-only list of files from the active version</returns>
+        public IReadOnlyList<File> GetActiveVersionFiles()
+        {
+            return ActiveVersion?.Files.ToList().AsReadOnly() ?? new List<File>().AsReadOnly();
+        }
+
+        /// <summary>
+        /// Gets the latest version (most recently created).
+        /// </summary>
+        /// <returns>The latest version, or null if no versions exist</returns>
+        public ModelVersion? GetLatestVersion()
+        {
+            return _versions.OrderByDescending(v => v.CreatedAt).FirstOrDefault();
         }
 
         /// <summary>

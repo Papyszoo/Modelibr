@@ -13,6 +13,11 @@ public class ModelUploadedEvent : DomainEvent
     public int ModelId { get; }
     
     /// <summary>
+    /// The ID of the model version the file was added to.
+    /// </summary>
+    public int ModelVersionId { get; }
+    
+    /// <summary>
     /// The SHA256 hash of the model file for deduplication.
     /// </summary>
     public string ModelHash { get; }
@@ -22,9 +27,10 @@ public class ModelUploadedEvent : DomainEvent
     /// </summary>
     public bool IsNewModel { get; }
 
-    public ModelUploadedEvent(int modelId, string modelHash, bool isNewModel)
+    public ModelUploadedEvent(int modelId, int modelVersionId, string modelHash, bool isNewModel)
     {
         ModelId = modelId;
+        ModelVersionId = modelVersionId;
         ModelHash = modelHash ?? throw new ArgumentNullException(nameof(modelHash));
         IsNewModel = isNewModel;
     }

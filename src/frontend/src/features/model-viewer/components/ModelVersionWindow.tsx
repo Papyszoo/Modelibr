@@ -14,6 +14,7 @@ interface ModelVersionWindowProps {
   model: Model | null
   onVersionSelect?: (version: ModelVersionDto) => void
   onDefaultFileChange?: (fileId: number) => void
+  onModelUpdate?: () => void
 }
 
 function ModelVersionWindow({
@@ -23,6 +24,7 @@ function ModelVersionWindow({
   model,
   onVersionSelect,
   onDefaultFileChange,
+  onModelUpdate,
 }: ModelVersionWindowProps) {
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] = useState<ModelVersionDto | null>(null)
@@ -105,6 +107,21 @@ function ModelVersionWindow({
     }
   }
 
+  const handleSetActiveVersion = async (versionId: number) => {
+    if (!model) return
+    try {
+      await ApiClient.setActiveVersion(parseInt(model.id), versionId)
+      // Reload versions to update badges
+      await loadVersions()
+      // Notify parent to refresh model data so UI updates immediately
+      if (onModelUpdate) {
+        onModelUpdate()
+      }
+    } catch (error) {
+      console.error('Failed to set active version:', error)
+    }
+  }
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -147,14 +164,33 @@ function ModelVersionWindow({
               >
                 <div className="version-header">
                   <span className="version-number">Version {version.versionNumber}</span>
-                  {version.id === versions[versions.length - 1]?.id && (
-                    <span className="latest-badge">Latest</span>
-                  )}
+                  <div className="version-badges">
+                    {model?.activeVersionId === version.id && (
+                      <span className="active-badge">Active</span>
+                    )}
+                    {version.id === versions[versions.length - 1]?.id && (
+                      <span className="latest-badge">Latest</span>
+                    )}
+                  </div>
                 </div>
                 {version.description && (
                   <div className="version-description">{version.description}</div>
                 )}
                 <div className="version-date">{formatDate(version.createdAt)}</div>
+                {model?.activeVersionId !== version.id && (
+                  <Button
+                    label="Set as Active"
+                    icon="pi pi-check-circle"
+                    size="small"
+                    severity="success"
+                    outlined
+                    className="set-active-button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSetActiveVersion(version.id)
+                    }}
+                  />
+                )}
               </div>
             ))}
           </div>

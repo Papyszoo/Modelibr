@@ -24,43 +24,17 @@ internal sealed class ModelRepository : IModelRepository
         return model;
     }
 
-    public async Task<Model> AddFileAsync(int modelId, Domain.Models.File file, CancellationToken cancellationToken = default)
-    {
-        var model = await _context.Models
-            .Include(m => m.Files)
-            .Include(m => m.TextureSets)
-            .Include(m => m.Packs)
-            .Include(m => m.Projects)
-            .Include(m => m.Thumbnail)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(m => m.Id == modelId, cancellationToken);
-        
-        if (model == null)
-        {
-            throw new ArgumentException($"Model with ID {modelId} not found", nameof(modelId));
-        }
-
-        // Add the file to the database first
-        _context.Files.Add(file);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Add the file to the model using domain method
-        model.AddFile(file, _dateTimeProvider.UtcNow);
-        
-        await _context.SaveChangesAsync(cancellationToken);
-        
-        return model;
-    }
-
     public async Task<IEnumerable<Model>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Models
             .Where(m => !m.IsDeleted)
-            .Include(m => m.Files)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
-            .Include(m => m.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Thumbnail)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
@@ -70,11 +44,13 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => !m.IsDeleted)
-            .Include(m => m.Files)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
-            .Include(m => m.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Thumbnail)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
@@ -84,14 +60,16 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => !m.IsDeleted)
-            .Include(m => m.Files)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
-            .Include(m => m.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Thumbnail)
             .Include(m => m.Versions)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(m => m.Files.Any(f => f.Sha256Hash == sha256Hash), cancellationToken);
+            .FirstOrDefaultAsync(m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)), cancellationToken);
     }
 
     public async Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
@@ -104,11 +82,13 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => m.IsDeleted)
-            .Include(m => m.Files)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
-            .Include(m => m.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Thumbnail)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .AsSplitQuery()
@@ -119,12 +99,13 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => m.IsDeleted)
-            .Include(m => m.Files)
-                .ThenInclude(f => f.Models)
             .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
-            .Include(m => m.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Thumbnail)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .AsSplitQuery()
@@ -134,26 +115,14 @@ internal sealed class ModelRepository : IModelRepository
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         var model = await _context.Models
-            .Include(m => m.Files)
-                .ThenInclude(f => f.Models)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
-            .Include(m => m.Thumbnail)
+            .Include(m => m.Versions)
+                .ThenInclude(v => v.Thumbnail)
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
 
         if (model != null)
         {
-            // Get files that are only associated with this model (not shared with others)
-            var filesToDelete = model.Files
-                .Where(f => f.Models.Count == 1 && f.Models.First().Id == model.Id)
-                .ToList();
-            
-            // Remove files that are not shared
-            if (filesToDelete.Any())
-            {
-                _context.Files.RemoveRange(filesToDelete);
-            }
-            
             // Get version files that are only associated with this model's versions
             foreach (var version in model.Versions)
             {
@@ -162,16 +131,15 @@ internal sealed class ModelRepository : IModelRepository
                 {
                     _context.Files.RemoveRange(version.Files);
                 }
+                
+                if (version.Thumbnail != null)
+                {
+                    _context.Thumbnails.Remove(version.Thumbnail);
+                }
             }
             
             // Remove all versions
             _context.ModelVersions.RemoveRange(model.Versions);
-            
-            // Remove thumbnail if exists
-            if (model.Thumbnail != null)
-            {
-                _context.Thumbnails.Remove(model.Thumbnail);
-            }
             
             // Remove the model (this will also remove the many-to-many join table entries)
             _context.Models.Remove(model);

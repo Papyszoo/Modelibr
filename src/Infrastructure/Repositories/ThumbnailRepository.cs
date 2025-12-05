@@ -33,31 +33,31 @@ public class ThumbnailRepository : IThumbnailRepository
     public async Task<Thumbnail?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Thumbnails
-            .Include(t => t.Model)
+            .Include(t => t.ModelVersion)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
-    public async Task<Thumbnail?> GetByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
+    public async Task<Thumbnail?> GetByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default)
     {
         return await _context.Thumbnails
-            .Include(t => t.Model)
-            .FirstOrDefaultAsync(t => t.ModelId == modelId, cancellationToken);
+            .Include(t => t.ModelVersion)
+            .FirstOrDefaultAsync(t => t.ModelVersionId == modelVersionId, cancellationToken);
     }
 
     public async Task<Thumbnail?> GetByModelHashAsync(string modelHash, CancellationToken cancellationToken = default)
     {
         return await _context.Thumbnails
-            .Include(t => t.Model)
+            .Include(t => t.ModelVersion)
             .ThenInclude(m => m.Files)
-            .FirstOrDefaultAsync(t => t.Model.Files.Any(f => f.Sha256Hash == modelHash), cancellationToken);
+            .FirstOrDefaultAsync(t => t.ModelVersion.Files.Any(f => f.Sha256Hash == modelHash), cancellationToken);
     }
 
     public async Task<bool> ExistsByModelHashAsync(string modelHash, CancellationToken cancellationToken = default)
     {
         return await _context.Thumbnails
-            .Include(t => t.Model)
+            .Include(t => t.ModelVersion)
             .ThenInclude(m => m.Files)
-            .AnyAsync(t => t.Model.Files.Any(f => f.Sha256Hash == modelHash), cancellationToken);
+            .AnyAsync(t => t.ModelVersion.Files.Any(f => f.Sha256Hash == modelHash), cancellationToken);
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)

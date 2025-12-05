@@ -66,7 +66,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                     return Result.Failure<GetDeletePreviewResponse>(new Error("ModelNotFound", "Model not found"));
                 
                 entityName = model.Name;
-                // Get unique files from versions - files are shared between model.Files and version.Files
+                // Get unique files from versions
                 var uniqueFiles = model.Versions
                     .SelectMany(v => v.Files)
                     .DistinctBy(f => f.Id)
@@ -75,7 +75,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 
                 if (model.Versions.Any())
                     relatedEntities.Add($"{model.Versions.Count} model version(s)");
-                if (model.Thumbnail != null)
+                if (model.ActiveVersion?.Thumbnail != null)
                     relatedEntities.Add("1 thumbnail");
                 break;
 
@@ -149,16 +149,6 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (model == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("ModelNotFound", "Model not found"));
                 
-                // Delete files from disk (only if not shared with other models)
-                foreach (var file in model.Files)
-                {
-                    // Only delete from disk if this file is only associated with this model
-                    if (file.Models.Count == 1 && file.Models.First().Id == model.Id)
-                    {
-                        await _fileStorage.DeleteFileAsync(file.FilePath, cancellationToken);
-                        deletedFiles.Add(new DeletedFileInfo(file.FilePath, file.OriginalFileName, file.SizeBytes));
-                    }
-                }
                 
                 // Delete version files from disk (version files have direct FK to version, not shared)
                 foreach (var version in model.Versions)
@@ -168,12 +158,12 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                         await _fileStorage.DeleteFileAsync(versionFile.FilePath, cancellationToken);
                         deletedFiles.Add(new DeletedFileInfo(versionFile.FilePath, versionFile.OriginalFileName, versionFile.SizeBytes));
                     }
-                }
-                
-                // Delete thumbnail from disk if exists
-                if (model.Thumbnail != null && !string.IsNullOrEmpty(model.Thumbnail.ThumbnailPath))
-                {
-                    await _fileStorage.DeleteFileAsync(model.Thumbnail.ThumbnailPath, cancellationToken);
+                    
+                    // Delete version thumbnail from disk if exists
+                    if (version.Thumbnail != null && !string.IsNullOrEmpty(version.Thumbnail.ThumbnailPath))
+                    {
+                        await _fileStorage.DeleteFileAsync(version.Thumbnail.ThumbnailPath, cancellationToken);
+                    }
                 }
                 
                 // Delete model and related entities from database

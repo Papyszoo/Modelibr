@@ -31,6 +31,7 @@ public static class ModelVersionEndpoints
         int modelId,
         IFormFile file,
         string? description,
+        bool setAsActive,
         ICommandHandler<CreateModelVersionCommand, CreateModelVersionResponse> commandHandler,
         CancellationToken cancellationToken)
     {
@@ -42,7 +43,8 @@ public static class ModelVersionEndpoints
         var command = new CreateModelVersionCommand(
             modelId,
             new FormFileUpload(file),
-            description);
+            description,
+            setAsActive);
 
         var result = await commandHandler.Handle(command, cancellationToken);
 

@@ -26,27 +26,28 @@ public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
     {
         try
         {
-            _logger.LogInformation("Handling ModelUploadedEvent for model {ModelId} with hash {ModelHash}, IsNewModel: {IsNewModel}",
-                domainEvent.ModelId, domainEvent.ModelHash, domainEvent.IsNewModel);
+            _logger.LogInformation("Handling ModelUploadedEvent for model {ModelId} version {ModelVersionId} with hash {ModelHash}, IsNewModel: {IsNewModel}",
+                domainEvent.ModelId, domainEvent.ModelVersionId, domainEvent.ModelHash, domainEvent.IsNewModel);
 
             // Enqueue thumbnail generation job - the queue handles idempotency automatically
             var job = await _thumbnailQueue.EnqueueAsync(
                 domainEvent.ModelId,
+                domainEvent.ModelVersionId,
                 domainEvent.ModelHash,
                 cancellationToken: cancellationToken);
 
-            _logger.LogInformation("Successfully enqueued thumbnail job {JobId} for model {ModelId} with status {Status}",
-                job.Id, domainEvent.ModelId, job.Status);
+            _logger.LogInformation("Successfully enqueued thumbnail job {JobId} for model {ModelId} version {ModelVersionId} with status {Status}",
+                job.Id, domainEvent.ModelId, domainEvent.ModelVersionId, job.Status);
 
             return Result.Success();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to enqueue thumbnail job for model {ModelId} with hash {ModelHash}",
-                domainEvent.ModelId, domainEvent.ModelHash);
+            _logger.LogError(ex, "Failed to enqueue thumbnail job for model {ModelId} version {ModelVersionId} with hash {ModelHash}",
+                domainEvent.ModelId, domainEvent.ModelVersionId, domainEvent.ModelHash);
 
             return Result.Failure(new Error("ThumbnailJobEnqueueFailed", 
-                $"Failed to enqueue thumbnail job for model {domainEvent.ModelId}: {ex.Message}"));
+                $"Failed to enqueue thumbnail job for model {domainEvent.ModelId} version {domainEvent.ModelVersionId}: {ex.Message}"));
         }
     }
 }

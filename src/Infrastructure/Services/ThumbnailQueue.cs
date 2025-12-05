@@ -26,7 +26,8 @@ public class ThumbnailQueue : IThumbnailQueue
     }
 
     public async Task<ThumbnailJob> EnqueueAsync(
-        int modelId, 
+        int modelId,
+        int modelVersionId,
         string modelHash, 
         int maxAttempts = 3, 
         int lockTimeoutMinutes = 10, 
@@ -41,11 +42,11 @@ public class ThumbnailQueue : IThumbnailQueue
             return existingJob;
         }
 
-        var job = ThumbnailJob.Create(modelId, modelHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var job = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
 
-        _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} with hash {ModelHash}", 
-            createdJob.Id, modelId, modelHash);
+        _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} version {ModelVersionId} with hash {ModelHash}", 
+            createdJob.Id, modelId, modelVersionId, modelHash);
 
         // Send real-time notification to workers that a new job is available
         await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
@@ -70,8 +71,8 @@ public class ThumbnailQueue : IThumbnailQueue
 
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
 
-        _logger.LogInformation("Worker {WorkerId} claimed thumbnail job {JobId} for model {ModelId} (attempt {AttemptCount})", 
-            workerId, job.Id, job.ModelId, job.AttemptCount);
+        _logger.LogInformation("Worker {WorkerId} claimed thumbnail job {JobId} for model {ModelId} version {ModelVersionId} (attempt {AttemptCount})", 
+            workerId, job.Id, job.ModelId, job.ModelVersionId, job.AttemptCount);
 
         // Notify other workers about job status change for coordination
         await _queueNotificationService.NotifyJobStatusChangedAsync(job.Id, job.Status.ToString(), workerId, cancellationToken);
@@ -91,8 +92,8 @@ public class ThumbnailQueue : IThumbnailQueue
         job.MarkAsCompleted(DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
 
-        _logger.LogInformation("Marked thumbnail job {JobId} as completed for model {ModelId}", 
-            jobId, job.ModelId);
+        _logger.LogInformation("Marked thumbnail job {JobId} as completed for model {ModelId} version {ModelVersionId}", 
+            jobId, job.ModelId, job.ModelVersionId);
     }
 
     public async Task MarkFailedAsync(int jobId, string errorMessage, CancellationToken cancellationToken = default)
@@ -110,13 +111,13 @@ public class ThumbnailQueue : IThumbnailQueue
 
         if (job.Status == Domain.ValueObjects.ThumbnailJobStatus.Dead)
         {
-            _logger.LogWarning("Thumbnail job {JobId} for model {ModelId} moved to dead letter queue after {AttemptCount} attempts. Error: {ErrorMessage}", 
-                jobId, job.ModelId, job.AttemptCount, errorMessage);
+            _logger.LogWarning("Thumbnail job {JobId} for model {ModelId} version {ModelVersionId} moved to dead letter queue after {AttemptCount} attempts. Error: {ErrorMessage}", 
+                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, errorMessage);
         }
         else
         {
-            _logger.LogInformation("Thumbnail job {JobId} for model {ModelId} failed (attempt {AttemptCount}), will retry. Error: {ErrorMessage}", 
-                jobId, job.ModelId, job.AttemptCount, errorMessage);
+            _logger.LogInformation("Thumbnail job {JobId} for model {ModelId} version {ModelVersionId} failed (attempt {AttemptCount}), will retry. Error: {ErrorMessage}", 
+                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, errorMessage);
         }
     }
 
@@ -132,8 +133,8 @@ public class ThumbnailQueue : IThumbnailQueue
         job.Reset(DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
 
-        _logger.LogInformation("Reset thumbnail job {JobId} for manual retry for model {ModelId}", 
-            jobId, job.ModelId);
+        _logger.LogInformation("Reset thumbnail job {JobId} for manual retry for model {ModelId} version {ModelVersionId}", 
+            jobId, job.ModelId, job.ModelVersionId);
 
         // Send real-time notification to workers that a job is available for processing
         await _queueNotificationService.NotifyJobEnqueuedAsync(job, cancellationToken);

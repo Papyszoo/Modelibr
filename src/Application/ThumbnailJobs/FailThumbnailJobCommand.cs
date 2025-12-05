@@ -17,7 +17,7 @@ public record FailThumbnailJobCommand(
     int JobId,
     string ErrorMessage) : ICommand<FailThumbnailJobResponse>;
 
-public record FailThumbnailJobResponse(int ModelId, ThumbnailStatus Status);
+public record FailThumbnailJobResponse(int ModelId, int ModelVersionId, ThumbnailStatus Status);
 
 /// <summary>
 /// Handler for failing thumbnail jobs.
@@ -72,11 +72,11 @@ public class FailThumbnailJobCommandHandler : ICommandHandler<FailThumbnailJobCo
 
         try
         {
-            // Get or create the thumbnail entity
-            var thumbnail = await _thumbnailRepository.GetByModelIdAsync(job.ModelId, cancellationToken);
+            // Get or create the thumbnail entity for this version
+            var thumbnail = await _thumbnailRepository.GetByModelVersionIdAsync(job.ModelVersionId, cancellationToken);
             if (thumbnail == null)
             {
-                thumbnail = Thumbnail.Create(job.ModelId, now);
+                thumbnail = Thumbnail.Create(job.ModelVersionId, now);
                 thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
             }
 
@@ -89,15 +89,15 @@ public class FailThumbnailJobCommandHandler : ICommandHandler<FailThumbnailJobCo
             // Save changes - the domain event will be dispatched automatically
             await _thumbnailRepository.UpdateAsync(thumbnail, cancellationToken);
 
-            _logger.LogInformation("Successfully marked thumbnail job {JobId} as failed for model {ModelId}: {ErrorMessage}", 
-                command.JobId, job.ModelId, command.ErrorMessage);
+            _logger.LogInformation("Successfully marked thumbnail job {JobId} as failed for model {ModelId} version {ModelVersionId}: {ErrorMessage}", 
+                command.JobId, job.ModelId, job.ModelVersionId, command.ErrorMessage);
 
-            return Result.Success(new FailThumbnailJobResponse(job.ModelId, ThumbnailStatus.Failed));
+            return Result.Success(new FailThumbnailJobResponse(job.ModelId, job.ModelVersionId, ThumbnailStatus.Failed));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to mark thumbnail job {JobId} as failed for model {ModelId}", 
-                command.JobId, job.ModelId);
+            _logger.LogError(ex, "Failed to mark thumbnail job {JobId} as failed for model {ModelId} version {ModelVersionId}", 
+                command.JobId, job.ModelId, job.ModelVersionId);
 
             return Result.Failure<FailThumbnailJobResponse>(
                 new Error("ThumbnailJobFailureFailed", 

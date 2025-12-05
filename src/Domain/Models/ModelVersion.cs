@@ -9,11 +9,13 @@ public class ModelVersion
     public int VersionNumber { get; private set; }
     public string? Description { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTime? DeletedAt { get; private set; }
     
     // Navigation properties
     public Model Model { get; set; } = null!;
+    public Thumbnail? Thumbnail { get; private set; }
     public ICollection<File> Files 
     { 
         get => _files; 
@@ -35,7 +37,8 @@ public class ModelVersion
             ModelId = modelId,
             VersionNumber = versionNumber,
             Description = description?.Trim(),
-            CreatedAt = createdAt
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
         };
     }
 
@@ -53,6 +56,13 @@ public class ModelVersion
             return; // File already exists in this version
 
         _files.Add(file);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetThumbnail(Thumbnail thumbnail)
+    {
+        Thumbnail = thumbnail ?? throw new ArgumentNullException(nameof(thumbnail));
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public bool HasFile(string sha256Hash)

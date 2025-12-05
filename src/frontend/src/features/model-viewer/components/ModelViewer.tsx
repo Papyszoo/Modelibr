@@ -85,7 +85,7 @@ function ModelViewer({
 
   useEffect(() => {
     if (!propModel && modelId) {
-      fetchModel(modelId)
+      fetchModel(modelId, false) // Use cache for initial load
     }
   }, [propModel, modelId])
 
@@ -127,11 +127,11 @@ function ModelViewer({
     }
   }, [selectedTextureSetId])
 
-  const fetchModel = async (id: string): Promise<void> => {
+  const fetchModel = async (id: string, skipCache: boolean = true): Promise<void> => {
     try {
       setLoading(true)
       setError('')
-      const model = await ApiClient.getModelById(id)
+      const model = await ApiClient.getModelById(id, { skipCache })
       setModel(model)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model')
@@ -150,9 +150,10 @@ function ModelViewer({
     }
   }
 
-  const handleModelUpdated = () => {
+  const handleModelUpdated = async () => {
     if (modelId) {
-      fetchModel(modelId)
+      await fetchModel(modelId, true) // Skip cache to get fresh data
+      await loadVersions() // Also reload versions to update UI
     }
   }
 
@@ -246,14 +247,15 @@ function ModelViewer({
     file: File,
     action: 'current' | 'new',
     description?: string,
-    targetVersionNumber?: number
+    targetVersionNumber?: number,
+    setAsActive?: boolean
   ) => {
     if (!model) return
 
     try {
       if (action === 'new') {
         // Always create new version when explicitly requested
-        await ApiClient.createModelVersion(parseInt(model.id), file, description)
+        await ApiClient.createModelVersion(parseInt(model.id), file, description, setAsActive ?? true)
       } else {
         // Add to current/selected version
         // If no versions are loaded yet, reload them first to check if version 1 exists
@@ -272,7 +274,7 @@ function ModelViewer({
             )
           } else {
             // No versions exist at all, create first version
-            await ApiClient.createModelVersion(parseInt(model.id), file, description)
+            await ApiClient.createModelVersion(parseInt(model.id), file, description, setAsActive ?? true)
           }
         } else {
           // Versions are already loaded, use selected or latest
@@ -532,6 +534,7 @@ function ModelViewer({
           model={model}
           onVersionSelect={handleVersionSelect}
           onDefaultFileChange={handleDefaultFileChange}
+          onModelUpdate={handleModelUpdated}
         />
       </ModelProvider>
 

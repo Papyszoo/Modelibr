@@ -48,16 +48,16 @@ namespace Application.Models
                 await _thumbnailQueue.CancelActiveJobsForModelAsync(command.ModelId, cancellationToken);
 
                 // Get the model's primary file hash for thumbnail generation
-                var primaryFile = model.Files.FirstOrDefault();
-                if (primaryFile != null)
+                var primaryFile = model.ActiveVersion?.Files.FirstOrDefault();
+                if (primaryFile != null && model.ActiveVersion != null)
                 {
                     var currentTime = _dateTimeProvider.UtcNow;
 
                     // Reset existing thumbnail if it exists
-                    if (model.Thumbnail != null)
+                    if (model.ActiveVersion.Thumbnail != null)
                     {
-                        model.Thumbnail.Reset(currentTime);
-                        await _thumbnailRepository.UpdateAsync(model.Thumbnail, cancellationToken);
+                        model.ActiveVersion.Thumbnail.Reset(currentTime);
+                        await _thumbnailRepository.UpdateAsync(model.ActiveVersion.Thumbnail, cancellationToken);
                     }
 
                     // Reset any existing job for this model and create new one
@@ -70,6 +70,7 @@ namespace Application.Models
                     {
                         await _thumbnailQueue.EnqueueAsync(
                             command.ModelId,
+                            model.ActiveVersion.Id,
                             primaryFile.Sha256Hash,
                             cancellationToken: cancellationToken);
                     }

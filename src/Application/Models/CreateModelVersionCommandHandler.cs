@@ -1,6 +1,7 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -14,17 +15,20 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IDomainEventDispatcher _domainEventDispatcher;
 
     public CreateModelVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IDomainEventDispatcher domainEventDispatcher)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _domainEventDispatcher = domainEventDispatcher;
     }
 
     public async Task<Result<CreateModelVersionResponse>> Handle(
@@ -70,7 +74,25 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
 
         // Link file to version
         fileEntity.SetModelVersion(savedVersion.Id);
+
+        // Set this version as active if requested
+        if (command.SetAsActive)
+        {
+            model.SetActiveVersion(savedVersion.Id, _dateTimeProvider.UtcNow);
+        }
+
         await _modelRepository.UpdateAsync(model, cancellationToken);
+
+        // Raise domain event to trigger thumbnail generation for the new version
+        // Only trigger if the file is renderable (can generate thumbnail from it)
+        if (fileType.IsRenderable)
+        {
+            model.RaiseModelUploadedEvent(savedVersion.Id, fileEntity.Sha256Hash, true);
+            
+            // Publish domain events
+            await _domainEventDispatcher.PublishAsync(model.DomainEvents, cancellationToken);
+            model.ClearDomainEvents();
+        }
 
         return Result.Success(new CreateModelVersionResponse(
             savedVersion.Id,
@@ -82,9 +104,11 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
 public record CreateModelVersionCommand(
     int ModelId,
     IFileUpload File,
-    string? Description = null) : ICommand<CreateModelVersionResponse>;
+    string? Description = null,
+    bool SetAsActive = true) : ICommand<CreateModelVersionResponse>;
 
 public record CreateModelVersionResponse(
     int VersionId,
     int VersionNumber,
     int FileId);
+

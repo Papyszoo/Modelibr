@@ -11,17 +11,19 @@ public class ThumbnailJobDomainTests
     {
         // Arrange
         var modelId = 1;
+        var modelVersionId = 10;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         var createdAt = DateTime.UtcNow;
         var maxAttempts = 3;
         var lockTimeoutMinutes = 10;
 
         // Act
-        var job = ThumbnailJob.Create(modelId, modelHash, createdAt, maxAttempts, lockTimeoutMinutes);
+        var job = ThumbnailJob.Create(modelId, modelVersionId, modelHash, createdAt, maxAttempts, lockTimeoutMinutes);
 
         // Assert
         Assert.NotNull(job);
         Assert.Equal(modelId, job.ModelId);
+        Assert.Equal(modelVersionId, job.ModelVersionId);
         Assert.Equal(modelHash, job.ModelHash);
         Assert.Equal(ThumbnailJobStatus.Pending, job.Status);
         Assert.Equal(0, job.AttemptCount);
@@ -41,12 +43,13 @@ public class ThumbnailJobDomainTests
     public void Create_WithInvalidModelId_ShouldThrowArgumentException(int invalidModelId)
     {
         // Arrange
+        var modelVersionId = 10;
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         var createdAt = DateTime.UtcNow;
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            ThumbnailJob.Create(invalidModelId, modelHash, createdAt));
+            ThumbnailJob.Create(invalidModelId, modelVersionId, modelHash, createdAt));
     }
 
     [Theory]
@@ -58,11 +61,12 @@ public class ThumbnailJobDomainTests
     {
         // Arrange
         var modelId = 1;
+        var modelVersionId = 10;
         var createdAt = DateTime.UtcNow;
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            ThumbnailJob.Create(modelId, invalidHash, createdAt));
+            ThumbnailJob.Create(modelId, modelVersionId, invalidHash, createdAt));
     }
 
     [Fact]
@@ -198,7 +202,7 @@ public class ThumbnailJobDomainTests
         Assert.NotNull(job.CompletedAt);
         Assert.Null(job.LockedBy);
         Assert.Null(job.LockedAt);
-        Assert.Equal(3, job.AttemptCount); // 3 attempts = MaxAttempts
+        Assert.Equal(3, job.AttemptCount);
     }
 
     [Fact]
@@ -340,6 +344,7 @@ public class ThumbnailJobDomainTests
     {
         return ThumbnailJob.Create(
             1, 
+            10,
             "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
             DateTime.UtcNow);
     }

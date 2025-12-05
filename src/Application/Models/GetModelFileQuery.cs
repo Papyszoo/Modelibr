@@ -26,12 +26,12 @@ internal class GetModelFileQueryHandler : IQueryHandler<GetModelFileQuery, GetMo
                 new Error("ModelNotFound", $"Model with ID {query.ModelId} was not found."));
         }
 
-        var renderableFile = model.Files.FirstOrDefault(f => f.FileType.IsRenderable);
+        var renderableFile = model.ActiveVersion?.Files.FirstOrDefault(f => f.FileType.IsRenderable);
         
         if (renderableFile == null)
         {
             return Result.Failure<GetModelFileQueryResponse>(
-                new Error("NoRenderableFile", $"Model {query.ModelId} has no renderable files."));
+                new Error("NoRenderableFile", $"Model {query.ModelId} has no active version or no renderable files in active version."));
         }
 
         var fullPath = Path.Combine(_pathProvider.UploadRootPath, renderableFile.FilePath);

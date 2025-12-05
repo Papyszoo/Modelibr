@@ -29,6 +29,7 @@ export interface Model {
   createdAt: string
   updatedAt: string
   defaultTextureSetId?: number
+  activeVersionId?: number
   textureSets?: { id: number; name: string }[]
   packs?: { id: number; name: string }[]
 }

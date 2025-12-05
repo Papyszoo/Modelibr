@@ -161,7 +161,7 @@ public class ChangeTextureTypeCommandHandlerTests
             "image/jpeg",
             FileType.Texture,
             1024L,
-            "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
+            "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd",
             DateTime.UtcNow
         );
     }

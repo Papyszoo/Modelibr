@@ -59,6 +59,26 @@
   font-weight: 500;
 }
 
+.version-badges {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.active-badge {
+  background: #3b82f6;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.set-active-button {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
 .version-description {
   font-size: 0.875rem;
   color: #475569;

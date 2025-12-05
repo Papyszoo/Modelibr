@@ -20,7 +20,7 @@ public record CompleteThumbnailJobCommand(
     int Width,
     int Height) : ICommand<CompleteThumbnailJobResponse>;
 
-public record CompleteThumbnailJobResponse(int ModelId, ThumbnailStatus Status);
+public record CompleteThumbnailJobResponse(int ModelId, int ModelVersionId, ThumbnailStatus Status);
 
 /// <summary>
 /// Handler for completing thumbnail jobs.
@@ -75,11 +75,11 @@ public class CompleteThumbnailJobCommandHandler : ICommandHandler<CompleteThumbn
 
         try
         {
-            // Get or create the thumbnail entity - check database first to avoid race conditions
-            var thumbnail = await _thumbnailRepository.GetByModelIdAsync(job.ModelId, cancellationToken);
+            // Get or create the thumbnail entity for this version
+            var thumbnail = await _thumbnailRepository.GetByModelVersionIdAsync(job.ModelVersionId, cancellationToken);
             if (thumbnail == null)
             {
-                thumbnail = Thumbnail.Create(job.ModelId, now);
+                thumbnail = Thumbnail.Create(job.ModelVersionId, now);
                 thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
             }
 
@@ -92,15 +92,15 @@ public class CompleteThumbnailJobCommandHandler : ICommandHandler<CompleteThumbn
             // Save changes - the domain event will be dispatched automatically
             await _thumbnailRepository.UpdateAsync(thumbnail, cancellationToken);
 
-            _logger.LogInformation("Successfully completed thumbnail job {JobId} for model {ModelId}", 
-                command.JobId, job.ModelId);
+            _logger.LogInformation("Successfully completed thumbnail job {JobId} for model {ModelId} version {ModelVersionId}", 
+                command.JobId, job.ModelId, job.ModelVersionId);
 
-            return Result.Success(new CompleteThumbnailJobResponse(job.ModelId, ThumbnailStatus.Ready));
+            return Result.Success(new CompleteThumbnailJobResponse(job.ModelId, job.ModelVersionId, ThumbnailStatus.Ready));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to complete thumbnail job {JobId} for model {ModelId}", 
-                command.JobId, job.ModelId);
+            _logger.LogError(ex, "Failed to complete thumbnail job {JobId} for model {ModelId} version {ModelVersionId}", 
+                command.JobId, job.ModelId, job.ModelVersionId);
 
             return Result.Failure<CompleteThumbnailJobResponse>(
                 new Error("ThumbnailJobCompletionFailed", 
