@@ -83,7 +83,7 @@ function DraggableTab({
   onClose,
   onDragStart,
   onDragEnd,
-  side: _side, // prefix with underscore to indicate intentionally unused
+  side,
 }: DraggableTabProps): JSX.Element {
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
@@ -117,6 +117,8 @@ function DraggableTab({
   }
 
   const tooltipId = `tab-tooltip-${tab.id}`
+  // Position tooltip on the opposite side of the tab panel to avoid covering the icon
+  const tooltipPosition = side === 'left' ? 'right' : 'left'
 
   return (
     <>
@@ -134,7 +136,7 @@ function DraggableTab({
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         data-pr-tooltip={getTabTooltip(tab)}
-        data-pr-position="right"
+        data-pr-position={tooltipPosition}
       >
         {/* Tab content - always show icon for now */}
         <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
@@ -145,7 +147,7 @@ function DraggableTab({
           onClick={handleCloseClick}
           aria-label="Close tab"
         >
-          <i className="pi pi-times"></i>
+          ×
         </button>
       </div>
     </>
