@@ -133,10 +133,13 @@ public static class ModelVersionEndpoints
         var etag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{response.Sha256Hash}\"");
         
         // Check If-None-Match header for cache validation
-        if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch) &&
-            ifNoneMatch.ToString().Contains(response.Sha256Hash))
+        if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch))
         {
-            return Results.StatusCode(StatusCodes.Status304NotModified);
+            if (Microsoft.Net.Http.Headers.EntityTagHeaderValue.TryParse(ifNoneMatch.ToString(), out var clientEtag) &&
+                clientEtag.Tag.Equals(etag.Tag))
+            {
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            }
         }
 
         var fileStream = System.IO.File.OpenRead(response.FilePath);
