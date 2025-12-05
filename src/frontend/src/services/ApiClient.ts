@@ -208,6 +208,10 @@ class ApiClient {
     return `${this.baseURL}/models/${modelId}/thumbnail/file`
   }
 
+  getVersionThumbnailUrl(versionId: number): string {
+    return `${this.baseURL}/model-versions/${versionId}/thumbnail/file`
+  }
+
   async getThumbnailFile(
     modelId: string,
     options: { skipCache?: boolean } = {}
