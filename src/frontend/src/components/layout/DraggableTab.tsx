@@ -37,22 +37,41 @@ const getTabTooltip = (tab: Tab): string => {
   switch (tab.type) {
     case 'modelList':
       return 'Models List'
-    case 'modelViewer':
-      return `Model: ${tab.label || tab.modelId || 'Unknown'}`
+    case 'modelViewer': {
+      // If label exists and is not just "Model {id}", use it as the name
+      // Otherwise fall back to showing the ID
+      const modelName =
+        tab.label && !tab.label.match(/^Model \d+$/) ? tab.label : tab.modelId
+      return `Model: ${modelName || 'Unknown'}`
+    }
     case 'texture':
       return 'Textures List'
     case 'textureSets':
       return 'Texture Sets'
-    case 'textureSetViewer':
-      return `Texture Set: ${tab.label || tab.setId || 'Unknown'}`
+    case 'textureSetViewer': {
+      // If label exists and is not just "Set {id}", use it as the name
+      const setName =
+        tab.label && !tab.label.match(/^Set \d+$/) ? tab.label : tab.setId
+      return `Texture Set: ${setName || 'Unknown'}`
+    }
     case 'packs':
       return 'Packs'
-    case 'packViewer':
-      return `Pack: ${tab.label || tab.packId || 'Unknown'}`
+    case 'packViewer': {
+      // If label exists and is not just "Pack {id}", use it as the name
+      const packName =
+        tab.label && !tab.label.match(/^Pack \d+$/) ? tab.label : tab.packId
+      return `Pack: ${packName || 'Unknown'}`
+    }
     case 'projects':
       return 'Projects'
-    case 'projectViewer':
-      return `Project: ${tab.label || tab.projectId || 'Unknown'}`
+    case 'projectViewer': {
+      // If label exists and is not just "Project {id}", use it as the name
+      const projectName =
+        tab.label && !tab.label.match(/^Project \d+$/)
+          ? tab.label
+          : tab.projectId
+      return `Project: ${projectName || 'Unknown'}`
+    }
     case 'animation':
       return 'Animations List'
     case 'settings':
