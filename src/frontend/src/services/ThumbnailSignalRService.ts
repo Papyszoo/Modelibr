@@ -22,6 +22,14 @@ type ThumbnailStatusChangedCallback = (
 ) => void
 type ActiveVersionChangedCallback = (event: ActiveVersionChangedEvent) => void
 
+// Only log in development mode
+const isDev = import.meta.env.DEV
+const log = (message: string, ...args: unknown[]) => {
+  if (isDev) {
+    console.log(message, ...args)
+  }
+}
+
 class ThumbnailSignalRService {
   private connection: signalR.HubConnection | null = null
   private thumbnailStatusCallbacks: Set<ThumbnailStatusChangedCallback> =
@@ -63,18 +71,17 @@ class ThumbnailSignalRService {
             )
           },
         })
-        .configureLogging(signalR.LogLevel.Information)
+        .configureLogging(
+          isDev ? signalR.LogLevel.Information : signalR.LogLevel.Warning
+        )
         .build()
 
       // Set up event handlers
       this.connection.on(
         'ThumbnailStatusChanged',
         (event: ThumbnailStatusChangedEvent) => {
-          console.log(
-            'ThumbnailSignalR: Received ThumbnailStatusChanged event',
-            event
-          )
-          console.log(
+          log('ThumbnailSignalR: Received ThumbnailStatusChanged event', event)
+          log(
             `ThumbnailSignalR: Notifying ${this.thumbnailStatusCallbacks.size} callback(s)`
           )
           this.thumbnailStatusCallbacks.forEach(callback => callback(event))
@@ -84,11 +91,8 @@ class ThumbnailSignalRService {
       this.connection.on(
         'ActiveVersionChanged',
         (event: ActiveVersionChangedEvent) => {
-          console.log(
-            'ThumbnailSignalR: Received ActiveVersionChanged event',
-            event
-          )
-          console.log(
+          log('ThumbnailSignalR: Received ActiveVersionChanged event', event)
+          log(
             `ThumbnailSignalR: Notifying ${this.activeVersionCallbacks.size} callback(s)`
           )
           this.activeVersionCallbacks.forEach(callback => callback(event))
@@ -96,20 +100,20 @@ class ThumbnailSignalRService {
       )
 
       this.connection.onreconnecting(() => {
-        console.log('ThumbnailSignalR: Reconnecting...')
+        log('ThumbnailSignalR: Reconnecting...')
       })
 
       this.connection.onreconnected(() => {
-        console.log('ThumbnailSignalR: Reconnected')
+        log('ThumbnailSignalR: Reconnected')
         this.reconnectAttempts = 0
       })
 
       this.connection.onclose(() => {
-        console.log('ThumbnailSignalR: Connection closed')
+        log('ThumbnailSignalR: Connection closed')
       })
 
       await this.connection.start()
-      console.log('ThumbnailSignalR: Connected')
+      log('ThumbnailSignalR: Connected')
       this.reconnectAttempts = 0
     } catch (error) {
       console.error('ThumbnailSignalR: Failed to connect', error)
@@ -129,12 +133,14 @@ class ThumbnailSignalRService {
   async joinAllModelsGroup(): Promise<void> {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       await this.connection.invoke('JoinAllModelsGroup')
+      log('ThumbnailSignalR: Joined AllModelsGroup')
     }
   }
 
   async leaveAllModelsGroup(): Promise<void> {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       await this.connection.invoke('LeaveAllModelsGroup')
+      log('ThumbnailSignalR: Left AllModelsGroup')
     }
   }
 
@@ -178,12 +184,12 @@ class ThumbnailSignalRService {
     callback: ThumbnailStatusChangedCallback
   ): () => void {
     this.thumbnailStatusCallbacks.add(callback)
-    console.log(
+    log(
       `ThumbnailSignalR: Registered ThumbnailStatusChanged callback. Total: ${this.thumbnailStatusCallbacks.size}`
     )
     return () => {
       this.thumbnailStatusCallbacks.delete(callback)
-      console.log(
+      log(
         `ThumbnailSignalR: Unregistered ThumbnailStatusChanged callback. Total: ${this.thumbnailStatusCallbacks.size}`
       )
     }
@@ -191,12 +197,12 @@ class ThumbnailSignalRService {
 
   onActiveVersionChanged(callback: ActiveVersionChangedCallback): () => void {
     this.activeVersionCallbacks.add(callback)
-    console.log(
+    log(
       `ThumbnailSignalR: Registered ActiveVersionChanged callback. Total: ${this.activeVersionCallbacks.size}`
     )
     return () => {
       this.activeVersionCallbacks.delete(callback)
-      console.log(
+      log(
         `ThumbnailSignalR: Unregistered ActiveVersionChanged callback. Total: ${this.activeVersionCallbacks.size}`
       )
     }

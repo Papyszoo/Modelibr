@@ -5,6 +5,14 @@ import thumbnailSignalRService, {
   ActiveVersionChangedEvent,
 } from '../../../services/ThumbnailSignalRService'
 
+// Only log in development mode
+const isDev = import.meta.env.DEV
+const log = (message: string, ...args: unknown[]) => {
+  if (isDev) {
+    console.log(message, ...args)
+  }
+}
+
 export function useThumbnail(modelId: string) {
   const [thumbnailDetails, setThumbnailDetails] =
     useState<ThumbnailStatus | null>(null)
@@ -15,11 +23,11 @@ export function useThumbnail(modelId: string) {
 
   const fetchThumbnailDetails = useCallback(async () => {
     try {
-      console.log(`useThumbnail[${modelId}]: Fetching thumbnail details...`)
+      log(`useThumbnail[${modelId}]: Fetching thumbnail details...`)
       const details = await ApiClient.getThumbnailStatus(modelId, {
         skipCache: true,
       })
-      console.log(`useThumbnail[${modelId}]: Got details:`, details)
+      log(`useThumbnail[${modelId}]: Got details:`, details)
       setThumbnailDetails(details)
 
       // Use direct URL to leverage browser caching instead of fetching blob
@@ -28,7 +36,7 @@ export function useThumbnail(modelId: string) {
         const baseUrl = ApiClient.getThumbnailUrl(modelId)
         // Use the stable timestamp that only changes on SignalR events
         const newSrc = `${baseUrl}?t=${cacheBustTimestamp.current}`
-        console.log(`useThumbnail[${modelId}]: Setting imgSrc to:`, newSrc)
+        log(`useThumbnail[${modelId}]: Setting imgSrc to:`, newSrc)
         setImgSrc(newSrc)
       } else {
         setImgSrc(null)
@@ -45,12 +53,12 @@ export function useThumbnail(modelId: string) {
 
   // Subscribe to SignalR events for real-time updates
   useEffect(() => {
-    console.log(`useThumbnail[${modelId}]: Setting up SignalR subscriptions`)
+    log(`useThumbnail[${modelId}]: Setting up SignalR subscriptions`)
 
     const handleThumbnailStatusChanged = (
       event: ThumbnailStatusChangedEvent
     ) => {
-      console.log(
+      log(
         `useThumbnail[${modelId}]: Received ThumbnailStatusChanged event:`,
         event
       )
@@ -59,7 +67,7 @@ export function useThumbnail(modelId: string) {
       // The ThumbnailStatusChangedEvent contains modelVersionId, not modelId
       // So we need to refresh to check if this affects our model
       if (event.status === 'Ready' || event.status === 'Failed') {
-        console.log(
+        log(
           `useThumbnail[${modelId}]: Triggering refresh due to status change`
         )
         // Update cache bust timestamp when we receive a SignalR event
@@ -69,13 +77,13 @@ export function useThumbnail(modelId: string) {
     }
 
     const handleActiveVersionChanged = (event: ActiveVersionChangedEvent) => {
-      console.log(
+      log(
         `useThumbnail[${modelId}]: Received ActiveVersionChanged event:`,
         event
       )
       // When active version changes for our model, refresh thumbnail
       if (event.modelId.toString() === modelId) {
-        console.log(
+        log(
           `useThumbnail[${modelId}]: Triggering refresh due to active version change`
         )
         // Update cache bust timestamp when we receive a SignalR event
@@ -92,7 +100,7 @@ export function useThumbnail(modelId: string) {
       thumbnailSignalRService.onActiveVersionChanged(handleActiveVersionChanged)
 
     return () => {
-      console.log(`useThumbnail[${modelId}]: Cleaning up SignalR subscriptions`)
+      log(`useThumbnail[${modelId}]: Cleaning up SignalR subscriptions`)
       unsubscribeThumbnail()
       unsubscribeActiveVersion()
     }
