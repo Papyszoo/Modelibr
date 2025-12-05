@@ -17,6 +17,13 @@ import { Checkbox } from 'primereact/checkbox'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
+import { formatFileSize, getSpriteTypeName } from '../../../utils/fileUtils'
+import {
+  TOAST_LIFE_MS,
+  DIALOG_WIDTH_SM,
+  SPRITE_TYPE_STATIC,
+  SPRITE_TYPE_GIF,
+} from '../../../utils/constants'
 import './SpriteList.css'
 
 interface SpriteDto {
@@ -41,8 +48,6 @@ interface SpriteCategoryDto {
 }
 
 const UNASSIGNED_CATEGORY_ID = -1
-const SPRITE_TYPE_STATIC = 1
-const SPRITE_TYPE_GIF = 3
 
 function SpriteList() {
   const [sprites, setSprites] = useState<SpriteDto[]>([])
@@ -89,7 +94,7 @@ function SpriteList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load sprites',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setLoading(false)
@@ -125,7 +130,7 @@ function SpriteList() {
         severity: 'warn',
         summary: 'Invalid Files',
         detail: 'Please drop image files only',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       return
     }
@@ -167,7 +172,7 @@ function SpriteList() {
           severity: 'success',
           summary: 'Success',
           detail: `Sprite "${fileName}" created successfully`,
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
       } catch (error) {
         if (uploadId && uploadProgressContext) {
@@ -179,7 +184,7 @@ function SpriteList() {
           severity: 'error',
           summary: 'Error',
           detail: `Failed to create sprite from ${file.name}`,
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
       }
     }
@@ -189,29 +194,6 @@ function SpriteList() {
 
   const { onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDragAndDrop(handleFileDrop)
-
-  const getSpriteTypeName = (type: number): string => {
-    switch (type) {
-      case 1:
-        return 'Static'
-      case 2:
-        return 'Sprite Sheet'
-      case 3:
-        return 'GIF'
-      case 4:
-        return 'APNG'
-      case 5:
-        return 'Animated WebP'
-      default:
-        return 'Unknown'
-    }
-  }
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
 
   const openCreateCategoryDialog = () => {
     setEditingCategory(null)
@@ -233,7 +215,7 @@ function SpriteList() {
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Category name is required',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       return
     }
@@ -249,7 +231,7 @@ function SpriteList() {
           severity: 'success',
           summary: 'Success',
           detail: 'Category updated successfully',
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
       } else {
         const result = await ApiClient.createSpriteCategory(
@@ -260,7 +242,7 @@ function SpriteList() {
           severity: 'success',
           summary: 'Success',
           detail: 'Category created successfully',
-          life: 3000,
+          life: TOAST_LIFE_MS,
         })
         setActiveCategoryId(result.id)
       }
@@ -273,7 +255,7 @@ function SpriteList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to save category',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -291,7 +273,7 @@ function SpriteList() {
             severity: 'success',
             summary: 'Success',
             detail: 'Category deleted successfully',
-            life: 3000,
+            life: TOAST_LIFE_MS,
           })
           if (activeCategoryId === category.id) {
             setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
@@ -304,7 +286,7 @@ function SpriteList() {
             severity: 'error',
             summary: 'Error',
             detail: 'Failed to delete category',
-            life: 3000,
+            life: TOAST_LIFE_MS,
           })
         }
       },
@@ -338,7 +320,7 @@ function SpriteList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to download sprite',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -521,7 +503,7 @@ function SpriteList() {
         severity: 'success',
         summary: 'Success',
         detail: message,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       setSelectedSpriteIds(new Set())
       loadSprites()
@@ -531,7 +513,7 @@ function SpriteList() {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to update sprite category',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
 
@@ -728,7 +710,7 @@ function SpriteList() {
         header={editingCategory ? 'Rename Category' : 'Add Category'}
         visible={showCategoryDialog}
         onHide={() => setShowCategoryDialog(false)}
-        style={{ width: '400px' }}
+        style={{ width: DIALOG_WIDTH_SM }}
         footer={
           <div>
             <Button

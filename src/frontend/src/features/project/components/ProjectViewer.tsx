@@ -7,11 +7,24 @@ import { MenuItem } from 'primereact/menuitem'
 import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
 import ApiClient from '../../../services/ApiClient'
-import { ProjectDto, Model, TextureSetDto, TextureType, SpriteDto } from '../../../types'
+import { ProjectDto, Model, TextureSetDto, SpriteDto } from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
+import {
+  formatFileSize,
+  getSpriteTypeName,
+  getModelDisplayName,
+} from '../../../utils/fileUtils'
+import { getAlbedoTextureUrl } from '../../../utils/textureTypeUtils'
+import {
+  TOAST_LIFE_MS,
+  DIALOG_WIDTH_LG,
+  DIALOG_WIDTH_FULL,
+  DIALOG_MAX_WIDTH,
+  DIALOG_MAX_HEIGHT,
+} from '../../../utils/constants'
 import './ProjectViewer.css'
 
 interface ProjectViewerProps {
@@ -68,7 +81,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -90,7 +103,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load project content',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setLoading(false)
@@ -126,7 +139,9 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
       const response = await ApiClient.getAllSprites()
       // Filter out sprites already in this project
       const spriteIds = sprites.map(s => s.id)
-      const available = (response.sprites || []).filter(s => !spriteIds.includes(s.id))
+      const available = (response.sprites || []).filter(
+        s => !spriteIds.includes(s.id)
+      )
       setAllSprites(available)
     } catch (error) {
       console.error('Failed to load sprites:', error)
@@ -140,7 +155,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: 'Model removed from project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadProjectContent()
       loadProject()
@@ -150,7 +165,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to remove model from project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -162,7 +177,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: 'Texture set removed from project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadProjectContent()
       loadProject()
@@ -172,7 +187,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to remove texture set from project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -184,7 +199,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: 'Sprite removed from project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadProjectContent()
       loadProject()
@@ -194,7 +209,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to remove sprite from project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -212,7 +227,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: `${selectedModelIds.length} model(s) added to project`,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       setShowAddModelDialog(false)
       setSelectedModelIds([])
@@ -224,7 +239,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to add models to project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -242,7 +257,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: `${selectedTextureSetIds.length} texture set(s) added to project`,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       setShowAddTextureSetDialog(false)
       setSelectedTextureSetIds([])
@@ -254,7 +269,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to add texture sets to project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -272,7 +287,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: `${selectedSpriteIds.length} sprite(s) added to project`,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       setShowAddSpriteDialog(false)
       setSelectedSpriteIds([])
@@ -284,7 +299,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to add sprites to project',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -370,7 +385,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: message,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadProjectContent()
       loadProject()
@@ -380,7 +395,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to upload models',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setUploadingModel(false)
@@ -445,7 +460,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: `${newCount} texture(s) uploaded and added to project`,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadProjectContent()
       loadProject()
@@ -455,7 +470,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to upload textures',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setUploadingTextureSet(false)
@@ -532,7 +547,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'success',
         summary: 'Success',
         detail: `${newCount} sprite(s) uploaded and added to project`,
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
       loadProjectContent()
       loadProject()
@@ -542,7 +557,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to upload sprites',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     } finally {
       setUploadingSprite(false)
@@ -577,47 +592,8 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     )
   }
 
-  const getModelName = (model: Model) => {
-    return model.files && model.files.length > 0
-      ? model.files[0].originalFileName
-      : model.name || `Model ${model.id}`
-  }
-
-  const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
-    const albedo = textureSet.textures?.find(
-      t => t.textureType === TextureType.Albedo
-    )
-    const diffuse = textureSet.textures?.find(
-      t => t.textureType === TextureType.Diffuse
-    )
-    const texture = albedo || diffuse
-    if (texture) {
-      return ApiClient.getFileUrl(texture.fileId.toString())
-    }
-    return null
-  }
-
-  const getSpriteTypeName = (type: number): string => {
-    switch (type) {
-      case 1:
-        return 'Static'
-      case 2:
-        return 'Sprite Sheet'
-      case 3:
-        return 'GIF'
-      case 4:
-        return 'APNG'
-      case 5:
-        return 'Animated WebP'
-      default:
-        return 'Unknown'
-    }
-  }
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  const getTextureSetAlbedoUrl = (textureSet: TextureSetDto) => {
+    return getAlbedoTextureUrl(textureSet, ApiClient.getFileUrl.bind(ApiClient))
   }
 
   const openSpriteModal = (sprite: SpriteDto) => {
@@ -647,7 +623,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to download sprite',
-        life: 3000,
+        life: TOAST_LIFE_MS,
       })
     }
   }
@@ -689,7 +665,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
   ]
 
   const filteredAvailableModels = allModels.filter(model => {
-    const modelName = getModelName(model).toLowerCase()
+    const modelName = getModelDisplayName(model).toLowerCase()
     return modelName.includes(modelSearchQuery.toLowerCase())
   })
 
@@ -758,7 +734,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                     <ThumbnailDisplay modelId={model.id} />
                     <div className="project-card-overlay">
                       <span className="project-card-name">
-                        {getModelName(model)}
+                        {getModelDisplayName(model)}
                       </span>
                     </div>
                   </div>
@@ -795,7 +771,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
           >
             <div className="project-grid">
               {textureSets.map(textureSet => {
-                const albedoUrl = getAlbedoTextureUrl(textureSet)
+                const albedoUrl = getTextureSetAlbedoUrl(textureSet)
                 return (
                   <div
                     key={textureSet.id}
@@ -916,7 +892,11 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
       <Dialog
         header="Add Models to Project"
         visible={showAddModelDialog}
-        style={{ width: '80vw', maxWidth: '1200px', maxHeight: '80vh' }}
+        style={{
+          width: DIALOG_WIDTH_FULL,
+          maxWidth: DIALOG_MAX_WIDTH,
+          maxHeight: DIALOG_MAX_HEIGHT,
+        }}
         onHide={() => {
           setShowAddModelDialog(false)
           setSelectedModelIds([])
@@ -972,7 +952,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                     <ThumbnailDisplay modelId={model.id} />
                     <div className="project-card-overlay">
                       <span className="project-card-name">
-                        {getModelName(model)}
+                        {getModelDisplayName(model)}
                       </span>
                     </div>
                   </div>
@@ -993,7 +973,11 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
       <Dialog
         header="Add Texture Sets to Project"
         visible={showAddTextureSetDialog}
-        style={{ width: '80vw', maxWidth: '1200px', maxHeight: '80vh' }}
+        style={{
+          width: DIALOG_WIDTH_FULL,
+          maxWidth: DIALOG_MAX_WIDTH,
+          maxHeight: DIALOG_MAX_HEIGHT,
+        }}
         onHide={() => {
           setShowAddTextureSetDialog(false)
           setSelectedTextureSetIds([])
@@ -1032,7 +1016,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
           </div>
           <div className="project-grid scrollable-grid">
             {filteredAvailableTextureSets.map(textureSet => {
-              const albedoUrl = getAlbedoTextureUrl(textureSet)
+              const albedoUrl = getTextureSetAlbedoUrl(textureSet)
               const isSelected = selectedTextureSetIds.includes(textureSet.id)
               return (
                 <div
@@ -1082,7 +1066,11 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
       <Dialog
         header="Add Sprites to Project"
         visible={showAddSpriteDialog}
-        style={{ width: '80vw', maxWidth: '1200px', maxHeight: '80vh' }}
+        style={{
+          width: DIALOG_WIDTH_FULL,
+          maxWidth: DIALOG_MAX_WIDTH,
+          maxHeight: DIALOG_MAX_HEIGHT,
+        }}
         onHide={() => {
           setShowAddSpriteDialog(false)
           setSelectedSpriteIds([])
@@ -1170,7 +1158,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         header={selectedSprite?.name || 'Sprite'}
         visible={showSpriteModal}
         onHide={() => setShowSpriteModal(false)}
-        style={{ width: '600px' }}
+        style={{ width: DIALOG_WIDTH_LG }}
         className="sprite-detail-modal"
       >
         {selectedSprite && (
