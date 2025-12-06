@@ -22,6 +22,7 @@ interface VersionStripProps {
   selectedVersion: ModelVersionDto | null
   onVersionSelect: (version: ModelVersionDto) => void
   onSetActiveVersion: (versionId: number) => void
+  onRecycleVersion: (versionId: number) => void
   defaultFileId: number | null
   onDefaultFileChange: (fileId: number) => void
 }
@@ -32,6 +33,7 @@ function VersionStrip({
   selectedVersion,
   onVersionSelect,
   onSetActiveVersion,
+  onRecycleVersion,
   defaultFileId,
   onDefaultFileChange,
 }: VersionStripProps) {
@@ -179,18 +181,30 @@ function VersionStrip({
                     {version.files.length !== 1 ? 's' : ''}
                   </span>
                 </div>
-                {model.activeVersionId !== version.id && (
+                <div className="version-dropdown-item-actions">
+                  {model.activeVersionId !== version.id && (
+                    <Button
+                      icon="pi pi-check-circle"
+                      className="p-button-text p-button-sm version-set-active-btn"
+                      onClick={e => {
+                        e.stopPropagation()
+                        onSetActiveVersion(version.id)
+                      }}
+                      tooltip="Set as Active"
+                      tooltipOptions={{ position: 'bottom' }}
+                    />
+                  )}
                   <Button
-                    icon="pi pi-check-circle"
-                    className="p-button-text p-button-sm version-set-active-btn"
+                    icon="pi pi-trash"
+                    className="p-button-text p-button-sm p-button-danger version-recycle-btn"
                     onClick={e => {
                       e.stopPropagation()
-                      onSetActiveVersion(version.id)
+                      onRecycleVersion(version.id)
                     }}
-                    tooltip="Set as Active"
+                    tooltip="Recycle Version"
                     tooltipOptions={{ position: 'bottom' }}
                   />
-                )}
+                </div>
               </div>
             ))}
           </div>

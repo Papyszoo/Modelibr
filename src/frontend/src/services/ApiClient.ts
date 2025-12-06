@@ -1094,6 +1094,10 @@ class ApiClient {
         useApiCacheStore.getState().invalidateModels()
         useApiCacheStore.getState().invalidateModelById(entityId.toString())
         break
+      case 'modelversion':
+        // Invalidate models cache as version restoration affects model data
+        useApiCacheStore.getState().invalidateModels()
+        break
       case 'textureset':
         useApiCacheStore.getState().invalidateTextureSets()
         useApiCacheStore.getState().invalidateTextureSetById(entityId)
@@ -1131,6 +1135,16 @@ class ApiClient {
 
     // Invalidate cache on successful soft delete
     useApiCacheStore.getState().invalidateModels()
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+  }
+
+  async softDeleteModelVersion(
+    modelId: number,
+    versionId: number
+  ): Promise<void> {
+    await this.client.delete(`/models/${modelId}/versions/${versionId}`)
+
+    // Invalidate cache on successful soft delete
     useApiCacheStore.getState().invalidateModelById(modelId.toString())
   }
 
