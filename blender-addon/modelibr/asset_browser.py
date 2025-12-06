@@ -120,15 +120,19 @@ class AssetLibraryHandler:
         Returns:
             (success, message)
         """
+        imported_objects = []
         try:
             version_number = version_data.get('versionNumber', 1)
             asset_path = AssetLibraryHandler.get_model_asset_path(model_id, version_number)
             
-            # Create a new blend file
-            bpy.ops.wm.read_homefile(use_empty=True)
+            # Store current selection to restore later
+            original_selection = list(bpy.context.selected_objects)
             
             # Import the model based on file extension
             ext = os.path.splitext(file_path)[1].lower()
+            
+            # Deselect all objects before import
+            bpy.ops.object.select_all(action='DESELECT')
             
             if ext in ['.glb', '.gltf']:
                 bpy.ops.import_scene.gltf(filepath=file_path)
@@ -144,14 +148,12 @@ class AssetLibraryHandler:
                 for obj in data_to.objects:
                     if obj is not None:
                         bpy.context.collection.objects.link(obj)
+                        obj.select_set(True)
             else:
                 return (False, f"Unsupported file format: {ext}")
             
-            # Get imported objects
-            imported_objects = [obj for obj in bpy.context.selected_objects]
-            if not imported_objects:
-                # If nothing selected, use all objects in the scene
-                imported_objects = list(bpy.context.scene.objects)
+            # Get imported objects (should be selected after import)
+            imported_objects = [obj for obj in bpy.context.selected_objects if obj]
             
             if not imported_objects:
                 return (False, "No objects imported")
@@ -160,25 +162,47 @@ class AssetLibraryHandler:
             for obj in imported_objects:
                 AssetLibraryHandler.mark_object_as_asset(obj, model_data, version_data)
             
-            # Download and set thumbnail
+            # Download thumbnail
             try:
                 thumbnail_path = AssetLibraryHandler.get_thumbnail_path(model_id)
                 client.download_thumbnail(model_id, str(thumbnail_path.parent))
-                
-                # Set preview image for the first object (Blender 4.0+ API)
-                if imported_objects and os.path.exists(thumbnail_path):
-                    # Note: Setting custom preview images requires special handling in Blender
-                    # For now, Blender will generate its own preview
-                    pass
             except Exception as e:
                 print(f"[Modelibr] Warning: Could not download thumbnail: {e}")
             
-            # Save the blend file
-            bpy.ops.wm.save_as_mainfile(filepath=str(asset_path), copy=False)
+            # Write objects to a new .blend file as a library
+            # This saves only the selected objects without affecting the current file
+            data_blocks = set(imported_objects)
+            
+            # Also include any meshes, materials, etc. used by these objects
+            for obj in imported_objects:
+                if obj.data:
+                    data_blocks.add(obj.data)
+                for mat_slot in obj.material_slots:
+                    if mat_slot.material:
+                        data_blocks.add(mat_slot.material)
+            
+            # Write the data blocks to the asset file
+            bpy.data.libraries.write(str(asset_path), data_blocks, path_remap='RELATIVE', fake_user=True)
+            
+            # Clean up: Remove imported objects from current scene
+            for obj in imported_objects:
+                bpy.data.objects.remove(obj, do_unlink=True)
+            
+            # Restore original selection
+            for obj in original_selection:
+                if obj and obj.name in bpy.data.objects:
+                    obj.select_set(True)
             
             return (True, f"Asset created at: {asset_path}")
             
         except Exception as e:
+            # Clean up imported objects on error
+            for obj in imported_objects:
+                try:
+                    if obj and obj.name in bpy.data.objects:
+                        bpy.data.objects.remove(obj, do_unlink=True)
+                except:
+                    pass
             return (False, f"Failed to create asset: {str(e)}")
     
     @staticmethod
@@ -256,6 +280,7 @@ class AssetLibraryHandler:
                     # Get active version
                     versions = client.get_model_versions(model_id)
                     if not versions:
+                        print(f"[Modelibr] No versions found for model {model_id}")
                         continue
                     
                     # Find active version
@@ -271,11 +296,14 @@ class AssetLibraryHandler:
                     
                     if asset_path.exists():
                         # Asset already synced
+                        print(f"[Modelibr] Asset already exists for model {model_id} version {version_number}, skipping")
+                        synced_count += 1  # Count it as synced since it exists
                         continue
                     
                     # Get files for this version
                     files = version.get('files', [])
                     if not files:
+                        print(f"[Modelibr] No files found for model {model_id} version {version_number}")
                         continue
                     
                     # Find best file to download (prefer GLB)
@@ -294,13 +322,16 @@ class AssetLibraryHandler:
                         file_to_import = files[0]
                     
                     # Download file to temp directory
+                    print(f"[Modelibr] Processing model {model_id}: {model_data.get('name', 'Unknown')}")
                     with tempfile.TemporaryDirectory() as temp_dir:
                         filename = file_to_import.get('originalFileName', f"model_{model_id}")
+                        print(f"[Modelibr] Downloading file: {filename}")
                         downloaded_path = client.download_file(
                             file_to_import['id'],
                             temp_dir,
                             filename
                         )
+                        print(f"[Modelibr] Downloaded to: {downloaded_path}")
                         
                         # Create asset blend file
                         success, msg = AssetLibraryHandler.create_asset_blend(
@@ -317,7 +348,9 @@ class AssetLibraryHandler:
                             print(f"[Modelibr] Failed to create asset for model {model_id}: {msg}")
                 
                 except Exception as e:
+                    import traceback
                     print(f"[Modelibr] Error syncing model {model_id}: {e}")
+                    print(f"[Modelibr] Traceback: {traceback.format_exc()}")
                     continue
             
             return (True, f"Synced {synced_count} of {total} models", synced_count)
