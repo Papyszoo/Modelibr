@@ -11,7 +11,9 @@ jest.mock('../../../../services/ApiClient', () => ({
     getFileUrl: jest.fn((id: string) => `http://api.test/files/${id}`),
     getModelVersions: jest.fn().mockResolvedValue([]),
     getTextureSetById: jest.fn(),
-    getThumbnailUrl: jest.fn((id: string) => `http://api.test/models/${id}/thumbnail`),
+    getThumbnailUrl: jest.fn(
+      (id: string) => `http://api.test/models/${id}/thumbnail`
+    ),
   },
 }))
 

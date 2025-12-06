@@ -103,10 +103,12 @@ function ModelViewer({
     try {
       const data = await ApiClient.getModelVersions(parseInt(model.id))
       setVersions(data)
-      
+
       // Auto-select the active version if no version is currently selected
       if (data.length > 0 && !selectedVersion) {
-        const activeVersion = data.find(v => v.id === model.activeVersionId) || data[data.length - 1]
+        const activeVersion =
+          data.find(v => v.id === model.activeVersionId) ||
+          data[data.length - 1]
         handleVersionSelect(activeVersion)
       } else if (selectedVersion) {
         // If a version is already selected, refresh its data from the new versions list
@@ -221,12 +223,14 @@ function ModelViewer({
         })),
       }
       setVersionModel(versionModelData)
-      
+
       // Auto-select first renderable file if no file is currently selected
       // or if the currently selected file is not in this version
       const renderableFiles = version.files.filter(f => f.isRenderable)
       if (renderableFiles.length > 0) {
-        const currentFileInVersion = version.files.find(f => f.id === defaultFileId)
+        const currentFileInVersion = version.files.find(
+          f => f.id === defaultFileId
+        )
         if (!currentFileInVersion || !currentFileInVersion.isRenderable) {
           setDefaultFileId(renderableFiles[0].id)
         }

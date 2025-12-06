@@ -2,17 +2,61 @@ import { Tab } from '../../types'
 import {
   getTabLabel,
   parseCompactTabFormat,
+  parseCompactTabFormatAsync,
   serializeToCompactFormat,
 } from '../tabSerialization'
 
+// Mock ApiClient with properly typed mock functions
+const mockGetModelById = jest.fn()
+const mockGetTextureSetById = jest.fn()
+const mockGetPackById = jest.fn()
+const mockGetProjectById = jest.fn()
+const mockGetStageById = jest.fn()
+
+jest.mock('../../services/ApiClient', () => ({
+  __esModule: true,
+  default: {
+    getModelById: (...args: unknown[]) => mockGetModelById(...args),
+    getTextureSetById: (...args: unknown[]) => mockGetTextureSetById(...args),
+    getPackById: (...args: unknown[]) => mockGetPackById(...args),
+    getProjectById: (...args: unknown[]) => mockGetProjectById(...args),
+    getStageById: (...args: unknown[]) => mockGetStageById(...args),
+  },
+}))
+
 describe('Tab Serialization (Browser Refresh Compatibility)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
   describe('getTabLabel', () => {
     it('should return correct labels for different tab types', () => {
       expect(getTabLabel('modelList')).toBe('Models')
-      expect(getTabLabel('texture')).toBe('Textures')
-      expect(getTabLabel('animation')).toBe('Animations')
+      expect(getTabLabel('textureSets')).toBe('Texture Sets')
+      expect(getTabLabel('packs')).toBe('Packs')
       expect(getTabLabel('modelViewer')).toBe('Model Viewer')
-      expect(getTabLabel('modelViewer', '123')).toBe('Model 123')
+      expect(getTabLabel('modelViewer', { modelId: '123' })).toBe('Model 123')
+    })
+
+    it('should use name when provided', () => {
+      expect(
+        getTabLabel('modelViewer', { modelId: '123', modelName: 'My Model' })
+      ).toBe('My Model')
+      expect(
+        getTabLabel('textureSetViewer', { setId: '456', setName: 'My Set' })
+      ).toBe('My Set')
+      expect(
+        getTabLabel('packViewer', { packId: '789', packName: 'My Pack' })
+      ).toBe('My Pack')
+      expect(
+        getTabLabel('projectViewer', {
+          projectId: '111',
+          projectName: 'My Project',
+        })
+      ).toBe('My Project')
+      expect(
+        getTabLabel('stageEditor', { stageId: '222', stageName: 'My Stage' })
+      ).toBe('My Stage')
     })
   })
 
@@ -34,17 +78,17 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     })
 
     it('should parse multiple tabs', () => {
-      const result = parseCompactTabFormat('modelList,texture,model-456')
+      const result = parseCompactTabFormat('modelList,textureSets,model-456')
       expect(result).toHaveLength(3)
       expect(result[0].type).toBe('modelList')
-      expect(result[1].type).toBe('texture')
+      expect(result[1].type).toBe('textureSets')
       expect(result[2].type).toBe('modelViewer')
       expect(result[2].modelId).toBe('456')
     })
 
     it('should generate deterministic IDs for same input', () => {
-      const result1 = parseCompactTabFormat('modelList,texture')
-      const result2 = parseCompactTabFormat('modelList,texture')
+      const result1 = parseCompactTabFormat('modelList,textureSets')
+      const result2 = parseCompactTabFormat('modelList,textureSets')
 
       expect(result1[0].id).toBe(result2[0].id)
       expect(result1[1].id).toBe(result2[1].id)
@@ -91,12 +135,12 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       // If the URL somehow contains duplicates (e.g., modelList,textureSets,set-1,model-1,model-1)
       // the parser should deduplicate them to prevent rendering duplicate tabs
       const result = parseCompactTabFormat(
-        'modelList,model-123,model-123,texture'
+        'modelList,model-123,model-123,textureSets'
       )
       expect(result).toHaveLength(3)
       expect(result[0].id).toBe('modelList')
       expect(result[1].id).toBe('model-123')
-      expect(result[2].id).toBe('texture')
+      expect(result[2].id).toBe('textureSets')
 
       // Ensure no duplicates exist
       const ids = result.map(tab => tab.id)
@@ -109,9 +153,9 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     it('should serialize basic tabs without modelId', () => {
       const tabs: Tab[] = [
         { id: 'modelList', type: 'modelList', label: 'Models' },
-        { id: 'texture', type: 'texture', label: 'Textures' },
+        { id: 'textureSets', type: 'textureSets', label: 'Texture Sets' },
       ]
-      expect(serializeToCompactFormat(tabs)).toBe('modelList,texture')
+      expect(serializeToCompactFormat(tabs)).toBe('modelList,textureSets')
     })
 
     it('should serialize tabs with modelId', () => {
@@ -146,9 +190,11 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           label: 'Model 123',
           modelId: '123',
         }, // duplicate
-        { id: 'texture', type: 'texture', label: 'Textures' },
+        { id: 'textureSets', type: 'textureSets', label: 'Texture Sets' },
       ]
-      expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123,texture')
+      expect(serializeToCompactFormat(tabs)).toBe(
+        'modelList,model-123,textureSets'
+      )
     })
 
     it('should keep first occurrence when deduplicating', () => {
@@ -175,7 +221,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     it('should preserve tab functionality after serialization and parsing', () => {
       const originalTabs: Tab[] = [
         { id: 'modelList', type: 'modelList', label: 'Models' },
-        { id: 'texture', type: 'texture', label: 'Textures' },
+        { id: 'textureSets', type: 'textureSets', label: 'Texture Sets' },
         {
           id: 'model-123',
           type: 'modelViewer',
@@ -186,7 +232,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
       // Serialize tabs to URL format
       const serialized = serializeToCompactFormat(originalTabs)
-      expect(serialized).toBe('modelList,texture,model-123')
+      expect(serialized).toBe('modelList,textureSets,model-123')
 
       // Parse back from URL format (simulating browser refresh)
       const parsedTabs = parseCompactTabFormat(serialized)
@@ -194,7 +240,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       // Verify that parsed tabs have consistent structure
       expect(parsedTabs).toHaveLength(3)
       expect(parsedTabs[0].type).toBe('modelList')
-      expect(parsedTabs[1].type).toBe('texture')
+      expect(parsedTabs[1].type).toBe('textureSets')
       expect(parsedTabs[2].type).toBe('modelViewer')
       expect(parsedTabs[2].modelId).toBe('123')
 
@@ -203,6 +249,117 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(parsedTabs[0].id).toBe(parsedAgain[0].id)
       expect(parsedTabs[1].id).toBe(parsedAgain[1].id)
       expect(parsedTabs[2].id).toBe(parsedAgain[2].id)
+    })
+  })
+
+  describe('parseCompactTabFormatAsync', () => {
+    it('should fetch model name from API', async () => {
+      mockGetModelById.mockResolvedValue({ id: 123, name: 'My Model' })
+
+      const result = await parseCompactTabFormatAsync('model-123')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('modelViewer')
+      expect(result[0].label).toBe('My Model')
+      expect(result[0].modelId).toBe('123')
+      expect(mockGetModelById).toHaveBeenCalledWith('123')
+    })
+
+    it('should fetch texture set name from API', async () => {
+      mockGetTextureSetById.mockResolvedValue({
+        id: 456,
+        name: 'My Texture Set',
+      })
+
+      const result = await parseCompactTabFormatAsync('set-456')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('textureSetViewer')
+      expect(result[0].label).toBe('My Texture Set')
+      expect(result[0].setId).toBe('456')
+      expect(mockGetTextureSetById).toHaveBeenCalledWith(456)
+    })
+
+    it('should fetch pack name from API', async () => {
+      mockGetPackById.mockResolvedValue({ id: 789, name: 'My Pack' })
+
+      const result = await parseCompactTabFormatAsync('pack-789')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('packViewer')
+      expect(result[0].label).toBe('My Pack')
+      expect(result[0].packId).toBe('789')
+      expect(mockGetPackById).toHaveBeenCalledWith(789)
+    })
+
+    it('should fetch project name from API', async () => {
+      mockGetProjectById.mockResolvedValue({ id: 111, name: 'My Project' })
+
+      const result = await parseCompactTabFormatAsync('project-111')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('projectViewer')
+      expect(result[0].label).toBe('My Project')
+      expect(result[0].projectId).toBe('111')
+      expect(mockGetProjectById).toHaveBeenCalledWith(111)
+    })
+
+    it('should fetch stage name from API', async () => {
+      mockGetStageById.mockResolvedValue({ id: 222, name: 'My Stage' })
+
+      const result = await parseCompactTabFormatAsync('stage-222')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('stageEditor')
+      expect(result[0].label).toBe('My Stage')
+      expect(result[0].stageId).toBe('222')
+      expect(mockGetStageById).toHaveBeenCalledWith(222)
+    })
+
+    it('should fall back to ID-based label when API fails', async () => {
+      mockGetModelById.mockRejectedValue(new Error('Not found'))
+
+      const result = await parseCompactTabFormatAsync('model-999')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('modelViewer')
+      expect(result[0].label).toBe('Model 999')
+      expect(result[0].modelId).toBe('999')
+    })
+
+    it('should handle mixed tab types', async () => {
+      mockGetModelById.mockResolvedValue({ id: 123, name: 'My Model' })
+
+      const result = await parseCompactTabFormatAsync(
+        'modelList,model-123,textureSets'
+      )
+      expect(result).toHaveLength(3)
+      expect(result[0].type).toBe('modelList')
+      expect(result[0].label).toBe('Models')
+      expect(result[1].type).toBe('modelViewer')
+      expect(result[1].label).toBe('My Model')
+      expect(result[2].type).toBe('textureSets')
+      expect(result[2].label).toBe('Texture Sets')
+    })
+
+    it('should handle legacy JSON format', async () => {
+      const legacyFormat = JSON.stringify([
+        { id: 'modelList', type: 'modelList' },
+        { id: 'model-123', type: 'modelViewer', modelId: '123' },
+      ])
+      const result = await parseCompactTabFormatAsync(legacyFormat)
+      expect(result).toHaveLength(2)
+      expect(result[0].type).toBe('modelList')
+      expect(result[1].type).toBe('modelViewer')
+      expect(result[1].modelId).toBe('123')
+    })
+
+    it('should return default value for empty input', async () => {
+      const result = await parseCompactTabFormatAsync('')
+      expect(result).toEqual([])
+
+      const customDefault = [
+        { id: 'default', type: 'modelList', label: 'Default' },
+      ] as Tab[]
+      const resultWithDefault = await parseCompactTabFormatAsync(
+        '',
+        customDefault
+      )
+      expect(resultWithDefault).toEqual(customDefault)
     })
   })
 })

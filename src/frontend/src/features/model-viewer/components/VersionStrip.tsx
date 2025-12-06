@@ -41,7 +41,10 @@ function VersionStrip({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setDropdownOpen(false)
       }
     }
@@ -112,14 +115,16 @@ function VersionStrip({
     )
   }
 
-  const isActiveVersion = selectedVersion && model.activeVersionId === selectedVersion.id
-  const isLatestVersion = selectedVersion && selectedVersion.id === versions[versions.length - 1]?.id
+  const isActiveVersion =
+    selectedVersion && model.activeVersionId === selectedVersion.id
+  const isLatestVersion =
+    selectedVersion && selectedVersion.id === versions[versions.length - 1]?.id
 
   return (
     <div className="version-strip">
       {/* Version Dropdown */}
       <div className="version-dropdown-container" ref={dropdownRef}>
-        <button 
+        <button
           className="version-dropdown-trigger"
           onClick={() => setDropdownOpen(!dropdownOpen)}
         >
@@ -128,16 +133,22 @@ function VersionStrip({
               v{selectedVersion?.versionNumber || '?'}
             </span>
             <div className="version-dropdown-badges">
-              {isActiveVersion && <span className="version-badge active">Active</span>}
-              {isLatestVersion && <span className="version-badge latest">Latest</span>}
+              {isActiveVersion && (
+                <span className="version-badge active">Active</span>
+              )}
+              {isLatestVersion && (
+                <span className="version-badge latest">Latest</span>
+              )}
             </div>
           </div>
-          <i className={`pi ${dropdownOpen ? 'pi-chevron-up' : 'pi-chevron-down'}`} />
+          <i
+            className={`pi ${dropdownOpen ? 'pi-chevron-up' : 'pi-chevron-down'}`}
+          />
         </button>
 
         {dropdownOpen && (
           <div className="version-dropdown-menu">
-            {versions.map((version) => (
+            {versions.map(version => (
               <div
                 key={version.id}
                 className={`version-dropdown-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
@@ -147,12 +158,14 @@ function VersionStrip({
                   src={ApiClient.getVersionThumbnailUrl(version.id)}
                   alt={`v${version.versionNumber}`}
                   className="version-dropdown-thumb"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
+                  onError={e => {
+                    ;(e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
                 <div className="version-dropdown-item-info">
-                  <span className="version-dropdown-item-number">v{version.versionNumber}</span>
+                  <span className="version-dropdown-item-number">
+                    v{version.versionNumber}
+                  </span>
                   <div className="version-dropdown-item-badges">
                     {model.activeVersionId === version.id && (
                       <span className="version-badge active">Active</span>
@@ -162,14 +175,15 @@ function VersionStrip({
                     )}
                   </div>
                   <span className="version-dropdown-item-files">
-                    {version.files.length} file{version.files.length !== 1 ? 's' : ''}
+                    {version.files.length} file
+                    {version.files.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 {model.activeVersionId !== version.id && (
                   <Button
                     icon="pi pi-check-circle"
                     className="p-button-text p-button-sm version-set-active-btn"
-                    onClick={(e) => {
+                    onClick={e => {
                       e.stopPropagation()
                       onSetActiveVersion(version.id)
                     }}
@@ -192,32 +206,39 @@ function VersionStrip({
           {displayFiles.length === 0 ? (
             <div className="file-list-empty">No files</div>
           ) : (
-            displayFiles.map((file) => (
+            displayFiles.map(file => (
               <div
                 key={file.id}
                 className={`file-strip-card ${file.isRenderable ? 'renderable' : ''} ${file.id === defaultFileId ? 'selected' : ''}`}
                 onClick={() => handleFileSelect(file)}
               >
-                <img 
-                  src={getFileFormatIcon(file.fileType)} 
+                <img
+                  src={getFileFormatIcon(file.fileType)}
                   alt={file.fileType}
                   className="file-strip-icon-img"
                 />
                 <div className="file-strip-info">
-                  <span className="file-strip-name" title={file.originalFileName}>
-                    {file.originalFileName.length > 16 
+                  <span
+                    className="file-strip-name"
+                    title={file.originalFileName}
+                  >
+                    {file.originalFileName.length > 16
                       ? `${file.originalFileName.substring(0, 14)}...`
                       : file.originalFileName}
                   </span>
                   <div className="file-strip-meta">
-                    <span className="file-strip-format">{file.fileType.toUpperCase()}</span>
-                    <span className="file-strip-size">{formatFileSize(file.sizeBytes)}</span>
+                    <span className="file-strip-format">
+                      {file.fileType.toUpperCase()}
+                    </span>
+                    <span className="file-strip-size">
+                      {formatFileSize(file.sizeBytes)}
+                    </span>
                   </div>
                 </div>
                 <Button
                   icon="pi pi-download"
                   className="p-button-text p-button-sm file-download-btn"
-                  onClick={(e) => {
+                  onClick={e => {
                     e.stopPropagation()
                     handleDownloadFile(file)
                   }}
