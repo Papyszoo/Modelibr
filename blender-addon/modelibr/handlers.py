@@ -45,8 +45,15 @@ def handle_uri_on_startup():
             params = parse_modelibr_uri(arg)
             if params.get('model_id'):
                 # Schedule the operation to run after Blender is fully loaded
+                def safe_set_context():
+                    try:
+                        set_model_context_from_uri(params)
+                    except Exception as e:
+                        print(f"[Modelibr] Error setting model context: {e}")
+                    return None  # Return None to stop timer
+                
                 bpy.app.timers.register(
-                    lambda: set_model_context_from_uri(params),
+                    safe_set_context,
                     first_interval=0.5,
                 )
             break

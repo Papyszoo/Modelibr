@@ -11,6 +11,16 @@ public static class BlenderEndpoints
 
     private static IResult GetLaunchUri(int modelId, int? versionId = null)
     {
+        if (modelId <= 0)
+        {
+            return Results.BadRequest(new { error = "InvalidModelId", message = "Model ID must be a positive integer." });
+        }
+
+        if (versionId.HasValue && versionId.Value <= 0)
+        {
+            return Results.BadRequest(new { error = "InvalidVersionId", message = "Version ID must be a positive integer." });
+        }
+
         var uri = $"modelibr://open?modelId={modelId}";
         
         if (versionId.HasValue)

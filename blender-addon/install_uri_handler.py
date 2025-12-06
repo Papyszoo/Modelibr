@@ -22,15 +22,21 @@ import argparse
 
 def find_blender_path():
     """Attempt to find Blender installation path."""
+    import glob
     system = platform.system()
     
+    common_paths = []
+    
     if system == "Windows":
-        common_paths = [
-            os.path.expandvars(r"%ProgramFiles%\Blender Foundation\Blender 4.0\blender.exe"),
-            os.path.expandvars(r"%ProgramFiles%\Blender Foundation\Blender 4.1\blender.exe"),
-            os.path.expandvars(r"%ProgramFiles%\Blender Foundation\Blender 4.2\blender.exe"),
-            os.path.expandvars(r"%ProgramFiles%\Blender Foundation\Blender\blender.exe"),
-        ]
+        # Search for any Blender version in Program Files
+        program_files = os.path.expandvars(r"%ProgramFiles%\Blender Foundation")
+        if os.path.isdir(program_files):
+            pattern = os.path.join(program_files, "Blender*", "blender.exe")
+            found = glob.glob(pattern)
+            # Sort to get latest version first
+            common_paths.extend(sorted(found, reverse=True))
+        # Also check direct path
+        common_paths.append(os.path.expandvars(r"%ProgramFiles%\Blender Foundation\Blender\blender.exe"))
     elif system == "Darwin":  # macOS
         common_paths = [
             "/Applications/Blender.app/Contents/MacOS/Blender",
@@ -44,6 +50,9 @@ def find_blender_path():
             "/snap/bin/blender",
             "/opt/blender/blender",
         ]
+        # Search for versioned installations
+        opt_pattern = "/opt/blender*/blender"
+        common_paths.extend(sorted(glob.glob(opt_pattern), reverse=True))
     
     for path in common_paths:
         if os.path.isfile(path):

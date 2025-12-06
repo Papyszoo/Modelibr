@@ -16,6 +16,8 @@ class ModelibrApiClient:
     def __init__(self, server_url: str, api_key: str = ""):
         self.server_url = server_url.rstrip('/')
         self.api_key = api_key
+        self.read_timeout = 10  # Shorter timeout for read operations
+        self.upload_timeout = 300  # Longer timeout for uploads
 
     def _get_headers(self) -> dict:
         headers = {
@@ -26,16 +28,17 @@ class ModelibrApiClient:
         return headers
 
     def _make_request(self, method: str, endpoint: str, data: Optional[bytes] = None,
-                      content_type: Optional[str] = None) -> dict:
+                      content_type: Optional[str] = None, timeout: Optional[int] = None) -> dict:
         url = f"{self.server_url}{endpoint}"
         headers = self._get_headers()
         if content_type:
             headers["Content-Type"] = content_type
 
         req = request.Request(url, data=data, headers=headers, method=method)
+        request_timeout = timeout if timeout else self.read_timeout
 
         try:
-            with request.urlopen(req, timeout=30) as response:
+            with request.urlopen(req, timeout=request_timeout) as response:
                 response_data = response.read().decode('utf-8')
                 if response_data:
                     return json.loads(response_data)
@@ -95,7 +98,7 @@ class ModelibrApiClient:
         req = request.Request(url, data=body, headers=headers, method="POST")
 
         try:
-            with request.urlopen(req, timeout=300) as response:
+            with request.urlopen(req, timeout=self.upload_timeout) as response:
                 response_data = response.read().decode('utf-8')
                 if response_data:
                     return json.loads(response_data)

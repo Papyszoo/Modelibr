@@ -13,6 +13,11 @@ def get_api_client() -> ModelibrApiClient:
     return ModelibrApiClient(prefs.server_url, prefs.api_key)
 
 
+def sanitize_filename(name: str) -> str:
+    """Sanitize a name for use as a filename."""
+    return "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).strip()
+
+
 class MODELIBR_OT_refresh_models(Operator):
     bl_idname = "modelibr.refresh_models"
     bl_label = "Refresh Models"
@@ -132,10 +137,14 @@ class MODELIBR_OT_import_model(Operator):
                 elif ext == '.obj':
                     bpy.ops.wm.obj_import(filepath=file_path)
                 elif ext == '.blend':
+                    # Import from .blend with name conflict resolution
                     with bpy.data.libraries.load(file_path, link=False) as (data_from, data_to):
                         data_to.objects = data_from.objects
                     for obj in data_to.objects:
                         if obj is not None:
+                            # Handle name conflicts by letting Blender auto-rename
+                            if obj.name in context.collection.objects:
+                                obj.name = obj.name + ".imported"
                             context.collection.objects.link(obj)
                 else:
                     self.report({'ERROR'}, f"Unsupported file format: {ext}")
@@ -219,7 +228,7 @@ class MODELIBR_OT_upload_version(Operator):
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Export model
                 model_name = props.current_model_name or "model"
-                safe_name = "".join(c for c in model_name if c.isalnum() or c in (' ', '-', '_')).strip()
+                safe_name = sanitize_filename(model_name)
 
                 if self.export_format == 'GLB':
                     export_path = os.path.join(temp_dir, f"{safe_name}.glb")
@@ -323,7 +332,7 @@ class MODELIBR_OT_upload_new_model(Operator):
             client = get_api_client()
 
             with tempfile.TemporaryDirectory() as temp_dir:
-                safe_name = "".join(c for c in self.model_name if c.isalnum() or c in (' ', '-', '_')).strip()
+                safe_name = sanitize_filename(self.model_name)
 
                 if self.export_format == 'GLB':
                     export_path = os.path.join(temp_dir, f"{safe_name}.glb")
