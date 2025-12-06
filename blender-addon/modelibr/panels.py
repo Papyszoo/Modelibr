@@ -13,10 +13,6 @@ class MODELIBR_PT_main_panel(Panel):
         layout = self.layout
         props = context.scene.modelibr
 
-        # Open Browser button (prominent)
-        layout.operator("modelibr.open_browser", text="Open Browser Window", icon='FILEBROWSER')
-        layout.separator()
-
         # Current model context
         if props.current_model_id > 0:
             box = layout.box()
@@ -134,41 +130,8 @@ class MODELIBR_UL_model_list(bpy.types.UIList):
             layout.label(text=item.name, icon='MESH_DATA')
 
 
-class MODELIBR_UL_version_list(bpy.types.UIList):
-    bl_idname = "MODELIBR_UL_version_list"
-
-    def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
-        if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            row = layout.row(align=True)
-            row.label(text=f"Version {item.version_number}", icon='SEQUENCE')
-            if item.is_active:
-                row.label(text="", icon='CHECKMARK')
-            row.label(text=f"({len(item.files)} files)")
-        elif self.layout_type == 'GRID':
-            layout.alignment = 'CENTER'
-            layout.label(text=f"v{item.version_number}", icon='SEQUENCE')
-
-
-# Menu entry for opening the browser
-class MODELIBR_MT_editor_menus(bpy.types.Menu):
-    bl_label = "Modelibr Browser"
-    bl_idname = "MODELIBR_MT_editor_menus"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.operator("modelibr.open_browser", text="Open Browser", icon='FILEBROWSER')
-
-
-def draw_modelibr_menu(self, context):
-    """Draw Modelibr in the Editor Type menu"""
-    self.layout.separator()
-    self.layout.operator("modelibr.open_browser", text="Modelibr Browser", icon='FILEBROWSER')
-
-
 classes = [
     MODELIBR_UL_model_list,
-    MODELIBR_UL_version_list,
-    MODELIBR_MT_editor_menus,
     MODELIBR_PT_main_panel,
     MODELIBR_PT_browse_panel,
     MODELIBR_PT_upload_panel,
@@ -178,14 +141,8 @@ classes = [
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    
-    # Add to Window menu
-    bpy.types.TOPBAR_MT_window.append(draw_modelibr_menu)
 
 
 def unregister():
-    # Remove from Window menu
-    bpy.types.TOPBAR_MT_window.remove(draw_modelibr_menu)
-    
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
