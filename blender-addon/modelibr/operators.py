@@ -527,56 +527,6 @@ class MODELIBR_OT_clear_model_context(Operator):
         return {'FINISHED'}
 
 
-class MODELIBR_OT_refresh_versions(Operator):
-    bl_idname = "modelibr.refresh_versions"
-    bl_label = "Refresh Versions"
-    bl_description = "Refresh the version list for the current model"
-
-    def execute(self, context):
-        props = context.scene.modelibr
-        
-        if props.current_model_id <= 0:
-            self.report({'ERROR'}, "No model context set")
-            return {'CANCELLED'}
-        
-        props.is_loading = True
-        props.error_message = ""
-
-        try:
-            client = get_api_client()
-            versions = client.get_model_versions(props.current_model_id)
-
-            props.versions.clear()
-            for version_data in versions:
-                item = props.versions.add()
-                item.id = version_data.get('id', 0)
-                item.version_number = version_data.get('versionNumber', 0)
-                item.description = version_data.get('description', '')
-                item.is_active = version_data.get('isActive', False)
-                item.created_at = version_data.get('createdAt', '')
-                
-                # Add files
-                files = version_data.get('files', [])
-                for file_data in files:
-                    file_item = item.files.add()
-                    file_item.id = file_data.get('id', 0)
-                    file_item.original_filename = file_data.get('originalFileName', '')
-                    file_item.file_type = file_data.get('fileType', '')
-                    file_item.size_bytes = file_data.get('sizeBytes', 0)
-                    file_item.is_renderable = file_data.get('isRenderable', False)
-
-            self.report({'INFO'}, f"Loaded {len(versions)} versions")
-
-        except ApiError as e:
-            props.error_message = str(e)
-            self.report({'ERROR'}, str(e))
-
-        finally:
-            props.is_loading = False
-
-        return {'FINISHED'}
-
-
 classes = [
     MODELIBR_OT_refresh_models,
     MODELIBR_OT_import_model,
@@ -584,7 +534,6 @@ classes = [
     MODELIBR_OT_upload_new_model,
     MODELIBR_OT_test_connection,
     MODELIBR_OT_clear_model_context,
-    MODELIBR_OT_refresh_versions,
 ]
 
 
