@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Modelibr",
-    "author": "Modelibr",
+    "author": "Patryk Kowalczyk",
     "version": (1, 0, 0),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > Modelibr",

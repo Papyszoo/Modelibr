@@ -9,7 +9,7 @@ class ModelibrPreferences(AddonPreferences):
     server_url: StringProperty(
         name="Server URL",
         description="URL of your Modelibr server",
-        default="http://localhost:5009",
+        default="http://localhost:8080",
     )
 
     api_key: StringProperty(

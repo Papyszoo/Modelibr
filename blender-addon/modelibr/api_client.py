@@ -141,12 +141,14 @@ class ModelibrApiClient:
 
     def create_version(self, model_id: int, file_path: str, 
                        description: str = "", set_as_active: bool = True) -> dict:
+        # Add setAsActive as query parameter (must be in query string, not form data)
+        query_params = parse.urlencode({"setAsActive": str(set_as_active).lower()})
+        endpoint = f"/models/{model_id}/versions?{query_params}"
         return self._upload_file(
-            f"/models/{model_id}/versions",
+            endpoint,
             file_path,
             {
                 "description": description,
-                "setAsActive": "true" if set_as_active else "false",
             }
         )
 
