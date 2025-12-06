@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
 import { DockProvider } from '../../contexts/DockContext'
@@ -6,6 +6,7 @@ import DockPanel from './DockPanel'
 import { Tab, SplitterEvent } from '../../types'
 import {
   parseCompactTabFormat,
+  parseCompactTabFormatAsync,
   serializeToCompactFormat,
 } from '../../utils/tabSerialization'
 import { usePanelStore } from '../../stores/panelStore'
@@ -71,6 +72,68 @@ function SplitterLayout(): JSX.Element {
     parse: value => value || '',
     serialize: value => value,
   })
+
+  // Track URL parameter values for label updates
+  const leftTabsUrl = useRef<string>('')
+  const rightTabsUrl = useRef<string>('')
+  const leftLabelsUpdated = useRef<Set<string>>(new Set())
+  const rightLabelsUpdated = useRef<Set<string>>(new Set())
+
+  // Update tab labels with actual names from database
+  const updateTabLabels = useCallback(
+    async (
+      tabs: Tab[],
+      setTabs: (tabs: Tab[]) => void,
+      labelsUpdated: React.MutableRefObject<Set<string>>
+    ) => {
+      const tabsStr = serializeToCompactFormat(tabs)
+      if (!tabsStr) return
+
+      // Check which tabs need label updates
+      const tabsNeedingUpdate = tabs.filter(
+        tab => !labelsUpdated.current.has(tab.id)
+      )
+      if (tabsNeedingUpdate.length === 0) return
+
+      try {
+        const updatedTabs = await parseCompactTabFormatAsync(tabsStr, tabs)
+        // Mark all tabs as updated
+        updatedTabs.forEach(tab => labelsUpdated.current.add(tab.id))
+        // Only update if labels changed
+        const hasChanges = updatedTabs.some(
+          (tab, idx) => tab.label !== tabs[idx]?.label
+        )
+        if (hasChanges) {
+          setTabs(updatedTabs)
+        }
+      } catch {
+        // Keep existing tabs if async fetch fails
+      }
+    },
+    []
+  )
+
+  // Effect to update left tabs labels when tabs change
+  useEffect(() => {
+    const currentStr = serializeToCompactFormat(leftTabs)
+    if (currentStr !== leftTabsUrl.current) {
+      leftTabsUrl.current = currentStr
+      // Reset labels updated set when tabs change (new tabs added)
+      leftLabelsUpdated.current = new Set()
+    }
+    updateTabLabels(leftTabs, setLeftTabs, leftLabelsUpdated)
+  }, [leftTabs, setLeftTabs, updateTabLabels])
+
+  // Effect to update right tabs labels when tabs change
+  useEffect(() => {
+    const currentStr = serializeToCompactFormat(rightTabs)
+    if (currentStr !== rightTabsUrl.current) {
+      rightTabsUrl.current = currentStr
+      // Reset labels updated set when tabs change (new tabs added)
+      rightLabelsUpdated.current = new Set()
+    }
+    updateTabLabels(rightTabs, setRightTabs, rightLabelsUpdated)
+  }, [rightTabs, setRightTabs, updateTabLabels])
 
   const handleSplitterResize = (event: SplitterEvent): void => {
     const leftSize = Math.round(event.sizes[0])
