@@ -79,6 +79,13 @@ class ModelibrSceneProperties(PropertyGroup):
         default="",
     )
 
+    versions: CollectionProperty(type=ModelibrVersionItem)
+
+    active_version_index: IntProperty(
+        name="Active Version Index",
+        default=0,
+    )
+
 
 def register():
     bpy.utils.register_class(ModelibrFileItem)
