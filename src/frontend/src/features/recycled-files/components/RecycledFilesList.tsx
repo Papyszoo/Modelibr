@@ -399,7 +399,20 @@ export default function RecycledFilesList() {
                 {modelVersions.map(version => (
                   <div key={version.id} className="recycled-card">
                     <div className="recycled-card-thumbnail">
-                      <div className="version-placeholder">
+                      <img
+                        src={ApiClient.getVersionThumbnailUrl(version.id)}
+                        alt={`Version ${version.versionNumber}`}
+                        className="recycled-card-image"
+                        onError={e => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const placeholder = target.nextElementSibling as HTMLElement
+                          if (placeholder) {
+                            placeholder.style.display = 'flex'
+                          }
+                        }}
+                      />
+                      <div className="version-placeholder" style={{ display: 'none' }}>
                         <i className="pi pi-clone" />
                         <span className="version-number">
                           v{version.versionNumber}
