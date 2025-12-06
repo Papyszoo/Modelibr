@@ -29,7 +29,7 @@ export default function DockContentArea({
       activeTab={activeTab}
       setActiveTab={setActiveTab}
     >
-      <TabContent tab={activeTabData} />
+      <TabContent key={activeTabData.id} tab={activeTabData} />
     </TabProvider>
   )
 }
