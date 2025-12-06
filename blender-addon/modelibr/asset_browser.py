@@ -163,9 +163,11 @@ class AssetLibraryHandler:
                 AssetLibraryHandler.mark_object_as_asset(obj, model_data, version_data)
             
             # Download thumbnail
+            # Note: Animated WebP thumbnails will display as static (first frame) in Blender's Asset Browser
             try:
                 thumbnail_path = AssetLibraryHandler.get_thumbnail_path(model_id)
-                client.download_thumbnail(model_id, str(thumbnail_path.parent))
+                client.download_thumbnail(model_id, str(thumbnail_path.parent), filename="thumbnail.webp")
+                print(f"[Modelibr] Thumbnail downloaded to: {thumbnail_path}")
             except Exception as e:
                 print(f"[Modelibr] Warning: Could not download thumbnail: {e}")
             
@@ -246,6 +248,13 @@ class AssetLibraryHandler:
     def sync_assets_from_api(client, progress_callback=None) -> tuple[bool, str, int]:
         """
         Sync models from the Modelibr API to local asset library.
+        
+        IMPORTANT: This operation downloads ALL model files from the server and creates
+        local .blend assets. This is designed for offline access but requires disk space
+        for each model. For large collections, consider:
+        - Syncing selectively (future enhancement)
+        - Using the sidebar workflow which downloads models on-demand
+        - Implementing lazy loading with placeholder assets (future enhancement)
         
         Args:
             client: ModelibrApiClient instance

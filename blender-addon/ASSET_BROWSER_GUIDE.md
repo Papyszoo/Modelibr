@@ -296,22 +296,52 @@ Debug format: `[Modelibr] <message>`
 
 ## Performance Considerations
 
+### Sync Behavior and Strategy
+
+**Current Implementation:**
+The "Sync Assets from Server" operation downloads ALL model files immediately:
+- Downloads each model file to temporary storage
+- Creates a .blend asset file for each model
+- Stores assets in the local asset library
+- Downloads thumbnails for each model
+
+**Storage Impact:**
+- Each synced model: ~1-10 MB (typical) for the .blend file
+- Thumbnails: ~50-200 KB each (WebP format)
+- Total storage scales linearly with number of models
+- Large collections (100+ models) can use 1-5 GB of disk space
+
+**Considerations for Large Collections:**
+If you plan to have a huge collection of files and don't want to download them all:
+1. **Use Sidebar Workflow**: The traditional sidebar (View3D > Sidebar > Modelibr) downloads models on-demand when you import them
+2. **Selective Sync** (future): We plan to add options to sync only specific models or categories
+3. **Lazy Loading** (future): Placeholder assets that download on first use
+
+**Alternative Workflow:**
+For large collections, consider using the sidebar instead of Asset Browser:
+- Models listed without downloading
+- Files downloaded only when imported
+- Search and filter before downloading
+- More suitable for large libraries (1000+ models)
+
 ### Sync Performance
 - Downloads files sequentially to avoid server overload
 - Creates assets in background
 - Progress reporting for user feedback
-- Recommended: Sync during downtime
+- Recommended: Sync during downtime or off-hours
+- Consider network bandwidth for large collections
 
 ### Asset Loading
-- .blend files are lightweight
+- .blend files are lightweight once created
 - Assets load on-demand (Blender's standard behavior)
 - Thumbnails cached by Blender
-- No performance impact on normal Blender usage
+- No performance impact on normal Blender usage after sync
 
-### Storage Requirements
-- Each model version: ~1-10 MB (typical)
-- Thumbnails: ~50-200 KB each
-- Total storage scales with number of models
+### Thumbnail Handling
+- Thumbnails downloaded as WebP images
+- Animated WebP thumbnails display as static (first frame only) in Blender
+- Blender's Asset Browser does not support animated previews
+- Thumbnails cached by Blender for fast browsing
 
 ## Testing Checklist
 

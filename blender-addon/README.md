@@ -91,6 +91,11 @@ The Asset Browser panels provide:
 -   **Asset Details** - View model context and version information
 -   **Quick Help** - Usage instructions
 
+**Important Notes:**
+-   **Sync Downloads All Files**: The "Sync Assets from Server" operation downloads all model files and creates local .blend assets. This is by design for offline access. For large collections, consider syncing selectively or using the sidebar workflow which downloads models on-demand.
+-   **Thumbnails**: Thumbnails are downloaded as WebP images. If your server provides animated WebP thumbnails, Blender will display only the first frame as static previews.
+-   **Storage**: Each synced model requires disk space for both the .blend asset file and the original model file during processing.
+
 ### Using the Sidebar (Legacy)
 
 The traditional sidebar interface is still available:
