@@ -68,6 +68,12 @@ class ModelibrApiClient:
 
     def _upload_file(self, endpoint: str, file_path: str, 
                      additional_fields: Optional[dict] = None) -> dict:
+        # Verify file exists before attempting upload
+        if not os.path.exists(file_path):
+            raise ApiError(f"File not found: {file_path}")
+        if os.path.getsize(file_path) <= 0:
+            raise ApiError(f"File is empty: {file_path}")
+        
         boundary = '----WebKitFormBoundary' + os.urandom(16).hex()
         headers = self._get_headers()
         headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"

@@ -6,6 +6,7 @@ from bpy.props import StringProperty, IntProperty, BoolProperty, EnumProperty
 
 from .api_client import ModelibrApiClient, ApiError
 from .preferences import get_preferences
+import datetime
 
 
 def get_api_client() -> ModelibrApiClient:
@@ -16,7 +17,36 @@ def get_api_client() -> ModelibrApiClient:
 def sanitize_filename(name: str) -> str:
     """Sanitize a name for use as a filename."""
     return "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).strip()
+ 
 
+def _debug_log(message: str) -> None:
+    """Append debug messages to a file in the OS temp directory so they are available
+    even when Blender's console is not visible."""
+    try:
+        log_path = os.path.join(tempfile.gettempdir(), "modelibr_debug.log")
+        timestamp = datetime.datetime.utcnow().isoformat()
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"{timestamp} {message}\n")
+    except Exception:
+        # Never raise from logging to avoid interfering with the operator
+        pass
+
+
+def _extract_id(d: dict, keys=('id', 'versionId', 'version_id', 'modelId', 'model_id')) -> int:
+    """Extract an integer id from a response dict using multiple possible keys."""
+    if not isinstance(d, dict):
+        return 0
+    for k in keys:
+        v = d.get(k)
+        try:
+            if v is None:
+                continue
+            iv = int(v)
+            if iv > 0:
+                return iv
+        except Exception:
+            continue
+    return 0
 
 class MODELIBR_OT_refresh_models(Operator):
     bl_idname = "modelibr.refresh_models"
@@ -207,6 +237,12 @@ class MODELIBR_OT_upload_version(Operator):
         self.export_format = prefs.default_export_format
         self.include_blend = prefs.always_include_blend
 
+        # Debug: record preference and initial state
+        try:
+            _debug_log(f"invoke upload_version: always_include_blend={prefs.always_include_blend}, include_blend={self.include_blend}, current_model_id={props.current_model_id}")
+        except Exception:
+            pass
+
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -221,6 +257,12 @@ class MODELIBR_OT_upload_version(Operator):
 
     def execute(self, context):
         props = context.scene.modelibr
+
+        # Debug: entry to execute
+        try:
+            _debug_log(f"execute upload_version start: include_blend={self.include_blend}, current_model_id={props.current_model_id}")
+        except Exception:
+            pass
 
         try:
             client = get_api_client()
@@ -237,32 +279,67 @@ class MODELIBR_OT_upload_version(Operator):
                         export_format='GLB',
                         use_selection=False,
                     )
+                    _debug_log(f"Exported GLB to: {export_path}")
                 elif self.export_format == 'FBX':
                     export_path = os.path.join(temp_dir, f"{safe_name}.fbx")
                     bpy.ops.export_scene.fbx(filepath=export_path)
+                    _debug_log(f"Exported FBX to: {export_path}")
                 elif self.export_format == 'OBJ':
                     export_path = os.path.join(temp_dir, f"{safe_name}.obj")
                     bpy.ops.wm.obj_export(filepath=export_path)
+                    _debug_log(f"Exported OBJ to: {export_path}")
 
                 # Create version with main file
-                result = client.create_version(
-                    props.current_model_id,
-                    export_path,
-                    self.description,
-                    self.set_as_active,
-                )
+                try:
+                    _debug_log(f"Calling create_version with file: {export_path}")
+                    result = client.create_version(
+                        props.current_model_id,
+                        export_path,
+                        self.description,
+                        self.set_as_active,
+                    )
+                    _debug_log(f"create_version result: {result}")
+                except Exception as e:
+                    _debug_log(f"create_version raised: {str(e)}")
+                    raise
 
-                version_id = result.get('id', 0)
+                version_id = _extract_id(result, keys=('id', 'versionId', 'version_id'))
+                _debug_log(f"version_id after create_version: {version_id} (raw result keys: {list(result.keys())})")
 
                 # Upload .blend file if requested
                 if self.include_blend and version_id > 0:
                     blend_path = os.path.join(temp_dir, f"{safe_name}.blend")
-                    bpy.ops.wm.save_as_mainfile(filepath=blend_path, copy=True)
-                    client.add_file_to_version(
-                        props.current_model_id,
-                        version_id,
-                        blend_path
-                    )
+                    try:
+                        _debug_log(f"Saving blend file to: {blend_path}")
+                        # Save the blend file
+                        result = bpy.ops.wm.save_as_mainfile(filepath=blend_path, copy=True)
+                        _debug_log(f"Blend save result: {result}")
+
+                        # Check if operation succeeded (result is a set containing 'FINISHED')
+                        if 'FINISHED' in result:
+                            exists = os.path.exists(blend_path)
+                            _debug_log(f"Checking file existence: {exists}")
+                            # Verify file was created and has content
+                            if exists and os.path.getsize(blend_path) > 0:
+                                file_size = os.path.getsize(blend_path)
+                                _debug_log(f"Blend file created successfully ({file_size} bytes). Uploading...")
+                                client.add_file_to_version(
+                                    props.current_model_id,
+                                    version_id,
+                                    blend_path
+                                )
+                                _debug_log("Blend file uploaded successfully")
+                            else:
+                                _debug_log(f"Blend file does not exist or is empty at {blend_path}")
+                                self.report({'WARNING'}, "Blend file could not be saved")
+                        else:
+                            _debug_log("Blend save operation failed or was cancelled")
+                            self.report({'WARNING'}, "Blend file save operation was cancelled or failed")
+                    except Exception as e:
+                        _debug_log(f"Exception during blend file upload: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
+                        self.report({'WARNING'}, f"Could not include blend file: {str(e)}")
 
                 # Update current version
                 if version_id > 0:
@@ -272,6 +349,7 @@ class MODELIBR_OT_upload_version(Operator):
                 return {'FINISHED'}
 
         except ApiError as e:
+            _debug_log(f"ApiError in upload_version: {str(e)}")
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
 
@@ -313,7 +391,14 @@ class MODELIBR_OT_upload_new_model(Operator):
         if blend_name:
             self.model_name = os.path.splitext(blend_name)[0]
 
+        # Debug: record preference and initial state for new model upload
+        try:
+            _debug_log(f"invoke upload_new_model: always_include_blend={prefs.always_include_blend}, include_blend={self.include_blend}, blend_name={blend_name}")
+        except Exception:
+            pass
+
         return context.window_manager.invoke_props_dialog(self)
+
 
     def draw(self, context):
         layout = self.layout
@@ -327,6 +412,12 @@ class MODELIBR_OT_upload_new_model(Operator):
             return {'CANCELLED'}
 
         props = context.scene.modelibr
+
+        # Debug: entry to execute for new model upload
+        try:
+            _debug_log(f"execute upload_new_model start: include_blend={self.include_blend}, model_name={self.model_name}")
+        except Exception:
+            pass
 
         try:
             client = get_api_client()
@@ -349,18 +440,51 @@ class MODELIBR_OT_upload_new_model(Operator):
                     bpy.ops.wm.obj_export(filepath=export_path)
 
                 # Create new model
-                result = client.create_model(export_path)
-                model_id = result.get('id', 0)
+                try:
+                    _debug_log(f"Calling create_model with file: {export_path}")
+                    result = client.create_model(export_path)
+                    _debug_log(f"create_model result: {result}")
+                except Exception as e:
+                    _debug_log(f"create_model raised: {str(e)}")
+                    raise
+
+                model_id = _extract_id(result, keys=('id', 'modelId', 'model_id'))
+                _debug_log(f"model_id after create_model: {model_id} (raw result keys: {list(result.keys())})")
 
                 # Upload .blend file if requested
                 if self.include_blend and model_id > 0:
                     versions = client.get_model_versions(model_id)
                     if versions:
-                        version_id = versions[-1].get('id', 0)
+                        version_id = _extract_id(versions[-1], keys=('id', 'versionId', 'version_id'))
                         if version_id > 0:
                             blend_path = os.path.join(temp_dir, f"{safe_name}.blend")
-                            bpy.ops.wm.save_as_mainfile(filepath=blend_path, copy=True)
-                            client.add_file_to_version(model_id, version_id, blend_path)
+                            try:
+                                _debug_log(f"Saving blend file to: {blend_path}")
+                                # Save the blend file
+                                result = bpy.ops.wm.save_as_mainfile(filepath=blend_path, copy=True)
+                                _debug_log(f"Blend save result: {result}")
+                                
+                                # Check if operation succeeded (result is a set containing 'FINISHED')
+                                if 'FINISHED' in result:
+                                    exists = os.path.exists(blend_path)
+                                    _debug_log(f"Checking file existence: {exists}")
+                                    # Verify file was created and has content
+                                    if exists and os.path.getsize(blend_path) > 0:
+                                        file_size = os.path.getsize(blend_path)
+                                        _debug_log(f"Blend file created successfully ({file_size} bytes). Uploading...")
+                                        client.add_file_to_version(model_id, version_id, blend_path)
+                                        _debug_log("Blend file uploaded successfully")
+                                    else:
+                                        _debug_log(f"Blend file does not exist or is empty at {blend_path}")
+                                        self.report({'WARNING'}, "Blend file could not be saved")
+                                else:
+                                    _debug_log("Blend save operation failed or was cancelled")
+                                    self.report({'WARNING'}, "Blend file save operation was cancelled or failed")
+                            except Exception as e:
+                                _debug_log(f"Exception during blend file upload: {str(e)}")
+                                import traceback
+                                traceback.print_exc()
+                                self.report({'WARNING'}, f"Could not include blend file: {str(e)}")
 
                 # Set as current model
                 if model_id > 0:
