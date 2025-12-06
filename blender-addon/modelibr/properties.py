@@ -35,6 +35,46 @@ class ModelibrModelItem(PropertyGroup):
     description: StringProperty(name="Description")
 
 
+class ModelibrAssetMetadata(PropertyGroup):
+    """Metadata stored on asset datablocks for asset browser integration"""
+    model_id: IntProperty(
+        name="Model ID",
+        description="Modelibr model ID",
+        default=0,
+    )
+    
+    version_id: IntProperty(
+        name="Version ID", 
+        description="Modelibr version ID",
+        default=0,
+    )
+    
+    version_number: IntProperty(
+        name="Version Number",
+        description="Version number",
+        default=1,
+    )
+    
+    asset_type: EnumProperty(
+        name="Asset Type",
+        description="Type of asset",
+        items=[
+            ('MODEL', 'Model', 'A 3D model asset'),
+            ('TEXTURE', 'Texture', 'A texture asset (future)'),
+            ('RIG', 'Rig', 'A rigging asset (future)'),
+            ('ANIMATION', 'Animation', 'An animation asset (future)'),
+            ('SCENE', 'Scene', 'A scene asset with model references (future)'),
+        ],
+        default='MODEL',
+    )
+    
+    referenced_models: StringProperty(
+        name="Referenced Models",
+        description="JSON list of referenced model IDs (for SCENE type)",
+        default="[]",
+    )
+
+
 class ModelibrSceneProperties(PropertyGroup):
     current_model_id: IntProperty(
         name="Current Model ID",
@@ -84,6 +124,7 @@ def register():
     bpy.utils.register_class(ModelibrFileItem)
     bpy.utils.register_class(ModelibrVersionItem)
     bpy.utils.register_class(ModelibrModelItem)
+    bpy.utils.register_class(ModelibrAssetMetadata)
     bpy.utils.register_class(ModelibrSceneProperties)
     bpy.types.Scene.modelibr = bpy.props.PointerProperty(type=ModelibrSceneProperties)
 
@@ -91,6 +132,7 @@ def register():
 def unregister():
     del bpy.types.Scene.modelibr
     bpy.utils.unregister_class(ModelibrSceneProperties)
+    bpy.utils.unregister_class(ModelibrAssetMetadata)
     bpy.utils.unregister_class(ModelibrModelItem)
     bpy.utils.unregister_class(ModelibrVersionItem)
     bpy.utils.unregister_class(ModelibrFileItem)
