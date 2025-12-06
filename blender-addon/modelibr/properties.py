@@ -79,6 +79,30 @@ class ModelibrSceneProperties(PropertyGroup):
         default="",
     )
 
+    browser_tab: EnumProperty(
+        name="Browser Tab",
+        description="Active tab in the browser",
+        items=[
+            ('BROWSE', "Browse", "Browse available models", 'FILEBROWSER', 0),
+            ('VERSIONS', "Versions", "View model versions", 'SEQUENCE', 1),
+            ('UPLOAD', "Upload", "Upload models", 'EXPORT', 2),
+        ],
+        default='BROWSE',
+    )
+
+    show_thumbnails: BoolProperty(
+        name="Show Thumbnails",
+        description="Show thumbnail previews for models",
+        default=True,
+    )
+
+    versions: CollectionProperty(type=ModelibrVersionItem)
+
+    active_version_index: IntProperty(
+        name="Active Version Index",
+        default=0,
+    )
+
 
 def register():
     bpy.utils.register_class(ModelibrFileItem)
