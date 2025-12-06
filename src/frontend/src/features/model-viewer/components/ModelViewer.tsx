@@ -512,6 +512,22 @@ function ModelViewer({
                 position: buttonPosition === 'left' ? 'right' : 'left',
               }}
             />
+            <Button
+              icon="pi pi-box"
+              className="p-button-rounded viewer-control-btn"
+              onClick={() => {
+                if (model?.id) {
+                  const versionParam = selectedVersion?.id
+                    ? `&versionId=${selectedVersion.id}`
+                    : ''
+                  window.location.href = `modelibr://open?modelId=${model.id}${versionParam}`
+                }
+              }}
+              tooltip="Open in Blender"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+            />
           </div>
 
           {error ? (
