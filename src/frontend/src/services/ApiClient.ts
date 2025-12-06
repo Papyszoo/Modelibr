@@ -1094,6 +1094,10 @@ class ApiClient {
         useApiCacheStore.getState().invalidateModels()
         useApiCacheStore.getState().invalidateModelById(entityId.toString())
         break
+      case 'modelversion':
+        // Invalidate models cache as version restoration affects model data
+        useApiCacheStore.getState().invalidateModels()
+        break
       case 'textureset':
         useApiCacheStore.getState().invalidateTextureSets()
         useApiCacheStore.getState().invalidateTextureSetById(entityId)
