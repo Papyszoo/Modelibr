@@ -1134,6 +1134,16 @@ class ApiClient {
     useApiCacheStore.getState().invalidateModelById(modelId.toString())
   }
 
+  async softDeleteModelVersion(
+    modelId: number,
+    versionId: number
+  ): Promise<void> {
+    await this.client.delete(`/models/${modelId}/versions/${versionId}`)
+
+    // Invalidate cache on successful soft delete
+    useApiCacheStore.getState().invalidateModelById(modelId.toString())
+  }
+
   async softDeleteTextureSet(textureSetId: number): Promise<void> {
     await this.client.delete(`/texture-sets/${textureSetId}`)
 

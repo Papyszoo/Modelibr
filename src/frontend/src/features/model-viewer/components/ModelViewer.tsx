@@ -274,6 +274,33 @@ function ModelViewer({
     }
   }
 
+  const handleRecycleVersion = async (versionId: number) => {
+    if (!model) return
+    try {
+      await ApiClient.softDeleteModelVersion(parseInt(model.id), versionId)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Model version recycled successfully',
+        life: 3000,
+      })
+      // Reload versions to update list
+      await loadVersions()
+      // Refresh model data in case active version changed
+      if (modelId) {
+        await fetchModel(modelId, true) // Skip cache to get fresh data
+      }
+    } catch (error) {
+      console.error('Failed to recycle version:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to recycle model version',
+        life: 3000,
+      })
+    }
+  }
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -442,6 +469,7 @@ function ModelViewer({
           selectedVersion={selectedVersion}
           onVersionSelect={handleVersionSelect}
           onSetActiveVersion={handleSetActiveVersion}
+          onRecycleVersion={handleRecycleVersion}
           defaultFileId={defaultFileId}
           onDefaultFileChange={handleDefaultFileChange}
         />
@@ -602,6 +630,7 @@ function ModelViewer({
           onVersionSelect={handleVersionSelect}
           onDefaultFileChange={handleDefaultFileChange}
           onModelUpdate={handleModelUpdated}
+          onRecycleVersion={handleRecycleVersion}
         />
       </ModelProvider>
 
