@@ -135,6 +135,7 @@ class AssetLibraryHandler:
             elif ext == '.fbx':
                 bpy.ops.import_scene.fbx(filepath=file_path)
             elif ext == '.obj':
+                # Blender 4.0+ uses wm.obj_import
                 bpy.ops.wm.obj_import(filepath=file_path)
             elif ext == '.blend':
                 # Import from blend file
@@ -183,22 +184,30 @@ class AssetLibraryHandler:
     @staticmethod
     def mark_object_as_asset(obj, model_data: dict, version_data: dict):
         """Mark a Blender object as an asset with Modelibr metadata."""
-        # Mark as asset (Blender 4.0+ API)
-        obj.asset_mark()
+        try:
+            # Mark as asset (Blender 3.0+ API)
+            if hasattr(obj, 'asset_mark'):
+                obj.asset_mark()
+            else:
+                print("[Modelibr] Warning: asset_mark() not available in this Blender version")
+                return
+            
+            # Set basic asset metadata
+            if hasattr(obj, 'asset_data'):
+                asset_data = obj.asset_data
+                asset_data.description = model_data.get('description', '')
+                
+                # Add tags
+                tags = model_data.get('tags', '')
+                if tags:
+                    for tag in tags.split(','):
+                        tag = tag.strip()
+                        if tag and hasattr(asset_data, 'tags'):
+                            asset_data.tags.new(tag)
+        except Exception as e:
+            print(f"[Modelibr] Warning: Could not set asset metadata: {e}")
         
-        # Set basic asset metadata
-        asset_data = obj.asset_data
-        asset_data.description = model_data.get('description', '')
-        
-        # Add tags
-        tags = model_data.get('tags', '')
-        if tags:
-            for tag in tags.split(','):
-                tag = tag.strip()
-                if tag:
-                    asset_data.tags.new(tag)
-        
-        # Store Modelibr-specific metadata as custom properties
+        # Store Modelibr-specific metadata as custom properties (always works)
         obj["modelibr_model_id"] = model_data.get('id', 0)
         obj["modelibr_version_id"] = version_data.get('id', 0)
         obj["modelibr_version_number"] = version_data.get('versionNumber', 1)

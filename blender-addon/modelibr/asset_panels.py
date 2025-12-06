@@ -20,10 +20,14 @@ class ASSETBROWSER_PT_modelibr_tools(Panel):
     @classmethod
     def poll(cls, context):
         # Only show in asset browser context
-        return (
-            context.space_data.browse_mode == 'ASSETS' and
-            hasattr(context, 'asset_library_reference')
-        )
+        try:
+            return (
+                hasattr(context, 'space_data') and
+                hasattr(context.space_data, 'browse_mode') and
+                context.space_data.browse_mode == 'ASSETS'
+            )
+        except (AttributeError, TypeError):
+            return False
     
     def draw(self, context):
         layout = self.layout
@@ -76,10 +80,14 @@ class ASSETBROWSER_PT_modelibr_details(Panel):
     @classmethod
     def poll(cls, context):
         # Only show in asset browser context
-        return (
-            context.space_data.browse_mode == 'ASSETS' and
-            hasattr(context, 'asset_library_reference')
-        )
+        try:
+            return (
+                hasattr(context, 'space_data') and
+                hasattr(context.space_data, 'browse_mode') and
+                context.space_data.browse_mode == 'ASSETS'
+            )
+        except (AttributeError, TypeError):
+            return False
     
     def draw(self, context):
         layout = self.layout
@@ -123,10 +131,14 @@ class ASSETBROWSER_PT_modelibr_info(Panel):
     
     @classmethod
     def poll(cls, context):
-        return (
-            context.space_data.browse_mode == 'ASSETS' and
-            hasattr(context, 'asset_library_reference')
-        )
+        try:
+            return (
+                hasattr(context, 'space_data') and
+                hasattr(context.space_data, 'browse_mode') and
+                context.space_data.browse_mode == 'ASSETS'
+            )
+        except (AttributeError, TypeError):
+            return False
     
     def draw(self, context):
         layout = self.layout

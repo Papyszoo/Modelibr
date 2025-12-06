@@ -36,7 +36,7 @@ def register():
         try:
             AssetLibraryHandler.register_asset_library()
             print("[Modelibr] Asset library auto-registered")
-        except Exception as e:
+        except (OSError, PermissionError, RuntimeError) as e:
             print(f"[Modelibr] Could not auto-register asset library: {e}")
 
 
