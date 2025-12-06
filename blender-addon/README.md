@@ -4,10 +4,14 @@ A Blender addon that integrates with the self-hosted Modelibr application, enabl
 
 ## Features
 
--   **Model Browser Panel** - Browse and search models from your Modelibr server with thumbnails
+-   **Window-Based Browser** - Dedicated browser window interface for better workflow (accessible via Window menu)
+-   **Model Browser with Thumbnails** - Browse and search models from your Modelibr server with thumbnail previews
+-   **Version Browser** - View and manage all versions of your models
+-   **Tabbed Interface** - Switch between Browse, Versions, and Upload tabs
 -   **Model Import** - Import models directly into Blender (supports GLB, FBX, OBJ, and .blend files)
 -   **Version Upload** - Create new versions of models you're working on
 -   **New Model Upload** - Upload current scene as a completely new model
+-   **Sidebar Panel** - Quick access panel in 3D Viewport sidebar
 -   **Open from Web App** - Support for `modelibr://` URI scheme for opening Blender from the web app
 
 ## Requirements
@@ -69,20 +73,63 @@ This script will register the URI handler for your operating system:
 
 ## Usage
 
-### Accessing the Panel
+### Opening the Modelibr Browser Window
 
-The Modelibr panel is located in the 3D Viewport sidebar:
+There are three ways to access the Modelibr browser:
 
+**Method 1: Window Menu (Recommended)**
+1. Go to **Window** menu in the top menu bar
+2. Click **Modelibr Browser** at the bottom
+3. A dedicated browser window will open
+
+**Method 2: Sidebar Panel**
 1. Open a 3D Viewport
 2. Press **N** to open the sidebar (or View > Sidebar)
 3. Click on the **Modelibr** tab
+4. Click **Open Browser Window** button
 
-### Browsing Models
+**Method 3: Search**
+1. Press **F3** (or Edit > Menu Search)
+2. Type "Modelibr Browser"
+3. Press Enter
 
-1. Click **Load Models** or the refresh button to fetch models from your server
-2. Use the search box to filter models by name or tags
-3. Select a model from the list
-4. Click **Import** to import the selected model
+### Using the Browser Window
+
+The browser window has three tabs:
+
+#### Browse Tab
+- **Search**: Use the search box to filter models by name or tags
+- **Refresh**: Click the refresh icon to reload the model list
+- **Thumbnails**: Toggle thumbnail display with the image icon
+- **Model List**: Browse available models in the list view
+- **Details Panel**: View model details, description, tags, and creation date
+- **Import**: Select a model and click "Import Model" to load it into Blender
+
+#### Versions Tab
+- **View Versions**: Shows all versions of the currently selected model
+- **Version Details**: See version number, description, creation date, and active status
+- **File List**: View all files included in each version
+- **Import Version**: Import a specific version of the model
+
+#### Upload Tab
+- **Upload New Version**: Create a new version of the current model (requires model context)
+- **Upload New Model**: Upload the current scene as a completely new model
+
+### Working with Model Versions
+
+The Versions tab allows you to:
+- View all versions of a model
+- See which version is currently active
+- Check version details and descriptions
+- Browse files included in each version
+- Import specific versions
+
+To use the Versions tab:
+1. First import a model from the Browse tab (this sets the model context)
+2. Switch to the **Versions** tab
+3. Click **Load Versions** to fetch all versions
+4. Select a version to see its details and files
+5. Click **Import This Version** to import that specific version
 
 ### Importing Models
 
@@ -108,6 +155,14 @@ After importing a model (or opening via URI):
 2. Enter a name for your model
 3. Choose your export format and options
 4. Click OK to upload
+
+### Thumbnail Previews
+
+The addon supports thumbnail previews for models:
+- Thumbnails are automatically downloaded and cached
+- Toggle thumbnail display with the image icon in the Browse tab
+- Thumbnails are stored in your system's temporary directory
+- The cache persists across Blender sessions for faster loading
 
 ### Opening from Web App
 
@@ -184,10 +239,12 @@ blender-addon/
 ├── modelibr/
 │   ├── __init__.py          # Addon registration
 │   ├── preferences.py       # Addon preferences
-│   ├── properties.py        # Scene properties
+│   ├── properties.py        # Scene properties and data structures
 │   ├── api_client.py        # REST API client
-│   ├── operators.py         # Blender operators
-│   ├── panels.py            # UI panels
+│   ├── operators.py         # Blender operators (import, upload, refresh)
+│   ├── panels.py            # UI panels for sidebar
+│   ├── space.py             # Window-based browser interface
+│   ├── thumbnails.py        # Thumbnail caching and preview management
 │   └── handlers.py          # URI and startup handlers
 ├── install_uri_handler.py   # URI handler installer
 └── README.md                # This file
