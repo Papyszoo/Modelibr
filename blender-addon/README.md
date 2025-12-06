@@ -1,12 +1,14 @@
 # Modelibr Blender Addon
 
-A Blender addon that integrates with the self-hosted Modelibr application, enabling users to browse, import, and upload 3D models directly from within Blender.
+A Blender addon that integrates with the self-hosted Modelibr application, enabling users to browse, import, and upload 3D models directly from within Blender. Features full Asset Browser integration for seamless asset management.
 
 ## Features
 
--   **Model Browser Panel** - Browse and search models from your Modelibr server with thumbnails
+-   **Asset Browser Integration** (NEW) - Access your Modelibr models through Blender's native Asset Browser
+-   **Automatic Asset Library** - Models are automatically synced to a local asset library with thumbnails
+-   **Model Browser Panel** - Browse and search models from your Modelibr server (legacy sidebar view)
 -   **Model Import** - Import models directly into Blender (supports GLB, FBX, OBJ, and .blend files)
--   **Version Upload** - Create new versions of models you're working on
+-   **Version Upload** - Create new versions of models you're working on (accessible from both sidebar and Asset Browser)
 -   **New Model Upload** - Upload current scene as a completely new model
 -   **Open from Web App** - Support for `modelibr://` URI scheme for opening Blender from the web app
 
@@ -48,6 +50,10 @@ Then restart Blender and enable the addon in preferences.
 4. If your server requires authentication, enter your **API Key**
 5. Configure your preferred **Default Export Format** (GLB, FBX, or OBJ)
 6. Optionally enable **Always Include .blend File** for uploads
+7. Enable **Asset Browser Integration** (enabled by default)
+8. Click **Register Asset Library** to add Modelibr to your asset libraries
+
+The asset library is automatically registered on first load, but you can manually register it from preferences if needed.
 
 ### 3. Install URI Handler (Optional)
 
@@ -69,22 +75,38 @@ This script will register the URI handler for your operating system:
 
 ## Usage
 
-### Accessing the Panel
+### Using the Asset Browser (Recommended)
 
-The Modelibr panel is located in the 3D Viewport sidebar:
+The Asset Browser integration provides the most streamlined workflow:
+
+1. Open the **Asset Browser** (Top left area type menu → Asset Browser, or via workspace)
+2. In the Asset Browser sidebar, find the **Modelibr** tab
+3. Click **Sync Assets from Server** to download all models as assets
+4. Select the **Modelibr** library from the library dropdown
+5. Browse your models with thumbnails
+6. **Drag and drop** assets into your scene to import them
+
+The Asset Browser panels provide:
+-   **Modelibr Tools** - Sync assets, upload new models, test connection
+-   **Asset Details** - View model context and version information
+-   **Quick Help** - Usage instructions
+
+### Using the Sidebar (Legacy)
+
+The traditional sidebar interface is still available:
 
 1. Open a 3D Viewport
 2. Press **N** to open the sidebar (or View > Sidebar)
 3. Click on the **Modelibr** tab
 
-### Browsing Models
+**Browsing Models:**
 
 1. Click **Load Models** or the refresh button to fetch models from your server
 2. Use the search box to filter models by name or tags
 3. Select a model from the list
 4. Click **Import** to import the selected model
 
-### Importing Models
+**Importing Models:**
 
 When importing a model:
 
@@ -175,6 +197,19 @@ The addon communicates with the following Modelibr API endpoints:
 -   On macOS, restart the Finder
 -   On Windows, try running as administrator
 
+### Asset Sync Issues
+
+-   If assets don't appear after sync, try refreshing the Asset Browser
+-   Check Blender's console for sync errors
+-   Verify you have write permissions to the asset library directory
+-   The library is located at: `{blender_user_data}/modelibr_assets/`
+
+### Asset Library Not Showing
+
+-   Go to Edit → Preferences → Add-ons → Modelibr
+-   Click "Register Asset Library"
+-   Restart Blender if needed
+
 ## Development
 
 ### Project Structure
@@ -184,14 +219,36 @@ blender-addon/
 ├── modelibr/
 │   ├── __init__.py          # Addon registration
 │   ├── preferences.py       # Addon preferences
-│   ├── properties.py        # Scene properties
+│   ├── properties.py        # Scene properties & asset metadata
 │   ├── api_client.py        # REST API client
-│   ├── operators.py         # Blender operators
-│   ├── panels.py            # UI panels
-│   └── handlers.py          # URI and startup handlers
+│   ├── operators.py         # Blender operators (sidebar)
+│   ├── panels.py            # UI panels (sidebar)
+│   ├── handlers.py          # URI and startup handlers
+│   ├── asset_browser.py     # Asset library management
+│   ├── asset_operators.py   # Asset Browser operators
+│   └── asset_panels.py      # Asset Browser panels
 ├── install_uri_handler.py   # URI handler installer
 └── README.md                # This file
 ```
+
+### Asset System Architecture
+
+The asset system consists of three main components:
+
+1. **AssetLibraryHandler** (`asset_browser.py`): Manages the local asset library
+   - Registers the library in Blender preferences
+   - Syncs models from API to local .blend files
+   - Creates assets with proper metadata and tags
+
+2. **Asset Operators** (`asset_operators.py`): Provides asset-specific operations
+   - Sync assets from server
+   - Switch between versions
+   - Register/unregister library
+
+3. **Asset Panels** (`asset_panels.py`): UI panels in Asset Browser
+   - Tools panel for sync and upload
+   - Details panel for asset metadata
+   - Help panel with usage instructions
 
 ### Testing
 

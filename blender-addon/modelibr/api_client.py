@@ -170,3 +170,20 @@ class ModelibrApiClient:
             return True
         except ApiError:
             return False
+    
+    # Future API endpoints for asset types
+    
+    def get_asset_types(self) -> list:
+        """
+        Future: Get supported asset types from server.
+        Currently returns hardcoded list.
+        """
+        return ['MODEL', 'TEXTURE', 'RIG', 'ANIMATION', 'SCENE']
+    
+    def get_scenes(self, search: str = "") -> list:
+        """
+        Future: Get scene assets from server.
+        Currently not implemented.
+        """
+        # This will be implemented when the backend supports scenes
+        raise NotImplementedError("Scene assets not yet supported by server")
