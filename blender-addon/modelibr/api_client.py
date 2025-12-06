@@ -138,8 +138,8 @@ class ModelibrApiClient:
         target_path = os.path.join(target_dir, filename)
         return self._download_file(f"/files/{file_id}", target_path)
 
-    def download_thumbnail(self, model_id: int, target_dir: str) -> str:
-        target_path = os.path.join(target_dir, f"thumbnail_{model_id}.webp")
+    def download_thumbnail(self, model_id: int, target_dir: str, filename: str = "thumbnail.webp") -> str:
+        target_path = os.path.join(target_dir, filename)
         return self._download_file(f"/models/{model_id}/thumbnail/file", target_path)
 
     def create_model(self, file_path: str) -> dict:
@@ -170,3 +170,20 @@ class ModelibrApiClient:
             return True
         except ApiError:
             return False
+    
+    # Future API endpoints for asset types
+    
+    def get_asset_types(self) -> list:
+        """
+        Future: Get supported asset types from server.
+        Currently returns hardcoded list.
+        """
+        return ['MODEL', 'TEXTURE', 'RIG', 'ANIMATION', 'SCENE']
+    
+    def get_scenes(self, search: str = "") -> list:
+        """
+        Future: Get scene assets from server.
+        Currently not implemented.
+        """
+        # This will be implemented when the backend supports scenes
+        raise NotImplementedError("Scene assets not yet supported by server")

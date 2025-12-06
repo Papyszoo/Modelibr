@@ -36,6 +36,12 @@ class ModelibrPreferences(AddonPreferences):
         default=False,
     )
 
+    use_asset_browser: BoolProperty(
+        name="Enable Asset Browser Integration",
+        description="Use Blender's Asset Browser for model management",
+        default=True,
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -48,6 +54,12 @@ class ModelibrPreferences(AddonPreferences):
         box = layout.box()
         box.prop(self, "default_export_format")
         box.prop(self, "always_include_blend")
+
+        layout.label(text="Asset Browser:")
+        box = layout.box()
+        box.prop(self, "use_asset_browser")
+        if self.use_asset_browser:
+            box.operator("modelibr.register_asset_library", text="Register Asset Library", icon='ASSET_MANAGER')
 
 
 def get_preferences():
