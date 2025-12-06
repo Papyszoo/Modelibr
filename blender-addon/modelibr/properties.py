@@ -70,8 +70,8 @@ class ModelibrAssetMetadata(PropertyGroup):
     
     referenced_models: StringProperty(
         name="Referenced Models",
-        description="JSON list of referenced model IDs (for SCENE type)",
-        default="[]",
+        description="Comma-separated list of referenced model IDs (for SCENE type)",
+        default="",
     )
 
 
