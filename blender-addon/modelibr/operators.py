@@ -573,6 +573,12 @@ class MODELIBR_OT_upload_from_imported(Operator):
     bl_label = "Upload Selected Asset"
     bl_description = "Upload selected asset as new version or new model"
     
+    model_id: IntProperty(
+        name="Model ID",
+        description="Model ID for version upload",
+        default=0,
+    )
+    
     upload_as: EnumProperty(
         name="Upload As",
         items=[
@@ -650,19 +656,33 @@ class MODELIBR_OT_upload_from_imported(Operator):
         layout.prop(self, "include_blend")
     
     def execute(self, context):
+        props = context.scene.modelibr
+        
         if self.upload_as == 'VERSION':
             # Upload as new version
             if self.model_id <= 0:
                 self.report({'ERROR'}, "No model ID available")
                 return {'CANCELLED'}
             
-            # Delegate to upload_version operator
-            bpy.ops.modelibr.upload_version(
-                description=self.description,
-                export_format=self.export_format,
-                include_blend=self.include_blend,
-                set_as_active=True,
-            )
+            # Temporarily set model context for upload_version
+            original_model_id = props.current_model_id
+            original_model_name = props.current_model_name
+            
+            try:
+                props.current_model_id = self.model_id
+                props.current_model_name = self.model_name
+                
+                # Delegate to upload_version operator
+                bpy.ops.modelibr.upload_version(
+                    description=self.description,
+                    export_format=self.export_format,
+                    include_blend=self.include_blend,
+                    set_as_active=True,
+                )
+            finally:
+                # Restore original context
+                props.current_model_id = original_model_id
+                props.current_model_name = original_model_name
         else:
             # Upload as new model
             if not self.model_name:
