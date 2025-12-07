@@ -115,6 +115,14 @@ function ModelViewer({
         const updatedVersion = data.find(v => v.id === selectedVersion.id)
         if (updatedVersion) {
           handleVersionSelect(updatedVersion)
+        } else {
+          // Selected version no longer exists (was recycled), select the active version
+          const activeVersion =
+            data.find(v => v.id === model.activeVersionId) ||
+            data[data.length - 1]
+          if (activeVersion) {
+            handleVersionSelect(activeVersion)
+          }
         }
       }
     } catch (error) {
@@ -288,15 +296,8 @@ function ModelViewer({
       if (modelId) {
         await fetchModel(modelId, true) // Skip cache to get fresh data
       }
-      // Reload versions to update list
+      // Reload versions to update list - loadVersions will handle selecting appropriate version
       await loadVersions()
-      // If the recycled version was selected, select the active version
-      if (selectedVersion?.id === versionId && model.activeVersionId) {
-        const activeVersion = versions.find(v => v.id === model.activeVersionId)
-        if (activeVersion) {
-          handleVersionSelect(activeVersion)
-        }
-      }
     } catch (error) {
       console.error('Failed to recycle version:', error)
       const errorMessage = error instanceof Error && error.message.includes('last remaining version')
