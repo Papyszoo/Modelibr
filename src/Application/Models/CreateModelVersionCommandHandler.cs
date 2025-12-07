@@ -72,8 +72,12 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         // Save version
         var savedVersion = await _versionRepository.AddAsync(version, cancellationToken);
 
-        // Link file to version
-        fileEntity.SetModelVersion(savedVersion.Id);
+        // Link file to version only if not already linked to another version
+        // This prevents overwriting the ModelVersionId for deduplicated files
+        if (fileEntity.ModelVersionId == null)
+        {
+            fileEntity.SetModelVersion(savedVersion.Id);
+        }
 
         // Set this version as active if requested
         if (command.SetAsActive)
