@@ -67,13 +67,18 @@ class MODELIBR_OT_browse_assets(Operator):
             
             # Load thumbnails in background
             thumbnail_manager = get_thumbnail_manager()
+            print(f"[Modelibr] Loading thumbnails for {len(self.models)} models...")
             for model in self.models:
                 if model.get('thumbnailUrl'):
-                    thumbnail_manager.load_thumbnail(
+                    print(f"[Modelibr] Loading thumbnail for model {model['id']}: {model.get('name')}")
+                    result = thumbnail_manager.load_thumbnail(
                         model['id'],
                         model['thumbnailUrl'],
                         client
                     )
+                    print(f"[Modelibr] Thumbnail load result for model {model['id']}: {result is not None}")
+                else:
+                    print(f"[Modelibr] No thumbnail URL for model {model['id']}: {model.get('name')}")
             
         except ApiError as e:
             self.error_message = str(e)
@@ -84,6 +89,13 @@ class MODELIBR_OT_browse_assets(Operator):
     def draw(self, context):
         """Draw the browse window UI"""
         layout = self.layout
+        
+        # Header with close button
+        header_row = layout.row()
+        header_row.label(text="Browse Modelibr Assets", icon='FILEBROWSER')
+        header_row.operator("modelibr.close_browse", text="", icon='X', emboss=False)
+        
+        layout.separator()
         
         # Search bar
         row = layout.row(align=True)
@@ -131,28 +143,32 @@ class MODELIBR_OT_browse_assets(Operator):
                 
                 # Thumbnail display
                 thumbnail = thumbnail_manager.get_thumbnail(model['id'])
-                if thumbnail and thumbnail.get_preview_id():
+                if thumbnail:
                     preview_id = thumbnail.get_preview_id()
-                    try:
-                        # Try to get the image from bpy.data.images
-                        image_name = f"modelibr_thumb_{model['id']}"
-                        if image_name in bpy.data.images:
-                            img = bpy.data.images[image_name]
-                            # Use template_preview to display the image
-                            col.template_preview(img, show_buttons=False)
-                        else:
-                            # Fallback to preview collection icon
-                            preview = thumbnail_manager.preview_collection[preview_id]
-                            if preview.icon_id > 0:
-                                col.template_icon(icon_value=preview.icon_id, scale=5.0)
+                    if preview_id:
+                        try:
+                            # Try to get the image from bpy.data.images
+                            image_name = f"modelibr_thumb_{model['id']}"
+                            if image_name in bpy.data.images:
+                                img = bpy.data.images[image_name]
+                                # Use template_preview to display the image
+                                col.template_preview(img, show_buttons=False)
                             else:
-                                col.label(text="[No preview]", icon='IMAGE_DATA')
-                    except (KeyError, AttributeError) as e:
-                        # Debug: show error
-                        col.label(text=f"[Error]", icon='ERROR')
+                                # Fallback to preview collection icon
+                                preview = thumbnail_manager.preview_collection[preview_id]
+                                if preview.icon_id > 0:
+                                    col.template_icon(icon_value=preview.icon_id, scale=5.0)
+                                else:
+                                    col.label(text="[No icon]", icon='IMAGE_DATA')
+                        except (KeyError, AttributeError) as e:
+                            # Debug: show error
+                            col.label(text=f"[Error]", icon='ERROR')
+                    else:
+                        # No preview_id set
+                        col.label(text="[No ID]", icon='QUESTION')
                 else:
-                    # Placeholder
-                    col.label(text="[Loading...]", icon='TIME')
+                    # Thumbnail not loaded yet
+                    col.label(text="[Not loaded]", icon='TIME')
                 
                 # Import button with model name
                 import_op = col.operator(
