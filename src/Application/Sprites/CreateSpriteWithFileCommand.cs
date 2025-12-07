@@ -70,8 +70,8 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                     "sprite",
                     file.Id,
                     _dateTimeProvider.UtcNow,
-                    packId: null,
-                    projectId: null,
+                    packId: command.PackId,
+                    projectId: command.ProjectId,
                     modelId: null,
                     textureSetId: null,
                     spriteId: createdSprite.Id);
@@ -104,7 +104,9 @@ public record CreateSpriteWithFileCommand(
     string Name,
     SpriteType SpriteType,
     int? CategoryId,
-    string? BatchId) : ICommand<CreateSpriteWithFileResponse>;
+    string? BatchId,
+    int? PackId,
+    int? ProjectId) : ICommand<CreateSpriteWithFileResponse>;
 
 public record CreateSpriteWithFileResponse(
     int SpriteId,

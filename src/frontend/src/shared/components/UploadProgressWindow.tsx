@@ -60,11 +60,14 @@ const getExtensionIcon = (
 }
 
 // Map file type to icon
-const getFileTypeIcon = (fileType: 'model' | 'texture' | 'file'): string => {
+const getFileTypeIcon = (
+  fileType: 'model' | 'texture' | 'file' | 'sprite'
+): string => {
   const typeIconMap = {
     model: 'pi-box',
     texture: 'pi-image',
     file: 'pi-file',
+    sprite: 'pi-image',
   }
   return typeIconMap[fileType]
 }
@@ -196,7 +199,7 @@ export default function UploadProgressWindow() {
         </div>
 
         <div className="upload-item-actions">
-          {upload.status === 'completed' && (
+          {upload.status === 'completed' && upload.fileType !== 'sprite' && (
             <Button
               icon="pi pi-external-link"
               size="small"
