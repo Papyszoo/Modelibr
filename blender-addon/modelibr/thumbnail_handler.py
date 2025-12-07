@@ -158,13 +158,25 @@ class ThumbnailManager:
         Returns:
             AnimatedThumbnail instance or None if loading failed
         """
+        print(f"[Modelibr ThumbnailManager] load_thumbnail called for model {model_id}")
+        
         if model_id in self.thumbnails:
+            print(f"[Modelibr ThumbnailManager] Thumbnail already loaded for model {model_id}")
             return self.thumbnails[model_id]
         
+        print(f"[Modelibr ThumbnailManager] Creating new AnimatedThumbnail for model {model_id}")
         thumbnail = AnimatedThumbnail(model_id, thumbnail_url)
-        if thumbnail.load(api_client, self.preview_collection):
+        
+        print(f"[Modelibr ThumbnailManager] Calling thumbnail.load() for model {model_id}")
+        load_success = thumbnail.load(api_client, self.preview_collection)
+        print(f"[Modelibr ThumbnailManager] thumbnail.load() returned: {load_success}")
+        
+        if load_success:
             self.thumbnails[model_id] = thumbnail
+            print(f"[Modelibr ThumbnailManager] Thumbnail stored in manager for model {model_id}")
             return thumbnail
+        else:
+            print(f"[Modelibr ThumbnailManager] Thumbnail loading FAILED for model {model_id}")
         
         return None
     

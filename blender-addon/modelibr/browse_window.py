@@ -68,19 +68,43 @@ class MODELIBR_OT_browse_assets(Operator):
             # Load thumbnails in background
             thumbnail_manager = get_thumbnail_manager()
             print(f"[Modelibr] Loading thumbnails for {len(self.models)} models...")
+            print(f"[Modelibr] Thumbnail manager initialized: {thumbnail_manager is not None}")
+            print(f"[Modelibr] Preview collection exists: {thumbnail_manager.preview_collection is not None}")
+            
             for model in self.models:
-                if model.get('thumbnailUrl'):
-                    print(f"[Modelibr] Loading thumbnail for model {model['id']}: {model.get('name')}")
-                    result = thumbnail_manager.load_thumbnail(
-                        model['id'],
-                        model['thumbnailUrl'],
-                        client
-                    )
-                    print(f"[Modelibr] Thumbnail load result for model {model['id']}: {result is not None}")
+                thumbnail_url = model.get('thumbnailUrl')
+                print(f"[Modelibr] Model {model['id']} ({model.get('name')}): thumbnailUrl = {thumbnail_url}")
+                
+                if thumbnail_url:
+                    print(f"[Modelibr] Attempting to load thumbnail for model {model['id']}")
+                    try:
+                        result = thumbnail_manager.load_thumbnail(
+                            model['id'],
+                            thumbnail_url,
+                            client
+                        )
+                        print(f"[Modelibr] Thumbnail load result for model {model['id']}: {result is not None}")
+                        if result:
+                            print(f"[Modelibr] Thumbnail preview_id: {result.get_preview_id()}")
+                        else:
+                            print(f"[Modelibr] Thumbnail loading FAILED for model {model['id']}")
+                    except Exception as e:
+                        print(f"[Modelibr] Exception loading thumbnail for model {model['id']}: {e}")
+                        import traceback
+                        traceback.print_exc()
                 else:
                     print(f"[Modelibr] No thumbnail URL for model {model['id']}: {model.get('name')}")
             
+            print(f"[Modelibr] Finished loading thumbnails. Total thumbnails in manager: {len(thumbnail_manager.thumbnails)}")
+            
         except ApiError as e:
+            print(f"[Modelibr] ApiError in load_models: {e}")
+            self.error_message = str(e)
+            self.models = []
+        except Exception as e:
+            print(f"[Modelibr] Exception in load_models: {e}")
+            import traceback
+            traceback.print_exc()
             self.error_message = str(e)
             self.models = []
         finally:
