@@ -88,6 +88,13 @@ class AnimatedThumbnail:
                     # Older Blender versions don't have force_reload parameter
                     preview_collection.load(preview_id, self.thumbnail_path, 'IMAGE')
             
+            # Verify the preview was loaded successfully
+            if preview_id in preview_collection:
+                preview = preview_collection[preview_id]
+                print(f"[Modelibr] Preview loaded: {preview_id}, icon_id={preview.icon_id}")
+            else:
+                print(f"[Modelibr] WARNING: Preview {preview_id} not found in collection after load!")
+            
             self.preview_id = preview_id
             print(f"[Modelibr] Successfully loaded thumbnail for model {self.model_id}, preview_id: {self.preview_id}")
             return True

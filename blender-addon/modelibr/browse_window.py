@@ -173,13 +173,16 @@ class MODELIBR_OT_browse_assets(Operator):
                         try:
                             # Get icon from preview collection
                             preview = thumbnail_manager.preview_collection[preview_id]
+                            print(f"[Modelibr UI] Model {model['id']}: preview_id={preview_id}, icon_id={preview.icon_id}")
                             if preview.icon_id > 0:
                                 col.template_icon(icon_value=preview.icon_id, scale=5.0)
                             else:
                                 col.label(text="[No icon]", icon='IMAGE_DATA')
+                                print(f"[Modelibr UI] Model {model['id']}: icon_id is 0!")
                         except (KeyError, AttributeError) as e:
                             # Debug: show error
                             col.label(text=f"[Error]", icon='ERROR')
+                            print(f"[Modelibr UI] Model {model['id']}: Exception getting preview: {e}")
                     else:
                         # No preview_id set
                         col.label(text="[No ID]", icon='QUESTION')
