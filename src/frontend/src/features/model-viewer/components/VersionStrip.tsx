@@ -201,7 +201,8 @@ function VersionStrip({
                       e.stopPropagation()
                       onRecycleVersion(version.id)
                     }}
-                    tooltip="Recycle Version"
+                    disabled={versions.length <= 1}
+                    tooltip={versions.length <= 1 ? "Cannot delete the last version" : "Recycle Version"}
                     tooltipOptions={{ position: 'bottom' }}
                   />
                 </div>

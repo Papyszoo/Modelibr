@@ -46,15 +46,22 @@ internal sealed class SoftDeleteModelVersionCommandHandler : ICommandHandler<Sof
             return Result.Failure<SoftDeleteModelVersionResponse>(new Error("VersionMismatch", "The version does not belong to the specified model."));
         }
 
+        // Check if this is the last non-deleted version
+        var nonDeletedVersions = await _modelVersionRepository.GetByModelIdAsync(request.ModelId, cancellationToken);
+        if (nonDeletedVersions.Count <= 1)
+        {
+            return Result.Failure<SoftDeleteModelVersionResponse>(new Error("LastVersion", "Cannot delete the last remaining version. A model must have at least one version."));
+        }
+
         var now = _dateTimeProvider.UtcNow;
         version.SoftDelete(now);
         await _modelVersionRepository.UpdateAsync(version, cancellationToken);
 
-        // If this was the active version, set active to the latest non-deleted version
+        // If this was the active version, set active to the latest non-deleted version (excluding the one just deleted)
         if (model.ActiveVersionId == request.VersionId)
         {
-            var nonDeletedVersions = await _modelVersionRepository.GetByModelIdAsync(request.ModelId, cancellationToken);
-            var latestVersion = nonDeletedVersions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+            var remainingVersions = nonDeletedVersions.Where(v => v.Id != request.VersionId).ToList();
+            var latestVersion = remainingVersions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
             
             if (latestVersion != null)
             {

@@ -86,6 +86,30 @@ public class SoftDeleteModelVersionCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenLastVersion_ReturnsFailure()
+    {
+        // Arrange
+        var model = CreateModelWithVersion(1, 1);
+        var version = model.Versions.First();
+        var command = new SoftDeleteModelVersionCommand(1, version.Id);
+        
+        _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(model);
+        _mockModelVersionRepository.Setup(x => x.GetByIdAsync(version.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(version);
+        _mockModelVersionRepository.Setup(x => x.GetByModelIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ModelVersion> { version });
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("LastVersion", result.Error.Code);
+        _mockModelVersionRepository.Verify(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_WhenVersionIsNotActive_SoftDeletesVersion()
     {
         // Arrange
@@ -98,6 +122,8 @@ public class SoftDeleteModelVersionCommandHandlerTests
             .ReturnsAsync(model);
         _mockModelVersionRepository.Setup(x => x.GetByIdAsync(versionToDelete.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(versionToDelete);
+        _mockModelVersionRepository.Setup(x => x.GetByModelIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(model.Versions.ToList());
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
         _mockModelVersionRepository.Setup(x => x.UpdateAsync(versionToDelete, It.IsAny<CancellationToken>()))
             .ReturnsAsync(versionToDelete);
@@ -124,10 +150,7 @@ public class SoftDeleteModelVersionCommandHandlerTests
         
         var command = new SoftDeleteModelVersionCommand(1, activeVersion.Id);
         
-        var remainingVersions = new List<ModelVersion>
-        {
-            model.Versions.First(v => v.VersionNumber == 1)
-        };
+        var allVersions = model.Versions.ToList();
         
         _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(model);
@@ -137,7 +160,7 @@ public class SoftDeleteModelVersionCommandHandlerTests
         _mockModelVersionRepository.Setup(x => x.UpdateAsync(activeVersion, It.IsAny<CancellationToken>()))
             .ReturnsAsync(activeVersion);
         _mockModelVersionRepository.Setup(x => x.GetByModelIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(remainingVersions);
+            .ReturnsAsync(allVersions);
         _mockModelRepository.Setup(x => x.UpdateAsync(model, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -149,7 +172,8 @@ public class SoftDeleteModelVersionCommandHandlerTests
         Assert.True(activeVersion.IsDeleted);
         Assert.Equal(now, activeVersion.DeletedAt);
         Assert.NotEqual(activeVersion.Id, model.ActiveVersionId);
-        Assert.Equal(remainingVersions.First().Id, model.ActiveVersionId);
+        var remainingVersion = allVersions.First(v => v.Id != activeVersion.Id);
+        Assert.Equal(remainingVersion.Id, model.ActiveVersionId);
         _mockModelVersionRepository.Verify(x => x.UpdateAsync(activeVersion, It.IsAny<CancellationToken>()), Times.Once);
         _mockModelRepository.Verify(x => x.UpdateAsync(model, It.IsAny<CancellationToken>()), Times.Once);
     }

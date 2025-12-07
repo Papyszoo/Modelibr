@@ -284,18 +284,28 @@ function ModelViewer({
         detail: 'Model version recycled successfully',
         life: 3000,
       })
-      // Reload versions to update list
-      await loadVersions()
       // Refresh model data in case active version changed
       if (modelId) {
         await fetchModel(modelId, true) // Skip cache to get fresh data
       }
+      // Reload versions to update list
+      await loadVersions()
+      // If the recycled version was selected, select the active version
+      if (selectedVersion?.id === versionId && model.activeVersionId) {
+        const activeVersion = versions.find(v => v.id === model.activeVersionId)
+        if (activeVersion) {
+          handleVersionSelect(activeVersion)
+        }
+      }
     } catch (error) {
       console.error('Failed to recycle version:', error)
+      const errorMessage = error instanceof Error && error.message.includes('last remaining version')
+        ? 'Cannot delete the last version. A model must have at least one version.'
+        : 'Failed to recycle model version'
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to recycle model version',
+        detail: errorMessage,
         life: 3000,
       })
     }

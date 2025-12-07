@@ -211,12 +211,14 @@ function ModelVersionWindow({
                     size="small"
                     severity="danger"
                     outlined
+                    disabled={versions.length <= 1}
                     onClick={e => {
                       e.stopPropagation()
                       if (onRecycleVersion) {
                         onRecycleVersion(version.id)
                       }
                     }}
+                    tooltip={versions.length <= 1 ? "Cannot delete the last version" : undefined}
                   />
                 </div>
               </div>
