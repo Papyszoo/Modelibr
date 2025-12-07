@@ -6,6 +6,7 @@ from bpy.props import StringProperty, IntProperty, BoolProperty, EnumProperty
 
 from .api_client import ModelibrApiClient, ApiError
 from .preferences import get_preferences
+from .tracking import store_object_metadata
 import datetime
 
 
@@ -158,6 +159,9 @@ class MODELIBR_OT_import_model(Operator):
                     filename
                 )
 
+                # Track objects before import to identify newly imported objects
+                objects_before = set(context.scene.objects)
+                
                 # Import based on file extension
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in ['.glb', '.gltf']:
@@ -179,6 +183,20 @@ class MODELIBR_OT_import_model(Operator):
                 else:
                     self.report({'ERROR'}, f"Unsupported file format: {ext}")
                     return {'CANCELLED'}
+                
+                # Identify newly imported objects and store metadata
+                objects_after = set(context.scene.objects)
+                new_objects = objects_after - objects_before
+                
+                for obj in new_objects:
+                    store_object_metadata(
+                        obj,
+                        model_id=self.model_id,
+                        model_name=model.get('name', ''),
+                        version_id=version.get('id', 0),
+                        version_number=version.get('versionNumber', 1),
+                        file_id=file_to_import['id']
+                    )
 
             # Update scene properties
             props.current_model_id = self.model_id
@@ -527,6 +545,140 @@ class MODELIBR_OT_clear_model_context(Operator):
         return {'FINISHED'}
 
 
+class MODELIBR_OT_focus_object(Operator):
+    bl_idname = "modelibr.focus_object"
+    bl_label = "Focus Object"
+    bl_description = "Select and frame object in viewport"
+    
+    object_name: StringProperty(name="Object Name")
+    
+    def execute(self, context):
+        obj = bpy.data.objects.get(self.object_name)
+        if obj:
+            # Deselect all
+            bpy.ops.object.select_all(action='DESELECT')
+            # Select target
+            obj.select_set(True)
+            context.view_layer.objects.active = obj
+            # Frame in viewport
+            bpy.ops.view3d.view_selected()
+            return {'FINISHED'}
+        
+        self.report({'WARNING'}, f"Object '{self.object_name}' not found")
+        return {'CANCELLED'}
+
+
+class MODELIBR_OT_upload_from_imported(Operator):
+    bl_idname = "modelibr.upload_from_imported"
+    bl_label = "Upload Selected Asset"
+    bl_description = "Upload selected asset as new version or new model"
+    
+    upload_as: EnumProperty(
+        name="Upload As",
+        items=[
+            ('VERSION', "New Version", "Upload as new version of existing model"),
+            ('MODEL', "New Model", "Upload as completely new model"),
+        ],
+        default='VERSION',
+    )
+    
+    description: StringProperty(
+        name="Description",
+        description="Version or model description",
+        default="",
+    )
+    
+    model_name: StringProperty(
+        name="Model Name",
+        description="Name for new model (only for New Model option)",
+        default="",
+    )
+    
+    export_format: EnumProperty(
+        name="Export Format",
+        items=[
+            ('GLB', "GLB", "GL Transmission Format Binary"),
+            ('FBX', "FBX", "Autodesk FBX"),
+            ('OBJ', "OBJ", "Wavefront OBJ"),
+        ],
+        default='GLB',
+    )
+    
+    include_blend: BoolProperty(
+        name="Include .blend File",
+        description="Also upload the .blend file",
+        default=False,
+    )
+    
+    def invoke(self, context, event):
+        obj = context.active_object
+        prefs = get_preferences()
+        
+        self.export_format = prefs.default_export_format
+        self.include_blend = prefs.always_include_blend
+        
+        # Detect if active object is from Modelibr
+        if obj and "modelibr_model_id" in obj:
+            self.model_id = obj["modelibr_model_id"]
+            self.model_name = obj.get("modelibr_model_name", "")
+            # Default to VERSION upload
+            self.upload_as = 'VERSION'
+        else:
+            # Force NEW_MODEL if no Modelibr context
+            self.upload_as = 'MODEL'
+            self.model_id = 0
+            
+            # Default name from blend file
+            blend_name = bpy.path.basename(bpy.data.filepath)
+            if blend_name:
+                self.model_name = os.path.splitext(blend_name)[0]
+        
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        
+        layout.prop(self, "upload_as", expand=True)
+        
+        if self.upload_as == 'VERSION':
+            layout.label(text=f"Model: {self.model_name}")
+            layout.prop(self, "description")
+        else:
+            layout.prop(self, "model_name")
+        
+        layout.prop(self, "export_format")
+        layout.prop(self, "include_blend")
+    
+    def execute(self, context):
+        if self.upload_as == 'VERSION':
+            # Upload as new version
+            if self.model_id <= 0:
+                self.report({'ERROR'}, "No model ID available")
+                return {'CANCELLED'}
+            
+            # Delegate to upload_version operator
+            bpy.ops.modelibr.upload_version(
+                description=self.description,
+                export_format=self.export_format,
+                include_blend=self.include_blend,
+                set_as_active=True,
+            )
+        else:
+            # Upload as new model
+            if not self.model_name:
+                self.report({'ERROR'}, "Model name is required")
+                return {'CANCELLED'}
+            
+            # Delegate to upload_new_model operator
+            bpy.ops.modelibr.upload_new_model(
+                model_name=self.model_name,
+                export_format=self.export_format,
+                include_blend=self.include_blend,
+            )
+        
+        return {'FINISHED'}
+
+
 classes = [
     MODELIBR_OT_refresh_models,
     MODELIBR_OT_import_model,
@@ -534,6 +686,8 @@ classes = [
     MODELIBR_OT_upload_new_model,
     MODELIBR_OT_test_connection,
     MODELIBR_OT_clear_model_context,
+    MODELIBR_OT_focus_object,
+    MODELIBR_OT_upload_from_imported,
 ]
 
 

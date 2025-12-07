@@ -1,0 +1,182 @@
+"""
+Thumbnail handler module for animated WebP thumbnails.
+Handles thumbnail loading, caching, and animation on hover.
+"""
+
+import bpy
+import os
+import tempfile
+from pathlib import Path
+from typing import Dict, Optional
+
+
+class AnimatedThumbnail:
+    """Handle animated WebP thumbnails with hover detection"""
+    
+    def __init__(self, model_id: int, thumbnail_url: str):
+        """
+        Initialize an animated thumbnail handler.
+        
+        Args:
+            model_id: Model ID from Modelibr
+            thumbnail_url: URL to download thumbnail from
+        """
+        self.model_id = model_id
+        self.thumbnail_url = thumbnail_url
+        self.frames = []
+        self.current_frame = 0
+        self.is_animating = False
+        self.temp_dir = None
+        self.thumbnail_path = None
+        self.preview_id = None
+    
+    def load(self, api_client, preview_collection) -> bool:
+        """
+        Download and prepare thumbnail.
+        
+        Args:
+            api_client: ModelibrApiClient instance for downloading
+            preview_collection: Blender preview collection to add icon to
+            
+        Returns:
+            True if thumbnail loaded successfully, False otherwise
+        """
+        try:
+            # Create temp directory if needed
+            if not self.temp_dir:
+                self.temp_dir = Path(tempfile.gettempdir()) / "modelibr_thumbnails"
+                self.temp_dir.mkdir(exist_ok=True)
+            
+            # Download thumbnail
+            self.thumbnail_path = api_client.download_thumbnail(
+                self.model_id,
+                str(self.temp_dir)
+            )
+            
+            if not os.path.exists(self.thumbnail_path):
+                return False
+            
+            # Load into preview collection
+            preview_id = f"modelibr_thumb_{self.model_id}"
+            if preview_id not in preview_collection:
+                preview_collection.load(preview_id, self.thumbnail_path, 'IMAGE')
+            
+            self.preview_id = preview_id
+            return True
+            
+        except Exception as e:
+            print(f"[Modelibr] Error loading thumbnail for model {self.model_id}: {e}")
+            return False
+    
+    def get_preview_id(self) -> Optional[str]:
+        """
+        Get the preview ID for use in UI.
+        
+        Returns:
+            Preview ID string or None if not loaded
+        """
+        return self.preview_id
+    
+    def start_animation(self):
+        """Start cycling through frames (called on hover)"""
+        # Note: For initial implementation, we'll use static thumbnails
+        # Animation can be added later if API provides multi-frame WebP
+        self.is_animating = True
+    
+    def stop_animation(self):
+        """Stop animation (called on hover end)"""
+        self.is_animating = False
+        self.current_frame = 0
+    
+    def cleanup(self):
+        """Clean up temporary files"""
+        try:
+            if self.thumbnail_path and os.path.exists(self.thumbnail_path):
+                os.remove(self.thumbnail_path)
+        except Exception:
+            pass
+
+
+class ThumbnailManager:
+    """Manage all thumbnails for browse window"""
+    
+    def __init__(self):
+        """Initialize thumbnail manager"""
+        self.thumbnails: Dict[int, AnimatedThumbnail] = {}
+        self.preview_collection = None
+    
+    def initialize(self):
+        """Initialize preview collection"""
+        if not self.preview_collection:
+            self.preview_collection = bpy.utils.previews.new()
+    
+    def load_thumbnail(self, model_id: int, thumbnail_url: str, api_client) -> Optional[AnimatedThumbnail]:
+        """
+        Load a thumbnail for a model.
+        
+        Args:
+            model_id: Model ID from Modelibr
+            thumbnail_url: URL to download thumbnail from
+            api_client: API client for downloading
+            
+        Returns:
+            AnimatedThumbnail instance or None if loading failed
+        """
+        if model_id in self.thumbnails:
+            return self.thumbnails[model_id]
+        
+        thumbnail = AnimatedThumbnail(model_id, thumbnail_url)
+        if thumbnail.load(api_client, self.preview_collection):
+            self.thumbnails[model_id] = thumbnail
+            return thumbnail
+        
+        return None
+    
+    def get_thumbnail(self, model_id: int) -> Optional[AnimatedThumbnail]:
+        """
+        Get a loaded thumbnail.
+        
+        Args:
+            model_id: Model ID
+            
+        Returns:
+            AnimatedThumbnail instance or None if not loaded
+        """
+        return self.thumbnails.get(model_id)
+    
+    def cleanup(self):
+        """Clean up all thumbnails and preview collection"""
+        for thumbnail in self.thumbnails.values():
+            thumbnail.cleanup()
+        
+        self.thumbnails.clear()
+        
+        if self.preview_collection:
+            bpy.utils.previews.remove(self.preview_collection)
+            self.preview_collection = None
+
+
+# Global thumbnail manager instance
+_thumbnail_manager: Optional[ThumbnailManager] = None
+
+
+def get_thumbnail_manager() -> ThumbnailManager:
+    """
+    Get the global thumbnail manager instance.
+    
+    Returns:
+        ThumbnailManager instance
+    """
+    global _thumbnail_manager
+    if _thumbnail_manager is None:
+        _thumbnail_manager = ThumbnailManager()
+        _thumbnail_manager.initialize()
+    return _thumbnail_manager
+
+
+def cleanup_thumbnail_manager():
+    """Clean up the global thumbnail manager"""
+    global _thumbnail_manager
+    if _thumbnail_manager:
+        _thumbnail_manager.cleanup()
+        _thumbnail_manager = None
