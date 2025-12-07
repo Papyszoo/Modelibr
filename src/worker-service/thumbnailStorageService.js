@@ -59,7 +59,7 @@ export class ThumbnailStorageService {
   /**
    * Get the full paths for thumbnail files for a specific model hash
    * @param {string} modelHash - The SHA256 hash of the model
-   * @returns {Object} Object containing paths for webp and poster files
+   * @returns {Object} Object containing paths for webp, poster, and png files
    */
   getThumbnailPaths(modelHash) {
     const hashDir = this.getHashStorageDirectory(modelHash)
@@ -67,6 +67,7 @@ export class ThumbnailStorageService {
     return {
       webpPath: path.join(hashDir, 'orbit.webp'),
       posterPath: path.join(hashDir, 'poster.jpg'),
+      pngPath: path.join(hashDir, 'thumbnail.png'),
       directory: hashDir,
     }
   }
@@ -80,7 +81,7 @@ export class ThumbnailStorageService {
    */
   async checkThumbnailsExist(modelHash) {
     if (!this.enabled) {
-      return { webpExists: false, posterExists: false, skipRendering: false }
+      return { webpExists: false, posterExists: false, pngExists: false, skipRendering: false }
     }
 
     try {
@@ -97,6 +98,7 @@ export class ThumbnailStorageService {
       const result = {
         webpExists: false,
         posterExists: false,
+        pngExists: false,
         skipRendering: false, // Always render when using API
         paths: this.getThumbnailPaths(modelHash),
       }
@@ -114,7 +116,7 @@ export class ThumbnailStorageService {
       })
 
       // Return false values on error to allow processing to continue
-      return { webpExists: false, posterExists: false, skipRendering: false }
+      return { webpExists: false, posterExists: false, pngExists: false, skipRendering: false }
     }
   }
 
@@ -123,6 +125,7 @@ export class ThumbnailStorageService {
    * @param {string} modelHash - The SHA256 hash of the model
    * @param {string} webpSourcePath - Path to the generated WebP file
    * @param {string} posterSourcePath - Path to the generated poster file
+   * @param {string} pngSourcePath - Path to the generated PNG file
    * @param {number} modelId - The model ID for API upload
    * @returns {Promise<Object>} Object with upload results and metadata
    */
@@ -130,11 +133,12 @@ export class ThumbnailStorageService {
     modelHash,
     webpSourcePath,
     posterSourcePath,
+    pngSourcePath,
     modelId = null
   ) {
     if (!this.enabled) {
       logger.warn('Thumbnail storage is disabled, skipping API upload')
-      return { stored: false, webpPath: null, posterPath: null }
+      return { stored: false, webpPath: null, posterPath: null, pngPath: null }
     }
 
     try {
@@ -143,6 +147,7 @@ export class ThumbnailStorageService {
         modelId,
         webpSourcePath,
         posterSourcePath,
+        pngSourcePath,
       })
 
       // Validate model ID
@@ -158,6 +163,7 @@ export class ThumbnailStorageService {
         {
           webpPath: webpSourcePath,
           posterPath: posterSourcePath,
+          pngPath: pngSourcePath,
         }
       )
 
@@ -165,8 +171,10 @@ export class ThumbnailStorageService {
         stored: uploadResult.allSuccessful,
         webpPath: webpSourcePath, // Keep original paths for reference
         posterPath: posterSourcePath,
+        pngPath: pngSourcePath,
         webpStored: false,
         posterStored: false,
+        pngStored: false,
         uploadResults: uploadResult.uploads,
         apiResponse: uploadResult,
       }
@@ -179,6 +187,9 @@ export class ThumbnailStorageService {
         if (upload.type === 'poster' && upload.success) {
           results.posterStored = true
         }
+        if (upload.type === 'png' && upload.success) {
+          results.pngStored = true
+        }
       })
 
       logger.info('API-based thumbnail storage completed', {
@@ -187,6 +198,7 @@ export class ThumbnailStorageService {
         stored: results.stored,
         webpStored: results.webpStored,
         posterStored: results.posterStored,
+        pngStored: results.pngStored,
         totalUploads: uploadResult.uploads.length,
         allSuccessful: uploadResult.allSuccessful,
       })
@@ -198,6 +210,7 @@ export class ThumbnailStorageService {
         modelId,
         webpSourcePath,
         posterSourcePath,
+        pngSourcePath,
         error: error.message,
         stack: error.stack,
       })
@@ -207,8 +220,10 @@ export class ThumbnailStorageService {
         stored: false,
         webpPath: null,
         posterPath: null,
+        pngPath: null,
         webpStored: false,
         posterStored: false,
+        pngStored: false,
         error: error.message,
       }
     }

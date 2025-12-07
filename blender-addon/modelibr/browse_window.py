@@ -72,8 +72,9 @@ class MODELIBR_OT_browse_assets(Operator):
             print(f"[Modelibr] Preview collection exists: {thumbnail_manager.preview_collection is not None}")
             
             for model in self.models:
-                thumbnail_url = model.get('thumbnailUrl')
-                print(f"[Modelibr] Model {model['id']} ({model.get('name')}): thumbnailUrl = {thumbnail_url}")
+                # Prioritize PNG thumbnail if available, fallback to regular thumbnail
+                thumbnail_url = model.get('pngThumbnailUrl') or model.get('thumbnailUrl')
+                print(f"[Modelibr] Model {model['id']} ({model.get('name')}): pngThumbnailUrl = {model.get('pngThumbnailUrl')}, thumbnailUrl = {model.get('thumbnailUrl')}")
                 
                 if thumbnail_url:
                     print(f"[Modelibr] Attempting to load thumbnail for model {model['id']}")

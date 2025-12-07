@@ -485,6 +485,7 @@ export class JobProcessor {
               job.modelHash,
               encodingResult.webpPath,
               encodingResult.posterPath,
+              encodingResult.pngPath,
               job.modelId // Pass model ID for API upload
             )
 
@@ -492,6 +493,7 @@ export class JobProcessor {
               stored: storageResult.stored,
               webpStored: storageResult.webpStored,
               posterStored: storageResult.posterStored,
+              pngStored: storageResult.pngStored,
               uploadResults: storageResult.uploadResults?.length || 0,
               allSuccessful: storageResult.apiResponse?.allSuccessful,
             })
