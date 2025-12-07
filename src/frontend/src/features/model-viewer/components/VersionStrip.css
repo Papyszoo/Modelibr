@@ -154,14 +154,22 @@
   color: var(--text-color-secondary);
 }
 
-.version-set-active-btn {
+.version-dropdown-item-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.version-set-active-btn,
+.version-recycle-btn {
   width: 1.75rem !important;
   height: 1.75rem !important;
   padding: 0 !important;
   flex-shrink: 0;
 }
 
-.version-set-active-btn .pi {
+.version-set-active-btn .pi,
+.version-recycle-btn .pi {
   font-size: 0.8rem !important;
 }
 

@@ -16,6 +16,15 @@ interface RecycledModel {
   fileCount: number
 }
 
+interface RecycledModelVersion {
+  id: number
+  modelId: number
+  versionNumber: number
+  description: string | null
+  deletedAt: string
+  fileCount: number
+}
+
 interface RecycledTextureSet {
   id: number
   name: string
@@ -27,7 +36,7 @@ interface RecycledTextureSet {
 interface DeletePreviewItem {
   id: number
   name: string
-  type: 'model' | 'textureSet'
+  type: 'model' | 'modelVersion' | 'textureSet'
 }
 
 interface DeletePreviewInfo {
@@ -43,6 +52,7 @@ interface DeletePreviewInfo {
 
 export default function RecycledFilesList() {
   const [models, setModels] = useState<RecycledModel[]>([])
+  const [modelVersions, setModelVersions] = useState<RecycledModelVersion[]>([])
   const [textureSets, setTextureSets] = useState<RecycledTextureSet[]>([])
   const [loading, setLoading] = useState(true)
   const [deletePreview, setDeletePreview] = useState<DeletePreviewInfo | null>(
@@ -66,6 +76,17 @@ export default function RecycledFilesList() {
           name: m.name,
           deletedAt: m.deletedAt,
           fileCount: m.fileCount,
+        }))
+      )
+
+      setModelVersions(
+        data.modelVersions.map(v => ({
+          id: v.id,
+          modelId: v.modelId,
+          versionNumber: v.versionNumber,
+          description: v.description,
+          deletedAt: v.deletedAt,
+          fileCount: v.fileCount,
         }))
       )
 
@@ -112,6 +133,29 @@ export default function RecycledFilesList() {
     }
   }
 
+  const handleRestoreModelVersion = async (version: RecycledModelVersion) => {
+    try {
+      await ApiClient.restoreEntity('modelVersion', version.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Restored',
+        detail: `Version ${version.versionNumber} has been restored`,
+        life: 3000,
+      })
+      setModelVersions(prevVersions =>
+        prevVersions.filter(v => v.id !== version.id)
+      )
+    } catch (error) {
+      console.error('Failed to restore:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore model version',
+        life: 3000,
+      })
+    }
+  }
+
   const handleRestoreTextureSet = async (textureSet: RecycledTextureSet) => {
     try {
       await ApiClient.restoreEntity('textureSet', textureSet.id)
@@ -139,6 +183,31 @@ export default function RecycledFilesList() {
     try {
       const preview = await ApiClient.getDeletePreview('model', model.id)
       setDeletePreview({ ...preview, item: { ...model, type: 'model' } })
+      setShowPreviewDialog(true)
+    } catch (error) {
+      console.error('Failed to load delete preview:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load delete preview',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleDeletePreviewModelVersion = async (
+    version: RecycledModelVersion
+  ) => {
+    try {
+      const preview = await ApiClient.getDeletePreview('modelVersion', version.id)
+      setDeletePreview({
+        ...preview,
+        item: {
+          id: version.id,
+          name: `Version ${version.versionNumber}`,
+          type: 'modelVersion',
+        },
+      })
       setShowPreviewDialog(true)
     } catch (error) {
       console.error('Failed to load delete preview:', error)
@@ -194,6 +263,10 @@ export default function RecycledFilesList() {
       const deletedItem = deletePreview.item
       if (deletedItem.type === 'model') {
         setModels(prevModels => prevModels.filter(m => m.id !== deletedItem.id))
+      } else if (deletedItem.type === 'modelVersion') {
+        setModelVersions(prevVersions =>
+          prevVersions.filter(v => v.id !== deletedItem.id)
+        )
       } else if (deletedItem.type === 'textureSet') {
         setTextureSets(prevTextureSets =>
           prevTextureSets.filter(ts => ts.id !== deletedItem.id)
@@ -241,7 +314,8 @@ export default function RecycledFilesList() {
     )
   }
 
-  const isEmpty = models.length === 0 && textureSets.length === 0
+  const isEmpty =
+    models.length === 0 && modelVersions.length === 0 && textureSets.length === 0
 
   return (
     <div className="recycled-files-list">
@@ -305,6 +379,78 @@ export default function RecycledFilesList() {
                           {model.fileCount} file
                           {model.fileCount !== 1 ? 's' : ''} • Deleted{' '}
                           {formatDate(model.deletedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Model Versions Section */}
+          {modelVersions.length > 0 && (
+            <div className="recycled-section">
+              <h3 className="recycled-section-title">
+                <i className="pi pi-clone" />
+                Model Versions ({modelVersions.length})
+              </h3>
+              <div className="recycled-cards-grid">
+                {modelVersions.map(version => (
+                  <div key={version.id} className="recycled-card">
+                    <div className="recycled-card-thumbnail">
+                      <img
+                        src={ApiClient.getVersionThumbnailUrl(version.id)}
+                        alt={`Version ${version.versionNumber}`}
+                        className="recycled-card-image"
+                        onError={e => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const placeholder = target.nextElementSibling as HTMLElement
+                          if (placeholder) {
+                            placeholder.style.display = 'flex'
+                          }
+                        }}
+                      />
+                      <div className="version-placeholder" style={{ display: 'none' }}>
+                        <i className="pi pi-clone" />
+                        <span className="version-number">
+                          v{version.versionNumber}
+                        </span>
+                      </div>
+                      <div className="recycled-card-actions">
+                        <Button
+                          icon="pi pi-replay"
+                          className="p-button-success p-button-rounded"
+                          onClick={() => handleRestoreModelVersion(version)}
+                          tooltip="Restore"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-danger p-button-rounded"
+                          onClick={() => handleDeletePreviewModelVersion(version)}
+                          tooltip="Delete Forever"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                      </div>
+                      <div className="recycled-card-overlay">
+                        <span
+                          className="recycled-card-name"
+                          title={`Version ${version.versionNumber}${version.description ? ` - ${version.description}` : ''}`}
+                        >
+                          Version {version.versionNumber}
+                          {version.description && (
+                            <span className="version-description">
+                              {' '}
+                              - {version.description}
+                            </span>
+                          )}
+                        </span>
+                        <span className="recycled-card-meta">
+                          {version.fileCount} file
+                          {version.fileCount !== 1 ? 's' : ''} • Deleted{' '}
+                          {formatDate(version.deletedAt)}
                         </span>
                       </div>
                     </div>

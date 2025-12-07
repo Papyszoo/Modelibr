@@ -92,5 +92,23 @@ public static class ModelsEndpoints
         })
         .WithName("Soft Delete Model")
         .WithTags("Models");
+
+        app.MapDelete("/models/{modelId}/versions/{versionId}", async (
+            int modelId,
+            int versionId,
+            ICommandHandler<SoftDeleteModelVersionCommand, SoftDeleteModelVersionResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new SoftDeleteModelVersionCommand(modelId, versionId), cancellationToken);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+            
+            return Results.Ok(result.Value);
+        })
+        .WithName("Soft Delete Model Version")
+        .WithTags("Models");
     }
 }

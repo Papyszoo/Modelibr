@@ -74,9 +74,14 @@
   font-weight: 500;
 }
 
-.set-active-button {
+.version-item-actions {
+  display: flex;
+  gap: 0.5rem;
   margin-top: 0.5rem;
-  width: 100%;
+}
+
+.set-active-button {
+  flex: 1;
 }
 
 .version-description {
