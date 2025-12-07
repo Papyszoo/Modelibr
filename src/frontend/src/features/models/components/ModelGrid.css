@@ -192,22 +192,22 @@
 /* Responsive adjustments */
 @media (max-width: 1200px) {
   .model-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 }
 
 @media (max-width: 768px) {
   .model-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
   }
 
   .model-grid-controls {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
-  .search-bar {
-    padding: 0.5rem 0.75rem;
+  .model-grid-container {
+    gap: 0.75rem;
   }
 
   .model-card-name {
@@ -218,6 +218,7 @@
 @media (max-width: 480px) {
   .model-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem;
   }
 }
 
