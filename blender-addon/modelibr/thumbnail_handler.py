@@ -49,18 +49,45 @@ class AnimatedThumbnail:
             
             # Download thumbnail
             print(f"[Modelibr] Downloading thumbnail for model {self.model_id}...")
-            self.thumbnail_path = api_client.download_thumbnail(
+            downloaded_path = api_client.download_thumbnail(
                 self.model_id,
                 str(self.temp_dir)
             )
             
-            print(f"[Modelibr] Thumbnail path: {self.thumbnail_path}, exists: {os.path.exists(self.thumbnail_path)}")
+            print(f"[Modelibr] Downloaded thumbnail path: {downloaded_path}, exists: {os.path.exists(downloaded_path)}")
             
-            if not os.path.exists(self.thumbnail_path):
-                print(f"[Modelibr] Thumbnail file does not exist at {self.thumbnail_path}")
+            if not os.path.exists(downloaded_path):
+                print(f"[Modelibr] Thumbnail file does not exist at {downloaded_path}")
                 return False
             
-            # Load into Blender's image data blocks for better compatibility with WebP
+            # Convert WebP to PNG for better Blender compatibility
+            # WebP decoding can fail in some Blender versions, so we convert to PNG
+            png_path = downloaded_path.replace('.webp', '.png')
+            
+            try:
+                # Load WebP using Blender and save as PNG
+                print(f"[Modelibr] Converting WebP to PNG for compatibility...")
+                temp_img = bpy.data.images.load(downloaded_path, check_existing=False)
+                
+                # Save as PNG
+                temp_img.filepath_raw = png_path
+                temp_img.file_format = 'PNG'
+                temp_img.save()
+                
+                # Remove temporary image from Blender
+                bpy.data.images.remove(temp_img)
+                
+                # Use PNG path for preview collection
+                self.thumbnail_path = png_path
+                print(f"[Modelibr] Converted to PNG: {png_path}")
+                
+            except Exception as conv_error:
+                print(f"[Modelibr] WebP conversion failed: {conv_error}")
+                print(f"[Modelibr] Trying to use WebP directly...")
+                # Fall back to using WebP directly if conversion fails
+                self.thumbnail_path = downloaded_path
+            
+            # Load into Blender's image data blocks
             image_name = f"modelibr_thumb_{self.model_id}"
             
             # Check if image already loaded
