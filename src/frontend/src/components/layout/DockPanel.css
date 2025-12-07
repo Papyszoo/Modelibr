@@ -16,7 +16,7 @@
 /* Dock Bar (Side menu with tabs) */
 .dock-bar {
   width: 60px;
-  background: var(--surface-900);
+  background: #1e293b;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -26,11 +26,11 @@
 }
 
 .dock-bar-left {
-  border-right: 1px solid var(--surface-border);
+  border-right: 1px solid #334155;
 }
 
 .dock-bar-right {
-  border-left: 1px solid var(--surface-border);
+  border-left: 1px solid #334155;
 }
 
 .dock-tabs {
@@ -43,18 +43,18 @@
 .dock-add {
   margin-top: auto;
   padding-top: 0.5rem;
-  border-top: 1px solid var(--surface-border);
+  border-top: 1px solid #334155;
 }
 
 .dock-add-button {
-  color: var(--text-color-secondary) !important;
+  color: #94a3b8 !important;
   width: 40px !important;
   height: 40px !important;
 }
 
 .dock-add-button:hover {
-  background: var(--surface-hover) !important;
-  color: var(--text-color) !important;
+  background: #334155 !important;
+  color: #e2e8f0 !important;
 }
 
 .dock-add-menu {
