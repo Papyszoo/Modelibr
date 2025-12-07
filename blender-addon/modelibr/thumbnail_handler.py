@@ -48,12 +48,16 @@ class AnimatedThumbnail:
                 self.temp_dir.mkdir(exist_ok=True)
             
             # Download thumbnail
+            print(f"[Modelibr] Downloading thumbnail for model {self.model_id}...")
             self.thumbnail_path = api_client.download_thumbnail(
                 self.model_id,
                 str(self.temp_dir)
             )
             
+            print(f"[Modelibr] Thumbnail path: {self.thumbnail_path}, exists: {os.path.exists(self.thumbnail_path)}")
+            
             if not os.path.exists(self.thumbnail_path):
+                print(f"[Modelibr] Thumbnail file does not exist at {self.thumbnail_path}")
                 return False
             
             # Load into Blender's image data blocks for better compatibility with WebP
@@ -68,13 +72,16 @@ class AnimatedThumbnail:
                     img.reload()
             else:
                 # Load new image
+                print(f"[Modelibr] Loading image into bpy.data.images: {self.thumbnail_path}")
                 img = bpy.data.images.load(self.thumbnail_path, check_existing=True)
                 img.name = image_name
+                print(f"[Modelibr] Image loaded successfully: {img.name}")
             
             # Also load into preview collection for icon display
             preview_id = f"modelibr_thumb_{self.model_id}"
             if preview_id not in preview_collection:
                 try:
+                    print(f"[Modelibr] Loading into preview collection: {preview_id}")
                     # Force reload the preview to ensure it's loaded properly
                     preview_collection.load(preview_id, self.thumbnail_path, 'IMAGE', force_reload=True)
                 except TypeError:
@@ -82,10 +89,13 @@ class AnimatedThumbnail:
                     preview_collection.load(preview_id, self.thumbnail_path, 'IMAGE')
             
             self.preview_id = preview_id
+            print(f"[Modelibr] Successfully loaded thumbnail for model {self.model_id}, preview_id: {self.preview_id}")
             return True
             
         except Exception as e:
             print(f"[Modelibr] Error loading thumbnail for model {self.model_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def get_preview_id(self) -> Optional[str]:
