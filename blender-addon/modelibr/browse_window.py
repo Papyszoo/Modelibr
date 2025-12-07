@@ -175,7 +175,10 @@ class MODELIBR_OT_browse_assets(Operator):
                             preview = thumbnail_manager.preview_collection[preview_id]
                             print(f"[Modelibr UI] Model {model['id']}: preview_id={preview_id}, icon_id={preview.icon_id}")
                             if preview.icon_id > 0:
-                                col.template_icon(icon_value=preview.icon_id, scale=5.0)
+                                # Use icon_value in a label to display the thumbnail
+                                thumb_box = col.box()
+                                thumb_box.scale_y = 2.5
+                                thumb_box.label(text="", icon_value=preview.icon_id)
                             else:
                                 col.label(text="[No icon]", icon='IMAGE_DATA')
                                 print(f"[Modelibr UI] Model {model['id']}: icon_id is 0!")
