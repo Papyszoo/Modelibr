@@ -7,6 +7,7 @@ import { getModelFileFormat } from '../../../utils/fileUtils'
 // eslint-disable-next-line no-restricted-imports -- ModelInfo needs direct API access
 import apiClient from '../../../services/ApiClient'
 import TextureSetAssociationDialog from './TextureSetAssociationDialog'
+import './ModelInfo.css'
 
 function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(
@@ -66,51 +67,35 @@ function ModelInfo({ model, onModelUpdated }) {
   }
 
   return (
-    <>
-      <div className="info-section">
-        <h3>Model Information</h3>
-        <div className="info-grid">
-          <div className="info-item">
+    <div className="model-info">
+      <div className="model-info-section">
+        <h3 className="model-info-title">Model Information</h3>
+        <div className="model-info-grid">
+          <div className="model-info-item">
             <label>ID:</label>
             <span>{model.id}</span>
           </div>
-          <div className="info-item">
+          <div className="model-info-item">
             <label>Created:</label>
             <span>{new Date(model.createdAt).toLocaleString()}</span>
           </div>
-          <div className="info-item">
+          <div className="model-info-item">
             <label>Modified:</label>
             <span>{new Date(model.updatedAt).toLocaleString()}</span>
           </div>
-          <div className="info-item">
+          <div className="model-info-item">
             <label>Format:</label>
             <span>{getModelFileFormat(model)}</span>
           </div>
         </div>
       </div>
 
-      <div className="info-section">
-        <h3>AI Classification</h3>
+      <div className="model-info-section">
+        <h3 className="model-info-title">AI Classification</h3>
 
-        <div className="tags-section" style={{ marginBottom: '1rem' }}>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 500,
-            }}
-          >
-            Tags:
-          </label>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.5rem',
-              marginBottom: '0.75rem',
-              minHeight: '2rem',
-            }}
-          >
+        <div className="tags-section">
+          <label className="field-label">Tags:</label>
+          <div className="tags-container">
             {tags.length > 0 ? (
               tags.map((tag, index) => (
                 <Chip
@@ -122,24 +107,16 @@ function ModelInfo({ model, onModelUpdated }) {
                 />
               ))
             ) : (
-              <span
-                style={{
-                  color: '#94a3b8',
-                  fontStyle: 'italic',
-                  alignSelf: 'center',
-                }}
-              >
-                No tags yet
-              </span>
+              <span className="empty-state-text">No tags yet</span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="tag-input-group">
             <InputText
               value={newTag}
               onChange={e => setNewTag(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Add new tag..."
-              style={{ flex: 1 }}
+              className="tag-input"
             />
             <Button
               label="Add"
@@ -151,22 +128,14 @@ function ModelInfo({ model, onModelUpdated }) {
           </div>
         </div>
 
-        <div className="description-section" style={{ marginBottom: '1rem' }}>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 500,
-            }}
-          >
-            Description:
-          </label>
+        <div className="description-section">
+          <label className="field-label">Description:</label>
           <InputTextarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            placeholder="Enter description with confidence metrics..."
+            placeholder="Enter description..."
             rows={3}
-            style={{ width: '100%' }}
+            className="description-textarea"
           />
         </div>
 
@@ -175,22 +144,14 @@ function ModelInfo({ model, onModelUpdated }) {
           icon="pi pi-save"
           onClick={handleSave}
           disabled={isSaving}
-          style={{ width: '100%' }}
+          className="save-button"
         />
       </div>
 
-      <div className="info-section">
-        <h3>Linked Texture Sets</h3>
-        <div className="texture-sets-section" style={{ marginBottom: '1rem' }}>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.5rem',
-              marginBottom: '0.75rem',
-              minHeight: '2rem',
-            }}
-          >
+      <div className="model-info-section">
+        <h3 className="model-info-title">Linked Texture Sets</h3>
+        <div className="texture-sets-section">
+          <div className="tags-container">
             {model.textureSets && model.textureSets.length > 0 ? (
               model.textureSets.map(textureSet => (
                 <Chip
@@ -203,29 +164,21 @@ function ModelInfo({ model, onModelUpdated }) {
                 />
               ))
             ) : (
-              <span
-                style={{
-                  color: '#94a3b8',
-                  fontStyle: 'italic',
-                  alignSelf: 'center',
-                }}
-              >
-                No texture sets linked
-              </span>
+              <span className="empty-state-text">No texture sets linked</span>
             )}
           </div>
           <Button
             label="Link Texture Sets"
             icon="pi pi-link"
             onClick={() => setShowTextureSetDialog(true)}
-            style={{ width: '100%' }}
+            className="link-button"
             size="small"
           />
         </div>
       </div>
 
-      <div className="info-section">
-        <h3>Controls</h3>
+      <div className="model-info-section">
+        <h3 className="model-info-title">Controls</h3>
         <ul className="controls-list">
           <li>
             <strong>Mouse:</strong> Rotate view
@@ -252,7 +205,7 @@ function ModelInfo({ model, onModelUpdated }) {
           }}
         />
       )}
-    </>
+    </div>
   )
 }
 
