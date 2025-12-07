@@ -2,7 +2,7 @@
   position: relative;
   width: 40px;
   height: 40px;
-  background: var(--surface-700);
+  background: #334155;
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -14,22 +14,22 @@
 }
 
 .draggable-tab:hover {
-  background: var(--surface-600);
-  border-color: var(--surface-500);
+  background: #475569;
+  border-color: #64748b;
 }
 
 .draggable-tab.active {
-  background: var(--primary-color);
-  border-color: var(--primary-600);
+  background: #3b82f6;
+  border-color: #2563eb;
 }
 
 .draggable-tab.active:hover {
-  background: var(--primary-600);
+  background: #2563eb;
 }
 
 /* Tab Icon */
 .tab-icon {
-  color: var(--text-color);
+  color: #e2e8f0;
   font-size: 1rem;
 }
 
