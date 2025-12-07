@@ -115,6 +115,14 @@ function ModelViewer({
         const updatedVersion = data.find(v => v.id === selectedVersion.id)
         if (updatedVersion) {
           handleVersionSelect(updatedVersion)
+        } else {
+          // Selected version no longer exists (was recycled), select the active version
+          const activeVersion =
+            data.find(v => v.id === model.activeVersionId) ||
+            data[data.length - 1]
+          if (activeVersion) {
+            handleVersionSelect(activeVersion)
+          }
         }
       }
     } catch (error) {
@@ -269,6 +277,36 @@ function ModelViewer({
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to set active version',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleRecycleVersion = async (versionId: number) => {
+    if (!model) return
+    try {
+      await ApiClient.softDeleteModelVersion(parseInt(model.id), versionId)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Model version recycled successfully',
+        life: 3000,
+      })
+      // Refresh model data in case active version changed
+      if (modelId) {
+        await fetchModel(modelId, true) // Skip cache to get fresh data
+      }
+      // Reload versions to update list - loadVersions will handle selecting appropriate version
+      await loadVersions()
+    } catch (error) {
+      console.error('Failed to recycle version:', error)
+      const errorMessage = error instanceof Error && error.message.includes('last remaining version')
+        ? 'Cannot delete the last version. A model must have at least one version.'
+        : 'Failed to recycle model version'
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: errorMessage,
         life: 3000,
       })
     }
@@ -442,6 +480,7 @@ function ModelViewer({
           selectedVersion={selectedVersion}
           onVersionSelect={handleVersionSelect}
           onSetActiveVersion={handleSetActiveVersion}
+          onRecycleVersion={handleRecycleVersion}
           defaultFileId={defaultFileId}
           onDefaultFileChange={handleDefaultFileChange}
         />
@@ -618,6 +657,7 @@ function ModelViewer({
           onVersionSelect={handleVersionSelect}
           onDefaultFileChange={handleDefaultFileChange}
           onModelUpdate={handleModelUpdated}
+          onRecycleVersion={handleRecycleVersion}
         />
       </ModelProvider>
 

@@ -15,6 +15,7 @@ interface ModelVersionWindowProps {
   onVersionSelect?: (version: ModelVersionDto) => void
   onDefaultFileChange?: (fileId: number) => void
   onModelUpdate?: () => void
+  onRecycleVersion?: (versionId: number) => void
 }
 
 function ModelVersionWindow({
@@ -25,6 +26,7 @@ function ModelVersionWindow({
   onVersionSelect,
   onDefaultFileChange,
   onModelUpdate,
+  onRecycleVersion,
 }: ModelVersionWindowProps) {
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] =
@@ -188,20 +190,37 @@ function ModelVersionWindow({
                 <div className="version-date">
                   {formatDate(version.createdAt)}
                 </div>
-                {model?.activeVersionId !== version.id && (
+                <div className="version-item-actions">
+                  {model?.activeVersionId !== version.id && (
+                    <Button
+                      label="Set as Active"
+                      icon="pi pi-check-circle"
+                      size="small"
+                      severity="success"
+                      outlined
+                      className="set-active-button"
+                      onClick={e => {
+                        e.stopPropagation()
+                        handleSetActiveVersion(version.id)
+                      }}
+                    />
+                  )}
                   <Button
-                    label="Set as Active"
-                    icon="pi pi-check-circle"
+                    label="Recycle"
+                    icon="pi pi-trash"
                     size="small"
-                    severity="success"
+                    severity="danger"
                     outlined
-                    className="set-active-button"
+                    disabled={versions.length <= 1}
                     onClick={e => {
                       e.stopPropagation()
-                      handleSetActiveVersion(version.id)
+                      if (onRecycleVersion) {
+                        onRecycleVersion(version.id)
+                      }
                     }}
+                    tooltip={versions.length <= 1 ? "Cannot delete the last version" : undefined}
                   />
-                )}
+                </div>
               </div>
             ))}
           </div>
