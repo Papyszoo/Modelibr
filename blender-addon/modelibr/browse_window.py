@@ -171,19 +171,12 @@ class MODELIBR_OT_browse_assets(Operator):
                     preview_id = thumbnail.get_preview_id()
                     if preview_id:
                         try:
-                            # Try to get the image from bpy.data.images
-                            image_name = f"modelibr_thumb_{model['id']}"
-                            if image_name in bpy.data.images:
-                                img = bpy.data.images[image_name]
-                                # Use template_preview to display the image
-                                col.template_preview(img, show_buttons=False)
+                            # Get icon from preview collection
+                            preview = thumbnail_manager.preview_collection[preview_id]
+                            if preview.icon_id > 0:
+                                col.template_icon(icon_value=preview.icon_id, scale=5.0)
                             else:
-                                # Fallback to preview collection icon
-                                preview = thumbnail_manager.preview_collection[preview_id]
-                                if preview.icon_id > 0:
-                                    col.template_icon(icon_value=preview.icon_id, scale=5.0)
-                                else:
-                                    col.label(text="[No icon]", icon='IMAGE_DATA')
+                                col.label(text="[No icon]", icon='IMAGE_DATA')
                         except (KeyError, AttributeError) as e:
                             # Debug: show error
                             col.label(text=f"[Error]", icon='ERROR')
