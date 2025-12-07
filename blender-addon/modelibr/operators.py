@@ -545,6 +545,25 @@ class MODELIBR_OT_clear_model_context(Operator):
         return {'FINISHED'}
 
 
+class MODELIBR_OT_set_current_model(Operator):
+    bl_idname = "modelibr.set_current_model"
+    bl_label = "Set Current Model"
+    bl_description = "Set this model as the current model context"
+    
+    model_id: IntProperty(name="Model ID")
+    model_name: StringProperty(name="Model Name")
+    version_id: IntProperty(name="Version ID")
+    
+    def execute(self, context):
+        props = context.scene.modelibr
+        props.current_model_id = self.model_id
+        props.current_model_name = self.model_name
+        props.current_version_id = self.version_id
+        
+        self.report({'INFO'}, f"Set current model to: {self.model_name}")
+        return {'FINISHED'}
+
+
 class MODELIBR_OT_focus_object(Operator):
     bl_idname = "modelibr.focus_object"
     bl_label = "Focus Object"
@@ -706,6 +725,7 @@ classes = [
     MODELIBR_OT_upload_new_model,
     MODELIBR_OT_test_connection,
     MODELIBR_OT_clear_model_context,
+    MODELIBR_OT_set_current_model,
     MODELIBR_OT_focus_object,
     MODELIBR_OT_upload_from_imported,
 ]

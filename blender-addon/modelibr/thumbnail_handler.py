@@ -59,7 +59,12 @@ class AnimatedThumbnail:
             # Load into preview collection
             preview_id = f"modelibr_thumb_{self.model_id}"
             if preview_id not in preview_collection:
-                preview_collection.load(preview_id, self.thumbnail_path, 'IMAGE')
+                try:
+                    # Force reload the preview to ensure it's loaded properly
+                    preview_collection.load(preview_id, self.thumbnail_path, 'IMAGE', force_reload=True)
+                except TypeError:
+                    # Older Blender versions don't have force_reload parameter
+                    preview_collection.load(preview_id, self.thumbnail_path, 'IMAGE')
             
             self.preview_id = preview_id
             return True
