@@ -107,9 +107,9 @@ describe('ModelGrid', () => {
       />
     )
 
-    expect(screen.getByText('model1.obj')).toBeInTheDocument()
-    expect(screen.getByText('model2.glb')).toBeInTheDocument()
-    expect(screen.getByText('test.gltf')).toBeInTheDocument()
+    expect(screen.getByText('Model 1')).toBeInTheDocument()
+    expect(screen.getByText('Model 2')).toBeInTheDocument()
+    expect(screen.getByText('Test Model')).toBeInTheDocument()
   })
 
   it('filters models based on search query', () => {
@@ -127,9 +127,9 @@ describe('ModelGrid', () => {
     const searchInput = screen.getByPlaceholderText('Search models...')
     fireEvent.change(searchInput, { target: { value: 'test' } })
 
-    expect(screen.getByText('test.gltf')).toBeInTheDocument()
-    expect(screen.queryByText('model1.obj')).not.toBeInTheDocument()
-    expect(screen.queryByText('model2.glb')).not.toBeInTheDocument()
+    expect(screen.getByText('Test Model')).toBeInTheDocument()
+    expect(screen.queryByText('Model 1')).not.toBeInTheDocument()
+    expect(screen.queryByText('Model 2')).not.toBeInTheDocument()
   })
 
   it('shows no results message when search has no matches', () => {
@@ -164,7 +164,7 @@ describe('ModelGrid', () => {
       />
     )
 
-    const modelCard = screen.getByText('model1.obj').closest('.model-card')
+    const modelCard = screen.getByText('Model 1').closest('.model-card')
     expect(modelCard).toBeInTheDocument()
 
     fireEvent.click(modelCard!)
@@ -218,6 +218,6 @@ describe('ModelGrid', () => {
     const searchInput = screen.getByPlaceholderText('Search models...')
     fireEvent.change(searchInput, { target: { value: 'TEST' } })
 
-    expect(screen.getByText('test.gltf')).toBeInTheDocument()
+    expect(screen.getByText('Test Model')).toBeInTheDocument()
   })
 })
