@@ -40,12 +40,14 @@ public class GetVersionThumbnailQueryHandler : IQueryHandler<GetVersionThumbnail
                 null,
                 null,
                 null,
+                null,
                 null));
         }
 
         return Result.Success(new GetVersionThumbnailQueryResponse(
             thumbnail.Status,
             thumbnail.ThumbnailPath,
+            thumbnail.PngThumbnailPath,
             thumbnail.SizeBytes,
             thumbnail.Width,
             thumbnail.Height,
@@ -60,6 +62,7 @@ public record GetVersionThumbnailQuery(int VersionId) : IQuery<GetVersionThumbna
 public record GetVersionThumbnailQueryResponse(
     ThumbnailStatus Status,
     string? ThumbnailPath,
+    string? PngThumbnailPath,
     long? SizeBytes,
     int? Width,
     int? Height,

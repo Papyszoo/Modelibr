@@ -109,7 +109,48 @@ export class ThumbnailApiService {
       allSuccessful: true,
     }
 
-    // Upload WebP thumbnail if available
+    // Upload PNG thumbnail first (primary thumbnail for compatibility)
+    if (thumbnailPaths.pngPath && fs.existsSync(thumbnailPaths.pngPath)) {
+      try {
+        const pngStats = fs.statSync(thumbnailPaths.pngPath)
+        const result = await this.uploadThumbnail(
+          modelId,
+          thumbnailPaths.pngPath,
+          {
+            width: 256, // Default PNG dimensions
+            height: 256,
+          }
+        )
+
+        results.uploads.push({
+          type: 'png',
+          path: thumbnailPaths.pngPath,
+          size: pngStats.size,
+          ...result,
+        })
+
+        if (!result.success) {
+          results.allSuccessful = false
+        }
+      } catch (error) {
+        logger.error('Error processing PNG thumbnail', {
+          modelId,
+          path: thumbnailPaths.pngPath,
+          error: error.message,
+        })
+
+        results.uploads.push({
+          type: 'png',
+          path: thumbnailPaths.pngPath,
+          success: false,
+          error: error.message,
+        })
+
+        results.allSuccessful = false
+      }
+    }
+
+    // Upload WebP thumbnail if available (for animated support)
     if (thumbnailPaths.webpPath && fs.existsSync(thumbnailPaths.webpPath)) {
       try {
         const webpStats = fs.statSync(thumbnailPaths.webpPath)
@@ -150,11 +191,11 @@ export class ThumbnailApiService {
       }
     }
 
-    // Upload poster thumbnail if available and webp failed or not available
+    // Upload poster thumbnail if available and PNG failed
     if (thumbnailPaths.posterPath && fs.existsSync(thumbnailPaths.posterPath)) {
-      // Only upload poster if WebP upload failed or WebP doesn't exist
-      const webpUpload = results.uploads.find(u => u.type === 'webp')
-      const shouldUploadPoster = !webpUpload || !webpUpload.success
+      // Only upload poster if PNG upload failed or PNG doesn't exist
+      const pngUpload = results.uploads.find(u => u.type === 'png')
+      const shouldUploadPoster = !pngUpload || !pngUpload.success
 
       if (shouldUploadPoster) {
         try {
@@ -195,7 +236,7 @@ export class ThumbnailApiService {
           results.allSuccessful = false
         }
       } else {
-        logger.info('Skipping poster upload, WebP upload was successful', {
+        logger.info('Skipping poster upload, PNG upload was successful', {
           modelId,
           posterPath: thumbnailPaths.posterPath,
         })
