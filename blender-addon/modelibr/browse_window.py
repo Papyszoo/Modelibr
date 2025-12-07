@@ -129,20 +129,30 @@ class MODELIBR_OT_browse_assets(Operator):
                 model = self.models[model_idx]
                 col = row.column(align=True)
                 
-                # Thumbnail or placeholder icon
+                # Thumbnail display
                 thumbnail = thumbnail_manager.get_thumbnail(model['id'])
                 if thumbnail and thumbnail.get_preview_id():
                     preview_id = thumbnail.get_preview_id()
                     try:
-                        preview = thumbnail_manager.preview_collection[preview_id]
-                        # Display the preview icon - should work with WebP now
-                        col.template_icon(icon_value=preview.icon_id, scale=5.0)
-                    except (KeyError, AttributeError):
-                        # Fallback to placeholder
-                        col.label(text="", icon='MESH_DATA')
+                        # Try to get the image from bpy.data.images
+                        image_name = f"modelibr_thumb_{model['id']}"
+                        if image_name in bpy.data.images:
+                            img = bpy.data.images[image_name]
+                            # Use template_preview to display the image
+                            col.template_preview(img, show_buttons=False)
+                        else:
+                            # Fallback to preview collection icon
+                            preview = thumbnail_manager.preview_collection[preview_id]
+                            if preview.icon_id > 0:
+                                col.template_icon(icon_value=preview.icon_id, scale=5.0)
+                            else:
+                                col.label(text="[No preview]", icon='IMAGE_DATA')
+                    except (KeyError, AttributeError) as e:
+                        # Debug: show error
+                        col.label(text=f"[Error]", icon='ERROR')
                 else:
                     # Placeholder
-                    col.label(text="", icon='MESH_DATA')
+                    col.label(text="[Loading...]", icon='TIME')
                 
                 # Import button with model name
                 import_op = col.operator(

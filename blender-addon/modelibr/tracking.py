@@ -179,3 +179,18 @@ def get_object_metadata(obj: bpy.types.Object) -> Optional[dict]:
         "imported_at": obj.get("modelibr_imported_at", ""),
         "is_modified": is_modified(obj),
     }
+
+
+def update_hashes_after_upload(scene: bpy.types.Scene, model_id: int) -> None:
+    """
+    Update the original hashes for all objects belonging to a model after upload.
+    This marks them as "unmodified" relative to the new version.
+    
+    Args:
+        scene: Blender scene
+        model_id: Model ID to update hashes for
+    """
+    for obj in scene.objects:
+        if obj.get("modelibr_model_id") == model_id:
+            # Recalculate and store the current hash as the new baseline
+            obj["modelibr_original_hash"] = calculate_object_hash(obj)

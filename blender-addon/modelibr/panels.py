@@ -109,9 +109,9 @@ class MODELIBR_PT_imported_panel(Panel):
         for model_info in imported_models:
             row = layout.row(align=True)
             
-            # Color yellow if modified
+            # Show warning icon for modified models (yellow in Blender)
             if model_info["is_modified"]:
-                row.alert = True
+                row.label(text="", icon='ERROR')
             
             # Model name (clickable to set as current model)
             set_model_op = row.operator(
@@ -126,10 +126,6 @@ class MODELIBR_PT_imported_panel(Panel):
             
             # Version info
             row.label(text=f"v{model_info['version_number']}")
-            
-            # Modified indicator
-            if model_info["is_modified"]:
-                row.label(text="", icon='ERROR')
 
 
 class MODELIBR_UL_model_list(bpy.types.UIList):

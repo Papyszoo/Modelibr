@@ -6,7 +6,7 @@ from bpy.props import StringProperty, IntProperty, BoolProperty, EnumProperty
 
 from .api_client import ModelibrApiClient, ApiError
 from .preferences import get_preferences
-from .tracking import store_object_metadata
+from .tracking import store_object_metadata, update_hashes_after_upload
 import datetime
 
 
@@ -362,6 +362,9 @@ class MODELIBR_OT_upload_version(Operator):
                 # Update current version
                 if version_id > 0:
                     props.current_version_id = version_id
+                
+                # Update hashes for all objects of this model to reflect the new baseline
+                update_hashes_after_upload(context.scene, props.current_model_id)
 
                 self.report({'INFO'}, f"Uploaded new version for '{props.current_model_name}'")
                 return {'FINISHED'}
@@ -508,6 +511,9 @@ class MODELIBR_OT_upload_new_model(Operator):
                 if model_id > 0:
                     props.current_model_id = model_id
                     props.current_model_name = self.model_name
+                    
+                    # Update hashes for all objects of this model to reflect the new baseline
+                    update_hashes_after_upload(context.scene, model_id)
 
                 self.report({'INFO'}, f"Created new model: '{self.model_name}'")
                 return {'FINISHED'}
