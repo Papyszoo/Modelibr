@@ -1,7 +1,7 @@
 import bpy
 from bpy.types import Panel
 
-from .tracking import get_modelibr_objects, is_modified
+from .tracking import get_modelibr_objects, get_modelibr_models, is_modified
 
 
 class MODELIBR_PT_main_panel(Panel):
@@ -16,9 +16,7 @@ class MODELIBR_PT_main_panel(Panel):
         props = context.scene.modelibr
 
         # Browse Assets button
-        row = layout.row(align=True)
-        row.operator("modelibr.browse_assets", text="Browse Assets", icon='FILEBROWSER')
-        row.operator("modelibr.refresh_models", text="", icon='FILE_REFRESH')
+        layout.operator("modelibr.browse_assets", text="Browse Assets", icon='FILEBROWSER')
         
         layout.separator()
 
@@ -33,71 +31,6 @@ class MODELIBR_PT_main_panel(Panel):
 
         # Connection status
         layout.operator("modelibr.test_connection", icon='URL')
-
-
-class MODELIBR_PT_browse_panel(Panel):
-    bl_label = "Browse Models"
-    bl_idname = "MODELIBR_PT_browse_panel"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'Modelibr'
-    bl_parent_id = "MODELIBR_PT_main_panel"
-
-    def draw(self, context):
-        layout = self.layout
-        props = context.scene.modelibr
-
-        # Search bar
-        row = layout.row(align=True)
-        row.prop(props, "search_query", text="", icon='VIEWZOOM')
-        row.operator("modelibr.refresh_models", text="", icon='FILE_REFRESH')
-
-        # Loading indicator
-        if props.is_loading:
-            layout.label(text="Loading...", icon='TIME')
-            return
-
-        # Error message
-        if props.error_message:
-            box = layout.box()
-            box.alert = True
-            box.label(text="Error:", icon='ERROR')
-            col = box.column()
-            # Wrap long error messages
-            words = props.error_message.split()
-            line = ""
-            for word in words:
-                if len(line + " " + word) > 40:
-                    col.label(text=line)
-                    line = word
-                else:
-                    line = (line + " " + word).strip()
-            if line:
-                col.label(text=line)
-
-        # Model list
-        if len(props.models) > 0:
-            layout.template_list(
-                "MODELIBR_UL_model_list",
-                "",
-                props,
-                "models",
-                props,
-                "active_model_index",
-                rows=5,
-            )
-
-            # Import selected
-            if props.active_model_index >= 0 and props.active_model_index < len(props.models):
-                selected = props.models[props.active_model_index]
-                layout.operator(
-                    "modelibr.import_model",
-                    text=f"Import: {selected.name}",
-                    icon='IMPORT',
-                ).model_id = selected.id
-        else:
-            layout.label(text="No models found")
-            layout.operator("modelibr.refresh_models", text="Load Models", icon='FILE_REFRESH')
 
 
 class MODELIBR_PT_upload_panel(Panel):
@@ -165,36 +98,37 @@ class MODELIBR_PT_imported_panel(Panel):
         layout = self.layout
         scene = context.scene
         
-        # Find all imported objects
-        imported_objects = get_modelibr_objects(scene)
+        # Get unique imported models (not individual objects)
+        imported_models = get_modelibr_models(scene)
         
-        if not imported_objects:
+        if not imported_models:
             layout.label(text="No imported assets", icon='INFO')
             return
         
-        # Display each imported object
-        for obj in imported_objects:
+        # Display each imported model
+        for model_info in imported_models:
             row = layout.row(align=True)
             
             # Color yellow if modified
-            if is_modified(obj):
+            if model_info["is_modified"]:
                 row.alert = True
             
-            # Object name (clickable to focus)
-            focus_op = row.operator(
-                "modelibr.focus_object",
-                text=obj.name,
+            # Model name (clickable to set as current model)
+            set_model_op = row.operator(
+                "modelibr.set_current_model",
+                text=model_info["model_name"],
                 emboss=False,
                 icon='OBJECT_DATA'
             )
-            focus_op.object_name = obj.name
+            set_model_op.model_id = model_info["model_id"]
+            set_model_op.model_name = model_info["model_name"]
+            set_model_op.version_id = model_info["version_id"]
             
             # Version info
-            version_num = obj.get('modelibr_version_number', 1)
-            row.label(text=f"v{version_num}")
+            row.label(text=f"v{model_info['version_number']}")
             
             # Modified indicator
-            if is_modified(obj):
+            if model_info["is_modified"]:
                 row.label(text="", icon='ERROR')
 
 
@@ -215,7 +149,6 @@ class MODELIBR_UL_model_list(bpy.types.UIList):
 classes = [
     MODELIBR_UL_model_list,
     MODELIBR_PT_main_panel,
-    MODELIBR_PT_browse_panel,
     MODELIBR_PT_upload_panel,
     MODELIBR_PT_imported_panel,
 ]

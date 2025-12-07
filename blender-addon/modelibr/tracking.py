@@ -95,6 +95,44 @@ def get_modelibr_objects(scene: bpy.types.Scene) -> List[bpy.types.Object]:
     return imported_objects
 
 
+def get_modelibr_models(scene: bpy.types.Scene) -> List[dict]:
+    """
+    Get a list of unique imported models (not individual objects).
+    Groups objects by model_id and returns one entry per model.
+    
+    Args:
+        scene: Blender scene to search
+        
+    Returns:
+        List of dicts with model info and representative object
+    """
+    models_dict = {}
+    
+    for obj in scene.objects:
+        if "modelibr_model_id" in obj:
+            model_id = obj.get("modelibr_model_id", 0)
+            
+            # Keep track of unique models
+            if model_id not in models_dict:
+                models_dict[model_id] = {
+                    "model_id": model_id,
+                    "model_name": obj.get("modelibr_model_name", ""),
+                    "version_id": obj.get("modelibr_version_id", 0),
+                    "version_number": obj.get("modelibr_version_number", 1),
+                    "objects": [],
+                    "is_modified": False,
+                }
+            
+            # Add object to this model's list
+            models_dict[model_id]["objects"].append(obj)
+            
+            # Check if any object in this model is modified
+            if is_modified(obj):
+                models_dict[model_id]["is_modified"] = True
+    
+    return list(models_dict.values())
+
+
 def store_object_metadata(obj: bpy.types.Object, model_id: int, model_name: str, 
                          version_id: int, version_number: int, file_id: int) -> None:
     """
