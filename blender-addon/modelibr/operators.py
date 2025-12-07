@@ -260,6 +260,19 @@ class MODELIBR_OT_upload_version(Operator):
             _debug_log(f"invoke upload_version: always_include_blend={prefs.always_include_blend}, include_blend={self.include_blend}, current_model_id={props.current_model_id}")
         except Exception:
             pass
+        
+        # Check if any objects from this model have been modified
+        from .tracking import get_modelibr_models
+        models = get_modelibr_models(context.scene)
+        has_modifications = False
+        for model_info in models:
+            if model_info["model_id"] == props.current_model_id:
+                has_modifications = model_info["is_modified"]
+                break
+        
+        # Warn if no modifications detected
+        if not has_modifications:
+            self.report({'WARNING'}, "No changes detected. Uploading unchanged model may cause issues with previous version files.")
 
         return context.window_manager.invoke_props_dialog(self)
 
