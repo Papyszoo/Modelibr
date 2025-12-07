@@ -2,7 +2,7 @@
   position: relative;
   width: 40px;
   height: 40px;
-  background: #334155;
+  background: var(--surface-700);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -14,23 +14,23 @@
 }
 
 .draggable-tab:hover {
-  background: #475569;
-  border-color: #64748b;
+  background: var(--surface-600);
+  border-color: var(--surface-500);
 }
 
 .draggable-tab.active {
-  background: #3b82f6;
-  border-color: #2563eb;
+  background: var(--primary-color);
+  border-color: var(--primary-600);
 }
 
 .draggable-tab.active:hover {
-  background: #2563eb;
+  background: var(--primary-600);
 }
 
 /* Tab Icon */
 .tab-icon {
-  color: #e2e8f0;
-  font-size: 1.1rem;
+  color: var(--text-color);
+  font-size: 1rem;
 }
 
 .draggable-tab.active .tab-icon {
@@ -46,7 +46,7 @@
   height: 14px;
   min-width: 14px;
   max-width: 14px;
-  background: #ef4444;
+  background: var(--red-500);
   border: none;
   border-radius: 50%;
   display: none; /* Hidden by default */
@@ -64,7 +64,7 @@
 }
 
 .tab-close-btn:hover {
-  background: #dc2626;
+  background: var(--red-600);
   transform: scale(1.1);
 }
 
