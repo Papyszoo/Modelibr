@@ -49,7 +49,9 @@ class MODELIBR_OT_browse_assets(Operator):
         # Load initial models
         self.load_models(context)
         
-        return context.window_manager.invoke_props_dialog(self, width=800)
+        # Use invoke_popup instead of invoke_props_dialog to avoid OK/Cancel buttons
+        wm = context.window_manager
+        return wm.invoke_popup(self, width=800)
     
     def load_models(self, context):
         """Load models from API"""
@@ -131,9 +133,13 @@ class MODELIBR_OT_browse_assets(Operator):
                 thumbnail = thumbnail_manager.get_thumbnail(model['id'])
                 if thumbnail and thumbnail.get_preview_id():
                     preview_id = thumbnail.get_preview_id()
-                    preview = thumbnail_manager.preview_collection[preview_id]
-                    # Use template_icon with the preview
-                    col.template_icon(icon_value=preview.icon_id, scale=5.0)
+                    try:
+                        preview = thumbnail_manager.preview_collection[preview_id]
+                        # Display the preview icon - should work with WebP now
+                        col.template_icon(icon_value=preview.icon_id, scale=5.0)
+                    except (KeyError, AttributeError):
+                        # Fallback to placeholder
+                        col.label(text="", icon='MESH_DATA')
                 else:
                     # Placeholder
                     col.label(text="", icon='MESH_DATA')
@@ -152,11 +158,9 @@ class MODELIBR_OT_browse_assets(Operator):
         
         layout.separator()
         
-        # Footer with pagination and close
+        # Footer with model count
         row = layout.row(align=True)
         row.label(text=f"Showing {len(self.models)} models")
-        row = layout.row(align=True)
-        row.operator("modelibr.close_browse", text="Close", icon='X')
     
     def execute(self, context):
         """Execute (not used, dialog handles interaction)"""
