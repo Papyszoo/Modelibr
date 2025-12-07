@@ -19,7 +19,7 @@ function ThumbnailDisplay({ modelId, modelName }: ThumbnailDisplayProps) {
         <img
           src={imgSrc}
           alt={modelName || 'Model Thumbnail'}
-          title={modelName}
+          title={modelName || 'Model Thumbnail'}
           className="thumbnail-image"
           loading="lazy"
         />
