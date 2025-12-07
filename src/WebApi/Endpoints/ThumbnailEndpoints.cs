@@ -159,6 +159,52 @@ public static class ThumbnailEndpoints
         .WithName("Get Thumbnail File")
         .WithTags("Thumbnails");
 
+        app.MapGet("/models/{id}/thumbnail/png-file", async (
+            int id,
+            IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler) =>
+        {
+            var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.NotFound(result.Error.Message);
+            }
+
+            var response = result.Value;
+            
+            if (response.Status != ThumbnailStatus.Ready || string.IsNullOrEmpty(response.PngThumbnailPath))
+            {
+                return Results.NotFound("PNG thumbnail not ready or not found");
+            }
+
+            // Ensure the directory exists before checking file existence
+            var directory = Path.GetDirectoryName(response.PngThumbnailPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
+            if (!System.IO.File.Exists(response.PngThumbnailPath))
+            {
+                return Results.NotFound("PNG thumbnail file not found on disk");
+            }
+
+            var fileStream = System.IO.File.OpenRead(response.PngThumbnailPath);
+            
+            // Add cache headers for thumbnail files - include version ID for proper cache invalidation
+            var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
+            if (httpContext != null)
+            {
+                httpContext.Response.Headers.CacheControl = "public, max-age=86400"; // Cache for 24 hours
+                // Include version ID in ETag to ensure cache invalidation when active version changes
+                httpContext.Response.Headers.ETag = $"\"{id}-v{response.ActiveVersionId}-png-{response.ProcessedAt?.Ticks}\"";
+            }
+            
+            return Results.File(fileStream, "image/png", enableRangeProcessing: true);
+        })
+        .WithName("Get Model PNG Thumbnail File")
+        .WithTags("Thumbnails");
+
         app.MapGet("/models/{id}/classification-views/{viewName}", async (
             int id,
             string viewName,
