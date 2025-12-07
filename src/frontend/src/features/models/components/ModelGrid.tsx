@@ -99,10 +99,14 @@ export default function ModelGrid({
   }
 
   const getModelName = (model: Model) => {
-    // Get the first file's name or use the model name
-    return model.files && model.files.length > 0
-      ? model.files[0].originalFileName
-      : model.name || `Model ${model.id}`
+    // Use model name first, fallback to first file's name without extension
+    if (model.name) {
+      return model.name
+    }
+    if (model.files && model.files.length > 0) {
+      return model.files[0].originalFileName
+    }
+    return `Model ${model.id}`
   }
 
   const filteredModels = models.filter(model => {
@@ -170,7 +174,7 @@ export default function ModelGrid({
             }}
           >
             <div className="model-card-thumbnail">
-              <ThumbnailDisplay modelId={model.id} />
+              <ThumbnailDisplay modelId={model.id} modelName={model.name} />
               <div className="model-card-overlay">
                 <span className="model-card-name">{getModelName(model)}</span>
               </div>
