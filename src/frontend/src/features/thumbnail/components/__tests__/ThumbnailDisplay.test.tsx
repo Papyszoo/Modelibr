@@ -47,7 +47,6 @@ describe('ThumbnailDisplay', () => {
     await waitFor(() => {
       const image = screen.getByRole('img')
       expect(image).toBeInTheDocument()
-      expect(image).toHaveAttribute('alt', 'Model Thumbnail')
       expect(image).toHaveAttribute(
         'src',
         'http://localhost:5009/models/1/thumbnail/file'
@@ -122,5 +121,42 @@ describe('ThumbnailDisplay', () => {
     // Verify getThumbnailUrl was called
     expect(mockApiClient.getThumbnailUrl).toHaveBeenCalledTimes(1)
     expect(mockApiClient.getThumbnailUrl).toHaveBeenCalledWith('1')
+  })
+
+  it('uses model name in alt text and title when provided', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({
+      status: 'Ready',
+    } as any)
+
+    mockApiClient.getThumbnailUrl.mockReturnValue(
+      'http://localhost:5009/models/1/thumbnail/file'
+    )
+
+    render(<ThumbnailDisplay modelId="1" modelName="Sci-Fi Spaceship" />)
+
+    await waitFor(() => {
+      const image = screen.getByRole('img')
+      expect(image).toBeInTheDocument()
+      expect(image).toHaveAttribute('alt', 'Sci-Fi Spaceship')
+      expect(image).toHaveAttribute('title', 'Sci-Fi Spaceship')
+    })
+  })
+
+  it('uses default alt text when model name is not provided', async () => {
+    mockApiClient.getThumbnailStatus.mockResolvedValue({
+      status: 'Ready',
+    } as any)
+
+    mockApiClient.getThumbnailUrl.mockReturnValue(
+      'http://localhost:5009/models/1/thumbnail/file'
+    )
+
+    render(<ThumbnailDisplay modelId="1" />)
+
+    await waitFor(() => {
+      const image = screen.getByRole('img')
+      expect(image).toBeInTheDocument()
+      expect(image).toHaveAttribute('alt', 'Model Thumbnail')
+    })
   })
 })
