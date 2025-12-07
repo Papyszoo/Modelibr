@@ -102,8 +102,35 @@ def load_handler(dummy):
     pass
 
 
+@bpy.app.handlers.persistent
+def depsgraph_update_handler(scene, depsgraph):
+    """
+    Handler called when scene is updated.
+    Clears model context if all objects from that model are deleted.
+    """
+    try:
+        props = scene.modelibr
+        if props.current_model_id > 0:
+            # Check if any objects with this model_id still exist in the scene
+            model_exists = False
+            for obj in scene.objects:
+                if obj.get("modelibr_model_id") == props.current_model_id:
+                    model_exists = True
+                    break
+            
+            # If no objects remain, clear the model context
+            if not model_exists:
+                props.current_model_id = 0
+                props.current_model_name = ""
+                props.current_version_id = 0
+    except Exception:
+        # Silently ignore errors to avoid interrupting Blender operations
+        pass
+
+
 def register():
     bpy.app.handlers.load_post.append(load_handler)
+    bpy.app.handlers.depsgraph_update_post.append(depsgraph_update_handler)
     
     # Handle URI on startup
     handle_uri_on_startup()
@@ -112,3 +139,5 @@ def register():
 def unregister():
     if load_handler in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(load_handler)
+    if depsgraph_update_handler in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(depsgraph_update_handler)

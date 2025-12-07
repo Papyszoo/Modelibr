@@ -56,7 +56,22 @@ class AnimatedThumbnail:
             if not os.path.exists(self.thumbnail_path):
                 return False
             
-            # Load into preview collection
+            # Load into Blender's image data blocks for better compatibility with WebP
+            image_name = f"modelibr_thumb_{self.model_id}"
+            
+            # Check if image already loaded
+            if image_name in bpy.data.images:
+                img = bpy.data.images[image_name]
+                # Reload if path changed
+                if img.filepath != self.thumbnail_path:
+                    img.filepath = self.thumbnail_path
+                    img.reload()
+            else:
+                # Load new image
+                img = bpy.data.images.load(self.thumbnail_path, check_existing=True)
+                img.name = image_name
+            
+            # Also load into preview collection for icon display
             preview_id = f"modelibr_thumb_{self.model_id}"
             if preview_id not in preview_collection:
                 try:
@@ -94,8 +109,14 @@ class AnimatedThumbnail:
         self.current_frame = 0
     
     def cleanup(self):
-        """Clean up temporary files"""
+        """Clean up temporary files and image data"""
         try:
+            # Remove image from bpy.data.images
+            image_name = f"modelibr_thumb_{self.model_id}"
+            if image_name in bpy.data.images:
+                bpy.data.images.remove(bpy.data.images[image_name])
+            
+            # Remove temporary file
             if self.thumbnail_path and os.path.exists(self.thumbnail_path):
                 os.remove(self.thumbnail_path)
         except Exception:
