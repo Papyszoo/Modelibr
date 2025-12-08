@@ -56,6 +56,8 @@ export interface TextureDto {
 export interface ModelSummaryDto {
   id: number
   name: string
+  versionNumber?: number
+  modelVersionId?: number
 }
 
 export interface PackSummaryDto {

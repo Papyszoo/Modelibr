@@ -88,9 +88,14 @@ function TextureSetSelectorWindow({
     e.stopPropagation()
     try {
       setUnlinking(textureSetId)
-      await ApiClient.disassociateTextureSetFromModel(
+      const activeVersionId = model.activeVersionId
+      if (!activeVersionId) {
+        console.error('Model has no active version')
+        return
+      }
+      await ApiClient.disassociateTextureSetFromModelVersion(
         textureSetId,
-        parseInt(model.id)
+        activeVersionId
       )
 
       // If this was the default texture set, clear or update the default

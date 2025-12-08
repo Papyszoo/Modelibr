@@ -141,19 +141,25 @@ function TextureSetAssociationDialog({
     try {
       setSaving(true)
 
+      // Get the active version ID to associate with
+      const activeVersionId = model.activeVersionId
+      if (!activeVersionId) {
+        throw new Error('Model has no active version')
+      }
+
       // Process associations
       for (const textureSet of toAssociate) {
-        await ApiClient.associateTextureSetWithModel(
+        await ApiClient.associateTextureSetWithModelVersion(
           textureSet.id,
-          parseInt(model.id)
+          activeVersionId
         )
       }
 
       // Process disassociations
       for (const textureSet of toDisassociate) {
-        await ApiClient.disassociateTextureSetFromModel(
+        await ApiClient.disassociateTextureSetFromModelVersion(
           textureSet.id,
-          parseInt(model.id)
+          activeVersionId
         )
       }
 
