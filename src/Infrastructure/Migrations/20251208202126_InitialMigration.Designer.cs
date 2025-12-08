@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251204213624_InitialMigration")]
+    [Migration("20251208202126_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -590,6 +590,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("ModelVersionId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("PngThumbnailPath")
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");

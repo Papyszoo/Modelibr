@@ -588,6 +588,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ModelVersionId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("PngThumbnailPath")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");
 
