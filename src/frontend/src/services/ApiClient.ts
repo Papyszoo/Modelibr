@@ -205,8 +205,7 @@ class ApiClient {
   }
 
   getThumbnailUrl(modelId: string): string {
-    // Use PNG thumbnail for static display to avoid animated WebP
-    return `${this.baseURL}/models/${modelId}/thumbnail/png-file`
+    return `${this.baseURL}/models/${modelId}/thumbnail/file`
   }
 
   getVersionThumbnailUrl(versionId: number): string {
