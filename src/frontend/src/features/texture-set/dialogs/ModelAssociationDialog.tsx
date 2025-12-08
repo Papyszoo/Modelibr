@@ -4,8 +4,10 @@ import { Toast } from 'primereact/toast'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
-import { TextureSetDto, Model, PackSummaryDto } from '../../../types'
+import { Dropdown } from 'primereact/dropdown'
+import { TextureSetDto, Model, PackSummaryDto, ModelVersionDto } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
+import ApiClient from '../../../services/ApiClient'
 import ThumbnailDisplay from '../../thumbnail/components/ThumbnailDisplay'
 import './dialogs.css'
 
@@ -16,11 +18,19 @@ interface ModelAssociationDialogProps {
   onAssociationsChanged: () => void
 }
 
-interface ModelAssociation {
-  model: Model
+interface ModelVersionAssociation {
+  modelVersionId: number
+  versionNumber: number
   isAssociated: boolean
   originallyAssociated: boolean
-  recentlyUnlinked?: boolean
+}
+
+interface ModelAssociation {
+  model: Model
+  versions: ModelVersionAssociation[]
+  selectedVersionOption: 'specific' | 'all' | null
+  selectedVersionId: number | null
+  hasChanges: boolean
 }
 
 function ModelAssociationDialog({
@@ -63,19 +73,34 @@ function ModelAssociationDialog({
       setLoading(true)
       const allModels = await textureSetsApi.getModels()
 
-      // Get currently associated model IDs
-      const associatedModelIds = new Set(
-        textureSet.associatedModels.map(m => m.id)
-      )
+      // Load versions for each model and build associations
+      const associationsPromises = allModels.map(async (model) => {
+        const versions = await ApiClient.getModelVersions(parseInt(model.id))
+        
+        // Get currently associated version IDs for this model
+        const associatedVersions = textureSet.associatedModels
+          .filter(m => m.id === parseInt(model.id))
+          .map(m => m.modelVersionId)
+        
+        const versionAssociations: ModelVersionAssociation[] = versions.map(v => ({
+          modelVersionId: v.id,
+          versionNumber: v.versionNumber,
+          isAssociated: associatedVersions.includes(v.id),
+          originallyAssociated: associatedVersions.includes(v.id),
+        }))
+        
+        const hasAnyAssociated = versionAssociations.some(v => v.isAssociated)
+        
+        return {
+          model,
+          versions: versionAssociations,
+          selectedVersionOption: hasAnyAssociated ? ('specific' as const) : null,
+          selectedVersionId: hasAnyAssociated ? versionAssociations.find(v => v.isAssociated)?.modelVersionId || null : null,
+          hasChanges: false,
+        }
+      })
 
-      // Create association objects
-      const associations: ModelAssociation[] = allModels.map(model => ({
-        model,
-        isAssociated: associatedModelIds.has(parseInt(model.id)),
-        originallyAssociated: associatedModelIds.has(parseInt(model.id)),
-        recentlyUnlinked: false,
-      }))
-
+      const associations = await Promise.all(associationsPromises)
       setModelAssociations(associations)
     } catch (error) {
       console.error('Failed to load models:', error)
@@ -90,24 +115,15 @@ function ModelAssociationDialog({
     }
   }, [textureSetsApi, textureSet.associatedModels])
 
-  const handleToggleAssociation = (modelId: string, isAssociated: boolean) => {
+  const handleVersionOptionChange = (modelId: string, option: 'specific' | 'all' | null, versionId: number | null) => {
     setModelAssociations(prev =>
       prev.map(assoc => {
         if (assoc.model.id === modelId) {
-          // Track recently unlinked
-          if (assoc.originallyAssociated && !isAssociated) {
-            setRecentlyUnlinkedIds(prev => new Set(prev).add(modelId))
-          } else if (!isAssociated && assoc.originallyAssociated) {
-            setRecentlyUnlinkedIds(prev => {
-              const newSet = new Set(prev)
-              newSet.delete(modelId)
-              return newSet
-            })
-          }
           return {
             ...assoc,
-            isAssociated,
-            recentlyUnlinked: !isAssociated && assoc.originallyAssociated,
+            selectedVersionOption: option,
+            selectedVersionId: versionId,
+            hasChanges: true,
           }
         }
         return assoc
@@ -115,29 +131,11 @@ function ModelAssociationDialog({
     )
   }
 
-  const getChanges = () => {
-    const toAssociate: Model[] = []
-    const toDisassociate: Model[] = []
-
-    modelAssociations.forEach(assoc => {
-      if (assoc.isAssociated && !assoc.originallyAssociated) {
-        toAssociate.push(assoc.model)
-      } else if (!assoc.isAssociated && assoc.originallyAssociated) {
-        toDisassociate.push(assoc.model)
-      }
-    })
-
-    return { toAssociate, toDisassociate }
-  }
-
   const hasChanges = () => {
-    const { toAssociate, toDisassociate } = getChanges()
-    return toAssociate.length > 0 || toDisassociate.length > 0
+    return modelAssociations.some(assoc => assoc.hasChanges)
   }
 
   const handleSave = async () => {
-    const { toAssociate, toDisassociate } = getChanges()
-
     if (!hasChanges()) {
       onHide()
       return
@@ -146,20 +144,31 @@ function ModelAssociationDialog({
     try {
       setSaving(true)
 
-      // Process associations
-      for (const model of toAssociate) {
-        await textureSetsApi.associateTextureSetWithModel(
-          textureSet.id,
-          parseInt(model.id)
-        )
-      }
+      for (const assoc of modelAssociations) {
+        if (!assoc.hasChanges) continue
 
-      // Process disassociations
-      for (const model of toDisassociate) {
-        await textureSetsApi.disassociateTextureSetFromModel(
-          textureSet.id,
-          parseInt(model.id)
-        )
+        // First, disassociate all current associations for this model
+        for (const version of assoc.versions) {
+          if (version.originallyAssociated) {
+            await textureSetsApi.disassociateTextureSetFromModelVersion(
+              textureSet.id,
+              version.modelVersionId
+            )
+          }
+        }
+
+        // Then add new associations
+        if (assoc.selectedVersionOption === 'all') {
+          await textureSetsApi.associateTextureSetWithAllModelVersions(
+            textureSet.id,
+            parseInt(assoc.model.id)
+          )
+        } else if (assoc.selectedVersionOption === 'specific' && assoc.selectedVersionId) {
+          await textureSetsApi.associateTextureSetWithModelVersion(
+            textureSet.id,
+            assoc.selectedVersionId
+          )
+        }
       }
 
       toast.current?.show({
@@ -169,9 +178,8 @@ function ModelAssociationDialog({
         life: 3000,
       })
 
-      // Clear recently unlinked
-      setRecentlyUnlinkedIds(new Set())
       onAssociationsChanged()
+      onHide()
     } catch (error) {
       console.error('Failed to update model associations:', error)
       toast.current?.show({
@@ -213,14 +221,6 @@ function ModelAssociationDialog({
 
     return matchesSearch && matchesPack
   })
-
-  // Split into recently unlinked and others
-  const recentlyUnlinkedModels = filteredModels.filter(
-    assoc => assoc.recentlyUnlinked && recentlyUnlinkedIds.has(assoc.model.id)
-  )
-  const otherModels = filteredModels.filter(
-    assoc => !assoc.recentlyUnlinked || !recentlyUnlinkedIds.has(assoc.model.id)
-  )
 
   const handlePackFilterToggle = (packId: number) => {
     setSelectedPackIds(prev =>
@@ -302,52 +302,31 @@ function ModelAssociationDialog({
             <p>Loading models...</p>
           </div>
         ) : (
-          <>
-            {/* Recently Unlinked Section */}
-            {recentlyUnlinkedModels.length > 0 && (
-              <div className="association-section">
-                <h4 className="section-header">
-                  <i className="pi pi-history" />
-                  Recently Unlinked ({recentlyUnlinkedModels.length})
-                </h4>
-                <div className="models-card-grid">
-                  {recentlyUnlinkedModels.map(assoc => (
-                    <ModelCard
-                      key={assoc.model.id}
-                      model={assoc.model}
-                      isAssociated={assoc.isAssociated}
-                      onToggle={handleToggleAssociation}
-                    />
-                  ))}
-                </div>
+          <div className="association-section">
+            <h4 className="section-header">
+              <i className="pi pi-box" />
+              All Models ({filteredModels.length})
+            </h4>
+            {filteredModels.length === 0 ? (
+              <div className="no-results">
+                <i className="pi pi-inbox" />
+                <p>No models found</p>
+              </div>
+            ) : (
+              <div className="models-card-grid">
+                {filteredModels.map(assoc => (
+                  <ModelCard
+                    key={assoc.model.id}
+                    model={assoc.model}
+                    versions={assoc.versions}
+                    selectedVersionOption={assoc.selectedVersionOption}
+                    selectedVersionId={assoc.selectedVersionId}
+                    onVersionOptionChange={handleVersionOptionChange}
+                  />
+                ))}
               </div>
             )}
-
-            {/* All Models Section */}
-            <div className="association-section">
-              <h4 className="section-header">
-                <i className="pi pi-box" />
-                All Models ({otherModels.length})
-              </h4>
-              {otherModels.length === 0 ? (
-                <div className="no-results">
-                  <i className="pi pi-inbox" />
-                  <p>No models found</p>
-                </div>
-              ) : (
-                <div className="models-card-grid">
-                  {otherModels.map(assoc => (
-                    <ModelCard
-                      key={assoc.model.id}
-                      model={assoc.model}
-                      isAssociated={assoc.isAssociated}
-                      onToggle={handleToggleAssociation}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
+          </div>
         )}
       </div>
     </Dialog>
@@ -356,24 +335,48 @@ function ModelAssociationDialog({
 
 interface ModelCardProps {
   model: Model
-  isAssociated: boolean
-  onToggle: (modelId: string, isAssociated: boolean) => void
+  versions: ModelVersionAssociation[]
+  selectedVersionOption: 'specific' | 'all' | null
+  selectedVersionId: number | null
+  onVersionOptionChange: (modelId: string, option: 'specific' | 'all' | null, versionId: number | null) => void
 }
 
-function ModelCard({ model, isAssociated, onToggle }: ModelCardProps) {
+function ModelCard({ model, versions, selectedVersionOption, selectedVersionId, onVersionOptionChange }: ModelCardProps) {
+  const versionOptions = [
+    { label: 'Not linked', value: null },
+    { label: 'All versions', value: 'all' },
+    ...versions.map(v => ({
+      label: `Version ${v.versionNumber}`,
+      value: v.modelVersionId
+    }))
+  ]
+
+  const dropdownValue = selectedVersionOption === 'all' ? 'all' : selectedVersionId
+
   return (
-    <div
-      className={`model-association-card ${isAssociated ? 'selected' : ''}`}
-      onClick={() => onToggle(model.id, !isAssociated)}
-    >
-      <div className="model-association-checkbox">
-        <Checkbox checked={isAssociated} readOnly />
-      </div>
+    <div className="model-association-card">
       <div className="model-card-thumbnail">
         <ThumbnailDisplay modelId={model.id} />
         <div className="model-card-overlay">
           <span className="model-card-name">{model.name}</span>
         </div>
+      </div>
+      <div className="model-card-version-selector" style={{ padding: '0.5rem' }}>
+        <Dropdown
+          value={dropdownValue}
+          options={versionOptions}
+          onChange={(e) => {
+            if (e.value === null) {
+              onVersionOptionChange(model.id, null, null)
+            } else if (e.value === 'all') {
+              onVersionOptionChange(model.id, 'all', null)
+            } else {
+              onVersionOptionChange(model.id, 'specific', e.value as number)
+            }
+          }}
+          placeholder="Select version"
+          style={{ width: '100%' }}
+        />
       </div>
     </div>
   )
