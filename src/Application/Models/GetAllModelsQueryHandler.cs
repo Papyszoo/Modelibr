@@ -41,6 +41,12 @@ namespace Application.Models
                 Description = m.Description,
                 DefaultTextureSetId = m.DefaultTextureSetId,
                 ActiveVersionId = m.ActiveVersionId,
+                ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
+                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file" 
+                    : null,
+                PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
+                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file" 
+                    : null,
                 Files = (m.ActiveVersion?.Files ?? Array.Empty<Domain.Models.File>()).Select(f => new FileDto
                 {
                     Id = f.Id,
@@ -85,6 +91,8 @@ namespace Application.Models
         public string? Description { get; init; }
         public int? DefaultTextureSetId { get; init; }
         public int? ActiveVersionId { get; init; }
+        public string? ThumbnailUrl { get; init; }
+        public string? PngThumbnailUrl { get; init; }
         public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
         public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
         public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();

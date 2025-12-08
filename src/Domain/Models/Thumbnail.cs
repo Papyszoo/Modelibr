@@ -26,6 +26,12 @@ public class Thumbnail : AggregateRoot
     public string? ThumbnailPath { get; private set; }
     
     /// <summary>
+    /// The file path where the PNG thumbnail is stored (when Ready).
+    /// For better compatibility with clients that have WebP issues.
+    /// </summary>
+    public string? PngThumbnailPath { get; private set; }
+    
+    /// <summary>
     /// Size of the generated thumbnail file in bytes (when Ready).
     /// </summary>
     public long? SizeBytes { get; private set; }
@@ -98,6 +104,34 @@ public class Thumbnail : AggregateRoot
         ValidateThumbnailPath(thumbnailPath);
         ValidateSizeBytes(sizeBytes);
         ValidateImageDimensions(width, height);
+
+        Status = ThumbnailStatus.Ready;
+        ThumbnailPath = thumbnailPath.Trim();
+        SizeBytes = sizeBytes;
+        Width = width;
+        Height = height;
+        ErrorMessage = null;
+        ProcessedAt = processedAt;
+        UpdatedAt = processedAt;
+        
+        var thumbnailUrl = $"/model-versions/{ModelVersionId}/thumbnail/file";
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status, thumbnailUrl));
+    }
+
+    /// <summary>
+    /// Marks the thumbnail as ready with the generated file details, including PNG variant.
+    /// </summary>
+    public void MarkAsReady(string thumbnailPath, string? pngThumbnailPath, long sizeBytes, int width, int height, DateTime processedAt)
+    {
+        ValidateThumbnailPath(thumbnailPath);
+        ValidateSizeBytes(sizeBytes);
+        ValidateImageDimensions(width, height);
+
+        if (!string.IsNullOrWhiteSpace(pngThumbnailPath))
+        {
+            ValidateThumbnailPath(pngThumbnailPath);
+            PngThumbnailPath = pngThumbnailPath.Trim();
+        }
 
         Status = ThumbnailStatus.Ready;
         ThumbnailPath = thumbnailPath.Trim();

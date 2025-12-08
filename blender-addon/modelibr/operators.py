@@ -6,6 +6,7 @@ from bpy.props import StringProperty, IntProperty, BoolProperty, EnumProperty
 
 from .api_client import ModelibrApiClient, ApiError
 from .preferences import get_preferences
+from .tracking import store_object_metadata, update_hashes_after_upload
 import datetime
 
 
@@ -158,6 +159,9 @@ class MODELIBR_OT_import_model(Operator):
                     filename
                 )
 
+                # Track objects before import to identify newly imported objects
+                objects_before = set(context.scene.objects)
+                
                 # Import based on file extension
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in ['.glb', '.gltf']:
@@ -179,6 +183,20 @@ class MODELIBR_OT_import_model(Operator):
                 else:
                     self.report({'ERROR'}, f"Unsupported file format: {ext}")
                     return {'CANCELLED'}
+                
+                # Identify newly imported objects and store metadata
+                objects_after = set(context.scene.objects)
+                new_objects = objects_after - objects_before
+                
+                for obj in new_objects:
+                    store_object_metadata(
+                        obj,
+                        model_id=self.model_id,
+                        model_name=model.get('name', ''),
+                        version_id=version.get('id', 0),
+                        version_number=version.get('versionNumber', 1),
+                        file_id=file_to_import['id']
+                    )
 
             # Update scene properties
             props.current_model_id = self.model_id
@@ -242,6 +260,19 @@ class MODELIBR_OT_upload_version(Operator):
             _debug_log(f"invoke upload_version: always_include_blend={prefs.always_include_blend}, include_blend={self.include_blend}, current_model_id={props.current_model_id}")
         except Exception:
             pass
+        
+        # Check if any objects from this model have been modified
+        from .tracking import get_modelibr_models
+        models = get_modelibr_models(context.scene)
+        has_modifications = False
+        for model_info in models:
+            if model_info["model_id"] == props.current_model_id:
+                has_modifications = model_info["is_modified"]
+                break
+        
+        # Warn if no modifications detected
+        if not has_modifications:
+            self.report({'WARNING'}, "No changes detected. Uploading unchanged model may cause issues with previous version files.")
 
         return context.window_manager.invoke_props_dialog(self)
 
@@ -344,6 +375,9 @@ class MODELIBR_OT_upload_version(Operator):
                 # Update current version
                 if version_id > 0:
                     props.current_version_id = version_id
+                
+                # Update hashes for all objects of this model to reflect the new baseline
+                update_hashes_after_upload(context.scene, props.current_model_id)
 
                 self.report({'INFO'}, f"Uploaded new version for '{props.current_model_name}'")
                 return {'FINISHED'}
@@ -490,6 +524,9 @@ class MODELIBR_OT_upload_new_model(Operator):
                 if model_id > 0:
                     props.current_model_id = model_id
                     props.current_model_name = self.model_name
+                    
+                    # Update hashes for all objects of this model to reflect the new baseline
+                    update_hashes_after_upload(context.scene, model_id)
 
                 self.report({'INFO'}, f"Created new model: '{self.model_name}'")
                 return {'FINISHED'}
@@ -527,6 +564,179 @@ class MODELIBR_OT_clear_model_context(Operator):
         return {'FINISHED'}
 
 
+class MODELIBR_OT_set_current_model(Operator):
+    bl_idname = "modelibr.set_current_model"
+    bl_label = "Set Current Model"
+    bl_description = "Set this model as the current model context"
+    
+    model_id: IntProperty(name="Model ID")
+    model_name: StringProperty(name="Model Name")
+    version_id: IntProperty(name="Version ID")
+    
+    def execute(self, context):
+        props = context.scene.modelibr
+        props.current_model_id = self.model_id
+        props.current_model_name = self.model_name
+        props.current_version_id = self.version_id
+        
+        self.report({'INFO'}, f"Set current model to: {self.model_name}")
+        return {'FINISHED'}
+
+
+class MODELIBR_OT_focus_object(Operator):
+    bl_idname = "modelibr.focus_object"
+    bl_label = "Focus Object"
+    bl_description = "Select and frame object in viewport"
+    
+    object_name: StringProperty(name="Object Name")
+    
+    def execute(self, context):
+        obj = bpy.data.objects.get(self.object_name)
+        if obj:
+            # Deselect all
+            bpy.ops.object.select_all(action='DESELECT')
+            # Select target
+            obj.select_set(True)
+            context.view_layer.objects.active = obj
+            # Frame in viewport
+            bpy.ops.view3d.view_selected()
+            return {'FINISHED'}
+        
+        self.report({'WARNING'}, f"Object '{self.object_name}' not found")
+        return {'CANCELLED'}
+
+
+class MODELIBR_OT_upload_from_imported(Operator):
+    bl_idname = "modelibr.upload_from_imported"
+    bl_label = "Upload Selected Asset"
+    bl_description = "Upload selected asset as new version or new model"
+    
+    model_id: IntProperty(
+        name="Model ID",
+        description="Model ID for version upload",
+        default=0,
+    )
+    
+    upload_as: EnumProperty(
+        name="Upload As",
+        items=[
+            ('VERSION', "New Version", "Upload as new version of existing model"),
+            ('MODEL', "New Model", "Upload as completely new model"),
+        ],
+        default='VERSION',
+    )
+    
+    description: StringProperty(
+        name="Description",
+        description="Version or model description",
+        default="",
+    )
+    
+    model_name: StringProperty(
+        name="Model Name",
+        description="Name for new model (only for New Model option)",
+        default="",
+    )
+    
+    export_format: EnumProperty(
+        name="Export Format",
+        items=[
+            ('GLB', "GLB", "GL Transmission Format Binary"),
+            ('FBX', "FBX", "Autodesk FBX"),
+            ('OBJ', "OBJ", "Wavefront OBJ"),
+        ],
+        default='GLB',
+    )
+    
+    include_blend: BoolProperty(
+        name="Include .blend File",
+        description="Also upload the .blend file",
+        default=False,
+    )
+    
+    def invoke(self, context, event):
+        obj = context.active_object
+        prefs = get_preferences()
+        
+        self.export_format = prefs.default_export_format
+        self.include_blend = prefs.always_include_blend
+        
+        # Detect if active object is from Modelibr
+        if obj and "modelibr_model_id" in obj:
+            self.model_id = obj["modelibr_model_id"]
+            self.model_name = obj.get("modelibr_model_name", "")
+            # Default to VERSION upload
+            self.upload_as = 'VERSION'
+        else:
+            # Force NEW_MODEL if no Modelibr context
+            self.upload_as = 'MODEL'
+            self.model_id = 0
+            
+            # Default name from blend file
+            blend_name = bpy.path.basename(bpy.data.filepath)
+            if blend_name:
+                self.model_name = os.path.splitext(blend_name)[0]
+        
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        
+        layout.prop(self, "upload_as", expand=True)
+        
+        if self.upload_as == 'VERSION':
+            layout.label(text=f"Model: {self.model_name}")
+            layout.prop(self, "description")
+        else:
+            layout.prop(self, "model_name")
+        
+        layout.prop(self, "export_format")
+        layout.prop(self, "include_blend")
+    
+    def execute(self, context):
+        props = context.scene.modelibr
+        
+        if self.upload_as == 'VERSION':
+            # Upload as new version
+            if self.model_id <= 0:
+                self.report({'ERROR'}, "No model ID available")
+                return {'CANCELLED'}
+            
+            # Temporarily set model context for upload_version
+            original_model_id = props.current_model_id
+            original_model_name = props.current_model_name
+            
+            try:
+                props.current_model_id = self.model_id
+                props.current_model_name = self.model_name
+                
+                # Delegate to upload_version operator
+                bpy.ops.modelibr.upload_version(
+                    description=self.description,
+                    export_format=self.export_format,
+                    include_blend=self.include_blend,
+                    set_as_active=True,
+                )
+            finally:
+                # Restore original context
+                props.current_model_id = original_model_id
+                props.current_model_name = original_model_name
+        else:
+            # Upload as new model
+            if not self.model_name:
+                self.report({'ERROR'}, "Model name is required")
+                return {'CANCELLED'}
+            
+            # Delegate to upload_new_model operator
+            bpy.ops.modelibr.upload_new_model(
+                model_name=self.model_name,
+                export_format=self.export_format,
+                include_blend=self.include_blend,
+            )
+        
+        return {'FINISHED'}
+
+
 classes = [
     MODELIBR_OT_refresh_models,
     MODELIBR_OT_import_model,
@@ -534,6 +744,9 @@ classes = [
     MODELIBR_OT_upload_new_model,
     MODELIBR_OT_test_connection,
     MODELIBR_OT_clear_model_context,
+    MODELIBR_OT_set_current_model,
+    MODELIBR_OT_focus_object,
+    MODELIBR_OT_upload_from_imported,
 ]
 
 

@@ -71,11 +71,20 @@ export class FrameEncoderService {
         jobLogger
       )
 
+      // Step 3: Create PNG thumbnail from first frame for better compatibility
+      const firstFrame = frames[0]
+      const pngPath = await this.createPngThumbnail(
+        firstFrame,
+        workingDir,
+        jobLogger
+      )
+
       const encodeTime = Date.now() - startTime
 
       jobLogger.info('Frame encoding completed', {
         webpPath,
         posterPath,
+        pngPath,
         encodeTimeMs: encodeTime,
         frameCount: frames.length,
         isAnimated: true,
@@ -84,6 +93,7 @@ export class FrameEncoderService {
       return {
         webpPath,
         posterPath,
+        pngPath,
         frameCount: frames.length,
         representativeFrameIndex: middleFrameIndex,
         encodeTimeMs: encodeTime,
@@ -231,6 +241,44 @@ export class FrameEncoderService {
       return posterPath
     } catch (error) {
       jobLogger.error('Failed to create poster frame', {
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Create PNG thumbnail from a single frame for better compatibility
+   * @param {Object} frame - Frame data with pixels buffer
+   * @param {string} workingDir - Working directory
+   * @param {Object} jobLogger - Logger with job context
+   * @returns {Promise<string>} Path to created PNG file
+   */
+  async createPngThumbnail(frame, workingDir, jobLogger) {
+    const pngPath = path.join(workingDir, 'thumbnail.png')
+    const quality = config.encoding?.pngQuality || 85
+
+    jobLogger.info('Creating PNG thumbnail', {
+      quality,
+      width: frame.width,
+      height: frame.height,
+      outputPath: pngPath,
+    })
+
+    try {
+      await sharp(frame.pixels)
+        .png({ quality, compressionLevel: 6 })
+        .toFile(pngPath)
+
+      const stats = fs.statSync(pngPath)
+      jobLogger.info('PNG thumbnail created successfully', {
+        sizeBytes: stats.size,
+        sizeMB: (stats.size / 1024 / 1024).toFixed(2),
+      })
+
+      return pngPath
+    } catch (error) {
+      jobLogger.error('Failed to create PNG thumbnail', {
         error: error.message,
       })
       throw error

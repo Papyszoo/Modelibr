@@ -37,6 +37,7 @@ public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQu
                 null,
                 null,
                 null,
+                null,
                 null));
         }
 
@@ -44,6 +45,7 @@ public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQu
             thumbnail.Status,
             activeVersionId,
             thumbnail.ThumbnailPath,
+            thumbnail.PngThumbnailPath,
             thumbnail.SizeBytes,
             thumbnail.Width,
             thumbnail.Height,
@@ -59,6 +61,7 @@ public record GetThumbnailStatusQueryResponse(
     ThumbnailStatus Status,
     int? ActiveVersionId,
     string? ThumbnailPath,
+    string? PngThumbnailPath,
     long? SizeBytes,
     int? Width,
     int? Height,
