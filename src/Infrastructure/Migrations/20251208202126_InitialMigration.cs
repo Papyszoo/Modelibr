@@ -450,6 +450,7 @@ namespace Infrastructure.Migrations
                     ModelVersionId = table.Column<int>(type: "integer", nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
                     ThumbnailPath = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    PngThumbnailPath = table.Column<string>(type: "text", nullable: true),
                     SizeBytes = table.Column<long>(type: "bigint", nullable: true),
                     Width = table.Column<int>(type: "integer", nullable: true),
                     Height = table.Column<int>(type: "integer", nullable: true),
