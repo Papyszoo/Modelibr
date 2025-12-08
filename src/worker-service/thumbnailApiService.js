@@ -109,48 +109,7 @@ export class ThumbnailApiService {
       allSuccessful: true,
     }
 
-    // Upload PNG thumbnail first (primary thumbnail for compatibility)
-    if (thumbnailPaths.pngPath && fs.existsSync(thumbnailPaths.pngPath)) {
-      try {
-        const pngStats = fs.statSync(thumbnailPaths.pngPath)
-        const result = await this.uploadThumbnail(
-          modelId,
-          thumbnailPaths.pngPath,
-          {
-            width: 256, // Default PNG dimensions
-            height: 256,
-          }
-        )
-
-        results.uploads.push({
-          type: 'png',
-          path: thumbnailPaths.pngPath,
-          size: pngStats.size,
-          ...result,
-        })
-
-        if (!result.success) {
-          results.allSuccessful = false
-        }
-      } catch (error) {
-        logger.error('Error processing PNG thumbnail', {
-          modelId,
-          path: thumbnailPaths.pngPath,
-          error: error.message,
-        })
-
-        results.uploads.push({
-          type: 'png',
-          path: thumbnailPaths.pngPath,
-          success: false,
-          error: error.message,
-        })
-
-        results.allSuccessful = false
-      }
-    }
-
-    // Upload WebP thumbnail if available (for animated support)
+    // Upload WebP thumbnail FIRST (primary animated thumbnail for frontend)
     if (thumbnailPaths.webpPath && fs.existsSync(thumbnailPaths.webpPath)) {
       try {
         const webpStats = fs.statSync(thumbnailPaths.webpPath)
@@ -189,6 +148,24 @@ export class ThumbnailApiService {
 
         results.allSuccessful = false
       }
+    }
+
+    // Note: PNG thumbnail is NOT uploaded via this method
+    // PNG is uploaded separately via the new PNG-specific endpoint
+    // to avoid overwriting the animated WebP thumbnail
+    if (thumbnailPaths.pngPath && fs.existsSync(thumbnailPaths.pngPath)) {
+      logger.info('PNG thumbnail path available for separate upload', {
+        modelId,
+        pngPath: thumbnailPaths.pngPath,
+      })
+      
+      results.uploads.push({
+        type: 'png',
+        path: thumbnailPaths.pngPath,
+        size: fs.statSync(thumbnailPaths.pngPath).size,
+        success: true,
+        note: 'PNG saved locally, to be uploaded via dedicated endpoint',
+      })
     }
 
     // Upload poster thumbnail if available and PNG failed
