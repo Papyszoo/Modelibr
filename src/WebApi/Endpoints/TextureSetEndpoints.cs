@@ -287,11 +287,12 @@ public static class TextureSetEndpoints
     private static async Task<IResult> AssociateTextureSetWithModel(
         int packId,
         int modelId,
+        int? modelVersionId,
         ICommandHandler<AssociateTextureSetWithModelCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new AssociateTextureSetWithModelCommand(packId, modelId), 
+            new AssociateTextureSetWithModelCommand(packId, modelId, modelVersionId), 
             cancellationToken);
 
         if (!result.IsSuccess)
@@ -305,11 +306,12 @@ public static class TextureSetEndpoints
     private static async Task<IResult> DisassociateTextureSetFromModel(
         int packId,
         int modelId,
+        int? modelVersionId,
         ICommandHandler<DisassociateTextureSetFromModelCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new DisassociateTextureSetFromModelCommand(packId, modelId), 
+            new DisassociateTextureSetFromModelCommand(packId, modelId, modelVersionId), 
             cancellationToken);
 
         if (!result.IsSuccess)
