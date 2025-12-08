@@ -58,12 +58,17 @@ class AnimatedThumbnail:
                     str(self.temp_dir / f"thumbnail_{self.thumbnail_key}.webp")
                 )
             else:
-                # Legacy support - extract model_id and use old method
-                # Assume thumbnail_key is model_id in this case
-                downloaded_path = api_client.download_thumbnail(
-                    int(self.thumbnail_key) if isinstance(self.thumbnail_key, (int, str)) and str(self.thumbnail_key).isdigit() else 0,
-                    str(self.temp_dir)
-                )
+                # Legacy support - for old code that passes model_id directly
+                # Extract numeric model_id from thumbnail_key
+                try:
+                    # If thumbnail_key is "123_v456", extract 123
+                    if isinstance(self.thumbnail_key, str) and '_v' in self.thumbnail_key:
+                        model_id = int(self.thumbnail_key.split('_v')[0])
+                    else:
+                        model_id = int(self.thumbnail_key)
+                    downloaded_path = api_client.download_thumbnail(model_id, str(self.temp_dir))
+                except (ValueError, AttributeError) as e:
+                    raise ValueError(f"Invalid thumbnail_key format: {self.thumbnail_key}. Expected model_id or 'model_id_vversion_id'")
             
             print(f"[Modelibr] Downloaded thumbnail path: {downloaded_path}, exists: {os.path.exists(downloaded_path)}")
             

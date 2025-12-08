@@ -14,17 +14,31 @@ from .operators import get_api_client
 
 
 # Global registry to track active browse window instance
+# This is needed because Blender operators that are called from within a modal dialog
+# (like our version change buttons) cannot directly access the parent operator's state.
+# We use a simple global reference that is set when the window opens and cleared when it closes.
+# Note: Only one browse window can be open at a time by design.
 _active_browse_window = None
 
 
 def get_active_browse_window():
-    """Get the currently active browse window instance"""
+    """
+    Get the currently active browse window instance.
+    
+    Returns:
+        MODELIBR_OT_browse_assets instance or None if no window is open
+    """
     global _active_browse_window
     return _active_browse_window
 
 
 def set_active_browse_window(window):
-    """Set the currently active browse window instance"""
+    """
+    Set the currently active browse window instance.
+    
+    Args:
+        window: MODELIBR_OT_browse_assets instance or None to clear
+    """
     global _active_browse_window
     _active_browse_window = window
 
@@ -93,13 +107,14 @@ class MODELIBR_OT_browse_assets(Operator):
                     versions = client.get_model_versions(model_id)
                     if versions:
                         self.model_versions[model_id] = versions
-                        # Default to active version if available, otherwise latest
+                        # Default to active version if available, otherwise latest by version number
                         active_version_id = model.get('activeVersionId')
                         if active_version_id and any(v['id'] == active_version_id for v in versions):
                             self.selected_version_ids[model_id] = active_version_id
                         else:
-                            # Use latest version
-                            self.selected_version_ids[model_id] = versions[-1]['id']
+                            # Use latest version (highest version number)
+                            latest_version = max(versions, key=lambda v: v['versionNumber'])
+                            self.selected_version_ids[model_id] = latest_version['id']
                     else:
                         self.model_versions[model_id] = []
                         self.selected_version_ids[model_id] = None
@@ -342,6 +357,8 @@ class MODELIBR_OT_close_browse(Operator):
     bl_description = "Close browse window"
     
     def execute(self, context):
+        # Clear the active window reference when explicitly closing
+        set_active_browse_window(None)
         return {'FINISHED'}
 
 
