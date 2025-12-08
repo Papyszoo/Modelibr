@@ -13,15 +13,15 @@ from typing import Dict, Optional
 class AnimatedThumbnail:
     """Handle animated WebP thumbnails with hover detection"""
     
-    def __init__(self, model_id: int, thumbnail_url: str):
+    def __init__(self, thumbnail_key, thumbnail_url: str):
         """
         Initialize an animated thumbnail handler.
         
         Args:
-            model_id: Model ID from Modelibr
+            thumbnail_key: Unique key for this thumbnail (can be model_id or model_id_vversion_id)
             thumbnail_url: URL to download thumbnail from
         """
-        self.model_id = model_id
+        self.thumbnail_key = thumbnail_key
         self.thumbnail_url = thumbnail_url
         self.frames = []
         self.current_frame = 0
@@ -48,11 +48,22 @@ class AnimatedThumbnail:
                 self.temp_dir.mkdir(exist_ok=True)
             
             # Download thumbnail
-            print(f"[Modelibr] Downloading thumbnail for model {self.model_id}...")
-            downloaded_path = api_client.download_thumbnail(
-                self.model_id,
-                str(self.temp_dir)
-            )
+            print(f"[Modelibr] Downloading thumbnail for key {self.thumbnail_key}...")
+            
+            # Check if URL is a direct endpoint path or a full URL
+            if self.thumbnail_url.startswith('/'):
+                # It's an API endpoint - use direct download
+                downloaded_path = api_client._download_file(
+                    self.thumbnail_url,
+                    str(self.temp_dir / f"thumbnail_{self.thumbnail_key}.webp")
+                )
+            else:
+                # Legacy support - extract model_id and use old method
+                # Assume thumbnail_key is model_id in this case
+                downloaded_path = api_client.download_thumbnail(
+                    int(self.thumbnail_key) if isinstance(self.thumbnail_key, (int, str)) and str(self.thumbnail_key).isdigit() else 0,
+                    str(self.temp_dir)
+                )
             
             print(f"[Modelibr] Downloaded thumbnail path: {downloaded_path}, exists: {os.path.exists(downloaded_path)}")
             
@@ -88,7 +99,7 @@ class AnimatedThumbnail:
                 self.thumbnail_path = downloaded_path
             
             # Load into Blender's image data blocks
-            image_name = f"modelibr_thumb_{self.model_id}"
+            image_name = f"modelibr_thumb_{self.thumbnail_key}"
             
             # Check if image already loaded
             if image_name in bpy.data.images:
@@ -105,7 +116,7 @@ class AnimatedThumbnail:
                 print(f"[Modelibr] Image loaded successfully: {img.name}")
             
             # Also load into preview collection for icon display
-            preview_id = f"modelibr_thumb_{self.model_id}"
+            preview_id = f"modelibr_thumb_{self.thumbnail_key}"
             if preview_id not in preview_collection:
                 try:
                     print(f"[Modelibr] Loading into preview collection: {preview_id}")
@@ -123,11 +134,11 @@ class AnimatedThumbnail:
                 print(f"[Modelibr] WARNING: Preview {preview_id} not found in collection after load!")
             
             self.preview_id = preview_id
-            print(f"[Modelibr] Successfully loaded thumbnail for model {self.model_id}, preview_id: {self.preview_id}")
+            print(f"[Modelibr] Successfully loaded thumbnail for key {self.thumbnail_key}, preview_id: {self.preview_id}")
             return True
             
         except Exception as e:
-            print(f"[Modelibr] Error loading thumbnail for model {self.model_id}: {e}")
+            print(f"[Modelibr] Error loading thumbnail for key {self.thumbnail_key}: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -156,7 +167,7 @@ class AnimatedThumbnail:
         """Clean up temporary files and image data"""
         try:
             # Remove image from bpy.data.images
-            image_name = f"modelibr_thumb_{self.model_id}"
+            image_name = f"modelibr_thumb_{self.thumbnail_key}"
             if image_name in bpy.data.images:
                 bpy.data.images.remove(bpy.data.images[image_name])
             
@@ -172,7 +183,7 @@ class ThumbnailManager:
     
     def __init__(self):
         """Initialize thumbnail manager"""
-        self.thumbnails: Dict[int, AnimatedThumbnail] = {}
+        self.thumbnails: Dict[str, AnimatedThumbnail] = {}  # Changed to string key
         self.preview_collection = None
     
     def initialize(self):
@@ -180,51 +191,51 @@ class ThumbnailManager:
         if not self.preview_collection:
             self.preview_collection = bpy.utils.previews.new()
     
-    def load_thumbnail(self, model_id: int, thumbnail_url: str, api_client) -> Optional[AnimatedThumbnail]:
+    def load_thumbnail(self, thumbnail_key, thumbnail_url: str, api_client) -> Optional[AnimatedThumbnail]:
         """
         Load a thumbnail for a model.
         
         Args:
-            model_id: Model ID from Modelibr
+            thumbnail_key: Unique key for this thumbnail (can be model_id or "model_id_vversion_id")
             thumbnail_url: URL to download thumbnail from
             api_client: API client for downloading
             
         Returns:
             AnimatedThumbnail instance or None if loading failed
         """
-        print(f"[Modelibr ThumbnailManager] load_thumbnail called for model {model_id}")
+        print(f"[Modelibr ThumbnailManager] load_thumbnail called for key {thumbnail_key}")
         
-        if model_id in self.thumbnails:
-            print(f"[Modelibr ThumbnailManager] Thumbnail already loaded for model {model_id}")
-            return self.thumbnails[model_id]
+        if thumbnail_key in self.thumbnails:
+            print(f"[Modelibr ThumbnailManager] Thumbnail already loaded for key {thumbnail_key}")
+            return self.thumbnails[thumbnail_key]
         
-        print(f"[Modelibr ThumbnailManager] Creating new AnimatedThumbnail for model {model_id}")
-        thumbnail = AnimatedThumbnail(model_id, thumbnail_url)
+        print(f"[Modelibr ThumbnailManager] Creating new AnimatedThumbnail for key {thumbnail_key}")
+        thumbnail = AnimatedThumbnail(thumbnail_key, thumbnail_url)
         
-        print(f"[Modelibr ThumbnailManager] Calling thumbnail.load() for model {model_id}")
+        print(f"[Modelibr ThumbnailManager] Calling thumbnail.load() for key {thumbnail_key}")
         load_success = thumbnail.load(api_client, self.preview_collection)
         print(f"[Modelibr ThumbnailManager] thumbnail.load() returned: {load_success}")
         
         if load_success:
-            self.thumbnails[model_id] = thumbnail
-            print(f"[Modelibr ThumbnailManager] Thumbnail stored in manager for model {model_id}")
+            self.thumbnails[thumbnail_key] = thumbnail
+            print(f"[Modelibr ThumbnailManager] Thumbnail stored in manager for key {thumbnail_key}")
             return thumbnail
         else:
-            print(f"[Modelibr ThumbnailManager] Thumbnail loading FAILED for model {model_id}")
+            print(f"[Modelibr ThumbnailManager] Thumbnail loading FAILED for key {thumbnail_key}")
         
         return None
     
-    def get_thumbnail(self, model_id: int) -> Optional[AnimatedThumbnail]:
+    def get_thumbnail(self, thumbnail_key) -> Optional[AnimatedThumbnail]:
         """
         Get a loaded thumbnail.
         
         Args:
-            model_id: Model ID
+            thumbnail_key: Unique key for this thumbnail
             
         Returns:
             AnimatedThumbnail instance or None if not loaded
         """
-        return self.thumbnails.get(model_id)
+        return self.thumbnails.get(thumbnail_key)
     
     def cleanup(self):
         """Clean up all thumbnails and preview collection"""

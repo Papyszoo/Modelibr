@@ -13,6 +13,22 @@ from .thumbnail_handler import get_thumbnail_manager
 from .operators import get_api_client
 
 
+# Global registry to track active browse window instance
+_active_browse_window = None
+
+
+def get_active_browse_window():
+    """Get the currently active browse window instance"""
+    global _active_browse_window
+    return _active_browse_window
+
+
+def set_active_browse_window(window):
+    """Set the currently active browse window instance"""
+    global _active_browse_window
+    _active_browse_window = window
+
+
 class MODELIBR_OT_browse_assets(Operator):
     """Browse and import assets from Modelibr server"""
     bl_idname = "modelibr.browse_assets"
@@ -45,6 +61,11 @@ class MODELIBR_OT_browse_assets(Operator):
         self.models = []
         self.is_loading = False
         self.error_message = ""
+        self.model_versions = {}  # Dictionary to store versions per model: {model_id: [versions]}
+        self.selected_version_ids = {}  # Dictionary to track selected version per model: {model_id: version_id}
+        
+        # Register this instance as the active browse window
+        set_active_browse_window(self)
         
         # Load initial models
         self.load_models(context)
@@ -65,36 +86,62 @@ class MODELIBR_OT_browse_assets(Operator):
             # Store models
             self.models = models if models else []
             
-            # Load thumbnails in background
+            # Load versions for each model and initialize selected version
+            for model in self.models:
+                model_id = model['id']
+                try:
+                    versions = client.get_model_versions(model_id)
+                    if versions:
+                        self.model_versions[model_id] = versions
+                        # Default to active version if available, otherwise latest
+                        active_version_id = model.get('activeVersionId')
+                        if active_version_id and any(v['id'] == active_version_id for v in versions):
+                            self.selected_version_ids[model_id] = active_version_id
+                        else:
+                            # Use latest version
+                            self.selected_version_ids[model_id] = versions[-1]['id']
+                    else:
+                        self.model_versions[model_id] = []
+                        self.selected_version_ids[model_id] = None
+                except Exception as e:
+                    print(f"[Modelibr] Failed to load versions for model {model_id}: {e}")
+                    self.model_versions[model_id] = []
+                    self.selected_version_ids[model_id] = None
+            
+            # Load thumbnails for selected versions
             thumbnail_manager = get_thumbnail_manager()
             print(f"[Modelibr] Loading thumbnails for {len(self.models)} models...")
             print(f"[Modelibr] Thumbnail manager initialized: {thumbnail_manager is not None}")
             print(f"[Modelibr] Preview collection exists: {thumbnail_manager.preview_collection is not None}")
             
             for model in self.models:
-                # Prioritize PNG thumbnail if available, fallback to regular thumbnail
-                thumbnail_url = model.get('pngThumbnailUrl') or model.get('thumbnailUrl')
-                print(f"[Modelibr] Model {model['id']} ({model.get('name')}): pngThumbnailUrl = {model.get('pngThumbnailUrl')}, thumbnailUrl = {model.get('thumbnailUrl')}")
+                model_id = model['id']
+                selected_version_id = self.selected_version_ids.get(model_id)
                 
-                if thumbnail_url:
-                    print(f"[Modelibr] Attempting to load thumbnail for model {model['id']}")
+                if selected_version_id:
+                    # Load thumbnail for the selected version
+                    thumbnail_url = f"/model-versions/{selected_version_id}/thumbnail/file"
+                    print(f"[Modelibr] Model {model_id} ({model.get('name')}): Loading version {selected_version_id} thumbnail")
+                    
                     try:
+                        # Use a unique identifier that includes version ID
+                        thumbnail_key = f"{model_id}_v{selected_version_id}"
                         result = thumbnail_manager.load_thumbnail(
-                            model['id'],
+                            thumbnail_key,
                             thumbnail_url,
                             client
                         )
-                        print(f"[Modelibr] Thumbnail load result for model {model['id']}: {result is not None}")
+                        print(f"[Modelibr] Thumbnail load result for model {model_id} version {selected_version_id}: {result is not None}")
                         if result:
                             print(f"[Modelibr] Thumbnail preview_id: {result.get_preview_id()}")
                         else:
-                            print(f"[Modelibr] Thumbnail loading FAILED for model {model['id']}")
+                            print(f"[Modelibr] Thumbnail loading FAILED for model {model_id}")
                     except Exception as e:
-                        print(f"[Modelibr] Exception loading thumbnail for model {model['id']}: {e}")
+                        print(f"[Modelibr] Exception loading thumbnail for model {model_id}: {e}")
                         import traceback
                         traceback.print_exc()
                 else:
-                    print(f"[Modelibr] No thumbnail URL for model {model['id']}: {model.get('name')}")
+                    print(f"[Modelibr] No selected version for model {model_id}: {model.get('name')}")
             
             print(f"[Modelibr] Finished loading thumbnails. Total thumbnails in manager: {len(thumbnail_manager.thumbnails)}")
             
@@ -110,6 +157,36 @@ class MODELIBR_OT_browse_assets(Operator):
             self.models = []
         finally:
             self.is_loading = False
+    
+    def change_version(self, context, model_id, version_id):
+        """Change the selected version for a model and reload its thumbnail"""
+        if model_id not in self.selected_version_ids:
+            return
+        
+        # Update selected version
+        self.selected_version_ids[model_id] = version_id
+        
+        # Load thumbnail for the new version
+        thumbnail_manager = get_thumbnail_manager()
+        client = get_api_client()
+        
+        try:
+            thumbnail_url = f"/model-versions/{version_id}/thumbnail/file"
+            thumbnail_key = f"{model_id}_v{version_id}"
+            print(f"[Modelibr] Changing to version {version_id} for model {model_id}")
+            
+            result = thumbnail_manager.load_thumbnail(
+                thumbnail_key,
+                thumbnail_url,
+                client
+            )
+            
+            if result:
+                print(f"[Modelibr] Successfully loaded thumbnail for version {version_id}")
+            else:
+                print(f"[Modelibr] Failed to load thumbnail for version {version_id}")
+        except Exception as e:
+            print(f"[Modelibr] Exception loading thumbnail for version {version_id}: {e}")
     
     def draw(self, context):
         """Draw the browse window UI"""
@@ -164,33 +241,60 @@ class MODELIBR_OT_browse_assets(Operator):
                     break
                 
                 model = self.models[model_idx]
+                model_id = model['id']
                 col = row.column(align=True)
                 
-                # Thumbnail display
-                thumbnail = thumbnail_manager.get_thumbnail(model['id'])
-                if thumbnail:
-                    preview_id = thumbnail.get_preview_id()
-                    if preview_id:
-                        try:
-                            # Get icon from preview collection
-                            preview = thumbnail_manager.preview_collection[preview_id]
-                            print(f"[Modelibr UI] Model {model['id']}: preview_id={preview_id}, icon_id={preview.icon_id}")
-                            if preview.icon_id > 0:
-                                # Use template_icon with scale parameter for large display
-                                col.template_icon(preview.icon_id, scale=8.0)
-                            else:
-                                col.label(text="[No icon]", icon='IMAGE_DATA')
-                                print(f"[Modelibr UI] Model {model['id']}: icon_id is 0!")
-                        except (KeyError, AttributeError) as e:
-                            # Debug: show error
-                            col.label(text=f"[Error]", icon='ERROR')
-                            print(f"[Modelibr UI] Model {model['id']}: Exception getting preview: {e}")
+                # Thumbnail display - use version-specific thumbnail key
+                selected_version_id = self.selected_version_ids.get(model_id)
+                if selected_version_id:
+                    thumbnail_key = f"{model_id}_v{selected_version_id}"
+                    thumbnail = thumbnail_manager.get_thumbnail(thumbnail_key)
+                    if thumbnail:
+                        preview_id = thumbnail.get_preview_id()
+                        if preview_id:
+                            try:
+                                # Get icon from preview collection
+                                preview = thumbnail_manager.preview_collection[preview_id]
+                                if preview.icon_id > 0:
+                                    # Use template_icon with scale parameter for large display
+                                    col.template_icon(preview.icon_id, scale=8.0)
+                                else:
+                                    col.label(text="[No icon]", icon='IMAGE_DATA')
+                            except (KeyError, AttributeError) as e:
+                                # Debug: show error
+                                col.label(text=f"[Error]", icon='ERROR')
+                                print(f"[Modelibr UI] Model {model_id}: Exception getting preview: {e}")
+                        else:
+                            # No preview_id set
+                            col.label(text="[No ID]", icon='QUESTION')
                     else:
-                        # No preview_id set
-                        col.label(text="[No ID]", icon='QUESTION')
+                        # Thumbnail not loaded yet
+                        col.label(text="[Not loaded]", icon='TIME')
                 else:
-                    # Thumbnail not loaded yet
-                    col.label(text="[Not loaded]", icon='TIME')
+                    col.label(text="[No version]", icon='QUESTION')
+                
+                # Version selector - show all versions as buttons in a compact row
+                versions = self.model_versions.get(model_id, [])
+                if versions and len(versions) > 1:
+                    # Sort versions by version number
+                    sorted_versions = sorted(versions, key=lambda v: v['versionNumber'], reverse=True)
+                    
+                    # Create a compact row for version buttons
+                    version_box = col.box()
+                    version_box.scale_y = 0.6
+                    version_row = version_box.row(align=True)
+                    version_row.label(text="Ver:", icon='SORTTIME')
+                    
+                    # Show up to 5 most recent versions as buttons
+                    for v in sorted_versions[:5]:
+                        version_btn = version_row.operator(
+                            "modelibr.change_model_version",
+                            text=f"{v['versionNumber']}",
+                            depress=(v['id'] == selected_version_id)
+                        )
+                        version_btn.model_id = model_id
+                        version_btn.version_id = v['id']
+                        version_btn.model_idx = model_idx
                 
                 # Import button with model name
                 import_op = col.operator(
@@ -198,7 +302,8 @@ class MODELIBR_OT_browse_assets(Operator):
                     text=model.get('name', 'Unnamed')[:20],
                     icon='IMPORT'
                 )
-                import_op.model_id = model['id']
+                import_op.model_id = model_id
+                import_op.version_id = selected_version_id if selected_version_id else 0
                 
                 # Tags (if available)
                 if model.get('tags'):
@@ -212,6 +317,8 @@ class MODELIBR_OT_browse_assets(Operator):
     
     def execute(self, context):
         """Execute (not used, dialog handles interaction)"""
+        # Unregister this instance when done
+        set_active_browse_window(None)
         return {'FINISHED'}
 
 
@@ -238,10 +345,37 @@ class MODELIBR_OT_close_browse(Operator):
         return {'FINISHED'}
 
 
+class MODELIBR_OT_change_model_version(Operator):
+    """Change the selected version for a model"""
+    bl_idname = "modelibr.change_model_version"
+    bl_label = "Change Version"
+    bl_description = "Change to a different version of this model"
+    
+    model_id: IntProperty(name="Model ID")
+    version_id: IntProperty(name="Version ID")
+    model_idx: IntProperty(name="Model Index")
+    
+    def execute(self, context):
+        # Get the active browse window instance
+        browse_window = get_active_browse_window()
+        
+        if browse_window:
+            # Change version and reload thumbnail
+            browse_window.change_version(context, self.model_id, self.version_id)
+            
+            # Force redraw to update UI
+            for area in context.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
+        
+        return {'FINISHED'}
+
+
 classes = [
     MODELIBR_OT_browse_assets,
     MODELIBR_OT_refresh_browse,
     MODELIBR_OT_close_browse,
+    MODELIBR_OT_change_model_version,
 ]
 
 
