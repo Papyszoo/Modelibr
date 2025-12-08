@@ -77,6 +77,7 @@ class MODELIBR_OT_browse_assets(Operator):
         self.error_message = ""
         self.model_versions = {}  # Dictionary to store versions per model: {model_id: [versions]}
         self.selected_version_ids = {}  # Dictionary to track selected version per model: {model_id: version_id}
+        self.version_enum_cache = {}  # Cache for version enum items per model
         
         # Register this instance as the active browse window
         set_active_browse_window(self)
@@ -84,9 +85,10 @@ class MODELIBR_OT_browse_assets(Operator):
         # Load initial models
         self.load_models(context)
         
-        # Use invoke_popup instead of invoke_props_dialog to avoid OK/Cancel buttons
+        # Use invoke_props_dialog for a modal dialog that doesn't close on cursor leave
+        # Width is controlled through the draw method
         wm = context.window_manager
-        return wm.invoke_popup(self, width=800)
+        return wm.invoke_props_dialog(self, width=800)
     
     def load_models(self, context):
         """Load models from API"""
@@ -174,6 +176,25 @@ class MODELIBR_OT_browse_assets(Operator):
             self.models = []
         finally:
             self.is_loading = False
+    
+    def get_version_enum_items(self, model_id):
+        """Generate enum items for version dropdown"""
+        versions = self.model_versions.get(model_id, [])
+        if not versions:
+            return [('0', 'No versions', '')]
+        
+        # Sort versions by version number (descending)
+        sorted_versions = sorted(versions, key=lambda v: v['versionNumber'], reverse=True)
+        
+        # Create enum items: (identifier, name, description)
+        items = []
+        for v in sorted_versions:
+            version_id = str(v['id'])
+            version_num = v['versionNumber']
+            description = v.get('description', '') or f'Version {version_num}'
+            items.append((version_id, f"v{version_num}", description[:64]))  # Blender limits description to 64 chars
+        
+        return items
     
     def change_version(self, context, model_id, version_id):
         """Change the selected version for a model and reload its thumbnail"""
@@ -290,28 +311,21 @@ class MODELIBR_OT_browse_assets(Operator):
                 else:
                     col.label(text="[No version]", icon='QUESTION')
                 
-                # Version selector - show all versions as buttons in a compact row
+                # Version selector - dropdown for models with multiple versions
                 versions = self.model_versions.get(model_id, [])
                 if versions and len(versions) > 1:
-                    # Sort versions by version number
-                    sorted_versions = sorted(versions, key=lambda v: v['versionNumber'], reverse=True)
+                    # Create a compact dropdown selector
+                    version_row = col.row(align=True)
+                    version_row.scale_y = 0.8
                     
-                    # Create a compact row for version buttons
-                    version_box = col.box()
-                    version_box.scale_y = 0.6
-                    version_row = version_box.row(align=True)
-                    version_row.label(text="Ver:", icon='SORTTIME')
-                    
-                    # Show up to 5 most recent versions as buttons
-                    for v in sorted_versions[:5]:
-                        version_btn = version_row.operator(
-                            "modelibr.change_model_version",
-                            text=f"{v['versionNumber']}",
-                            depress=(v['id'] == selected_version_id)
-                        )
-                        version_btn.model_id = model_id
-                        version_btn.version_id = v['id']
-                        version_btn.model_idx = model_idx
+                    # Create version selection operator with menu
+                    select_op = version_row.operator(
+                        "modelibr.select_version_dropdown",
+                        text=f"v{next((v['versionNumber'] for v in versions if v['id'] == selected_version_id), 1)}",
+                        icon='DOWNARROW_HLT'
+                    )
+                    select_op.model_id = model_id
+                    select_op.model_idx = model_idx
                 
                 # Import button with model name
                 import_op = col.operator(
@@ -321,10 +335,6 @@ class MODELIBR_OT_browse_assets(Operator):
                 )
                 import_op.model_id = model_id
                 import_op.version_id = selected_version_id if selected_version_id else 0
-                
-                # Tags (if available)
-                if model.get('tags'):
-                    col.label(text=f"[{model['tags'][:15]}]", icon='BOOKMARKS')
         
         layout.separator()
         
@@ -373,6 +383,44 @@ class MODELIBR_OT_close_browse(Operator):
         return {'FINISHED'}
 
 
+class MODELIBR_OT_select_version_dropdown(Operator):
+    """Show dropdown menu to select model version"""
+    bl_idname = "modelibr.select_version_dropdown"
+    bl_label = "Select Version"
+    bl_description = "Select a version of this model"
+    
+    model_id: IntProperty(name="Model ID")
+    model_idx: IntProperty(name="Model Index")
+    
+    def invoke(self, context, event):
+        # Get the active browse window instance
+        browse_window = get_active_browse_window()
+        
+        if not browse_window:
+            return {'CANCELLED'}
+        
+        # Get versions for this model
+        versions = browse_window.model_versions.get(self.model_id, [])
+        if not versions:
+            return {'CANCELLED'}
+        
+        # Sort versions by version number (descending)
+        sorted_versions = sorted(versions, key=lambda v: v['versionNumber'], reverse=True)
+        
+        def draw_menu(menu_self, context):
+            layout = menu_self.layout
+            for v in sorted_versions:
+                op = layout.operator(
+                    "modelibr.change_model_version",
+                    text=f"Version {v['versionNumber']}"
+                )
+                op.model_id = self.model_id
+                op.version_id = v['id']
+        
+        context.window_manager.popup_menu(draw_menu, title="Select Version", icon='DOWNARROW_HLT')
+        return {'FINISHED'}
+
+
 class MODELIBR_OT_change_model_version(Operator):
     """Change the selected version for a model"""
     bl_idname = "modelibr.change_model_version"
@@ -381,7 +429,6 @@ class MODELIBR_OT_change_model_version(Operator):
     
     model_id: IntProperty(name="Model ID")
     version_id: IntProperty(name="Version ID")
-    model_idx: IntProperty(name="Model Index")
     
     def execute(self, context):
         # Get the active browse window instance
@@ -403,6 +450,7 @@ classes = [
     MODELIBR_OT_browse_assets,
     MODELIBR_OT_refresh_browse,
     MODELIBR_OT_close_browse,
+    MODELIBR_OT_select_version_dropdown,
     MODELIBR_OT_change_model_version,
 ]
 
