@@ -231,11 +231,10 @@ class MODELIBR_OT_browse_assets(Operator):
         """Draw the browse window UI"""
         layout = self.layout
         
-        # Header with title and close instruction
+        # Header with title and close button
         header_row = layout.row()
         header_row.label(text="Browse Modelibr Assets", icon='FILEBROWSER')
-        close_btn = header_row.operator("modelibr.close_browse", text="", icon='PANEL_CLOSE', emboss=False)
-        close_btn.depress = False
+        header_row.operator("modelibr.close_browse", text="", icon='PANEL_CLOSE', emboss=False)
         
         layout.separator()
         
