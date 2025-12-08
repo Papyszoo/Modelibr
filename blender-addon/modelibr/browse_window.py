@@ -78,6 +78,7 @@ class MODELIBR_OT_browse_assets(Operator):
         self.model_versions = {}  # Dictionary to store versions per model: {model_id: [versions]}
         self.selected_version_ids = {}  # Dictionary to track selected version per model: {model_id: version_id}
         self.version_enum_cache = {}  # Cache for version enum items per model
+        self._close_requested = False  # Flag to track close request
         
         # Register this instance as the active browse window
         set_active_browse_window(self)
@@ -85,10 +86,11 @@ class MODELIBR_OT_browse_assets(Operator):
         # Load initial models
         self.load_models(context)
         
-        # Use invoke_popup which creates a simple popup without OK/Cancel buttons
-        # Note: This will still close when clicking outside, but that's a Blender limitation
-        # The close button will work properly
+        # Use modal operator to keep window open and handle closing
         wm = context.window_manager
+        wm.modal_handler_add(self)
+        
+        # Open the window
         return wm.invoke_popup(self, width=800)
     
     def load_models(self, context):
@@ -226,6 +228,21 @@ class MODELIBR_OT_browse_assets(Operator):
                 print(f"[Modelibr] Failed to load thumbnail for version {version_id}")
         except Exception as e:
             print(f"[Modelibr] Exception loading thumbnail for version {version_id}: {e}")
+    
+    def modal(self, context, event):
+        """Modal handler to keep window open and handle close button"""
+        # Check if close was requested
+        if self._close_requested:
+            set_active_browse_window(None)
+            return {'FINISHED'}
+        
+        # Handle ESC key to close
+        if event.type == 'ESC' and event.value == 'PRESS':
+            set_active_browse_window(None)
+            return {'FINISHED'}
+        
+        # Pass through all other events
+        return {'PASS_THROUGH'}
     
     def draw(self, context):
         """Draw the browse window UI"""
@@ -386,12 +403,11 @@ class MODELIBR_OT_close_browse(Operator):
     bl_description = "Close browse window"
     
     def execute(self, context):
-        # Clear the active window reference and trigger cancel on browse window
+        # Set close flag on browse window
         browse_window = get_active_browse_window()
         if browse_window:
-            browse_window.cancel(context)
-        set_active_browse_window(None)
-        return {'CANCELLED'}  # Return CANCELLED to try to dismiss the popup
+            browse_window._close_requested = True
+        return {'FINISHED'}
 
 
 class MODELIBR_OT_select_version_dropdown(Operator):
