@@ -89,14 +89,14 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
             }
             else
             {
-                // WebP exists, set PNG separately
+                // WebP exists, set PNG separately using overloaded method
                 model.ActiveVersion.Thumbnail!.MarkAsReady(
-                    model.ActiveVersion.Thumbnail!.ThumbnailPath,
-                    model.ActiveVersion.Thumbnail!.SizeBytes,
-                    model.ActiveVersion.Thumbnail!.Width,
-                    model.ActiveVersion.Thumbnail!.Height,
-                    now,
-                    fullPath); // PNG path as additional parameter
+                    model.ActiveVersion.Thumbnail!.ThumbnailPath!, // thumbnailPath
+                    fullPath, // pngThumbnailPath
+                    model.ActiveVersion.Thumbnail!.SizeBytes!.Value, // sizeBytes
+                    model.ActiveVersion.Thumbnail!.Width!.Value, // width
+                    model.ActiveVersion.Thumbnail!.Height!.Value, // height
+                    now); // processedAt
             }
 
             await _thumbnailRepository.UpdateAsync(model.ActiveVersion.Thumbnail!, cancellationToken);
