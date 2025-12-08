@@ -78,7 +78,6 @@ class MODELIBR_OT_browse_assets(Operator):
         self.model_versions = {}  # Dictionary to store versions per model: {model_id: [versions]}
         self.selected_version_ids = {}  # Dictionary to track selected version per model: {model_id: version_id}
         self.version_enum_cache = {}  # Cache for version enum items per model
-        self._close_requested = False  # Flag to track close request
         
         # Register this instance as the active browse window
         set_active_browse_window(self)
@@ -230,12 +229,7 @@ class MODELIBR_OT_browse_assets(Operator):
             print(f"[Modelibr] Exception loading thumbnail for version {version_id}: {e}")
     
     def modal(self, context, event):
-        """Modal handler to keep window open and handle close button"""
-        # Check if close was requested
-        if self._close_requested:
-            set_active_browse_window(None)
-            return {'FINISHED'}
-        
+        """Modal handler to keep window open and handle ESC key"""
         # Handle ESC key to close
         if event.type == 'ESC' and event.value == 'PRESS':
             set_active_browse_window(None)
@@ -248,10 +242,9 @@ class MODELIBR_OT_browse_assets(Operator):
         """Draw the browse window UI"""
         layout = self.layout
         
-        # Header with title and close button
+        # Header with title
         header_row = layout.row()
-        header_row.label(text="Browse Modelibr Assets", icon='FILEBROWSER')
-        header_row.operator("modelibr.close_browse", text="", icon='PANEL_CLOSE', emboss=False)
+        header_row.label(text="Browse Modelibr Assets (Press ESC to close)", icon='FILEBROWSER')
         
         layout.separator()
         
@@ -396,20 +389,6 @@ class MODELIBR_OT_refresh_browse(Operator):
         return {'FINISHED'}
 
 
-class MODELIBR_OT_close_browse(Operator):
-    """Close browse window"""
-    bl_idname = "modelibr.close_browse"
-    bl_label = "Close"
-    bl_description = "Close browse window"
-    
-    def execute(self, context):
-        # Set close flag on browse window
-        browse_window = get_active_browse_window()
-        if browse_window:
-            browse_window._close_requested = True
-        return {'FINISHED'}
-
-
 class MODELIBR_OT_select_version_dropdown(Operator):
     """Show dropdown menu to select model version"""
     bl_idname = "modelibr.select_version_dropdown"
@@ -476,7 +455,6 @@ class MODELIBR_OT_change_model_version(Operator):
 classes = [
     MODELIBR_OT_browse_assets,
     MODELIBR_OT_refresh_browse,
-    MODELIBR_OT_close_browse,
     MODELIBR_OT_select_version_dropdown,
     MODELIBR_OT_change_model_version,
 ]
