@@ -197,4 +197,180 @@ public class ModelVersionDomainTests
         Assert.IsAssignableFrom<IReadOnlyList<DomainFile>>(files);
         Assert.Single(files);
     }
+
+    [Fact]
+    public void AddTextureSet_AddsTextureSetToVersion()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.AddTextureSet(textureSet, updatedAt);
+
+        // Assert
+        Assert.Single(version.TextureSets);
+        Assert.Contains(textureSet, version.TextureSets);
+        Assert.Equal(updatedAt, version.UpdatedAt);
+    }
+
+    [Fact]
+    public void AddTextureSet_WithDuplicateId_DoesNotAddTextureSet()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.AddTextureSet(textureSet, updatedAt);
+        version.AddTextureSet(textureSet, updatedAt);
+
+        // Assert
+        Assert.Single(version.TextureSets);
+    }
+
+    [Fact]
+    public void AddTextureSet_WithNullTextureSet_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+
+        // Act & Assert
+#pragma warning disable CS8625
+        Assert.Throws<ArgumentNullException>(() => version.AddTextureSet(null, DateTime.UtcNow));
+#pragma warning restore CS8625
+    }
+
+    [Fact]
+    public void RemoveTextureSet_RemovesTextureSetFromVersion()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        version.AddTextureSet(textureSet, DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.RemoveTextureSet(textureSet, updatedAt);
+
+        // Assert
+        Assert.Empty(version.TextureSets);
+        Assert.Equal(updatedAt, version.UpdatedAt);
+    }
+
+    [Fact]
+    public void RemoveTextureSet_WithNonExistingTextureSet_DoesNothing()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        var initialUpdatedAt = version.UpdatedAt;
+
+        // Act
+        version.RemoveTextureSet(textureSet, DateTime.UtcNow);
+
+        // Assert
+        Assert.Empty(version.TextureSets);
+        Assert.Equal(initialUpdatedAt, version.UpdatedAt);
+    }
+
+    [Fact]
+    public void HasTextureSet_WithExistingTextureSet_ReturnsTrue()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        version.AddTextureSet(textureSet, DateTime.UtcNow);
+
+        // Act
+        var result = version.HasTextureSet(1);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void HasTextureSet_WithNonExistingTextureSet_ReturnsFalse()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+
+        // Act
+        var result = version.HasTextureSet(1);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void GetTextureSets_ReturnsReadOnlyList()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        version.AddTextureSet(textureSet, DateTime.UtcNow);
+
+        // Act
+        var textureSets = version.GetTextureSets();
+
+        // Assert
+        Assert.IsAssignableFrom<IReadOnlyList<TextureSet>>(textureSets);
+        Assert.Single(textureSets);
+    }
+
+    [Fact]
+    public void SetDefaultTextureSet_WithAssociatedTextureSet_SetsDefault()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        version.AddTextureSet(textureSet, DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.SetDefaultTextureSet(1, updatedAt);
+
+        // Assert
+        Assert.Equal(1, version.DefaultTextureSetId);
+        Assert.Equal(updatedAt, version.UpdatedAt);
+    }
+
+    [Fact]
+    public void SetDefaultTextureSet_WithNull_ClearsDefault()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
+        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, 1);
+        version.AddTextureSet(textureSet, DateTime.UtcNow);
+        version.SetDefaultTextureSet(1, DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.SetDefaultTextureSet(null, updatedAt);
+
+        // Assert
+        Assert.Null(version.DefaultTextureSetId);
+        Assert.Equal(updatedAt, version.UpdatedAt);
+    }
+
+    [Fact]
+    public void SetDefaultTextureSet_WithNonAssociatedTextureSet_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => 
+            version.SetDefaultTextureSet(1, DateTime.UtcNow));
+    }
 }
