@@ -178,8 +178,11 @@ class MODELIBR_OT_browse_assets(Operator):
                             if preview.icon_id > 0:
                                 # Use icon_value in a label to display the thumbnail
                                 thumb_box = col.box()
-                                thumb_box.scale_y = 6.0  # Increased from 2.5 for better visibility
-                                thumb_box.label(text="", icon_value=preview.icon_id)
+                                thumb_box.scale_y = 6.0  # Make box taller
+                                # Scale the label itself to make the icon larger
+                                label = thumb_box.label(text="", icon_value=preview.icon_id)
+                                label.scale_x = 4.0
+                                label.scale_y = 4.0
                             else:
                                 col.label(text="[No icon]", icon='IMAGE_DATA')
                                 print(f"[Modelibr UI] Model {model['id']}: icon_id is 0!")
