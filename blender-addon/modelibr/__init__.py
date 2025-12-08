@@ -15,19 +15,26 @@ from . import properties
 from . import operators
 from . import panels
 from . import handlers
+from . import browse_window
+from . import thumbnail_handler
 
 
 def register():
     preferences.register()
     properties.register()
     operators.register()
+    browse_window.register()
     panels.register()
     handlers.register()
 
 
 def unregister():
+    # Clean up thumbnails before unregistering
+    thumbnail_handler.cleanup_thumbnail_manager()
+    
     handlers.unregister()
     panels.unregister()
+    browse_window.unregister()
     operators.unregister()
     properties.unregister()
     preferences.unregister()
