@@ -67,15 +67,21 @@ public static class TextureSetEndpoints
             .WithSummary("Changes the texture type of an existing texture in a set")
             .WithOpenApi();
 
-        // Model association
-        app.MapPost("/texture-sets/{packId}/models/{modelId}", AssociateTextureSetWithModel)
-            .WithName("Associate Texture Set with Model")
-            .WithSummary("Associates a texture set with a model")
+        // Model version association
+        app.MapPost("/texture-sets/{packId}/model-versions/{modelVersionId}", AssociateTextureSetWithModelVersion)
+            .WithName("Associate Texture Set with Model Version")
+            .WithSummary("Associates a texture set with a specific model version")
             .WithOpenApi();
 
-        app.MapDelete("/texture-sets/{packId}/models/{modelId}", DisassociateTextureSetFromModel)
-            .WithName("Disassociate Texture Set from Model")
-            .WithSummary("Removes the association between a texture set and a model")
+        app.MapDelete("/texture-sets/{packId}/model-versions/{modelVersionId}", DisassociateTextureSetFromModelVersion)
+            .WithName("Disassociate Texture Set from Model Version")
+            .WithSummary("Removes the association between a texture set and a model version")
+            .WithOpenApi();
+        
+        // Legacy: Associate with all versions of a model (uses active version as starting point)
+        app.MapPost("/texture-sets/{packId}/models/{modelId}/all-versions", AssociateTextureSetWithAllModelVersions)
+            .WithName("Associate Texture Set with All Model Versions")
+            .WithSummary("Associates a texture set with all versions of a model")
             .WithOpenApi();
     }
 
@@ -284,15 +290,14 @@ public static class TextureSetEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> AssociateTextureSetWithModel(
+    private static async Task<IResult> AssociateTextureSetWithModelVersion(
         int packId,
-        int modelId,
-        int? modelVersionId,
-        ICommandHandler<AssociateTextureSetWithModelCommand> commandHandler,
+        int modelVersionId,
+        ICommandHandler<AssociateTextureSetWithModelVersionCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new AssociateTextureSetWithModelCommand(packId, modelId, modelVersionId), 
+            new AssociateTextureSetWithModelVersionCommand(packId, modelVersionId), 
             cancellationToken);
 
         if (!result.IsSuccess)
@@ -303,15 +308,32 @@ public static class TextureSetEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> DisassociateTextureSetFromModel(
+    private static async Task<IResult> DisassociateTextureSetFromModelVersion(
         int packId,
-        int modelId,
-        int? modelVersionId,
-        ICommandHandler<DisassociateTextureSetFromModelCommand> commandHandler,
+        int modelVersionId,
+        ICommandHandler<DisassociateTextureSetFromModelVersionCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new DisassociateTextureSetFromModelCommand(packId, modelId, modelVersionId), 
+            new DisassociateTextureSetFromModelVersionCommand(packId, modelVersionId), 
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> AssociateTextureSetWithAllModelVersions(
+        int packId,
+        int modelId,
+        ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new AssociateTextureSetWithAllModelVersionsCommand(packId, modelId), 
             cancellationToken);
 
         if (!result.IsSuccess)

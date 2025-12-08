@@ -50,7 +50,8 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             {
                 Id = mv.Model.Id,
                 Name = mv.Model.Name,
-                VersionNumber = mv.VersionNumber
+                VersionNumber = mv.VersionNumber,
+                ModelVersionId = mv.Id
             }).ToList(),
             Packs = tp.Packs.Select(p => new PackSummaryDto
             {
@@ -99,6 +100,7 @@ public record ModelSummaryDto
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public int? VersionNumber { get; init; }
+    public int ModelVersionId { get; init; }
 }
 
 public record PackSummaryDto

@@ -40,6 +40,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Where(v => !v.IsDeleted)
             .Include(v => v.Files)
+            .Include(v => v.Thumbnail)
             .Where(v => v.ModelId == modelId)
             .OrderBy(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
