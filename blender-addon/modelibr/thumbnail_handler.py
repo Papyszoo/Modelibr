@@ -68,7 +68,7 @@ class AnimatedThumbnail:
                         model_id = int(self.thumbnail_key)
                     downloaded_path = api_client.download_thumbnail(model_id, str(self.temp_dir))
                 except (ValueError, AttributeError) as e:
-                    raise ValueError(f"Invalid thumbnail_key format: {self.thumbnail_key}. Expected model_id or 'model_id_vversion_id'")
+                    raise ValueError(f"Invalid thumbnail_key format: {self.thumbnail_key}. Expected model_id or 'model_id_v{{version_id}}'")
             
             print(f"[Modelibr] Downloaded thumbnail path: {downloaded_path}, exists: {os.path.exists(downloaded_path)}")
             

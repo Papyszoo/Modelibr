@@ -101,6 +101,8 @@ class MODELIBR_OT_browse_assets(Operator):
             self.models = models if models else []
             
             # Load versions for each model and initialize selected version
+            # Note: This is done sequentially in the main thread for simplicity.
+            # For very large model lists, this could be optimized with batched requests.
             for model in self.models:
                 model_id = model['id']
                 try:
@@ -333,8 +335,17 @@ class MODELIBR_OT_browse_assets(Operator):
     def execute(self, context):
         """Execute (not used, dialog handles interaction)"""
         # Unregister this instance when done
-        set_active_browse_window(None)
+        # This is called when the popup is dismissed in any way (ESC, click outside, etc.)
+        if get_active_browse_window() == self:
+            set_active_browse_window(None)
         return {'FINISHED'}
+    
+    def cancel(self, context):
+        """Called when operator is cancelled"""
+        # Ensure cleanup on cancellation as well
+        if get_active_browse_window() == self:
+            set_active_browse_window(None)
+        return {'CANCELLED'}
 
 
 class MODELIBR_OT_refresh_browse(Operator):
