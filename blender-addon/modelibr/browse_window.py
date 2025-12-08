@@ -85,10 +85,11 @@ class MODELIBR_OT_browse_assets(Operator):
         # Load initial models
         self.load_models(context)
         
-        # Use invoke_props_dialog for a modal dialog that doesn't close on cursor leave
-        # Width is controlled through the draw method
+        # Use invoke_popup which creates a simple popup without OK/Cancel buttons
+        # Note: This will still close when clicking outside, but that's a Blender limitation
+        # The close button will work properly
         wm = context.window_manager
-        return wm.invoke_props_dialog(self, width=800)
+        return wm.invoke_popup(self, width=800)
     
     def load_models(self, context):
         """Load models from API"""
@@ -230,10 +231,11 @@ class MODELIBR_OT_browse_assets(Operator):
         """Draw the browse window UI"""
         layout = self.layout
         
-        # Header with close button
+        # Header with title and close instruction
         header_row = layout.row()
         header_row.label(text="Browse Modelibr Assets", icon='FILEBROWSER')
-        header_row.operator("modelibr.close_browse", text="", icon='X', emboss=False)
+        close_btn = header_row.operator("modelibr.close_browse", text="", icon='PANEL_CLOSE', emboss=False)
+        close_btn.depress = False
         
         layout.separator()
         
@@ -311,21 +313,28 @@ class MODELIBR_OT_browse_assets(Operator):
                 else:
                     col.label(text="[No version]", icon='QUESTION')
                 
-                # Version selector - dropdown for models with multiple versions
+                # Version selector - always show dropdown for consistent spacing
                 versions = self.model_versions.get(model_id, [])
-                if versions and len(versions) > 1:
+                if versions:
                     # Create a compact dropdown selector
                     version_row = col.row(align=True)
                     version_row.scale_y = 0.8
                     
-                    # Create version selection operator with menu
-                    select_op = version_row.operator(
-                        "modelibr.select_version_dropdown",
-                        text=f"v{next((v['versionNumber'] for v in versions if v['id'] == selected_version_id), 1)}",
-                        icon='DOWNARROW_HLT'
-                    )
-                    select_op.model_id = model_id
-                    select_op.model_idx = model_idx
+                    # Show version number - if only 1 version, still show dropdown for consistency
+                    current_version_num = next((v['versionNumber'] for v in versions if v['id'] == selected_version_id), 1)
+                    
+                    if len(versions) > 1:
+                        # Multiple versions - clickable dropdown
+                        select_op = version_row.operator(
+                            "modelibr.select_version_dropdown",
+                            text=f"v{current_version_num}",
+                            icon='DOWNARROW_HLT'
+                        )
+                        select_op.model_id = model_id
+                        select_op.model_idx = model_idx
+                    else:
+                        # Single version - show as non-clickable for consistent spacing
+                        version_row.label(text=f"v{current_version_num}", icon='DOWNARROW_HLT')
                 
                 # Import button with model name
                 import_op = col.operator(
@@ -378,9 +387,12 @@ class MODELIBR_OT_close_browse(Operator):
     bl_description = "Close browse window"
     
     def execute(self, context):
-        # Clear the active window reference when explicitly closing
+        # Clear the active window reference and trigger cancel on browse window
+        browse_window = get_active_browse_window()
+        if browse_window:
+            browse_window.cancel(context)
         set_active_browse_window(None)
-        return {'FINISHED'}
+        return {'CANCELLED'}  # Return CANCELLED to try to dismiss the popup
 
 
 class MODELIBR_OT_select_version_dropdown(Operator):
