@@ -112,6 +112,44 @@ public static class ThumbnailEndpoints
         .WithTags("Thumbnails")
         .DisableAntiforgery();
 
+        app.MapPost("/models/{id}/thumbnail/png-upload", async (
+            int id,
+            IFormFile file,
+            [FromForm] int? width,
+            [FromForm] int? height,
+            ICommandHandler<UploadPngThumbnailCommand, UploadPngThumbnailCommandResponse> commandHandler,
+            Application.Settings.ISettingsService settingsService) =>
+        {
+            var settings = await settingsService.GetSettingsAsync(CancellationToken.None);
+            // Validate file
+            var validationResult = ValidateThumbnailFile(file, settings.MaxThumbnailSizeBytes);
+            if (!validationResult.IsSuccess)
+            {
+                return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
+            }
+
+            var command = new UploadPngThumbnailCommand(id, new FormFileUpload(file), width, height);
+            var result = await commandHandler.Handle(command, CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new 
+            { 
+                Message = "PNG thumbnail uploaded successfully", 
+                ModelId = result.Value.ModelId,
+                PngThumbnailPath = result.Value.PngThumbnailPath,
+                SizeBytes = result.Value.SizeBytes,
+                Width = result.Value.Width,
+                Height = result.Value.Height
+            });
+        })
+        .WithName("Upload PNG Thumbnail")
+        .WithTags("Thumbnails")
+        .DisableAntiforgery();
+
         app.MapGet("/models/{id}/thumbnail/file", async (
             int id,
             IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler) =>

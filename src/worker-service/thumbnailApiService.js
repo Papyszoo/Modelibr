@@ -97,6 +97,76 @@ export class ThumbnailApiService {
   }
 
   /**
+   * Upload PNG thumbnail file separately
+   * @param {number} modelId - The model ID to upload PNG thumbnail for
+   * @param {string} pngPath - Path to the PNG thumbnail file
+   * @param {Object} metadata - Optional metadata about the thumbnail
+   * @returns {Promise<Object>} Upload result
+   */
+  async uploadPngThumbnail(modelId, pngPath, metadata = {}) {
+    try {
+      if (!fs.existsSync(pngPath)) {
+        throw new Error(`PNG thumbnail file not found: ${pngPath}`)
+      }
+
+      const formData = new FormData()
+
+      // Add the PNG file
+      formData.append('file', fs.createReadStream(pngPath))
+
+      // Add optional metadata
+      if (metadata.width) {
+        formData.append('width', metadata.width.toString())
+      }
+      if (metadata.height) {
+        formData.append('height', metadata.height.toString())
+      }
+
+      logger.info('Uploading PNG thumbnail to API', {
+        modelId,
+        pngPath,
+        apiUrl: `${this.apiBaseUrl}/models/${modelId}/thumbnail/png-upload`,
+        metadata,
+      })
+
+      const response = await this.client.post(
+        `/models/${modelId}/thumbnail/png-upload`,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+
+      logger.info('PNG thumbnail uploaded successfully', {
+        modelId,
+        responseData: response.data,
+      })
+
+      return {
+        success: true,
+        data: response.data,
+      }
+    } catch (error) {
+      logger.error('Failed to upload PNG thumbnail to API', {
+        modelId,
+        pngPath,
+        error: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+      })
+
+      return {
+        success: false,
+        error: error.message,
+        details: error.response?.data,
+      }
+    }
+  }
+
+  /**
    * Upload multiple thumbnail files (e.g., WebP and poster)
    * @param {number} modelId - The model ID to upload thumbnails for
    * @param {Object} thumbnailPaths - Object containing paths to different thumbnail formats
@@ -150,22 +220,45 @@ export class ThumbnailApiService {
       }
     }
 
-    // Note: PNG thumbnail is NOT uploaded via this method
-    // PNG is uploaded separately via the new PNG-specific endpoint
-    // to avoid overwriting the animated WebP thumbnail
+    // Upload PNG thumbnail SEPARATELY via dedicated endpoint
     if (thumbnailPaths.pngPath && fs.existsSync(thumbnailPaths.pngPath)) {
-      logger.info('PNG thumbnail path available for separate upload', {
-        modelId,
-        pngPath: thumbnailPaths.pngPath,
-      })
-      
-      results.uploads.push({
-        type: 'png',
-        path: thumbnailPaths.pngPath,
-        size: fs.statSync(thumbnailPaths.pngPath).size,
-        success: true,
-        note: 'PNG saved locally, to be uploaded via dedicated endpoint',
-      })
+      try {
+        const pngStats = fs.statSync(thumbnailPaths.pngPath)
+        const result = await this.uploadPngThumbnail(
+          modelId,
+          thumbnailPaths.pngPath,
+          {
+            width: 256, // Default PNG dimensions
+            height: 256,
+          }
+        )
+
+        results.uploads.push({
+          type: 'png',
+          path: thumbnailPaths.pngPath,
+          size: pngStats.size,
+          ...result,
+        })
+
+        if (!result.success) {
+          results.allSuccessful = false
+        }
+      } catch (error) {
+        logger.error('Error processing PNG thumbnail', {
+          modelId,
+          path: thumbnailPaths.pngPath,
+          error: error.message,
+        })
+
+        results.uploads.push({
+          type: 'png',
+          path: thumbnailPaths.pngPath,
+          success: false,
+          error: error.message,
+        })
+
+        results.allSuccessful = false
+      }
     }
 
     // Upload poster thumbnail if available and PNG failed

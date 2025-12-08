@@ -177,7 +177,7 @@ class MODELIBR_OT_browse_assets(Operator):
                             print(f"[Modelibr UI] Model {model['id']}: preview_id={preview_id}, icon_id={preview.icon_id}")
                             if preview.icon_id > 0:
                                 # Use template_icon with scale parameter for large display
-                                col.template_icon(icon_value=preview.icon_id, scale=8.0)
+                                col.template_icon(preview.icon_id, scale=8.0)
                             else:
                                 col.label(text="[No icon]", icon='IMAGE_DATA')
                                 print(f"[Modelibr UI] Model {model['id']}: icon_id is 0!")
