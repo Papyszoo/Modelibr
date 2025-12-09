@@ -1198,6 +1198,8 @@ class ApiClient {
       spriteType?: number
       categoryId?: number
       batchId?: string
+      packId?: number
+      projectId?: number
     }
   ): Promise<{
     spriteId: number
@@ -1216,6 +1218,10 @@ class ApiClient {
     if (options?.categoryId !== undefined)
       params.append('categoryId', options.categoryId.toString())
     if (options?.batchId) params.append('batchId', options.batchId)
+    if (options?.packId !== undefined)
+      params.append('packId', options.packId.toString())
+    if (options?.projectId !== undefined)
+      params.append('projectId', options.projectId.toString())
 
     const response = await this.client.post(
       `/sprites/with-file?${params.toString()}`,

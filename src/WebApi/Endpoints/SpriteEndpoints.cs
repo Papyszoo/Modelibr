@@ -107,6 +107,8 @@ public static class SpriteEndpoints
         SpriteType? spriteType,
         int? categoryId,
         string? batchId,
+        int? packId,
+        int? projectId,
         ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse> commandHandler,
         CancellationToken cancellationToken)
     {
@@ -125,7 +127,9 @@ public static class SpriteEndpoints
                 spriteName,
                 type,
                 categoryId,
-                batchId),
+                batchId,
+                packId,
+                projectId),
             cancellationToken);
 
         if (!result.IsSuccess)

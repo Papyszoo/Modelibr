@@ -22,7 +22,9 @@ public record BatchUploadHistoryDto(
     int? ModelId,
     string? ModelName,
     int? TextureSetId,
-    string? TextureSetName
+    string? TextureSetName,
+    int? SpriteId,
+    string? SpriteName
 );
 
 internal class GetBatchUploadHistoryQueryHandler : IQueryHandler<GetBatchUploadHistoryQuery, GetBatchUploadHistoryResponse>
@@ -58,7 +60,9 @@ internal class GetBatchUploadHistoryQueryHandler : IQueryHandler<GetBatchUploadH
                 bu.ModelId,
                 bu.Model?.Name,
                 bu.TextureSetId,
-                bu.TextureSet?.Name
+                bu.TextureSet?.Name,
+                bu.SpriteId,
+                bu.Sprite?.Name
             ))
             .ToList();
 

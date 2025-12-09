@@ -20,6 +20,8 @@ interface BatchUploadHistory {
   modelName: string | null
   textureSetId: number | null
   textureSetName: string | null
+  spriteId: number | null
+  spriteName: string | null
 }
 
 interface BatchGroup {
@@ -73,6 +75,7 @@ const getFileTypeIcon = (fileType: string): string => {
     pack: 'pi-inbox',
     project: 'pi-briefcase',
     file: 'pi-file',
+    sprite: 'pi-image',
   }
   return typeIconMap[fileType] || 'pi-file'
 }
@@ -145,12 +148,12 @@ export default function History() {
   }
 
   const getUploadedToText = (upload: BatchUploadHistory): string => {
-    // Priority: Pack > Project > Model > TextureSet > Default
+    // Priority: Pack > Project > Model > TextureSet > Sprite > Default
     if (upload.packId && upload.packName) {
-      return `Pack: ${upload.packName}`
+      return `${upload.packName} Pack`
     }
     if (upload.projectId && upload.projectName) {
-      return `Project: ${upload.projectName}`
+      return `${upload.projectName} Project`
     }
     if (upload.modelId) {
       return 'Models List'
@@ -158,12 +161,18 @@ export default function History() {
     if (upload.textureSetId) {
       return 'Texture Sets List'
     }
+    if (upload.spriteId) {
+      return 'Sprites Page'
+    }
     // Fallback based on upload type
     if (upload.uploadType === 'model') {
       return 'Models List'
     }
     if (upload.uploadType === 'texture' || upload.uploadType === 'textureSet') {
       return 'Texture Sets List'
+    }
+    if (upload.uploadType === 'sprite') {
+      return 'Sprites Page'
     }
     return 'Unknown'
   }

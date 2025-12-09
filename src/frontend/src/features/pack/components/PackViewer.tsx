@@ -509,6 +509,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
           const response = await ApiClient.createSpriteWithFile(file, {
             name: spriteName,
             batchId,
+            packId,
           })
 
           if (uploadId && uploadProgressContext) {
