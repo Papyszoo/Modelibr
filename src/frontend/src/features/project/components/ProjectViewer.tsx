@@ -509,6 +509,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
           const response = await ApiClient.createSpriteWithFile(file, {
             name: spriteName,
             batchId,
+            projectId,
           })
 
           if (uploadId && uploadProgressContext) {
