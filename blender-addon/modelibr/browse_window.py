@@ -137,9 +137,17 @@ class MODELIBR_OT_browse_assets(Operator):
                 selected_version_id = self.selected_version_ids.get(model_id)
                 
                 if selected_version_id:
-                    # Load thumbnail for the selected version
-                    thumbnail_url = f"/model-versions/{selected_version_id}/thumbnail/file"
-                    print(f"[Modelibr] Model {model_id} ({model.get('name')}): Loading version {selected_version_id} thumbnail")
+                    # Use pngThumbnailUrl from model data if it matches the selected version
+                    active_version_id = model.get('activeVersionId')
+                    thumbnail_url = None
+                    if selected_version_id == active_version_id:
+                        thumbnail_url = model.get('pngThumbnailUrl')
+                    
+                    # Fall back to constructing URL if not available or version doesn't match
+                    if not thumbnail_url:
+                        thumbnail_url = f"/model-versions/{selected_version_id}/thumbnail/png-file"
+                    
+                    print(f"[Modelibr] Model {model_id} ({model.get('name')}): Loading version {selected_version_id} thumbnail from {thumbnail_url}")
                     
                     try:
                         # Use a unique identifier that includes version ID
@@ -208,7 +216,8 @@ class MODELIBR_OT_browse_assets(Operator):
         client = get_api_client()
         
         try:
-            thumbnail_url = f"/model-versions/{version_id}/thumbnail/file"
+            # Use PNG thumbnail endpoint
+            thumbnail_url = f"/model-versions/{version_id}/thumbnail/png-file"
             thumbnail_key = f"{model_id}_v{version_id}"
             print(f"[Modelibr] Changing to version {version_id} for model {model_id}")
             
