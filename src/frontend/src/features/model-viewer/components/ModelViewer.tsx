@@ -627,6 +627,7 @@ function ModelViewer({
           onClose={() => setTextureSetWindowVisible(false)}
           side={side}
           model={model}
+          modelVersionId={selectedVersion?.id || model.activeVersionId || null}
           selectedTextureSetId={selectedTextureSetId}
           onTextureSetSelect={handleTextureSetSelect}
           onModelUpdated={handleModelUpdated}

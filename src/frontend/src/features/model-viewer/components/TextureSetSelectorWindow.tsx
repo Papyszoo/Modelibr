@@ -13,6 +13,7 @@ interface TextureSetSelectorWindowProps {
   onClose: () => void
   side: 'left' | 'right'
   model: Model
+  modelVersionId: number | null
   selectedTextureSetId: number | null
   onTextureSetSelect: (textureSetId: number | null) => void
   onModelUpdated: () => void
@@ -23,6 +24,7 @@ function TextureSetSelectorWindow({
   onClose,
   side,
   model,
+  modelVersionId,
   selectedTextureSetId,
   onTextureSetSelect,
   onModelUpdated,
@@ -34,18 +36,17 @@ function TextureSetSelectorWindow({
   const [unlinking, setUnlinking] = useState<number | null>(null)
 
   const loadTextureSets = async () => {
-    if (!model.textureSets || model.textureSets.length === 0) {
+    if (!modelVersionId) {
       setTextureSets([])
       return
     }
 
     try {
       setLoading(true)
+      // Get all texture sets and filter to those associated with this model version
       const allTextureSets = await ApiClient.getAllTextureSets()
-      // Filter to only show texture sets associated with this model
-      const modelTextureSetIds = new Set(model.textureSets.map(ts => ts.id))
       const filteredTextureSets = allTextureSets.filter(ts =>
-        modelTextureSetIds.has(ts.id)
+        ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
       )
       setTextureSets(filteredTextureSets)
     } catch (error) {
@@ -56,11 +57,11 @@ function TextureSetSelectorWindow({
   }
 
   useEffect(() => {
-    if (visible && model.textureSets) {
+    if (visible && modelVersionId) {
       loadTextureSets()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, model])
+  }, [visible, modelVersionId])
 
   const handleSetDefault = async (textureSetId: number | null) => {
     try {
@@ -256,6 +257,7 @@ function TextureSetSelectorWindow({
       <TextureSetAssociationDialog
         visible={linkDialogVisible}
         model={model}
+        modelVersionId={modelVersionId!}
         onHide={handleLinkDialogClose}
         onAssociationsChanged={handleLinkDialogClose}
       />
