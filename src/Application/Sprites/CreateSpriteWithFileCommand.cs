@@ -52,7 +52,36 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
 
             var file = fileResult.Value;
 
-            // 3. Create the sprite
+            // 3. Check if a sprite already exists with this file hash
+            var existingSprite = await _spriteRepository.GetByFileHashAsync(file.Sha256Hash, cancellationToken);
+            if (existingSprite != null)
+            {
+                // Track batch upload if batchId provided
+                if (!string.IsNullOrWhiteSpace(command.BatchId))
+                {
+                    var batchUpload = BatchUpload.Create(
+                        command.BatchId,
+                        "sprite",
+                        file.Id,
+                        _dateTimeProvider.UtcNow,
+                        packId: command.PackId,
+                        projectId: command.ProjectId,
+                        modelId: null,
+                        textureSetId: null,
+                        spriteId: existingSprite.Id);
+
+                    await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+                }
+
+                return Result.Success(new CreateSpriteWithFileResponse(
+                    existingSprite.Id,
+                    existingSprite.Name,
+                    file.Id,
+                    existingSprite.SpriteType,
+                    file.SizeBytes));
+            }
+
+            // 4. Create new sprite
             var sprite = Sprite.Create(
                 command.Name,
                 file,
@@ -62,7 +91,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
 
             var createdSprite = await _spriteRepository.AddAsync(sprite, cancellationToken);
 
-            // 4. Track batch upload if batchId provided
+            // 5. Track batch upload if batchId provided
             if (!string.IsNullOrWhiteSpace(command.BatchId))
             {
                 var batchUpload = BatchUpload.Create(
