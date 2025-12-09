@@ -19,6 +19,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Where(v => !v.IsDeleted)
             .Include(v => v.Files)
+            .Include(v => v.TextureSets)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
@@ -30,6 +31,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Where(v => !v.IsDeleted)
             .Include(v => v.Files)
+            .Include(v => v.TextureSets)
             .FirstOrDefaultAsync(v => v.ModelId == modelId && v.VersionNumber == versionNumber, cancellationToken);
     }
 
@@ -41,6 +43,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             .Where(v => !v.IsDeleted)
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
+            .Include(v => v.TextureSets)
             .Where(v => v.ModelId == modelId)
             .OrderBy(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
@@ -51,6 +54,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Where(v => v.IsDeleted)
             .Include(v => v.Files)
+            .Include(v => v.TextureSets)
             .OrderBy(v => v.ModelId)
             .ThenBy(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
@@ -61,6 +65,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Where(v => v.IsDeleted)
             .Include(v => v.Files)
+            .Include(v => v.TextureSets)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
