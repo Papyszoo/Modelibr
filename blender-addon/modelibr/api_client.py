@@ -139,7 +139,7 @@ class ModelibrApiClient:
         return self._download_file(f"/files/{file_id}", target_path)
 
     def download_thumbnail(self, model_id: int, target_dir: str) -> str:
-        target_path = os.path.join(target_dir, f"thumbnail_{model_id}.webp")
+        target_path = os.path.join(target_dir, f"thumbnail_{model_id}.png")
         return self._download_file(f"/models/{model_id}/thumbnail/file", target_path)
 
     def create_model(self, file_path: str) -> dict:

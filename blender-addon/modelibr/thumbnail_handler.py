@@ -1,6 +1,6 @@
 """
-Thumbnail handler module for animated WebP thumbnails.
-Handles thumbnail loading, caching, and animation on hover.
+Thumbnail handler module for static PNG thumbnails.
+Handles thumbnail loading and caching.
 """
 
 import bpy
@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import Dict, Optional
 
 
-class AnimatedThumbnail:
-    """Handle animated WebP thumbnails with hover detection"""
+class StaticThumbnail:
+    """Handle static PNG thumbnails"""
     
     def __init__(self, thumbnail_key, thumbnail_url: str):
         """
-        Initialize an animated thumbnail handler.
+        Initialize a static thumbnail handler.
         
         Args:
             thumbnail_key: Unique key for this thumbnail (can be model_id or model_id_vversion_id)
@@ -23,9 +23,6 @@ class AnimatedThumbnail:
         """
         self.thumbnail_key = thumbnail_key
         self.thumbnail_url = thumbnail_url
-        self.frames = []
-        self.current_frame = 0
-        self.is_animating = False
         self.temp_dir = None
         self.thumbnail_path = None
         self.preview_id = None
@@ -47,7 +44,7 @@ class AnimatedThumbnail:
                 self.temp_dir = Path(tempfile.gettempdir()) / "modelibr_thumbnails"
                 self.temp_dir.mkdir(exist_ok=True)
             
-            # Download thumbnail
+            # Download thumbnail as PNG
             print(f"[Modelibr] Downloading thumbnail for key {self.thumbnail_key}...")
             
             # Check if URL is a direct endpoint path or a full URL
@@ -55,7 +52,7 @@ class AnimatedThumbnail:
                 # It's an API endpoint - use direct download
                 downloaded_path = api_client._download_file(
                     self.thumbnail_url,
-                    str(self.temp_dir / f"thumbnail_{self.thumbnail_key}.webp")
+                    str(self.temp_dir / f"thumbnail_{self.thumbnail_key}.png")
                 )
             else:
                 # Legacy support - for old code that passes model_id directly
@@ -76,32 +73,9 @@ class AnimatedThumbnail:
                 print(f"[Modelibr] Thumbnail file does not exist at {downloaded_path}")
                 return False
             
-            # Convert WebP to PNG for better Blender compatibility
-            # WebP decoding can fail in some Blender versions, so we convert to PNG
-            png_path = downloaded_path.replace('.webp', '.png')
-            
-            try:
-                # Load WebP using Blender and save as PNG
-                print(f"[Modelibr] Converting WebP to PNG for compatibility...")
-                temp_img = bpy.data.images.load(downloaded_path, check_existing=False)
-                
-                # Save as PNG
-                temp_img.filepath_raw = png_path
-                temp_img.file_format = 'PNG'
-                temp_img.save()
-                
-                # Remove temporary image from Blender
-                bpy.data.images.remove(temp_img)
-                
-                # Use PNG path for preview collection
-                self.thumbnail_path = png_path
-                print(f"[Modelibr] Converted to PNG: {png_path}")
-                
-            except Exception as conv_error:
-                print(f"[Modelibr] WebP conversion failed: {conv_error}")
-                print(f"[Modelibr] Trying to use WebP directly...")
-                # Fall back to using WebP directly if conversion fails
-                self.thumbnail_path = downloaded_path
+            # Use the downloaded PNG directly
+            self.thumbnail_path = downloaded_path
+            print(f"[Modelibr] Using PNG thumbnail: {self.thumbnail_path}")
             
             # Load into Blender's image data blocks
             image_name = f"modelibr_thumb_{self.thumbnail_key}"
@@ -157,17 +131,6 @@ class AnimatedThumbnail:
         """
         return self.preview_id
     
-    def start_animation(self):
-        """Start cycling through frames (called on hover)"""
-        # Note: For initial implementation, we'll use static thumbnails
-        # Animation can be added later if API provides multi-frame WebP
-        self.is_animating = True
-    
-    def stop_animation(self):
-        """Stop animation (called on hover end)"""
-        self.is_animating = False
-        self.current_frame = 0
-    
     def cleanup(self):
         """Clean up temporary files and image data"""
         try:
@@ -188,7 +151,7 @@ class ThumbnailManager:
     
     def __init__(self):
         """Initialize thumbnail manager"""
-        self.thumbnails: Dict[str, AnimatedThumbnail] = {}  # Changed to string key
+        self.thumbnails: Dict[str, StaticThumbnail] = {}
         self.preview_collection = None
     
     def initialize(self):
@@ -196,7 +159,7 @@ class ThumbnailManager:
         if not self.preview_collection:
             self.preview_collection = bpy.utils.previews.new()
     
-    def load_thumbnail(self, thumbnail_key, thumbnail_url: str, api_client) -> Optional[AnimatedThumbnail]:
+    def load_thumbnail(self, thumbnail_key, thumbnail_url: str, api_client) -> Optional[StaticThumbnail]:
         """
         Load a thumbnail for a model.
         
@@ -206,7 +169,7 @@ class ThumbnailManager:
             api_client: API client for downloading
             
         Returns:
-            AnimatedThumbnail instance or None if loading failed
+            StaticThumbnail instance or None if loading failed
         """
         print(f"[Modelibr ThumbnailManager] load_thumbnail called for key {thumbnail_key}")
         
@@ -214,8 +177,8 @@ class ThumbnailManager:
             print(f"[Modelibr ThumbnailManager] Thumbnail already loaded for key {thumbnail_key}")
             return self.thumbnails[thumbnail_key]
         
-        print(f"[Modelibr ThumbnailManager] Creating new AnimatedThumbnail for key {thumbnail_key}")
-        thumbnail = AnimatedThumbnail(thumbnail_key, thumbnail_url)
+        print(f"[Modelibr ThumbnailManager] Creating new StaticThumbnail for key {thumbnail_key}")
+        thumbnail = StaticThumbnail(thumbnail_key, thumbnail_url)
         
         print(f"[Modelibr ThumbnailManager] Calling thumbnail.load() for key {thumbnail_key}")
         load_success = thumbnail.load(api_client, self.preview_collection)
@@ -230,7 +193,7 @@ class ThumbnailManager:
         
         return None
     
-    def get_thumbnail(self, thumbnail_key) -> Optional[AnimatedThumbnail]:
+    def get_thumbnail(self, thumbnail_key) -> Optional[StaticThumbnail]:
         """
         Get a loaded thumbnail.
         
@@ -238,7 +201,7 @@ class ThumbnailManager:
             thumbnail_key: Unique key for this thumbnail
             
         Returns:
-            AnimatedThumbnail instance or None if not loaded
+            StaticThumbnail instance or None if not loaded
         """
         return self.thumbnails.get(thumbnail_key)
     
