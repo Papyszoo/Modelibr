@@ -137,10 +137,14 @@ class MODELIBR_OT_browse_assets(Operator):
                 selected_version_id = self.selected_version_ids.get(model_id)
                 
                 if selected_version_id:
-                    # Use pngThumbnailUrl from model data if available
-                    thumbnail_url = model.get('pngThumbnailUrl')
+                    # Use pngThumbnailUrl from model data if it matches the selected version
+                    active_version_id = model.get('activeVersionId')
+                    thumbnail_url = None
+                    if selected_version_id == active_version_id:
+                        thumbnail_url = model.get('pngThumbnailUrl')
+                    
+                    # Fall back to constructing URL if not available or version doesn't match
                     if not thumbnail_url:
-                        # Fall back to constructing URL if not provided
                         thumbnail_url = f"/model-versions/{selected_version_id}/thumbnail/png-file"
                     
                     print(f"[Modelibr] Model {model_id} ({model.get('name')}): Loading version {selected_version_id} thumbnail from {thumbnail_url}")
