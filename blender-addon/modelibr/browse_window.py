@@ -85,11 +85,8 @@ class MODELIBR_OT_browse_assets(Operator):
         # Load initial models
         self.load_models(context)
         
-        # Use modal operator to keep window open and handle closing
+        # Use invoke_popup for simple popup (will close when clicking outside)
         wm = context.window_manager
-        wm.modal_handler_add(self)
-        
-        # Open the window
         return wm.invoke_popup(self, width=800)
     
     def load_models(self, context):
@@ -228,23 +225,13 @@ class MODELIBR_OT_browse_assets(Operator):
         except Exception as e:
             print(f"[Modelibr] Exception loading thumbnail for version {version_id}: {e}")
     
-    def modal(self, context, event):
-        """Modal handler to keep window open and handle ESC key"""
-        # Handle ESC key to close
-        if event.type == 'ESC' and event.value == 'PRESS':
-            set_active_browse_window(None)
-            return {'FINISHED'}
-        
-        # Pass through all other events
-        return {'PASS_THROUGH'}
-    
     def draw(self, context):
         """Draw the browse window UI"""
         layout = self.layout
         
         # Header with title
         header_row = layout.row()
-        header_row.label(text="Browse Modelibr Assets (Press ESC to close)", icon='FILEBROWSER')
+        header_row.label(text="Browse Modelibr Assets", icon='FILEBROWSER')
         
         layout.separator()
         
