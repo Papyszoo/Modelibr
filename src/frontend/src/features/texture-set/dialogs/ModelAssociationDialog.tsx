@@ -89,13 +89,25 @@ function ModelAssociationDialog({
           originallyAssociated: associatedVersions.includes(v.id),
         }))
         
-        const hasAnyAssociated = versionAssociations.some(v => v.isAssociated)
+        const associatedCount = versionAssociations.filter(v => v.isAssociated).length
+        const allVersionsAssociated = associatedCount === versions.length && versions.length > 0
+        
+        // Determine initial selection
+        let selectedVersionOption: 'specific' | 'all' | null = null
+        let selectedVersionId: number | null = null
+        
+        if (allVersionsAssociated) {
+          selectedVersionOption = 'all'
+        } else if (associatedCount > 0) {
+          selectedVersionOption = 'specific'
+          selectedVersionId = versionAssociations.find(v => v.isAssociated)?.modelVersionId || null
+        }
         
         return {
           model,
           versions: versionAssociations,
-          selectedVersionOption: hasAnyAssociated ? ('specific' as const) : null,
-          selectedVersionId: hasAnyAssociated ? versionAssociations.find(v => v.isAssociated)?.modelVersionId || null : null,
+          selectedVersionOption,
+          selectedVersionId,
           hasChanges: false,
         }
       })

@@ -57,7 +57,7 @@ export interface ModelSummaryDto {
   id: number
   name: string
   versionNumber?: number
-  modelVersionId?: number
+  modelVersionId: number
 }
 
 export interface PackSummaryDto {
