@@ -809,7 +809,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                   <div
                     key={textureSet.id}
                     className="project-card"
-                    onClick={() => openTextureSetDetailsTab(textureSet)}
+                    onClick={() => openTextureSetDetailsTab(textureSet.id, textureSet.name)}
                     onContextMenu={e => {
                       e.preventDefault()
                       setSelectedTextureSet(textureSet)

@@ -98,7 +98,7 @@ function TextureSetList() {
   }
 
   const handleViewDetails = (textureSet: TextureSetDto) => {
-    openTextureSetDetailsTab(textureSet)
+    openTextureSetDetailsTab(textureSet.id, textureSet.name)
   }
 
   const handleTextureSetRecycled = (textureSetId: number) => {

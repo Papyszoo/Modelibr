@@ -238,7 +238,7 @@ export default function History() {
                   const textureSet = await ApiClient.getTextureSetById(
                     upload.textureSetId!
                   )
-                  openTextureSetDetailsTab(textureSet)
+                  openTextureSetDetailsTab(textureSet.id, textureSet.name)
                 } catch (error) {
                   console.error('Failed to open texture set:', error)
                 }
