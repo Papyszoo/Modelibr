@@ -39,10 +39,22 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
                 FileName = t.File?.OriginalFileName,
                 CreatedAt = t.CreatedAt
             }).ToList(),
-            AssociatedModels = textureSet.Models.Select(m => new ModelSummaryDto
+            AssociatedModels = textureSet.ModelVersions.Select(mv => new ModelSummaryDto
             {
-                Id = m.Id,
-                Name = m.Name
+                Id = mv.Model.Id,
+                Name = mv.Model.Name,
+                VersionNumber = mv.VersionNumber,
+                ModelVersionId = mv.Id
+            }).ToList(),
+            Packs = textureSet.Packs.Select(p => new PackSummaryDto
+            {
+                Id = p.Id,
+                Name = p.Name
+            }).ToList(),
+            Projects = textureSet.Projects.Select(p => new ProjectSummaryDto
+            {
+                Id = p.Id,
+                Name = p.Name
             }).ToList()
         };
 

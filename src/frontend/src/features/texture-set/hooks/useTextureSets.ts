@@ -167,17 +167,17 @@ export function useTextureSets() {
     []
   )
 
-  const associateTextureSetWithModel = useCallback(
-    async (setId: number, modelId: number): Promise<void> => {
+  const associateTextureSetWithModelVersion = useCallback(
+    async (setId: number, modelVersionId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.associateTextureSetWithModel(setId, modelId)
+        await ApiClient.associateTextureSetWithModelVersion(setId, modelVersionId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : 'Failed to associate texture set with model'
+            : 'Failed to associate texture set with model version'
         setError(errorMessage)
         throw err
       } finally {
@@ -187,17 +187,37 @@ export function useTextureSets() {
     []
   )
 
-  const disassociateTextureSetFromModel = useCallback(
-    async (setId: number, modelId: number): Promise<void> => {
+  const disassociateTextureSetFromModelVersion = useCallback(
+    async (setId: number, modelVersionId: number): Promise<void> => {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.disassociateTextureSetFromModel(setId, modelId)
+        await ApiClient.disassociateTextureSetFromModelVersion(setId, modelVersionId)
       } catch (err) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : 'Failed to disassociate texture set from model'
+            : 'Failed to disassociate texture set from model version'
+        setError(errorMessage)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
+  const associateTextureSetWithAllModelVersions = useCallback(
+    async (setId: number, modelId: number): Promise<void> => {
+      try {
+        setLoading(true)
+        setError(null)
+        await ApiClient.associateTextureSetWithAllModelVersions(setId, modelId)
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : 'Failed to associate texture set with all model versions'
         setError(errorMessage)
         throw err
       } finally {
@@ -233,8 +253,9 @@ export function useTextureSets() {
     addTextureToSetEndpoint,
     removeTextureFromSet,
     changeTextureType,
-    associateTextureSetWithModel,
-    disassociateTextureSetFromModel,
+    associateTextureSetWithModelVersion,
+    disassociateTextureSetFromModelVersion,
+    associateTextureSetWithAllModelVersions,
     getModels,
   }
 }

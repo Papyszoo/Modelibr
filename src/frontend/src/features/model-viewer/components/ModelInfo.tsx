@@ -54,9 +54,14 @@ function ModelInfo({ model, onModelUpdated }) {
 
   const handleRemoveTextureSet = async (textureSetId: number) => {
     try {
-      await apiClient.disassociateTextureSetFromModel(
+      const activeVersionId = model.activeVersionId
+      if (!activeVersionId) {
+        console.error('Model has no active version')
+        return
+      }
+      await apiClient.disassociateTextureSetFromModelVersion(
         textureSetId,
-        parseInt(model.id)
+        activeVersionId
       )
       if (onModelUpdated) {
         onModelUpdated()

@@ -46,10 +46,12 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 FileName = t.File?.OriginalFileName,
                 CreatedAt = t.CreatedAt
             }).ToList(),
-            AssociatedModels = tp.Models.Select(m => new ModelSummaryDto
+            AssociatedModels = tp.ModelVersions.Select(mv => new ModelSummaryDto
             {
-                Id = m.Id,
-                Name = m.Name
+                Id = mv.Model.Id,
+                Name = mv.Model.Name,
+                VersionNumber = mv.VersionNumber,
+                ModelVersionId = mv.Id
             }).ToList(),
             Packs = tp.Packs.Select(p => new PackSummaryDto
             {
@@ -97,6 +99,8 @@ public record ModelSummaryDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public int? VersionNumber { get; init; }
+    public int ModelVersionId { get; init; }
 }
 
 public record PackSummaryDto

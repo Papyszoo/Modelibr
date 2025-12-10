@@ -25,11 +25,17 @@ namespace Infrastructure.Persistence
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Configure many-to-many relationship between Model and TextureSet
+            // Configure many-to-many relationship between Model and TextureSet (DEPRECATED - kept for backward compatibility)
             modelBuilder.Entity<Model>()
                 .HasMany(m => m.TextureSets)
                 .WithMany(tp => tp.Models)
                 .UsingEntity(j => j.ToTable("ModelTextureSets"));
+
+            // Configure many-to-many relationship between ModelVersion and TextureSet
+            modelBuilder.Entity<ModelVersion>()
+                .HasMany(mv => mv.TextureSets)
+                .WithMany(ts => ts.ModelVersions)
+                .UsingEntity(j => j.ToTable("ModelVersionTextureSets"));
 
             // Configure many-to-many relationship between Model and Pack
             modelBuilder.Entity<Model>()
@@ -115,6 +121,12 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(v => v.IsDeleted);
+
+                // Configure optional relationship with default TextureSet
+                entity.HasOne<TextureSet>()
+                    .WithMany()
+                    .HasForeignKey(v => v.DefaultTextureSetId)
+                    .OnDelete(DeleteBehavior.SetNull);
 
                 // Configure many-to-many relationship with Files
                 entity.HasMany(v => v.Files)

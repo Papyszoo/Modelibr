@@ -98,15 +98,20 @@ function TextureSetDetailDialog({
   }
 
   const handleDisassociateModel = (model: ModelSummaryDto) => {
+    const versionInfo = model.versionNumber ? ` (Version ${model.versionNumber})` : ''
     confirmDialog({
-      message: `Are you sure you want to disassociate the model "${model.name}" from this texture set?`,
+      message: `Are you sure you want to disassociate the model "${model.name}"${versionInfo} from this texture set?`,
       header: 'Disassociate Model',
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
-          await textureSetsApi.disassociateTextureSetFromModel(
+          if (!model.modelVersionId) {
+            console.error('Model version ID is missing')
+            return
+          }
+          await textureSetsApi.disassociateTextureSetFromModelVersion(
             currentSet.id,
-            model.id
+            model.modelVersionId
           )
           toast.current?.show({
             severity: 'success',

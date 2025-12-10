@@ -28,13 +28,14 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => !m.IsDeleted)
-            .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.TextureSets)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
@@ -44,13 +45,14 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => !m.IsDeleted)
-            .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.TextureSets)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
@@ -60,13 +62,14 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => !m.IsDeleted)
-            .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.TextureSets)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)), cancellationToken);
@@ -82,13 +85,14 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => m.IsDeleted)
-            .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.TextureSets)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .AsSplitQuery()
@@ -99,13 +103,14 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .Where(m => m.IsDeleted)
-            .Include(m => m.TextureSets)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.TextureSets)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .AsSplitQuery()

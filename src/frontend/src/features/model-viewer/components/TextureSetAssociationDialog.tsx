@@ -17,6 +17,7 @@ import './TextureSetAssociationDialog.css'
 interface TextureSetAssociationDialogProps {
   visible: boolean
   model: Model
+  modelVersionId: number
   onHide: () => void
   onAssociationsChanged: () => void
 }
@@ -30,6 +31,7 @@ interface TextureSetAssociation {
 function TextureSetAssociationDialog({
   visible,
   model,
+  modelVersionId,
   onHide,
   onAssociationsChanged,
 }: TextureSetAssociationDialogProps) {
@@ -65,9 +67,11 @@ function TextureSetAssociationDialog({
       setLoading(true)
       const allTextureSets = await ApiClient.getAllTextureSets()
 
-      // Get currently associated texture set IDs
+      // Get currently associated texture set IDs for this specific model version
       const associatedTextureSetIds = new Set(
-        model.textureSets?.map(ts => ts.id) || []
+        allTextureSets
+          .filter(ts => ts.associatedModels.some(m => m.modelVersionId === modelVersionId))
+          .map(ts => ts.id)
       )
 
       // Create association objects
@@ -91,7 +95,7 @@ function TextureSetAssociationDialog({
     } finally {
       setLoading(false)
     }
-  }, [model.textureSets])
+  }, [modelVersionId])
 
   const handleToggleAssociation = (
     textureSetId: number,
@@ -141,19 +145,19 @@ function TextureSetAssociationDialog({
     try {
       setSaving(true)
 
-      // Process associations
+      // Process associations for the selected model version
       for (const textureSet of toAssociate) {
-        await ApiClient.associateTextureSetWithModel(
+        await ApiClient.associateTextureSetWithModelVersion(
           textureSet.id,
-          parseInt(model.id)
+          modelVersionId
         )
       }
 
       // Process disassociations
       for (const textureSet of toDisassociate) {
-        await ApiClient.disassociateTextureSetFromModel(
+        await ApiClient.disassociateTextureSetFromModelVersion(
           textureSet.id,
-          parseInt(model.id)
+          modelVersionId
         )
       }
 

@@ -9,15 +9,18 @@ internal class DisassociateTextureSetFromModelCommandHandler : ICommandHandler<D
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IModelRepository _modelRepository;
+    private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public DisassociateTextureSetFromModelCommandHandler(
         ITextureSetRepository textureSetRepository,
         IModelRepository modelRepository,
+        IModelVersionRepository modelVersionRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _textureSetRepository = textureSetRepository;
         _modelRepository = modelRepository;
+        _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -33,23 +36,59 @@ internal class DisassociateTextureSetFromModelCommandHandler : ICommandHandler<D
                     new Error("TextureSetNotFound", $"Texture set with ID {command.TextureSetId} was not found."));
             }
 
-            // Get the model
-            var model = await _modelRepository.GetByIdAsync(command.ModelId, cancellationToken);
-            if (model == null)
+            // If ModelVersionId is specified, use it directly
+            if (command.ModelVersionId.HasValue)
             {
-                return Result.Failure(
-                    new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
-            }
+                var modelVersion = await _modelVersionRepository.GetByIdAsync(command.ModelVersionId.Value, cancellationToken);
+                if (modelVersion == null)
+                {
+                    return Result.Failure(
+                        new Error("ModelVersionNotFound", $"Model version with ID {command.ModelVersionId.Value} was not found."));
+                }
 
-            // Check if association exists
-            if (!textureSet.HasModel(command.ModelId))
+                // Check if association exists
+                if (!textureSet.HasModelVersion(command.ModelVersionId.Value))
+                {
+                    return Result.Failure(
+                        new Error("AssociationNotFound", $"Texture set '{textureSet.Name}' is not associated with model version {modelVersion.VersionNumber}."));
+                }
+
+                // Remove the model version association
+                textureSet.RemoveModelVersion(modelVersion, _dateTimeProvider.UtcNow);
+            }
+            else
             {
-                return Result.Failure(
-                    new Error("AssociationNotFound", $"Texture set '{textureSet.Name}' is not associated with model '{model.Name}'."));
-            }
+                // Fallback: Use ModelId and disassociate from active version for backward compatibility
+                var model = await _modelRepository.GetByIdAsync(command.ModelId, cancellationToken);
+                if (model == null)
+                {
+                    return Result.Failure(
+                        new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
+                }
 
-            // Remove the model association
-            textureSet.RemoveModel(model, _dateTimeProvider.UtcNow);
+                if (model.ActiveVersionId == null)
+                {
+                    return Result.Failure(
+                        new Error("NoActiveVersion", $"Model '{model.Name}' has no active version."));
+                }
+
+                var activeVersion = model.ActiveVersion;
+                if (activeVersion == null)
+                {
+                    return Result.Failure(
+                        new Error("ActiveVersionNotLoaded", $"Active version for model '{model.Name}' could not be loaded."));
+                }
+
+                // Check if association exists
+                if (!textureSet.HasModelVersion(activeVersion.Id))
+                {
+                    return Result.Failure(
+                        new Error("AssociationNotFound", $"Texture set '{textureSet.Name}' is not associated with the active version of model '{model.Name}'."));
+                }
+
+                // Remove the active version association
+                textureSet.RemoveModelVersion(activeVersion, _dateTimeProvider.UtcNow);
+            }
 
             // Update the texture set
             await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
@@ -64,4 +103,4 @@ internal class DisassociateTextureSetFromModelCommandHandler : ICommandHandler<D
     }
 }
 
-public record DisassociateTextureSetFromModelCommand(int TextureSetId, int ModelId) : ICommand;
+public record DisassociateTextureSetFromModelCommand(int TextureSetId, int ModelId, int? ModelVersionId = null) : ICommand;
