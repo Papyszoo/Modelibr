@@ -64,9 +64,13 @@ function TextureSetSelectorWindow({
   }, [visible, modelVersionId])
 
   const handleSetDefault = async (textureSetId: number | null) => {
+    if (!modelVersionId) {
+      console.error('No model version ID available')
+      return
+    }
     try {
       setSettingDefault(true)
-      await ApiClient.setDefaultTextureSet(parseInt(model.id), textureSetId)
+      await ApiClient.setDefaultTextureSet(parseInt(model.id), textureSetId, modelVersionId)
       // Refresh the model to show updated default
       onModelUpdated()
     } catch (error) {
@@ -87,16 +91,15 @@ function TextureSetSelectorWindow({
     e: React.MouseEvent
   ) => {
     e.stopPropagation()
+    if (!modelVersionId) {
+      console.error('No model version ID available')
+      return
+    }
     try {
       setUnlinking(textureSetId)
-      const activeVersionId = model.activeVersionId
-      if (!activeVersionId) {
-        console.error('Model has no active version')
-        return
-      }
       await ApiClient.disassociateTextureSetFromModelVersion(
         textureSetId,
-        activeVersionId
+        modelVersionId
       )
 
       // If this was the default texture set, clear or update the default
@@ -107,7 +110,7 @@ function TextureSetSelectorWindow({
         )
         const newDefaultId =
           remainingTextureSets.length > 0 ? remainingTextureSets[0].id : null
-        await ApiClient.setDefaultTextureSet(parseInt(model.id), newDefaultId)
+        await ApiClient.setDefaultTextureSet(parseInt(model.id), newDefaultId, modelVersionId)
       }
 
       // If this was the selected texture set, clear selection
