@@ -1,6 +1,5 @@
 import { createContext } from 'react'
 import { Tab } from '../types'
-import { Model } from '../utils/fileUtils'
 
 export interface TabContextValue {
   side: 'left' | 'right'
@@ -8,7 +7,7 @@ export interface TabContextValue {
   setTabs: (tabs: Tab[]) => void
   activeTab: string
   setActiveTab: (tabId: string) => void
-  openModelDetailsTab: (model: Model) => void
+  openModelDetailsTab: (modelId: string, name?: string) => void
   openTextureSetDetailsTab: (textureSetId: number, name?: string) => void
   openPackDetailsTab: (packId: string) => void
   openProjectDetailsTab: (projectId: string) => void

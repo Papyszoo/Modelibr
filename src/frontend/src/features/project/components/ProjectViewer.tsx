@@ -756,7 +756,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                 <div
                   key={model.id}
                   className="project-card"
-                  onClick={() => openModelDetailsTab(model)}
+                  onClick={() => openModelDetailsTab(model.id, model.name)}
                   onContextMenu={e => {
                     e.preventDefault()
                     setSelectedModel(model)

@@ -219,7 +219,7 @@ export default function History() {
                   const model = await ApiClient.getModelById(
                     upload.modelId!.toString()
                   )
-                  openModelDetailsTab(model)
+                  openModelDetailsTab(model.id, model.name)
                 } catch (error) {
                   console.error('Failed to open model:', error)
                 }
