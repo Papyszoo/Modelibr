@@ -4,7 +4,7 @@ using SharedKernel;
 
 namespace Application.Packs;
 
-internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDto>
+internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDetailDto>
 {
     private readonly IPackRepository _packRepository;
 
@@ -13,17 +13,17 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDto
         _packRepository = packRepository;
     }
 
-    public async Task<Result<PackDto>> Handle(GetPackByIdQuery query, CancellationToken cancellationToken)
+    public async Task<Result<PackDetailDto>> Handle(GetPackByIdQuery query, CancellationToken cancellationToken)
     {
         var pack = await _packRepository.GetByIdAsync(query.Id, cancellationToken);
 
         if (pack == null)
         {
-            return Result.Failure<PackDto>(
+            return Result.Failure<PackDetailDto>(
                 new Error("PackNotFound", $"Pack with ID {query.Id} was not found."));
         }
 
-        var packDto = new PackDto
+        var packDetailDto = new PackDetailDto
         {
             Id = pack.Id,
             Name = pack.Name,
@@ -51,8 +51,45 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDto
             }).ToList()
         };
 
-        return Result.Success(packDto);
+        return Result.Success(packDetailDto);
     }
 }
 
-public record GetPackByIdQuery(int Id) : IQuery<PackDto>;
+public record GetPackByIdQuery(int Id) : IQuery<PackDetailDto>;
+
+/// <summary>
+/// Detailed DTO for single pack - contains all related models, texture sets, and sprites
+/// </summary>
+public record PackDetailDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+    public int ModelCount { get; init; }
+    public int TextureSetCount { get; init; }
+    public int SpriteCount { get; init; }
+    public bool IsEmpty { get; init; }
+    public ICollection<PackModelDto> Models { get; init; } = new List<PackModelDto>();
+    public ICollection<PackTextureSetDto> TextureSets { get; init; } = new List<PackTextureSetDto>();
+    public ICollection<PackSpriteDto> Sprites { get; init; } = new List<PackSpriteDto>();
+}
+
+public record PackModelDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record PackTextureSetDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record PackSpriteDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
