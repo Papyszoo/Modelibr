@@ -1,7 +1,6 @@
 import { useContext, ReactNode } from 'react'
 import TabContext, { TabContextValue } from '../contexts/TabContext'
-import { Tab, TextureSetDto } from '../types'
-import { Model } from '../utils/fileUtils'
+import { Tab } from '../types'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useTabContext = (): TabContextValue => {
@@ -29,10 +28,10 @@ export const TabProvider = ({
   activeTab,
   setActiveTab,
 }: TabProviderProps): JSX.Element => {
-  const openModelDetailsTab = (model: Model): void => {
+  const openModelDetailsTab = (modelId: string, name?: string): void => {
     // Check if tab already exists
     const existingTab = tabs.find(
-      tab => tab.type === 'modelViewer' && tab.modelId === model.id
+      tab => tab.type === 'modelViewer' && tab.modelId === modelId
     )
 
     if (existingTab) {
@@ -43,10 +42,10 @@ export const TabProvider = ({
 
     // Create new tab
     const newTab: Tab = {
-      id: `model-${model.id}`,
+      id: `model-${modelId}`,
       type: 'modelViewer',
-      label: model.name || `Model ${model.id}`,
-      modelId: model.id,
+      label: name || `Model ${modelId}`,
+      modelId: modelId,
     }
 
     const newTabs = [...tabs, newTab]
@@ -54,12 +53,12 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
-  const openTextureSetDetailsTab = (textureSet: TextureSetDto): void => {
+  const openTextureSetDetailsTab = (textureSetId: number, name?: string): void => {
     // Check if tab already exists
     const existingTab = tabs.find(
       tab =>
         tab.type === 'textureSetViewer' &&
-        tab.setId === textureSet.id.toString()
+        tab.setId === textureSetId.toString()
     )
 
     if (existingTab) {
@@ -70,10 +69,10 @@ export const TabProvider = ({
 
     // Create new tab
     const newTab: Tab = {
-      id: `set-${textureSet.id}`,
+      id: `set-${textureSetId}`,
       type: 'textureSetViewer',
-      label: textureSet.name || `Set ${textureSet.id}`,
-      setId: textureSet.id.toString(),
+      label: name || `Set ${textureSetId}`,
+      setId: textureSetId.toString(),
     }
 
     const newTabs = [...tabs, newTab]

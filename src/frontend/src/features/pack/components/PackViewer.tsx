@@ -756,7 +756,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
                 <div
                   key={model.id}
                   className="pack-card"
-                  onClick={() => openModelDetailsTab(model)}
+                  onClick={() => openModelDetailsTab(model.id, model.name)}
                   onContextMenu={e => {
                     e.preventDefault()
                     setSelectedModel(model)
@@ -809,7 +809,7 @@ export default function PackViewer({ packId }: PackViewerProps) {
                   <div
                     key={textureSet.id}
                     className="pack-card"
-                    onClick={() => openTextureSetDetailsTab(textureSet)}
+                    onClick={() => openTextureSetDetailsTab(textureSet.id, textureSet.name)}
                     onContextMenu={e => {
                       e.preventDefault()
                       setSelectedTextureSet(textureSet)

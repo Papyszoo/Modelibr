@@ -88,7 +88,7 @@ public static class PackEndpoints
 
     private static async Task<IResult> GetPackById(
         int id,
-        IQueryHandler<GetPackByIdQuery, PackDto> queryHandler,
+        IQueryHandler<GetPackByIdQuery, PackDetailDto> queryHandler,
         CancellationToken cancellationToken)
     {
         var query = new GetPackByIdQuery(id);

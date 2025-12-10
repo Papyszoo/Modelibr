@@ -23,7 +23,7 @@ namespace Application.Models
                     new Error("ModelNotFound", $"Model with ID {query.ModelId} was not found."));
             }
 
-            var modelDto = new ModelDto
+            var modelDetailDto = new ModelDetailDto
             {
                 Id = model.Id,
                 Name = model.Name,
@@ -33,6 +33,12 @@ namespace Application.Models
                 Description = model.Description,
                 DefaultTextureSetId = model.DefaultTextureSetId,
                 ActiveVersionId = model.ActiveVersionId,
+                ThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
+                    ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/file" 
+                    : null,
+                PngThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready && !string.IsNullOrEmpty(model.ActiveVersion.Thumbnail.PngThumbnailPath)
+                    ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/png-file" 
+                    : null,
                 Files = (model.ActiveVersion?.Files ?? Array.Empty<Domain.Models.File>()).Select(f => new FileDto
                 {
                     Id = f.Id,
@@ -42,6 +48,16 @@ namespace Application.Models
                     IsRenderable = f.FileType.IsRenderable,
                     SizeBytes = f.SizeBytes
                 }).ToList(),
+                Packs = model.Packs.Select(p => new PackSummaryDto
+                {
+                    Id = p.Id,
+                    Name = p.Name
+                }).ToList(),
+                Projects = model.Projects.Select(p => new ProjectSummaryDto
+                {
+                    Id = p.Id,
+                    Name = p.Name
+                }).ToList(),
                 TextureSets = model.TextureSets.Select(ts => new TextureSetSummaryDto
                 {
                     Id = ts.Id,
@@ -49,11 +65,60 @@ namespace Application.Models
                 }).ToList()
             };
 
-            return Result.Success(new GetModelByIdQueryResponse(modelDto));
+            return Result.Success(new GetModelByIdQueryResponse(modelDetailDto));
         }
     }
 
     public record GetModelByIdQuery(int ModelId) : IQuery<GetModelByIdQueryResponse>;
     
-    public record GetModelByIdQueryResponse(ModelDto Model);
+    public record GetModelByIdQueryResponse(ModelDetailDto Model);
+
+    /// <summary>
+    /// Detailed DTO for single model - contains all related files, packs, projects, and texture sets
+    /// </summary>
+    public record ModelDetailDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public DateTime CreatedAt { get; init; }
+        public DateTime UpdatedAt { get; init; }
+        public string? Tags { get; init; }
+        public string? Description { get; init; }
+        public int? DefaultTextureSetId { get; init; }
+        public int? ActiveVersionId { get; init; }
+        public string? ThumbnailUrl { get; init; }
+        public string? PngThumbnailUrl { get; init; }
+        public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
+        public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
+        public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();
+        public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();
+    }
+
+    public record FileDto
+    {
+        public int Id { get; init; }
+        public string OriginalFileName { get; init; } = string.Empty;
+        public string MimeType { get; init; } = string.Empty;
+        public required Domain.ValueObjects.FileType FileType { get; init; }
+        public bool IsRenderable { get; init; }
+        public long SizeBytes { get; init; }
+    }
+
+    public record PackSummaryDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
+
+    public record ProjectSummaryDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
+
+    public record TextureSetSummaryDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
 }

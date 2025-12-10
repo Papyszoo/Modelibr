@@ -30,7 +30,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             textureSets = textureSets.Where(ts => ts.Projects.Any(p => p.Id == query.ProjectId.Value));
         }
 
-        var textureSetDtos = textureSets.Select(tp => new TextureSetDto
+        var textureSetListDtos = textureSets.Select(tp => new TextureSetListDto
         {
             Id = tp.Id,
             Name = tp.Name,
@@ -38,41 +38,33 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             UpdatedAt = tp.UpdatedAt,
             TextureCount = tp.TextureCount,
             IsEmpty = tp.IsEmpty,
-            Textures = tp.Textures.Select(t => new TextureDto
+            Textures = tp.Textures.Select(t => new TextureListDto
             {
                 Id = t.Id,
                 TextureType = t.TextureType,
-                FileId = t.FileId,
-                FileName = t.File?.OriginalFileName,
-                CreatedAt = t.CreatedAt
+                FileId = t.FileId
             }).ToList(),
-            AssociatedModels = tp.ModelVersions.Select(mv => new ModelSummaryDto
+            AssociatedModels = tp.ModelVersions.Select(mv => new ModelSummaryListDto
             {
                 Id = mv.Model.Id,
                 Name = mv.Model.Name,
-                VersionNumber = mv.VersionNumber,
                 ModelVersionId = mv.Id
-            }).ToList(),
-            Packs = tp.Packs.Select(p => new PackSummaryDto
-            {
-                Id = p.Id,
-                Name = p.Name
-            }).ToList(),
-            Projects = tp.Projects.Select(p => new ProjectSummaryDto
-            {
-                Id = p.Id,
-                Name = p.Name
             }).ToList()
         }).ToList();
 
-        return Result.Success(new GetAllTextureSetsResponse(textureSetDtos));
+        return Result.Success(new GetAllTextureSetsResponse(textureSetListDtos));
     }
 }
 
 public record GetAllTextureSetsQuery(int? PackId = null, int? ProjectId = null) : IQuery<GetAllTextureSetsResponse>;
-public record GetAllTextureSetsResponse(IEnumerable<TextureSetDto> TextureSets);
+public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets);
 
-public record TextureSetDto
+/// <summary>
+/// Minimal DTO for texture set list - contains only basic information needed for list views
+/// Includes minimal texture information for thumbnails and drag-and-drop functionality
+/// Includes minimal model association info for filtering
+/// </summary>
+public record TextureSetListDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -80,37 +72,26 @@ public record TextureSetDto
     public DateTime UpdatedAt { get; init; }
     public int TextureCount { get; init; }
     public bool IsEmpty { get; init; }
-    public ICollection<TextureDto> Textures { get; init; } = new List<TextureDto>();
-    public ICollection<ModelSummaryDto> AssociatedModels { get; init; } = new List<ModelSummaryDto>();
-    public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
-    public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();
+    public ICollection<TextureListDto> Textures { get; init; } = new List<TextureListDto>();
+    public ICollection<ModelSummaryListDto> AssociatedModels { get; init; } = new List<ModelSummaryListDto>();
 }
 
-public record TextureDto
+/// <summary>
+/// Minimal texture info for list views - only essential fields for thumbnails and basic operations
+/// </summary>
+public record TextureListDto
 {
     public int Id { get; init; }
     public required TextureType TextureType { get; init; }
     public int FileId { get; init; }
-    public string? FileName { get; init; }
-    public DateTime CreatedAt { get; init; }
 }
 
-public record ModelSummaryDto
+/// <summary>
+/// Minimal model summary for list views - only essential fields for filtering and display
+/// </summary>
+public record ModelSummaryListDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
-    public int? VersionNumber { get; init; }
     public int ModelVersionId { get; init; }
-}
-
-public record PackSummaryDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
-}
-
-public record ProjectSummaryDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
 }

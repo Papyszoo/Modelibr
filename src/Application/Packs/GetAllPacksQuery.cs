@@ -17,7 +17,7 @@ internal class GetAllPacksQueryHandler : IQueryHandler<GetAllPacksQuery, GetAllP
     {
         var packs = await _packRepository.GetAllAsync(cancellationToken);
 
-        var packDtos = packs.Select(p => new PackDto
+        var packListDtos = packs.Select(p => new PackListDto
         {
             Id = p.Id,
             Name = p.Name,
@@ -27,32 +27,20 @@ internal class GetAllPacksQueryHandler : IQueryHandler<GetAllPacksQuery, GetAllP
             ModelCount = p.ModelCount,
             TextureSetCount = p.TextureSetCount,
             SpriteCount = p.SpriteCount,
-            IsEmpty = p.IsEmpty,
-            Models = p.Models.Select(m => new PackModelDto
-            {
-                Id = m.Id,
-                Name = m.Name
-            }).ToList(),
-            TextureSets = p.TextureSets.Select(ts => new PackTextureSetDto
-            {
-                Id = ts.Id,
-                Name = ts.Name
-            }).ToList(),
-            Sprites = p.Sprites.Select(s => new PackSpriteDto
-            {
-                Id = s.Id,
-                Name = s.Name
-            }).ToList()
+            IsEmpty = p.IsEmpty
         }).ToList();
 
-        return Result.Success(new GetAllPacksResponse(packDtos));
+        return Result.Success(new GetAllPacksResponse(packListDtos));
     }
 }
 
 public record GetAllPacksQuery() : IQuery<GetAllPacksResponse>;
-public record GetAllPacksResponse(IEnumerable<PackDto> Packs);
+public record GetAllPacksResponse(IEnumerable<PackListDto> Packs);
 
-public record PackDto
+/// <summary>
+/// Minimal DTO for pack list - contains only basic information and counts needed for list views
+/// </summary>
+public record PackListDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -63,25 +51,4 @@ public record PackDto
     public int TextureSetCount { get; init; }
     public int SpriteCount { get; init; }
     public bool IsEmpty { get; init; }
-    public ICollection<PackModelDto> Models { get; init; } = new List<PackModelDto>();
-    public ICollection<PackTextureSetDto> TextureSets { get; init; } = new List<PackTextureSetDto>();
-    public ICollection<PackSpriteDto> Sprites { get; init; } = new List<PackSpriteDto>();
-}
-
-public record PackModelDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
-}
-
-public record PackTextureSetDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
-}
-
-public record PackSpriteDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
 }

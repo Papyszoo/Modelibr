@@ -756,7 +756,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                 <div
                   key={model.id}
                   className="project-card"
-                  onClick={() => openModelDetailsTab(model)}
+                  onClick={() => openModelDetailsTab(model.id, model.name)}
                   onContextMenu={e => {
                     e.preventDefault()
                     setSelectedModel(model)
@@ -809,7 +809,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                   <div
                     key={textureSet.id}
                     className="project-card"
-                    onClick={() => openTextureSetDetailsTab(textureSet)}
+                    onClick={() => openTextureSetDetailsTab(textureSet.id, textureSet.name)}
                     onContextMenu={e => {
                       e.preventDefault()
                       setSelectedTextureSet(textureSet)
