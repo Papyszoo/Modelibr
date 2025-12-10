@@ -43,6 +43,12 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 Id = t.Id,
                 TextureType = t.TextureType,
                 FileId = t.FileId
+            }).ToList(),
+            AssociatedModels = tp.ModelVersions.Select(mv => new ModelSummaryListDto
+            {
+                Id = mv.Model.Id,
+                Name = mv.Model.Name,
+                ModelVersionId = mv.Id
             }).ToList()
         }).ToList();
 
@@ -56,6 +62,7 @@ public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSe
 /// <summary>
 /// Minimal DTO for texture set list - contains only basic information needed for list views
 /// Includes minimal texture information for thumbnails and drag-and-drop functionality
+/// Includes minimal model association info for filtering
 /// </summary>
 public record TextureSetListDto
 {
@@ -66,6 +73,7 @@ public record TextureSetListDto
     public int TextureCount { get; init; }
     public bool IsEmpty { get; init; }
     public ICollection<TextureListDto> Textures { get; init; } = new List<TextureListDto>();
+    public ICollection<ModelSummaryListDto> AssociatedModels { get; init; } = new List<ModelSummaryListDto>();
 }
 
 /// <summary>
@@ -76,4 +84,14 @@ public record TextureListDto
     public int Id { get; init; }
     public required TextureType TextureType { get; init; }
     public int FileId { get; init; }
+}
+
+/// <summary>
+/// Minimal model summary for list views - only essential fields for filtering and display
+/// </summary>
+public record ModelSummaryListDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public int ModelVersionId { get; init; }
 }
