@@ -433,18 +433,17 @@
 
 .model-association-card {
   position: relative;
-  cursor: pointer;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--surface-card);
   border: 2px solid var(--surface-border);
   transition: all 0.2s;
-  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .model-association-card:hover {
   border-color: var(--primary-color);
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -452,6 +451,24 @@
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.2);
   background: rgba(var(--primary-color-rgb), 0.05);
+}
+
+.model-association-card .model-card-thumbnail {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.model-association-card .model-card-version-selector {
+  padding: 0.5rem;
+  background: var(--surface-ground);
+  border-top: 1px solid var(--surface-border);
+  z-index: 1;
+}
+
+.model-association-card .model-card-version-selector .p-dropdown {
+  width: 100%;
 }
 
 .model-association-checkbox {
