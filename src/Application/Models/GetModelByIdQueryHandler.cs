@@ -58,7 +58,7 @@ namespace Application.Models
                     Id = p.Id,
                     Name = p.Name
                 }).ToList(),
-                TextureSets = (model.ActiveVersion?.TextureSets ?? Array.Empty<Domain.Models.TextureSet>()).Select(ts => new TextureSetSummaryDto
+                TextureSets = model.TextureSets.Select(ts => new TextureSetSummaryDto
                 {
                     Id = ts.Id,
                     Name = ts.Name
