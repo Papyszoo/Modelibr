@@ -464,10 +464,16 @@
   padding: 0.5rem;
   background: var(--surface-ground);
   border-top: 1px solid var(--surface-border);
+  position: relative;
   z-index: 1;
 }
 
-.model-association-card .model-card-version-selector .p-dropdown {
+.model-association-card:hover .model-card-version-selector {
+  z-index: 10;
+}
+
+.model-association-card .model-card-version-selector .p-dropdown,
+.model-association-card .model-card-version-selector .p-multiselect {
   width: 100%;
 }
 

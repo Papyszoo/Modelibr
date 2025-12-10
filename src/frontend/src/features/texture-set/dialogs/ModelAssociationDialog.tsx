@@ -4,7 +4,7 @@ import { Toast } from 'primereact/toast'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
-import { Dropdown } from 'primereact/dropdown'
+import { MultiSelect } from 'primereact/multiselect'
 import { TextureSetDto, Model, PackSummaryDto, ModelVersionDto } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import ApiClient from '../../../services/ApiClient'
@@ -28,8 +28,8 @@ interface ModelVersionAssociation {
 interface ModelAssociation {
   model: Model
   versions: ModelVersionAssociation[]
-  selectedVersionOption: 'specific' | 'all' | null
-  selectedVersionId: number | null
+  selectedVersionIds: number[]
+  originalVersionIds: number[]
   hasChanges: boolean
 }
 
@@ -89,25 +89,14 @@ function ModelAssociationDialog({
           originallyAssociated: associatedVersions.includes(v.id),
         }))
         
-        const associatedCount = versionAssociations.filter(v => v.isAssociated).length
-        const allVersionsAssociated = associatedCount === versions.length && versions.length > 0
-        
-        // Determine initial selection
-        let selectedVersionOption: 'specific' | 'all' | null = null
-        let selectedVersionId: number | null = null
-        
-        if (allVersionsAssociated) {
-          selectedVersionOption = 'all'
-        } else if (associatedCount > 0) {
-          selectedVersionOption = 'specific'
-          selectedVersionId = versionAssociations.find(v => v.isAssociated)?.modelVersionId || null
-        }
+        // Get IDs of currently associated versions
+        const selectedVersionIds = associatedVersions
         
         return {
           model,
           versions: versionAssociations,
-          selectedVersionOption,
-          selectedVersionId,
+          selectedVersionIds,
+          originalVersionIds: [...associatedVersions],
           hasChanges: false,
         }
       })
@@ -127,15 +116,19 @@ function ModelAssociationDialog({
     }
   }, [textureSetsApi, textureSet.associatedModels])
 
-  const handleVersionOptionChange = (modelId: string, option: 'specific' | 'all' | null, versionId: number | null) => {
+  const handleVersionSelectionChange = (modelId: string, selectedIds: number[]) => {
     setModelAssociations(prev =>
       prev.map(assoc => {
         if (assoc.model.id === modelId) {
+          // Check if the selection has changed from original
+          const hasChanges = 
+            selectedIds.length !== assoc.originalVersionIds.length ||
+            !selectedIds.every(id => assoc.originalVersionIds.includes(id))
+          
           return {
             ...assoc,
-            selectedVersionOption: option,
-            selectedVersionId: versionId,
-            hasChanges: true,
+            selectedVersionIds: selectedIds,
+            hasChanges,
           }
         }
         return assoc
@@ -159,26 +152,27 @@ function ModelAssociationDialog({
       for (const assoc of modelAssociations) {
         if (!assoc.hasChanges) continue
 
-        // First, disassociate all current associations for this model
-        for (const version of assoc.versions) {
-          if (version.originallyAssociated) {
-            await textureSetsApi.disassociateTextureSetFromModelVersion(
-              textureSet.id,
-              version.modelVersionId
-            )
-          }
+        // Find versions to add and remove
+        const versionsToAdd = assoc.selectedVersionIds.filter(
+          id => !assoc.originalVersionIds.includes(id)
+        )
+        const versionsToRemove = assoc.originalVersionIds.filter(
+          id => !assoc.selectedVersionIds.includes(id)
+        )
+
+        // Remove disassociated versions
+        for (const versionId of versionsToRemove) {
+          await textureSetsApi.disassociateTextureSetFromModelVersion(
+            textureSet.id,
+            versionId
+          )
         }
 
-        // Then add new associations
-        if (assoc.selectedVersionOption === 'all') {
-          await textureSetsApi.associateTextureSetWithAllModelVersions(
-            textureSet.id,
-            parseInt(assoc.model.id)
-          )
-        } else if (assoc.selectedVersionOption === 'specific' && assoc.selectedVersionId) {
+        // Add newly associated versions
+        for (const versionId of versionsToAdd) {
           await textureSetsApi.associateTextureSetWithModelVersion(
             textureSet.id,
-            assoc.selectedVersionId
+            versionId
           )
         }
       }
@@ -331,9 +325,8 @@ function ModelAssociationDialog({
                     key={assoc.model.id}
                     model={assoc.model}
                     versions={assoc.versions}
-                    selectedVersionOption={assoc.selectedVersionOption}
-                    selectedVersionId={assoc.selectedVersionId}
-                    onVersionOptionChange={handleVersionOptionChange}
+                    selectedVersionIds={assoc.selectedVersionIds}
+                    onVersionSelectionChange={handleVersionSelectionChange}
                   />
                 ))}
               </div>
@@ -348,22 +341,15 @@ function ModelAssociationDialog({
 interface ModelCardProps {
   model: Model
   versions: ModelVersionAssociation[]
-  selectedVersionOption: 'specific' | 'all' | null
-  selectedVersionId: number | null
-  onVersionOptionChange: (modelId: string, option: 'specific' | 'all' | null, versionId: number | null) => void
+  selectedVersionIds: number[]
+  onVersionSelectionChange: (modelId: string, selectedIds: number[]) => void
 }
 
-function ModelCard({ model, versions, selectedVersionOption, selectedVersionId, onVersionOptionChange }: ModelCardProps) {
-  const versionOptions = [
-    { label: 'Not linked', value: null },
-    { label: 'All versions', value: 'all' },
-    ...versions.map(v => ({
-      label: `Version ${v.versionNumber}`,
-      value: v.modelVersionId
-    }))
-  ]
-
-  const dropdownValue = selectedVersionOption === 'all' ? 'all' : selectedVersionId
+function ModelCard({ model, versions, selectedVersionIds, onVersionSelectionChange }: ModelCardProps) {
+  const versionOptions = versions.map(v => ({
+    label: `Version ${v.versionNumber}`,
+    value: v.modelVersionId
+  }))
 
   return (
     <div className="model-association-card">
@@ -374,20 +360,15 @@ function ModelCard({ model, versions, selectedVersionOption, selectedVersionId, 
         </div>
       </div>
       <div className="model-card-version-selector" style={{ padding: '0.5rem' }}>
-        <Dropdown
-          value={dropdownValue}
+        <MultiSelect
+          value={selectedVersionIds}
           options={versionOptions}
-          onChange={(e) => {
-            if (e.value === null) {
-              onVersionOptionChange(model.id, null, null)
-            } else if (e.value === 'all') {
-              onVersionOptionChange(model.id, 'all', null)
-            } else {
-              onVersionOptionChange(model.id, 'specific', e.value as number)
-            }
-          }}
-          placeholder="Select version"
+          onChange={(e) => onVersionSelectionChange(model.id, e.value)}
+          placeholder="Select versions"
+          display="chip"
           style={{ width: '100%' }}
+          panelStyle={{ zIndex: 1100 }}
+          maxSelectedLabels={2}
         />
       </div>
     </div>
