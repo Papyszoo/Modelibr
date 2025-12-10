@@ -88,7 +88,7 @@ public static class ProjectEndpoints
 
     private static async Task<IResult> GetProjectById(
         int id,
-        IQueryHandler<GetProjectByIdQuery, ProjectDto> queryHandler,
+        IQueryHandler<GetProjectByIdQuery, ProjectDetailDto> queryHandler,
         CancellationToken cancellationToken)
     {
         var query = new GetProjectByIdQuery(id);

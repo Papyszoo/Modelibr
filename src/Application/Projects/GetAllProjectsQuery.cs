@@ -17,7 +17,7 @@ internal class GetAllProjectsQueryHandler : IQueryHandler<GetAllProjectsQuery, G
     {
         var projects = await _projectRepository.GetAllAsync(cancellationToken);
 
-        var projectDtos = projects.Select(p => new ProjectDto
+        var projectListDtos = projects.Select(p => new ProjectListDto
         {
             Id = p.Id,
             Name = p.Name,
@@ -27,32 +27,20 @@ internal class GetAllProjectsQueryHandler : IQueryHandler<GetAllProjectsQuery, G
             ModelCount = p.ModelCount,
             TextureSetCount = p.TextureSetCount,
             SpriteCount = p.SpriteCount,
-            IsEmpty = p.IsEmpty,
-            Models = p.Models.Select(m => new ProjectModelDto
-            {
-                Id = m.Id,
-                Name = m.Name
-            }).ToList(),
-            TextureSets = p.TextureSets.Select(ts => new ProjectTextureSetDto
-            {
-                Id = ts.Id,
-                Name = ts.Name
-            }).ToList(),
-            Sprites = p.Sprites.Select(s => new ProjectSpriteDto
-            {
-                Id = s.Id,
-                Name = s.Name
-            }).ToList()
+            IsEmpty = p.IsEmpty
         }).ToList();
 
-        return Result.Success(new GetAllProjectsResponse(projectDtos));
+        return Result.Success(new GetAllProjectsResponse(projectListDtos));
     }
 }
 
 public record GetAllProjectsQuery() : IQuery<GetAllProjectsResponse>;
-public record GetAllProjectsResponse(IEnumerable<ProjectDto> Projects);
+public record GetAllProjectsResponse(IEnumerable<ProjectListDto> Projects);
 
-public record ProjectDto
+/// <summary>
+/// Minimal DTO for project list - contains only basic information and counts needed for list views
+/// </summary>
+public record ProjectListDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -63,25 +51,4 @@ public record ProjectDto
     public int TextureSetCount { get; init; }
     public int SpriteCount { get; init; }
     public bool IsEmpty { get; init; }
-    public ICollection<ProjectModelDto> Models { get; init; } = new List<ProjectModelDto>();
-    public ICollection<ProjectTextureSetDto> TextureSets { get; init; } = new List<ProjectTextureSetDto>();
-    public ICollection<ProjectSpriteDto> Sprites { get; init; } = new List<ProjectSpriteDto>();
-}
-
-public record ProjectModelDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
-}
-
-public record ProjectTextureSetDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
-}
-
-public record ProjectSpriteDto
-{
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
 }

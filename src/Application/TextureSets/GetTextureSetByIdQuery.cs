@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.TextureSets;
@@ -23,7 +24,7 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
                 new Error("TextureSetNotFound", $"Texture set with ID {query.Id} was not found."));
         }
 
-        var textureSetDto = new TextureSetDto
+        var textureSetDetailDto = new TextureSetDetailDto
         {
             Id = textureSet.Id,
             Name = textureSet.Name,
@@ -58,9 +59,55 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
             }).ToList()
         };
 
-        return Result.Success(new GetTextureSetByIdResponse(textureSetDto));
+        return Result.Success(new GetTextureSetByIdResponse(textureSetDetailDto));
     }
 }
 
 public record GetTextureSetByIdQuery(int Id) : IQuery<GetTextureSetByIdResponse>;
-public record GetTextureSetByIdResponse(TextureSetDto TextureSet);
+public record GetTextureSetByIdResponse(TextureSetDetailDto TextureSet);
+
+/// <summary>
+/// Detailed DTO for single texture set - contains all related information including textures, models, packs, and projects
+/// </summary>
+public record TextureSetDetailDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+    public int TextureCount { get; init; }
+    public bool IsEmpty { get; init; }
+    public ICollection<TextureDto> Textures { get; init; } = new List<TextureDto>();
+    public ICollection<ModelSummaryDto> AssociatedModels { get; init; } = new List<ModelSummaryDto>();
+    public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
+    public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();
+}
+
+public record TextureDto
+{
+    public int Id { get; init; }
+    public required TextureType TextureType { get; init; }
+    public int FileId { get; init; }
+    public string? FileName { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+
+public record ModelSummaryDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public int? VersionNumber { get; init; }
+    public int ModelVersionId { get; init; }
+}
+
+public record PackSummaryDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record ProjectSummaryDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}

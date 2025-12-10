@@ -4,7 +4,7 @@ using SharedKernel;
 
 namespace Application.Projects;
 
-internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, ProjectDto>
+internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, ProjectDetailDto>
 {
     private readonly IProjectRepository _projectRepository;
 
@@ -13,17 +13,17 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
         _projectRepository = projectRepository;
     }
 
-    public async Task<Result<ProjectDto>> Handle(GetProjectByIdQuery query, CancellationToken cancellationToken)
+    public async Task<Result<ProjectDetailDto>> Handle(GetProjectByIdQuery query, CancellationToken cancellationToken)
     {
         var project = await _projectRepository.GetByIdAsync(query.Id, cancellationToken);
 
         if (project == null)
         {
-            return Result.Failure<ProjectDto>(
+            return Result.Failure<ProjectDetailDto>(
                 new Error("ProjectNotFound", $"Project with ID {query.Id} was not found."));
         }
 
-        var projectDto = new ProjectDto
+        var projectDetailDto = new ProjectDetailDto
         {
             Id = project.Id,
             Name = project.Name,
@@ -51,8 +51,45 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             }).ToList()
         };
 
-        return Result.Success(projectDto);
+        return Result.Success(projectDetailDto);
     }
 }
 
-public record GetProjectByIdQuery(int Id) : IQuery<ProjectDto>;
+public record GetProjectByIdQuery(int Id) : IQuery<ProjectDetailDto>;
+
+/// <summary>
+/// Detailed DTO for single project - contains all related models, texture sets, and sprites
+/// </summary>
+public record ProjectDetailDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+    public int ModelCount { get; init; }
+    public int TextureSetCount { get; init; }
+    public int SpriteCount { get; init; }
+    public bool IsEmpty { get; init; }
+    public ICollection<ProjectModelDto> Models { get; init; } = new List<ProjectModelDto>();
+    public ICollection<ProjectTextureSetDto> TextureSets { get; init; } = new List<ProjectTextureSetDto>();
+    public ICollection<ProjectSpriteDto> Sprites { get; init; } = new List<ProjectSpriteDto>();
+}
+
+public record ProjectModelDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record ProjectTextureSetDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record ProjectSpriteDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}

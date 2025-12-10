@@ -31,7 +31,7 @@ namespace Application.Models
                 models = models.Where(m => m.Projects.Any(p => p.Id == query.ProjectId.Value));
             }
             
-            var modelDtos = models.Select(m => new ModelDto
+            var modelListDtos = models.Select(m => new ModelListDto
             {
                 Id = m.Id,
                 Name = m.Name,
@@ -39,49 +39,27 @@ namespace Application.Models
                 UpdatedAt = m.UpdatedAt,
                 Tags = m.Tags,
                 Description = m.Description,
-                DefaultTextureSetId = m.ActiveVersion?.DefaultTextureSetId,
                 ActiveVersionId = m.ActiveVersionId,
                 ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
                     ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file" 
                     : null,
                 PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
                     ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file" 
-                    : null,
-                Files = (m.ActiveVersion?.Files ?? Array.Empty<Domain.Models.File>()).Select(f => new FileDto
-                {
-                    Id = f.Id,
-                    OriginalFileName = f.OriginalFileName,
-                    MimeType = f.MimeType,
-                    FileType = f.FileType,
-                    IsRenderable = f.FileType.IsRenderable,
-                    SizeBytes = f.SizeBytes
-                }).ToList(),
-                Packs = m.Packs.Select(p => new PackSummaryDto
-                {
-                    Id = p.Id,
-                    Name = p.Name
-                }).ToList(),
-                Projects = m.Projects.Select(p => new ProjectSummaryDto
-                {
-                    Id = p.Id,
-                    Name = p.Name
-                }).ToList(),
-                TextureSets = (m.ActiveVersion?.TextureSets ?? Array.Empty<Domain.Models.TextureSet>()).Select(ts => new TextureSetSummaryDto
-                {
-                    Id = ts.Id,
-                    Name = ts.Name
-                }).ToList()
+                    : null
             }).ToList();
 
-            return Result.Success(new GetAllModelsQueryResponse(modelDtos));
+            return Result.Success(new GetAllModelsQueryResponse(modelListDtos));
         }
     }
 
     public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null) : IQuery<GetAllModelsQueryResponse>;
     
-    public record GetAllModelsQueryResponse(IEnumerable<ModelDto> Models);
+    public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models);
     
-    public record ModelDto
+    /// <summary>
+    /// Minimal DTO for model list - contains only basic information and thumbnails needed for list views
+    /// </summary>
+    public record ModelListDto
     {
         public int Id { get; init; }
         public string Name { get; init; } = string.Empty;
@@ -89,41 +67,8 @@ namespace Application.Models
         public DateTime UpdatedAt { get; init; }
         public string? Tags { get; init; }
         public string? Description { get; init; }
-        public int? DefaultTextureSetId { get; init; }
         public int? ActiveVersionId { get; init; }
         public string? ThumbnailUrl { get; init; }
         public string? PngThumbnailUrl { get; init; }
-        public ICollection<FileDto> Files { get; init; } = new List<FileDto>();
-        public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
-        public ICollection<ProjectSummaryDto> Projects { get; init; } = new List<ProjectSummaryDto>();
-        public ICollection<TextureSetSummaryDto> TextureSets { get; init; } = new List<TextureSetSummaryDto>();
-    }
-
-    public record FileDto
-    {
-        public int Id { get; init; }
-        public string OriginalFileName { get; init; } = string.Empty;
-        public string MimeType { get; init; } = string.Empty;
-        public required FileType FileType { get; init; }
-        public bool IsRenderable { get; init; }
-        public long SizeBytes { get; init; }
-    }
-
-    public record PackSummaryDto
-    {
-        public int Id { get; init; }
-        public string Name { get; init; } = string.Empty;
-    }
-
-    public record ProjectSummaryDto
-    {
-        public int Id { get; init; }
-        public string Name { get; init; } = string.Empty;
-    }
-
-    public record TextureSetSummaryDto
-    {
-        public int Id { get; init; }
-        public string Name { get; init; } = string.Empty;
     }
 }

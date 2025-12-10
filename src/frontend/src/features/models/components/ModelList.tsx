@@ -133,7 +133,7 @@ function ModelListContent({
   const handleModelSelect = (model: Model) => {
     if (isTabContent && tabContext) {
       // Open model details in new tab
-      tabContext.openModelDetailsTab(model)
+      tabContext.openModelDetailsTab(model.id, model.name)
     } else {
       // For backward compatibility when not in tab mode - just log for now
       console.log('Model selected:', model)
