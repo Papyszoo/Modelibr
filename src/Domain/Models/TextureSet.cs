@@ -10,6 +10,7 @@ public class TextureSet : AggregateRoot
 {
     private readonly List<Texture> _textures = new();
     private readonly List<Model> _models = new();
+    private readonly List<ModelVersion> _modelVersions = new();
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
 
@@ -33,6 +34,7 @@ public class TextureSet : AggregateRoot
     }
 
     // Navigation property for many-to-many relationship with Models - EF Core requires this to be settable
+    // DEPRECATED: Use ModelVersions instead for new associations
     public ICollection<Model> Models
     {
         get => _models;
@@ -41,6 +43,18 @@ public class TextureSet : AggregateRoot
             _models.Clear();
             if (value != null)
                 _models.AddRange(value);
+        }
+    }
+
+    // Navigation property for many-to-many relationship with ModelVersions - EF Core requires this to be settable
+    public ICollection<ModelVersion> ModelVersions
+    {
+        get => _modelVersions;
+        set
+        {
+            _modelVersions.Clear();
+            if (value != null)
+                _modelVersions.AddRange(value);
         }
     }
 
@@ -203,10 +217,12 @@ public class TextureSet : AggregateRoot
 
     /// <summary>
     /// Associates a model with this texture set.
+    /// DEPRECATED: Use AddModelVersion instead for new associations.
     /// </summary>
     /// <param name="model">The model to associate</param>
     /// <param name="updatedAt">When the association was made</param>
     /// <exception cref="ArgumentNullException">Thrown when model is null</exception>
+    [Obsolete("Use AddModelVersion instead to associate with specific model versions.")]
     public void AddModel(Model model, DateTime updatedAt)
     {
         if (model == null)
@@ -221,10 +237,12 @@ public class TextureSet : AggregateRoot
 
     /// <summary>
     /// Removes a model association from this texture set.
+    /// DEPRECATED: Use RemoveModelVersion instead.
     /// </summary>
     /// <param name="model">The model to remove</param>
     /// <param name="updatedAt">When the association was removed</param>
     /// <exception cref="ArgumentNullException">Thrown when model is null</exception>
+    [Obsolete("Use RemoveModelVersion instead to disassociate from specific model versions.")]
     public void RemoveModel(Model model, DateTime updatedAt)
     {
         if (model == null)
@@ -238,9 +256,11 @@ public class TextureSet : AggregateRoot
 
     /// <summary>
     /// Checks if this texture set is associated with a model with the specified ID.
+    /// DEPRECATED: Use HasModelVersion instead.
     /// </summary>
     /// <param name="modelId">The model ID to check</param>
     /// <returns>True if the model is associated with this texture set</returns>
+    [Obsolete("Use HasModelVersion instead to check specific model version associations.")]
     public bool HasModel(int modelId)
     {
         return _models.Any(m => m.Id == modelId);
@@ -248,11 +268,67 @@ public class TextureSet : AggregateRoot
 
     /// <summary>
     /// Gets all models associated with this texture set.
+    /// DEPRECATED: Use GetModelVersions instead.
     /// </summary>
     /// <returns>Read-only list of associated models</returns>
+    [Obsolete("Use GetModelVersions instead to get specific model version associations.")]
     public IReadOnlyList<Model> GetModels()
     {
         return _models.AsReadOnly();
+    }
+
+    /// <summary>
+    /// Associates a model version with this texture set.
+    /// </summary>
+    /// <param name="modelVersion">The model version to associate</param>
+    /// <param name="updatedAt">When the association was made</param>
+    /// <exception cref="ArgumentNullException">Thrown when modelVersion is null</exception>
+    public void AddModelVersion(ModelVersion modelVersion, DateTime updatedAt)
+    {
+        if (modelVersion == null)
+            throw new ArgumentNullException(nameof(modelVersion));
+
+        if (_modelVersions.Any(mv => mv.Id == modelVersion.Id))
+            return; // Model version already associated
+
+        _modelVersions.Add(modelVersion);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a model version association from this texture set.
+    /// </summary>
+    /// <param name="modelVersion">The model version to remove</param>
+    /// <param name="updatedAt">When the association was removed</param>
+    /// <exception cref="ArgumentNullException">Thrown when modelVersion is null</exception>
+    public void RemoveModelVersion(ModelVersion modelVersion, DateTime updatedAt)
+    {
+        if (modelVersion == null)
+            throw new ArgumentNullException(nameof(modelVersion));
+
+        if (_modelVersions.Remove(modelVersion))
+        {
+            UpdatedAt = updatedAt;
+        }
+    }
+
+    /// <summary>
+    /// Checks if this texture set is associated with a model version with the specified ID.
+    /// </summary>
+    /// <param name="modelVersionId">The model version ID to check</param>
+    /// <returns>True if the model version is associated with this texture set</returns>
+    public bool HasModelVersion(int modelVersionId)
+    {
+        return _modelVersions.Any(mv => mv.Id == modelVersionId);
+    }
+
+    /// <summary>
+    /// Gets all model versions associated with this texture set.
+    /// </summary>
+    /// <returns>Read-only list of associated model versions</returns>
+    public IReadOnlyList<ModelVersion> GetModelVersions()
+    {
+        return _modelVersions.AsReadOnly();
     }
 
     /// <summary>

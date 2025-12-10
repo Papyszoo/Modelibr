@@ -1,4 +1,5 @@
 import { Button } from 'primereact/button'
+import { Badge } from 'primereact/badge'
 import { ModelSummaryDto } from '../../../types'
 import ThumbnailDisplay from '../../thumbnail/components/ThumbnailDisplay'
 import './ModelsCardGrid.css'
@@ -40,7 +41,7 @@ export default function ModelsCardGrid({
       ) : (
         <div className="models-card-grid">
           {models.map(model => (
-            <div key={model.id} className="model-card">
+            <div key={`${model.id}-${model.modelVersionId}`} className="model-card">
               <Button
                 icon="pi pi-times"
                 className="model-card-delete"
@@ -56,6 +57,13 @@ export default function ModelsCardGrid({
                 <ThumbnailDisplay modelId={model.id.toString()} />
                 <div className="model-card-overlay">
                   <span className="model-card-name">{model.name}</span>
+                  {model.versionNumber && (
+                    <Badge 
+                      value={`Version ${model.versionNumber}`} 
+                      severity="info"
+                      style={{ marginTop: '0.5rem' }}
+                    />
+                  )}
                 </div>
               </div>
             </div>

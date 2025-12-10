@@ -39,7 +39,7 @@ namespace Application.Models
                 UpdatedAt = m.UpdatedAt,
                 Tags = m.Tags,
                 Description = m.Description,
-                DefaultTextureSetId = m.DefaultTextureSetId,
+                DefaultTextureSetId = m.ActiveVersion?.DefaultTextureSetId,
                 ActiveVersionId = m.ActiveVersionId,
                 ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
                     ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file" 
@@ -66,7 +66,7 @@ namespace Application.Models
                     Id = p.Id,
                     Name = p.Name
                 }).ToList(),
-                TextureSets = m.TextureSets.Select(ts => new TextureSetSummaryDto
+                TextureSets = (m.ActiveVersion?.TextureSets ?? Array.Empty<Domain.Models.TextureSet>()).Select(ts => new TextureSetSummaryDto
                 {
                     Id = ts.Id,
                     Name = ts.Name

@@ -50,9 +50,9 @@ public static class ModelsEndpoints
         })
         .WithName("Get Model File");
 
-        app.MapPut("/models/{id}/defaultTextureSet", async (int id, int? textureSetId, ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> commandHandler) =>
+        app.MapPut("/models/{id}/defaultTextureSet", async (int id, int? textureSetId, int? modelVersionId, ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> commandHandler) =>
         {
-            var result = await commandHandler.Handle(new SetDefaultTextureSetCommand(id, textureSetId), CancellationToken.None);
+            var result = await commandHandler.Handle(new SetDefaultTextureSetCommand(id, textureSetId, modelVersionId), CancellationToken.None);
             
             if (!result.IsSuccess)
             {

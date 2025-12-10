@@ -409,24 +409,35 @@ class ApiClient {
     useApiCacheStore.getState().invalidateTextureSetById(setId)
   }
 
-  async associateTextureSetWithModel(
+  async associateTextureSetWithModelVersion(
     setId: number,
-    modelId: number
+    modelVersionId: number
   ): Promise<void> {
-    await this.client.post(`/texture-sets/${setId}/models/${modelId}`)
+    await this.client.post(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
 
     // Invalidate texture sets and models cache when associations change
     useApiCacheStore.getState().invalidateTextureSets()
     useApiCacheStore.getState().invalidateTextureSetById(setId)
     useApiCacheStore.getState().invalidateModels()
-    useApiCacheStore.getState().invalidateModelById(modelId.toString())
   }
 
-  async disassociateTextureSetFromModel(
+  async disassociateTextureSetFromModelVersion(
+    setId: number,
+    modelVersionId: number
+  ): Promise<void> {
+    await this.client.delete(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
+
+    // Invalidate texture sets and models cache when associations change
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
+    useApiCacheStore.getState().invalidateModels()
+  }
+
+  async associateTextureSetWithAllModelVersions(
     setId: number,
     modelId: number
   ): Promise<void> {
-    await this.client.delete(`/texture-sets/${setId}/models/${modelId}`)
+    await this.client.post(`/texture-sets/${setId}/models/${modelId}/all-versions`)
 
     // Invalidate texture sets and models cache when associations change
     useApiCacheStore.getState().invalidateTextureSets()
@@ -947,13 +958,14 @@ class ApiClient {
 
   async setDefaultTextureSet(
     modelId: number,
-    textureSetId: number | null
+    textureSetId: number | null,
+    modelVersionId?: number
   ): Promise<{ modelId: number; defaultTextureSetId: number | null }> {
     const response = await this.client.put(
       `/models/${modelId}/defaultTextureSet`,
       null,
       {
-        params: { textureSetId },
+        params: { textureSetId, modelVersionId },
       }
     )
 

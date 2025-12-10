@@ -6,24 +6,27 @@ using SharedKernel;
 
 namespace Application.Models
 {
-    public record SetDefaultTextureSetCommand(int ModelId, int? TextureSetId) : ICommand<SetDefaultTextureSetResponse>;
+    public record SetDefaultTextureSetCommand(int ModelId, int? TextureSetId, int? ModelVersionId = null) : ICommand<SetDefaultTextureSetResponse>;
 
-    public record SetDefaultTextureSetResponse(int ModelId, int? DefaultTextureSetId);
+    public record SetDefaultTextureSetResponse(int ModelId, int? ModelVersionId, int? DefaultTextureSetId);
 
     internal class SetDefaultTextureSetCommandHandler : ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>
     {
         private readonly IModelRepository _modelRepository;
+        private readonly IModelVersionRepository _modelVersionRepository;
         private readonly IThumbnailRepository _thumbnailRepository;
         private readonly IThumbnailQueue _thumbnailQueue;
         private readonly IDateTimeProvider _dateTimeProvider;
 
         public SetDefaultTextureSetCommandHandler(
             IModelRepository modelRepository,
+            IModelVersionRepository modelVersionRepository,
             IThumbnailRepository thumbnailRepository,
             IThumbnailQueue thumbnailQueue,
             IDateTimeProvider dateTimeProvider)
         {
             _modelRepository = modelRepository;
+            _modelVersionRepository = modelVersionRepository;
             _thumbnailRepository = thumbnailRepository;
             _thumbnailQueue = thumbnailQueue;
             _dateTimeProvider = dateTimeProvider;
@@ -41,42 +44,82 @@ namespace Application.Models
 
             try
             {
-                model.SetDefaultTextureSet(command.TextureSetId, _dateTimeProvider.UtcNow);
-                await _modelRepository.UpdateAsync(model, cancellationToken);
+                Domain.Models.ModelVersion? targetVersion;
 
-                // Cancel any active thumbnail jobs for this model
-                await _thumbnailQueue.CancelActiveJobsForModelAsync(command.ModelId, cancellationToken);
-
-                // Get the model's primary file hash for thumbnail generation
-                var primaryFile = model.ActiveVersion?.Files.FirstOrDefault();
-                if (primaryFile != null && model.ActiveVersion != null)
+                // Determine which version to update
+                if (command.ModelVersionId.HasValue)
                 {
-                    var currentTime = _dateTimeProvider.UtcNow;
-
-                    // Reset existing thumbnail if it exists
-                    if (model.ActiveVersion.Thumbnail != null)
+                    targetVersion = await _modelVersionRepository.GetByIdAsync(command.ModelVersionId.Value, cancellationToken);
+                    if (targetVersion == null)
                     {
-                        model.ActiveVersion.Thumbnail.Reset(currentTime);
-                        await _thumbnailRepository.UpdateAsync(model.ActiveVersion.Thumbnail, cancellationToken);
+                        return Result.Failure<SetDefaultTextureSetResponse>(
+                            new Error("ModelVersionNotFound", $"Model version with ID {command.ModelVersionId.Value} was not found."));
                     }
 
-                    // Reset any existing job for this model and create new one
-                    var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
-                    if (existingJob != null)
+                    if (targetVersion.ModelId != command.ModelId)
                     {
-                        await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
+                        return Result.Failure<SetDefaultTextureSetResponse>(
+                            new Error("ModelVersionMismatch", $"Model version {command.ModelVersionId.Value} does not belong to model {command.ModelId}."));
                     }
-                    else
+                }
+                else
+                {
+                    // Use active version for backward compatibility
+                    if (model.ActiveVersionId == null)
                     {
-                        await _thumbnailQueue.EnqueueAsync(
-                            command.ModelId,
-                            model.ActiveVersion.Id,
-                            primaryFile.Sha256Hash,
-                            cancellationToken: cancellationToken);
+                        return Result.Failure<SetDefaultTextureSetResponse>(
+                            new Error("NoActiveVersion", $"Model '{model.Name}' has no active version."));
+                    }
+
+                    targetVersion = model.ActiveVersion;
+                    if (targetVersion == null)
+                    {
+                        return Result.Failure<SetDefaultTextureSetResponse>(
+                            new Error("ActiveVersionNotLoaded", $"Active version for model '{model.Name}' could not be loaded."));
                     }
                 }
 
-                return Result.Success(new SetDefaultTextureSetResponse(model.Id, model.DefaultTextureSetId));
+                // Set default texture set on the model version
+                targetVersion.SetDefaultTextureSet(command.TextureSetId, _dateTimeProvider.UtcNow);
+                await _modelVersionRepository.UpdateAsync(targetVersion, cancellationToken);
+
+                // If updating the active version, regenerate thumbnail
+                if (targetVersion.Id == model.ActiveVersionId)
+                {
+                    // Cancel any active thumbnail jobs for this model
+                    await _thumbnailQueue.CancelActiveJobsForModelAsync(command.ModelId, cancellationToken);
+
+                    // Get the model's primary file hash for thumbnail generation
+                    var primaryFile = targetVersion.Files.FirstOrDefault();
+                    if (primaryFile != null)
+                    {
+                        var currentTime = _dateTimeProvider.UtcNow;
+
+                        // Reset existing thumbnail if it exists
+                        if (targetVersion.Thumbnail != null)
+                        {
+                            targetVersion.Thumbnail.Reset(currentTime);
+                            await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail, cancellationToken);
+                        }
+
+                        // Reset any existing job for this model and create new one
+                        var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
+                        if (existingJob != null)
+                        {
+                            await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
+                        }
+                        else
+                        {
+                            await _thumbnailQueue.EnqueueAsync(
+                                command.ModelId,
+                                targetVersion.Id,
+                                primaryFile.Sha256Hash,
+                                cancellationToken: cancellationToken);
+                        }
+                    }
+                }
+
+                return Result.Success(new SetDefaultTextureSetResponse(model.Id, targetVersion.Id, targetVersion.DefaultTextureSetId));
             }
             catch (InvalidOperationException ex)
             {
