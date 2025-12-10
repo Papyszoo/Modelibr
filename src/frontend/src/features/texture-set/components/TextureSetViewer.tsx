@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { TabView, TabPanel } from 'primereact/tabview'
 import { TextureSetDto, TextureType } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
@@ -28,7 +28,7 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const textureSetsApi = useTextureSets()
 
-  const loadTextureSet = async () => {
+  const loadTextureSet = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
@@ -41,12 +41,11 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [setId, textureSetsApi])
 
   useEffect(() => {
     loadTextureSet()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setId])
+  }, [loadTextureSet])
 
   const handleUpdateName = async (newName: string) => {
     if (!textureSet) return
