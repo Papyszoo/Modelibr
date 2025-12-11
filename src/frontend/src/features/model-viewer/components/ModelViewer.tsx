@@ -136,7 +136,7 @@ function ModelViewer({
   useEffect(() => {
     if (selectedVersion?.defaultTextureSetId) {
       setSelectedTextureSetId(selectedVersion.defaultTextureSetId)
-      setHasUserSelectedTexture(false) // Reset flag so default can be applied
+      setHasUserSelectedTexture(false) // Reset so future version changes can apply their defaults
     } else if (selectedVersion && !selectedVersion.defaultTextureSetId) {
       // Version has no default, clear selection
       setSelectedTextureSetId(null)
