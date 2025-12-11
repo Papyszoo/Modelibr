@@ -170,3 +170,34 @@ class ModelibrApiClient:
             return True
         except ApiError:
             return False
+
+    def get_texture_set(self, texture_set_id: int) -> dict:
+        """Get texture set details including all textures."""
+        return self._make_request("GET", f"/texture-sets/{texture_set_id}")
+
+    def create_texture_set_with_file(self, file_path: str, name: str, 
+                                     texture_type: str = "Albedo", batch_id: str = None) -> dict:
+        """Create a new texture set and upload a texture file."""
+        additional_fields = {
+            "name": name,
+            "textureType": texture_type
+        }
+        if batch_id:
+            additional_fields["batchId"] = batch_id
+        return self._upload_file("/texture-sets/with-file", file_path, additional_fields)
+
+    def associate_texture_set_with_version(self, texture_set_id: int, version_id: int) -> dict:
+        """Associate a texture set with a model version."""
+        return self._make_request("POST", f"/texture-sets/{texture_set_id}/model-versions/{version_id}")
+
+    def set_default_texture_set(self, model_id: int, texture_set_id: int, version_id: int = None) -> dict:
+        """Set the default texture set for a model or specific version."""
+        data = {
+            "textureSetId": texture_set_id
+        }
+        if version_id:
+            data["modelVersionId"] = version_id
+        
+        json_data = json.dumps(data).encode('utf-8')
+        return self._make_request("POST", f"/models/{model_id}/default-texture-set", 
+                                 data=json_data, content_type="application/json")
