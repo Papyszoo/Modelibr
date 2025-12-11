@@ -41,11 +41,12 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
                 new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
         }
 
-        // Check if model has an active version
-        if (model.ActiveVersion == null)
+        // Get the specified version
+        var targetVersion = model.Versions.FirstOrDefault(v => v.Id == command.ModelVersionId);
+        if (targetVersion == null)
         {
             return Result.Failure<UploadPngThumbnailCommandResponse>(
-                new Error("NoActiveVersion", $"Model {command.ModelId} has no active version."));
+                new Error("VersionNotFound", $"Model version with ID {command.ModelVersionId} was not found."));
         }
 
         try
@@ -67,20 +68,20 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
             var width = command.Width ?? 256; // Default width if not provided
             var height = command.Height ?? 256; // Default height if not provided
 
-            // Update or create thumbnail
+            // Update or create thumbnail for the specified version
             var now = _dateTimeProvider.UtcNow;
             
-            if (model.ActiveVersion.Thumbnail == null)
+            if (targetVersion.Thumbnail == null)
             {
-                var thumbnail = Thumbnail.Create(model.ActiveVersion.Id, now);
-                model.ActiveVersion.SetThumbnail(await _thumbnailRepository.AddAsync(thumbnail, cancellationToken));
+                var thumbnail = Thumbnail.Create(targetVersion.Id, now);
+                targetVersion.SetThumbnail(await _thumbnailRepository.AddAsync(thumbnail, cancellationToken));
             }
 
             // Mark PNG thumbnail path - use overloaded method if WebP already exists
-            if (string.IsNullOrEmpty(model.ActiveVersion.Thumbnail!.ThumbnailPath))
+            if (string.IsNullOrEmpty(targetVersion.Thumbnail!.ThumbnailPath))
             {
                 // No WebP yet, set PNG as primary
-                model.ActiveVersion.Thumbnail!.MarkAsReady(
+                targetVersion.Thumbnail!.MarkAsReady(
                     fullPath,
                     storedFileResult.SizeBytes,
                     width,
@@ -90,16 +91,16 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
             else
             {
                 // WebP exists, set PNG separately using overloaded method
-                model.ActiveVersion.Thumbnail!.MarkAsReady(
-                    model.ActiveVersion.Thumbnail!.ThumbnailPath!, // thumbnailPath
+                targetVersion.Thumbnail!.MarkAsReady(
+                    targetVersion.Thumbnail!.ThumbnailPath!, // thumbnailPath
                     fullPath, // pngThumbnailPath
-                    model.ActiveVersion.Thumbnail!.SizeBytes!.Value, // sizeBytes
-                    model.ActiveVersion.Thumbnail!.Width!.Value, // width
-                    model.ActiveVersion.Thumbnail!.Height!.Value, // height
+                    targetVersion.Thumbnail!.SizeBytes!.Value, // sizeBytes
+                    targetVersion.Thumbnail!.Width!.Value, // width
+                    targetVersion.Thumbnail!.Height!.Value, // height
                     now); // processedAt
             }
 
-            await _thumbnailRepository.UpdateAsync(model.ActiveVersion.Thumbnail!, cancellationToken);
+            await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail!, cancellationToken);
 
             return Result.Success(new UploadPngThumbnailCommandResponse(
                 model.Id,
@@ -118,6 +119,7 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
 
 public record UploadPngThumbnailCommand(
     int ModelId,
+    int ModelVersionId,
     IFileUpload PngFile,
     int? Width = null,
     int? Height = null) : ICommand<UploadPngThumbnailCommandResponse>;
