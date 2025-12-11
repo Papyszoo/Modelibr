@@ -671,12 +671,12 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelHash")
-                        .IsUnique();
-
                     b.HasIndex("ModelId");
 
                     b.HasIndex("ModelVersionId");
+
+                    b.HasIndex("ModelHash", "ModelVersionId")
+                        .IsUnique();
 
                     b.HasIndex("Status", "CreatedAt");
 

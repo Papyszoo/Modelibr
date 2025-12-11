@@ -285,7 +285,6 @@ namespace Infrastructure.Migrations
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Tags = table.Column<string>(type: "text", nullable: true),
                     Description = table.Column<string>(type: "text", nullable: true),
-                    DefaultTextureSetId = table.Column<int>(type: "integer", nullable: true),
                     ActiveVersionId = table.Column<int>(type: "integer", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -299,12 +298,6 @@ namespace Infrastructure.Migrations
                         column: x => x.FileId,
                         principalTable: "Files",
                         principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_Models_TextureSets_DefaultTextureSetId",
-                        column: x => x.DefaultTextureSetId,
-                        principalTable: "TextureSets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -343,7 +336,8 @@ namespace Infrastructure.Migrations
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DefaultTextureSetId = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -354,6 +348,12 @@ namespace Infrastructure.Migrations
                         principalTable: "Models",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ModelVersions_TextureSets_DefaultTextureSetId",
+                        column: x => x.DefaultTextureSetId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -400,6 +400,30 @@ namespace Infrastructure.Migrations
                         name: "FK_ProjectModels_Projects_ProjectsId",
                         column: x => x.ProjectsId,
                         principalTable: "Projects",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ModelVersionTextureSets",
+                columns: table => new
+                {
+                    ModelVersionsId = table.Column<int>(type: "integer", nullable: false),
+                    TextureSetsId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ModelVersionTextureSets", x => new { x.ModelVersionsId, x.TextureSetsId });
+                    table.ForeignKey(
+                        name: "FK_ModelVersionTextureSets_ModelVersions_ModelVersionsId",
+                        column: x => x.ModelVersionsId,
+                        principalTable: "ModelVersions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ModelVersionTextureSets_TextureSets_TextureSetsId",
+                        column: x => x.TextureSetsId,
+                        principalTable: "TextureSets",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -642,11 +666,6 @@ namespace Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Models_DefaultTextureSetId",
-                table: "Models",
-                column: "DefaultTextureSetId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Models_FileId",
                 table: "Models",
                 column: "FileId");
@@ -662,6 +681,11 @@ namespace Infrastructure.Migrations
                 column: "TextureSetsId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ModelVersions_DefaultTextureSetId",
+                table: "ModelVersions",
+                column: "DefaultTextureSetId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ModelVersions_IsDeleted",
                 table: "ModelVersions",
                 column: "IsDeleted");
@@ -671,6 +695,11 @@ namespace Infrastructure.Migrations
                 table: "ModelVersions",
                 columns: new[] { "ModelId", "VersionNumber" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ModelVersionTextureSets_TextureSetsId",
+                table: "ModelVersionTextureSets",
+                column: "TextureSetsId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PackModels_PacksId",
@@ -793,9 +822,9 @@ namespace Infrastructure.Migrations
                 columns: new[] { "ThumbnailJobId", "OccurredAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_ThumbnailJobs_ModelHash",
+                name: "IX_ThumbnailJobs_ModelHash_ModelVersionId",
                 table: "ThumbnailJobs",
-                column: "ModelHash",
+                columns: new[] { "ModelHash", "ModelVersionId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -879,6 +908,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ModelTextureSets");
+
+            migrationBuilder.DropTable(
+                name: "ModelVersionTextureSets");
 
             migrationBuilder.DropTable(
                 name: "PackModels");
