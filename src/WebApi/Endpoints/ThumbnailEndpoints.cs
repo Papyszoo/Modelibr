@@ -61,16 +61,17 @@ public static class ThumbnailEndpoints
 
         app.MapPost("/models/{id}/thumbnail/regenerate", async (
             int id,
+            [FromQuery] int? versionId,
             ICommandHandler<RegenerateThumbnailCommand, RegenerateThumbnailCommandResponse> commandHandler) =>
         {
-            var result = await commandHandler.Handle(new RegenerateThumbnailCommand(id), CancellationToken.None);
+            var result = await commandHandler.Handle(new RegenerateThumbnailCommand(id, versionId), CancellationToken.None);
             
             if (!result.IsSuccess)
             {
                 return Results.NotFound(result.Error.Message);
             }
 
-            return Results.Ok(new { Message = "Thumbnail regeneration queued successfully", ModelId = result.Value.ModelId });
+            return Results.Ok(new { Message = "Thumbnail regeneration queued successfully", ModelId = result.Value.ModelId, ModelVersionId = result.Value.ModelVersionId });
         })
         .WithName("Regenerate Thumbnail")
         .WithTags("Thumbnails");

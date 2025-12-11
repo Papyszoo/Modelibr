@@ -212,11 +212,12 @@ function ModelViewer({
     if (!model) return
 
     try {
-      await ApiClient.regenerateThumbnail(model.id.toString())
+      await ApiClient.regenerateThumbnail(model.id.toString(), selectedVersion?.id)
+      const versionInfo = selectedVersion ? ` version #${selectedVersion.id}` : '';
       toast.current?.show({
         severity: 'success',
         summary: 'Thumbnail Regeneration',
-        detail: `Thumbnail regeneration queued for model #${model.id}`,
+        detail: `Thumbnail regeneration queued for model #${model.id}${versionInfo}`,
         life: 3000,
       })
     } catch (err) {
