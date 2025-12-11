@@ -84,7 +84,7 @@ namespace Application.Models
                 targetVersion.SetDefaultTextureSet(command.TextureSetId, now);
                 await _modelVersionRepository.UpdateAsync(targetVersion, cancellationToken);
 
-                // Regenerate thumbnail for the version with the new default texture set
+                // Regenerate thumbnail for the target version (applies default texture if set)
                 var primaryFile = targetVersion.Files.FirstOrDefault();
                 if (primaryFile != null)
                 {
