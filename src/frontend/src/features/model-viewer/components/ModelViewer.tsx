@@ -214,6 +214,17 @@ function ModelViewer({
 
   const handleVersionSelect = (version: ModelVersionDto) => {
     setSelectedVersion(version)
+    
+    // Apply version's default texture set immediately
+    if (version.defaultTextureSetId) {
+      setSelectedTextureSetId(version.defaultTextureSetId)
+      setHasUserSelectedTexture(false)
+    } else {
+      // Version has no default, clear selection
+      setSelectedTextureSetId(null)
+      setHasUserSelectedTexture(false)
+    }
+    
     // Create a temporary model with the version's files for preview
     if (model) {
       const versionModelData: Model = {
