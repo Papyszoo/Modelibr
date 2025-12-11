@@ -84,39 +84,32 @@ namespace Application.Models
                 targetVersion.SetDefaultTextureSet(command.TextureSetId, now);
                 await _modelVersionRepository.UpdateAsync(targetVersion, cancellationToken);
 
-                // If updating the active version, regenerate thumbnail
-                if (targetVersion.Id == model.ActiveVersionId)
+                // Regenerate thumbnail for the version with the new default texture set
+                var primaryFile = targetVersion.Files.FirstOrDefault();
+                if (primaryFile != null)
                 {
-                    // Cancel any active thumbnail jobs for this model
-                    await _thumbnailQueue.CancelActiveJobsForModelAsync(command.ModelId, cancellationToken);
+                    var currentTime = _dateTimeProvider.UtcNow;
 
-                    // Get the model's primary file hash for thumbnail generation
-                    var primaryFile = targetVersion.Files.FirstOrDefault();
-                    if (primaryFile != null)
+                    // Reset existing thumbnail if it exists
+                    if (targetVersion.Thumbnail != null)
                     {
-                        var currentTime = _dateTimeProvider.UtcNow;
+                        targetVersion.Thumbnail.Reset(currentTime);
+                        await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail, cancellationToken);
+                    }
 
-                        // Reset existing thumbnail if it exists
-                        if (targetVersion.Thumbnail != null)
-                        {
-                            targetVersion.Thumbnail.Reset(currentTime);
-                            await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail, cancellationToken);
-                        }
-
-                        // Reset any existing job for this model and create new one
-                        var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
-                        if (existingJob != null)
-                        {
-                            await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
-                        }
-                        else
-                        {
-                            await _thumbnailQueue.EnqueueAsync(
-                                command.ModelId,
-                                targetVersion.Id,
-                                primaryFile.Sha256Hash,
-                                cancellationToken: cancellationToken);
-                        }
+                    // Reset any existing job for this version and create new one
+                    var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
+                    if (existingJob != null)
+                    {
+                        await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
+                    }
+                    else
+                    {
+                        await _thumbnailQueue.EnqueueAsync(
+                            command.ModelId,
+                            targetVersion.Id,
+                            primaryFile.Sha256Hash,
+                            cancellationToken: cancellationToken);
                     }
                 }
 
