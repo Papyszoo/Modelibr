@@ -132,15 +132,17 @@ function ModelViewer({
 
   // Set initial selected texture set to default if available
   // Only auto-select if user hasn't made a manual selection yet
+  // Apply version's default texture set when version changes
   useEffect(() => {
-    if (
-      selectedVersion?.defaultTextureSetId &&
-      selectedTextureSetId === null &&
-      !hasUserSelectedTexture
-    ) {
+    if (selectedVersion?.defaultTextureSetId) {
       setSelectedTextureSetId(selectedVersion.defaultTextureSetId)
+      setHasUserSelectedTexture(false) // Reset flag so default can be applied
+    } else if (selectedVersion && !selectedVersion.defaultTextureSetId) {
+      // Version has no default, clear selection
+      setSelectedTextureSetId(null)
+      setHasUserSelectedTexture(false)
     }
-  }, [selectedVersion?.defaultTextureSetId, selectedTextureSetId, hasUserSelectedTexture])
+  }, [selectedVersion?.id, selectedVersion?.defaultTextureSetId])
 
   // Load selected texture set data
   useEffect(() => {
