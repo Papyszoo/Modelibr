@@ -245,10 +245,12 @@ class ApiClient {
     return response.data
   }
 
-  async regenerateThumbnail(modelId: string): Promise<void> {
-    const response: AxiosResponse<void> = await this.client.post(
-      `/models/${modelId}/thumbnail/regenerate`
-    )
+  async regenerateThumbnail(modelId: string, versionId?: number): Promise<void> {
+    const url = versionId 
+      ? `/models/${modelId}/thumbnail/regenerate?versionId=${versionId}`
+      : `/models/${modelId}/thumbnail/regenerate`;
+    
+    const response: AxiosResponse<void> = await this.client.post(url)
 
     // Invalidate thumbnail cache for this model
     useApiCacheStore.getState().invalidateThumbnailById(modelId)
