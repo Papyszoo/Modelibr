@@ -33,13 +33,15 @@ public class ThumbnailQueue : IThumbnailQueue
         int lockTimeoutMinutes = 10, 
         CancellationToken cancellationToken = default)
     {
-        // Check for existing job with same model hash AND same version to prevent duplicates
-        // Different versions can share the same model file (same hash) but need separate thumbnail jobs
-        var existingJob = await _thumbnailJobRepository.GetByModelHashAsync(modelHash, cancellationToken);
-        if (existingJob != null && existingJob.ModelVersionId == modelVersionId)
+        // Check for existing job for this specific version (identified by modelId AND modelVersionId)
+        // Multiple versions can share the same model file (same hash) so we need version-specific jobs
+        var existingJobs = await _thumbnailJobRepository.GetActiveJobsByModelIdAsync(modelId, cancellationToken);
+        var existingJob = existingJobs.FirstOrDefault(j => j.ModelVersionId == modelVersionId);
+        
+        if (existingJob != null)
         {
-            _logger.LogInformation("Thumbnail job already exists for model hash {ModelHash} and version {ModelVersionId}, returning existing job {JobId}", 
-                modelHash, modelVersionId, existingJob.Id);
+            _logger.LogInformation("Thumbnail job already exists for model {ModelId} version {ModelVersionId}, returning existing job {JobId}", 
+                modelId, modelVersionId, existingJob.Id);
             return existingJob;
         }
 
