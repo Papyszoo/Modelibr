@@ -197,6 +197,15 @@ class MODELIBR_OT_import_model(Operator):
                         version_number=version.get('versionNumber', 1),
                         file_id=file_to_import['id']
                     )
+                
+                # Apply default texture set if available
+                default_texture_set_id = version.get('defaultTextureSetId')
+                if default_texture_set_id:
+                    try:
+                        self._apply_default_textures(client, default_texture_set_id, new_objects, temp_dir)
+                    except Exception as e:
+                        _debug_log(f"Failed to apply textures: {str(e)}")
+                        self.report({'WARNING'}, f"Could not apply textures: {str(e)}")
 
             # Update scene properties
             props.current_model_id = self.model_id
@@ -209,6 +218,205 @@ class MODELIBR_OT_import_model(Operator):
         except ApiError as e:
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
+
+    def _apply_default_textures(self, client, texture_set_id: int, objects, temp_dir: str):
+        """Download and apply default texture set to imported objects."""
+        try:
+            # Get texture set details
+            texture_set = client.get_texture_set(texture_set_id)
+            textures = texture_set.get('textures', [])
+            
+            if not textures:
+                return
+            
+            _debug_log(f"Applying {len(textures)} textures from set {texture_set_id}")
+            
+            # Download all texture files
+            texture_paths = {}
+            for texture in textures:
+                file_id = texture.get('fileId')
+                file_name = texture.get('fileName', f"texture_{file_id}")
+                texture_type = texture.get('textureType')
+                
+                if file_id and texture_type:
+                    try:
+                        texture_path = client.download_file(file_id, temp_dir, file_name)
+                        texture_paths[texture_type] = texture_path
+                        _debug_log(f"Downloaded {texture_type} texture: {texture_path}")
+                    except Exception as e:
+                        _debug_log(f"Failed to download texture {file_id}: {str(e)}")
+            
+            if not texture_paths:
+                return
+            
+            # Apply textures to materials
+            for obj in objects:
+                if obj.type == 'MESH' and obj.data.materials:
+                    for mat_slot in obj.material_slots:
+                        mat = mat_slot.material
+                        if mat and mat.use_nodes:
+                            self._apply_textures_to_material(mat, texture_paths, texture_set_id)
+        
+        except Exception as e:
+            _debug_log(f"Error applying textures: {str(e)}")
+            raise
+
+    def _apply_textures_to_material(self, material, texture_paths: dict, texture_set_id: int):
+        """Apply textures to a Blender material."""
+        nodes = material.node_tree.nodes
+        links = material.node_tree.links
+        
+        # Store texture set metadata on material
+        material["modelibr_texture_set_id"] = texture_set_id
+        material["modelibr_has_textures"] = True
+        
+        # Find or create the Principled BSDF node
+        principled = None
+        for node in nodes:
+            if node.type == 'BSDF_PRINCIPLED':
+                principled = node
+                break
+        
+        if not principled:
+            return
+        
+        # Texture type mapping to Principled BSDF inputs
+        texture_mapping = {
+            'Albedo': 'Base Color',
+            'Diffuse': 'Base Color',
+            'Normal': 'Normal',
+            'Roughness': 'Roughness',
+            'Metallic': 'Metallic',
+            'AO': 'Base Color',  # Could be mixed
+            'Emissive': 'Emission Color',
+            'Alpha': 'Alpha',
+        }
+        
+        node_x_offset = -300
+        node_y_start = 300
+        node_y_spacing = 300
+        current_y = node_y_start
+        
+        for texture_type, texture_path in texture_paths.items():
+            socket_name = texture_mapping.get(texture_type)
+            if not socket_name or socket_name not in principled.inputs:
+                continue
+            
+            # Create image texture node
+            tex_node = nodes.new('ShaderNodeTexImage')
+            tex_node.location = (principled.location.x + node_x_offset, current_y)
+            current_y -= node_y_spacing
+            
+            # Load image
+            try:
+                img = bpy.data.images.load(texture_path)
+                tex_node.image = img
+                
+                # Store texture metadata
+                img["modelibr_texture_type"] = texture_type
+                img["modelibr_texture_set_id"] = texture_set_id
+                
+                # Set color space
+                if texture_type in ['Normal', 'Roughness', 'Metallic', 'AO', 'Alpha']:
+                    img.colorspace_settings.name = 'Non-Color'
+                
+                # Handle normal maps specially
+                if texture_type == 'Normal':
+                    normal_map = nodes.new('ShaderNodeNormalMap')
+                    normal_map.location = (tex_node.location.x + 250, tex_node.location.y)
+                    links.new(tex_node.outputs['Color'], normal_map.inputs['Color'])
+                    links.new(normal_map.outputs['Normal'], principled.inputs['Normal'])
+                else:
+                    # Direct connection for other textures
+                    links.new(tex_node.outputs['Color'], principled.inputs[socket_name])
+                
+                _debug_log(f"Applied {texture_type} texture to material {material.name}")
+            
+            except Exception as e:
+                _debug_log(f"Failed to load texture {texture_path}: {str(e)}")
+
+
+def collect_textures_from_scene(model_id: int) -> dict:
+    """Collect textures from materials in the scene for the specified model.
+    Returns a dict mapping texture types to image file paths."""
+    textures = {}
+    
+    for obj in bpy.data.objects:
+        # Check if object belongs to this model
+        if not obj.get("modelibr_model_id") == model_id:
+            continue
+        
+        if obj.type == 'MESH' and obj.data.materials:
+            for mat_slot in obj.material_slots:
+                mat = mat_slot.material
+                if not mat or not mat.use_nodes:
+                    continue
+                
+                # Look for image texture nodes
+                for node in mat.node_tree.nodes:
+                    if node.type == 'TEX_IMAGE' and node.image:
+                        img = node.image
+                        
+                        # Get texture type from metadata or guess from connections
+                        texture_type = img.get("modelibr_texture_type")
+                        
+                        if not texture_type:
+                            # Try to guess from socket connections
+                            texture_type = _guess_texture_type_from_node(node, mat.node_tree)
+                        
+                        if texture_type and img.filepath:
+                            # Get absolute path
+                            img_path = bpy.path.abspath(img.filepath)
+                            if os.path.exists(img_path):
+                                textures[texture_type] = img_path
+    
+    return textures
+
+
+def _guess_texture_type_from_node(tex_node, node_tree) -> str:
+    """Guess texture type based on what the texture is connected to."""
+    for link in node_tree.links:
+        if link.from_node == tex_node:
+            to_socket = link.to_socket.name
+            
+            # Map socket names to texture types
+            socket_mapping = {
+                'Base Color': 'Albedo',
+                'Normal': 'Normal',
+                'Roughness': 'Roughness',
+                'Metallic': 'Metallic',
+                'Emission': 'Emissive',
+                'Emission Color': 'Emissive',
+                'Alpha': 'Alpha',
+            }
+            
+            if to_socket in socket_mapping:
+                return socket_mapping[to_socket]
+    
+    # Default to Albedo if we can't determine
+    return 'Albedo'
+
+
+def has_texture_changes(model_id: int) -> bool:
+    """Check if any textures have been modified for the specified model."""
+    for obj in bpy.data.objects:
+        if not obj.get("modelibr_model_id") == model_id:
+            continue
+        
+        if obj.type == 'MESH' and obj.data.materials:
+            for mat_slot in obj.material_slots:
+                mat = mat_slot.material
+                if not mat or not mat.use_nodes:
+                    continue
+                
+                for node in mat.node_tree.nodes:
+                    if node.type == 'TEX_IMAGE' and node.image:
+                        img = node.image
+                        # Check if image has been modified or is new
+                        if img.is_dirty or not img.get("modelibr_texture_set_id"):
+                            return True
+    
+    return False
 
 
 class MODELIBR_OT_upload_version(Operator):
@@ -285,6 +493,58 @@ class MODELIBR_OT_upload_version(Operator):
         layout.prop(self, "export_format")
         layout.prop(self, "set_as_active")
         layout.prop(self, "include_blend")
+
+    def _upload_textures(self, client, model_id: int, version_id: int, temp_dir: str, base_name: str) -> int:
+        """Upload changed textures as a new texture set and associate with version.
+        Returns the texture set ID if successful, 0 otherwise."""
+        try:
+            # Collect textures from the scene
+            textures = collect_textures_from_scene(model_id)
+            
+            if not textures:
+                _debug_log("No textures to upload")
+                return 0
+            
+            _debug_log(f"Collected {len(textures)} textures to upload")
+            
+            # Create texture set with first texture
+            first_type = list(textures.keys())[0]
+            first_path = textures[first_type]
+            
+            texture_set_name = f"{base_name}_textures"
+            _debug_log(f"Creating texture set '{texture_set_name}' with {first_type} texture")
+            
+            result = client.create_texture_set_with_file(
+                first_path,
+                texture_set_name,
+                first_type
+            )
+            
+            texture_set_id = result.get('textureSetId', 0)
+            if not texture_set_id:
+                _debug_log("Failed to get texture set ID from response")
+                return 0
+            
+            _debug_log(f"Created texture set {texture_set_id}")
+            
+            # Upload remaining textures to the set
+            # Note: This requires an endpoint to add textures to existing set
+            # For now, we'll create the set with the first texture only
+            # TODO: Add support for uploading additional textures once backend supports it
+            
+            # Associate texture set with model version
+            _debug_log(f"Associating texture set {texture_set_id} with version {version_id}")
+            client.associate_texture_set_with_version(texture_set_id, version_id)
+            
+            # Set as default texture set
+            _debug_log(f"Setting texture set {texture_set_id} as default for model {model_id}")
+            client.set_default_texture_set(model_id, texture_set_id, version_id)
+            
+            return texture_set_id
+            
+        except Exception as e:
+            _debug_log(f"Error in _upload_textures: {str(e)}")
+            raise
 
     def execute(self, context):
         props = context.scene.modelibr
@@ -372,6 +632,24 @@ class MODELIBR_OT_upload_version(Operator):
                         traceback.print_exc()
                         self.report({'WARNING'}, f"Could not include blend file: {str(e)}")
 
+                # Handle texture uploads if textures have changed
+                if version_id > 0 and has_texture_changes(props.current_model_id):
+                    try:
+                        _debug_log("Texture changes detected, creating new texture set")
+                        texture_set_id = self._upload_textures(
+                            client, 
+                            props.current_model_id, 
+                            version_id,
+                            temp_dir,
+                            safe_name
+                        )
+                        if texture_set_id:
+                            _debug_log(f"Created texture set {texture_set_id}, setting as default")
+                            self.report({'INFO'}, "Uploaded textures as new texture set")
+                    except Exception as e:
+                        _debug_log(f"Failed to upload textures: {str(e)}")
+                        self.report({'WARNING'}, f"Could not upload textures: {str(e)}")
+                
                 # Update current version
                 if version_id > 0:
                     props.current_version_id = version_id
@@ -439,6 +717,54 @@ class MODELIBR_OT_upload_new_model(Operator):
         layout.prop(self, "model_name")
         layout.prop(self, "export_format")
         layout.prop(self, "include_blend")
+
+    def _upload_textures_for_new_model(self, client, model_id: int, version_id: int, 
+                                       temp_dir: str, base_name: str) -> int:
+        """Upload textures as a new texture set for a new model.
+        Returns the texture set ID if successful, 0 otherwise."""
+        try:
+            # Collect textures from the scene
+            textures = collect_textures_from_scene(model_id)
+            
+            if not textures:
+                _debug_log("No textures to upload")
+                return 0
+            
+            _debug_log(f"Collected {len(textures)} textures to upload")
+            
+            # Create texture set with first texture
+            first_type = list(textures.keys())[0]
+            first_path = textures[first_type]
+            
+            texture_set_name = f"{base_name}_textures"
+            _debug_log(f"Creating texture set '{texture_set_name}' with {first_type} texture")
+            
+            result = client.create_texture_set_with_file(
+                first_path,
+                texture_set_name,
+                first_type
+            )
+            
+            texture_set_id = result.get('textureSetId', 0)
+            if not texture_set_id:
+                _debug_log("Failed to get texture set ID from response")
+                return 0
+            
+            _debug_log(f"Created texture set {texture_set_id}")
+            
+            # Associate texture set with model version
+            _debug_log(f"Associating texture set {texture_set_id} with version {version_id}")
+            client.associate_texture_set_with_version(texture_set_id, version_id)
+            
+            # Set as default texture set
+            _debug_log(f"Setting texture set {texture_set_id} as default for model {model_id}")
+            client.set_default_texture_set(model_id, texture_set_id, version_id)
+            
+            return texture_set_id
+            
+        except Exception as e:
+            _debug_log(f"Error in _upload_textures_for_new_model: {str(e)}")
+            raise
 
     def execute(self, context):
         if not self.model_name:
@@ -520,6 +846,28 @@ class MODELIBR_OT_upload_new_model(Operator):
                                 traceback.print_exc()
                                 self.report({'WARNING'}, f"Could not include blend file: {str(e)}")
 
+                # Handle texture uploads if there are any textures in the scene
+                if model_id > 0:
+                    versions = client.get_model_versions(model_id)
+                    if versions:
+                        version_id = _extract_id(versions[-1], keys=('id', 'versionId', 'version_id'))
+                        if version_id > 0 and has_texture_changes(model_id):
+                            try:
+                                _debug_log("Uploading textures for new model")
+                                texture_set_id = self._upload_textures_for_new_model(
+                                    client,
+                                    model_id,
+                                    version_id,
+                                    temp_dir,
+                                    safe_name
+                                )
+                                if texture_set_id:
+                                    _debug_log(f"Created texture set {texture_set_id}")
+                                    self.report({'INFO'}, "Uploaded textures with model")
+                            except Exception as e:
+                                _debug_log(f"Failed to upload textures: {str(e)}")
+                                self.report({'WARNING'}, f"Could not upload textures: {str(e)}")
+                
                 # Set as current model
                 if model_id > 0:
                     props.current_model_id = model_id
