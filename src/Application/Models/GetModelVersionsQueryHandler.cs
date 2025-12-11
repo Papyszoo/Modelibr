@@ -28,10 +28,10 @@ internal class GetModelVersionsQueryHandler : IQueryHandler<GetModelVersionsQuer
             CreatedAt = v.CreatedAt,
             DefaultTextureSetId = v.DefaultTextureSetId,
             ThumbnailUrl = v.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
-                ? $"/model-versions/{v.Id}/thumbnail/file" 
+                ? $"/model-versions/{v.Id}/thumbnail/file?t={v.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                 : null,
             PngThumbnailUrl = v.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready && !string.IsNullOrEmpty(v.Thumbnail.PngThumbnailPath)
-                ? $"/model-versions/{v.Id}/thumbnail/png-file" 
+                ? $"/model-versions/{v.Id}/thumbnail/png-file?t={v.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                 : null,
             Files = v.Files.Select(f => new VersionFileDto
             {
