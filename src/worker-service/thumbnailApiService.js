@@ -110,9 +110,10 @@ export class ThumbnailApiService {
    * @param {number} modelId - The model ID to upload PNG thumbnail for
    * @param {string} pngPath - Path to the PNG thumbnail file
    * @param {Object} metadata - Optional metadata about the thumbnail
+   * @param {number} [versionId] - Optional version ID to upload for specific version
    * @returns {Promise<Object>} Upload result
    */
-  async uploadPngThumbnail(modelId, pngPath, metadata = {}) {
+  async uploadPngThumbnail(modelId, pngPath, metadata = {}, versionId = null) {
     try {
       if (!fs.existsSync(pngPath)) {
         throw new Error(`PNG thumbnail file not found: ${pngPath}`)
