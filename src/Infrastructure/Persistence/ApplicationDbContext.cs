@@ -89,12 +89,6 @@ namespace Infrastructure.Persistence
                     .HasForeignKey<Model>(m => m.ActiveVersionId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Configure optional relationship with default TextureSet
-                entity.HasOne<TextureSet>()
-                    .WithMany()
-                    .HasForeignKey(m => m.DefaultTextureSetId)
-                    .OnDelete(DeleteBehavior.SetNull);
-
                 // Configure one-to-many relationship with ModelVersions
                 entity.HasMany(m => m.Versions)
                     .WithOne(v => v.Model)

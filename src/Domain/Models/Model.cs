@@ -16,7 +16,6 @@ namespace Domain.Models
         public string? Tags { get; private set; }
         public string? Description { get; private set; }
 
-        public int? DefaultTextureSetId { get; private set; }
         public int? ActiveVersionId { get; private set; }
         public bool IsDeleted { get; private set; }
         public DateTime? DeletedAt { get; private set; }
@@ -158,37 +157,7 @@ namespace Domain.Models
             return _textureSets.AsReadOnly();
         }
 
-        /// <summary>
-        /// Sets the default texture set for this model.
-        /// </summary>
-        /// <param name="textureSetId">The ID of the texture set to set as default, or null to clear</param>
-        /// <param name="updatedAt">When the default was set</param>
-        /// <exception cref="InvalidOperationException">Thrown when the texture set is not associated with this model</exception>
-        public void SetDefaultTextureSet(int? textureSetId, DateTime updatedAt)
-        {
-            if (textureSetId.HasValue && !_textureSets.Any(ts => ts.Id == textureSetId.Value))
-            {
-                throw new InvalidOperationException($"Texture set {textureSetId.Value} is not associated with this model.");
-            }
 
-            DefaultTextureSetId = textureSetId;
-            UpdatedAt = updatedAt;
-        }
-
-        /// <summary>
-        /// Syncs the model's default texture set from the active version.
-        /// This method is used when migrating from the deprecated Model-TextureSet relationship
-        /// to the newer ModelVersion-TextureSet relationship. It sets the model's DefaultTextureSetId
-        /// to match the active version's DefaultTextureSetId without validating against the deprecated
-        /// Model.TextureSets collection.
-        /// </summary>
-        /// <param name="textureSetId">The ID of the texture set from the active version, or null to clear</param>
-        /// <param name="updatedAt">When the default was synced</param>
-        public void SyncDefaultTextureSetFromActiveVersion(int? textureSetId, DateTime updatedAt)
-        {
-            DefaultTextureSetId = textureSetId;
-            UpdatedAt = updatedAt;
-        }
 
         /// <summary>
         /// Raises a ModelUploaded domain event for this model.

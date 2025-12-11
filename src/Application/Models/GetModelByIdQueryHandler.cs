@@ -31,7 +31,6 @@ namespace Application.Models
                 UpdatedAt = model.UpdatedAt,
                 Tags = model.Tags,
                 Description = model.Description,
-                DefaultTextureSetId = model.DefaultTextureSetId,
                 ActiveVersionId = model.ActiveVersionId,
                 ThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
                     ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/file?t={model.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
@@ -84,7 +83,6 @@ namespace Application.Models
         public DateTime UpdatedAt { get; init; }
         public string? Tags { get; init; }
         public string? Description { get; init; }
-        public int? DefaultTextureSetId { get; init; }
         public int? ActiveVersionId { get; init; }
         public string? ThumbnailUrl { get; init; }
         public string? PngThumbnailUrl { get; init; }
