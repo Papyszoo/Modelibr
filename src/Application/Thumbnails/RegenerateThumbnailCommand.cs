@@ -82,18 +82,9 @@ public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumb
             targetVersion.SetThumbnail(await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken));
         }
 
-        // Check if there's an existing job for this specific version
-        var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
-        if (existingJob != null && existingJob.ModelVersionId == targetVersion.Id)
-        {
-            // Reuse existing job only if it's for the same version
-            await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
-        }
-        else
-        {
-            // Create new job for this version (even if another version has same model hash)
-            await _thumbnailQueue.EnqueueAsync(model.Id, targetVersion.Id, primaryFile.Sha256Hash, cancellationToken: cancellationToken);
-        }
+        // Enqueue thumbnail job for this version
+        // EnqueueAsync will check for existing jobs for this specific version and reuse them
+        await _thumbnailQueue.EnqueueAsync(model.Id, targetVersion.Id, primaryFile.Sha256Hash, cancellationToken: cancellationToken);
 
         return Result.Success(new RegenerateThumbnailCommandResponse(model.Id, targetVersion.Id));
     }

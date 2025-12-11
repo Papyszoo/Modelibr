@@ -97,22 +97,13 @@ namespace Application.Models
                         await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail, cancellationToken);
                     }
 
-                    // Check for existing job - only reuse if it's for the same version
-                    var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
-                    if (existingJob != null && existingJob.ModelVersionId == targetVersion.Id)
-                    {
-                        // Reuse existing job for this version
-                        await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
-                    }
-                    else
-                    {
-                        // Create new job for this version (different version or no existing job)
-                        await _thumbnailQueue.EnqueueAsync(
-                            command.ModelId,
-                            targetVersion.Id,
-                            primaryFile.Sha256Hash,
-                            cancellationToken: cancellationToken);
-                    }
+                    // Enqueue thumbnail job for this version
+                    // EnqueueAsync will check for existing jobs for this specific version and reuse them
+                    await _thumbnailQueue.EnqueueAsync(
+                        command.ModelId,
+                        targetVersion.Id,
+                        primaryFile.Sha256Hash,
+                        cancellationToken: cancellationToken);
                 }
 
                 return Result.Success(new SetDefaultTextureSetResponse(model.Id, targetVersion.Id, targetVersion.DefaultTextureSetId));
