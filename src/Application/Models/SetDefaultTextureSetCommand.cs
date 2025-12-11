@@ -84,16 +84,13 @@ namespace Application.Models
                 targetVersion.SetDefaultTextureSet(command.TextureSetId, now);
                 await _modelVersionRepository.UpdateAsync(targetVersion, cancellationToken);
 
-                // If updating the active version, also sync the model's default texture set
+                // If updating the active version, sync model's default and regenerate thumbnail
                 if (targetVersion.Id == model.ActiveVersionId)
                 {
+                    // Sync the model's default texture set from the active version
                     model.SyncDefaultTextureSetFromActiveVersion(command.TextureSetId, now);
                     await _modelRepository.UpdateAsync(model, cancellationToken);
-                }
 
-                // If updating the active version, regenerate thumbnail
-                if (targetVersion.Id == model.ActiveVersionId)
-                {
                     // Cancel any active thumbnail jobs for this model
                     await _thumbnailQueue.CancelActiveJobsForModelAsync(command.ModelId, cancellationToken);
 
