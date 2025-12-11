@@ -317,37 +317,7 @@ public class ModelDomainTests
         Assert.False(hasVersion);
     }
 
-    [Fact]
-    public void SyncDefaultTextureSetFromActiveVersion_SetsDefaultTextureSetId()
-    {
-        // Arrange
-        var model = Model.Create("Test Model", DateTime.UtcNow);
-        var textureSetId = 42;
-        var updatedAt = DateTime.UtcNow;
 
-        // Act
-        model.SyncDefaultTextureSetFromActiveVersion(textureSetId, updatedAt);
-
-        // Assert
-        Assert.Equal(textureSetId, model.DefaultTextureSetId);
-        Assert.Equal(updatedAt, model.UpdatedAt);
-    }
-
-    [Fact]
-    public void SyncDefaultTextureSetFromActiveVersion_WithNull_ClearsDefaultTextureSetId()
-    {
-        // Arrange
-        var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.SyncDefaultTextureSetFromActiveVersion(42, DateTime.UtcNow);
-        var updatedAt = DateTime.UtcNow.AddMinutes(1);
-
-        // Act
-        model.SyncDefaultTextureSetFromActiveVersion(null, updatedAt);
-
-        // Assert
-        Assert.Null(model.DefaultTextureSetId);
-        Assert.Equal(updatedAt, model.UpdatedAt);
-    }
 
     #endregion
 }

@@ -96,8 +96,7 @@ public class SetDefaultTextureSetCommandHandlerTests
             x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), 
             Times.Once);
         
-        // Verify model default was NOT updated (each version has independent default)
-        Assert.Null(model.DefaultTextureSetId);
+        // Verify model was NOT updated (only version gets updated)
         _mockModelRepository.Verify(
             x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), 
             Times.Never);
@@ -146,9 +145,7 @@ public class SetDefaultTextureSetCommandHandlerTests
         Assert.Equal(1, result.Value.DefaultTextureSetId);
         Assert.Equal(1, version.DefaultTextureSetId);
         
-        // Verify model default was NOT updated (each version has independent default)
-        Assert.Null(model.DefaultTextureSetId);
-        
+        // Verify model was NOT updated (only version gets updated)
         _mockModelVersionRepository.Verify(
             x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), 
             Times.Once);
@@ -185,9 +182,7 @@ public class SetDefaultTextureSetCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(1, version2.DefaultTextureSetId);
         
-        // Model default should NOT be updated since this is not the active version
-        Assert.Null(model.DefaultTextureSetId);
-        
+        // Verify model was NOT updated (only version gets updated)
         _mockModelVersionRepository.Verify(
             x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), 
             Times.Once);
@@ -218,7 +213,7 @@ public class SetDefaultTextureSetCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ClearingDefault_OnlyClearsVersionDefault()
+    public async Task Handle_ClearingDefault_ClearsVersionDefault()
     {
         // Arrange
         var now = DateTime.UtcNow;
@@ -228,9 +223,6 @@ public class SetDefaultTextureSetCommandHandlerTests
         var textureSet = CreateTextureSet(1, "Test Texture Set");
         model.ActiveVersion!.AddTextureSet(textureSet, now);
         model.ActiveVersion.SetDefaultTextureSet(1, now);
-        
-        // Set model default independently (simulating legacy state or different workflow)
-        model.SyncDefaultTextureSetFromActiveVersion(1, now);
         
         var command = new SetDefaultTextureSetCommand(1, null); // Clear version default
         
@@ -252,9 +244,6 @@ public class SetDefaultTextureSetCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value.DefaultTextureSetId);
         Assert.Null(model.ActiveVersion.DefaultTextureSetId);
-        
-        // Model default is independent and should remain unchanged
-        Assert.Equal(1, model.DefaultTextureSetId);
     }
 
     private Model CreateModelWithActiveVersion(int modelId, int versionId)
