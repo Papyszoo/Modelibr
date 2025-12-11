@@ -80,8 +80,16 @@ namespace Application.Models
                 }
 
                 // Set default texture set on the model version
-                targetVersion.SetDefaultTextureSet(command.TextureSetId, _dateTimeProvider.UtcNow);
+                var now = _dateTimeProvider.UtcNow;
+                targetVersion.SetDefaultTextureSet(command.TextureSetId, now);
                 await _modelVersionRepository.UpdateAsync(targetVersion, cancellationToken);
+
+                // If updating the active version, also sync the model's default texture set
+                if (targetVersion.Id == model.ActiveVersionId)
+                {
+                    model.SyncDefaultTextureSetFromActiveVersion(command.TextureSetId, now);
+                    await _modelRepository.UpdateAsync(model, cancellationToken);
+                }
 
                 // If updating the active version, regenerate thumbnail
                 if (targetVersion.Id == model.ActiveVersionId)

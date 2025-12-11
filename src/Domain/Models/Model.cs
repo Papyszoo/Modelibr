@@ -176,6 +176,21 @@ namespace Domain.Models
         }
 
         /// <summary>
+        /// Syncs the model's default texture set from the active version.
+        /// This method is used when migrating from the deprecated Model-TextureSet relationship
+        /// to the newer ModelVersion-TextureSet relationship. It sets the model's DefaultTextureSetId
+        /// to match the active version's DefaultTextureSetId without validating against the deprecated
+        /// Model.TextureSets collection.
+        /// </summary>
+        /// <param name="textureSetId">The ID of the texture set from the active version, or null to clear</param>
+        /// <param name="updatedAt">When the default was synced</param>
+        public void SyncDefaultTextureSetFromActiveVersion(int? textureSetId, DateTime updatedAt)
+        {
+            DefaultTextureSetId = textureSetId;
+            UpdatedAt = updatedAt;
+        }
+
+        /// <summary>
         /// Raises a ModelUploaded domain event for this model.
         /// Should be called when a model upload is completed.
         /// </summary>
