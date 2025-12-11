@@ -229,6 +229,7 @@ export interface ModelVersionDto {
   versionNumber: number
   description?: string
   createdAt: string
+  defaultTextureSetId?: number
   files: VersionFileDto[]
 }
 

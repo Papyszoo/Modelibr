@@ -134,13 +134,13 @@ function ModelViewer({
   // Only auto-select if user hasn't made a manual selection yet
   useEffect(() => {
     if (
-      model?.defaultTextureSetId &&
+      selectedVersion?.defaultTextureSetId &&
       selectedTextureSetId === null &&
       !hasUserSelectedTexture
     ) {
-      setSelectedTextureSetId(model.defaultTextureSetId)
+      setSelectedTextureSetId(selectedVersion.defaultTextureSetId)
     }
-  }, [model?.defaultTextureSetId, selectedTextureSetId, hasUserSelectedTexture])
+  }, [selectedVersion?.defaultTextureSetId, selectedTextureSetId, hasUserSelectedTexture])
 
   // Load selected texture set data
   useEffect(() => {
@@ -628,6 +628,7 @@ function ModelViewer({
           side={side}
           model={model}
           modelVersionId={selectedVersion?.id || model.activeVersionId || null}
+          selectedVersion={selectedVersion}
           selectedTextureSetId={selectedTextureSetId}
           onTextureSetSelect={handleTextureSetSelect}
           onModelUpdated={handleModelUpdated}

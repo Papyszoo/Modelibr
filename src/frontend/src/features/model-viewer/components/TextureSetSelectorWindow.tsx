@@ -14,6 +14,7 @@ interface TextureSetSelectorWindowProps {
   side: 'left' | 'right'
   model: Model
   modelVersionId: number | null
+  selectedVersion: { id: number; defaultTextureSetId?: number } | null
   selectedTextureSetId: number | null
   onTextureSetSelect: (textureSetId: number | null) => void
   onModelUpdated: () => void
@@ -25,6 +26,7 @@ function TextureSetSelectorWindow({
   side,
   model,
   modelVersionId,
+  selectedVersion,
   selectedTextureSetId,
   onTextureSetSelect,
   onModelUpdated,
@@ -103,7 +105,7 @@ function TextureSetSelectorWindow({
       )
 
       // If this was the default texture set, clear or update the default
-      if (model.defaultTextureSetId === textureSetId) {
+      if (selectedVersion?.defaultTextureSetId === textureSetId) {
         // Find another linked texture set to set as default, or clear if none
         const remainingTextureSets = textureSets.filter(
           ts => ts.id !== textureSetId
@@ -194,7 +196,7 @@ function TextureSetSelectorWindow({
               {textureSets.map(textureSet => {
                 const previewUrl = getPreviewUrl(textureSet)
                 const isSelected = selectedTextureSetId === textureSet.id
-                const isDefault = model.defaultTextureSetId === textureSet.id
+                const isDefault = selectedVersion?.defaultTextureSetId === textureSet.id
 
                 return (
                   <div
