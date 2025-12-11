@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useState } from 'react'
 import { Button } from 'primereact/button'
 import { Badge } from 'primereact/badge'
 import { ContextMenu } from 'primereact/contextmenu'
@@ -29,7 +29,7 @@ export default function ModelsCardGrid({
   onManageAssociations,
 }: ModelsCardGridProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
-  const selectedModelRef = useRef<GroupedModel | null>(null)
+  const [contextMenuItems, setContextMenuItems] = useState<MenuItem[]>([])
 
   // Group models by ID
   const groupedModels = useMemo(() => {
@@ -45,7 +45,9 @@ export default function ModelsCardGrid({
       }
 
       const group = groups.get(model.id)!
-      if (model.versionNumber !== undefined) {
+      // Only add versions that have a version number defined
+      // In the texture set context, all associated models should have versions
+      if (model.versionNumber !== undefined && model.versionNumber !== null) {
         group.versions.push({
           versionNumber: model.versionNumber,
           modelVersionId: model.modelVersionId,
@@ -64,7 +66,6 @@ export default function ModelsCardGrid({
   const handleContextMenu = (e: React.MouseEvent, model: GroupedModel) => {
     e.preventDefault()
     e.stopPropagation()
-    selectedModelRef.current = model
 
     // Create context menu items dynamically for this model
     const menuItems: MenuItem[] = model.versions.map(version => ({
@@ -81,17 +82,12 @@ export default function ModelsCardGrid({
       },
     }))
 
-    // Update the context menu model
-    if (contextMenuRef.current) {
-      // @ts-expect-error - PrimeReact ContextMenu has a setModel method but it's not in the types
-      contextMenuRef.current.setModel(menuItems)
-      contextMenuRef.current.show(e)
-    }
+    // Update the context menu items and show the menu
+    setContextMenuItems(menuItems)
+    contextMenuRef.current?.show(e)
   }
 
-  const handleCardClick = (e: React.MouseEvent, modelId: number) => {
-    // Don't open tab on right-click
-    if (e.button === 2) return
+  const handleCardClick = (modelId: number) => {
     openTabInPanel('modelViewer', 'left', modelId.toString())
   }
 
@@ -126,7 +122,7 @@ export default function ModelsCardGrid({
             <div
               key={model.id}
               className="model-card"
-              onClick={e => handleCardClick(e, model.id)}
+              onClick={() => handleCardClick(model.id)}
               onContextMenu={e => handleContextMenu(e, model)}
             >
               <div className="model-card-thumbnail">
@@ -149,7 +145,7 @@ export default function ModelsCardGrid({
         </div>
       )}
 
-      <ContextMenu model={[]} ref={contextMenuRef} autoZIndex />
+      <ContextMenu model={contextMenuItems} ref={contextMenuRef} autoZIndex />
     </>
   )
 }
