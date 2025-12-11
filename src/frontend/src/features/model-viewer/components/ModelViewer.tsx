@@ -133,12 +133,13 @@ function ModelViewer({
 
   // Subscribe to thumbnail status changes to refresh versions when thumbnails are ready
   useEffect(() => {
-    if (!model?.id) return
+    if (!model?.id || versions.length === 0) return
 
     const handleThumbnailStatusChanged = (event: ThumbnailStatusChangedEvent) => {
-      // Reload versions when a thumbnail for any version of this model is ready
-      // This ensures the version dropdown shows updated thumbnails
-      if (event.status === 'Ready') {
+      // Only reload if the thumbnail is for a version of this model
+      const isThisModelsVersion = versions.some(v => v.id === event.modelVersionId)
+      
+      if (event.status === 'Ready' && isThisModelsVersion) {
         loadVersions()
       }
     }
@@ -149,7 +150,7 @@ function ModelViewer({
       // Cleanup: unsubscribe when component unmounts or model changes
       unsubscribe()
     }
-  }, [model?.id])
+  }, [model?.id, versions])
 
   // Set initial selected texture set to default if available
   // Only auto-select if user hasn't made a manual selection yet
