@@ -270,7 +270,10 @@ export class JobProcessor {
       jobLogger.info('Fetching model file from API')
       await this.jobEventService.logModelDownloadStarted(job.id, job.modelId)
 
-      const fileInfo = await this.modelFileService.fetchModelFile(job.modelId)
+      const fileInfo = await this.modelFileService.fetchModelFile(
+        job.modelId,
+        job.modelVersionId
+      )
       tempFilePath = fileInfo.filePath
 
       jobLogger.info('Model file fetched successfully', {
@@ -486,7 +489,8 @@ export class JobProcessor {
               encodingResult.webpPath,
               encodingResult.posterPath,
               encodingResult.pngPath,
-              job.modelId // Pass model ID for API upload
+              job.modelId, // Pass model ID for API upload
+              job.modelVersionId // Pass model version ID for version-specific upload
             )
 
             jobLogger.info('Thumbnail API upload completed', {
