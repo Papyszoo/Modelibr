@@ -283,8 +283,9 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.CreatedAt).IsRequired();
                 entity.Property(tj => tj.UpdatedAt).IsRequired();
 
-                // Create unique index for ModelHash to prevent duplicate jobs
-                entity.HasIndex(tj => tj.ModelHash).IsUnique();
+                // Create composite unique index for ModelHash + ModelVersionId to prevent duplicate jobs per version
+                // This allows different versions to have separate thumbnail jobs even when sharing the same model file
+                entity.HasIndex(tj => new { tj.ModelHash, tj.ModelVersionId }).IsUnique();
                 
                 // Create index for efficient job querying
                 entity.HasIndex(tj => new { tj.Status, tj.CreatedAt });
