@@ -33,10 +33,10 @@ public class ThumbnailQueue : IThumbnailQueue
         int lockTimeoutMinutes = 10, 
         CancellationToken cancellationToken = default)
     {
-        // Check for existing job for this specific version (identified by modelId AND modelVersionId)
-        // Multiple versions can share the same model file (same hash) so we need version-specific jobs
-        var existingJobs = await _thumbnailJobRepository.GetActiveJobsByModelIdAsync(modelId, cancellationToken);
-        var existingJob = existingJobs.FirstOrDefault(j => j.ModelVersionId == modelVersionId);
+        // Check for ANY existing job for this specific version (regardless of status)
+        // We need to check ALL jobs (not just active ones) to avoid duplicate key constraint violations
+        // The unique index is on (ModelHash, ModelVersionId) so we must reuse existing jobs
+        var existingJob = await _thumbnailJobRepository.GetByModelVersionIdAsync(modelVersionId, cancellationToken);
         
         if (existingJob != null)
         {
@@ -46,8 +46,8 @@ public class ThumbnailQueue : IThumbnailQueue
             existingJob.Reset(currentTime);
             await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
             
-            _logger.LogInformation("Reset existing thumbnail job {JobId} for model {ModelId} version {ModelVersionId} for regeneration", 
-                existingJob.Id, modelId, modelVersionId);
+            _logger.LogInformation("Reset existing thumbnail job {JobId} (status: {OldStatus}) for model {ModelId} version {ModelVersionId} for regeneration", 
+                existingJob.Id, existingJob.Status, modelId, modelVersionId);
             
             // Send real-time notification to workers that a job is available for processing
             await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);

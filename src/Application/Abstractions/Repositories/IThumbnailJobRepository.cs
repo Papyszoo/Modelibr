@@ -33,6 +33,11 @@ public interface IThumbnailJobRepository
     Task<IEnumerable<ThumbnailJob>> GetActiveJobsByModelIdAsync(int modelId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets a thumbnail job by model version ID, regardless of status.
+    /// </summary>
+    Task<ThumbnailJob?> GetByModelVersionIdAsync(int modelVersionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the next pending job for processing with proper locking.
     /// </summary>
     Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default);
