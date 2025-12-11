@@ -204,6 +204,16 @@ class ApiClient {
     return response.data
   }
 
+  async getVersionThumbnailStatus(
+    versionId: number,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ThumbnailStatus> {
+    const response: AxiosResponse<ThumbnailStatus> = await this.client.get(
+      `/model-versions/${versionId}/thumbnail`
+    )
+    return response.data
+  }
+
   getThumbnailUrl(modelId: string): string {
     return `${this.baseURL}/models/${modelId}/thumbnail/file`
   }

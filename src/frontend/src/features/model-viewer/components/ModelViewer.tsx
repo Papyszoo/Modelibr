@@ -673,6 +673,7 @@ function ModelViewer({
           onClose={() => setThumbnailWindowVisible(false)}
           side={side}
           model={model}
+          selectedVersion={selectedVersion}
           onRegenerate={handleRegenerateThumbnail}
         />
         <ModelHierarchyWindow
