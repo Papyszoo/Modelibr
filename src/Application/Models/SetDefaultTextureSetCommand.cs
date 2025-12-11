@@ -97,14 +97,16 @@ namespace Application.Models
                         await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail, cancellationToken);
                     }
 
-                    // Reset any existing job for this version and create new one
+                    // Check for existing job - only reuse if it's for the same version
                     var existingJob = await _thumbnailQueue.GetJobByModelHashAsync(primaryFile.Sha256Hash, cancellationToken);
-                    if (existingJob != null)
+                    if (existingJob != null && existingJob.ModelVersionId == targetVersion.Id)
                     {
+                        // Reuse existing job for this version
                         await _thumbnailQueue.RetryJobAsync(existingJob.Id, cancellationToken);
                     }
                     else
                     {
+                        // Create new job for this version (different version or no existing job)
                         await _thumbnailQueue.EnqueueAsync(
                             command.ModelId,
                             targetVersion.Id,
