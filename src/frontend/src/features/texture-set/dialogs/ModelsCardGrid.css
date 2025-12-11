@@ -22,15 +22,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.model-card-delete {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.95) !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
 .model-card-thumbnail {
   position: relative;
   width: 100%;
@@ -72,6 +63,9 @@
   );
   padding: 2rem 0.75rem 0.75rem;
   color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .model-card-name {
@@ -80,6 +74,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.model-card-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .models-empty-state {
