@@ -218,7 +218,7 @@ public class SetDefaultTextureSetCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ClearingDefault_UpdatesBothModelAndVersion()
+    public async Task Handle_ClearingDefault_OnlyClearsVersionDefault()
     {
         // Arrange
         var now = DateTime.UtcNow;
@@ -228,9 +228,11 @@ public class SetDefaultTextureSetCommandHandlerTests
         var textureSet = CreateTextureSet(1, "Test Texture Set");
         model.ActiveVersion!.AddTextureSet(textureSet, now);
         model.ActiveVersion.SetDefaultTextureSet(1, now);
+        
+        // Set model default independently (simulating legacy state or different workflow)
         model.SyncDefaultTextureSetFromActiveVersion(1, now);
         
-        var command = new SetDefaultTextureSetCommand(1, null); // Clear default
+        var command = new SetDefaultTextureSetCommand(1, null); // Clear version default
         
         _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(model);
@@ -251,7 +253,7 @@ public class SetDefaultTextureSetCommandHandlerTests
         Assert.Null(result.Value.DefaultTextureSetId);
         Assert.Null(model.ActiveVersion.DefaultTextureSetId);
         
-        // Model default should remain as set (version defaults are independent)
+        // Model default is independent and should remain unchanged
         Assert.Equal(1, model.DefaultTextureSetId);
     }
 
