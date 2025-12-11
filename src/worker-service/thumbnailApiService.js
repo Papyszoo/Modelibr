@@ -31,9 +31,10 @@ export class ThumbnailApiService {
    * @param {number} modelId - The model ID to upload thumbnail for
    * @param {string} thumbnailPath - Path to the thumbnail file
    * @param {Object} metadata - Optional metadata about the thumbnail
+   * @param {number} [versionId] - Optional version ID to upload for specific version
    * @returns {Promise<Object>} Upload result
    */
-  async uploadThumbnail(modelId, thumbnailPath, metadata = {}) {
+  async uploadThumbnail(modelId, thumbnailPath, metadata = {}, versionId = null) {
     try {
       if (!fs.existsSync(thumbnailPath)) {
         throw new Error(`Thumbnail file not found: ${thumbnailPath}`)
@@ -52,15 +53,21 @@ export class ThumbnailApiService {
         formData.append('height', metadata.height.toString())
       }
 
+      // Construct upload URL with optional versionId parameter
+      const uploadUrl = versionId
+        ? `/models/${modelId}/thumbnail/upload?versionId=${versionId}`
+        : `/models/${modelId}/thumbnail/upload`
+
       logger.info('Uploading thumbnail to API', {
         modelId,
+        versionId,
         thumbnailPath,
-        apiUrl: `${this.apiBaseUrl}/models/${modelId}/thumbnail/upload`,
+        apiUrl: `${this.apiBaseUrl}${uploadUrl}`,
         metadata,
       })
 
       const response = await this.client.post(
-        `/models/${modelId}/thumbnail/upload`,
+        uploadUrl,
         formData,
         {
           headers: {
@@ -72,6 +79,7 @@ export class ThumbnailApiService {
 
       logger.info('Thumbnail uploaded successfully', {
         modelId,
+        versionId,
         responseData: response.data,
       })
 
@@ -82,6 +90,7 @@ export class ThumbnailApiService {
     } catch (error) {
       logger.error('Failed to upload thumbnail to API', {
         modelId,
+        versionId,
         thumbnailPath,
         error: error.message,
         stack: error.stack,
@@ -122,15 +131,21 @@ export class ThumbnailApiService {
         formData.append('height', metadata.height.toString())
       }
 
+      // Construct upload URL with optional versionId parameter
+      const uploadUrl = versionId
+        ? `/models/${modelId}/thumbnail/png-upload?versionId=${versionId}`
+        : `/models/${modelId}/thumbnail/png-upload`
+
       logger.info('Uploading PNG thumbnail to API', {
         modelId,
+        versionId,
         pngPath,
-        apiUrl: `${this.apiBaseUrl}/models/${modelId}/thumbnail/png-upload`,
+        apiUrl: `${this.apiBaseUrl}${uploadUrl}`,
         metadata,
       })
 
       const response = await this.client.post(
-        `/models/${modelId}/thumbnail/png-upload`,
+        uploadUrl,
         formData,
         {
           headers: {
@@ -142,6 +157,7 @@ export class ThumbnailApiService {
 
       logger.info('PNG thumbnail uploaded successfully', {
         modelId,
+        versionId,
         responseData: response.data,
       })
 
@@ -152,6 +168,7 @@ export class ThumbnailApiService {
     } catch (error) {
       logger.error('Failed to upload PNG thumbnail to API', {
         modelId,
+        versionId,
         pngPath,
         error: error.message,
         stack: error.stack,
@@ -170,11 +187,13 @@ export class ThumbnailApiService {
    * Upload multiple thumbnail files (e.g., WebP and poster)
    * @param {number} modelId - The model ID to upload thumbnails for
    * @param {Object} thumbnailPaths - Object containing paths to different thumbnail formats
+   * @param {number} [versionId] - Optional version ID to upload for specific version
    * @returns {Promise<Object>} Upload results
    */
-  async uploadMultipleThumbnails(modelId, thumbnailPaths) {
+  async uploadMultipleThumbnails(modelId, thumbnailPaths, versionId = null) {
     const results = {
       modelId,
+      versionId,
       uploads: [],
       allSuccessful: true,
     }
@@ -189,7 +208,8 @@ export class ThumbnailApiService {
           {
             width: 256, // Default WebP dimensions
             height: 256,
-          }
+          },
+          versionId
         )
 
         results.uploads.push({
@@ -230,7 +250,8 @@ export class ThumbnailApiService {
           {
             width: 256, // Default PNG dimensions
             height: 256,
-          }
+          },
+          versionId
         )
 
         results.uploads.push({
@@ -276,7 +297,8 @@ export class ThumbnailApiService {
             {
               width: 256, // Default poster dimensions
               height: 256,
-            }
+            },
+            versionId
           )
 
           results.uploads.push({

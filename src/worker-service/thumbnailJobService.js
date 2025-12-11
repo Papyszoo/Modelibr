@@ -118,17 +118,24 @@ export class ThumbnailJobService {
   /**
    * Get model file information for a job
    * @param {number} modelId - The model ID
+   * @param {number} [modelVersionId] - Optional model version ID (if provided, fetches version-specific file)
    * @returns {Promise<Object>} Model file information
    */
-  async getModelFile(modelId) {
+  async getModelFile(modelId, modelVersionId = null) {
     try {
-      const response = await this.apiClient.get(`/models/${modelId}/file`, {
+      // Use version-specific endpoint if modelVersionId is provided
+      const endpoint = modelVersionId
+        ? `/models/${modelId}/versions/${modelVersionId}/file`
+        : `/models/${modelId}/file`
+      
+      const response = await this.apiClient.get(endpoint, {
         responseType: 'stream',
       })
       return response
     } catch (error) {
       logger.error('Failed to get model file', {
         modelId,
+        modelVersionId,
         error: error.message,
       })
       throw error
