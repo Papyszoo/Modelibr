@@ -30,6 +30,7 @@ public static class ThumbnailJobEndpoints
             {
                 Id = response.Job.Id,
                 ModelId = response.Job.ModelId,
+                ModelVersionId = response.Job.ModelVersionId,
                 ModelHash = response.Job.ModelHash,
                 Status = response.Job.Status.ToString(),
                 AttemptCount = response.Job.AttemptCount,
