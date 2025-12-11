@@ -32,6 +32,7 @@ public static class ThumbnailJobEndpoints
                 ModelId = response.Job.ModelId,
                 ModelVersionId = response.Job.ModelVersionId,
                 ModelHash = response.Job.ModelHash,
+                DefaultTextureSetId = response.Job.ModelVersion.DefaultTextureSetId,
                 Status = response.Job.Status.ToString(),
                 AttemptCount = response.Job.AttemptCount,
                 CreatedAt = response.Job.CreatedAt,
