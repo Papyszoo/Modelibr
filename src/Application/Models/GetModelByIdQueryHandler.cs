@@ -34,10 +34,10 @@ namespace Application.Models
                 DefaultTextureSetId = model.DefaultTextureSetId,
                 ActiveVersionId = model.ActiveVersionId,
                 ThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
-                    ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/file" 
+                    ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/file?t={model.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                     : null,
                 PngThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready && !string.IsNullOrEmpty(model.ActiveVersion.Thumbnail.PngThumbnailPath)
-                    ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/png-file" 
+                    ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/png-file?t={model.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                     : null,
                 Files = (model.ActiveVersion?.Files ?? Array.Empty<Domain.Models.File>()).Select(f => new FileDto
                 {
