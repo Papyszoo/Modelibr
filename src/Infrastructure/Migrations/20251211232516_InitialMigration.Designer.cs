@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251208204532_AddTextureSetToModelVersion")]
-    partial class AddTextureSetToModelVersion
+    [Migration("20251211232516_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -203,9 +203,6 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int?>("DefaultTextureSetId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -232,8 +229,6 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ActiveVersionId")
                         .IsUnique();
-
-                    b.HasIndex("DefaultTextureSetId");
 
                     b.HasIndex("FileId");
 
@@ -679,12 +674,12 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelHash")
-                        .IsUnique();
-
                     b.HasIndex("ModelId");
 
                     b.HasIndex("ModelVersionId");
+
+                    b.HasIndex("ModelHash", "ModelVersionId")
+                        .IsUnique();
 
                     b.HasIndex("Status", "CreatedAt");
 
@@ -912,11 +907,6 @@ namespace Infrastructure.Migrations
                         .WithOne()
                         .HasForeignKey("Domain.Models.Model", "ActiveVersionId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Domain.Models.TextureSet", null)
-                        .WithMany()
-                        .HasForeignKey("DefaultTextureSetId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Domain.Models.File", null)
                         .WithMany("Models")
