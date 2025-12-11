@@ -158,7 +158,7 @@ function VersionStrip({
               >
                 {version.thumbnailUrl ? (
                   <img
-                    src={version.thumbnailUrl}
+                    src={ApiClient.getBaseURL() + version.thumbnailUrl}
                     alt={`v${version.versionNumber}`}
                     className="version-dropdown-thumb"
                     onError={e => {
