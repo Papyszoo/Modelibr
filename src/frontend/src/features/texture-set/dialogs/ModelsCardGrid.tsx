@@ -44,10 +44,14 @@ export default function ModelsCardGrid({
         })
       }
 
-      const group = groups.get(model.id)!
+      const group = groups.get(model.id)
       // Only add versions that have a version number defined
       // In the texture set context, all associated models should have versions
-      if (model.versionNumber !== undefined && model.versionNumber !== null) {
+      if (
+        group &&
+        model.versionNumber !== undefined &&
+        model.versionNumber !== null
+      ) {
         group.versions.push({
           versionNumber: model.versionNumber,
           modelVersionId: model.modelVersionId,
