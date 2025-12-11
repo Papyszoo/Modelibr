@@ -19,6 +19,7 @@ import { TextureSetDto, ModelVersionDto } from '../../../types'
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
+import thumbnailSignalRService, { ThumbnailStatusChangedEvent } from '../../../services/ThumbnailSignalRService'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -129,6 +130,26 @@ function ModelViewer({
       console.error('Failed to load versions:', error)
     }
   }
+
+  // Subscribe to thumbnail status changes to refresh versions when thumbnails are ready
+  useEffect(() => {
+    if (!model?.id) return
+
+    const handleThumbnailStatusChanged = (event: ThumbnailStatusChangedEvent) => {
+      // Reload versions when a thumbnail for any version of this model is ready
+      // This ensures the version dropdown shows updated thumbnails
+      if (event.status === 'Ready') {
+        loadVersions()
+      }
+    }
+
+    const unsubscribe = thumbnailSignalRService.onThumbnailStatusChanged(handleThumbnailStatusChanged)
+
+    return () => {
+      // Cleanup: unsubscribe when component unmounts or model changes
+      unsubscribe()
+    }
+  }, [model?.id])
 
   // Set initial selected texture set to default if available
   // Only auto-select if user hasn't made a manual selection yet
