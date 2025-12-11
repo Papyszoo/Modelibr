@@ -156,14 +156,20 @@ function VersionStrip({
                 className={`version-dropdown-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
                 onClick={() => handleVersionClick(version)}
               >
-                <img
-                  src={ApiClient.getVersionThumbnailUrl(version.id)}
-                  alt={`v${version.versionNumber}`}
-                  className="version-dropdown-thumb"
-                  onError={e => {
-                    ;(e.target as HTMLImageElement).style.display = 'none'
-                  }}
-                />
+                {version.thumbnailUrl ? (
+                  <img
+                    src={version.thumbnailUrl}
+                    alt={`v${version.versionNumber}`}
+                    className="version-dropdown-thumb"
+                    onError={e => {
+                      ;(e.target as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                ) : (
+                  <div className="version-dropdown-thumb version-dropdown-thumb-placeholder">
+                    <i className="pi pi-image" style={{ fontSize: '1.5rem', opacity: 0.3 }} />
+                  </div>
+                )}
                 <div className="version-dropdown-item-info">
                   <span className="version-dropdown-item-number">
                     v{version.versionNumber}

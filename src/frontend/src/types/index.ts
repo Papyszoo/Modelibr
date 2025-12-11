@@ -230,6 +230,8 @@ export interface ModelVersionDto {
   description?: string
   createdAt: string
   defaultTextureSetId?: number
+  thumbnailUrl?: string
+  pngThumbnailUrl?: string
   files: VersionFileDto[]
 }
 
