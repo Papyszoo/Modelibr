@@ -66,6 +66,7 @@ public class ThumbnailJobRepository : IThumbnailJobRepository
             
             var job = await _context.ThumbnailJobs
                 .Include(tj => tj.Model)
+                .Include(tj => tj.ModelVersion)
                 .Where(tj => tj.Status == ThumbnailJobStatus.Pending || 
                            (tj.Status == ThumbnailJobStatus.Processing && 
                             tj.LockedAt.HasValue && 
