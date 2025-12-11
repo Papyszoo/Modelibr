@@ -96,11 +96,11 @@ public class SetDefaultTextureSetCommandHandlerTests
             x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), 
             Times.Once);
         
-        // Verify model default was synced
-        Assert.Equal(1, model.DefaultTextureSetId);
+        // Verify model default was NOT updated (each version has independent default)
+        Assert.Null(model.DefaultTextureSetId);
         _mockModelRepository.Verify(
             x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), 
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]
@@ -145,14 +145,16 @@ public class SetDefaultTextureSetCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(1, result.Value.DefaultTextureSetId);
         Assert.Equal(1, version.DefaultTextureSetId);
-        Assert.Equal(1, model.DefaultTextureSetId);
+        
+        // Verify model default was NOT updated (each version has independent default)
+        Assert.Null(model.DefaultTextureSetId);
         
         _mockModelVersionRepository.Verify(
             x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), 
             Times.Once);
         _mockModelRepository.Verify(
             x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), 
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]
@@ -248,7 +250,9 @@ public class SetDefaultTextureSetCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value.DefaultTextureSetId);
         Assert.Null(model.ActiveVersion.DefaultTextureSetId);
-        Assert.Null(model.DefaultTextureSetId);
+        
+        // Model default should remain as set (version defaults are independent)
+        Assert.Equal(1, model.DefaultTextureSetId);
     }
 
     private Model CreateModelWithActiveVersion(int modelId, int versionId)
