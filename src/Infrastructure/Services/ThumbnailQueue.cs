@@ -40,8 +40,18 @@ public class ThumbnailQueue : IThumbnailQueue
         
         if (existingJob != null)
         {
-            _logger.LogInformation("Thumbnail job already exists for model {ModelId} version {ModelVersionId}, returning existing job {JobId}", 
-                modelId, modelVersionId, existingJob.Id);
+            // Reset the existing job to trigger fresh thumbnail generation
+            // This is important when regenerating thumbnails or changing default texture sets
+            var currentTime = DateTime.UtcNow;
+            existingJob.Reset(currentTime);
+            await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+            
+            _logger.LogInformation("Reset existing thumbnail job {JobId} for model {ModelId} version {ModelVersionId} for regeneration", 
+                existingJob.Id, modelId, modelVersionId);
+            
+            // Send real-time notification to workers that a job is available for processing
+            await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+            
             return existingJob;
         }
 
