@@ -130,9 +130,11 @@ namespace Infrastructure.Persistence
 
                 // Configure one-to-one relationship with Thumbnail
                 // ModelVersion owns the relationship with ThumbnailId as foreign key
+                // Use ThumbnailId, not Thumbnail.ModelVersionId which is kept for backwards compatibility
                 entity.HasOne(v => v.Thumbnail)
                     .WithOne(t => t.ModelVersion)
                     .HasForeignKey<ModelVersion>(v => v.ThumbnailId)
+                    .HasPrincipalKey<Thumbnail>(t => t.Id)
                     .OnDelete(DeleteBehavior.SetNull);
             });
 
@@ -258,6 +260,7 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<Thumbnail>(entity =>
             {
                 entity.HasKey(t => t.Id);
+                // ModelVersionId is a shadow property kept for tracking but not used as FK (ModelVersion.ThumbnailId is the FK)
                 entity.Property(t => t.ModelVersionId).IsRequired();
                 entity.Property(t => t.Status).IsRequired();
                 entity.Property(t => t.ThumbnailPath).HasMaxLength(500);
@@ -267,6 +270,9 @@ namespace Infrastructure.Persistence
 
                 // Create unique index for ModelVersionId to ensure one thumbnail per version
                 entity.HasIndex(t => t.ModelVersionId).IsUnique();
+                
+                // Note: The relationship is configured on ModelVersion side using ThumbnailId as FK
+                // This ModelVersionId property is kept for backwards compatibility and tracking
             });
 
             // Configure ThumbnailJob entity
