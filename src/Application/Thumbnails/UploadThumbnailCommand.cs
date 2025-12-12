@@ -75,7 +75,9 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
             if (targetVersion.Thumbnail == null)
             {
                 var thumbnail = Thumbnail.Create(targetVersion.Id, now);
-                targetVersion.SetThumbnail(await _thumbnailRepository.AddAsync(thumbnail, cancellationToken));
+                var createdThumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
+                targetVersion.SetThumbnail(createdThumbnail);
+                await _modelRepository.UpdateAsync(model, cancellationToken); // Save ThumbnailId to ModelVersion
             }
 
             // Mark thumbnail as ready with the uploaded file details
