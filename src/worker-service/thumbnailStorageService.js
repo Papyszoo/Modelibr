@@ -127,6 +127,7 @@ export class ThumbnailStorageService {
    * @param {string} posterSourcePath - Path to the generated poster file
    * @param {string} pngSourcePath - Path to the generated PNG file
    * @param {number} modelId - The model ID for API upload
+   * @param {number} [modelVersionId] - Optional model version ID for API upload
    * @returns {Promise<Object>} Object with upload results and metadata
    */
   async storeThumbnails(
@@ -134,7 +135,8 @@ export class ThumbnailStorageService {
     webpSourcePath,
     posterSourcePath,
     pngSourcePath,
-    modelId = null
+    modelId = null,
+    modelVersionId = null
   ) {
     if (!this.enabled) {
       logger.warn('Thumbnail storage is disabled, skipping API upload')
@@ -145,6 +147,7 @@ export class ThumbnailStorageService {
       logger.info('Starting API-based thumbnail storage', {
         modelHash,
         modelId,
+        modelVersionId,
         webpSourcePath,
         posterSourcePath,
         pngSourcePath,
@@ -164,7 +167,8 @@ export class ThumbnailStorageService {
           webpPath: webpSourcePath,
           posterPath: posterSourcePath,
           pngPath: pngSourcePath,
-        }
+        },
+        modelVersionId
       )
 
       const results = {
@@ -195,6 +199,7 @@ export class ThumbnailStorageService {
       logger.info('API-based thumbnail storage completed', {
         modelHash,
         modelId,
+        modelVersionId,
         stored: results.stored,
         webpStored: results.webpStored,
         posterStored: results.posterStored,
@@ -208,6 +213,7 @@ export class ThumbnailStorageService {
       logger.error('Failed to store thumbnails via API', {
         modelHash,
         modelId,
+        modelVersionId,
         webpSourcePath,
         posterSourcePath,
         pngSourcePath,

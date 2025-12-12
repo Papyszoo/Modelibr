@@ -270,7 +270,10 @@ export class JobProcessor {
       jobLogger.info('Fetching model file from API')
       await this.jobEventService.logModelDownloadStarted(job.id, job.modelId)
 
-      const fileInfo = await this.modelFileService.fetchModelFile(job.modelId)
+      const fileInfo = await this.modelFileService.fetchModelFile(
+        job.modelId,
+        job.modelVersionId
+      )
       tempFilePath = fileInfo.filePath
 
       jobLogger.info('Model file fetched successfully', {
@@ -318,20 +321,21 @@ export class JobProcessor {
 
       // Step 3.5: Fetch and apply textures if default texture set is configured
       try {
-        const modelInfo = await this.modelDataService.getModelInfo(job.modelId)
-        if (modelInfo && modelInfo.defaultTextureSetId) {
-          jobLogger.info('Model has default texture set configured', {
-            defaultTextureSetId: modelInfo.defaultTextureSetId,
+        // Use defaultTextureSetId from job (version-specific)
+        if (job.defaultTextureSetId) {
+          jobLogger.info('Model version has default texture set configured', {
+            defaultTextureSetId: job.defaultTextureSetId,
+            modelVersionId: job.modelVersionId,
           })
 
           await this.jobEventService.logEvent(
             job.id,
             'TextureFetchStarted',
-            `Fetching texture set ${modelInfo.defaultTextureSetId}`
+            `Fetching texture set ${job.defaultTextureSetId} for version ${job.modelVersionId}`
           )
 
           const textureSet = await this.modelDataService.getTextureSet(
-            modelInfo.defaultTextureSetId
+            job.defaultTextureSetId
           )
 
           if (
@@ -486,7 +490,8 @@ export class JobProcessor {
               encodingResult.webpPath,
               encodingResult.posterPath,
               encodingResult.pngPath,
-              job.modelId // Pass model ID for API upload
+              job.modelId, // Pass model ID for API upload
+              job.modelVersionId // Pass model version ID for version-specific upload
             )
 
             jobLogger.info('Thumbnail API upload completed', {

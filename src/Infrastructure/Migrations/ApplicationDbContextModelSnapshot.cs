@@ -200,9 +200,6 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int?>("DefaultTextureSetId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -229,8 +226,6 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ActiveVersionId")
                         .IsUnique();
-
-                    b.HasIndex("DefaultTextureSetId");
 
                     b.HasIndex("FileId");
 
@@ -266,6 +261,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ModelId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ThumbnailId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -277,6 +275,9 @@ namespace Infrastructure.Migrations
                     b.HasIndex("DefaultTextureSetId");
 
                     b.HasIndex("IsDeleted");
+
+                    b.HasIndex("ThumbnailId")
+                        .IsUnique();
 
                     b.HasIndex("ModelId", "VersionNumber")
                         .IsUnique();
@@ -676,12 +677,12 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelHash")
-                        .IsUnique();
-
                     b.HasIndex("ModelId");
 
                     b.HasIndex("ModelVersionId");
+
+                    b.HasIndex("ModelHash", "ModelVersionId")
+                        .IsUnique();
 
                     b.HasIndex("Status", "CreatedAt");
 
@@ -910,11 +911,6 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("Domain.Models.Model", "ActiveVersionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Models.TextureSet", null)
-                        .WithMany()
-                        .HasForeignKey("DefaultTextureSetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("Domain.Models.File", null)
                         .WithMany("Models")
                         .HasForeignKey("FileId");
@@ -935,7 +931,14 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Domain.Models.Thumbnail", "Thumbnail")
+                        .WithOne("ModelVersion")
+                        .HasForeignKey("Domain.Models.ModelVersion", "ThumbnailId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Model");
+
+                    b.Navigation("Thumbnail");
                 });
 
             modelBuilder.Entity("Domain.Models.Sprite", b =>
@@ -976,17 +979,6 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("File");
-                });
-
-            modelBuilder.Entity("Domain.Models.Thumbnail", b =>
-                {
-                    b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
-                        .WithOne("Thumbnail")
-                        .HasForeignKey("Domain.Models.Thumbnail", "ModelVersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ModelVersion");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJob", b =>
@@ -1152,13 +1144,17 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.ModelVersion", b =>
                 {
                     b.Navigation("Files");
-
-                    b.Navigation("Thumbnail");
                 });
 
             modelBuilder.Entity("Domain.Models.TextureSet", b =>
                 {
                     b.Navigation("Textures");
+                });
+
+            modelBuilder.Entity("Domain.Models.Thumbnail", b =>
+                {
+                    b.Navigation("ModelVersion")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

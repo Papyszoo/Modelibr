@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Files;
+using WebApi.Services;
 
 namespace WebApi.Endpoints;
 
@@ -22,6 +23,9 @@ public static class ModelVersionEndpoints
 
         app.MapGet("/models/{modelId}/versions/{versionId}", GetModelVersion)
             .WithName("Get Model Version");
+
+        app.MapGet("/models/{modelId}/versions/{versionId}/file", GetVersionRenderableFile)
+            .WithName("Get Version Renderable File");
 
         app.MapGet("/models/{modelId}/versions/{versionId}/files/{fileId}", GetVersionFile)
             .WithName("Get Version File");
@@ -112,6 +116,25 @@ public static class ModelVersionEndpoints
         }
 
         return Results.Ok(result.Value.Version);
+    }
+
+    private static async Task<IResult> GetVersionRenderableFile(
+        int modelId,
+        int versionId,
+        IQueryHandler<GetVersionRenderableFileQuery, GetVersionRenderableFileResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetVersionRenderableFileQuery(versionId), cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.NotFound(result.Error.Message);
+        }
+
+        var fileStream = System.IO.File.OpenRead(result.Value.FullPath);
+        var contentType = ContentTypeProvider.GetContentType(result.Value.OriginalFileName);
+        
+        return Results.File(fileStream, contentType, result.Value.OriginalFileName, enableRangeProcessing: true);
     }
 
     private static async Task<IResult> GetVersionFile(

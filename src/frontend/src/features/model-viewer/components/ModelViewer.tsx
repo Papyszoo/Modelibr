@@ -19,6 +19,7 @@ import { TextureSetDto, ModelVersionDto } from '../../../types'
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
+import thumbnailSignalRService, { ThumbnailStatusChangedEvent } from '../../../services/ThumbnailSignalRService'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -130,17 +131,40 @@ function ModelViewer({
     }
   }
 
+  // Subscribe to thumbnail status changes to refresh versions when thumbnails are ready
+  useEffect(() => {
+    if (!model?.id || versions.length === 0) return
+
+    const handleThumbnailStatusChanged = (event: ThumbnailStatusChangedEvent) => {
+      // Only reload if the thumbnail is for a version of this model
+      const isThisModelsVersion = versions.some(v => v.id === event.modelVersionId)
+      
+      if (event.status === 'Ready' && isThisModelsVersion) {
+        loadVersions()
+      }
+    }
+
+    const unsubscribe = thumbnailSignalRService.onThumbnailStatusChanged(handleThumbnailStatusChanged)
+
+    return () => {
+      // Cleanup: unsubscribe when component unmounts or model changes
+      unsubscribe()
+    }
+  }, [model?.id, versions])
+
   // Set initial selected texture set to default if available
   // Only auto-select if user hasn't made a manual selection yet
+  // Apply version's default texture set when version changes
   useEffect(() => {
-    if (
-      model?.defaultTextureSetId &&
-      selectedTextureSetId === null &&
-      !hasUserSelectedTexture
-    ) {
-      setSelectedTextureSetId(model.defaultTextureSetId)
+    if (selectedVersion?.defaultTextureSetId) {
+      setSelectedTextureSetId(selectedVersion.defaultTextureSetId)
+      setHasUserSelectedTexture(false) // Reset so future version changes can apply their defaults
+    } else if (selectedVersion && !selectedVersion.defaultTextureSetId) {
+      // Version has no default, clear selection
+      setSelectedTextureSetId(null)
+      setHasUserSelectedTexture(false)
     }
-  }, [model?.defaultTextureSetId, selectedTextureSetId, hasUserSelectedTexture])
+  }, [selectedVersion?.id, selectedVersion?.defaultTextureSetId])
 
   // Load selected texture set data
   useEffect(() => {
@@ -188,11 +212,12 @@ function ModelViewer({
     if (!model) return
 
     try {
-      await ApiClient.regenerateThumbnail(model.id.toString())
+      await ApiClient.regenerateThumbnail(model.id.toString(), selectedVersion?.id)
+      const versionInfo = selectedVersion ? ` version #${selectedVersion.id}` : '';
       toast.current?.show({
         severity: 'success',
         summary: 'Thumbnail Regeneration',
-        detail: `Thumbnail regeneration queued for model #${model.id}`,
+        detail: `Thumbnail regeneration queued for model #${model.id}${versionInfo}`,
         life: 3000,
       })
     } catch (err) {
@@ -212,6 +237,17 @@ function ModelViewer({
 
   const handleVersionSelect = (version: ModelVersionDto) => {
     setSelectedVersion(version)
+    
+    // Apply version's default texture set immediately
+    if (version.defaultTextureSetId) {
+      setSelectedTextureSetId(version.defaultTextureSetId)
+      setHasUserSelectedTexture(false)
+    } else {
+      // Version has no default, clear selection
+      setSelectedTextureSetId(null)
+      setHasUserSelectedTexture(false)
+    }
+    
     // Create a temporary model with the version's files for preview
     if (model) {
       const versionModelData: Model = {
@@ -628,6 +664,7 @@ function ModelViewer({
           side={side}
           model={model}
           modelVersionId={selectedVersion?.id || model.activeVersionId || null}
+          selectedVersion={selectedVersion}
           selectedTextureSetId={selectedTextureSetId}
           onTextureSetSelect={handleTextureSetSelect}
           onModelUpdated={handleModelUpdated}
@@ -637,6 +674,7 @@ function ModelViewer({
           onClose={() => setThumbnailWindowVisible(false)}
           side={side}
           model={model}
+          selectedVersion={selectedVersion}
           onRegenerate={handleRegenerateThumbnail}
         />
         <ModelHierarchyWindow

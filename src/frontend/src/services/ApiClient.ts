@@ -204,6 +204,16 @@ class ApiClient {
     return response.data
   }
 
+  async getVersionThumbnailStatus(
+    versionId: number,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ThumbnailStatus> {
+    const response: AxiosResponse<ThumbnailStatus> = await this.client.get(
+      `/model-versions/${versionId}/thumbnail`
+    )
+    return response.data
+  }
+
   getThumbnailUrl(modelId: string): string {
     return `${this.baseURL}/models/${modelId}/thumbnail/file`
   }
@@ -235,10 +245,12 @@ class ApiClient {
     return response.data
   }
 
-  async regenerateThumbnail(modelId: string): Promise<void> {
-    const response: AxiosResponse<void> = await this.client.post(
-      `/models/${modelId}/thumbnail/regenerate`
-    )
+  async regenerateThumbnail(modelId: string, versionId?: number): Promise<void> {
+    const url = versionId 
+      ? `/models/${modelId}/thumbnail/regenerate?versionId=${versionId}`
+      : `/models/${modelId}/thumbnail/regenerate`;
+    
+    const response: AxiosResponse<void> = await this.client.post(url)
 
     // Invalidate thumbnail cache for this model
     useApiCacheStore.getState().invalidateThumbnailById(modelId)

@@ -14,6 +14,7 @@ public class ModelVersion
     public bool IsDeleted { get; private set; }
     public DateTime? DeletedAt { get; private set; }
     public int? DefaultTextureSetId { get; private set; }
+    public int? ThumbnailId { get; private set; }
     
     // Navigation properties
     public Model Model { get; set; } = null!;
@@ -76,6 +77,7 @@ public class ModelVersion
     public void SetThumbnail(Thumbnail thumbnail)
     {
         Thumbnail = thumbnail ?? throw new ArgumentNullException(nameof(thumbnail));
+        ThumbnailId = thumbnail.Id;
         UpdatedAt = DateTime.UtcNow;
     }
 

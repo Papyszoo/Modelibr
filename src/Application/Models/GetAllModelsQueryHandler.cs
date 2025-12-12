@@ -41,10 +41,10 @@ namespace Application.Models
                 Description = m.Description,
                 ActiveVersionId = m.ActiveVersionId,
                 ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
-                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file" 
+                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                     : null,
                 PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
-                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file" 
+                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                     : null
             }).ToList();
 
