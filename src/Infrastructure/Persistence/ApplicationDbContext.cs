@@ -129,10 +129,11 @@ namespace Infrastructure.Persistence
                     .OnDelete(DeleteBehavior.SetNull);
 
                 // Configure one-to-one relationship with Thumbnail
+                // ModelVersion owns the relationship with ThumbnailId as foreign key
                 entity.HasOne(v => v.Thumbnail)
                     .WithOne(t => t.ModelVersion)
-                    .HasForeignKey<Thumbnail>(t => t.ModelVersionId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .HasForeignKey<ModelVersion>(v => v.ThumbnailId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // Configure File entity
