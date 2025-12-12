@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251211232516_InitialMigration")]
+    [Migration("20251212003645_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -264,6 +264,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ModelId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ThumbnailId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -275,6 +278,9 @@ namespace Infrastructure.Migrations
                     b.HasIndex("DefaultTextureSetId");
 
                     b.HasIndex("IsDeleted");
+
+                    b.HasIndex("ThumbnailId")
+                        .IsUnique();
 
                     b.HasIndex("ModelId", "VersionNumber")
                         .IsUnique();
@@ -928,7 +934,14 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Domain.Models.Thumbnail", "Thumbnail")
+                        .WithOne("ModelVersion")
+                        .HasForeignKey("Domain.Models.ModelVersion", "ThumbnailId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Model");
+
+                    b.Navigation("Thumbnail");
                 });
 
             modelBuilder.Entity("Domain.Models.Sprite", b =>
@@ -969,17 +982,6 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("File");
-                });
-
-            modelBuilder.Entity("Domain.Models.Thumbnail", b =>
-                {
-                    b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
-                        .WithOne("Thumbnail")
-                        .HasForeignKey("Domain.Models.Thumbnail", "ModelVersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ModelVersion");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJob", b =>
@@ -1145,13 +1147,17 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.ModelVersion", b =>
                 {
                     b.Navigation("Files");
-
-                    b.Navigation("Thumbnail");
                 });
 
             modelBuilder.Entity("Domain.Models.TextureSet", b =>
                 {
                     b.Navigation("Textures");
+                });
+
+            modelBuilder.Entity("Domain.Models.Thumbnail", b =>
+                {
+                    b.Navigation("ModelVersion")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
