@@ -72,23 +72,35 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
             // Update or create thumbnail for the specified version
             var now = _dateTimeProvider.UtcNow;
             
-            if (targetVersion.Thumbnail == null)
+            Thumbnail thumbnailToUpdate;
+            if (targetVersion.ThumbnailId == null)
             {
+                // Create a new thumbnail for this version
                 var thumbnail = Thumbnail.Create(targetVersion.Id, now);
-                var createdThumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
-                targetVersion.SetThumbnail(createdThumbnail);
+                thumbnailToUpdate = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
+                targetVersion.SetThumbnail(thumbnailToUpdate);
                 await _modelRepository.UpdateAsync(model, cancellationToken); // Save ThumbnailId to ModelVersion
+            }
+            else
+            {
+                // Load the existing thumbnail for this version by its ThumbnailId
+                thumbnailToUpdate = await _thumbnailRepository.GetByIdAsync(targetVersion.ThumbnailId.Value, cancellationToken);
+                if (thumbnailToUpdate == null)
+                {
+                    return Result.Failure<UploadThumbnailCommandResponse>(
+                        new Error("ThumbnailNotFound", $"Thumbnail with ID {targetVersion.ThumbnailId.Value} was not found."));
+                }
             }
 
             // Mark thumbnail as ready with the uploaded file details
-            targetVersion.Thumbnail!.MarkAsReady(
+            thumbnailToUpdate.MarkAsReady(
                 fullPath,
                 storedFileResult.SizeBytes,
                 width,
                 height,
                 now);
 
-            await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail!, cancellationToken);
+            await _thumbnailRepository.UpdateAsync(thumbnailToUpdate, cancellationToken);
 
             return Result.Success(new UploadThumbnailCommandResponse(
                 model.Id,
