@@ -158,7 +158,10 @@ function VersionStrip({
               >
                 {version.thumbnailUrl ? (
                   <img
-                    src={new URL(version.thumbnailUrl, ApiClient.getBaseURL()).toString()}
+                    src={new URL(
+                      version.thumbnailUrl,
+                      ApiClient.getBaseURL()
+                    ).toString()}
                     alt={`v${version.versionNumber}`}
                     className="version-dropdown-thumb"
                     onError={e => {
@@ -167,7 +170,10 @@ function VersionStrip({
                   />
                 ) : (
                   <div className="version-dropdown-thumb version-dropdown-thumb-placeholder">
-                    <i className="pi pi-image" style={{ fontSize: '1.5rem', opacity: 0.3 }} />
+                    <i
+                      className="pi pi-image"
+                      style={{ fontSize: '1.5rem', opacity: 0.3 }}
+                    />
                   </div>
                 )}
                 <div className="version-dropdown-item-info">
@@ -208,7 +214,11 @@ function VersionStrip({
                       onRecycleVersion(version.id)
                     }}
                     disabled={versions.length <= 1}
-                    tooltip={versions.length <= 1 ? "Cannot delete the last version" : "Recycle Version"}
+                    tooltip={
+                      versions.length <= 1
+                        ? 'Cannot delete the last version'
+                        : 'Recycle Version'
+                    }
                     tooltipOptions={{ position: 'bottom' }}
                   />
                 </div>

@@ -1,0 +1,14 @@
+# Test results and artifacts
+test-results/
+playwright-report/
+.features-gen/
+
+# E2E environment data
+data/
+
+# Node modules
+node_modules/
+
+# Temporary files
+*.log
+webapi_e2e_logs.txt
