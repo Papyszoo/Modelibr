@@ -27,9 +27,16 @@ public static class DatabaseExtensions
             }
             
             // Apply pending migrations to ensure database is up to date
-            await context.Database.MigrateAsync();
-            
-            logger.LogInformation("Database initialization completed successfully");
+            if (context.Database.IsInMemory())
+            {
+                await context.Database.EnsureCreatedAsync();
+                logger.LogInformation("InMemory database created successfully");
+            }
+            else
+            {
+                await context.Database.MigrateAsync();
+                logger.LogInformation("Database initialization completed successfully");
+            }
         }
         catch (Exception ex)
         {
