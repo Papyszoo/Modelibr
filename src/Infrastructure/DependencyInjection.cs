@@ -15,16 +15,23 @@ namespace Infrastructure
         {
             services.AddDbContext<ApplicationDbContext>(optionsBuilder =>
             {
-                var connectionString = configuration.GetConnectionString("Default");
-                if (string.IsNullOrEmpty(connectionString))
+                if (configuration.GetValue<bool>("UseInMemoryDatabase"))
                 {
-                    throw new InvalidOperationException("Database connection string 'Default' is not configured.");
+                    optionsBuilder.UseInMemoryDatabase("ModelibrDb");
                 }
-                
-                // Expand environment variables in connection string
-                connectionString = Environment.ExpandEnvironmentVariables(connectionString);
-                
-                optionsBuilder.UseNpgsql(connectionString);
+                else
+                {
+                    var connectionString = configuration.GetConnectionString("Default");
+                    if (string.IsNullOrEmpty(connectionString))
+                    {
+                        throw new InvalidOperationException("Database connection string 'Default' is not configured.");
+                    }
+
+                    // Expand environment variables in connection string
+                    connectionString = Environment.ExpandEnvironmentVariables(connectionString);
+
+                    optionsBuilder.UseNpgsql(connectionString);
+                }
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();

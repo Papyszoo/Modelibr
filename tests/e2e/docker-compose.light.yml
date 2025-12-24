@@ -1,0 +1,39 @@
+services:
+  webapi:
+    image: mcr.microsoft.com/dotnet/sdk:9.0
+    container_name: webapi-e2e-light
+    working_dir: /app/src/WebApi
+    command: dotnet run --urls "http://0.0.0.0:8080"
+    ports:
+      - "8090:8080"
+    restart: on-failure
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - UseInMemoryDatabase=true
+      - DisableHttpsRedirection=true
+      - ConnectionStrings__Default=Host=localhost;Database=Modelibr;Username=postgres;Password=password
+      - AllowedOrigins__0=http://localhost:3002
+      - AllowedOrigins__1=http://host.docker.internal:3002
+      - FileStoragePath=/app/data
+    volumes:
+      - ../..:/app
+      - ./data:/app/data
+
+  worker:
+    image: mcr.microsoft.com/playwright:v1.49.1-jammy
+    container_name: worker-e2e-light
+    working_dir: /app/src/worker-service
+    command: sh -c "npm install && npm start"
+    restart: on-failure
+    environment:
+      - API_BASE_URL=http://webapi:8080
+      - WORKER_PORT=3001
+      - IMAGE_CLASSIFICATION_ENABLED=false
+      - THUMBNAIL_STORAGE_PATH=/app/data/thumbnails
+    volumes:
+      - ../..:/app
+      - ./data:/app/data
+    depends_on:
+      - webapi
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

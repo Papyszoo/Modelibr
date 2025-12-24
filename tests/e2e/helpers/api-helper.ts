@@ -1,4 +1,5 @@
-import axios, { AxiosInstance } from "axios";
+import axios from "axios";
+import type { AxiosInstance } from "axios";
 import FormData from "form-data";
 import fs from "fs";
 
@@ -9,9 +10,10 @@ import fs from "fs";
 export class ApiHelper {
     private client: AxiosInstance;
 
-    constructor(baseURL: string = "http://localhost:8090") {
+    constructor(baseURL?: string) {
+        const url = baseURL || process.env.API_BASE_URL || "http://localhost:8090";
         this.client = axios.create({
-            baseURL,
+            baseURL: url,
             timeout: 30000,
             validateStatus: () => true, // Don't throw on any status
         });
@@ -201,7 +203,7 @@ export class ApiHelper {
         if (response.status !== 200) {
             throw new Error(`Failed to get texture sets: ${response.status}`);
         }
-        return response.data;
+        return Array.isArray(response.data) ? response.data : (response.data.items || []);
     }
 
     /**
@@ -209,9 +211,10 @@ export class ApiHelper {
      */
     async getTextureSetByName(name: string): Promise<any> {
         const sets = await this.getAllTextureSets();
+        console.log(`Debug: Looking for "${name}" in texture sets:`, JSON.stringify(sets.map(s => s.name)));
         const found = sets.find((s) => s.name === name);
         if (!found) {
-            throw new Error(`Texture set "${name}" not found`);
+            throw new Error(`Texture set "${name}" not found in ${JSON.stringify(sets)}`);
         }
         return found;
     }
