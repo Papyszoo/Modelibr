@@ -15,6 +15,7 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 3000,
+    allowedHosts: ['host.docker.internal'],
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',

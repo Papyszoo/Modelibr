@@ -268,15 +268,29 @@ When(
     "I set {string} as the default texture set for the current version",
     async ({ page }, name: string) => {
         const textureSet = sharedState.getTextureSet(name);
-        if (!textureSet || !textureSet.modelId || !textureSet.versionId) {
-            throw new Error(
-                `Texture set ${name} not properly linked to model in shared state`
-            );
+        if (!textureSet) {
+            throw new Error(`Texture set ${name} not found in shared state`);
+        }
+
+        // Get current model ID from page URL
+        const url = page.url();
+        const match = url.match(/model-(\d+)/);
+        if (!match) {
+            throw new Error("Could not determine model ID from URL");
+        }
+        const modelId = parseInt(match[1], 10);
+
+        // Get model to find active version
+        const model = await apiHelper.getModel(modelId);
+        const versionId = model.activeVersionId || model.versions?.[0]?.id;
+
+        if (!versionId) {
+            throw new Error("Could not determine model version ID");
         }
 
         await apiHelper.setDefaultTextureSet(
-            textureSet.modelId,
-            textureSet.versionId,
+            modelId,
+            versionId,
             textureSet.id
         );
 
