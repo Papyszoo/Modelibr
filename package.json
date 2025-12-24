@@ -1,28 +1,29 @@
 {
-  "name": "modelibr",
-  "private": true,
-  "version": "1.0.0",
-  "description": "A modern 3D model file upload service built with .NET 9.0 and React",
-  "type": "module", 
-  "scripts": {
-    "lint": "cd src/frontend && npm run lint && cd ../worker-service && npm run lint",
-    "lint:fix": "cd src/frontend && npm run lint:fix && cd ../worker-service && npm run lint:fix",
-    "format": "cd src/frontend && npm run format && cd ../worker-service && npm run format",
-    "format:check": "cd src/frontend && npm run format:check && cd ../worker-service && npm run format:check",
-    "test:frontend": "cd src/frontend && npm test",
-    "build:frontend": "cd src/frontend && npm run build"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Papyszoo/Modelibr.git"
-  },
-  "keywords": [
-    "3d-models",
-    "file-upload",
-    "react",
-    "dotnet",
-    "clean-architecture"
-  ],
-  "author": "Modelibr Team",
-  "license": "MIT"
+    "name": "modelibr",
+    "private": true,
+    "version": "1.0.0",
+    "description": "A modern 3D model file upload service built with .NET 9.0 and React",
+    "type": "module",
+    "scripts": {
+        "lint": "cd src/frontend && npm run lint && cd ../worker-service && npm run lint",
+        "lint:fix": "cd src/frontend && npm run lint:fix && cd ../worker-service && npm run lint:fix",
+        "format": "cd src/frontend && npm run format && cd ../worker-service && npm run format",
+        "format:check": "cd src/frontend && npm run format:check && cd ../worker-service && npm run format:check",
+        "test:frontend": "cd src/frontend && npm test",
+        "test:e2e": "cd tests/e2e && npm test",
+        "build:frontend": "cd src/frontend && npm run build"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Papyszoo/Modelibr.git"
+    },
+    "keywords": [
+        "3d-models",
+        "file-upload",
+        "react",
+        "dotnet",
+        "clean-architecture"
+    ],
+    "author": "Modelibr Team",
+    "license": "MIT"
 }

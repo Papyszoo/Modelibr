@@ -3,6 +3,7 @@ import { Button } from 'primereact/button'
 interface ModelListHeaderProps {
   isTabContent: boolean
   onBackToUpload?: () => void
+  onUpload?: () => void
   onRefresh?: () => void
   modelCount?: number
 }
@@ -10,6 +11,7 @@ interface ModelListHeaderProps {
 export default function ModelListHeader({
   isTabContent,
   onBackToUpload,
+  onUpload,
   onRefresh,
   modelCount = 0,
 }: ModelListHeaderProps) {
@@ -22,6 +24,16 @@ export default function ModelListHeader({
             <i className="pi pi-box"></i>
             {modelCount} models
           </span>
+          {onUpload && (
+            <Button
+              icon="pi pi-upload"
+              className="p-button-text p-button-sm"
+              onClick={onUpload}
+              tooltip="Upload models"
+              tooltipOptions={{ position: 'bottom' }}
+              aria-label="Upload models"
+            />
+          )}
           {onRefresh && (
             <Button
               icon="pi pi-refresh"

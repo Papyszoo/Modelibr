@@ -42,6 +42,7 @@ FROM node:20-bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
+    curl \
     gnupg \
     # Dependencies for Chromium
     chromium \

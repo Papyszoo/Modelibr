@@ -19,7 +19,9 @@ import { TextureSetDto, ModelVersionDto } from '../../../types'
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import thumbnailSignalRService, { ThumbnailStatusChangedEvent } from '../../../services/ThumbnailSignalRService'
+import thumbnailSignalRService, {
+  ThumbnailStatusChangedEvent,
+} from '../../../services/ThumbnailSignalRService'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -65,6 +67,7 @@ function ModelViewer({
   const [dragOver, setDragOver] = useState(false)
   const [uploadModalVisible, setUploadModalVisible] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] =
     useState<ModelVersionDto | null>(null)
@@ -135,16 +138,22 @@ function ModelViewer({
   useEffect(() => {
     if (!model?.id || versions.length === 0) return
 
-    const handleThumbnailStatusChanged = (event: ThumbnailStatusChangedEvent) => {
+    const handleThumbnailStatusChanged = (
+      event: ThumbnailStatusChangedEvent
+    ) => {
       // Only reload if the thumbnail is for a version of this model
-      const isThisModelsVersion = versions.some(v => v.id === event.modelVersionId)
-      
+      const isThisModelsVersion = versions.some(
+        v => v.id === event.modelVersionId
+      )
+
       if (event.status === 'Ready' && isThisModelsVersion) {
         loadVersions()
       }
     }
 
-    const unsubscribe = thumbnailSignalRService.onThumbnailStatusChanged(handleThumbnailStatusChanged)
+    const unsubscribe = thumbnailSignalRService.onThumbnailStatusChanged(
+      handleThumbnailStatusChanged
+    )
 
     return () => {
       // Cleanup: unsubscribe when component unmounts or model changes
@@ -212,8 +221,13 @@ function ModelViewer({
     if (!model) return
 
     try {
-      await ApiClient.regenerateThumbnail(model.id.toString(), selectedVersion?.id)
-      const versionInfo = selectedVersion ? ` version #${selectedVersion.id}` : '';
+      await ApiClient.regenerateThumbnail(
+        model.id.toString(),
+        selectedVersion?.id
+      )
+      const versionInfo = selectedVersion
+        ? ` version #${selectedVersion.id}`
+        : ''
       toast.current?.show({
         severity: 'success',
         summary: 'Thumbnail Regeneration',
@@ -237,7 +251,7 @@ function ModelViewer({
 
   const handleVersionSelect = (version: ModelVersionDto) => {
     setSelectedVersion(version)
-    
+
     // Apply version's default texture set immediately
     if (version.defaultTextureSetId) {
       setSelectedTextureSetId(version.defaultTextureSetId)
@@ -247,7 +261,7 @@ function ModelViewer({
       setSelectedTextureSetId(null)
       setHasUserSelectedTexture(false)
     }
-    
+
     // Create a temporary model with the version's files for preview
     if (model) {
       const versionModelData: Model = {
@@ -336,9 +350,11 @@ function ModelViewer({
       await loadVersions()
     } catch (error) {
       console.error('Failed to recycle version:', error)
-      const errorMessage = error instanceof Error && error.message.includes('last remaining version')
-        ? 'Cannot delete the last version. A model must have at least one version.'
-        : 'Failed to recycle model version'
+      const errorMessage =
+        error instanceof Error &&
+        error.message.includes('last remaining version')
+          ? 'Cannot delete the last version. A model must have at least one version.'
+          : 'Failed to recycle model version'
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
@@ -371,6 +387,19 @@ function ModelViewer({
       setDroppedFile(file)
       setUploadModalVisible(true)
     }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setDroppedFile(e.target.files[0])
+      setUploadModalVisible(true)
+      // Reset input
+      e.target.value = ''
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
   }
 
   const handleFileUpload = async (
@@ -523,6 +552,13 @@ function ModelViewer({
       </header>
 
       <ModelProvider>
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+          accept=".obj,.fbx,.gltf,.glb"
+        />
         <div className="viewer-container">
           {/* Model name overlay */}
           <div className="viewer-model-name-overlay">
@@ -530,6 +566,16 @@ function ModelViewer({
           </div>
           {/* Floating action buttons for sidebar controls */}
           <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
+            <Button
+              icon="pi pi-plus"
+              className="p-button-rounded viewer-control-btn"
+              onClick={handleUploadClick}
+              tooltip="Add Version"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+              aria-label="Add Version"
+            />
             <Button
               icon="pi pi-cog"
               className="p-button-rounded viewer-control-btn"
