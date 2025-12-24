@@ -3,8 +3,8 @@
  * Bypasses UI interaction for faster, more reliable test setup.
  */
 
-import { ApiHelper } from "../support/api-helper";
-import { DbHelper } from "../support/db-helper";
+import { ApiHelper } from "../helpers/api-helper";
+import { DbHelper } from "./db-helper";
 import { sharedState } from "./shared-state";
 
 export class TestDataBuilder {
