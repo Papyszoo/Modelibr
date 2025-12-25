@@ -12,3 +12,6 @@ node_modules/
 # Temporary files
 *.log
 webapi_e2e_logs.txt
+
+# Shared state file (used for test data persistence)
+fixtures/.shared-state.json

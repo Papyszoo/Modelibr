@@ -25,6 +25,7 @@ const { Given, When, Then } = createBdd();
 Given(
     "the following models exist in shared state:",
     async ({ page }, dataTable: DataTable) => {
+        console.log(`[SharedState Debug] Checking models. Current state: ${sharedState.getDebugInfo()}`);
         const models = dataTable.hashes();
 
         for (const row of models) {
@@ -49,6 +50,7 @@ Given(
 Given(
     "the following texture sets exist in shared state:",
     async ({ page }, dataTable: DataTable) => {
+        console.log(`[SharedState Debug] Checking texture sets. Current state: ${sharedState.getDebugInfo()}`);
         const textureSets = dataTable.hashes();
 
         for (const row of textureSets) {
@@ -79,30 +81,53 @@ When(
         
         // Wait for model to appear in list
         await modelListPage.expectModelVisible(fileName);
+        
+        // Store model name without extension (matches UI display)
+        const modelName = fileName.replace(/\.[^/.]+$/, '');
 
         // Store in shared state
         sharedState.saveModel(stateName, {
             id: 0, // Will be updated when navigating to viewer
-            name: fileName,
+            name: modelName,
         });
     }
 );
 
 /**
- * Navigates to model viewer page using a model from shared state.
+ * Navigates to model viewer page using a model from shared state or by name.
  */
 Given(
     "I am on the model viewer page for {string}",
     async ({ page }, stateName: string) => {
         let model = sharedState.getModel(stateName);
-
+        
+        // If not found by exact name, try stripping extension
         if (!model) {
-            throw new Error(
-                `Model "${stateName}" not found in shared state. Available: ${sharedState.getDebugInfo()}`
-            );
+            const nameWithoutExt = stateName.replace(/\.[^/.]+$/, '');
+            model = sharedState.getModel(nameWithoutExt);
         }
 
         const modelListPage = new ModelListPage(page);
+        
+        if (!model) {
+            // Not in shared state - try to open directly by name
+            // Strip extension for model name lookup
+            const modelName = stateName.replace(/\.[^/.]+$/, '');
+            await modelListPage.goto();
+            await modelListPage.openModel(modelName);
+            
+            // Store in shared state for future lookups
+            const url = page.url();
+            const match = url.match(/model-(\d+)/);
+            if (match) {
+                sharedState.saveModel(stateName, {
+                    id: parseInt(match[1], 10),
+                    name: modelName,
+                });
+            }
+            return;
+        }
+
         await modelListPage.openModel(model.name);
 
         // Extract model ID from URL

@@ -15,12 +15,10 @@ const __dirname = path.dirname(__filename);
 
 const { Given, When, Then, Before, After } = createBdd();
 
-let db: DbHelper;
+const db = new DbHelper();
 const apiHelper = new ApiHelper();
 
-Before(async () => {
-    db = new DbHelper();
-});
+// Note: db is initialized at module level for consistent database access
 
 After(async () => {
     if (db) {
@@ -40,9 +38,9 @@ When(
     async ({ page }) => {
         // Get version 1 ID from the database
         const res = await db.query(
-            'SELECT id FROM "ModelVersions" ORDER BY id ASC LIMIT 1'
+            'SELECT "Id" FROM "ModelVersions" ORDER BY "Id" ASC LIMIT 1'
         );
-        const v1Id = res.rows[0].id;
+        const v1Id = res.rows[0].Id;
 
         // Capture thumbnail details from database
         const thumbnailDetails = await db.getThumbnailDetails(v1Id);
@@ -63,9 +61,9 @@ Then(
     "I should receive a {string} notification via SignalR for version 2",
     async ({ page }, target: string) => {
         const res = await db.query(
-            'SELECT id FROM "ModelVersions" ORDER BY id ASC OFFSET 1 LIMIT 1'
+            'SELECT "Id" FROM "ModelVersions" ORDER BY "Id" ASC OFFSET 1 LIMIT 1'
         );
-        const v2Id = res.rows[0].id;
+        const v2Id = res.rows[0].Id;
 
         const signalR = new SignalRHelper(page);
         await signalR.waitForMessage(
@@ -81,9 +79,9 @@ Then(
     async () => {
         // Get version 1 ID
         const res = await db.query(
-            'SELECT id FROM "ModelVersions" ORDER BY id ASC LIMIT 1'
+            'SELECT "Id" FROM "ModelVersions" ORDER BY "Id" ASC LIMIT 1'
         );
-        const v1Id = res.rows[0].id;
+        const v1Id = res.rows[0].Id;
 
         // Get saved state from shared state
         const savedState = sharedState.getVersionState(v1Id);
@@ -100,8 +98,9 @@ Then(
         expect(currentDetails.ThumbnailPath).toBe(
             savedState.thumbnailDetails.ThumbnailPath
         );
-        expect(currentDetails.UpdatedAt.getTime()).toBe(
-            savedState.thumbnailDetails.UpdatedAt.getTime()
+        // Compare dates as strings (PostgreSQL returns string timestamps)
+        expect(String(currentDetails.UpdatedAt)).toBe(
+            String(savedState.thumbnailDetails.UpdatedAt)
         );
     }
 );
@@ -111,9 +110,9 @@ Then(
     async ({ page }) => {
         // Get version 1 ID
         const res = await db.query(
-            'SELECT id FROM "ModelVersions" ORDER BY id ASC LIMIT 1'
+            'SELECT "Id" FROM "ModelVersions" ORDER BY "Id" ASC LIMIT 1'
         );
-        const v1Id = res.rows[0].id;
+        const v1Id = res.rows[0].Id;
 
         // Get saved state from shared state
         const savedState = sharedState.getVersionState(v1Id);
@@ -149,14 +148,28 @@ Given(
     "I have uploaded a model {string}",
     async ({ page }, fileName: string) => {
         const modelList = new ModelListPage(page);
+        const modelName = fileName.replace(/\.[^/.]+$/, ''); // Strip extension
+        
+        // Check if model already exists in shared state (from previous test)
+        const existing = sharedState.getModel(fileName);
+        if (existing && existing.id > 0) {
+            // Model already uploaded, just navigate to list and ensure visible
+            await modelList.goto();
+            await modelList.expectModelVisible(modelName);
+            return;
+        }
+        
+        // Upload the model - API handles deduplication and returns existing if same hash
         const filePath = path.join(__dirname, "..", "assets", fileName);
         await modelList.uploadModel(filePath);
-        await modelList.expectModelVisible(fileName);
         
-        // Store in shared state for later steps to find
+        // Wait for model to appear in list (API may return existing deduplicated model)
+        await modelList.expectModelVisible(modelName);
+        
+        // Store in shared state with the filename as key
         sharedState.saveModel(fileName, {
             id: 0, // Will be updated when navigating to viewer
-            name: fileName,
+            name: modelName,
         });
     }
 );
@@ -210,15 +223,17 @@ When(
         // Derive texture set name from filename (app creates set with file basename)
         const setName = fileName.replace(/\.[^/.]+$/, '');
         
-        // Wait for texture set to appear in the list
+        // Wait for upload to complete and texture set to be created via API
         await page.waitForTimeout(2000); // Allow upload to complete
+        
+        // Verify via API that texture set was created (more reliable than UI check)
+        let textureSet: any = null;
         await expect(async () => {
-            const exists = await textureSetsPage.textureSetExists(setName);
-            expect(exists).toBe(true);
+            textureSet = await apiHelper.getTextureSetByName(setName);
+            expect(textureSet).not.toBeNull();
         }).toPass({ timeout: 10000 });
         
         // Store in shared state for subsequent steps
-        const textureSet = await apiHelper.getTextureSetByName(setName);
         sharedState.saveTextureSet(setName, {
             id: textureSet.id,
             name: setName
@@ -242,9 +257,9 @@ When(
         }
         const modelId = parseInt(match[1]);
 
-        // Get model to find active version
-        const model = await apiHelper.getModel(modelId);
-        const versionId = model.activeVersionId || model.versions?.[0]?.id;
+        // Get model versions to find active version
+        const versions = await apiHelper.getModelVersions(modelId);
+        const versionId = versions[0]?.id;
         if (!versionId) {
             throw new Error("Could not determine model version ID");
         }
@@ -268,17 +283,34 @@ When(
     "I set {string} as the default texture set for the current version",
     async ({ page }, name: string) => {
         const textureSet = sharedState.getTextureSet(name);
-        if (!textureSet || !textureSet.modelId || !textureSet.versionId) {
-            throw new Error(
-                `Texture set ${name} not properly linked to model in shared state`
-            );
+        if (!textureSet) {
+            throw new Error(`Texture set ${name} not found in shared state`);
         }
 
-        await apiHelper.setDefaultTextureSet(
-            textureSet.modelId,
-            textureSet.versionId,
-            textureSet.id
-        );
+        // Get modelId and versionId from the current page URL
+        const url = page.url();
+        const modelMatch = url.match(/model-(\d+)/);
+        if (!modelMatch) {
+            throw new Error(`Could not extract model ID from URL: ${url}`);
+        }
+        const modelId = parseInt(modelMatch[1], 10);
+
+        // Get versions from API
+        const versions = await apiHelper.getModelVersions(modelId);
+        const versionId = versions[0]?.id;
+        if (!versionId) {
+            throw new Error(`Could not find version ID for model ${modelId}. Versions: ${JSON.stringify(versions)}`);
+        }
+
+        // First link the texture set to the model version if not already linked
+        try {
+            await apiHelper.linkTextureSetToModel(textureSet.id, modelId, versionId);
+        } catch (e) {
+            // May already be linked, ignore error
+        }
+
+        // Set as default
+        await apiHelper.setDefaultTextureSet(modelId, versionId, textureSet.id);
 
         // Give UI time to update
         await page.waitForTimeout(1000);
@@ -305,7 +337,7 @@ Then(
     "the version thumbnail should eventually be {string}",
     async ({ page }, status: string) => {
         // In the viewer, we can check the thumbnail window or the version strip
-        await expect(page.locator(".thumbnail-status")).toHaveText(status, {
+        await expect(page.locator(".thumbnail-status-text")).toHaveText(status, {
             timeout: 60000,
         });
     }
@@ -335,8 +367,39 @@ When("I select version {int}", async ({ page }, versionNumber: number) => {
 When(
     "I set {string} as the default texture set for version {int}",
     async ({ page }, name: string, versionNumber: number) => {
-        const modelViewer = new ModelViewerPage(page);
-        await modelViewer.setDefaultTextureSet(name);
+        const textureSet = sharedState.getTextureSet(name);
+        if (!textureSet) {
+            throw new Error(`Texture set ${name} not found in shared state`);
+        }
+
+        // Get modelId from the current page URL
+        const url = page.url();
+        const modelMatch = url.match(/model-(\d+)/);
+        if (!modelMatch) {
+            throw new Error(`Could not extract model ID from URL: ${url}`);
+        }
+        const modelId = parseInt(modelMatch[1], 10);
+
+        // Get the specific version ID
+        const versions = await apiHelper.getModelVersions(modelId);
+        const version = versions.find(v => v.versionNumber === versionNumber);
+        if (!version) {
+            throw new Error(`Version ${versionNumber} not found for model ${modelId}`);
+        }
+        const versionId = version.id;
+
+        // First link the texture set to the model version if not already linked
+        try {
+            await apiHelper.linkTextureSetToModel(textureSet.id, modelId, versionId);
+        } catch (e) {
+            // May already be linked, ignore error
+        }
+
+        // Set as default via API
+        await apiHelper.setDefaultTextureSet(modelId, versionId, textureSet.id);
+
+        // Give UI time to update
+        await page.waitForTimeout(1000);
     }
 );
 

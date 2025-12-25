@@ -68,18 +68,34 @@ export class ModelListPage {
     }
 
     async openModel(modelName: string) {
-        const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
+        const nameWithoutExt = modelName.split(".").slice(0, -1).join(".") || modelName;
         
-        // Find the model element and click on it
-        const modelElement = this.page
-            .getByText(modelName)
-            .or(this.page.getByText(nameWithoutExt))
+        // Navigate to model list first
+        await this.goto();
+        
+        // Find the model card container that contains the model name
+        // The card has cursor=pointer and contains both the thumbnail and the name
+        const modelCard = this.page.locator('[class*="model-card"], [class*="model-list-item"]')
+            .filter({ hasText: nameWithoutExt })
             .first();
         
-        await expect(modelElement).toBeVisible({ timeout: 10000 });
-        await modelElement.click();
+        // If no specific card class, try finding clickable container with the text
+        const fallbackCard = this.page.locator('div[style*="cursor"]')
+            .filter({ hasText: nameWithoutExt })
+            .first();
+        
+        // Try the model card first, then fallback
+        const cardToClick = await modelCard.count() > 0 ? modelCard : fallbackCard;
+        
+        if (await cardToClick.count() === 0) {
+            // Last resort: find the image with alt text matching the model
+            const imgCard = this.page.locator(`img[alt="${nameWithoutExt}"]`).locator('..');
+            await imgCard.click();
+        } else {
+            await cardToClick.click();
+        }
 
-        // Wait for the model viewer to load
+        // Wait for the model viewer to load (canvas element)
         await this.page.waitForSelector("canvas", {
             state: "visible",
             timeout: 30000,

@@ -1,0 +1,51 @@
+{
+  "models": {
+    "single-version-model": {
+      "id": 1,
+      "name": "test-cube"
+    },
+    "multi-version-model": {
+      "id": 2,
+      "name": "test-torus"
+    },
+    "test-torus": {
+      "id": 2,
+      "name": "test-torus"
+    },
+    "test-cube": {
+      "id": 1,
+      "name": "test-cube"
+    }
+  },
+  "textureSets": {
+    "blue_color": {
+      "id": 1,
+      "name": "blue_color"
+    },
+    "red_color": {
+      "id": 2,
+      "name": "red_color",
+      "modelId": 2,
+      "versionId": 2
+    }
+  },
+  "versionStates": {
+    "1": {
+      "thumbnailDetails": {
+        "Id": 1,
+        "ModelVersionId": 1,
+        "Status": 2,
+        "ThumbnailPath": "/var/lib/modelibr/uploads/26/2f/262f09ea9a302727f5c34dc1e26e1d5cfe4653cb9905f2a4faabaff92581d67d",
+        "PngThumbnailPath": "/var/lib/modelibr/uploads/6e/95/6e959abb97e6ef4cadddbc9409e3a039bd4f0ecdda813436a0edbbbdb65bb72c",
+        "SizeBytes": "27544",
+        "Width": 256,
+        "Height": 256,
+        "ErrorMessage": null,
+        "CreatedAt": "2025-12-25T12:13:05.153Z",
+        "UpdatedAt": "2025-12-25T12:13:22.793Z",
+        "ProcessedAt": "2025-12-25T12:13:22.793Z"
+      },
+      "thumbnailSrc": null
+    }
+  }
+}

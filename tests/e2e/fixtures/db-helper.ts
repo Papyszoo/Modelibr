@@ -2,6 +2,7 @@ import pg from "pg";
 
 export class DbHelper {
     private pool: pg.Pool;
+    private isClosed: boolean = false;
 
     constructor() {
         this.pool = new pg.Pool({
@@ -15,6 +16,9 @@ export class DbHelper {
     }
 
     async query(text: string, params?: any[]) {
+        if (this.isClosed) {
+            throw new Error("Database pool has been closed");
+        }
         return this.pool.query(text, params);
     }
 
@@ -35,6 +39,9 @@ export class DbHelper {
     }
 
     async close() {
-        await this.pool.end();
+        if (!this.isClosed) {
+            this.isClosed = true;
+            await this.pool.end();
+        }
     }
 }

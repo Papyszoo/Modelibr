@@ -1,7 +1,16 @@
 /**
  * Shared state fixture for managing test data across scenarios within a single test run.
- * This enables dependent scenarios while maintaining isolation between full test runs.
+ * Uses file-based persistence to survive module reloads between test files.
  */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const STATE_FILE = path.join(__dirname, '..', '.shared-state.json');
 
 interface ModelData {
     id: number;
@@ -22,64 +31,88 @@ interface VersionState {
     thumbnailSrc: string | null;
 }
 
+interface StateData {
+    models: Record<string, ModelData>;
+    textureSets: Record<string, TextureSetData>;
+    versionStates: Record<string, VersionState>;
+}
+
 class SharedState {
-    private models: Map<string, ModelData> = new Map();
-    private textureSets: Map<string, TextureSetData> = new Map();
-    private versionStates: Map<number, VersionState> = new Map();
+    private loadState(): StateData {
+        try {
+            if (fs.existsSync(STATE_FILE)) {
+                const data = fs.readFileSync(STATE_FILE, 'utf-8');
+                return JSON.parse(data);
+            }
+        } catch (e) {
+            console.error('Error loading shared state:', e);
+        }
+        return { models: {}, textureSets: {}, versionStates: {} };
+    }
+
+    private saveState(state: StateData): void {
+        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    }
 
     // Model management
     saveModel(name: string, data: ModelData): void {
-        this.models.set(name, data);
+        const state = this.loadState();
+        state.models[name] = data;
+        this.saveState(state);
     }
 
     getModel(name: string): ModelData | undefined {
-        return this.models.get(name);
+        const state = this.loadState();
+        return state.models[name];
     }
 
     hasModel(name: string): boolean {
-        return this.models.has(name);
+        const state = this.loadState();
+        return name in state.models;
     }
 
     // Texture set management
     saveTextureSet(name: string, data: TextureSetData): void {
-        this.textureSets.set(name, data);
+        const state = this.loadState();
+        state.textureSets[name] = data;
+        this.saveState(state);
     }
 
     getTextureSet(name: string): TextureSetData | undefined {
-        return this.textureSets.get(name);
+        const state = this.loadState();
+        return state.textureSets[name];
     }
 
     hasTextureSet(name: string): boolean {
-        return this.textureSets.has(name);
+        const state = this.loadState();
+        return name in state.textureSets;
     }
 
-    // Version state management (for independence validation)
+    // Version state management
     saveVersionState(versionId: number, state: VersionState): void {
-        this.versionStates.set(versionId, state);
+        const stateData = this.loadState();
+        stateData.versionStates[versionId.toString()] = state;
+        this.saveState(stateData);
     }
 
     getVersionState(versionId: number): VersionState | undefined {
-        return this.versionStates.get(versionId);
+        const state = this.loadState();
+        return state.versionStates[versionId.toString()];
     }
 
-    hasVersionState(versionId: number): boolean {
-        return this.versionStates.has(versionId);
-    }
-
-    // Clear all state (called between test runs, not between scenarios)
+    // Clear all state (called at start of test run)
     clear(): void {
-        this.models.clear();
-        this.textureSets.clear();
-        this.versionStates.clear();
+        this.saveState({ models: {}, textureSets: {}, versionStates: {} });
     }
 
-    // Debug helper
+    // Debug info
     getDebugInfo(): string {
+        const state = this.loadState();
         return JSON.stringify(
             {
-                models: Array.from(this.models.keys()),
-                textureSets: Array.from(this.textureSets.keys()),
-                versionStates: Array.from(this.versionStates.keys()),
+                models: Object.keys(state.models),
+                textureSets: Object.keys(state.textureSets),
+                versionStates: Object.keys(state.versionStates),
             },
             null,
             2
@@ -87,5 +120,5 @@ class SharedState {
     }
 }
 
-// Global singleton instance - persists across scenarios within the same test run
+// Global singleton instance
 export const sharedState = new SharedState();

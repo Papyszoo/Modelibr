@@ -181,6 +181,18 @@ export class ApiHelper {
     }
 
     /**
+     * Get all versions for a model
+     */
+    async getModelVersions(modelId: number): Promise<any[]> {
+        const response = await this.client.get(`/models/${modelId}/versions`);
+        if (response.status !== 200) {
+            throw new Error(`Failed to get model versions: ${response.status}`);
+        }
+        // Response has a 'value' array
+        return response.data.value || response.data || [];
+    }
+
+    /**
      * Find a model by name (searches in the list)
      */
     async findModelByName(modelName: string): Promise<any | null> {
@@ -201,7 +213,7 @@ export class ApiHelper {
         if (response.status !== 200) {
             throw new Error(`Failed to get texture sets: ${response.status}`);
         }
-        return response.data;
+        return response.data.textureSets || [];
     }
 
     /**

@@ -4,9 +4,13 @@
  * Replaces run-e2e.ps1 to work on Windows, macOS, and Linux.
  */
 
-const { execSync, spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import { execSync } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const COMPOSE_FILE = 'docker-compose.e2e.yml';
 
@@ -39,6 +43,13 @@ function cleanup() {
     if (fs.existsSync(dataPath)) {
         fs.rmSync(dataPath, { recursive: true, force: true });
         console.log('Removed data directory');
+    }
+    
+    // Clear shared state file
+    const statePath = path.join(__dirname, 'fixtures', '.shared-state.json');
+    if (fs.existsSync(statePath)) {
+        fs.rmSync(statePath, { force: true });
+        console.log('Removed shared state file');
     }
 }
 
