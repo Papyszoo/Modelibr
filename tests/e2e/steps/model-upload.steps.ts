@@ -22,7 +22,7 @@ When("I upload a 3D model {string}", async ({ page }, fileName: string) => {
 });
 
 Then(
-    "I should see {string} in the list",
+    "I should see {string} in the model list",
     async ({ page }, modelName: string) => {
         const modelList = new ModelListPage(page);
         await modelList.expectModelVisible(modelName);

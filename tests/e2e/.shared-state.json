@@ -30,22 +30,22 @@
     }
   },
   "versionStates": {
-    "1": {
+    "2": {
       "thumbnailDetails": {
-        "Id": 1,
-        "ModelVersionId": 1,
+        "Id": 3,
+        "ModelVersionId": 2,
         "Status": 2,
-        "ThumbnailPath": "/var/lib/modelibr/uploads/26/2f/262f09ea9a302727f5c34dc1e26e1d5cfe4653cb9905f2a4faabaff92581d67d",
-        "PngThumbnailPath": "/var/lib/modelibr/uploads/6e/95/6e959abb97e6ef4cadddbc9409e3a039bd4f0ecdda813436a0edbbbdb65bb72c",
-        "SizeBytes": "27544",
+        "ThumbnailPath": "/var/lib/modelibr/uploads/92/3f/923ff0f655bf374b9e1ea16b982ba07d2ed933bcf7884155c7a0d77eb4d6a986",
+        "PngThumbnailPath": null,
+        "SizeBytes": "19832",
         "Width": 256,
         "Height": 256,
         "ErrorMessage": null,
-        "CreatedAt": "2025-12-25T12:13:05.153Z",
-        "UpdatedAt": "2025-12-25T12:13:22.793Z",
-        "ProcessedAt": "2025-12-25T12:13:22.793Z"
+        "CreatedAt": "2025-12-26T03:02:31.441Z",
+        "UpdatedAt": "2025-12-26T03:02:46.986Z",
+        "ProcessedAt": "2025-12-26T03:02:46.986Z"
       },
-      "thumbnailSrc": null
+      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=20251226030246"
     }
   }
 }

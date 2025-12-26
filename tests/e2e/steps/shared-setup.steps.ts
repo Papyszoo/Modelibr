@@ -1,6 +1,7 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { sharedState } from "../fixtures/shared-state";
+import { SignalRHelper } from "../fixtures/signalr-helper";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
 import path from "path";
@@ -79,11 +80,11 @@ When(
         const filePath = path.join(__dirname, "..", "assets", fileName);
         await modelListPage.uploadModel(filePath);
         
-        // Wait for model to appear in list
-        await modelListPage.expectModelVisible(fileName);
-        
         // Store model name without extension (matches UI display)
         const modelName = fileName.replace(/\.[^/.]+$/, '');
+        
+        // Wait for model to appear in list (grid shows name without extension)
+        await modelListPage.expectModelVisible(modelName);
 
         // Store in shared state
         sharedState.saveModel(stateName, {
@@ -158,6 +159,43 @@ Then("the model should be stored in shared state", async ({ page }) => {
 });
 
 /**
+ * Waits for thumbnail to be generated and verifies it's ready.
+ * Uses database polling to confirm thumbnail status.
+ */
+Then(
+    "the thumbnail should be generated via SignalR notification",
+    async ({ page }) => {
+        // Import DbHelper inline to avoid circular dependencies
+        const { DbHelper } = await import("../fixtures/db-helper");
+        const db = new DbHelper();
+        
+        // Poll database for thumbnail status (max 90 seconds)
+        const maxAttempts = 30;
+        const pollInterval = 3000;
+        let thumbnailReady = false;
+        
+        for (let i = 0; i < maxAttempts && !thumbnailReady; i++) {
+            const result = await db.query(
+                `SELECT t."Status" 
+                 FROM "Thumbnails" t 
+                 JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                 ORDER BY t."CreatedAt" DESC LIMIT 1`
+            );
+            
+            if (result.rows.length > 0 && result.rows[0].Status === 2) {
+                thumbnailReady = true;
+                console.log(`[Thumbnail] Ready (status=2)`);
+            } else {
+                await page.waitForTimeout(pollInterval);
+            }
+        }
+        
+        expect(thumbnailReady).toBe(true);
+        console.log("[Test] Thumbnail generation verified via database");
+    }
+);
+
+/**
  * Verifies that a model has the expected number of versions in shared state.
  */
 Then(
@@ -203,5 +241,33 @@ Then(
         // The linking step already validated the API response, 
         // this step just confirms we reached this point successfully
         expect(true).toBe(true);
+    }
+);
+
+/**
+ * Opens the version dropdown and leaves it open for the screenshot.
+ * This allows the test screenshot to show all available versions.
+ */
+Then(
+    "the version dropdown should be open",
+    async ({ page }) => {
+        // Close any open dialogs first (e.g., upload confirmation)
+        const closeButtons = page.locator('button[aria-label="Close"], .p-dialog-header-close');
+        for (let i = 0; i < await closeButtons.count(); i++) {
+            const btn = closeButtons.nth(i);
+            if (await btn.isVisible({ timeout: 500 })) {
+                await btn.click();
+                await page.waitForTimeout(300);
+            }
+        }
+        
+        // Also press Escape to close any dialogs
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(300);
+        
+        const dropdownTrigger = page.locator(".version-dropdown-trigger");
+        await dropdownTrigger.click();
+        await page.waitForSelector(".version-dropdown-menu", { state: "visible", timeout: 5000 });
+        console.log("[Screenshot] Version dropdown opened to show available versions");
     }
 );

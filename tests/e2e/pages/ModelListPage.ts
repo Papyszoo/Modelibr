@@ -58,12 +58,8 @@ export class ModelListPage {
     }
 
     async expectModelVisible(modelName: string) {
-        const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
         await expect(
-            this.page
-                .getByText(modelName)
-                .or(this.page.getByText(nameWithoutExt))
-                .first()
+            this.page.getByText(modelName).first()
         ).toBeVisible({ timeout: 30000 });
     }
 

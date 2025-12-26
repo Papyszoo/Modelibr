@@ -110,11 +110,17 @@ export class ApiHelper {
             `/texture-sets/${textureSetId}/model-versions/${modelVersionId}`
         );
 
+        // Accept 200, 201, 204 as success, and 400 with AssociationAlreadyExists as "already done"
         if (
             response.status !== 200 &&
             response.status !== 201 &&
             response.status !== 204
         ) {
+            // Check if it's "already associated" error - treat as success
+            if (response.status === 400 && response.data?.error === 'AssociationAlreadyExists') {
+                // Silently succeed - texture set is already linked
+                return;
+            }
             console.error(
                 "Link texture set failed:",
                 response.status,

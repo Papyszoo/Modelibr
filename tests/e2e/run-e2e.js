@@ -68,8 +68,8 @@ async function main() {
     
     console.log('\n🧪 Running tests...\n');
     
-    // Run tests
-    const testResult = run('npm test', { env: testEnv });
+    // Run tests (use test:quick to avoid recursion since npm test now calls this script)
+    const testResult = run('npm run test:quick', { env: testEnv });
     
     // Cleanup
     cleanup();

@@ -159,6 +159,21 @@ export class ModelViewerPage {
     }
 
     async selectVersion(versionNumber: number) {
+        // Close any open floating windows that might block clicks
+        const closeButtons = this.page.locator('.floating-window .pi-times, .floating-window button[aria-label="Close"]');
+        const closeButtonCount = await closeButtons.count();
+        for (let i = 0; i < closeButtonCount; i++) {
+            try {
+                await closeButtons.nth(i).click({ timeout: 1000 });
+            } catch {
+                // Ignore if already closed
+            }
+        }
+        
+        // Also press Escape to close any remaining modals/dropdowns
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+
         // Click on the version dropdown trigger
         const dropdownTrigger = this.page.locator(".version-dropdown-trigger");
         await expect(dropdownTrigger).toBeVisible({ timeout: 10000 });

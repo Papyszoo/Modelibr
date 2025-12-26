@@ -42,40 +42,18 @@ public static class ThumbnailJobEndpoints
         .WithName("Dequeue Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
-        app.MapPost("/api/thumbnail-jobs/{jobId:int}/complete", async (
+        app.MapPost("/api/thumbnail-jobs/{jobId:int}/finish", async (
             int jobId,
-            [FromBody] CompleteJobRequest request,
-            ICommandHandler<CompleteThumbnailJobCommand, CompleteThumbnailJobResponse> commandHandler) =>
+            [FromBody] FinishJobRequest request,
+            ICommandHandler<FinishThumbnailJobCommand, FinishThumbnailJobResponse> commandHandler) =>
         {
-            var result = await commandHandler.Handle(new CompleteThumbnailJobCommand(
+            var result = await commandHandler.Handle(new FinishThumbnailJobCommand(
                 jobId,
+                request.Success,
                 request.ThumbnailPath,
                 request.SizeBytes,
                 request.Width,
-                request.Height), CancellationToken.None);
-            
-            if (!result.IsSuccess)
-            {
-                return Results.BadRequest(result.Error.Message);
-            }
-
-            return Results.Ok(new
-            {
-                ModelId = result.Value.ModelId,
-                Status = result.Value.Status.ToString(),
-                Message = "Thumbnail job completed successfully"
-            });
-        })
-        .WithName("Complete Thumbnail Job")
-        .WithTags("ThumbnailJobs");
-
-        app.MapPost("/api/thumbnail-jobs/{jobId:int}/fail", async (
-            int jobId,
-            [FromBody] FailJobRequest request,
-            ICommandHandler<FailThumbnailJobCommand, FailThumbnailJobResponse> commandHandler) =>
-        {
-            var result = await commandHandler.Handle(new FailThumbnailJobCommand(
-                jobId,
+                request.Height,
                 request.ErrorMessage), CancellationToken.None);
             
             if (!result.IsSuccess)
@@ -86,11 +64,12 @@ public static class ThumbnailJobEndpoints
             return Results.Ok(new
             {
                 ModelId = result.Value.ModelId,
+                ModelVersionId = result.Value.ModelVersionId,
                 Status = result.Value.Status.ToString(),
-                Message = "Thumbnail job marked as failed"
+                Message = request.Success ? "Thumbnail job completed successfully" : "Thumbnail job marked as failed"
             });
         })
-        .WithName("Fail Thumbnail Job")
+        .WithName("Finish Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
         app.MapPost("/api/thumbnail-jobs/{jobId:int}/events", async (
@@ -151,14 +130,15 @@ public static class ThumbnailJobEndpoints
 public record DequeueRequest(string WorkerId);
 
 /// <summary>
-/// Request model for completing thumbnail jobs.
+/// Request model for finishing thumbnail jobs (unified complete/fail).
 /// </summary>
-public record CompleteJobRequest(string ThumbnailPath, long SizeBytes, int Width, int Height);
-
-/// <summary>
-/// Request model for failing thumbnail jobs.
-/// </summary>
-public record FailJobRequest(string ErrorMessage);
+public record FinishJobRequest(
+    bool Success,
+    string? ThumbnailPath = null,
+    long? SizeBytes = null,
+    int? Width = null,
+    int? Height = null,
+    string? ErrorMessage = null);
 
 /// <summary>
 /// Request model for logging thumbnail job events.

@@ -14,6 +14,7 @@ Feature: Default Texture Set Behavior
     When I set "blue_color" as the default texture set for the current version
     Then "blue_color" should be marked as default in the texture set selector
     And the version thumbnail should eventually be "Ready"
+    And the texture set selector should be visible
 
   Scenario: Independent default texture sets for different versions
     Given the following models exist in shared state:

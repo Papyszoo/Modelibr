@@ -4,8 +4,8 @@
     "description": "E2E tests for Modelibr using Playwright and BDD",
     "type": "module",
     "scripts": {
-        "test": "npx bddgen && npx playwright test",
-        "test:e2e": "node run-e2e.js",
+        "test": "node run-e2e.js",
+        "test:quick": "npx bddgen && npx playwright test",
         "bdd": "npx bddgen",
         "test:report": "npx playwright show-report"
     },
