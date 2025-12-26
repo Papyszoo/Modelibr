@@ -1,5 +1,5 @@
 import { createBdd } from "playwright-bdd";
-import { expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { sharedState } from "../fixtures/shared-state";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { ModelListPage } from "../pages/ModelListPage";
@@ -94,6 +94,8 @@ When(
     }
 );
 
+
+
 /**
  * Navigates to model viewer page using a model from shared state or by name.
  */
@@ -129,6 +131,36 @@ Given(
             return;
         }
 
+        // If we have the model ID, navigate directly via URL (more reliable)
+        if (model.id) {
+            console.log(`[Navigation] Using cached ID ${model.id} for ${stateName}`);
+            const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
+            
+            // Clear storage to prevent sticky tabs (like Texture Sets) from overriding the URL
+            await page.goto(baseUrl);
+            await page.evaluate(() => {
+                try {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                } catch (e) {
+                    // Ignore
+                }
+            });
+
+            await page.goto(`${baseUrl}/?leftTabs=modelList,model-${model.id}&activeLeft=model-${model.id}`);
+            await page.waitForSelector(".viewer-canvas canvas, .version-dropdown-trigger", { 
+                state: "visible", 
+                timeout: 30000 
+            });
+            console.log(`[Navigation] Opened model ${model.id} (${model.name}) via direct URL`);
+            return;
+        }
+
+        console.log(`[Navigation] ID missing for ${stateName} (id=${model.id}), using fallback (click card)`);
+
+        // Fallback: open by clicking on model card
+        // Ensure we are on the model list page first
+        await modelListPage.goto();
         await modelListPage.openModel(model.name);
 
         // Extract model ID from URL
@@ -136,6 +168,7 @@ Given(
         const match = url.match(/model-(\d+)/);
         if (match) {
             const modelId = parseInt(match[1], 10);
+            console.log(`[Navigation] Captured ID ${modelId} for ${stateName}`);
 
             // Update model with actual ID
             model = { ...model, id: modelId };
@@ -145,6 +178,8 @@ Given(
             if (model.name && stateName !== model.name) {
                 sharedState.saveModel(model.name, model);
             }
+        } else {
+             console.warn(`[Navigation] Could not capture ID for ${stateName} after click`);
         }
     }
 );
@@ -269,5 +304,24 @@ Then(
         await dropdownTrigger.click();
         await page.waitForSelector(".version-dropdown-menu", { state: "visible", timeout: 5000 });
         console.log("[Screenshot] Version dropdown opened to show available versions");
+    }
+);
+
+Then(
+    "I take a screenshot named {string}", 
+    async ({ page }, name: string) => {
+        const filename = name.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+        
+        const screenshot = await page.screenshot({ 
+            path: `test-results/screenshots/${filename}.png`,
+            fullPage: false 
+        });
+        
+        // Use global test info
+        const testInfo = test.info();
+        if (testInfo) {
+            await testInfo.attach(name, { body: screenshot, contentType: "image/png" });
+        }
+        console.log(`[Screenshot] Taken: ${name}`);
     }
 );

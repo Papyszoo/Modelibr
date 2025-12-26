@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import { Canvas } from '@react-three/fiber'
+import * as THREE from 'three'
 import { Stats } from '@react-three/drei'
 import ModelPreviewScene from './ModelPreviewScene'
 import ModelInfoWindow from './ModelInfoWindow'
@@ -671,6 +672,16 @@ function ModelViewer({
                   powerPreference: 'high-performance',
                 }}
                 dpr={Math.min(window.devicePixelRatio, 2)}
+                onCreated={(state) => {
+                  // Expose Three.js scene for E2E testing
+                  // This allows Playwright to verify actual 3D content is rendered
+                  if (typeof window !== 'undefined') {
+                    (window as Window & { __THREE_SCENE__?: THREE.Scene; __THREE_STATE__?: typeof state }).
+                      __THREE_SCENE__ = state.scene;
+                    (window as Window & { __THREE_SCENE__?: THREE.Scene; __THREE_STATE__?: typeof state }).
+                      __THREE_STATE__ = state;
+                  }
+                }}
               >
                 <ModelPreviewScene
                   key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}

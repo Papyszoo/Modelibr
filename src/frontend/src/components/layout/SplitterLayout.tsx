@@ -73,6 +73,43 @@ function SplitterLayout(): JSX.Element {
     serialize: value => value,
   })
 
+  // Deduplicate tabs on initial load if URL contains duplicates
+  // This runs once on mount to clean up any duplicate tabs from the URL
+  const hasCleanedDuplicates = useRef(false)
+  useEffect(() => {
+    if (hasCleanedDuplicates.current) return
+    hasCleanedDuplicates.current = true
+
+    // Check if leftTabs has duplicates
+    const leftIds = leftTabs.map(t => t.id)
+    const leftUniqueIds = [...new Set(leftIds)]
+    
+    if (leftIds.length !== leftUniqueIds.length) {
+      // Deduplicate by keeping first occurrence of each tab
+      const seen = new Set<string>()
+      const dedupedLeft = leftTabs.filter(tab => {
+        if (seen.has(tab.id)) return false
+        seen.add(tab.id)
+        return true
+      })
+      setLeftTabs(dedupedLeft)
+    }
+
+    // Check if rightTabs has duplicates
+    const rightIds = rightTabs.map(t => t.id)
+    const rightUniqueIds = [...new Set(rightIds)]
+    
+    if (rightIds.length !== rightUniqueIds.length) {
+      const seen = new Set<string>()
+      const dedupedRight = rightTabs.filter(tab => {
+        if (seen.has(tab.id)) return false
+        seen.add(tab.id)
+        return true
+      })
+      setRightTabs(dedupedRight)
+    }
+  }, [leftTabs, rightTabs, setLeftTabs, setRightTabs])
+
   // Track URL parameter values for label updates
   const leftTabsUrl = useRef<string>('')
   const rightTabsUrl = useRef<string>('')

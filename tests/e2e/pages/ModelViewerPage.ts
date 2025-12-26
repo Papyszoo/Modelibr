@@ -19,7 +19,7 @@ export class ModelViewerPage {
             .click();
     }
 
-    async openTab(tabName: string) {
+    async openTab(tabName: string, expectedSelector?: string) {
         // Map tab names to icon classes
         const buttonMap: Record<string, string> = {
             "Add Version": "pi-plus",
@@ -37,6 +37,15 @@ export class ModelViewerPage {
             throw new Error(`Unknown tab: ${tabName}`);
         }
 
+        // Check if content is already visible (if selector provided)
+        if (expectedSelector) {
+            const isVisible = await this.page.locator(expectedSelector).isVisible();
+            if (isVisible) {
+                console.log(`[UI] Tab "${tabName}" content (${expectedSelector}) is already visible.`);
+                return;
+            }
+        }
+
         // Wait for the model viewer controls to be ready
         await this.page.waitForSelector(".viewer-controls", {
             state: "visible",
@@ -48,7 +57,78 @@ export class ModelViewerPage {
             `.viewer-controls button:has(.${iconClass})`
         );
         await expect(button).toBeVisible({ timeout: 10000 });
+        
+        // Fallback: Check button class if no selector provided
+        // This helps if we don't know the window selector but know the button behavior
+        const classAttribute = await button.getAttribute("class");
+        if (!expectedSelector && classAttribute && (classAttribute.includes("active") || classAttribute.includes("p-highlight"))) {
+            console.log(`[UI] Tab "${tabName}" appears active (button class). Skipping click.`);
+            return;
+        }
+
         await button.click();
+    }
+
+    /**
+     * Closes the specified tab if it is currently open
+     */
+    async closeTab(tabName: string, expectedSelector?: string) {
+        // Map tab names to icon classes
+        const buttonMap: Record<string, string> = {
+            "Add Version": "pi-plus",
+            "Viewer Settings": "pi-cog",
+            "Model Info": "pi-info-circle",
+            "Texture Sets": "pi-palette",
+            "Model Hierarchy": "pi-sitemap",
+            "Thumbnail Details": "pi-image",
+            "UV Map": "pi-map",
+            "Open in Blender": "pi-box",
+        };
+
+        const iconClass = buttonMap[tabName];
+        if (!iconClass) {
+            throw new Error(`Unknown tab: ${tabName}`);
+        }
+
+        // Check availability of controls
+        const controls = this.page.locator(".viewer-controls");
+        if (!(await controls.isVisible())) {
+             console.log("[UI] Viewer controls not visible, cannot close tab.");
+             return; 
+        }
+
+        // If selector provided, check if visible. If NOT visible, we are already closed.
+        if (expectedSelector) {
+            const isVisible = await this.page.locator(expectedSelector).isVisible();
+            if (!isVisible) {
+                console.log(`[UI] Tab "${tabName}" content is already hidden.`);
+                return;
+            }
+        }
+
+        const button = this.page.locator(
+            `.viewer-controls button:has(.${iconClass})`
+        );
+        
+        // If selector NOT provided, check button class.
+        // If button is NOT active, assume closed.
+        if (!expectedSelector) {
+             const classAttribute = await button.getAttribute("class");
+             const isActive = classAttribute && (classAttribute.includes("active") || classAttribute.includes("p-highlight"));
+             if (!isActive) {
+                 console.log(`[UI] Tab "${tabName}" button is not active. Assuming closed.`);
+                 return;
+             }
+        }
+        
+        // Click to close
+        await button.click();
+        
+        // Wait for it to disappear if selector known
+        if (expectedSelector) {
+            await expect(this.page.locator(expectedSelector)).toBeHidden({ timeout: 5000 });
+        }
+        console.log(`[UI] Closed tab "${tabName}"`);
     }
 
     async createTextureSet(name: string) {
@@ -97,7 +177,7 @@ export class ModelViewerPage {
     }
 
     async setDefaultTextureSet(name: string) {
-        await this.openTab("Texture Sets");
+        await this.openTab("Texture Sets", ".tswindow-content");
         
         // Wait for texture set window to be visible
         await this.page.waitForSelector('.tswindow-content', {
@@ -255,5 +335,44 @@ export class ModelViewerPage {
         const url = this.page.url();
         const match = url.match(/model-(\d+)/);
         return match ? parseInt(match[1], 10) : null;
+    }
+
+    /**
+     * Select a texture set to preview it (does not set as default)
+     * This triggers the texture to be applied to the 3D model immediately
+     */
+    async selectTextureSet(name: string) {
+        await this.openTab("Texture Sets", ".tswindow-content");
+        
+        // Wait for texture set window to be visible
+        await this.page.waitForSelector('.tswindow-content', {
+            state: "visible",
+            timeout: 10000,
+        });
+        
+        // Find and click the texture set item to select it
+        const item = this.page.locator(".tswindow-item", { hasText: name });
+        await expect(item).toBeVisible({ timeout: 10000 });
+        await item.click();
+        
+        // Wait for texture to be applied
+        await this.page.waitForTimeout(2000);
+        
+        console.log(`[UI] Selected texture set "${name}" ✓`);
+    }
+
+    /**
+     * Check if a texture set is currently selected (highlighted in the selector)
+     */
+    async isTextureSetSelected(name: string): Promise<boolean> {
+        await this.openTab("Texture Sets");
+        
+        await this.page.waitForSelector('.tswindow-content', {
+            state: "visible",
+            timeout: 10000,
+        });
+        
+        const item = this.page.locator(".tswindow-item.tswindow-selected", { hasText: name });
+        return await item.isVisible({ timeout: 2000 }).catch(() => false);
     }
 }

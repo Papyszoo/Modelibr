@@ -20,6 +20,9 @@ const apiHelper = new ApiHelper();
 
 // Note: db uses lazy pool creation and handles its own lifecycle
 
+let capturedTextureUuid: string | null = null;
+let previousTextureUuid: string | null = null;
+
 // Helper to get model ID from page URL
 async function getModelIdFromUrl(page: any): Promise<number> {
     const url = page.url();
@@ -611,6 +614,17 @@ Then(
     }
 );
 
+/**
+ * Select a texture set in the UI to preview it (without setting as default)
+ */
+When(
+    "I select the texture set {string}",
+    async ({ page }, name: string) => {
+        const modelViewer = new ModelViewerPage(page);
+        await modelViewer.selectTextureSet(name);
+    }
+);
+
 Then(
     "version {int} should still have {string} as default",
     async ({ page }, versionNumber: number, textureSetName: string) => {
@@ -659,3 +673,268 @@ Then(
         console.log("[Screenshot] Texture set selector opened to show default texture set");
     }
 );
+
+/**
+ * Step: "the model should have textures applied in the 3D scene"
+ * 
+ * Verifies that textures are actually applied to the model's materials in Three.js.
+ * This inspects the scene and checks mesh materials for texture maps.
+ * 
+ * Checks performed:
+ * 1. Scene has meshes with MeshStandardMaterial
+ * 2. At least one mesh has a texture map applied (map, normalMap, etc.)
+ * 3. Logs which texture types are applied
+ * 
+ * @example Test output:
+ * [Three.js Textures] Meshes with materials: 5
+ * [Three.js Textures] Texture maps found:
+ *   - map (albedo/diffuse): true
+ *   - normalMap: false
+ *   - roughnessMap: false
+ * [Three.js Textures] ✓ Textures applied to model!
+ */
+Then(
+    "the model should have textures applied in the 3D scene",
+    async ({ page }) => {
+        // Wait for textures to load
+        await page.waitForTimeout(3000);
+        
+        const textureInfo = await page.evaluate(() => {
+            // @ts-expect-error - accessing runtime globals
+            const threeScene = window.__THREE_SCENE__;
+            
+            if (!threeScene) {
+                return { hasScene: false, hasTextures: false };
+            }
+            
+            let meshesWithMaterial = 0;
+            let hasAlbedoMap = false;
+            let hasNormalMap = false;
+            let hasRoughnessMap = false;
+            let hasMetalnessMap = false;
+            let hasAoMap = false;
+            let hasEmissiveMap = false;
+            
+            threeScene.traverse((obj: any) => {
+                if (obj.isMesh && obj.material) {
+                    meshesWithMaterial++;
+                    const mat = obj.material;
+                    
+                    // Check for texture maps
+                    if (mat.map) hasAlbedoMap = true;
+                    if (mat.normalMap) hasNormalMap = true;
+                    if (mat.roughnessMap) hasRoughnessMap = true;
+                    if (mat.metalnessMap) hasMetalnessMap = true;
+                    if (mat.aoMap) hasAoMap = true;
+                    if (mat.emissiveMap) hasEmissiveMap = true;
+                }
+            });
+            
+            return {
+                hasScene: true,
+                meshesWithMaterial,
+                hasTextures: hasAlbedoMap || hasNormalMap || hasRoughnessMap,
+                textureMaps: {
+                    albedo: hasAlbedoMap,
+                    normal: hasNormalMap,
+                    roughness: hasRoughnessMap,
+                    metalness: hasMetalnessMap,
+                    ao: hasAoMap,
+                    emissive: hasEmissiveMap
+                }
+            };
+        });
+        
+        console.log(`[Three.js Textures] Meshes with materials: ${textureInfo.meshesWithMaterial}`);
+        console.log(`[Three.js Textures] Texture maps found:`);
+        console.log(`  - map (albedo/diffuse): ${textureInfo.textureMaps?.albedo}`);
+        console.log(`  - normalMap: ${textureInfo.textureMaps?.normal}`);
+        console.log(`  - roughnessMap: ${textureInfo.textureMaps?.roughness}`);
+        console.log(`  - metalnessMap: ${textureInfo.textureMaps?.metalness}`);
+        console.log(`  - aoMap: ${textureInfo.textureMaps?.ao}`);
+        console.log(`  - emissiveMap: ${textureInfo.textureMaps?.emissive}`);
+        
+        if (textureInfo.hasTextures) {
+            console.log("[Three.js Textures] ✓ Textures applied to model!");
+        } else {
+            console.log("[Three.js Textures] ⚠ No textures detected on model materials");
+        }
+        
+        expect(textureInfo.hasScene).toBe(true);
+        expect(textureInfo.hasTextures).toBe(true);
+    }
+);
+
+/**
+ * Step: "the model should have {string} texture applied"
+ * 
+ * Verifies a specific texture type is applied to the model.
+ * Supported types: albedo, normal, roughness, metalness, ao, emissive
+ */
+Then(
+    "the model should have {string} texture applied",
+    async ({ page }, textureType: string) => {
+        await page.waitForTimeout(2000);
+        
+        const textureInfo = await page.evaluate((type: string) => {
+            // @ts-expect-error - accessing runtime globals
+            const threeScene = window.__THREE_SCENE__;
+            
+            if (!threeScene) return { found: false };
+            
+            let found = false;
+            
+            threeScene.traverse((obj: any) => {
+                if (obj.isMesh && obj.material) {
+                    const mat = obj.material;
+                    switch (type.toLowerCase()) {
+                        case 'albedo':
+                        case 'diffuse':
+                        case 'map':
+                            if (mat.map) found = true;
+                            break;
+                        case 'normal':
+                            if (mat.normalMap) found = true;
+                            break;
+                        case 'roughness':
+                            if (mat.roughnessMap) found = true;
+                            break;
+                        case 'metalness':
+                        case 'metallic':
+                            if (mat.metalnessMap) found = true;
+                            break;
+                        case 'ao':
+                            if (mat.aoMap) found = true;
+                            break;
+                        case 'emissive':
+                            if (mat.emissiveMap) found = true;
+                            break;
+                    }
+                }
+            });
+            
+            return { found };
+        }, textureType);
+        
+        console.log(`[Three.js Textures] ${textureType} texture: ${textureInfo.found ? '✓' : '✗'}`);
+        expect(textureInfo.found).toBe(true);
+    }
+);
+
+/**
+ * Captures the current texture UUID from the Three.js scene for comparison
+ */
+When("I capture the current texture state", async ({ page }) => {
+    // Wait a bit for textures to be stable
+    await page.waitForTimeout(1000);
+    
+    const uuid = await page.evaluate(() => {
+        // @ts-expect-error - accessing runtime globals
+        const scene = window.__THREE_SCENE__;
+        if (!scene) return null;
+        
+        let mapUuid = null;
+        scene.traverse((obj: any) => {
+            if (obj.isMesh && obj.material && obj.material.map) {
+                mapUuid = obj.material.map.uuid;
+                // Found one, good enough
+                return;
+            }
+        });
+        return mapUuid;
+    });
+    
+    if (!uuid) {
+        console.warn("[Three.js] Warning: No texture map found to capture. Proceeding but verification may fail if expecting a texture.");
+    }
+    
+    capturedTextureUuid = uuid;
+    previousTextureUuid = uuid;
+    console.log(`[Three.js] Captured texture UUID: ${uuid}`);
+});
+
+/**
+ * Verifies that the current texture UUID is different from the initially captured one
+ */
+Then("the applied texture should be different from the captured state", async ({ page }) => {
+    // Poll for the texture UUID to change
+    await expect.poll(async () => {
+        return await page.evaluate(() => {
+            // @ts-expect-error - accessing runtime globals
+            const scene = window.__THREE_SCENE__;
+            if (!scene) return null;
+            
+            let mapUuid = null;
+            scene.traverse((obj: any) => {
+                if (obj.isMesh && obj.material && obj.material.map) {
+                    mapUuid = obj.material.map.uuid;
+                    return;
+                }
+            });
+            return mapUuid;
+        });
+    }, {
+        message: "Waiting for texture UUID to differ from captured state",
+        timeout: 10000,
+        intervals: [500, 1000]
+    }).not.toBe(capturedTextureUuid);
+
+    console.log(`[Three.js] Texture changed from captured state ✓`);
+    
+    // Update reference
+    const currentUuid = await page.evaluate(() => {
+        // @ts-expect-error
+        const scene = window.__THREE_SCENE__;
+        let mapUuid = null;
+        scene.traverse((obj: any) => {
+            if (obj.isMesh && obj.material && obj.material.map) {
+                mapUuid = obj.material.map.uuid;
+            }
+        });
+        return mapUuid;
+    });
+    previousTextureUuid = currentUuid;
+});
+
+/**
+ * Verifies that the current texture UUID is different from the immediately previous state
+ */
+Then("the applied texture should be different from the previous state", async ({ page }) => {
+     // Poll for the texture UUID to change
+    await expect.poll(async () => {
+        return await page.evaluate(() => {
+            // @ts-expect-error - accessing runtime globals
+            const scene = window.__THREE_SCENE__;
+            if (!scene) return null;
+            
+            let mapUuid = null;
+            scene.traverse((obj: any) => {
+                if (obj.isMesh && obj.material && obj.material.map) {
+                    mapUuid = obj.material.map.uuid;
+                    return;
+                }
+            });
+            return mapUuid;
+        });
+    }, {
+        message: "Waiting for texture UUID to differ from previous state",
+        timeout: 10000,
+        intervals: [500, 1000]
+    }).not.toBe(previousTextureUuid);
+
+    console.log(`[Three.js] Texture changed from previous state ✓`);
+    
+    // Update reference
+    const currentUuid = await page.evaluate(() => {
+        // @ts-expect-error
+        const scene = window.__THREE_SCENE__;
+        let mapUuid = null;
+        scene.traverse((obj: any) => {
+            if (obj.isMesh && obj.material && obj.material.map) {
+                mapUuid = obj.material.map.uuid;
+            }
+        });
+        return mapUuid;
+    });
+    previousTextureUuid = currentUuid;
+});

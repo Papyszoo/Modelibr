@@ -4,9 +4,23 @@ export class ModelListPage {
     constructor(private page: Page) {}
 
     async goto() {
-        await this.page.goto("/");
-        // Wait for the page to be fully loaded
-        await this.page.waitForSelector('.model-list, .model-grid, [class*="model"]', {
+        // Clear local storage and force clean state
+        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
+        await this.page.goto(baseUrl);
+        await this.page.evaluate(() => {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                // Ignore errors if storage not accessible
+            }
+        });
+        
+        // Now navigate to the desired state
+        await this.page.goto(`${baseUrl}/?leftTabs=modelList&activeLeft=modelList`);
+        
+        // Wait for the page to be fully loaded and check for model list specific elements
+        await this.page.waitForSelector('.model-card, .empty-state', {
             state: "visible",
             timeout: 10000,
         });
