@@ -12,7 +12,7 @@ export class DbHelper {
                 database: process.env.POSTGRES_DB || "Modelibr",
                 password:
                     process.env.POSTGRES_PASSWORD || "ChangeThisStrongPassword123!",
-                port: parseInt(process.env.POSTGRES_PORT || "5432"),
+                port: parseInt(process.env.POSTGRES_PORT || "5433"),
                 // Keep connections alive and limit pool size
                 max: 5,
                 idleTimeoutMillis: 30000,

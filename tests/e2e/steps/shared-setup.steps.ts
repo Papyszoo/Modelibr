@@ -6,6 +6,7 @@ import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
 import path from "path";
 import { fileURLToPath } from "url";
+import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 
 // DataTable interface for cucumber-style data tables
 interface DataTable {
@@ -77,7 +78,10 @@ When(
     "I upload a model {string} and store it as {string}",
     async ({ page }, fileName: string, stateName: string) => {
         const modelListPage = new ModelListPage(page);
-        const filePath = path.join(__dirname, "..", "assets", fileName);
+        
+        console.log(`[Setup] Generating unique model file from "${fileName}"...`);
+        const filePath = await UniqueFileGenerator.generate(fileName);
+        
         await modelListPage.uploadModel(filePath);
         
         // Store model name without extension (matches UI display)
@@ -298,10 +302,27 @@ Then(
         
         // Also press Escape to close any dialogs
         await page.keyboard.press("Escape");
+        await page.waitForTimeout(500);
+        
+        // Wait for page to be stable (no loading spinners)
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        
+        // Wait for dropdown trigger to be visible with longer timeout
+        const dropdownTrigger = page.locator(".version-dropdown-trigger");
+        await dropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
+        
+        // Small delay to ensure UI is stable
         await page.waitForTimeout(300);
         
-        const dropdownTrigger = page.locator(".version-dropdown-trigger");
-        await dropdownTrigger.click();
+        // Click with retry logic
+        try {
+            await dropdownTrigger.click();
+        } catch (e) {
+            console.log("[Screenshot] First click failed, retrying after delay...");
+            await page.waitForTimeout(500);
+            await dropdownTrigger.click({ force: true });
+        }
+        
         await page.waitForSelector(".version-dropdown-menu", { state: "visible", timeout: 5000 });
         console.log("[Screenshot] Version dropdown opened to show available versions");
     }
@@ -325,3 +346,56 @@ Then(
         console.log(`[Screenshot] Taken: ${name}`);
     }
 );
+
+/**
+ * Verifies that the thumbnail is actually visible in the model list card UI.
+ * This goes beyond DB verification to ensure the image actually loads in the browser.
+ */
+Then(
+    "the thumbnail should be visible in the model card",
+    async ({ page }) => {
+        const modelListPage = new ModelListPage(page);
+        
+        // Navigate to model list to see the card
+        await modelListPage.goto();
+        await page.waitForLoadState("networkidle");
+        
+        // Wait for any thumbnail image in a model card to be visible
+        const thumbnailImg = page.locator(".model-grid .thumbnail-image, .model-card .thumbnail-image").first();
+        
+        // First check if there's a thumbnail image (not placeholder)
+        const hasImage = await thumbnailImg.count() > 0;
+        
+        if (!hasImage) {
+            // Take a screenshot to show the issue
+            await page.screenshot({ path: 'test-results/thumbnail-missing-in-card.png' });
+            throw new Error("No thumbnail image found in model card - only placeholder is showing. See test-results/thumbnail-missing-in-card.png");
+        }
+        
+        await expect(thumbnailImg).toBeVisible({ timeout: 15000 });
+        
+        // Verify the image actually loaded (naturalWidth > 0)
+        const isLoaded = await expect.poll(async () => {
+            return await thumbnailImg.evaluate((img: HTMLImageElement) => {
+                return img.complete && img.naturalWidth > 0;
+            });
+        }, {
+            message: "Waiting for thumbnail image to load in model card",
+            timeout: 15000,
+        }).toBe(true);
+        
+        // Log details for debugging
+        const src = await thumbnailImg.getAttribute("src");
+        const dimensions = await thumbnailImg.evaluate((img: HTMLImageElement) => ({
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+        }));
+        console.log(`[UI] Model card thumbnail loaded: ${dimensions.naturalWidth}x${dimensions.naturalHeight}`);
+        console.log(`[UI] Thumbnail src: ${src?.substring(0, 80)}...`);
+        
+        // Take screenshot to confirm thumbnail is visible
+        await page.screenshot({ path: 'test-results/thumbnail-visible-in-card.png' });
+        console.log("[Screenshot] Captured: thumbnail-visible-in-card.png ✓");
+    }
+);
+

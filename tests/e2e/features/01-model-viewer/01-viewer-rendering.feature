@@ -13,6 +13,7 @@ Feature: Model 3D Viewer Rendering
     Then the 3D canvas should be visible
     And the model name "test-torus" should be displayed in the header
     And the viewer controls should be visible
+    And I take a screenshot of the 3D model rendering
 
   @ui @controls
   Scenario: Floating control buttons are accessible
@@ -26,3 +27,4 @@ Feature: Model 3D Viewer Rendering
       | Model Hierarchy   |
       | Thumbnail Details |
       | UV Map            |
+    And I take a screenshot of the control buttons

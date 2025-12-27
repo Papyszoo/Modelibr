@@ -2,6 +2,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ModelListPage } from "../pages/ModelListPage";
 import { SignalRHelper } from "../fixtures/signalr-helper";
+import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -17,7 +18,8 @@ Given("I am on the model list page", async ({ page }) => {
 
 When("I upload a 3D model {string}", async ({ page }, fileName: string) => {
     const modelList = new ModelListPage(page);
-    const filePath = path.join(__dirname, "..", "assets", fileName);
+    // Use UniqueFileGenerator to get a unique copy (avoids deduplication)
+    const filePath = await UniqueFileGenerator.generate(fileName);
     await modelList.uploadModel(filePath);
 });
 

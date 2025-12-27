@@ -26,7 +26,7 @@ export class ModelListPage {
         });
     }
 
-    async uploadModel(filePath: string) {
+    async uploadModel(filePath: string, keepWindowOpen: boolean = false) {
         const fileChooserPromise = this.page.waitForEvent("filechooser");
         
         // Find the upload button by aria-label
@@ -43,19 +43,40 @@ export class ModelListPage {
             this.page.locator(".upload-summary-text").getByText(/completed/i)
         ).toBeVisible({ timeout: 30000 });
 
-        // Close the upload progress window so it doesn't block clicks
-        const closeButton = this.page
-            .locator(
-                '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times'
-            )
-            .first();
-        if (await closeButton.isVisible({ timeout: 1000 })) {
-            await closeButton.click();
-            // Wait for window to disappear
-            await expect(
-                this.page.locator("#upload-progress-window")
-            ).not.toBeVisible();
+        // Optionally close the upload progress window
+        if (!keepWindowOpen) {
+            const closeButton = this.page
+                .locator(
+                    '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times'
+                )
+                .first();
+            if (await closeButton.isVisible({ timeout: 1000 })) {
+                await closeButton.click();
+                // Wait for window to disappear
+                await expect(
+                    this.page.locator("#upload-progress-window")
+                ).not.toBeVisible();
+            }
         }
+    }
+
+    /**
+     * Upload multiple model files at once (batch upload)
+     * Does NOT wait for completion or close the window - allows test to verify upload state
+     */
+    async uploadMultipleModels(filePaths: string[]) {
+        const fileChooserPromise = this.page.waitForEvent("filechooser");
+        
+        // Find the upload button by aria-label
+        const uploadButton = this.page.getByLabel("Upload models");
+        await expect(uploadButton).toBeVisible({ timeout: 10000 });
+        await uploadButton.click();
+        
+        const fileChooser = await fileChooserPromise;
+        // Set multiple files at once - this triggers batch upload
+        await fileChooser.setFiles(filePaths);
+        
+        console.log(`[Upload] Started batch upload of ${filePaths.length} files`);
     }
 
     async expectModelStatus(modelName: string, status: string) {

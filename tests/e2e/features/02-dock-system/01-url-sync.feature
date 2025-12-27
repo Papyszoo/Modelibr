@@ -12,6 +12,7 @@ Feature: Tab URL Synchronization
     When I click on the model "single-version-model" to open it
     Then the URL should contain "model-"
     And the URL should contain "activeLeft=model-"
+    And I take a screenshot of the dock with model tab
 
   Scenario: URL with duplicate tabs gets deduplicated on load
     Given I navigate directly to URL with duplicate tabs "leftTabs=modelList,textureSets,textureSets,model-1,model-1&activeLeft=model-1"

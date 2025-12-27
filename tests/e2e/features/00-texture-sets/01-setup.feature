@@ -5,6 +5,7 @@ Feature: Setup - Create Models and Versions for Texture Set Tests
     Given I am on the model list page
     When I upload a model "test-cube.glb" and store it as "single-version-model"
     Then the thumbnail should be generated via SignalR notification
+    And the thumbnail should be visible in the model card
     And the model should be stored in shared state
 
   Scenario: Create model with two versions for independence tests
@@ -14,3 +15,6 @@ Feature: Setup - Create Models and Versions for Texture Set Tests
     And I upload a new version "test-cylinder.fbx"
     Then the model should have 2 versions in shared state
     And the version dropdown should be open
+    And version 1 should have a thumbnail image
+    And version 2 should have a thumbnail image
+

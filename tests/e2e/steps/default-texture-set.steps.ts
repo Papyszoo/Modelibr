@@ -176,9 +176,14 @@ Then(
         const modelViewer = new ModelViewerPage(page);
         const currentSrc = await modelViewer.getVersionThumbnailSrc(1);
 
-        // Verify unchanged
-        expect(currentSrc).toBe(savedState.thumbnailSrc);
-        console.log(`[UI Check] Version 1 thumbnail src unchanged ✓`);
+        // Compare URLs without query params (cache-busting timestamps change each time)
+        // The useThumbnail hook adds ?t=... which changes on each call
+        const stripQueryParams = (url: string | null) => url?.split('?')[0] || null;
+        const savedBasePath = stripQueryParams(savedState.thumbnailSrc);
+        const currentBasePath = stripQueryParams(currentSrc);
+        
+        expect(currentBasePath).toBe(savedBasePath);
+        console.log(`[UI Check] Version 1 thumbnail base path unchanged: ${currentBasePath} ✓`);
     }
 );
 
@@ -696,54 +701,67 @@ Then(
 Then(
     "the model should have textures applied in the 3D scene",
     async ({ page }) => {
-        // Wait for textures to load
-        await page.waitForTimeout(3000);
-        
-        const textureInfo = await page.evaluate(() => {
-            // @ts-expect-error - accessing runtime globals
-            const threeScene = window.__THREE_SCENE__;
-            
-            if (!threeScene) {
-                return { hasScene: false, hasTextures: false };
-            }
-            
-            let meshesWithMaterial = 0;
-            let hasAlbedoMap = false;
-            let hasNormalMap = false;
-            let hasRoughnessMap = false;
-            let hasMetalnessMap = false;
-            let hasAoMap = false;
-            let hasEmissiveMap = false;
-            
-            threeScene.traverse((obj: any) => {
-                if (obj.isMesh && obj.material) {
-                    meshesWithMaterial++;
-                    const mat = obj.material;
-                    
-                    // Check for texture maps
-                    if (mat.map) hasAlbedoMap = true;
-                    if (mat.normalMap) hasNormalMap = true;
-                    if (mat.roughnessMap) hasRoughnessMap = true;
-                    if (mat.metalnessMap) hasMetalnessMap = true;
-                    if (mat.aoMap) hasAoMap = true;
-                    if (mat.emissiveMap) hasEmissiveMap = true;
+        // Poll for meshes with textures to be available (async model loading)
+        const getTextureInfo = async () => {
+            return await page.evaluate(() => {
+                // @ts-expect-error - accessing runtime globals
+                const threeScene = window.__THREE_SCENE__;
+                
+                if (!threeScene) {
+                    return { hasScene: false, hasTextures: false, meshesWithMaterial: 0 };
                 }
+                
+                let meshesWithMaterial = 0;
+                let hasAlbedoMap = false;
+                let hasNormalMap = false;
+                let hasRoughnessMap = false;
+                let hasMetalnessMap = false;
+                let hasAoMap = false;
+                let hasEmissiveMap = false;
+                
+                threeScene.traverse((obj: any) => {
+                    if (obj.isMesh && obj.material) {
+                        meshesWithMaterial++;
+                        const mat = obj.material;
+                        
+                        // Check for texture maps
+                        if (mat.map) hasAlbedoMap = true;
+                        if (mat.normalMap) hasNormalMap = true;
+                        if (mat.roughnessMap) hasRoughnessMap = true;
+                        if (mat.metalnessMap) hasMetalnessMap = true;
+                        if (mat.aoMap) hasAoMap = true;
+                        if (mat.emissiveMap) hasEmissiveMap = true;
+                    }
+                });
+                
+                return {
+                    hasScene: true,
+                    meshesWithMaterial,
+                    hasTextures: hasAlbedoMap || hasNormalMap || hasRoughnessMap,
+                    textureMaps: {
+                        albedo: hasAlbedoMap,
+                        normal: hasNormalMap,
+                        roughness: hasRoughnessMap,
+                        metalness: hasMetalnessMap,
+                        ao: hasAoMap,
+                        emissive: hasEmissiveMap
+                    }
+                };
             });
-            
-            return {
-                hasScene: true,
-                meshesWithMaterial,
-                hasTextures: hasAlbedoMap || hasNormalMap || hasRoughnessMap,
-                textureMaps: {
-                    albedo: hasAlbedoMap,
-                    normal: hasNormalMap,
-                    roughness: hasRoughnessMap,
-                    metalness: hasMetalnessMap,
-                    ao: hasAoMap,
-                    emissive: hasEmissiveMap
-                }
-            };
-        });
+        };
+        
+        // Poll until we have meshes with textures (model loading is async)
+        await expect.poll(async () => {
+            const info = await getTextureInfo();
+            return info.meshesWithMaterial > 0 && info.hasTextures;
+        }, {
+            message: "Waiting for model meshes with textures to load",
+            timeout: 15000,
+            intervals: [500, 1000, 2000]
+        }).toBe(true);
+        
+        // Get final state for logging
+        const textureInfo = await getTextureInfo();
         
         console.log(`[Three.js Textures] Meshes with materials: ${textureInfo.meshesWithMaterial}`);
         console.log(`[Three.js Textures] Texture maps found:`);

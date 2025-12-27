@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import './ThumbnailDisplay.css'
 import { useThumbnail } from '../hooks/useThumbnail'
 
@@ -12,9 +13,15 @@ function ThumbnailDisplay({ modelId, versionId, modelName }: ThumbnailDisplayPro
   // Normalize modelId to string for consistency
   const modelIdStr = modelId.toString()
   const { thumbnailDetails, imgSrc } = useThumbnail(modelIdStr, versionId)
+  const [imageError, setImageError] = useState(false)
 
-  // Show thumbnail image when ready
-  if (thumbnailDetails?.status === 'Ready' && imgSrc) {
+  // Reset error state when image source changes
+  useEffect(() => {
+    setImageError(false)
+  }, [imgSrc])
+
+  // Show thumbnail image when ready and no error occurred
+  if (thumbnailDetails?.status === 'Ready' && imgSrc && !imageError) {
     return (
       <div className="thumbnail-image-container">
         <img
@@ -23,6 +30,7 @@ function ThumbnailDisplay({ modelId, versionId, modelName }: ThumbnailDisplayPro
           title={modelName || 'Model Thumbnail'}
           className="thumbnail-image"
           loading="lazy"
+          onError={() => setImageError(true)}
         />
       </div>
     )

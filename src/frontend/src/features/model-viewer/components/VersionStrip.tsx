@@ -4,6 +4,7 @@ import { Model } from '../../../utils/fileUtils'
 import { ModelVersionDto, VersionFileDto } from '../../../types'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
+import { useThumbnail } from '../../thumbnail/hooks/useThumbnail'
 import './VersionStrip.css'
 
 // Import file format icons
@@ -25,6 +26,40 @@ interface VersionStripProps {
   onRecycleVersion: (versionId: number) => void
   defaultFileId: number | null
   onDefaultFileChange: (fileId: number) => void
+}
+
+// Sub-component for version thumbnails that uses useThumbnail hook for real-time SignalR updates
+interface VersionThumbnailProps {
+  modelId: string
+  versionId: number
+  versionNumber: number
+}
+
+function VersionThumbnail({ modelId, versionId, versionNumber }: VersionThumbnailProps) {
+  const { imgSrc, thumbnailDetails } = useThumbnail(modelId, versionId)
+  
+  if (thumbnailDetails?.status === 'Ready' && imgSrc) {
+    return (
+      <img
+        src={imgSrc}
+        alt={`v${versionNumber}`}
+        className="version-dropdown-thumb"
+        onError={e => {
+          ;(e.target as HTMLImageElement).style.display = 'none'
+        }}
+      />
+    )
+  }
+  
+  // Show placeholder when thumbnail is not ready
+  return (
+    <div className="version-dropdown-thumb version-dropdown-thumb-placeholder">
+      <i
+        className="pi pi-image"
+        style={{ fontSize: '1.5rem', opacity: 0.3 }}
+      />
+    </div>
+  )
 }
 
 function VersionStrip({
@@ -156,26 +191,11 @@ function VersionStrip({
                 className={`version-dropdown-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
                 onClick={() => handleVersionClick(version)}
               >
-                {version.thumbnailUrl ? (
-                  <img
-                    src={new URL(
-                      version.thumbnailUrl,
-                      ApiClient.getBaseURL()
-                    ).toString()}
-                    alt={`v${version.versionNumber}`}
-                    className="version-dropdown-thumb"
-                    onError={e => {
-                      ;(e.target as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <div className="version-dropdown-thumb version-dropdown-thumb-placeholder">
-                    <i
-                      className="pi pi-image"
-                      style={{ fontSize: '1.5rem', opacity: 0.3 }}
-                    />
-                  </div>
-                )}
+                <VersionThumbnail 
+                  modelId={model.id} 
+                  versionId={version.id} 
+                  versionNumber={version.versionNumber} 
+                />
                 <div className="version-dropdown-item-info">
                   <span className="version-dropdown-item-number">
                     v{version.versionNumber}

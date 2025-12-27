@@ -12,3 +12,4 @@ Feature: Multi-Tab URL State
     When I refresh the page
     Then the URL should contain "leftTabs=modelList,textureSets"
     And the URL should contain "rightTabs=settings"
+    And I take a screenshot of the persisted tabs

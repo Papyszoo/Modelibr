@@ -211,31 +211,40 @@ export class ModelViewerPage {
     }
 
     async uploadNewVersion(filePath: string) {
-        // Click the Add Version button
+        // Click the Add Version button and wait for file chooser
         const fileChooserPromise = this.page.waitForEvent("filechooser");
-        await this.page
-            .getByRole('button', { name: 'Add Version' })
-            .click();
+        await this.page.getByRole('button', { name: 'Add Version' }).click();
         const fileChooser = await fileChooserPromise;
         await fileChooser.setFiles(filePath);
 
-        // Wait for the File Upload Modal to appear
-        await this.page.waitForSelector('.p-dialog', {
-            state: "visible",
-            timeout: 10000,
-        });
+        // Wait for dialog to appear
+        const dialog = this.page.locator('.p-dialog');
+        await dialog.waitFor({ state: "visible", timeout: 10000 });
+        
+        // Wait for dialog content to fully render
+        await this.page.waitForTimeout(1500);
+        
+        // Select "Create new version" radio option
+        const createNewLabel = this.page.getByText('Create new version');
+        await createNewLabel.waitFor({ state: "visible", timeout: 5000 });
+        await createNewLabel.click();
+        console.log("[Upload] Selected 'Create new version' option");
+        await this.page.waitForTimeout(500);
+        
+        // Click Upload button
+        const uploadBtn = dialog.getByRole('button', { name: 'Upload' });
+        await uploadBtn.waitFor({ state: "visible", timeout: 5000 });
+        await uploadBtn.click();
+        console.log("[Upload] Clicked Upload button");
 
-        // Look for "New Version" option and click it if visible
-        const newVersionOption = this.page.getByText(/new version/i);
-        if (await newVersionOption.isVisible({ timeout: 2000 })) {
-            await newVersionOption.click();
-        }
-
-        // Click Upload or Submit button in dialog
-        await this.page.getByRole("button", { name: /upload|submit|confirm/i }).click();
-
-        // Wait for upload success toast or dialog close
-        await this.page.waitForTimeout(3000);
+        // Wait for dialog to close
+        await dialog.waitFor({ state: "hidden", timeout: 60000 });
+        
+        // Wait for page to stabilize
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+        
+        console.log("[Upload] New version uploaded successfully");
     }
 
     async selectVersion(versionNumber: number) {
@@ -282,28 +291,66 @@ export class ModelViewerPage {
     }
 
     async getVersionThumbnailSrc(versionNumber: number): Promise<string | null> {
-        // Click on the version dropdown trigger to open it
         const dropdownTrigger = this.page.locator(".version-dropdown-trigger");
-        await expect(dropdownTrigger).toBeVisible({ timeout: 10000 });
-        await dropdownTrigger.click();
-
-        // Wait for dropdown menu to appear
-        await this.page.waitForSelector(".version-dropdown-menu", {
-            state: "visible",
-            timeout: 5000,
-        });
-
-        // Find the version item
-        const item = this.page.locator(".version-dropdown-item", {
-            hasText: `v${versionNumber}`,
-        });
-        const img = item.locator(".version-dropdown-thumb");
-        const src = await img.getAttribute("src");
+        const dropdownMenu = this.page.locator(".version-dropdown-menu");
         
-        // Close dropdown by clicking outside
-        await this.page.locator(".version-dropdown-trigger").click();
+        // Poll for the thumbnail with retries (useThumbnail hook may need time to fetch)
+        const maxAttempts = 15;
+        const pollInterval = 2000;
         
-        return src;
+        console.log(`[getVersionThumbnailSrc] Looking for version ${versionNumber} thumbnail...`);
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            // Ensure dropdown is open
+            if (!(await dropdownMenu.isVisible())) {
+                await expect(dropdownTrigger).toBeVisible({ timeout: 10000 });
+                await dropdownTrigger.click();
+                await this.page.waitForSelector(".version-dropdown-menu", {
+                    state: "visible",
+                    timeout: 5000,
+                });
+            }
+            
+            // Find the version item and specifically target the img element
+            const item = this.page.locator(".version-dropdown-item", {
+                hasText: `v${versionNumber}`,
+            });
+            const img = item.locator("img.version-dropdown-thumb");
+            
+            // Check if img exists and is loaded
+            const imgCount = await img.count();
+            if (imgCount > 0) {
+                const isVisible = await img.isVisible();
+                if (isVisible) {
+                    const naturalWidth = await img.evaluate((el: HTMLImageElement) => el.naturalWidth);
+                    if (naturalWidth > 0) {
+                        const src = await img.getAttribute("src");
+                        console.log(`[getVersionThumbnailSrc] Found thumbnail for v${versionNumber}: ${src?.substring(0, 50)}...`);
+                        
+                        // Close dropdown
+                        await dropdownTrigger.click();
+                        return src;
+                    }
+                }
+            }
+            
+            console.log(`[getVersionThumbnailSrc] Thumbnail not ready for v${versionNumber}, retrying... (${attempt + 1}/${maxAttempts})`);
+            
+            // Close dropdown for retry
+            if (await dropdownMenu.isVisible()) {
+                await dropdownTrigger.click();
+            }
+            await this.page.waitForTimeout(pollInterval);
+        }
+        
+        console.log(`[getVersionThumbnailSrc] Thumbnail not found for v${versionNumber} after ${maxAttempts} attempts`);
+        
+        // Close dropdown if still open
+        if (await dropdownMenu.isVisible()) {
+            await dropdownTrigger.click();
+        }
+        
+        return null;
     }
 
     async expectVersionThumbnailVisible(versionNumber: number) {
