@@ -39,17 +39,20 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ISpriteRepository _spriteRepository;
 
     public GetDeletePreviewQueryHandler(
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
         IFileRepository fileRepository,
-        ITextureSetRepository textureSetRepository)
+        ITextureSetRepository textureSetRepository,
+        ISpriteRepository spriteRepository)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
+        _spriteRepository = spriteRepository;
     }
 
     public async Task<Result<GetDeletePreviewResponse>> Handle(GetDeletePreviewQuery request, CancellationToken cancellationToken)
@@ -107,6 +110,15 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 relatedEntities.Add($"{textureSet.Textures.Count} texture(s)");
                 break;
 
+            case "sprite":
+                var sprite = await _spriteRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (sprite == null)
+                    return Result.Failure<GetDeletePreviewResponse>(new Error("SpriteNotFound", "Sprite not found"));
+                
+                entityName = sprite.Name;
+                filesToDelete.Add(new DeletedFileInfo(sprite.File.FilePath, sprite.File.OriginalFileName, sprite.File.SizeBytes));
+                break;
+
             default:
                 return Result.Failure<GetDeletePreviewResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));
         }
@@ -122,6 +134,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ISpriteRepository _spriteRepository;
     private readonly IFileStorage _fileStorage;
 
     public PermanentDeleteEntityCommandHandler(
@@ -129,12 +142,14 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         IModelVersionRepository modelVersionRepository,
         IFileRepository fileRepository,
         ITextureSetRepository textureSetRepository,
+        ISpriteRepository spriteRepository,
         IFileStorage fileStorage)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
+        _spriteRepository = spriteRepository;
         _fileStorage = fileStorage;
     }
 
@@ -212,6 +227,18 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 
                 await _textureSetRepository.DeleteAsync(textureSet.Id, cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Texture set permanently deleted", deletedFiles));
+
+            case "sprite":
+                var spriteToDelete = await _spriteRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (spriteToDelete == null)
+                    return Result.Failure<PermanentDeleteEntityResponse>(new Error("SpriteNotFound", "Sprite not found"));
+                
+                // Delete sprite file from disk
+                await _fileStorage.DeleteFileAsync(spriteToDelete.File.FilePath, cancellationToken);
+                deletedFiles.Add(new DeletedFileInfo(spriteToDelete.File.FilePath, spriteToDelete.File.OriginalFileName, spriteToDelete.File.SizeBytes));
+                
+                await _spriteRepository.DeleteAsync(spriteToDelete.Id, cancellationToken);
+                return Result.Success(new PermanentDeleteEntityResponse(true, "Sprite permanently deleted", deletedFiles));
 
             default:
                 return Result.Failure<PermanentDeleteEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));

@@ -33,10 +33,17 @@ interface RecycledTextureSet {
   previewFileId: number | null
 }
 
+interface RecycledSprite {
+  id: number
+  name: string
+  fileId: number
+  deletedAt: string
+}
+
 interface DeletePreviewItem {
   id: number
   name: string
-  type: 'model' | 'modelVersion' | 'textureSet'
+  type: 'model' | 'modelVersion' | 'textureSet' | 'sprite'
 }
 
 interface DeletePreviewInfo {
@@ -54,6 +61,7 @@ export default function RecycledFilesList() {
   const [models, setModels] = useState<RecycledModel[]>([])
   const [modelVersions, setModelVersions] = useState<RecycledModelVersion[]>([])
   const [textureSets, setTextureSets] = useState<RecycledTextureSet[]>([])
+  const [sprites, setSprites] = useState<RecycledSprite[]>([])
   const [loading, setLoading] = useState(true)
   const [deletePreview, setDeletePreview] = useState<DeletePreviewInfo | null>(
     null
@@ -97,6 +105,15 @@ export default function RecycledFilesList() {
           deletedAt: ts.deletedAt,
           textureCount: ts.textureCount,
           previewFileId: ts.previewFileId ?? null,
+        }))
+      )
+
+      setSprites(
+        (data.sprites || []).map(s => ({
+          id: s.id,
+          name: s.name,
+          fileId: s.fileId,
+          deletedAt: s.deletedAt,
         }))
       )
     } catch (error) {
@@ -244,6 +261,46 @@ export default function RecycledFilesList() {
     }
   }
 
+  const handleRestoreSprite = async (sprite: RecycledSprite) => {
+    try {
+      await ApiClient.restoreEntity('sprite', sprite.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Restored',
+        detail: `${sprite.name} has been restored`,
+        life: 3000,
+      })
+      setSprites(prevSprites => prevSprites.filter(s => s.id !== sprite.id))
+    } catch (error) {
+      console.error('Failed to restore:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore sprite',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleDeletePreviewSprite = async (sprite: RecycledSprite) => {
+    try {
+      const preview = await ApiClient.getDeletePreview('sprite', sprite.id)
+      setDeletePreview({
+        ...preview,
+        item: { ...sprite, type: 'sprite' },
+      })
+      setShowPreviewDialog(true)
+    } catch (error) {
+      console.error('Failed to load delete preview:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load delete preview',
+        life: 3000,
+      })
+    }
+  }
+
   const handlePermanentDelete = async () => {
     if (!deletePreview) return
 
@@ -270,6 +327,10 @@ export default function RecycledFilesList() {
       } else if (deletedItem.type === 'textureSet') {
         setTextureSets(prevTextureSets =>
           prevTextureSets.filter(ts => ts.id !== deletedItem.id)
+        )
+      } else if (deletedItem.type === 'sprite') {
+        setSprites(prevSprites =>
+          prevSprites.filter(s => s.id !== deletedItem.id)
         )
       }
       setDeletePreview(null)
@@ -315,7 +376,7 @@ export default function RecycledFilesList() {
   }
 
   const isEmpty =
-    models.length === 0 && modelVersions.length === 0 && textureSets.length === 0
+    models.length === 0 && modelVersions.length === 0 && textureSets.length === 0 && sprites.length === 0
 
   return (
     <div className="recycled-files-list">
@@ -519,6 +580,53 @@ export default function RecycledFilesList() {
                     </div>
                   )
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Sprites Section */}
+          {sprites.length > 0 && (
+            <div className="recycled-section" data-section="sprites">
+              <h3 className="recycled-section-title">
+                <i className="pi pi-image" />
+                Sprites ({sprites.length})
+              </h3>
+              <div className="recycled-cards-grid">
+                {sprites.map(sprite => (
+                  <div key={sprite.id} className="recycled-card">
+                    <div className="recycled-card-thumbnail">
+                      <img
+                        src={ApiClient.getFileUrl(sprite.fileId.toString())}
+                        alt={sprite.name}
+                        className="recycled-card-image"
+                      />
+                      <div className="recycled-card-actions">
+                        <Button
+                          icon="pi pi-replay"
+                          className="p-button-success p-button-rounded"
+                          onClick={() => handleRestoreSprite(sprite)}
+                          tooltip="Restore"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-danger p-button-rounded"
+                          onClick={() => handleDeletePreviewSprite(sprite)}
+                          tooltip="Delete Forever"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                      </div>
+                      <div className="recycled-card-overlay">
+                        <span className="recycled-card-name" title={sprite.name}>
+                          {sprite.name}
+                        </span>
+                        <span className="recycled-card-meta">
+                          Deleted {formatDate(sprite.deletedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -1,0 +1,24 @@
+{
+    "name": "modelibr-e2e",
+    "version": "1.0.0",
+    "description": "E2E tests for Modelibr using Playwright and BDD",
+    "type": "module",
+    "scripts": {
+        "test": "node run-e2e.js",
+        "test:quick": "npx bddgen && npx playwright test",
+        "bdd": "npx bddgen",
+        "test:report": "npx playwright show-report"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.49.1",
+        "@types/node": "^22.19.3",
+        "@types/pg": "^8.11.2",
+        "pg": "^8.11.3",
+        "playwright-bdd": "^7.5.0",
+        "typescript": "^5.7.2"
+    },
+    "dependencies": {
+        "axios": "^1.13.2",
+        "form-data": "^4.0.5"
+    }
+}

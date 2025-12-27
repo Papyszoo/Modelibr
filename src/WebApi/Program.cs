@@ -19,16 +19,17 @@ namespace WebApi
 
             builder.Services.AddAuthorization();
             builder.Services.AddHttpContextAccessor();
+            builder.Services.AddHealthChecks();
 
             // Add CORS for frontend development
             builder.Services.AddCors(options =>
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    policy.WithOrigins(
-                              "http://localhost:3000",
-                              "https://localhost:3000"
-                          )
+                    var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
+                        ?? new[] { "http://localhost:3000", "https://localhost:3000" };
+
+                    policy.WithOrigins(allowedOrigins)
                           .AllowAnyMethod()
                           .AllowAnyHeader()
                           .AllowCredentials();
@@ -94,6 +95,8 @@ namespace WebApi
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");
             app.MapHub<ThumbnailJobHub>("/thumbnailJobHub");
+
+            app.MapHealthChecks("/health");
 
             app.Run();
         }

@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Application.Models;
 using Application.Thumbnails;
 using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
@@ -60,16 +61,17 @@ public static class ThumbnailEndpoints
 
         app.MapPost("/models/{id}/thumbnail/regenerate", async (
             int id,
+            [FromQuery] int? versionId,
             ICommandHandler<RegenerateThumbnailCommand, RegenerateThumbnailCommandResponse> commandHandler) =>
         {
-            var result = await commandHandler.Handle(new RegenerateThumbnailCommand(id), CancellationToken.None);
+            var result = await commandHandler.Handle(new RegenerateThumbnailCommand(id, versionId), CancellationToken.None);
             
             if (!result.IsSuccess)
             {
                 return Results.NotFound(result.Error.Message);
             }
 
-            return Results.Ok(new { Message = "Thumbnail regeneration queued successfully", ModelId = result.Value.ModelId });
+            return Results.Ok(new { Message = "Thumbnail regeneration queued successfully", ModelId = result.Value.ModelId, ModelVersionId = result.Value.ModelVersionId });
         })
         .WithName("Regenerate Thumbnail")
         .WithTags("Thumbnails");
@@ -79,7 +81,9 @@ public static class ThumbnailEndpoints
             IFormFile file,
             [FromForm] int? width,
             [FromForm] int? height,
+            [FromForm] int? versionId,
             ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> commandHandler,
+            IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> modelQueryHandler,
             Application.Settings.ISettingsService settingsService) =>
         {
             var settings = await settingsService.GetSettingsAsync(CancellationToken.None);
@@ -90,7 +94,23 @@ public static class ThumbnailEndpoints
                 return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
             }
 
-            var command = new UploadThumbnailCommand(id, new FormFileUpload(file), width, height);
+            // If versionId not provided, get the active version
+            int targetVersionId;
+            if (versionId.HasValue)
+            {
+                targetVersionId = versionId.Value;
+            }
+            else
+            {
+                var modelResult = await modelQueryHandler.Handle(new GetModelByIdQuery(id), CancellationToken.None);
+                if (!modelResult.IsSuccess || modelResult.Value.Model.ActiveVersionId == null)
+                {
+                    return Results.BadRequest(new { error = "NoActiveVersion", message = "Model has no active version and versionId was not provided." });
+                }
+                targetVersionId = modelResult.Value.Model.ActiveVersionId.Value;
+            }
+
+            var command = new UploadThumbnailCommand(id, targetVersionId, new FormFileUpload(file), width, height);
             var result = await commandHandler.Handle(command, CancellationToken.None);
             
             if (!result.IsSuccess)
@@ -117,7 +137,9 @@ public static class ThumbnailEndpoints
             IFormFile file,
             [FromForm] int? width,
             [FromForm] int? height,
+            [FromForm] int? versionId,
             ICommandHandler<UploadPngThumbnailCommand, UploadPngThumbnailCommandResponse> commandHandler,
+            IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> modelQueryHandler,
             Application.Settings.ISettingsService settingsService) =>
         {
             var settings = await settingsService.GetSettingsAsync(CancellationToken.None);
@@ -128,7 +150,23 @@ public static class ThumbnailEndpoints
                 return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
             }
 
-            var command = new UploadPngThumbnailCommand(id, new FormFileUpload(file), width, height);
+            // If versionId not provided, get the active version
+            int targetVersionId;
+            if (versionId.HasValue)
+            {
+                targetVersionId = versionId.Value;
+            }
+            else
+            {
+                var modelResult = await modelQueryHandler.Handle(new GetModelByIdQuery(id), CancellationToken.None);
+                if (!modelResult.IsSuccess || modelResult.Value.Model.ActiveVersionId == null)
+                {
+                    return Results.BadRequest(new { error = "NoActiveVersion", message = "Model has no active version and versionId was not provided." });
+                }
+                targetVersionId = modelResult.Value.Model.ActiveVersionId.Value;
+            }
+
+            var command = new UploadPngThumbnailCommand(id, targetVersionId, new FormFileUpload(file), width, height);
             var result = await commandHandler.Handle(command, CancellationToken.None);
             
             if (!result.IsSuccess)

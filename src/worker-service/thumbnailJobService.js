@@ -59,35 +59,40 @@ export class ThumbnailJobService {
   }
 
   /**
-   * Mark a job as completed
+   * Finish a job (mark as completed or failed)
    * @param {number} jobId - The job ID
-   * @param {Object} thumbnailMetadata - Thumbnail metadata from upload
-   * @param {string} thumbnailMetadata.thumbnailPath - Path to the stored thumbnail
-   * @param {number} thumbnailMetadata.sizeBytes - Size of the thumbnail in bytes
-   * @param {number} thumbnailMetadata.width - Width of the thumbnail
-   * @param {number} thumbnailMetadata.height - Height of the thumbnail
+   * @param {boolean} success - Whether the job succeeded
+   * @param {Object} metadata - Thumbnail metadata (required when success=true)
+   * @param {string} metadata.thumbnailPath - Path to the stored thumbnail
+   * @param {number} metadata.sizeBytes - Size of the thumbnail in bytes
+   * @param {number} metadata.width - Width of the thumbnail
+   * @param {number} metadata.height - Height of the thumbnail
+   * @param {string} errorMessage - Error message (required when success=false)
    */
-  async markJobCompleted(jobId, thumbnailMetadata) {
+  async finishJob(jobId, success, metadata = {}, errorMessage = null) {
     try {
-      // Provide default values if metadata is not available (backwards compatibility)
       const requestData = {
-        thumbnailPath: thumbnailMetadata?.thumbnailPath || '/default/path',
-        sizeBytes: thumbnailMetadata?.sizeBytes || 0,
-        width: thumbnailMetadata?.width || 256,
-        height: thumbnailMetadata?.height || 256,
+        success,
+        thumbnailPath: metadata?.thumbnailPath || null,
+        sizeBytes: metadata?.sizeBytes || null,
+        width: metadata?.width || null,
+        height: metadata?.height || null,
+        errorMessage
       }
 
       await this.apiClient.post(
-        `/api/thumbnail-jobs/${jobId}/complete`,
+        `/api/thumbnail-jobs/${jobId}/finish`,
         requestData
       )
-      logger.info('Marked job as completed', {
+      logger.info(success ? 'Marked job as completed' : 'Marked job as failed', {
         jobId,
-        thumbnailMetadata: requestData,
+        success,
+        ...(success ? { thumbnailMetadata: metadata } : { errorMessage })
       })
     } catch (error) {
-      logger.error('Failed to mark job as completed', {
+      logger.error('Failed to finish job', {
         jobId,
+        success,
         error: error.message,
       })
       throw error
@@ -95,40 +100,42 @@ export class ThumbnailJobService {
   }
 
   /**
-   * Mark a job as failed
-   * @param {number} jobId - The job ID
-   * @param {string} errorMessage - The error message
+   * Mark a job as completed (convenience wrapper)
+   * @deprecated Use finishJob with success=true instead
+   */
+  async markJobCompleted(jobId, thumbnailMetadata) {
+    return this.finishJob(jobId, true, thumbnailMetadata)
+  }
+
+  /**
+   * Mark a job as failed (convenience wrapper)
+   * @deprecated Use finishJob with success=false instead
    */
   async markJobFailed(jobId, errorMessage) {
-    try {
-      await this.apiClient.post(`/api/thumbnail-jobs/${jobId}/fail`, {
-        errorMessage,
-      })
-      logger.info('Marked job as failed', { jobId, errorMessage })
-    } catch (error) {
-      logger.error('Failed to mark job as failed', {
-        jobId,
-        errorMessage,
-        error: error.message,
-      })
-      throw error
-    }
+    return this.finishJob(jobId, false, {}, errorMessage)
   }
 
   /**
    * Get model file information for a job
    * @param {number} modelId - The model ID
+   * @param {number} [modelVersionId] - Optional model version ID (if provided, fetches version-specific file)
    * @returns {Promise<Object>} Model file information
    */
-  async getModelFile(modelId) {
+  async getModelFile(modelId, modelVersionId = null) {
     try {
-      const response = await this.apiClient.get(`/models/${modelId}/file`, {
+      // Use version-specific endpoint if modelVersionId is provided
+      const endpoint = modelVersionId
+        ? `/models/${modelId}/versions/${modelVersionId}/file`
+        : `/models/${modelId}/file`
+      
+      const response = await this.apiClient.get(endpoint, {
         responseType: 'stream',
       })
       return response
     } catch (error) {
       logger.error('Failed to get model file', {
         modelId,
+        modelVersionId,
         error: error.message,
       })
       throw error

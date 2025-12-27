@@ -15,6 +15,12 @@
   border-bottom: 1px solid var(--surface-border);
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .header-content {
   flex: 1;
 }

@@ -1,0 +1,70 @@
+{
+  "models": {
+    "single-version-model": {
+      "id": 1,
+      "name": "test-cube"
+    },
+    "multi-version-model": {
+      "id": 2,
+      "name": "test-torus"
+    },
+    "test-torus": {
+      "id": 2,
+      "name": "test-torus"
+    },
+    "test-cube": {
+      "id": 1,
+      "name": "test-cube"
+    }
+  },
+  "textureSets": {
+    "blue_color": {
+      "id": 1,
+      "name": "blue_color",
+      "modelId": 1,
+      "versionId": 1
+    },
+    "red_color": {
+      "id": 2,
+      "name": "red_color",
+      "modelId": 1,
+      "versionId": 1
+    }
+  },
+  "versionStates": {
+    "2": {
+      "thumbnailDetails": {
+        "Id": 3,
+        "ModelVersionId": 2,
+        "Status": 2,
+        "ThumbnailPath": "/var/lib/modelibr/uploads/92/3f/923ff0f655bf374b9e1ea16b982ba07d2ed933bcf7884155c7a0d77eb4d6a986",
+        "PngThumbnailPath": null,
+        "SizeBytes": "19832",
+        "Width": 256,
+        "Height": 256,
+        "ErrorMessage": null,
+        "CreatedAt": "2025-12-27T21:36:28.937Z",
+        "UpdatedAt": "2025-12-27T21:37:00.949Z",
+        "ProcessedAt": "2025-12-27T21:37:00.949Z"
+      },
+      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=1766871438503"
+    },
+    "4": {
+      "thumbnailDetails": {
+        "Id": 5,
+        "ModelVersionId": 4,
+        "Status": 2,
+        "ThumbnailPath": "/var/lib/modelibr/uploads/92/3f/923ff0f655bf374b9e1ea16b982ba07d2ed933bcf7884155c7a0d77eb4d6a986",
+        "PngThumbnailPath": null,
+        "SizeBytes": "19832",
+        "Width": 256,
+        "Height": 256,
+        "ErrorMessage": null,
+        "CreatedAt": "2025-12-26T03:19:37.516Z",
+        "UpdatedAt": "2025-12-26T03:20:59.541Z",
+        "ProcessedAt": "2025-12-26T03:20:59.541Z"
+      },
+      "thumbnailSrc": "http://localhost:8090/model-versions/4/thumbnail/file?t=20251226032059"
+    }
+  }
+}

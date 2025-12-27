@@ -29,8 +29,9 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.75rem;
-  background: var(--surface-card);
-  border: 1px solid var(--surface-border);
+  background: var(--surface-card) !important;
+  color: var(--text-color) !important;
+  border: 1px solid var(--surface-border) !important;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;

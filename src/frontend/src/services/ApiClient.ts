@@ -204,6 +204,16 @@ class ApiClient {
     return response.data
   }
 
+  async getVersionThumbnailStatus(
+    versionId: number,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ThumbnailStatus> {
+    const response: AxiosResponse<ThumbnailStatus> = await this.client.get(
+      `/model-versions/${versionId}/thumbnail`
+    )
+    return response.data
+  }
+
   getThumbnailUrl(modelId: string): string {
     return `${this.baseURL}/models/${modelId}/thumbnail/file`
   }
@@ -235,10 +245,12 @@ class ApiClient {
     return response.data
   }
 
-  async regenerateThumbnail(modelId: string): Promise<void> {
-    const response: AxiosResponse<void> = await this.client.post(
-      `/models/${modelId}/thumbnail/regenerate`
-    )
+  async regenerateThumbnail(modelId: string, versionId?: number): Promise<void> {
+    const url = versionId 
+      ? `/models/${modelId}/thumbnail/regenerate?versionId=${versionId}`
+      : `/models/${modelId}/thumbnail/regenerate`;
+    
+    const response: AxiosResponse<void> = await this.client.post(url)
 
     // Invalidate thumbnail cache for this model
     useApiCacheStore.getState().invalidateThumbnailById(modelId)
@@ -1092,6 +1104,7 @@ class ApiClient {
     files: any[]
     textureSets: any[]
     textures: any[]
+    sprites: any[]
   }> {
     const response = await this.client.get('/recycled')
     return response.data
@@ -1113,6 +1126,9 @@ class ApiClient {
       case 'textureset':
         useApiCacheStore.getState().invalidateTextureSets()
         useApiCacheStore.getState().invalidateTextureSetById(entityId)
+        break
+      case 'sprite':
+        // Sprites don't have dedicated cache yet, but invalidate if added later
         break
     }
   }
@@ -1166,6 +1182,11 @@ class ApiClient {
     // Invalidate cache on successful soft delete
     useApiCacheStore.getState().invalidateTextureSets()
     useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
+  }
+
+  async softDeleteSprite(spriteId: number): Promise<void> {
+    await this.client.delete(`/sprites/${spriteId}/soft`)
+    // Sprites don't have dedicated cache yet
   }
 
   // Sprite methods
