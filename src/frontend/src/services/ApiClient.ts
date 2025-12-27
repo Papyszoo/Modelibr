@@ -1104,6 +1104,7 @@ class ApiClient {
     files: any[]
     textureSets: any[]
     textures: any[]
+    sprites: any[]
   }> {
     const response = await this.client.get('/recycled')
     return response.data
@@ -1125,6 +1126,9 @@ class ApiClient {
       case 'textureset':
         useApiCacheStore.getState().invalidateTextureSets()
         useApiCacheStore.getState().invalidateTextureSetById(entityId)
+        break
+      case 'sprite':
+        // Sprites don't have dedicated cache yet, but invalidate if added later
         break
     }
   }
@@ -1178,6 +1182,11 @@ class ApiClient {
     // Invalidate cache on successful soft delete
     useApiCacheStore.getState().invalidateTextureSets()
     useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
+  }
+
+  async softDeleteSprite(spriteId: number): Promise<void> {
+    await this.client.delete(`/sprites/${spriteId}/soft`)
+    // Sprites don't have dedicated cache yet
   }
 
   // Sprite methods

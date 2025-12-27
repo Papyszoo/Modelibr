@@ -43,11 +43,11 @@
         "Width": 256,
         "Height": 256,
         "ErrorMessage": null,
-        "CreatedAt": "2025-12-27T18:07:03.335Z",
-        "UpdatedAt": "2025-12-27T18:07:41.912Z",
-        "ProcessedAt": "2025-12-27T18:07:41.912Z"
+        "CreatedAt": "2025-12-27T21:36:28.937Z",
+        "UpdatedAt": "2025-12-27T21:37:00.949Z",
+        "ProcessedAt": "2025-12-27T21:37:00.949Z"
       },
-      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=1766858877720"
+      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=1766871438503"
     },
     "4": {
       "thumbnailDetails": {

@@ -17,6 +17,7 @@ export class RecycledFilesPage {
     private readonly modelsSection = ".recycled-section:has(.pi-box)";
     private readonly modelVersionsSection = ".recycled-section:has(.pi-clone)";
     private readonly textureSetsSection = ".recycled-section:has(.pi-images)";
+    private readonly spritesSection = ".recycled-section[data-section='sprites']";
 
     // Card selectors
     private readonly recycledCard = ".recycled-card";
@@ -211,6 +212,53 @@ export class RecycledFilesPage {
      */
     async clickDeleteForeverTextureSet(index: number): Promise<void> {
         const card = this.getTextureSetCard(index);
+        await card.hover();
+        await card.locator(this.deleteForeverButton).click();
+        await this.page.waitForSelector(this.deleteDialog, { state: "visible" });
+    }
+
+    // ===== Sprites Section =====
+
+    /**
+     * Get count of recycled sprites
+     */
+    async getRecycledSpriteCount(): Promise<number> {
+        const section = this.page.locator(this.spritesSection);
+        if (!(await section.isVisible())) return 0;
+        return await section.locator(this.recycledCard).count();
+    }
+
+    /**
+     * Get a recycled sprite card by index
+     */
+    getSpriteCard(index: number) {
+        return this.page.locator(this.spritesSection).locator(this.recycledCard).nth(index);
+    }
+
+    /**
+     * Get the name of a recycled sprite
+     */
+    async getSpriteName(index: number): Promise<string | null> {
+        const card = this.getSpriteCard(index);
+        return await card.locator(this.recycledCardName).textContent();
+    }
+
+    /**
+     * Click restore on a recycled sprite
+     */
+    async restoreSprite(index: number): Promise<void> {
+        const card = this.getSpriteCard(index);
+        await card.hover();
+        await card.locator(this.restoreButton).click();
+        // Wait for the action to complete
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Click "Delete Forever" on a recycled sprite
+     */
+    async clickDeleteForeverSprite(index: number): Promise<void> {
+        const card = this.getSpriteCard(index);
         await card.hover();
         await card.locator(this.deleteForeverButton).click();
         await this.page.waitForSelector(this.deleteDialog, { state: "visible" });

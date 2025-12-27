@@ -11,7 +11,8 @@ public record GetAllRecycledQueryResponse(
     IEnumerable<RecycledModelVersionDto> ModelVersions,
     IEnumerable<RecycledFileDto> Files,
     IEnumerable<RecycledTextureSetDto> TextureSets,
-    IEnumerable<RecycledTextureDto> Textures
+    IEnumerable<RecycledTextureDto> Textures,
+    IEnumerable<RecycledSpriteDto> Sprites
 );
 
 public record RecycledModelDto(
@@ -53,23 +54,33 @@ public record RecycledTextureDto(
     DateTime DeletedAt
 );
 
+public record RecycledSpriteDto(
+    int Id,
+    string Name,
+    int FileId,
+    DateTime DeletedAt
+);
+
 internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQuery, GetAllRecycledQueryResponse>
 {
     private readonly IModelRepository _modelRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ISpriteRepository _spriteRepository;
 
     public GetAllRecycledQueryHandler(
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
         IFileRepository fileRepository,
-        ITextureSetRepository textureSetRepository)
+        ITextureSetRepository textureSetRepository,
+        ISpriteRepository spriteRepository)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
+        _spriteRepository = spriteRepository;
     }
 
     public async Task<Result<GetAllRecycledQueryResponse>> Handle(GetAllRecycledQuery request, CancellationToken cancellationToken)
@@ -128,12 +139,22 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
                 t.DeletedAt!.Value
             )).ToList();
 
+        // Get deleted sprites
+        var sprites = await _spriteRepository.GetAllDeletedAsync(cancellationToken);
+        var spriteDtos = sprites.Select(s => new RecycledSpriteDto(
+            s.Id,
+            s.Name,
+            s.FileId,
+            s.DeletedAt!.Value
+        )).ToList();
+
         var response = new GetAllRecycledQueryResponse(
             modelDtos,
             modelVersionDtos,
             fileDtos,
             textureSetDtos,
-            textureDtos
+            textureDtos,
+            spriteDtos
         );
 
         return Result.Success(response);
