@@ -12,7 +12,7 @@ services:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
-            - ConnectionStrings__Default=Host=postgres;Port=${POSTGRES_PORT};Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
+            - ConnectionStrings__Default=Host=postgres;Port=5432;Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
             - DisableHttpsRedirection=true
         ports:
             - "${WEBAPI_HTTP_PORT}:8080"

@@ -179,6 +179,7 @@ function TextureSetList() {
       <TextureSetListHeader
         setCount={textureSets.length}
         onCreateSet={() => setShowCreateDialog(true)}
+        onFilesSelected={(files) => handleFileDrop(files)}
       />
 
       <TextureSetGrid

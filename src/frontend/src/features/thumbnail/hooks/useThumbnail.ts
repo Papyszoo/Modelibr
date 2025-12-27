@@ -13,7 +13,7 @@ const log = (message: string, ...args: unknown[]) => {
   }
 }
 
-export function useThumbnail(modelId: string) {
+export function useThumbnail(modelId: string, versionId?: number) {
   const [thumbnailDetails, setThumbnailDetails] =
     useState<ThumbnailStatus | null>(null)
   const [imgSrc, setImgSrc] = useState<string | null>(null)
@@ -23,28 +23,34 @@ export function useThumbnail(modelId: string) {
 
   const fetchThumbnailDetails = useCallback(async () => {
     try {
-      log(`useThumbnail[${modelId}]: Fetching thumbnail details...`)
-      const details = await ApiClient.getThumbnailStatus(modelId, {
-        skipCache: true,
-      })
-      log(`useThumbnail[${modelId}]: Got details:`, details)
+      const identifier = versionId ? `version:${versionId}` : `model:${modelId}`
+      log(`useThumbnail[${identifier}]: Fetching thumbnail details...`)
+      
+      const details = versionId
+        ? await ApiClient.getVersionThumbnailStatus(versionId, { skipCache: true })
+        : await ApiClient.getThumbnailStatus(modelId, { skipCache: true })
+      
+      log(`useThumbnail[${identifier}]: Got details:`, details)
       setThumbnailDetails(details)
 
       // Use direct URL to leverage browser caching instead of fetching blob
       // Add a cache-busting parameter only when thumbnail is updated via SignalR
       if (details?.status === 'Ready') {
-        const baseUrl = ApiClient.getThumbnailUrl(modelId)
+        const baseUrl = versionId
+          ? ApiClient.getVersionThumbnailUrl(versionId)
+          : ApiClient.getThumbnailUrl(modelId)
         // Use the stable timestamp that only changes on SignalR events
         const newSrc = `${baseUrl}?t=${cacheBustTimestamp.current}`
-        log(`useThumbnail[${modelId}]: Setting imgSrc to:`, newSrc)
+        log(`useThumbnail[${identifier}]: Setting imgSrc to:`, newSrc)
         setImgSrc(newSrc)
       } else {
         setImgSrc(null)
       }
     } catch (error) {
-      console.error(`useThumbnail[${modelId}]: Failed to fetch:`, error)
+      const identifier = versionId ? `version:${versionId}` : `model:${modelId}`
+      console.error(`useThumbnail[${identifier}]: Failed to fetch:`, error)
     }
-  }, [modelId])
+  }, [modelId, versionId])
 
   // Initial fetch
   useEffect(() => {

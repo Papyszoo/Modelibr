@@ -349,24 +349,44 @@
   right: 1rem;
 }
 
+/* Theme-aware viewer control buttons */
 .viewer-control-btn {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-  background: white !important;
-  color: #3b82f6 !important;
+  background: var(--surface-card) !important;
+  color: var(--text-color) !important;
   width: 3rem !important;
   height: 3rem !important;
-  border: none !important;
+  border: 1px solid var(--surface-border) !important;
 }
 
 .viewer-control-btn:hover {
-  background: #f0f9ff !important;
+  background: var(--surface-hover) !important;
   transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
 .viewer-control-btn .pi {
   font-size: 1.25rem !important;
-  color: #3b82f6 !important;
+  color: var(--primary-color) !important;
+}
+
+/* Fix for Version Dropdown white-on-white in Dark Mode */
+.viewer-controls-left .p-dropdown {
+  background: var(--surface-card) !important;
+  border: 1px solid var(--surface-border) !important;
+}
+
+.viewer-controls-left .p-dropdown .p-dropdown-label {
+  color: var(--text-color) !important;
+}
+
+.viewer-controls-left .p-dropdown:not(.p-disabled).p-focus {
+  box-shadow: 0 0 0 2px var(--primary-color-300) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.viewer-controls-left .p-dropdown .p-dropdown-trigger {
+  color: var(--text-color-secondary) !important;
 }
 
 /* Sidebar styling */

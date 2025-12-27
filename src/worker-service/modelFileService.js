@@ -27,10 +27,11 @@ export class ModelFileService {
   /**
    * Fetch model file for processing
    * @param {number} modelId - The model ID
+   * @param {number} [modelVersionId] - Optional model version ID
    * @returns {Promise<{filePath: string, fileType: string, originalFileName: string}>} File information
    */
-  async fetchModelFile(modelId) {
-    logger.debug('Fetching model file', { modelId })
+  async fetchModelFile(modelId, modelVersionId = null) {
+    logger.debug('Fetching model file', { modelId, modelVersionId })
 
     // Retry logic for race condition where file might not be immediately available after upload
     const maxRetries = 3
@@ -39,16 +40,17 @@ export class ModelFileService {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Get file stream from API
-        const response = await this.jobService.getModelFile(modelId)
+        const response = await this.jobService.getModelFile(modelId, modelVersionId)
 
         if (!response || !response.data) {
           throw new Error('No file data received from API')
         }
 
-        return await this.processFileResponse(response, modelId)
+        return await this.processFileResponse(response, modelId, modelVersionId)
       } catch (error) {
         logger.warn('Failed to fetch model file', {
           modelId,
+          modelVersionId,
           attempt,
           maxRetries,
           error: error.message,
@@ -62,6 +64,7 @@ export class ModelFileService {
         // Wait before retrying
         logger.info('Retrying model file fetch after delay', {
           modelId,
+          modelVersionId,
           attempt,
           retryDelayMs: retryDelay,
         })
@@ -74,9 +77,10 @@ export class ModelFileService {
    * Process the file response from API
    * @param {Object} response - API response
    * @param {number} modelId - Model ID for error context
+   * @param {number} [modelVersionId] - Optional model version ID for error context
    * @returns {Promise<{filePath: string, fileType: string, originalFileName: string}>} File information
    */
-  async processFileResponse(response, modelId) {
+  async processFileResponse(response, modelId, modelVersionId = null) {
     // Extract file information from response headers
     const contentDisposition = response.headers['content-disposition'] || ''
     const _contentType =
@@ -105,6 +109,7 @@ export class ModelFileService {
 
     logger.info('Model file fetched successfully', {
       modelId,
+      modelVersionId,
       originalFileName,
       fileType,
       tempFilePath,

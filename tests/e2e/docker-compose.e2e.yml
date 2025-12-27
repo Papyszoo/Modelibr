@@ -1,0 +1,91 @@
+services:
+    webapi-e2e:
+        build:
+            context: ../../
+            dockerfile: src/WebApi/Dockerfile
+        container_name: webapi-e2e
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Development
+            - ASPNETCORE_HTTP_PORTS=8080
+            - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
+            - ConnectionStrings__Default=Host=postgres-e2e;Port=5432;Database=Modelibr;Username=modelibr;Password=e2e_password;
+            - DisableHttpsRedirection=true
+            - AllowedOrigins__0=http://localhost:3002
+            - AllowedOrigins__1=http://localhost:3000
+        ports:
+            - "8090:8080"
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+        volumes:
+            - ./data/uploads:/var/lib/modelibr/uploads
+        depends_on:
+            postgres-e2e:
+                condition: service_healthy
+        networks:
+            - modelibr-e2e
+    frontend-e2e:
+        build:
+            context: ../../src/frontend
+            dockerfile: Dockerfile
+            target: production
+            args:
+                VITE_API_BASE_URL: http://localhost:8090
+        container_name: frontend-e2e
+        ports:
+            - "3002:80"
+        networks:
+            - modelibr-e2e
+    thumbnail-worker-e2e:
+        build:
+            context: ../../src/worker-service
+            dockerfile: Dockerfile
+        container_name: thumbnail-worker-e2e
+        environment:
+            - WORKER_ID=worker-e2e
+            - WORKER_PORT=3001
+            - API_BASE_URL=http://webapi-e2e:8080
+            - MAX_CONCURRENT_JOBS=3
+            - RENDER_WIDTH=256
+            - RENDER_HEIGHT=256
+            - RENDER_FORMAT=png
+            - LOG_LEVEL=info
+            - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
+        ports:
+            - "3003:3001"
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+        volumes:
+            - ./data/thumbnails:/var/lib/modelibr/thumbnails
+        depends_on:
+            webapi-e2e:
+                condition: service_healthy
+        networks:
+            - modelibr-e2e
+    postgres-e2e:
+        image: postgres:16-alpine
+        container_name: postgres-e2e
+        environment:
+            POSTGRES_DB: Modelibr
+            POSTGRES_USER: modelibr
+            POSTGRES_PASSWORD: e2e_password
+        ports:
+            - "5433:5432"
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U modelibr -d Modelibr"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+        volumes:
+            - ./data/postgres:/var/lib/postgresql/data
+        networks:
+            - modelibr-e2e
+
+networks:
+    modelibr-e2e:
+        driver: bridge

@@ -65,6 +65,19 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
 
         var fileEntity = fileResult.Value;
 
+        // Check if this file (by hash) already exists for this model
+        // This prevents creating orphan versions with no files when uploading duplicates
+        var existingVersion = model.Versions.FirstOrDefault(v => 
+            v.Files.Any(f => f.Sha256Hash == fileEntity.Sha256Hash));
+
+        if (existingVersion != null)
+        {
+            return Result.Failure<CreateModelVersionResponse>(
+                new Error("DuplicateFile", 
+                    $"This file already exists in version {existingVersion.VersionNumber}. " +
+                    "Upload a different file to create a new version."));
+        }
+
         // Create new version
         var version = model.CreateVersion(command.Description, _dateTimeProvider.UtcNow);
         version.AddFile(fileEntity);

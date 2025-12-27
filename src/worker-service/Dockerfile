@@ -1,49 +1,18 @@
 # Dockerfile for the thumbnail worker service using Puppeteer
 
-# Build stage - install dependencies
-FROM node:20-bookworm-slim AS builder
+# =============================================================================
+# BASE STAGE - Install Chromium and dependencies (cached after first build)
+# =============================================================================
+# This stage is separate so the slow apt-get install is cached and reused
+FROM node:20-bookworm-slim AS chromium-base
 
-# Install build dependencies and CA certificates
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates wget git \
-  && update-ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy package files and .npmrc
-COPY package*.json .npmrc ./
-
-# Copy scripts directory (needed for download-model.js)
-COPY scripts ./scripts
-
-# Install dependencies with proper SSL configuration
-# The allowlist proxy uses a self-signed certificate, so we need to disable strict SSL
-# Also, .npmrc tells Puppeteer to skip Chromium download
-# Skip model download during npm install - we'll do it separately
-RUN npm config set strict-ssl false && \
-    npm config set fetch-timeout 300000 && \
-    npm config set fetch-retries 5 && \
-    npm config set fetch-retry-mintimeout 20000 && \
-    npm config set fetch-retry-maxtimeout 120000 && \
-    SKIP_MODEL_DOWNLOAD=true PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || \
-    SKIP_MODEL_DOWNLOAD=true PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
-
-# Download the BLIP model after dependencies are installed
-# This runs separately so it doesn't fail the npm install if it times out
-RUN node scripts/download-model.js || echo "Model download failed, will download on first use"
-
-# Runtime stage - only copy what's needed
-FROM node:20-bookworm-slim AS runtime
-
-# Install runtime dependencies for Puppeteer
-# Puppeteer requires these dependencies for headless Chrome
-# Based on https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux
+# Install runtime dependencies for Puppeteer/Chromium
+# This is the slow step (~15min) but gets cached after first build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
+    curl \
     gnupg \
-    # Dependencies for Chromium
     chromium \
     chromium-driver \
     fonts-liberation \
@@ -73,6 +42,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxshmfence1 \
   && rm -rf /var/lib/apt/lists/*
 
+# =============================================================================
+# BUILD STAGE - Install Node dependencies
+# =============================================================================
+FROM node:20-bookworm-slim AS builder
+
+# Install build dependencies and CA certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates wget git \
+  && update-ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files and .npmrc
+COPY package*.json .npmrc ./
+
+# Copy scripts directory (needed for download-model.js)
+COPY scripts ./scripts
+
+# Install dependencies with proper SSL configuration
+RUN npm config set strict-ssl false && \
+    npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    SKIP_MODEL_DOWNLOAD=true PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci --omit=dev || \
+    SKIP_MODEL_DOWNLOAD=true PUPPETEER_SKIP_DOWNLOAD=true NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --production
+
+# Download the BLIP model after dependencies are installed
+RUN node scripts/download-model.js || echo "Model download failed, will download on first use"
+
+# =============================================================================
+# RUNTIME STAGE - Combine chromium base with app code
+# =============================================================================
+FROM chromium-base AS runtime
+
 WORKDIR /app
 
 # Set NODE_ENV
@@ -95,7 +100,6 @@ COPY package*.json ./
 COPY . .
 
 # Add user to audio,video groups so we don't need --no-sandbox (Puppeteer best practice)
-# Create Downloads directory as recommended by Puppeteer docs
 RUN groupadd -r worker && useradd -r -g worker -G audio,video worker \
     && mkdir -p /home/worker/Downloads /app \
     && chown -R worker:worker /home/worker \

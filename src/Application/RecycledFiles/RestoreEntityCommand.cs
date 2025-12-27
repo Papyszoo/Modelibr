@@ -18,6 +18,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ISpriteRepository _spriteRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public RestoreEntityCommandHandler(
@@ -25,12 +26,14 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         IModelVersionRepository modelVersionRepository,
         IFileRepository fileRepository,
         ITextureSetRepository textureSetRepository,
+        ISpriteRepository spriteRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
+        _spriteRepository = spriteRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -75,6 +78,15 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 textureSet.Restore(now);
                 await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Texture set restored successfully"));
+
+            case "sprite":
+                var sprite = await _spriteRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (sprite == null)
+                    return Result.Failure<RestoreEntityResponse>(new Error("SpriteNotFound", "Sprite not found"));
+                
+                sprite.Restore(now);
+                await _spriteRepository.UpdateAsync(sprite, cancellationToken);
+                return Result.Success(new RestoreEntityResponse(true, "Sprite restored successfully"));
 
             default:
                 return Result.Failure<RestoreEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));

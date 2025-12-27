@@ -41,10 +41,12 @@
   gap: 0.125rem;
 }
 
-.floating-window-btn {
-  background: transparent;
+/* High specificity to ensure override of global index.css button styles (0-2-1 specificity) */
+/* .floating-window (0-1-0) .floating-window-header (0-1-0) button.floating-window-btn (0-1-1) = 0-3-1 */
+.floating-window .floating-window-header button.floating-window-btn {
+  background: transparent !important;
   border: none;
-  color: white;
+  color: white; /* Icons always white on purple header */
   cursor: pointer;
   padding: 0.25rem;
   width: 22px;
@@ -53,11 +55,17 @@
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.1s;
 }
 
-.floating-window-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+.floating-window .floating-window-header button.floating-window-btn:hover {
+  background: rgba(255, 255, 255, 0.3) !important; /* More visible hover */
+  transform: scale(1.1);
+}
+
+.floating-window .floating-window-header button.floating-window-btn:active {
+  background: rgba(255, 255, 255, 0.5) !important; /* Strong active state */
+  transform: scale(0.95);
 }
 
 .floating-window-btn i {

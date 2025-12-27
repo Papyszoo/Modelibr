@@ -133,6 +133,29 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Thumbnails",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    ModelVersionId = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    ThumbnailPath = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    PngThumbnailPath = table.Column<string>(type: "text", nullable: true),
+                    SizeBytes = table.Column<long>(type: "bigint", nullable: true),
+                    Width = table.Column<int>(type: "integer", nullable: true),
+                    Height = table.Column<int>(type: "integer", nullable: true),
+                    ErrorMessage = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Thumbnails", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PackTextureSets",
                 columns: table => new
                 {
@@ -244,6 +267,44 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Sprites",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    FileId = table.Column<int>(type: "integer", nullable: false),
+                    SpriteType = table.Column<int>(type: "integer", nullable: false),
+                    SpriteCategoryId = table.Column<int>(type: "integer", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ThumbnailId = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Sprites", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Sprites_Files_FileId",
+                        column: x => x.FileId,
+                        principalTable: "Files",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Sprites_SpriteCategories_SpriteCategoryId",
+                        column: x => x.SpriteCategoryId,
+                        principalTable: "SpriteCategories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Sprites_Thumbnails_ThumbnailId",
+                        column: x => x.ThumbnailId,
+                        principalTable: "Thumbnails",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Textures",
                 columns: table => new
                 {
@@ -275,6 +336,54 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PackSprites",
+                columns: table => new
+                {
+                    PacksId = table.Column<int>(type: "integer", nullable: false),
+                    SpritesId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PackSprites", x => new { x.PacksId, x.SpritesId });
+                    table.ForeignKey(
+                        name: "FK_PackSprites_Packs_PacksId",
+                        column: x => x.PacksId,
+                        principalTable: "Packs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PackSprites_Sprites_SpritesId",
+                        column: x => x.SpritesId,
+                        principalTable: "Sprites",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ProjectSprites",
+                columns: table => new
+                {
+                    ProjectsId = table.Column<int>(type: "integer", nullable: false),
+                    SpritesId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ProjectSprites", x => new { x.ProjectsId, x.SpritesId });
+                    table.ForeignKey(
+                        name: "FK_ProjectSprites_Projects_ProjectsId",
+                        column: x => x.ProjectsId,
+                        principalTable: "Projects",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ProjectSprites_Sprites_SpritesId",
+                        column: x => x.SpritesId,
+                        principalTable: "Sprites",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Models",
                 columns: table => new
                 {
@@ -285,7 +394,6 @@ namespace Infrastructure.Migrations
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Tags = table.Column<string>(type: "text", nullable: true),
                     Description = table.Column<string>(type: "text", nullable: true),
-                    DefaultTextureSetId = table.Column<int>(type: "integer", nullable: true),
                     ActiveVersionId = table.Column<int>(type: "integer", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -299,12 +407,6 @@ namespace Infrastructure.Migrations
                         column: x => x.FileId,
                         principalTable: "Files",
                         principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_Models_TextureSets_DefaultTextureSetId",
-                        column: x => x.DefaultTextureSetId,
-                        principalTable: "TextureSets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -343,7 +445,9 @@ namespace Infrastructure.Migrations
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DefaultTextureSetId = table.Column<int>(type: "integer", nullable: true),
+                    ThumbnailId = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -354,6 +458,18 @@ namespace Infrastructure.Migrations
                         principalTable: "Models",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ModelVersions_TextureSets_DefaultTextureSetId",
+                        column: x => x.DefaultTextureSetId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_ModelVersions_Thumbnails_ThumbnailId",
+                        column: x => x.ThumbnailId,
+                        principalTable: "Thumbnails",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -405,6 +521,30 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ModelVersionTextureSets",
+                columns: table => new
+                {
+                    ModelVersionsId = table.Column<int>(type: "integer", nullable: false),
+                    TextureSetsId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ModelVersionTextureSets", x => new { x.ModelVersionsId, x.TextureSetsId });
+                    table.ForeignKey(
+                        name: "FK_ModelVersionTextureSets_ModelVersions_ModelVersionsId",
+                        column: x => x.ModelVersionsId,
+                        principalTable: "ModelVersions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ModelVersionTextureSets_TextureSets_TextureSetsId",
+                        column: x => x.TextureSetsId,
+                        principalTable: "TextureSets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ThumbnailJobs",
                 columns: table => new
                 {
@@ -442,35 +582,6 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Thumbnails",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ModelVersionId = table.Column<int>(type: "integer", nullable: false),
-                    Status = table.Column<int>(type: "integer", nullable: false),
-                    ThumbnailPath = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    PngThumbnailPath = table.Column<string>(type: "text", nullable: true),
-                    SizeBytes = table.Column<long>(type: "bigint", nullable: true),
-                    Width = table.Column<int>(type: "integer", nullable: true),
-                    Height = table.Column<int>(type: "integer", nullable: true),
-                    ErrorMessage = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Thumbnails", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Thumbnails_ModelVersions_ModelVersionId",
-                        column: x => x.ModelVersionId,
-                        principalTable: "ModelVersions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "ThumbnailJobEvents",
                 columns: table => new
                 {
@@ -490,92 +601,6 @@ namespace Infrastructure.Migrations
                         name: "FK_ThumbnailJobEvents_ThumbnailJobs_ThumbnailJobId",
                         column: x => x.ThumbnailJobId,
                         principalTable: "ThumbnailJobs",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Sprites",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    FileId = table.Column<int>(type: "integer", nullable: false),
-                    SpriteType = table.Column<int>(type: "integer", nullable: false),
-                    SpriteCategoryId = table.Column<int>(type: "integer", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ThumbnailId = table.Column<int>(type: "integer", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Sprites", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Sprites_Files_FileId",
-                        column: x => x.FileId,
-                        principalTable: "Files",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Sprites_SpriteCategories_SpriteCategoryId",
-                        column: x => x.SpriteCategoryId,
-                        principalTable: "SpriteCategories",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_Sprites_Thumbnails_ThumbnailId",
-                        column: x => x.ThumbnailId,
-                        principalTable: "Thumbnails",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "PackSprites",
-                columns: table => new
-                {
-                    PacksId = table.Column<int>(type: "integer", nullable: false),
-                    SpritesId = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PackSprites", x => new { x.PacksId, x.SpritesId });
-                    table.ForeignKey(
-                        name: "FK_PackSprites_Packs_PacksId",
-                        column: x => x.PacksId,
-                        principalTable: "Packs",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_PackSprites_Sprites_SpritesId",
-                        column: x => x.SpritesId,
-                        principalTable: "Sprites",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ProjectSprites",
-                columns: table => new
-                {
-                    ProjectsId = table.Column<int>(type: "integer", nullable: false),
-                    SpritesId = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ProjectSprites", x => new { x.ProjectsId, x.SpritesId });
-                    table.ForeignKey(
-                        name: "FK_ProjectSprites_Projects_ProjectsId",
-                        column: x => x.ProjectsId,
-                        principalTable: "Projects",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ProjectSprites_Sprites_SpritesId",
-                        column: x => x.SpritesId,
-                        principalTable: "Sprites",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -642,11 +667,6 @@ namespace Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Models_DefaultTextureSetId",
-                table: "Models",
-                column: "DefaultTextureSetId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Models_FileId",
                 table: "Models",
                 column: "FileId");
@@ -662,6 +682,11 @@ namespace Infrastructure.Migrations
                 column: "TextureSetsId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ModelVersions_DefaultTextureSetId",
+                table: "ModelVersions",
+                column: "DefaultTextureSetId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ModelVersions_IsDeleted",
                 table: "ModelVersions",
                 column: "IsDeleted");
@@ -671,6 +696,17 @@ namespace Infrastructure.Migrations
                 table: "ModelVersions",
                 columns: new[] { "ModelId", "VersionNumber" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ModelVersions_ThumbnailId",
+                table: "ModelVersions",
+                column: "ThumbnailId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ModelVersionTextureSets_TextureSetsId",
+                table: "ModelVersionTextureSets",
+                column: "TextureSetsId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PackModels_PacksId",
@@ -793,9 +829,9 @@ namespace Infrastructure.Migrations
                 columns: new[] { "ThumbnailJobId", "OccurredAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_ThumbnailJobs_ModelHash",
+                name: "IX_ThumbnailJobs_ModelHash_ModelVersionId",
                 table: "ThumbnailJobs",
-                column: "ModelHash",
+                columns: new[] { "ModelHash", "ModelVersionId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -881,6 +917,9 @@ namespace Infrastructure.Migrations
                 name: "ModelTextureSets");
 
             migrationBuilder.DropTable(
+                name: "ModelVersionTextureSets");
+
+            migrationBuilder.DropTable(
                 name: "PackModels");
 
             migrationBuilder.DropTable(
@@ -926,9 +965,6 @@ namespace Infrastructure.Migrations
                 name: "SpriteCategories");
 
             migrationBuilder.DropTable(
-                name: "Thumbnails");
-
-            migrationBuilder.DropTable(
                 name: "Files");
 
             migrationBuilder.DropTable(
@@ -939,6 +975,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "TextureSets");
+
+            migrationBuilder.DropTable(
+                name: "Thumbnails");
         }
     }
 }

@@ -14,6 +14,8 @@ import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Checkbox } from 'primereact/checkbox'
+import { ContextMenu } from 'primereact/contextmenu'
+import { MenuItem } from 'primereact/menuitem'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
@@ -76,6 +78,8 @@ function SpriteList() {
   const toast = useRef<Toast>(null)
   const uploadProgressContext = useUploadProgress()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const contextMenuRef = useRef<ContextMenu>(null)
+  const [contextMenuTarget, setContextMenuTarget] = useState<SpriteDto | null>(null)
 
   const loadSprites = useCallback(async () => {
     try {
@@ -545,6 +549,66 @@ function SpriteList() {
     return sprite.categoryId === activeCategoryId
   })
 
+  // Handle recycling sprites via context menu
+  const handleRecycleSprites = async () => {
+    const spriteIdsToRecycle = selectedSpriteIds.size > 0
+      ? Array.from(selectedSpriteIds)
+      : contextMenuTarget ? [contextMenuTarget.id] : []
+
+    if (spriteIdsToRecycle.length === 0) return
+
+    try {
+      await Promise.all(spriteIdsToRecycle.map(id => ApiClient.softDeleteSprite(id)))
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Recycled',
+        detail: spriteIdsToRecycle.length > 1
+          ? `${spriteIdsToRecycle.length} sprites moved to recycle bin`
+          : 'Sprite moved to recycle bin',
+        life: 3000,
+      })
+      setSelectedSpriteIds(new Set())
+      setContextMenuTarget(null)
+      loadSprites()
+    } catch (error) {
+      console.error('Failed to recycle sprites:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to recycle sprites',
+        life: 3000,
+      })
+    }
+  }
+
+  // Get context menu items (dynamic label based on selection)
+  const getContextMenuItems = (): MenuItem[] => {
+    const selectedCount = selectedSpriteIds.size
+    const label = selectedCount > 1 ? `Recycle ${selectedCount} sprites` : 'Recycle'
+
+    return [
+      {
+        label,
+        icon: 'pi pi-trash',
+        command: handleRecycleSprites,
+      },
+    ]
+  }
+
+  // Handle right-click on sprite card
+  const handleSpriteContextMenu = (
+    e: React.MouseEvent<HTMLDivElement>,
+    sprite: SpriteDto
+  ) => {
+    e.preventDefault()
+    // If right-clicked sprite is not in selection, select only that sprite
+    if (!selectedSpriteIds.has(sprite.id)) {
+      setSelectedSpriteIds(new Set([sprite.id]))
+    }
+    setContextMenuTarget(sprite)
+    contextMenuRef.current?.show(e)
+  }
+
   if (loading) {
     return (
       <div className="sprite-list-loading">
@@ -563,6 +627,7 @@ function SpriteList() {
     >
       <Toast ref={toast} />
       <ConfirmDialog />
+      <ContextMenu ref={contextMenuRef} model={getContextMenuItems()} />
 
       <div className="sprite-list-header">
         <div className="sprite-list-title">
@@ -667,6 +732,7 @@ function SpriteList() {
                 data-sprite-id={sprite.id}
                 className={`sprite-card ${draggedSpriteId === sprite.id ? 'dragging' : ''} ${selectedSpriteIds.has(sprite.id) ? 'selected' : ''}`}
                 onClick={() => openSpriteModal(sprite)}
+                onContextMenu={e => handleSpriteContextMenu(e, sprite)}
                 draggable
                 onDragStart={e => handleSpriteDragStart(e, sprite)}
                 onDragEnd={handleSpriteDragEnd}

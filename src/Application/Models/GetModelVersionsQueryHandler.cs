@@ -26,11 +26,12 @@ internal class GetModelVersionsQueryHandler : IQueryHandler<GetModelVersionsQuer
             VersionNumber = v.VersionNumber,
             Description = v.Description,
             CreatedAt = v.CreatedAt,
+            DefaultTextureSetId = v.DefaultTextureSetId,
             ThumbnailUrl = v.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
-                ? $"/model-versions/{v.Id}/thumbnail/file" 
+                ? $"/model-versions/{v.Id}/thumbnail/file?t={v.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                 : null,
             PngThumbnailUrl = v.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready && !string.IsNullOrEmpty(v.Thumbnail.PngThumbnailPath)
-                ? $"/model-versions/{v.Id}/thumbnail/png-file" 
+                ? $"/model-versions/{v.Id}/thumbnail/png-file?t={v.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                 : null,
             Files = v.Files.Select(f => new VersionFileDto
             {
@@ -58,6 +59,7 @@ public class ModelVersionDto
     public int VersionNumber { get; set; }
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int? DefaultTextureSetId { get; set; }
     public string? ThumbnailUrl { get; set; }
     public string? PngThumbnailUrl { get; set; }
     public List<VersionFileDto> Files { get; set; } = new();

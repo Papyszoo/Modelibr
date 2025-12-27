@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, JSX } from 'react'
 import { Canvas } from '@react-three/fiber'
+import * as THREE from 'three'
 import { Stats } from '@react-three/drei'
 import ModelPreviewScene from './ModelPreviewScene'
 import ModelInfoWindow from './ModelInfoWindow'
@@ -19,6 +20,9 @@ import { TextureSetDto, ModelVersionDto } from '../../../types'
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
+import thumbnailSignalRService, {
+  ThumbnailStatusChangedEvent,
+} from '../../../services/ThumbnailSignalRService'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -64,6 +68,7 @@ function ModelViewer({
   const [dragOver, setDragOver] = useState(false)
   const [uploadModalVisible, setUploadModalVisible] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] =
     useState<ModelVersionDto | null>(null)
@@ -130,17 +135,46 @@ function ModelViewer({
     }
   }
 
+  // Subscribe to thumbnail status changes to refresh versions when thumbnails are ready
+  useEffect(() => {
+    if (!model?.id || versions.length === 0) return
+
+    const handleThumbnailStatusChanged = (
+      event: ThumbnailStatusChangedEvent
+    ) => {
+      // Only reload if the thumbnail is for a version of this model
+      const isThisModelsVersion = versions.some(
+        v => v.id === event.modelVersionId
+      )
+
+      if (event.status === 'Ready' && isThisModelsVersion) {
+        loadVersions()
+      }
+    }
+
+    const unsubscribe = thumbnailSignalRService.onThumbnailStatusChanged(
+      handleThumbnailStatusChanged
+    )
+
+    return () => {
+      // Cleanup: unsubscribe when component unmounts or model changes
+      unsubscribe()
+    }
+  }, [model?.id, versions])
+
   // Set initial selected texture set to default if available
   // Only auto-select if user hasn't made a manual selection yet
+  // Apply version's default texture set when version changes
   useEffect(() => {
-    if (
-      model?.defaultTextureSetId &&
-      selectedTextureSetId === null &&
-      !hasUserSelectedTexture
-    ) {
-      setSelectedTextureSetId(model.defaultTextureSetId)
+    if (selectedVersion?.defaultTextureSetId) {
+      setSelectedTextureSetId(selectedVersion.defaultTextureSetId)
+      setHasUserSelectedTexture(false) // Reset so future version changes can apply their defaults
+    } else if (selectedVersion && !selectedVersion.defaultTextureSetId) {
+      // Version has no default, clear selection
+      setSelectedTextureSetId(null)
+      setHasUserSelectedTexture(false)
     }
-  }, [model?.defaultTextureSetId, selectedTextureSetId, hasUserSelectedTexture])
+  }, [selectedVersion?.id, selectedVersion?.defaultTextureSetId])
 
   // Load selected texture set data
   useEffect(() => {
@@ -188,11 +222,17 @@ function ModelViewer({
     if (!model) return
 
     try {
-      await ApiClient.regenerateThumbnail(model.id.toString())
+      await ApiClient.regenerateThumbnail(
+        model.id.toString(),
+        selectedVersion?.id
+      )
+      const versionInfo = selectedVersion
+        ? ` version #${selectedVersion.id}`
+        : ''
       toast.current?.show({
         severity: 'success',
         summary: 'Thumbnail Regeneration',
-        detail: `Thumbnail regeneration queued for model #${model.id}`,
+        detail: `Thumbnail regeneration queued for model #${model.id}${versionInfo}`,
         life: 3000,
       })
     } catch (err) {
@@ -212,6 +252,17 @@ function ModelViewer({
 
   const handleVersionSelect = (version: ModelVersionDto) => {
     setSelectedVersion(version)
+
+    // Apply version's default texture set immediately
+    if (version.defaultTextureSetId) {
+      setSelectedTextureSetId(version.defaultTextureSetId)
+      setHasUserSelectedTexture(false)
+    } else {
+      // Version has no default, clear selection
+      setSelectedTextureSetId(null)
+      setHasUserSelectedTexture(false)
+    }
+
     // Create a temporary model with the version's files for preview
     if (model) {
       const versionModelData: Model = {
@@ -300,9 +351,11 @@ function ModelViewer({
       await loadVersions()
     } catch (error) {
       console.error('Failed to recycle version:', error)
-      const errorMessage = error instanceof Error && error.message.includes('last remaining version')
-        ? 'Cannot delete the last version. A model must have at least one version.'
-        : 'Failed to recycle model version'
+      const errorMessage =
+        error instanceof Error &&
+        error.message.includes('last remaining version')
+          ? 'Cannot delete the last version. A model must have at least one version.'
+          : 'Failed to recycle model version'
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
@@ -335,6 +388,19 @@ function ModelViewer({
       setDroppedFile(file)
       setUploadModalVisible(true)
     }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setDroppedFile(e.target.files[0])
+      setUploadModalVisible(true)
+      // Reset input
+      e.target.value = ''
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
   }
 
   const handleFileUpload = async (
@@ -487,6 +553,13 @@ function ModelViewer({
       </header>
 
       <ModelProvider>
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+          accept=".obj,.fbx,.gltf,.glb"
+        />
         <div className="viewer-container">
           {/* Model name overlay */}
           <div className="viewer-model-name-overlay">
@@ -494,6 +567,16 @@ function ModelViewer({
           </div>
           {/* Floating action buttons for sidebar controls */}
           <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
+            <Button
+              icon="pi pi-plus"
+              className="p-button-rounded viewer-control-btn"
+              onClick={handleUploadClick}
+              tooltip="Add Version"
+              tooltipOptions={{
+                position: buttonPosition === 'left' ? 'right' : 'left',
+              }}
+              aria-label="Add Version"
+            />
             <Button
               icon="pi pi-cog"
               className="p-button-rounded viewer-control-btn"
@@ -589,6 +672,16 @@ function ModelViewer({
                   powerPreference: 'high-performance',
                 }}
                 dpr={Math.min(window.devicePixelRatio, 2)}
+                onCreated={(state) => {
+                  // Expose Three.js scene for E2E testing
+                  // This allows Playwright to verify actual 3D content is rendered
+                  if (typeof window !== 'undefined') {
+                    (window as Window & { __THREE_SCENE__?: THREE.Scene; __THREE_STATE__?: typeof state }).
+                      __THREE_SCENE__ = state.scene;
+                    (window as Window & { __THREE_SCENE__?: THREE.Scene; __THREE_STATE__?: typeof state }).
+                      __THREE_STATE__ = state;
+                  }
+                }}
               >
                 <ModelPreviewScene
                   key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
@@ -628,6 +721,7 @@ function ModelViewer({
           side={side}
           model={model}
           modelVersionId={selectedVersion?.id || model.activeVersionId || null}
+          selectedVersion={selectedVersion}
           selectedTextureSetId={selectedTextureSetId}
           onTextureSetSelect={handleTextureSetSelect}
           onModelUpdated={handleModelUpdated}
@@ -637,6 +731,7 @@ function ModelViewer({
           onClose={() => setThumbnailWindowVisible(false)}
           side={side}
           model={model}
+          selectedVersion={selectedVersion}
           onRegenerate={handleRegenerateThumbnail}
         />
         <ModelHierarchyWindow
