@@ -4,6 +4,7 @@ Handles thumbnail loading and caching.
 """
 
 import bpy
+import bpy.utils.previews  # Must be imported explicitly
 import os
 import tempfile
 from pathlib import Path
@@ -96,6 +97,12 @@ class StaticThumbnail:
             
             # Also load into preview collection for icon display
             preview_id = f"modelibr_thumb_{self.thumbnail_key}"
+            
+            # Check if preview_collection is valid
+            if preview_collection is None:
+                print(f"[Modelibr] WARNING: preview_collection is None, cannot load preview")
+                return False
+            
             if preview_id not in preview_collection:
                 try:
                     print(f"[Modelibr] Loading into preview collection: {preview_id}")
@@ -172,6 +179,11 @@ class ThumbnailManager:
             StaticThumbnail instance or None if loading failed
         """
         print(f"[Modelibr ThumbnailManager] load_thumbnail called for key {thumbnail_key}")
+        
+        # Ensure preview collection is initialized
+        if self.preview_collection is None:
+            print(f"[Modelibr ThumbnailManager] preview_collection is None, initializing...")
+            self.initialize()
         
         if thumbnail_key in self.thumbnails:
             print(f"[Modelibr ThumbnailManager] Thumbnail already loaded for key {thumbnail_key}")

@@ -41,7 +41,8 @@ internal class GetModelVersionsQueryHandler : IQueryHandler<GetModelVersionsQuer
                 FileType = f.FileType.Value,
                 SizeBytes = f.SizeBytes,
                 IsRenderable = f.FileType.IsRenderable
-            }).ToList()
+            }).ToList(),
+            TextureSetIds = v.TextureSets.Select(ts => ts.Id).ToList()
         }).ToList();
 
         return Result.Success(new GetModelVersionsResponse(versionDtos));
@@ -63,6 +64,7 @@ public class ModelVersionDto
     public string? ThumbnailUrl { get; set; }
     public string? PngThumbnailUrl { get; set; }
     public List<VersionFileDto> Files { get; set; } = new();
+    public List<int> TextureSetIds { get; set; } = new();
 }
 
 public class VersionFileDto

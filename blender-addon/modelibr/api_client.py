@@ -1,23 +1,33 @@
+"""
+API client for communicating with the Modelibr server.
+Provides methods for fetching models, uploading files, and managing texture sets.
+"""
 import json
 import os
-import tempfile
 from urllib import request, error, parse
-from typing import Optional
-from http.client import HTTPResponse
+from typing import Optional, List, Dict, Any
 
-
-class ApiError(Exception):
-    def __init__(self, message: str, status_code: int = 0):
-        super().__init__(message)
-        self.status_code = status_code
+from .config import API_READ_TIMEOUT, API_UPLOAD_TIMEOUT, API_DOWNLOAD_TIMEOUT
+from .exceptions import ApiError, ConnectionError, AuthenticationError
 
 
 class ModelibrApiClient:
+    """HTTP client for the Modelibr REST API."""
+    
     def __init__(self, server_url: str, api_key: str = ""):
+        """
+        Initialize the API client.
+        
+        Args:
+            server_url: Base URL of the Modelibr server
+            api_key: Optional API key for authentication
+        """
         self.server_url = server_url.rstrip('/')
         self.api_key = api_key
-        self.read_timeout = 10  # Shorter timeout for read operations
-        self.upload_timeout = 300  # Longer timeout for uploads
+        self.read_timeout = API_READ_TIMEOUT
+        self.upload_timeout = API_UPLOAD_TIMEOUT
+        self.download_timeout = API_DOWNLOAD_TIMEOUT
+
 
     def _get_headers(self) -> dict:
         headers = {
@@ -50,13 +60,14 @@ class ModelibrApiClient:
             raise ApiError(f"Connection error: {e.reason}")
 
     def _download_file(self, endpoint: str, target_path: str) -> str:
+        """Download a file from the API to a local path."""
         url = f"{self.server_url}{endpoint}"
         headers = self._get_headers()
 
         req = request.Request(url, headers=headers, method="GET")
 
         try:
-            with request.urlopen(req, timeout=120) as response:
+            with request.urlopen(req, timeout=self.download_timeout) as response:
                 with open(target_path, 'wb') as f:
                     while chunk := response.read(8192):
                         f.write(chunk)
@@ -170,3 +181,92 @@ class ModelibrApiClient:
             return True
         except ApiError:
             return False
+
+    # Texture Set API Methods
+    
+    def get_texture_set(self, texture_set_id: int) -> dict:
+        """
+        Fetch a texture set by ID with all its textures.
+        
+        Returns dict with keys: id, name, createdAt, updatedAt, textureCount, isEmpty,
+        textures (list of {id, textureType, fileId, fileName, createdAt})
+        """
+        return self._make_request("GET", f"/texture-sets/{texture_set_id}")
+
+    def create_texture_set_with_file(self, file_path: str, name: str, 
+                                     texture_type: str = "Albedo") -> dict:
+        """
+        Create a new texture set with an initial texture file.
+        
+        Args:
+            file_path: Path to the texture file
+            name: Name for the texture set
+            texture_type: Type of texture (Albedo, Normal, Roughness, Metallic, etc.)
+        
+        Returns dict with keys: textureSetId, textureId, fileId
+        """
+        return self._upload_file(
+            "/texture-sets/with-file",
+            file_path,
+            {
+                "name": name,
+                "textureType": texture_type,
+            }
+        )
+
+    def add_texture_to_set(self, texture_set_id: int, file_id: int, 
+                           texture_type: str = "Albedo") -> dict:
+        """
+        Add an existing file as a texture to a texture set.
+        
+        Args:
+            texture_set_id: ID of the texture set
+            file_id: ID of the file to add as texture
+            texture_type: Type of texture
+        """
+        return self._make_request(
+            "POST",
+            f"/texture-sets/{texture_set_id}/textures",
+            data=json.dumps({"fileId": file_id, "textureType": texture_type}).encode('utf-8'),
+            content_type="application/json"
+        )
+
+    def associate_texture_set_with_version(self, texture_set_id: int, 
+                                           model_version_id: int) -> None:
+        """
+        Associate a texture set with a model version.
+        """
+        self._make_request(
+            "POST",
+            f"/texture-sets/{texture_set_id}/model-versions/{model_version_id}"
+        )
+
+    def disassociate_texture_set_from_version(self, texture_set_id: int,
+                                               model_version_id: int) -> None:
+        """
+        Remove association between a texture set and a model version.
+        """
+        self._make_request(
+            "DELETE",
+            f"/texture-sets/{texture_set_id}/model-versions/{model_version_id}"
+        )
+
+    def set_default_texture_set(self, model_id: int, texture_set_id: Optional[int],
+                                 model_version_id: int) -> dict:
+        """
+        Set a texture set as the default for a model version.
+        
+        Args:
+            model_id: ID of the model
+            texture_set_id: ID of the texture set to set as default (or None to clear)
+            model_version_id: ID of the model version
+        """
+        return self._make_request(
+            "PUT",
+            f"/models/{model_id}/defaultTextureSet",
+            data=json.dumps({
+                "textureSetId": texture_set_id,
+                "modelVersionId": model_version_id
+            }).encode('utf-8'),
+            content_type="application/json"
+        )

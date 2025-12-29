@@ -141,14 +141,12 @@ export class ApiHelper {
         modelVersionId: number,
         textureSetId: number | null
     ): Promise<void> {
-        const params = new URLSearchParams();
-        if (textureSetId !== null) {
-            params.append("textureSetId", textureSetId.toString());
-        }
-        params.append("modelVersionId", modelVersionId.toString());
-
         const response = await this.client.put(
-            `/models/${modelId}/defaultTextureSet?${params.toString()}`
+            `/models/${modelId}/defaultTextureSet`,
+            {
+                TextureSetId: textureSetId,
+                ModelVersionId: modelVersionId,
+            }
         );
 
         if (response.status !== 200) {

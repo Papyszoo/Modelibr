@@ -337,6 +337,8 @@ export class PuppeteerRenderer {
                 url,
                 texture => {
                   texture.colorSpace = THREE.SRGBColorSpace
+                  // Use default flipY=true (web standard)
+                  // Blender addon handles UV conversion on export/import
                   resolve(texture)
                 },
                 undefined,
