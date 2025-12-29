@@ -369,7 +369,7 @@ class MODELIBR_OT_browse_assets(Operator):
         # Ensure cleanup on cancellation as well
         if get_active_browse_window() == self:
             set_active_browse_window(None)
-        return {'CANCELLED'}
+        # cancel() must return None, not a set
 
 
 class MODELIBR_OT_refresh_browse(Operator):

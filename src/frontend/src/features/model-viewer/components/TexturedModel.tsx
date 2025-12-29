@@ -145,6 +145,8 @@ function OBJModelWithTextures({
       if (texture && texture.wrapS !== undefined) {
         texture.wrapS = THREE.RepeatWrapping
         texture.wrapT = THREE.RepeatWrapping
+        // Use default flipY=true (web standard)
+        // Blender addon handles UV conversion on export/import
       }
     })
   }
@@ -260,6 +262,8 @@ function GLTFModelWithTextures({
       if (texture && texture.wrapS !== undefined) {
         texture.wrapS = THREE.RepeatWrapping
         texture.wrapT = THREE.RepeatWrapping
+        // Use default flipY=true (web standard)
+        // Blender addon handles UV conversion on export/import
       }
     })
   }
@@ -374,6 +378,8 @@ function FBXModelWithTextures({
       if (texture && texture.wrapS !== undefined) {
         texture.wrapS = THREE.RepeatWrapping
         texture.wrapT = THREE.RepeatWrapping
+        // Use default flipY=true (web standard)
+        // Blender addon handles UV conversion on export/import
       }
     })
   }

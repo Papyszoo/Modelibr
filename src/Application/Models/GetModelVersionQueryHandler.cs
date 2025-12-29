@@ -32,6 +32,8 @@ internal class GetModelVersionQueryHandler : IQueryHandler<GetModelVersionQuery,
             VersionNumber = version.VersionNumber,
             Description = version.Description,
             CreatedAt = version.CreatedAt,
+            DefaultTextureSetId = version.DefaultTextureSetId,
+            TextureSetIds = version.TextureSets.Select(ts => ts.Id).ToList(),
             Files = version.Files.Select(f => new VersionFileDto
             {
                 Id = f.Id,

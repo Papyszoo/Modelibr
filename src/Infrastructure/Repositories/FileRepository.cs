@@ -78,4 +78,24 @@ internal sealed class FileRepository : IFileRepository
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
+
+    public async Task<bool> IsFileSharedAsync(int fileId, int excludeVersionId, CancellationToken cancellationToken = default)
+    {
+        // Get the file to check
+        var file = await _context.Files
+            .Where(f => f.Id == fileId)
+            .Select(f => new { f.Sha256Hash })
+            .FirstOrDefaultAsync(cancellationToken);
+        
+        if (file == null || string.IsNullOrEmpty(file.Sha256Hash))
+            return false;
+        
+        // Check if any other non-deleted file with the same hash exists for a different version
+        return await _context.Files
+            .Where(f => f.Sha256Hash == file.Sha256Hash)
+            .Where(f => f.Id != fileId)
+            .Where(f => f.ModelVersionId != excludeVersionId || f.ModelVersionId == null)
+            .Where(f => !f.IsDeleted)
+            .AnyAsync(cancellationToken);
+    }
 }

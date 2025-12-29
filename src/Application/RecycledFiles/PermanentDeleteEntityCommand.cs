@@ -190,11 +190,16 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (version2 == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("VersionNotFound", "Model version not found"));
                 
-                // Delete files from disk
+                // Delete files from disk ONLY if not shared by other versions
                 foreach (var versionFile in version2.Files)
                 {
-                    await _fileStorage.DeleteFileAsync(versionFile.FilePath, cancellationToken);
-                    deletedFiles.Add(new DeletedFileInfo(versionFile.FilePath, versionFile.OriginalFileName, versionFile.SizeBytes));
+                    var isShared = await _fileRepository.IsFileSharedAsync(versionFile.Id, version2.Id, cancellationToken);
+                    if (!isShared)
+                    {
+                        await _fileStorage.DeleteFileAsync(versionFile.FilePath, cancellationToken);
+                        deletedFiles.Add(new DeletedFileInfo(versionFile.FilePath, versionFile.OriginalFileName, versionFile.SizeBytes));
+                    }
+                    // If shared, file stays on disk but DB record for this version's file will be removed
                 }
                 
                 await _modelVersionRepository.DeleteAsync(version2, cancellationToken);

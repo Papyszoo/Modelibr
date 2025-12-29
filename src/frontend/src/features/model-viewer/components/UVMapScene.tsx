@@ -55,8 +55,10 @@ function UVMapScene({ width, height }: UVMapSceneProps): JSX.Element {
             const i3 = index.array[i + 2]
 
             // Get UV coordinates (0-1 range)
+            // No V flip needed since we use flipY=false in Three.js
+            // Canvas Y=0 is at top, V=0 is at bottom, so we use 1-v to display correctly
             const u1 = uvAttribute.getX(i1)
-            const v1 = 1 - uvAttribute.getY(i1) // Flip V
+            const v1 = 1 - uvAttribute.getY(i1)
             const u2 = uvAttribute.getX(i2)
             const v2 = 1 - uvAttribute.getY(i2)
             const u3 = uvAttribute.getX(i3)

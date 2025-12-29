@@ -4,6 +4,8 @@ using WebApi.Services;
 
 namespace WebApi.Endpoints;
 
+public record SetDefaultTextureSetRequest(int? TextureSetId, int? ModelVersionId);
+
 public static class ModelsEndpoints
 {
     public static void MapModelsEndpoints(this IEndpointRouteBuilder app)
@@ -50,9 +52,9 @@ public static class ModelsEndpoints
         })
         .WithName("Get Model File");
 
-        app.MapPut("/models/{id}/defaultTextureSet", async (int id, int? textureSetId, int? modelVersionId, ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> commandHandler) =>
+        app.MapPut("/models/{id}/defaultTextureSet", async (int id, SetDefaultTextureSetRequest request, ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> commandHandler) =>
         {
-            var result = await commandHandler.Handle(new SetDefaultTextureSetCommand(id, textureSetId, modelVersionId), CancellationToken.None);
+            var result = await commandHandler.Handle(new SetDefaultTextureSetCommand(id, request.TextureSetId, request.ModelVersionId), CancellationToken.None);
             
             if (!result.IsSuccess)
             {

@@ -5,7 +5,16 @@ Handles modification detection and object metadata management.
 
 import bpy
 import hashlib
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+
+from .config import (
+    METADATA_MODEL_ID,
+    METADATA_MODEL_NAME,
+    METADATA_VERSION_ID,
+    METADATA_VERSION_NUMBER,
+    METADATA_FILE_ID,
+    METADATA_ORIGINAL_HASH,
+)
 
 
 def calculate_object_hash(obj: bpy.types.Object) -> str:

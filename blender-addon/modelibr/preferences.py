@@ -33,7 +33,7 @@ class ModelibrPreferences(AddonPreferences):
     always_include_blend: BoolProperty(
         name="Always Include .blend File",
         description="Always include the .blend file when uploading",
-        default=False,
+        default=True,
     )
 
     def draw(self, context):

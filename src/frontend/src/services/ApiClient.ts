@@ -975,9 +975,9 @@ class ApiClient {
   ): Promise<{ modelId: number; defaultTextureSetId: number | null }> {
     const response = await this.client.put(
       `/models/${modelId}/defaultTextureSet`,
-      null,
       {
-        params: { textureSetId, modelVersionId },
+        TextureSetId: textureSetId,
+        ModelVersionId: modelVersionId,
       }
     )
 
