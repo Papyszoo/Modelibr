@@ -352,14 +352,21 @@ def export_textures(objects: List[bpy.types.Object], temp_dir: str) -> List[Dict
 
 def apply_textures_to_materials(objects: List[bpy.types.Object], 
                                  textures: List[Dict], 
-                                 temp_dir: str) -> bool:
+                                 temp_dir: str,
+                                 texture_set_id: Optional[int] = None) -> bool:
     """
     Apply downloaded textures to objects' materials.
+    
+    If texture_set_id is provided, images will be named with the texture set ID
+    prefix (e.g., 'modelibr_ts5_albedo.png') and reused if already loaded.
+    This allows multiple models sharing the same texture set to use the same
+    image datablocks, showing user count in Blender's UI.
     
     Args:
         objects: List of Blender objects to apply textures to
         textures: List of texture info dicts from API (fileId, fileName, textureType)
         temp_dir: Directory where texture files were downloaded
+        texture_set_id: Optional texture set ID for naming and reuse
     
     Returns:
         True if textures were applied successfully
@@ -384,6 +391,20 @@ def apply_textures_to_materials(objects: List[bpy.types.Object],
         if not filename:
             continue
         
+        # Create a unique, identifiable image name based on texture set ID
+        if texture_set_id:
+            image_name = f"modelibr_ts{texture_set_id}_{filename}"
+        else:
+            image_name = f"modelibr_{filename}"
+        
+        # Check if this image already exists in Blender (reuse for shared texture sets)
+        if image_name in bpy.data.images:
+            image = bpy.data.images[image_name]
+            print(f"[Modelibr] Reusing existing image: {image_name} (users: {image.users})")
+            loaded_images[texture_type] = image
+            continue
+        
+        # Image doesn't exist, need to load it from file
         filepath = os.path.join(temp_dir, filename)
         if not os.path.exists(filepath):
             print(f"[Modelibr] Texture file not found at: {filepath}")
@@ -393,11 +414,13 @@ def apply_textures_to_materials(objects: List[bpy.types.Object],
             # Flip texture from web convention (Y=0 at top) to Blender convention (V=0 at bottom)
             flip_image_vertical(filepath)
             
-            image = bpy.data.images.load(filepath, check_existing=True)
+            image = bpy.data.images.load(filepath, check_existing=False)
+            # Rename to our identifiable name for future reuse
+            image.name = image_name
             # Pack the image into .blend file so it persists after temp dir cleanup
             image.pack()
             loaded_images[texture_type] = image
-            print(f"[Modelibr] Loaded, flipped, and packed texture {filename} successfully")
+            print(f"[Modelibr] Loaded, flipped, and packed texture as: {image_name}")
         except Exception as e:
             print(f"[Modelibr] Failed to load texture {filepath}: {e}")
             continue

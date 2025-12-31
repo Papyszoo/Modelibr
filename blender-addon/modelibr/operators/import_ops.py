@@ -82,7 +82,9 @@ class MODELIBR_OT_import_model(Operator):
                     return {'CANCELLED'}
                 
                 # Apply textures and store metadata
-                texture_hash = self._apply_textures(new_objects, downloaded_textures, temp_dir)
+                texture_hash = self._apply_textures(
+                    new_objects, downloaded_textures, temp_dir, default_texture_set_id
+                )
                 self._store_metadata(
                     new_objects, model, version, file_to_import,
                     default_texture_set_id, texture_hash
@@ -247,7 +249,8 @@ class MODELIBR_OT_import_model(Operator):
         self, 
         new_objects: List[Object], 
         downloaded_textures: List[Dict[str, Any]], 
-        temp_dir: str
+        temp_dir: str,
+        texture_set_id: Optional[int] = None
     ) -> str:
         """Apply textures to imported objects and return texture hash."""
         if not downloaded_textures:
@@ -255,7 +258,9 @@ class MODELIBR_OT_import_model(Operator):
         
         try:
             from ..texture_utils import apply_textures_to_materials, calculate_material_textures_hash
-            success = apply_textures_to_materials(new_objects, downloaded_textures, temp_dir)
+            success = apply_textures_to_materials(
+                new_objects, downloaded_textures, temp_dir, texture_set_id
+            )
             if success:
                 debug_log("Successfully applied textures to materials")
                 for obj in new_objects:
@@ -524,7 +529,7 @@ class MODELIBR_OT_import_model_async(Operator):
             texture_hash = ""
             if downloaded_textures:
                 texture_hash = self._apply_textures(
-                    new_objects, downloaded_textures, self._temp_dir
+                    new_objects, downloaded_textures, self._temp_dir, self._texture_set_id
                 )
             
             # Store metadata
@@ -639,13 +644,16 @@ class MODELIBR_OT_import_model_async(Operator):
         self, 
         new_objects: List[Object], 
         downloaded_textures: List[Dict[str, Any]], 
-        temp_dir: str
+        temp_dir: str,
+        texture_set_id: Optional[int] = None
     ) -> str:
         if not downloaded_textures:
             return ""
         try:
             from ..texture_utils import apply_textures_to_materials, calculate_material_textures_hash
-            success = apply_textures_to_materials(new_objects, downloaded_textures, temp_dir)
+            success = apply_textures_to_materials(
+                new_objects, downloaded_textures, temp_dir, texture_set_id
+            )
             if success:
                 for obj in new_objects:
                     if obj.material_slots:

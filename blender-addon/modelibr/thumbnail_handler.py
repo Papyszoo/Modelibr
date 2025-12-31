@@ -78,24 +78,9 @@ class StaticThumbnail:
             self.thumbnail_path = downloaded_path
             print(f"[Modelibr] Using PNG thumbnail: {self.thumbnail_path}")
             
-            # Load into Blender's image data blocks
-            image_name = f"modelibr_thumb_{self.thumbnail_key}"
-            
-            # Check if image already loaded
-            if image_name in bpy.data.images:
-                img = bpy.data.images[image_name]
-                # Reload if path changed
-                if img.filepath != self.thumbnail_path:
-                    img.filepath = self.thumbnail_path
-                    img.reload()
-            else:
-                # Load new image
-                print(f"[Modelibr] Loading image into bpy.data.images: {self.thumbnail_path}")
-                img = bpy.data.images.load(self.thumbnail_path, check_existing=True)
-                img.name = image_name
-                print(f"[Modelibr] Image loaded successfully: {img.name}")
-            
-            # Also load into preview collection for icon display
+            # Load into preview collection for icon display only
+            # We intentionally do NOT load into bpy.data.images to avoid
+            # cluttering the image list and saving thumbnails with .blend files
             preview_id = f"modelibr_thumb_{self.thumbnail_key}"
             
             # Check if preview_collection is valid
@@ -139,13 +124,8 @@ class StaticThumbnail:
         return self.preview_id
     
     def cleanup(self):
-        """Clean up temporary files and image data"""
+        """Clean up temporary files"""
         try:
-            # Remove image from bpy.data.images
-            image_name = f"modelibr_thumb_{self.thumbnail_key}"
-            if image_name in bpy.data.images:
-                bpy.data.images.remove(bpy.data.images[image_name])
-            
             # Remove temporary file
             if self.thumbnail_path and os.path.exists(self.thumbnail_path):
                 os.remove(self.thumbnail_path)
