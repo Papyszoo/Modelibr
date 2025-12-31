@@ -108,7 +108,9 @@ class ImportService:
                     )
                 
                 # Apply textures and store metadata
-                texture_hash = self._apply_textures(new_objects, downloaded_textures, temp_dir)
+                texture_hash = self._apply_textures(
+                    new_objects, downloaded_textures, temp_dir, default_texture_set_id
+                )
                 self._store_metadata(
                     new_objects, model, version, file_to_import,
                     default_texture_set_id, texture_hash
@@ -254,7 +256,8 @@ class ImportService:
         self, 
         new_objects: List[Any], 
         downloaded_textures: List[Dict[str, Any]], 
-        temp_dir: str
+        temp_dir: str,
+        texture_set_id: Optional[int] = None
     ) -> str:
         """Apply textures to imported objects and return texture hash."""
         if not downloaded_textures:
@@ -262,7 +265,9 @@ class ImportService:
         
         try:
             from ..texture_utils import apply_textures_to_materials, calculate_material_textures_hash
-            success = apply_textures_to_materials(new_objects, downloaded_textures, temp_dir)
+            success = apply_textures_to_materials(
+                new_objects, downloaded_textures, temp_dir, texture_set_id
+            )
             if success:
                 for obj in new_objects:
                     if obj.material_slots:
