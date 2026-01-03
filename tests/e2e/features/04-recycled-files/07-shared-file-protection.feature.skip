@@ -1,4 +1,4 @@
-@depends-on:setup
+@depends-on:setup @skip.noimpl
 Feature: Shared File Protection
   Tests that files shared between multiple model versions are protected during deletion
 

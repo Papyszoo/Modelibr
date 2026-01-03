@@ -4,6 +4,15 @@ import ModelGrid from '../ModelGrid'
 import { Model } from '../../../../utils/fileUtils'
 import ApiClient from '../../../../services/ApiClient'
 
+// Mock useThumbnail hook to avoid import.meta.env issues
+jest.mock('../../../thumbnail/hooks/useThumbnail', () => ({
+  useThumbnail: jest.fn(() => ({
+    thumbnailDetails: { status: 'Processing' },
+    imgSrc: null,
+    refreshThumbnail: jest.fn(),
+  })),
+}))
+
 // Mock ApiClient for ThumbnailDisplay component
 jest.mock('../../../../services/ApiClient', () => ({
   __esModule: true,

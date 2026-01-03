@@ -1,0 +1,26 @@
+{
+  "id": "ai-documentation/FRONTEND",
+  "title": "Frontend Development Guide",
+  "description": "React 18+ application with TypeScript, Three.js for 3D rendering, and PrimeReact UI components.",
+  "source": "@site/docs/ai-documentation/FRONTEND.md",
+  "sourceDirName": "ai-documentation",
+  "slug": "/ai-documentation/FRONTEND",
+  "permalink": "/ai-documentation/FRONTEND",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Blender Addon",
+    "permalink": "/ai-documentation/BLENDER_ADDON"
+  },
+  "next": {
+    "title": "Testing Documentation",
+    "permalink": "/ai-documentation/TESTING"
+  }
+}

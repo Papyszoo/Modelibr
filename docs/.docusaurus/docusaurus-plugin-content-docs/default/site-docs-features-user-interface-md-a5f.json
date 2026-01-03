@@ -1,0 +1,26 @@
+{
+  "id": "features/user-interface",
+  "title": "User Interface",
+  "description": "Modelibr uses a flexible panel system that lets you organize your workspace and share layouts with URLs.",
+  "source": "@site/docs/features/user-interface.md",
+  "sourceDirName": "features",
+  "slug": "/features/user-interface",
+  "permalink": "/features/user-interface",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Blender Addon",
+    "permalink": "/features/blender-addon"
+  },
+  "next": {
+    "title": "AI Documentation",
+    "permalink": "/category/ai-documentation"
+  }
+}

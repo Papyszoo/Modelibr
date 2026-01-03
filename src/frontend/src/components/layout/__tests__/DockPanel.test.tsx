@@ -9,37 +9,43 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <DockProvider>{children}</DockProvider>
 )
 
-// Mock PrimeReact components
-jest.mock('primereact/button', () => ({
-  Button: ({
-    children,
-    onClick,
-    ...props
-  }: React.PropsWithChildren<{ onClick?: (e: React.MouseEvent) => void }>) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  ),
-}))
+// Mock PrimeReact components - use require inside factory to avoid scope issues
+jest.mock('primereact/button', () => {
+  const React = require('react')
+  return {
+    Button: ({
+      children,
+      onClick,
+      ...props
+    }: React.PropsWithChildren<{ onClick?: (e: React.MouseEvent) => void }>) => (
+      <button onClick={onClick} {...props}>
+        {children}
+      </button>
+    ),
+  }
+})
 
-jest.mock('primereact/contextmenu', () => ({
-  ContextMenu: React.forwardRef(
-    (
-      { children, ...props }: React.PropsWithChildren<unknown>,
-      ref: React.Ref<{ hide: () => void; show: (e: unknown) => void }>
-    ) => {
-      React.useImperativeHandle(ref, () => ({
-        hide: jest.fn(),
-        show: jest.fn(),
-      }))
-      return <div {...props}>{children}</div>
-    }
-  ),
-}))
+jest.mock('primereact/contextmenu', () => {
+  const React = require('react')
+  return {
+    ContextMenu: React.forwardRef(
+      (
+        { children, ...props }: React.PropsWithChildren<unknown>,
+        ref: React.Ref<{ hide: () => void; show: (e: unknown) => void }>
+      ) => {
+        React.useImperativeHandle(ref, () => ({
+          hide: jest.fn(),
+          show: jest.fn(),
+        }))
+        return <div {...props}>{children}</div>
+      }
+    ),
+  }
+})
 
 // Mock TabContent and DraggableTab components
 jest.mock('../TabContent', () => {
-  return function MockTabContent({ tab }: { tab: Tab }) {
+  return function MockTabContent({ tab }: { tab: { label?: string } }) {
     return <div data-testid="tab-content">{tab.label} Content</div>
   }
 })
@@ -50,7 +56,7 @@ jest.mock('../DraggableTab', () => {
     isActive,
     onClose,
   }: {
-    tab: Tab
+    tab: { id: string; label?: string }
     isActive: boolean
     onClose: () => void
   }) {
@@ -69,11 +75,14 @@ jest.mock('../DraggableTab', () => {
   }
 })
 
-jest.mock('../../../hooks/useTabContext', () => ({
-  TabProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="tab-provider">{children}</div>
-  ),
-}))
+jest.mock('../../../hooks/useTabContext', () => {
+  const React = require('react')
+  return {
+    TabProvider: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="tab-provider">{children}</div>
+    ),
+  }
+})
 
 describe('DockPanel', () => {
   const mockProps = {

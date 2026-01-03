@@ -1,0 +1,103 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/",
+          "mainDocId": "intro",
+          "docs": [
+            {
+              "id": "ai-documentation/BACKEND_API",
+              "path": "/ai-documentation/BACKEND_API",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "ai-documentation/BLENDER_ADDON",
+              "path": "/ai-documentation/BLENDER_ADDON",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "ai-documentation/FRONTEND",
+              "path": "/ai-documentation/FRONTEND",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "ai-documentation/MCP_TESTING_REPORT",
+              "path": "/ai-documentation/MCP_TESTING_REPORT",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "ai-documentation/TESTING",
+              "path": "/ai-documentation/TESTING",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "ai-documentation/WORKER",
+              "path": "/ai-documentation/WORKER",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "features/blender-addon",
+              "path": "/features/blender-addon",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "features/models",
+              "path": "/features/models",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "features/recycled-files",
+              "path": "/features/recycled-files",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "features/texture-sets",
+              "path": "/features/texture-sets",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "features/user-interface",
+              "path": "/features/user-interface",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "intro",
+              "path": "/",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "roadmap",
+              "path": "/roadmap",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "/category/features",
+              "path": "/category/features",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "/category/ai-documentation",
+              "path": "/category/ai-documentation",
+              "sidebar": "tutorialSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "tutorialSidebar": {
+              "link": {
+                "path": "/",
+                "label": "intro"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

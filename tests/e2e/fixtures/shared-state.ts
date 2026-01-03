@@ -26,6 +26,18 @@ interface TextureSetData {
     versionId?: number;
 }
 
+interface PackData {
+    id: number;
+    name: string;
+    description?: string;
+}
+
+interface ProjectData {
+    id: number;
+    name: string;
+    description?: string;
+}
+
 interface VersionState {
     thumbnailDetails: any;
     thumbnailSrc: string | null;
@@ -34,6 +46,8 @@ interface VersionState {
 interface StateData {
     models: Record<string, ModelData>;
     textureSets: Record<string, TextureSetData>;
+    packs: Record<string, PackData>;
+    projects: Record<string, ProjectData>;
     versionStates: Record<string, VersionState>;
 }
 
@@ -47,7 +61,7 @@ class SharedState {
         } catch (e) {
             console.error('Error loading shared state:', e);
         }
-        return { models: {}, textureSets: {}, versionStates: {} };
+        return { models: {}, textureSets: {}, packs: {}, projects: {}, versionStates: {} };
     }
 
     private saveState(state: StateData): void {
@@ -100,9 +114,45 @@ class SharedState {
         return state.versionStates[versionId.toString()];
     }
 
+    // Pack management
+    savePack(name: string, data: PackData): void {
+        const state = this.loadState();
+        if (!state.packs) state.packs = {};
+        state.packs[name] = data;
+        this.saveState(state);
+    }
+
+    getPack(name: string): PackData | undefined {
+        const state = this.loadState();
+        return state.packs?.[name];
+    }
+
+    hasPack(name: string): boolean {
+        const state = this.loadState();
+        return state.packs ? name in state.packs : false;
+    }
+
+    // Project management
+    saveProject(name: string, data: ProjectData): void {
+        const state = this.loadState();
+        if (!state.projects) state.projects = {};
+        state.projects[name] = data;
+        this.saveState(state);
+    }
+
+    getProject(name: string): ProjectData | undefined {
+        const state = this.loadState();
+        return state.projects?.[name];
+    }
+
+    hasProject(name: string): boolean {
+        const state = this.loadState();
+        return state.projects ? name in state.projects : false;
+    }
+
     // Clear all state (called at start of test run)
     clear(): void {
-        this.saveState({ models: {}, textureSets: {}, versionStates: {} });
+        this.saveState({ models: {}, textureSets: {}, packs: {}, projects: {}, versionStates: {} });
     }
 
     // Debug info
@@ -112,6 +162,8 @@ class SharedState {
             {
                 models: Object.keys(state.models),
                 textureSets: Object.keys(state.textureSets),
+                packs: Object.keys(state.packs || {}),
+                projects: Object.keys(state.projects || {}),
                 versionStates: Object.keys(state.versionStates),
             },
             null,

@@ -15,6 +15,14 @@
     "test-cube": {
       "id": 1,
       "name": "test-cube"
+    },
+    "pack-test-model": {
+      "id": 0,
+      "name": "test-cube"
+    },
+    "project-test-model": {
+      "id": 0,
+      "name": "test-cube"
     }
   },
   "textureSets": {
@@ -32,6 +40,23 @@
     }
   },
   "versionStates": {
+    "1": {
+      "thumbnailDetails": {
+        "Id": 1,
+        "ModelVersionId": 1,
+        "Status": 2,
+        "ThumbnailPath": "/var/lib/modelibr/uploads/92/3f/923ff0f655bf374b9e1ea16b982ba07d2ed933bcf7884155c7a0d77eb4d6a986",
+        "PngThumbnailPath": "/var/lib/modelibr/uploads/56/22/5622fa1fec0d6b914b0f09a9fc60c46b555dc96b516faec64e200869b4c7a7a6",
+        "SizeBytes": "19832",
+        "Width": 256,
+        "Height": 256,
+        "ErrorMessage": null,
+        "CreatedAt": "2026-01-02T12:14:58.727Z",
+        "UpdatedAt": "2026-01-02T22:39:55.229Z",
+        "ProcessedAt": "2026-01-02T22:39:55.229Z"
+      },
+      "thumbnailSrc": "http://localhost:8090/model-versions/1/thumbnail/file?t=1767393611655"
+    },
     "2": {
       "thumbnailDetails": {
         "Id": 3,
@@ -43,11 +68,11 @@
         "Width": 256,
         "Height": 256,
         "ErrorMessage": null,
-        "CreatedAt": "2025-12-27T21:36:28.937Z",
-        "UpdatedAt": "2025-12-27T21:37:00.949Z",
-        "ProcessedAt": "2025-12-27T21:37:00.949Z"
+        "CreatedAt": "2026-01-03T00:16:11.184Z",
+        "UpdatedAt": "2026-01-03T00:16:46.089Z",
+        "ProcessedAt": "2026-01-03T00:16:46.089Z"
       },
-      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=1766871438503"
+      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=1767399424233"
     },
     "4": {
       "thumbnailDetails": {
@@ -65,6 +90,28 @@
         "ProcessedAt": "2025-12-26T03:20:59.541Z"
       },
       "thumbnailSrc": "http://localhost:8090/model-versions/4/thumbnail/file?t=20251226032059"
+    }
+  },
+  "packs": {
+    "Test Asset Pack": {
+      "id": 1,
+      "name": "Test Asset Pack",
+      "description": "A test pack for E2E testing"
+    },
+    "Minimal Pack": {
+      "id": 2,
+      "name": "Minimal Pack"
+    }
+  },
+  "projects": {
+    "Test Project": {
+      "id": 1,
+      "name": "Test Project",
+      "description": "A test project for E2E testing"
+    },
+    "Minimal Project": {
+      "id": 2,
+      "name": "Minimal Project"
     }
   }
 }

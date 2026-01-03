@@ -1,36 +1,11 @@
 export default {
-  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
-  globals: {
-    'import.meta': {
-      env: {
-        VITE_API_BASE_URL: 'http://localhost:5009',
-      },
-    },
-  },
   transform: {
-    '^.+\\.(ts|tsx)$': [
-      'ts-jest',
-      {
-        useESM: true,
-        tsconfig: {
-          jsx: 'react-jsx',
-        },
-      },
-    ],
-    '^.+\\.(js|jsx|mjs)$': [
-      'babel-jest',
-      {
-        presets: [
-          ['@babel/preset-env', { targets: { node: 'current' } }],
-          ['@babel/preset-react', { runtime: 'automatic' }],
-        ],
-      },
-    ],
+    '^.+\\.(ts|tsx|js|jsx|mjs)$': 'babel-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'mjs'],
   testMatch: [
@@ -54,5 +29,4 @@ export default {
   transformIgnorePatterns: [
     'node_modules/(?!(three|@react-three|.*\\.mjs$))',
   ],
-  extensionsToTreatAsEsm: ['.ts', '.tsx'],
 }

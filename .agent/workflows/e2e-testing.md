@@ -2,7 +2,7 @@
 
 ## Environment Overview
 
-- **Development**: `docker-compose.yml` at root → localhost:3000 (frontend), localhost:5000 (API)
+- **Development**: `docker-compose.yml` at root → localhost:3000 (frontend), localhost:5009 or 8080 (API)
 - **E2E Tests**: `tests/e2e/docker-compose.e2e.yml` → localhost:3002 (frontend), localhost:8090 (API), localhost:5433 (Postgres)
 
 ## Before Accessing E2E Application
@@ -68,12 +68,11 @@ The application deduplicates files by SHA256 hash:
 2. **Version upload**: Reuses existing file entity but creates new version
 
 **Impact on Tests**: Each test scenario that creates a model must use a UNIQUE file. Available test files:
-- `test-cube.glb`
+- `test-cube.glb` ← **Only GLB can be safely modified for uniqueness**
 - `test-torus.fbx`
 - `test-cone.fbx`
 - `test-cylinder.fbx`
 - `test-icosphere.fbx`
-- `test-uvsphere.obj`
 
 ## Shared State
 
@@ -95,5 +94,5 @@ Tests use `sharedState` singleton to pass data between scenarios. Key points:
 ```bash
 cd tests/e2e
 docker compose -f docker-compose.e2e.yml down -v
-Remove-Item -Path ./data -Recurse -Force
+rm -rf ./data
 ```
