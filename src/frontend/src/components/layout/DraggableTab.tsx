@@ -42,12 +42,12 @@ const getTabTooltip = (tab: Tab): string => {
     case 'textureSets':
       return 'Texture Sets'
     case 'textureSetViewer': {
-      return `Texture Set: ${tab.label || tab.modelId || 'Unknown'}`
+      return `Texture Set: ${tab.label || tab.setId || 'Unknown'}`
     }
     case 'packs':
       return 'Packs'
     case 'packViewer': {
-      return `Pack: ${tab.label || tab.modelId || 'Unknown'}`
+      return `Pack: ${tab.label || tab.packId || 'Unknown'}`
     }
     case 'projects':
       return 'Projects'

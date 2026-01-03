@@ -1,0 +1,26 @@
+{
+  "id": "features/texture-sets",
+  "title": "Texture Sets",
+  "description": "Texture Sets allow you to manage PBR (Physically Based Rendering) textures and apply them to your 3D models.",
+  "source": "@site/docs/features/texture-sets.md",
+  "sourceDirName": "features",
+  "slug": "/features/texture-sets",
+  "permalink": "/features/texture-sets",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Model Management",
+    "permalink": "/features/models"
+  },
+  "next": {
+    "title": "Recycled Files",
+    "permalink": "/features/recycled-files"
+  }
+}

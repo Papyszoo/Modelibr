@@ -1,0 +1,132 @@
+{
+  "/__docusaurus/debug-5ff": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---docusaurus-debugb-38-ad3"
+    }
+  },
+  "/__docusaurus/debug/config-5ba": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---docusaurus-debugb-38-ad3"
+    }
+  },
+  "/__docusaurus/debug/content-a2b": {
+    "__comp": "__comp---theme-debug-contentba-8-ce7",
+    "__context": {
+      "plugin": "plugin---docusaurus-debugb-38-ad3"
+    },
+    "__props": "__props---docusaurus-debug-content-3-c-0-be2"
+  },
+  "/__docusaurus/debug/globalData-c3c": {
+    "__comp": "__comp---theme-debug-global-dataede-0fa",
+    "__context": {
+      "plugin": "plugin---docusaurus-debugb-38-ad3"
+    }
+  },
+  "/__docusaurus/debug/metadata-156": {
+    "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
+    "__context": {
+      "plugin": "plugin---docusaurus-debugb-38-ad3"
+    }
+  },
+  "/__docusaurus/debug/registry-88c": {
+    "__comp": "__comp---theme-debug-registry-679-501",
+    "__context": {
+      "plugin": "plugin---docusaurus-debugb-38-ad3"
+    }
+  },
+  "/__docusaurus/debug/routes-000": {
+    "__comp": "__comp---theme-debug-routes-946-699",
+    "__context": {
+      "plugin": "plugin---docusaurus-debugb-38-ad3"
+    }
+  },
+  "/markdown-page-3d7": {
+    "__comp": "__comp---theme-mdx-page-1-f-3-b90",
+    "__context": {
+      "plugin": "plugin---markdown-pagea-74-7b5"
+    },
+    "content": "content---markdown-page-393-028"
+  },
+  "/-e5f": {
+    "__comp": "__comp---site-src-pages-index-tsx-1-df-d3e",
+    "__context": {
+      "plugin": "plugin---markdown-pagea-74-7b5"
+    },
+    "config": "config---5-e-9-4f3"
+  },
+  "/-eeb": {
+    "__comp": "__comp---theme-docs-root-5-e-9-0b6",
+    "__context": {
+      "plugin": "plugin---aba-d70"
+    }
+  },
+  "/-08c": {
+    "__comp": "__comp---theme-doc-version-roota-7-b-5de",
+    "__props": "__props---22-d-307"
+  },
+  "/-8fe": {
+    "__comp": "__comp---theme-doc-roota-94-67a"
+  },
+  "/ai-documentation/BACKEND_API-ae0": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---ai-documentation-backend-api-9-e-6-7c0"
+  },
+  "/ai-documentation/BLENDER_ADDON-80e": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---ai-documentation-blender-addon-9-bd-f51"
+  },
+  "/ai-documentation/FRONTEND-8b6": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---ai-documentation-fronten-dc-93-8c0"
+  },
+  "/ai-documentation/MCP_TESTING_REPORT-31c": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---ai-documentation-mcp-testing-report-574-16c"
+  },
+  "/ai-documentation/TESTING-6c3": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---ai-documentation-testing-209-f0d"
+  },
+  "/ai-documentation/WORKER-322": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---ai-documentation-worke-rfc-8-98d"
+  },
+  "/category/ai-documentation-d47": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "__props": "__props---category-ai-documentationcd-8-fce"
+  },
+  "/category/features-ae7": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "__props": "__props---category-features-70-a-cfc"
+  },
+  "/features/blender-addon-f14": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---features-blender-addonf-5-d-56e"
+  },
+  "/features/models-5a5": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---features-models-1-b-9-ea2"
+  },
+  "/features/recycled-files-c50": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---features-recycled-files-03-a-56c"
+  },
+  "/features/texture-sets-985": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---features-texture-sets-46-d-7a1"
+  },
+  "/features/user-interface-41a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---features-user-interfacea-5-f-a6d"
+  },
+  "/roadmap-8cb": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---roadmap-0-df-c9a"
+  },
+  "/-fc9": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---0-e-3-279"
+  }
+}

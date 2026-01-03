@@ -465,6 +465,24 @@ def apply_textures_to_materials(objects: List[bpy.types.Object],
                 print(f"[Modelibr]     No Principled BSDF found in material, available nodes: {[n.type for n in nodes]}")
                 continue
             
+            # Remove existing texture nodes (e.g., blank embedded textures from FBX)
+            # This ensures clean texture application from Modelibr texture sets
+            nodes_to_remove = []
+            for node in nodes:
+                if node.type == 'TEX_IMAGE':
+                    nodes_to_remove.append(node)
+                    print(f"[Modelibr]       Removing existing texture node: {node.name}")
+                elif node.type == 'NORMAL_MAP':
+                    # Also remove normal map nodes that were connected to embedded textures
+                    nodes_to_remove.append(node)
+                    print(f"[Modelibr]       Removing existing normal map node: {node.name}")
+            
+            for node in nodes_to_remove:
+                nodes.remove(node)
+            
+            if nodes_to_remove:
+                print(f"[Modelibr]     Removed {len(nodes_to_remove)} existing texture/normal nodes")
+            
             print(f"[Modelibr]     Found Principled BSDF, applying textures...")
             
             # Apply each texture type
@@ -505,6 +523,27 @@ def apply_textures_to_materials(objects: List[bpy.types.Object],
                     links.new(tex_node.outputs['Color'], principled.inputs[input_name])
                 
                 print(f"[Modelibr]       Successfully connected texture node!")
+    
+    # Clean up orphan images that were created from FBX embedded textures
+    # These are images with 0 users that aren't Modelibr textures
+    orphan_images = []
+    for img in bpy.data.images:
+        # Skip our Modelibr images (they have the modelibr_ prefix)
+        if img.name.startswith('modelibr_'):
+            continue
+        # Skip built-in images
+        if img.name in ['Render Result', 'Viewer Node']:
+            continue
+        # Check if image has no users (orphan)
+        if img.users == 0:
+            orphan_images.append(img)
+            print(f"[Modelibr] Found orphan image to remove: {img.name}")
+    
+    for img in orphan_images:
+        bpy.data.images.remove(img)
+    
+    if orphan_images:
+        print(f"[Modelibr] Cleaned up {len(orphan_images)} orphan images from FBX import")
     
     return True
 

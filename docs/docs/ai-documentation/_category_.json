@@ -1,0 +1,8 @@
+{
+  "label": "AI Documentation",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "description": "Technical documentation for AI agents working on the Modelibr codebase."
+  }
+}

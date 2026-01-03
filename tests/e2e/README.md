@@ -230,7 +230,7 @@ Tests share state via `SharedState`:
 import { sharedState } from '../fixtures/shared-state';
 
 // Store model reference
-sharedState.setModel('my-model', { id: 1, name: 'test-cube' });
+sharedState.saveModel('my-model', { id: 1, name: 'test-cube' });
 
 // Retrieve model
 const model = sharedState.getModel('my-model');
@@ -512,7 +512,7 @@ Feature: My New Feature
 Given("I upload a unique model as {string}", async ({ page }, alias: string) => {
     const filePath = await UniqueFileGenerator.generate('test-cube.glb');
     // ... upload logic
-    sharedState.setModel(alias, { id, name });
+    sharedState.saveModel(alias, { id, name });
 });
 ```
 

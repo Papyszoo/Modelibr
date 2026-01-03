@@ -84,6 +84,7 @@ tests/e2e/
   - **WebApi**: `http://localhost:8090`
   - **Frontend**: `http://localhost:3002`
   - **PostgreSQL**: `localhost:5433`
+  - **Worker**: `http://localhost:3003`
 
 ### Running Tests
 ```bash
@@ -100,8 +101,10 @@ The `run-e2e.js` script handles:
 ## Test Assets
 
 Located in `tests/e2e/assets/`:
-- **Models**: `test-cube.glb`, `test-cylinder.fbx`
-- **Textures**: `blue_color.png`, `red_color.png`
+- **Models**: `test-cube.glb` (GLB only - safe to modify), `test-cone.fbx`, `test-cylinder.fbx`, `test-icosphere.fbx`, `test-torus.fbx`
+- **Textures**: `blue_color.png`, `red_color.png`, `green_color.png`, `yellow_color.png`, `pink_color.png`, `black_color.png`
+
+> **WARNING**: Only `.glb` files can be safely modified for uniqueness via `UniqueFileGenerator`. FBX/OBJ files are binary and will corrupt if modified.
 
 ## Critical Selector Patterns
 

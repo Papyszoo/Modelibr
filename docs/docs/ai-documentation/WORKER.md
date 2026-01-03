@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # Thumbnail Worker Service
 
 Node.js microservice for generating 3D model thumbnails and animated previews. Operates independently from the .NET Web API, communicating via REST API and SignalR.

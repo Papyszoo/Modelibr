@@ -1,12 +1,25 @@
 import { render, screen } from '@testing-library/react'
 import ModelInfo from '../ModelInfo'
 
+// Mock the ApiClient
+jest.mock('../../../../services/ApiClient', () => ({
+  __esModule: true,
+  default: {
+    updateModelTags: jest.fn(),
+    disassociateTextureSetFromModelVersion: jest.fn(),
+    getAllTextureSets: jest.fn().mockResolvedValue([]),
+  },
+}))
+
 describe('ModelInfo', () => {
   const mockModel = {
     id: 'test-model-123',
     createdAt: '2024-01-15T10:30:00Z',
     updatedAt: '2024-01-16T14:45:00Z',
     files: [{ originalFileName: 'test-model.obj' }],
+    tags: '',
+    description: '',
+    textureSets: [],
   }
 
   it('should render model information correctly', () => {
@@ -29,23 +42,12 @@ describe('ModelInfo', () => {
     expect(screen.getByText(updatedDate)).toBeInTheDocument()
   })
 
-  it('should display TSL rendering features', () => {
+  it('should display AI Classification section', () => {
     render(<ModelInfo model={mockModel} />)
 
-    expect(screen.getByText('TSL Rendering Features')).toBeInTheDocument()
-    expect(
-      screen.getByText(/Real-time physically based rendering/)
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/Dynamic lighting with shadow mapping/)
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/Material metalness and roughness controls/)
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/Environment mapping for reflections/)
-    ).toBeInTheDocument()
-    expect(screen.getByText(/Interactive orbit controls/)).toBeInTheDocument()
+    expect(screen.getByText('AI Classification')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Add new tag...')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Enter description...')).toBeInTheDocument()
   })
 
   it('should display control instructions', () => {
@@ -59,9 +61,8 @@ describe('ModelInfo', () => {
 
   it('should handle model without files', () => {
     const modelWithoutFiles = {
+      ...mockModel,
       id: 'test-model-456',
-      createdAt: '2024-01-15T10:30:00Z',
-      updatedAt: '2024-01-16T14:45:00Z',
       files: [],
     }
 
@@ -73,9 +74,8 @@ describe('ModelInfo', () => {
 
   it('should handle model with multiple files', () => {
     const modelWithMultipleFiles = {
+      ...mockModel,
       id: 'test-model-789',
-      createdAt: '2024-01-15T10:30:00Z',
-      updatedAt: '2024-01-16T14:45:00Z',
       files: [
         { originalFileName: 'model.gltf' },
         { originalFileName: 'texture.jpg' },
@@ -91,15 +91,54 @@ describe('ModelInfo', () => {
   it('should render all required sections', () => {
     render(<ModelInfo model={mockModel} />)
 
-    // Check that all three main sections are present
+    // Check that all four main sections are present
     expect(
       screen.getByRole('heading', { name: 'Model Information' })
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: 'TSL Rendering Features' })
+      screen.getByRole('heading', { name: 'AI Classification' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Linked Texture Sets' })
     ).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: 'Controls' })
     ).toBeInTheDocument()
+  })
+
+  it('should display Linked Texture Sets section', () => {
+    render(<ModelInfo model={mockModel} />)
+
+    expect(screen.getByText('Linked Texture Sets')).toBeInTheDocument()
+    expect(screen.getByText('No texture sets linked')).toBeInTheDocument()
+    expect(screen.getByLabelText('Link Texture Sets')).toBeInTheDocument()
+  })
+
+  it('should display model tags when provided', () => {
+    const modelWithTags = {
+      ...mockModel,
+      tags: 'character, sci-fi, robot',
+    }
+
+    render(<ModelInfo model={modelWithTags} />)
+
+    expect(screen.getByText('character')).toBeInTheDocument()
+    expect(screen.getByText('sci-fi')).toBeInTheDocument()
+    expect(screen.getByText('robot')).toBeInTheDocument()
+  })
+
+  it('should display linked texture sets when provided', () => {
+    const modelWithTextureSets = {
+      ...mockModel,
+      textureSets: [
+        { id: 1, name: 'Metal Texture' },
+        { id: 2, name: 'Wood Texture' },
+      ],
+    }
+
+    render(<ModelInfo model={modelWithTextureSets} />)
+
+    expect(screen.getByText('Metal Texture')).toBeInTheDocument()
+    expect(screen.getByText('Wood Texture')).toBeInTheDocument()
   })
 })
