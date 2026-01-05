@@ -25,8 +25,8 @@ docker compose up -d
 ```
 
 The application will be available at:
-- **Frontend**: http://localhost:5173
-- **API**: http://localhost:5009
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:8080
 
 ### 2. Upload Your First Model
 

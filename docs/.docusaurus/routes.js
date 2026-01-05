@@ -43,109 +43,122 @@ export default [
     exact: true
   },
   {
-    path: '/',
-    component: ComponentCreator('/', 'e5f'),
-    exact: true
-  },
-  {
-    path: '/',
-    component: ComponentCreator('/', 'eeb'),
+    path: '/docs',
+    component: ComponentCreator('/docs', '303'),
     routes: [
       {
-        path: '/',
-        component: ComponentCreator('/', '08c'),
+        path: '/docs',
+        component: ComponentCreator('/docs', 'cd1'),
         routes: [
           {
-            path: '/',
-            component: ComponentCreator('/', '8fe'),
+            path: '/docs',
+            component: ComponentCreator('/docs', '70d'),
             routes: [
               {
-                path: '/ai-documentation/BACKEND_API',
-                component: ComponentCreator('/ai-documentation/BACKEND_API', 'ae0'),
+                path: '/docs/',
+                component: ComponentCreator('/docs/', '698'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/ai-documentation/BLENDER_ADDON',
-                component: ComponentCreator('/ai-documentation/BLENDER_ADDON', '80e'),
+                path: '/docs/ai-documentation/API_CONTRACTS',
+                component: ComponentCreator('/docs/ai-documentation/API_CONTRACTS', '88a'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/ai-documentation/FRONTEND',
-                component: ComponentCreator('/ai-documentation/FRONTEND', '8b6'),
+                path: '/docs/ai-documentation/BACKEND_API',
+                component: ComponentCreator('/docs/ai-documentation/BACKEND_API', 'd46'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/ai-documentation/MCP_TESTING_REPORT',
-                component: ComponentCreator('/ai-documentation/MCP_TESTING_REPORT', '31c'),
+                path: '/docs/ai-documentation/BLENDER_ADDON',
+                component: ComponentCreator('/docs/ai-documentation/BLENDER_ADDON', 'd24'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/ai-documentation/TESTING',
-                component: ComponentCreator('/ai-documentation/TESTING', '6c3'),
+                path: '/docs/ai-documentation/FRONTEND',
+                component: ComponentCreator('/docs/ai-documentation/FRONTEND', '145'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/ai-documentation/WORKER',
-                component: ComponentCreator('/ai-documentation/WORKER', '322'),
+                path: '/docs/ai-documentation/MCP_TESTING_REPORT',
+                component: ComponentCreator('/docs/ai-documentation/MCP_TESTING_REPORT', 'b0a'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/category/ai-documentation',
-                component: ComponentCreator('/category/ai-documentation', 'd47'),
+                path: '/docs/ai-documentation/TESTING',
+                component: ComponentCreator('/docs/ai-documentation/TESTING', '8d5'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/category/features',
-                component: ComponentCreator('/category/features', 'ae7'),
+                path: '/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING',
+                component: ComponentCreator('/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING', 'af4'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/features/blender-addon',
-                component: ComponentCreator('/features/blender-addon', 'f14'),
+                path: '/docs/ai-documentation/WORKER',
+                component: ComponentCreator('/docs/ai-documentation/WORKER', '64c'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/features/models',
-                component: ComponentCreator('/features/models', '5a5'),
+                path: '/docs/category/ai-documentation',
+                component: ComponentCreator('/docs/category/ai-documentation', 'fee'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/features/recycled-files',
-                component: ComponentCreator('/features/recycled-files', 'c50'),
+                path: '/docs/category/features',
+                component: ComponentCreator('/docs/category/features', 'ff0'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/features/texture-sets',
-                component: ComponentCreator('/features/texture-sets', '985'),
+                path: '/docs/changelog',
+                component: ComponentCreator('/docs/changelog', 'a62'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/features/user-interface',
-                component: ComponentCreator('/features/user-interface', '41a'),
+                path: '/docs/features/blender-addon',
+                component: ComponentCreator('/docs/features/blender-addon', '2ad'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/roadmap',
-                component: ComponentCreator('/roadmap', '8cb'),
+                path: '/docs/features/models',
+                component: ComponentCreator('/docs/features/models', '27f'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },
               {
-                path: '/',
-                component: ComponentCreator('/', 'fc9'),
+                path: '/docs/features/recycled-files',
+                component: ComponentCreator('/docs/features/recycled-files', 'e5c'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/docs/features/texture-sets',
+                component: ComponentCreator('/docs/features/texture-sets', 'fff'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/docs/features/user-interface',
+                component: ComponentCreator('/docs/features/user-interface', '6a9'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/docs/roadmap',
+                component: ComponentCreator('/docs/roadmap', 'ced'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               }
@@ -154,6 +167,11 @@ export default [
         ]
       }
     ]
+  },
+  {
+    path: '/',
+    component: ComponentCreator('/', 'e5f'),
+    exact: true
   },
   {
     path: '*',

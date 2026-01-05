@@ -5,7 +5,7 @@
   "source": "@site/docs/features/user-interface.md",
   "sourceDirName": "features",
   "slug": "/features/user-interface",
-  "permalink": "/features/user-interface",
+  "permalink": "/docs/features/user-interface",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Blender Addon",
-    "permalink": "/features/blender-addon"
+    "permalink": "/docs/features/blender-addon"
   },
   "next": {
     "title": "AI Documentation",
-    "permalink": "/category/ai-documentation"
+    "permalink": "/docs/category/ai-documentation"
   }
 }

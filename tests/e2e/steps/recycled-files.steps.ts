@@ -213,6 +213,47 @@ WhenBdd("I navigate back to the model list", async ({ page }) => {
     console.log("[Navigation] Navigated back to model list");
 });
 
+WhenBdd("I navigate back to the model viewer", async ({ page }) => {
+    // Try multiple possible model keys from shared state
+    const modelKeys = ["multi-version-test-model", "multiVersionModel", "test-model"];
+    let modelId: number | null = null;
+    
+    for (const key of modelKeys) {
+        const model = sharedState.getModel(key);
+        if (model && model.id) {
+            modelId = model.id;
+            console.log(`[Navigation] Found model ID ${modelId} from shared state key "${key}"`);
+            break;
+        }
+    }
+    
+    if (modelId) {
+        await page.goto(`http://localhost:3002/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`);
+        await page.waitForTimeout(1500);
+        console.log(`[Navigation] Navigated back to model viewer for model ${modelId}`);
+    } else {
+        // Fallback: go to model list and look for any model that was recently created
+        console.log("[Navigation] No model found in shared state, using fallback");
+        const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+        
+        // Get the latest model from API
+        const response = await page.request.get(`${API_BASE}/models`);
+        const data = await response.json();
+        const models = data.models || [];
+        
+        if (models.length > 0) {
+            // Get the last model (most recently created tends to be last)
+            const latestModel = models[models.length - 1];
+            modelId = latestModel.id;
+            await page.goto(`http://localhost:3002/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`);
+            await page.waitForTimeout(1500);
+            console.log(`[Navigation] Navigated back to model viewer for latest model ${modelId}`);
+        } else {
+            throw new Error("No models found to navigate to");
+        }
+    }
+});
+
 // ============================================
 // Action Steps
 // ============================================
@@ -449,7 +490,7 @@ GivenBdd(
         const modelListPage = new ModelListPage(page);
         
         // Upload first version
-        const filePath = UniqueFileGenerator.generate("test-cube.glb");
+        const filePath = await UniqueFileGenerator.generate("test-cube.glb");
         await modelListPage.uploadModel(filePath);
         
         // Wait for model to appear
@@ -470,7 +511,7 @@ GivenBdd(
         }
         
         // Upload second version
-        const versionFilePath = UniqueFileGenerator.generate("test-torus.fbx");
+        const versionFilePath = await UniqueFileGenerator.generate("test-torus.fbx");
         
         // Click add version button
         const addVersionBtn = page.locator("button:has-text('Add Version')");

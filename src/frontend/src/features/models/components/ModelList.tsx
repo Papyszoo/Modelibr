@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, JSX } from 'react'
+import { useState, useEffect, useRef, JSX, useCallback } from 'react'
 import './ModelList.css'
 // eslint-disable-next-line no-restricted-imports -- ModelList needs direct API access for fetching models
 import ApiClient from '../../../services/ApiClient'
@@ -18,6 +18,7 @@ import LoadingState from './LoadingState'
 import ErrorState from './ErrorState'
 import EmptyState from './EmptyState'
 import ModelGrid from './ModelGrid'
+import { PackDto, ProjectDto } from '../../../types'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
@@ -75,6 +76,10 @@ function ModelListContent({
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string>('')
+  const [packs, setPacks] = useState<PackDto[]>([])
+  const [projects, setProjects] = useState<ProjectDto[]>([])
+  const [selectedPackIds, setSelectedPackIds] = useState<number[]>([])
+  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([])
   const toast = useRef<Toast>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { refreshModels } = useApiCache()
@@ -97,14 +102,37 @@ function ModelListContent({
   const { onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDragAndDrop(uploadMultipleFiles)
 
-  useEffect(() => {
-    fetchModels()
+  // Fetch packs and projects for filtering
+  const fetchFilterOptions = useCallback(async () => {
+    try {
+      const [packsData, projectsData] = await Promise.all([
+        ApiClient.getAllPacks(),
+        ApiClient.getAllProjects(),
+      ])
+      setPacks(packsData)
+      setProjects(projectsData)
+    } catch (err) {
+      console.error('Failed to fetch filter options:', err)
+    }
   }, [])
 
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     try {
       setLoading(true)
-      const models = await ApiClient.getModels()
+      
+      // For multiselect, we need to handle multiple selections
+      // The API currently only supports single packId or projectId
+      // So we fetch for the first selected pack/project if any
+      const options: { packId?: number; projectId?: number } = {}
+      if (selectedPackIds.length > 0) {
+        // Use first selected pack for now (API limitation)
+        options.packId = selectedPackIds[0]
+      } else if (selectedProjectIds.length > 0) {
+        // Use first selected project for now (API limitation)
+        options.projectId = selectedProjectIds[0]
+      }
+      
+      const models = await ApiClient.getModels(options)
       setModels(models)
     } catch (err) {
       setError(
@@ -113,7 +141,15 @@ function ModelListContent({
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedPackIds, selectedProjectIds])
+
+  useEffect(() => {
+    fetchFilterOptions()
+  }, [fetchFilterOptions])
+
+  useEffect(() => {
+    fetchModels()
+  }, [fetchModels])
 
   const handleRefresh = async () => {
     refreshModels() // Invalidate cache
@@ -153,6 +189,34 @@ function ModelListContent({
     }
   }
 
+  const handlePackFilterChange = (packIds: number[]) => {
+    setSelectedPackIds(packIds)
+    // Clear project selection when pack is selected (they are mutually exclusive for now)
+    if (packIds.length > 0) {
+      setSelectedProjectIds([])
+    }
+  }
+
+  const handleProjectFilterChange = (projectIds: number[]) => {
+    setSelectedProjectIds(projectIds)
+    // Clear pack selection when project is selected (they are mutually exclusive for now)
+    if (projectIds.length > 0) {
+      setSelectedPackIds([])
+    }
+  }
+
+  // Build contextual message for empty state
+  const getEmptyStateMessage = () => {
+    if (selectedPackIds.length > 0) {
+      const packName = packs.find(p => p.id === selectedPackIds[0])?.name
+      return `No models in pack "${packName}"`
+    } else if (selectedProjectIds.length > 0) {
+      const projectName = projects.find(p => p.id === selectedProjectIds[0])?.name
+      return `No models in project "${projectName}"`
+    }
+    return undefined
+  }
+
   return (
     <div className={`model-list ${isTabContent ? 'model-list-tab' : ''}`}>
       <Toast ref={toast} />
@@ -190,6 +254,7 @@ function ModelListContent({
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
+        customMessage={getEmptyStateMessage()}
       />
 
       {!loading && !error && models.length > 0 && (
@@ -201,6 +266,12 @@ function ModelListContent({
           onDragEnter={onDragEnter}
           onDragLeave={onDragLeave}
           onModelRecycled={handleModelRecycled}
+          packs={packs}
+          projects={projects}
+          selectedPackIds={selectedPackIds}
+          selectedProjectIds={selectedProjectIds}
+          onPackFilterChange={handlePackFilterChange}
+          onProjectFilterChange={handleProjectFilterChange}
         />
       )}
     </div>

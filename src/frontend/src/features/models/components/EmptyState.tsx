@@ -4,6 +4,7 @@ interface EmptyStateProps {
   onDragOver: (e: React.DragEvent) => void
   onDragEnter: (e: React.DragEvent) => void
   onDragLeave: (e: React.DragEvent) => void
+  customMessage?: string
 }
 
 export default function EmptyState({
@@ -12,6 +13,7 @@ export default function EmptyState({
   onDragOver,
   onDragEnter,
   onDragLeave,
+  customMessage,
 }: EmptyStateProps) {
   if (!visible) return null
 
@@ -24,7 +26,7 @@ export default function EmptyState({
       onDragLeave={onDragLeave}
     >
       <i className="pi pi-box" style={{ fontSize: '4rem' }}></i>
-      <h3>No models found</h3>
+      <h3>{customMessage || 'No models found'}</h3>
       <p>Drag and drop 3D model files here to get started!</p>
     </div>
   )

@@ -35,6 +35,20 @@ function run(command, options = {}) {
     }
 }
 
+function runSilent(command) {
+    try {
+        return execSync(command, { encoding: 'utf-8' }).trim();
+    } catch {
+        return '';
+    }
+}
+
+function isE2ERunning() {
+    // Check if any containers from the E2E compose are running
+    const output = runSilent(`docker compose -f ${COMPOSE_FILE} ps -q`);
+    return output.length > 0;
+}
+
 function cleanup() {
     console.log('\n🧹 Cleaning up...\n');
     run(`docker compose -f ${COMPOSE_FILE} down -v`);
@@ -58,6 +72,28 @@ async function main() {
     
     console.log('🚀 Starting E2E test environment...\n');
     
+    // Always clean up data and state before starting for a fresh run
+    const dataPath = path.join(__dirname, 'data');
+    const statePath = path.join(__dirname, '.shared-state.json');
+    
+    // Stop any running containers first
+    if (isE2ERunning()) {
+        console.log('⚠️  E2E environment is already running. Stopping containers...\n');
+        run(`docker compose -f ${COMPOSE_FILE} down -v`);
+    }
+    
+    // Always clean data directory if it exists
+    if (fs.existsSync(dataPath)) {
+        fs.rmSync(dataPath, { recursive: true, force: true });
+        console.log('🗑️  Removed stale data directory');
+    }
+    
+    // Always clean shared state file if it exists
+    if (fs.existsSync(statePath)) {
+        fs.rmSync(statePath, { force: true });
+        console.log('🗑️  Removed stale shared state file');
+    }
+    
     // Start containers
     const startResult = run(`docker compose -f ${COMPOSE_FILE} up -d --build`);
     if (startResult !== 0) {
@@ -69,7 +105,9 @@ async function main() {
     console.log('\n🧪 Running tests...\n');
     
     // Run tests (use test:quick to avoid recursion since npm test now calls this script)
-    const testResult = run('npm run test:quick', { env: testEnv });
+    // Pass through any arguments from the command line
+    const args = process.argv.slice(2).join(' ');
+    const testResult = run(`npm run test:quick -- ${args}`, { env: testEnv });
     
     // Cleanup
     cleanup();

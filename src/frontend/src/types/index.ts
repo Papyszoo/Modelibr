@@ -37,17 +37,36 @@ export enum TextureType {
   AO = 4,
   Roughness = 5,
   Metallic = 6,
-  Diffuse = 7,
-  Specular = 8,
+  // Diffuse = 7 (REMOVED - use Albedo instead)
+  // Specular = 8 (REMOVED - not PBR standard)
   Emissive = 9,
   Bump = 10,
   Alpha = 11,
   Displacement = 12,
 }
 
+/**
+ * Represents a source channel from a texture file.
+ * Used for channel mapping where individual channels can be mapped to texture types.
+ */
+export enum TextureChannel {
+  /** Red channel (for grayscale textures like AO, Roughness, Metallic) */
+  R = 1,
+  /** Green channel */
+  G = 2,
+  /** Blue channel */
+  B = 3,
+  /** Alpha channel */
+  A = 4,
+  /** RGB group (for color textures like Albedo, Normal, Emissive) */
+  RGB = 5,
+}
+
 export interface TextureDto {
   id: number
   textureType: TextureType
+  /** Source channel from the file (R, G, B, A for grayscale, RGB for color) */
+  sourceChannel: TextureChannel
   fileId: number
   fileName?: string
   createdAt: string
@@ -107,11 +126,14 @@ export interface UpdateTextureSetResponse {
 export interface AddTextureToSetRequest {
   fileId: number
   textureType: TextureType
+  /** Optional source channel for channel-packed textures */
+  sourceChannel?: TextureChannel
 }
 
 export interface AddTextureToSetResponse {
   textureId: number
   setId: number
+  sourceChannel: TextureChannel
 }
 
 // Error response type

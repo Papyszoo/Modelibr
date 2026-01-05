@@ -28,7 +28,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          routeBasePath: '/', // Docs at root
+          routeBasePath: '/docs', // Docs at /docs, landing page at root
         },
         blog: false, // Disable blog
         theme: {
@@ -53,13 +53,18 @@ const config: Config = {
           label: 'Documentation',
         },
         {
-          href: '/ai-documentation/BACKEND_API',
+          href: '/docs/ai-documentation/BACKEND_API',
           label: 'AI Docs',
           position: 'left',
         },
         {
-          href: 'https://github.com/your-org/modelibr', // TODO: Update
+          href: 'https://github.com/Papyszoo/Modelibr',
           label: 'GitHub',
+          position: 'right',
+        },
+        {
+          href: '#', // TODO: Add Discord invite link
+          label: 'Discord',
           position: 'right',
         },
       ],
@@ -72,11 +77,11 @@ const config: Config = {
           items: [
             {
               label: 'Getting Started',
-              to: '/',
+              to: '/docs',
             },
             {
               label: 'Features',
-              to: '/category/features',
+              to: '/docs/category/features',
             },
           ],
         },
@@ -85,15 +90,28 @@ const config: Config = {
           items: [
             {
               label: 'Backend API',
-              href: '/ai-documentation/BACKEND_API',
+              href: '/docs/ai-documentation/BACKEND_API',
             },
             {
               label: 'Frontend',
-              href: '/ai-documentation/FRONTEND',
+              href: '/docs/ai-documentation/FRONTEND',
             },
             {
               label: 'Worker',
-              href: '/ai-documentation/WORKER',
+              href: '/docs/ai-documentation/WORKER',
+            },
+          ],
+        },
+        {
+          title: 'Community',
+          items: [
+            {
+              label: 'GitHub',
+              href: 'https://github.com/Papyszoo/Modelibr',
+            },
+            {
+              label: 'Discord',
+              href: '#', // TODO: Add Discord invite link
             },
           ],
         },

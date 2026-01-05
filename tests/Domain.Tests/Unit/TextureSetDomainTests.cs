@@ -158,7 +158,7 @@ public class TextureSetDomainTests
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() => textureSet.AddTexture(texture2, updatedAt));
         Assert.Contains("already exists", exception.Message);
-        Assert.Contains("Albedo", exception.Message);
+        Assert.Contains("Base color map", exception.Message);
     }
 
     [Fact]
@@ -371,19 +371,17 @@ public class TextureSetDomainTests
         // Assert
         Assert.Contains("My Pack", description);
         Assert.Contains("2 textures", description);
-        Assert.Contains("Base color or diffuse map", description); // Albedo description
+        Assert.Contains("Base color map", description); // Albedo description
         Assert.Contains("Normal map for surface detail", description); // Normal description
     }
 
     [Theory]
     [InlineData(TextureType.Albedo)]
     [InlineData(TextureType.Normal)]
-    [InlineData(TextureType.Height)]
     [InlineData(TextureType.AO)]
     [InlineData(TextureType.Roughness)]
     [InlineData(TextureType.Metallic)]
-    [InlineData(TextureType.Diffuse)]
-    [InlineData(TextureType.Specular)]
+    [InlineData(TextureType.Emissive)]
     public void HasTextureOfType_WithAllSupportedTypes_WorksCorrectly(TextureType textureType)
     {
         // Arrange

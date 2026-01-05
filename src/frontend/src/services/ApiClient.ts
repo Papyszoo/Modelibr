@@ -134,19 +134,36 @@ class ApiClient {
     return response.data
   }
 
-  async getModels(options: { skipCache?: boolean } = {}): Promise<Model[]> {
-    // Check cache first unless skipCache is true
-    if (!options.skipCache) {
+  async getModels(options: { skipCache?: boolean; packId?: number; projectId?: number } = {}): Promise<Model[]> {
+    // Check cache first unless skipCache is true or filters are applied
+    // When filtering, always fetch fresh data
+    const hasFilters = options.packId !== undefined || options.projectId !== undefined
+    if (!options.skipCache && !hasFilters) {
       const cached = useApiCacheStore.getState().getModels()
       if (cached) {
         return cached
       }
     }
 
-    const response: AxiosResponse<Model[]> = await this.client.get('/models')
+    // Build URL with query parameters for filtering
+    let url = '/models'
+    const params = new URLSearchParams()
+    if (options.packId !== undefined) {
+      params.append('packId', options.packId.toString())
+    }
+    if (options.projectId !== undefined) {
+      params.append('projectId', options.projectId.toString())
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`
+    }
 
-    // Update cache
-    useApiCacheStore.getState().setModels(response.data)
+    const response: AxiosResponse<Model[]> = await this.client.get(url)
+
+    // Only update cache when fetching all models (no filters)
+    if (!hasFilters) {
+      useApiCacheStore.getState().setModels(response.data)
+    }
 
     return response.data
   }
@@ -420,6 +437,21 @@ class ApiClient {
     useApiCacheStore.getState().invalidateTextureSets()
     useApiCacheStore.getState().invalidateTextureSetById(setId)
   }
+
+  async changeTextureChannel(
+    setId: number,
+    textureId: number,
+    sourceChannel: number
+  ): Promise<void> {
+    await this.client.put(`/texture-sets/${setId}/textures/${textureId}/channel`, {
+      sourceChannel,
+    })
+
+    // Invalidate texture sets cache when texture channels change
+    useApiCacheStore.getState().invalidateTextureSets()
+    useApiCacheStore.getState().invalidateTextureSetById(setId)
+  }
+
 
   async associateTextureSetWithModelVersion(
     setId: number,

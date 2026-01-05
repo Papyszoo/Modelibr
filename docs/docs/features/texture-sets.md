@@ -81,6 +81,60 @@ You can preview different textures without setting them as default:
 3. The 3D view updates immediately
 4. Switch between textures to compare
 
+## Channel Mapping
+
+Modelibr supports **channel-packed textures** like ORM (Occlusion/Roughness/Metallic) maps. You can extract individual channels from multi-channel images and assign them to different texture types.
+
+### Texture Set Viewer Tabs
+
+When you open a texture set, you'll see these tabs:
+
+#### Texture Types Tab
+
+Shows cards for each texture type (Albedo, Normal, Roughness, etc.):
+- **Click** an empty card to upload a texture for that type
+- **Drag and drop** files onto cards to replace
+- **Grayscale preview**: Non-RGB textures show their extracted channel as grayscale
+
+#### Files Tab
+
+Shows the source files used in the texture set:
+- **File preview**: Thumbnail of the original image
+- **RGB dropdown**: Shows how RGB channels are used (use merge dialog to change)
+- **R/G/B dropdowns**: When Split Channels is selected, change which texture type each channel represents
+- **A dropdown**: Change what the alpha channel is used for
+- **Used as**: Shows which texture types this file provides
+
+:::tip
+You can change **which texture type** a channel represents (e.g., change R from "Roughness" to "AO"). To set up the initial channel split from an ORM texture, use the **Merge Dialog**.
+:::
+
+### Height/Displacement/Bump
+
+These three texture types are **mutually exclusive** — only one can be active per texture set:
+
+- Special card with a **mode dropdown**
+- Switching modes changes the texture type
+- Helps when importing to Blender (determines shader node type)
+
+### Merging Texture Sets
+
+Drag one texture set onto another to merge:
+
+1. **Merge dialog** appears showing source files
+2. For each file, choose channel mapping:
+   - Use RGB as a single texture type, OR
+   - Split into individual R/G/B channels
+3. Assign texture types to each channel
+4. Click **Merge Textures**
+
+:::tip ORM Workflow
+For ORM packed textures:
+1. Select **Split Channels** for RGB
+2. Assign: R → AO, G → Roughness, B → Metallic
+3. Merge to automatically create three separate textures
+:::
+
 ## Managing Texture Sets
 
 ### Renaming
@@ -97,3 +151,4 @@ Texture sets are soft deleted to the Recycle Bin:
 :::warning
 Deleting a texture set will unlink it from all model versions using it.
 :::
+

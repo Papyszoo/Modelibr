@@ -5,7 +5,7 @@
   "source": "@site/docs/features/recycled-files.md",
   "sourceDirName": "features",
   "slug": "/features/recycled-files",
-  "permalink": "/features/recycled-files",
+  "permalink": "/docs/features/recycled-files",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Texture Sets",
-    "permalink": "/features/texture-sets"
+    "permalink": "/docs/features/texture-sets"
   },
   "next": {
     "title": "Blender Addon",
-    "permalink": "/features/blender-addon"
+    "permalink": "/docs/features/blender-addon"
   }
 }

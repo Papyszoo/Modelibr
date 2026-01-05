@@ -5,7 +5,7 @@
   "source": "@site/docs/features/blender-addon.md",
   "sourceDirName": "features",
   "slug": "/features/blender-addon",
-  "permalink": "/features/blender-addon",
+  "permalink": "/docs/features/blender-addon",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Recycled Files",
-    "permalink": "/features/recycled-files"
+    "permalink": "/docs/features/recycled-files"
   },
   "next": {
     "title": "User Interface",
-    "permalink": "/features/user-interface"
+    "permalink": "/docs/features/user-interface"
   }
 }

@@ -13,8 +13,6 @@ public class TextureTypeTests
     [InlineData(TextureType.AO)]
     [InlineData(TextureType.Roughness)]
     [InlineData(TextureType.Metallic)]
-    [InlineData(TextureType.Diffuse)]
-    [InlineData(TextureType.Specular)]
     [InlineData(TextureType.Emissive)]
     [InlineData(TextureType.Bump)]
     [InlineData(TextureType.Alpha)]
@@ -50,16 +48,14 @@ public class TextureTypeTests
         // Act
         var supportedTypes = TextureTypeExtensions.GetSupportedTypes();
 
-        // Assert
-        Assert.Equal(12, supportedTypes.Count);
+        // Assert - Diffuse and Specular have been removed, now 10 types
+        Assert.Equal(10, supportedTypes.Count);
         Assert.Contains(TextureType.Albedo, supportedTypes);
         Assert.Contains(TextureType.Normal, supportedTypes);
         Assert.Contains(TextureType.Height, supportedTypes);
         Assert.Contains(TextureType.AO, supportedTypes);
         Assert.Contains(TextureType.Roughness, supportedTypes);
         Assert.Contains(TextureType.Metallic, supportedTypes);
-        Assert.Contains(TextureType.Diffuse, supportedTypes);
-        Assert.Contains(TextureType.Specular, supportedTypes);
         Assert.Contains(TextureType.Emissive, supportedTypes);
         Assert.Contains(TextureType.Bump, supportedTypes);
         Assert.Contains(TextureType.Alpha, supportedTypes);
@@ -67,14 +63,12 @@ public class TextureTypeTests
     }
 
     [Theory]
-    [InlineData(TextureType.Albedo, "Base color or diffuse map")]
+    [InlineData(TextureType.Albedo, "Base color map")]
     [InlineData(TextureType.Normal, "Normal map for surface detail")]
-    [InlineData(TextureType.Height, "Height or displacement map")]
+    [InlineData(TextureType.Height, "Height map for parallax/displacement")]
     [InlineData(TextureType.AO, "Ambient Occlusion map")]
     [InlineData(TextureType.Roughness, "Surface roughness map")]
     [InlineData(TextureType.Metallic, "Metallic surface map")]
-    [InlineData(TextureType.Diffuse, "Diffuse color map (legacy)")]
-    [InlineData(TextureType.Specular, "Specular reflectivity map")]
     [InlineData(TextureType.Emissive, "Emissive map for glowing areas")]
     [InlineData(TextureType.Bump, "Bump map for surface detail")]
     [InlineData(TextureType.Alpha, "Alpha map for transparency")]
@@ -99,5 +93,35 @@ public class TextureTypeTests
 
         // Assert
         Assert.Equal("Unknown texture type", description);
+    }
+
+    [Theory]
+    [InlineData(TextureType.Height)]
+    [InlineData(TextureType.Displacement)]
+    [InlineData(TextureType.Bump)]
+    public void IsHeightRelatedType_WithHeightTypes_ReturnsTrue(TextureType textureType)
+    {
+        // Act
+        var isHeightRelated = textureType.IsHeightRelatedType();
+
+        // Assert
+        Assert.True(isHeightRelated);
+    }
+
+    [Theory]
+    [InlineData(TextureType.Albedo)]
+    [InlineData(TextureType.Normal)]
+    [InlineData(TextureType.AO)]
+    [InlineData(TextureType.Roughness)]
+    [InlineData(TextureType.Metallic)]
+    [InlineData(TextureType.Emissive)]
+    [InlineData(TextureType.Alpha)]
+    public void IsHeightRelatedType_WithNonHeightTypes_ReturnsFalse(TextureType textureType)
+    {
+        // Act
+        var isHeightRelated = textureType.IsHeightRelatedType();
+
+        // Assert
+        Assert.False(isHeightRelated);
     }
 }

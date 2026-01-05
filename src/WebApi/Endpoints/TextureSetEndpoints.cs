@@ -67,6 +67,12 @@ public static class TextureSetEndpoints
             .WithSummary("Changes the texture type of an existing texture in a set")
             .WithOpenApi();
 
+        app.MapPut("/texture-sets/{setId}/textures/{textureId}/channel", ChangeTextureChannel)
+            .WithName("Change Texture Channel")
+            .WithSummary("Changes the source channel of an existing texture in a set")
+            .WithOpenApi();
+
+
         // Model version association
         app.MapPost("/texture-sets/{packId}/model-versions/{modelVersionId}", AssociateTextureSetWithModelVersion)
             .WithName("Associate Texture Set with Model Version")
@@ -242,7 +248,7 @@ public static class TextureSetEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new AddTextureToPackCommand(id, request.FileId, request.TextureType), 
+            new AddTextureToPackCommand(id, request.FileId, request.TextureType, request.SourceChannel), 
             cancellationToken);
 
         if (!result.IsSuccess)
@@ -289,6 +295,26 @@ public static class TextureSetEndpoints
 
         return Results.NoContent();
     }
+
+    private static async Task<IResult> ChangeTextureChannel(
+        int setId,
+        int textureId,
+        [FromBody] ChangeTextureChannelRequest request,
+        ICommandHandler<UpdateTextureChannelCommand, UpdateTextureChannelResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UpdateTextureChannelCommand(setId, textureId, request.SourceChannel),
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
 
     private static async Task<IResult> AssociateTextureSetWithModelVersion(
         int packId,
@@ -348,5 +374,6 @@ public static class TextureSetEndpoints
 // Request DTOs
 public record CreateTextureSetRequest(string Name);
 public record UpdateTextureSetRequest(string Name);
-public record AddTextureToPackRequest(int FileId, TextureType TextureType);
+public record AddTextureToPackRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);
 public record ChangeTextureTypeRequest(TextureType TextureType);
+public record ChangeTextureChannelRequest(TextureChannel SourceChannel);

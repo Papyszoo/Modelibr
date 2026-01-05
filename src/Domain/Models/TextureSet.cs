@@ -117,11 +117,12 @@ public class TextureSet : AggregateRoot
 
     /// <summary>
     /// Adds a texture to the set, enforcing the business rule that only one texture per type is allowed.
+    /// Also enforces mutual exclusivity of Height, Displacement, and Bump types.
     /// </summary>
     /// <param name="texture">The texture to add</param>
     /// <param name="updatedAt">When the texture was added</param>
     /// <exception cref="ArgumentNullException">Thrown when texture is null</exception>
-    /// <exception cref="InvalidOperationException">Thrown when a texture of the same type already exists</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a texture of the same type already exists, or when Height/Displacement/Bump exclusivity is violated</exception>
     public void AddTexture(Texture texture, DateTime updatedAt)
     {
         if (texture == null)
@@ -132,6 +133,18 @@ public class TextureSet : AggregateRoot
             throw new InvalidOperationException(
                 $"A texture of type '{texture.TextureType.GetDescription()}' already exists in this set. " +
                 "Only one texture per type is allowed per set.");
+        }
+
+        // Validate mutual exclusivity of Height, Displacement, and Bump types
+        if (texture.TextureType.IsHeightRelatedType())
+        {
+            var existingHeightType = _textures.FirstOrDefault(t => t.TextureType.IsHeightRelatedType());
+            if (existingHeightType != null)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot add '{texture.TextureType}' because '{existingHeightType.TextureType}' already exists in this set. " +
+                    "Only one of Height, Displacement, or Bump can be assigned per texture set.");
+            }
         }
 
         _textures.Add(texture);

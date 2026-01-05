@@ -167,6 +167,8 @@ namespace Infrastructure.Persistence
                 entity.HasKey(t => t.Id);
                 entity.Property(t => t.FileId).IsRequired();
                 entity.Property(t => t.TextureType).IsRequired();
+                entity.Property(t => t.SourceChannel).IsRequired()
+                    .HasDefaultValue(TextureChannel.RGB); // Default for backward compatibility
                 entity.Property(t => t.CreatedAt).IsRequired();
                 entity.Property(t => t.UpdatedAt).IsRequired();
                 entity.Property(t => t.TextureSetId).IsRequired(false); // Optional relationship
@@ -182,13 +184,13 @@ namespace Infrastructure.Persistence
                 // Create index for efficient querying by texture type
                 entity.HasIndex(t => t.TextureType);
                 
-                // Create composite index for file and texture type to ensure uniqueness
-                entity.HasIndex(t => new { t.FileId, t.TextureType }).IsUnique();
+                // Create composite index for texture set, file, texture type, and source channel to ensure uniqueness within a texture set
+                // This allows the same file to be used in different texture sets with the same channel/type mapping
+                entity.HasIndex(t => new { t.TextureSetId, t.FileId, t.TextureType, t.SourceChannel }).IsUnique();
 
-                // Create composite index to ensure unique texture type per texture set
+                // Create composite index to ensure unique texture type per texture set (for non-deleted textures)
                 entity.HasIndex(t => new { t.TextureSetId, t.TextureType })
-                    .IsUnique()
-                    .HasFilter("\"TextureSetId\" IS NOT NULL");
+                    .HasFilter("\"TextureSetId\" IS NOT NULL AND \"IsDeleted\" = false");
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(t => t.IsDeleted);

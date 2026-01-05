@@ -45,7 +45,7 @@ export default {
       {
         "docs": {
           "sidebarPath": "./sidebars.ts",
-          "routeBasePath": "/"
+          "routeBasePath": "/docs"
         },
         "blog": false,
         "theme": {
@@ -71,13 +71,18 @@ export default {
           "label": "Documentation"
         },
         {
-          "href": "/ai-documentation/BACKEND_API",
+          "href": "/docs/ai-documentation/BACKEND_API",
           "label": "AI Docs",
           "position": "left"
         },
         {
-          "href": "https://github.com/your-org/modelibr",
+          "href": "https://github.com/Papyszoo/Modelibr",
           "label": "GitHub",
+          "position": "right"
+        },
+        {
+          "href": "#",
+          "label": "Discord",
           "position": "right"
         }
       ],
@@ -91,11 +96,11 @@ export default {
           "items": [
             {
               "label": "Getting Started",
-              "to": "/"
+              "to": "/docs"
             },
             {
               "label": "Features",
-              "to": "/category/features"
+              "to": "/docs/category/features"
             }
           ]
         },
@@ -104,15 +109,28 @@ export default {
           "items": [
             {
               "label": "Backend API",
-              "href": "/ai-documentation/BACKEND_API"
+              "href": "/docs/ai-documentation/BACKEND_API"
             },
             {
               "label": "Frontend",
-              "href": "/ai-documentation/FRONTEND"
+              "href": "/docs/ai-documentation/FRONTEND"
             },
             {
               "label": "Worker",
-              "href": "/ai-documentation/WORKER"
+              "href": "/docs/ai-documentation/WORKER"
+            }
+          ]
+        },
+        {
+          "title": "Community",
+          "items": [
+            {
+              "label": "GitHub",
+              "href": "https://github.com/Papyszoo/Modelibr"
+            },
+            {
+              "label": "Discord",
+              "href": "#"
             }
           ]
         }

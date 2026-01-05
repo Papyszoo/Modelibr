@@ -795,6 +795,7 @@ function SpriteList() {
         visible={showCategoryDialog}
         onHide={() => setShowCategoryDialog(false)}
         style={{ width: '400px' }}
+        data-testid="category-dialog"
         footer={
           <div>
             <Button
@@ -802,11 +803,13 @@ function SpriteList() {
               icon="pi pi-times"
               className="p-button-text"
               onClick={() => setShowCategoryDialog(false)}
+              data-testid="category-dialog-cancel"
             />
             <Button
               label="Save"
               icon="pi pi-check"
               onClick={handleSaveCategory}
+              data-testid="category-dialog-save"
             />
           </div>
         }
@@ -819,6 +822,7 @@ function SpriteList() {
               value={categoryName}
               onChange={e => setCategoryName(e.target.value)}
               autoFocus
+              data-testid="category-name-input"
             />
           </div>
           <div className="field">
@@ -828,6 +832,7 @@ function SpriteList() {
               value={categoryDescription}
               onChange={e => setCategoryDescription(e.target.value)}
               rows={3}
+              data-testid="category-description-input"
             />
           </div>
         </div>

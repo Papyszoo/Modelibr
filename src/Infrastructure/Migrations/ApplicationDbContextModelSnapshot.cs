@@ -514,6 +514,11 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("SourceChannel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5);
+
                     b.Property<int?>("TextureSetId")
                         .HasColumnType("integer");
 
@@ -525,16 +530,17 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FileId");
+
                     b.HasIndex("IsDeleted");
 
                     b.HasIndex("TextureType");
 
-                    b.HasIndex("FileId", "TextureType")
-                        .IsUnique();
-
                     b.HasIndex("TextureSetId", "TextureType")
-                        .IsUnique()
-                        .HasFilter("\"TextureSetId\" IS NOT NULL");
+                        .HasFilter("\"TextureSetId\" IS NOT NULL AND \"IsDeleted\" = false");
+
+                    b.HasIndex("TextureSetId", "FileId", "TextureType", "SourceChannel")
+                        .IsUnique();
 
                     b.ToTable("Textures");
                 });

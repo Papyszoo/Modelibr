@@ -39,8 +39,9 @@ export class TextureSetsPage {
    */
   async goto(): Promise<void> {
     // Navigate directly to texture sets using query params
+    // Use relative path to respect playwright config baseURL
     await this.page.goto(
-      `${this.baseUrl}/?leftTabs=modelList,textureSets&activeLeft=textureSets`
+      `/?leftTabs=modelList,textureSets&activeLeft=textureSets`
     )
 
     // Wait for the page to load
@@ -166,12 +167,13 @@ export class TextureSetsPage {
   async createEmptyTextureSet(name: string): Promise<void> {
     await this.createSetButton.click()
 
-    // Wait for dialog to appear
+    // Wait for dialog to appear and input to be ready
     const dialog = this.page.locator('.p-dialog')
     await dialog.waitFor({ state: 'visible' })
-
-    // Fill in the name
+    
+    // Wait specifically for the input to be visible and enabled
     const nameInput = dialog.locator('input[type="text"]')
+    await nameInput.waitFor({ state: 'visible', timeout: 5000 })
     await nameInput.fill(name)
 
     // Click create/submit button

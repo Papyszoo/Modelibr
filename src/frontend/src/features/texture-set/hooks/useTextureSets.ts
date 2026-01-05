@@ -167,6 +167,28 @@ export function useTextureSets() {
     []
   )
 
+  const changeTextureChannel = useCallback(
+    async (
+      setId: number,
+      textureId: number,
+      sourceChannel: number
+    ): Promise<void> => {
+      try {
+        setLoading(true)
+        setError(null)
+        await ApiClient.changeTextureChannel(setId, textureId, sourceChannel)
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to change texture channel'
+        setError(errorMessage)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
   const associateTextureSetWithModelVersion = useCallback(
     async (setId: number, modelVersionId: number): Promise<void> => {
       try {
@@ -253,6 +275,7 @@ export function useTextureSets() {
     addTextureToSetEndpoint,
     removeTextureFromSet,
     changeTextureType,
+    changeTextureChannel,
     associateTextureSetWithModelVersion,
     disassociateTextureSetFromModelVersion,
     associateTextureSetWithAllModelVersions,

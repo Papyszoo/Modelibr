@@ -4,11 +4,20 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import './TextureSetGrid.css'
-import { TextureSetDto, TextureType, PackDto } from '../../../types'
+import { TextureSetDto, TextureType, TextureChannel, PackDto } from '../../../types'
 import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import MergeTextureSetDialog from '../dialogs/MergeTextureSetDialog'
+
+// Interface for channel merge request (must match MergeTextureSetDialog)
+interface ChannelMergeRequest {
+  fileId: number
+  mappings: Array<{
+    channel: TextureChannel
+    textureType: TextureType
+  }>
+}
 
 interface TextureSetGridProps {
   textureSets: TextureSetDto[]
@@ -179,34 +188,12 @@ export default function TextureSetGrid({
         return
       }
 
-      // Check if source has an albedo texture
-      const albedoTexture = draggedTextureSet.textures?.find(
-        t => t.textureType === TextureType.Albedo
-      )
-
-      if (!albedoTexture) {
+      // Check if source has any textures
+      if (!draggedTextureSet.textures || draggedTextureSet.textures.length === 0) {
         toast.current?.show({
           severity: 'warn',
           summary: 'Warning',
-          detail: 'Source texture set does not have an Albedo texture to merge',
-          life: 3000,
-        })
-        setDraggedTextureSet(null)
-        setDragOverCardId(null)
-        return
-      }
-
-      // Check if source has other textures besides Albedo
-      const hasOtherTextures = draggedTextureSet.textures?.some(
-        t => t.textureType !== TextureType.Albedo
-      )
-
-      if (hasOtherTextures) {
-        toast.current?.show({
-          severity: 'warn',
-          summary: 'Warning',
-          detail:
-            'Source texture set has other textures besides Albedo. Only texture sets with Albedo only can be merged.',
+          detail: 'Source texture set has no textures to merge',
           life: 3000,
         })
         setDraggedTextureSet(null)
@@ -228,32 +215,29 @@ export default function TextureSetGrid({
     setDragOverCardId(null)
   }
 
-  const handleMergeTextureSets = async (textureType: TextureType) => {
+  const handleMergeTextureSets = async (requests: ChannelMergeRequest[]) => {
     if (!draggedTextureSet || !dropTargetTextureSet) return
 
     try {
-      // Find the albedo texture from the source set
-      const albedoTexture = draggedTextureSet.textures?.find(
-        t => t.textureType === TextureType.Albedo
-      )
-
-      if (!albedoTexture) {
-        throw new Error('Source texture set does not have an Albedo texture')
+      // Add each texture mapping to the target set
+      for (const request of requests) {
+        for (const mapping of request.mappings) {
+          await ApiClient.addTextureToSetEndpoint(dropTargetTextureSet.id, {
+            fileId: request.fileId,
+            textureType: mapping.textureType,
+            sourceChannel: mapping.channel,
+          })
+        }
       }
 
-      // Add the texture to the target set with the selected type
-      await ApiClient.addTextureToSetEndpoint(dropTargetTextureSet.id, {
-        fileId: albedoTexture.fileId,
-        textureType: textureType,
-      })
-
-      // Hard delete the source texture set after successful merge (keeps the file)
+      // Hard delete the source texture set after successful merge (keeps the files)
       await ApiClient.hardDeleteTextureSet(draggedTextureSet.id)
 
+      const textureCount = requests.reduce((sum, r) => sum + r.mappings.length, 0)
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: `Texture merged successfully as ${textureType}`,
+        detail: `Merged ${textureCount} texture${textureCount !== 1 ? 's' : ''} successfully`,
         life: 3000,
       })
 

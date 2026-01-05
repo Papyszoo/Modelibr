@@ -1,0 +1,23 @@
+{
+  "id": "ai-documentation/TEXTURE_CHANNEL_MAPPING",
+  "title": "Texture Type Channel Mapping - Design Specification",
+  "description": "Referenced from roadmap.md Priority 1.",
+  "source": "@site/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING.md",
+  "sourceDirName": "ai-documentation",
+  "slug": "/ai-documentation/TEXTURE_CHANNEL_MAPPING",
+  "permalink": "/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Services Testing Report for Copilot Agent",
+    "permalink": "/docs/ai-documentation/MCP_TESTING_REPORT"
+  },
+  "next": {
+    "title": "Changelog",
+    "permalink": "/docs/changelog"
+  }
+}

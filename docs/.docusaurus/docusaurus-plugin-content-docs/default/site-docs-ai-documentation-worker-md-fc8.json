@@ -5,7 +5,7 @@
   "source": "@site/docs/ai-documentation/WORKER.md",
   "sourceDirName": "ai-documentation",
   "slug": "/ai-documentation/WORKER",
-  "permalink": "/ai-documentation/WORKER",
+  "permalink": "/docs/ai-documentation/WORKER",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Testing Documentation",
-    "permalink": "/ai-documentation/TESTING"
+    "permalink": "/docs/ai-documentation/TESTING"
   },
   "next": {
-    "title": "Services Testing Report for Copilot Agent",
-    "permalink": "/ai-documentation/MCP_TESTING_REPORT"
+    "title": "API Contracts Documentation",
+    "permalink": "/docs/ai-documentation/API_CONTRACTS"
   }
 }

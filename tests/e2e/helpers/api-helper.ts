@@ -39,6 +39,40 @@ export class ApiHelper {
     }
 
     /**
+     * Create a texture set with a file in one operation
+     * Uses /texture-sets/with-file endpoint
+     */
+    async createTextureSetWithFile(
+        name: string,
+        filePath: string,
+        textureType: number = 1 // 1 = Albedo
+    ): Promise<{ textureSetId: number; name: string; fileId: number }> {
+        const formData = new FormData();
+        formData.append("file", fs.createReadStream(filePath));
+
+        const response = await this.client.post(
+            `/texture-sets/with-file?name=${encodeURIComponent(name)}&textureType=${textureType}`,
+            formData,
+            {
+                headers: formData.getHeaders(),
+            }
+        );
+
+        if (response.status !== 200 && response.status !== 201) {
+            console.error(
+                "Create texture set with file failed:",
+                response.status,
+                response.statusText,
+                response.data
+            );
+            throw new Error(
+                `Failed to create texture set with file: ${response.status} ${response.statusText}`
+            );
+        }
+        return response.data;
+    }
+
+    /**
      * Upload a texture file to a texture set
      * Two-step process: 1) Upload file via /files endpoint, 2) Add texture to set
      */

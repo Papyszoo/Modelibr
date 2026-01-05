@@ -4,11 +4,12 @@ import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
+import { MultiSelect } from 'primereact/multiselect'
 import './ModelGrid.css'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { Model } from '../../../utils/fileUtils'
 import ApiClient from '../../../services/ApiClient'
-import { PackDto } from '../../../types'
+import { PackDto, ProjectDto } from '../../../types'
 
 interface ModelGridProps {
   models: Model[]
@@ -18,6 +19,12 @@ interface ModelGridProps {
   onDragEnter: (e: React.DragEvent) => void
   onDragLeave: (e: React.DragEvent) => void
   onModelRecycled?: (modelId: number) => void
+  packs?: PackDto[]
+  projects?: ProjectDto[]
+  selectedPackIds?: number[]
+  selectedProjectIds?: number[]
+  onPackFilterChange?: (packIds: number[]) => void
+  onProjectFilterChange?: (projectIds: number[]) => void
 }
 
 export default function ModelGrid({
@@ -28,22 +35,33 @@ export default function ModelGrid({
   onDragEnter,
   onDragLeave,
   onModelRecycled,
+  packs = [],
+  projects = [],
+  selectedPackIds = [],
+  selectedProjectIds = [],
+  onPackFilterChange,
+  onProjectFilterChange,
 }: ModelGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [packs, setPacks] = useState<PackDto[]>([])
+  const [contextMenuPacks, setContextMenuPacks] = useState<PackDto[]>([])
   const [selectedModel, setSelectedModel] = useState<Model | null>(null)
   const [showPackDialog, setShowPackDialog] = useState(false)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
 
   useEffect(() => {
-    loadPacks()
-  }, [])
+    // Load packs for context menu if not provided via props
+    if (packs.length === 0) {
+      loadContextMenuPacks()
+    } else {
+      setContextMenuPacks(packs)
+    }
+  }, [packs])
 
-  const loadPacks = async () => {
+  const loadContextMenuPacks = async () => {
     try {
       const data = await ApiClient.getAllPacks()
-      setPacks(data)
+      setContextMenuPacks(data)
     } catch (error) {
       console.error('Failed to load packs:', error)
     }
@@ -119,7 +137,7 @@ export default function ModelGrid({
       label: 'Add to pack',
       icon: 'pi pi-box',
       command: () => {
-        loadPacks()
+        loadContextMenuPacks()
         setShowPackDialog(true)
       },
     },
@@ -131,6 +149,20 @@ export default function ModelGrid({
       },
     },
   ]
+
+  // Build options for multiselect
+  const packOptions = packs.map(pack => ({
+    label: pack.name,
+    value: pack.id,
+  }))
+
+  const projectOptions = projects.map(project => ({
+    label: project.name,
+    value: project.id,
+  }))
+
+  const hasFilters = packs.length > 0 || projects.length > 0
+  const hasActiveFilters = selectedPackIds.length > 0 || selectedProjectIds.length > 0
 
   return (
     <div
@@ -156,7 +188,50 @@ export default function ModelGrid({
           />
         </div>
         <div className="filter-bar">
-          <span className="filter-placeholder">Filters (Coming Soon)</span>
+          {hasFilters ? (
+            <>
+              {packs.length > 0 && (
+                <MultiSelect
+                  value={selectedPackIds}
+                  options={packOptions}
+                  onChange={e => onPackFilterChange?.(e.value || [])}
+                  placeholder="Filter by Packs"
+                  className="filter-multiselect"
+                  display="chip"
+                  showClear
+                  filter
+                  filterPlaceholder="Search packs..."
+                />
+              )}
+              {projects.length > 0 && (
+                <MultiSelect
+                  value={selectedProjectIds}
+                  options={projectOptions}
+                  onChange={e => onProjectFilterChange?.(e.value || [])}
+                  placeholder="Filter by Projects"
+                  className="filter-multiselect"
+                  display="chip"
+                  showClear
+                  filter
+                  filterPlaceholder="Search projects..."
+                />
+              )}
+              {hasActiveFilters && (
+                <Button
+                  icon="pi pi-times"
+                  className="p-button-text p-button-sm clear-filters-btn"
+                  tooltip="Clear all filters"
+                  tooltipOptions={{ position: 'bottom' }}
+                  onClick={() => {
+                    onPackFilterChange?.([])
+                    onProjectFilterChange?.([])
+                  }}
+                />
+              )}
+            </>
+          ) : (
+            <span className="filter-placeholder">No packs or projects to filter by</span>
+          )}
         </div>
       </div>
 
@@ -200,7 +275,7 @@ export default function ModelGrid({
         <div className="pack-selection-dialog">
           <p>Select a pack to add this model to:</p>
           <div className="pack-list">
-            {packs.map(pack => (
+            {contextMenuPacks.map(pack => (
               <div
                 key={pack.id}
                 className="pack-item"
@@ -219,7 +294,7 @@ export default function ModelGrid({
               </div>
             ))}
           </div>
-          {packs.length === 0 && (
+          {contextMenuPacks.length === 0 && (
             <div className="no-packs">
               <i className="pi pi-inbox" />
               <p>No packs available. Create a pack first.</p>

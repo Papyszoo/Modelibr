@@ -5,7 +5,7 @@
   "source": "@site/docs/ai-documentation/MCP_TESTING_REPORT.md",
   "sourceDirName": "ai-documentation",
   "slug": "/ai-documentation/MCP_TESTING_REPORT",
-  "permalink": "/ai-documentation/MCP_TESTING_REPORT",
+  "permalink": "/docs/ai-documentation/MCP_TESTING_REPORT",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -13,7 +13,11 @@
   "frontMatter": {},
   "sidebar": "tutorialSidebar",
   "previous": {
-    "title": "Thumbnail Worker Service",
-    "permalink": "/ai-documentation/WORKER"
+    "title": "API Contracts Documentation",
+    "permalink": "/docs/ai-documentation/API_CONTRACTS"
+  },
+  "next": {
+    "title": "Texture Type Channel Mapping - Design Specification",
+    "permalink": "/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING"
   }
 }

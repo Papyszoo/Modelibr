@@ -8,13 +8,13 @@ namespace Domain.ValueObjects;
 /// </summary>
 public enum TextureType
 {
-    /// <summary>Base color or diffuse map - the main surface color</summary>
+    /// <summary>Base color map - the main surface color</summary>
     Albedo = 1,
     
     /// <summary>Normal map - surface detail through normals</summary>
     Normal = 2,
     
-    /// <summary>Height or displacement map - surface geometry variation</summary>
+    /// <summary>Height map - surface geometry variation (mutually exclusive with Bump, Displacement)</summary>
     Height = 3,
     
     /// <summary>Ambient Occlusion map - shadow detail in surface crevices</summary>
@@ -26,22 +26,19 @@ public enum TextureType
     /// <summary>Metallic map - defines metallic vs non-metallic areas</summary>
     Metallic = 6,
     
-    /// <summary>Diffuse map - traditional diffuse color (legacy name for Albedo)</summary>
-    Diffuse = 7,
-    
-    /// <summary>Specular map - reflectivity and highlight intensity</summary>
-    Specular = 8,
+    // Diffuse = 7 (REMOVED - use Albedo instead)
+    // Specular = 8 (REMOVED - not PBR standard)
     
     /// <summary>Emissive map - areas where the mesh emits light</summary>
     Emissive = 9,
     
-    /// <summary>Bump map - simulates surface details by altering normals</summary>
+    /// <summary>Bump map - simulates surface details by altering normals (mutually exclusive with Height, Displacement)</summary>
     Bump = 10,
     
     /// <summary>Alpha map - defines transparency across the surface</summary>
     Alpha = 11,
     
-    /// <summary>Displacement map - actual geometric displacement of vertices</summary>
+    /// <summary>Displacement map - actual geometric displacement of vertices (mutually exclusive with Height, Bump)</summary>
     Displacement = 12
 }
 
@@ -58,12 +55,20 @@ public static class TextureTypeExtensions
         TextureType.AO,
         TextureType.Roughness,
         TextureType.Metallic,
-        TextureType.Diffuse,
-        TextureType.Specular,
         TextureType.Emissive,
         TextureType.Bump,
         TextureType.Alpha,
         TextureType.Displacement
+    };
+
+    /// <summary>
+    /// Height, Displacement, and Bump are mutually exclusive - only one can be present in a texture set.
+    /// </summary>
+    public static readonly TextureType[] MutuallyExclusiveHeightTypes = 
+    {
+        TextureType.Height,
+        TextureType.Displacement,
+        TextureType.Bump
     };
 
     /// <summary>
@@ -83,6 +88,14 @@ public static class TextureTypeExtensions
     }
 
     /// <summary>
+    /// Checks if this texture type is mutually exclusive with Height/Displacement/Bump.
+    /// </summary>
+    public static bool IsHeightRelatedType(this TextureType textureType)
+    {
+        return MutuallyExclusiveHeightTypes.Contains(textureType);
+    }
+
+    /// <summary>
     /// Gets all supported texture types.
     /// </summary>
     /// <returns>Read-only list of supported texture types</returns>
@@ -97,14 +110,12 @@ public static class TextureTypeExtensions
     {
         return textureType switch
         {
-            TextureType.Albedo => "Base color or diffuse map",
+            TextureType.Albedo => "Base color map",
             TextureType.Normal => "Normal map for surface detail",
-            TextureType.Height => "Height or displacement map",
+            TextureType.Height => "Height map for parallax/displacement",
             TextureType.AO => "Ambient Occlusion map",
             TextureType.Roughness => "Surface roughness map",
             TextureType.Metallic => "Metallic surface map",
-            TextureType.Diffuse => "Diffuse color map (legacy)",
-            TextureType.Specular => "Specular reflectivity map",
             TextureType.Emissive => "Emissive map for glowing areas",
             TextureType.Bump => "Bump map for surface detail",
             TextureType.Alpha => "Alpha map for transparency",

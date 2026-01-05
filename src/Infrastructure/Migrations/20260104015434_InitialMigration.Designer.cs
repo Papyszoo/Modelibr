@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251212003645_InitialMigration")]
+    [Migration("20260104015434_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -517,6 +517,11 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("SourceChannel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5);
+
                     b.Property<int?>("TextureSetId")
                         .HasColumnType("integer");
 
@@ -532,12 +537,12 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TextureType");
 
-                    b.HasIndex("FileId", "TextureType")
-                        .IsUnique();
-
                     b.HasIndex("TextureSetId", "TextureType")
                         .IsUnique()
                         .HasFilter("\"TextureSetId\" IS NOT NULL");
+
+                    b.HasIndex("FileId", "TextureType", "SourceChannel")
+                        .IsUnique();
 
                     b.ToTable("Textures");
                 });

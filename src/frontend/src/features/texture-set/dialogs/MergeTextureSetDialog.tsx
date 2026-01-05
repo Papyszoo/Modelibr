@@ -1,20 +1,69 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
-import { confirmDialog } from 'primereact/confirmdialog'
-import { TextureSetDto, TextureType } from '../../../types'
-import { getTextureTypeLabel } from '../../../utils/textureTypeUtils'
+import { Message } from 'primereact/message'
+import {
+  TextureSetDto,
+  TextureType,
+  TextureChannel,
+  TextureDto,
+} from '../../../types'
+import {
+  getTextureTypeLabel,
+  HEIGHT_RELATED_TYPES,
+  isHeightRelatedType,
+} from '../../../utils/textureTypeUtils'
 import './dialogs.css'
+
+// RGB dropdown options
+type RgbOption = 'none' | 'albedo' | 'normal' | 'emissive' | 'split'
+
+interface FileChannelMapping {
+  fileId: number
+  fileName: string
+  rgbOption: RgbOption
+  rChannel: TextureType | null
+  gChannel: TextureType | null
+  bChannel: TextureType | null
+  aChannel: TextureType | null
+}
+
+interface ChannelMergeRequest {
+  fileId: number
+  mappings: Array<{
+    channel: TextureChannel
+    textureType: TextureType
+  }>
+}
 
 interface MergeTextureSetDialogProps {
   visible: boolean
   sourceTextureSet: TextureSetDto | null
   targetTextureSet: TextureSetDto | null
   onHide: () => void
-  onMerge: (textureType: TextureType) => Promise<void>
+  onMerge: (requests: ChannelMergeRequest[]) => Promise<void>
 }
+
+// Grayscale texture types for R/G/B/A channels
+const GRAYSCALE_TYPES = [
+  TextureType.AO,
+  TextureType.Roughness,
+  TextureType.Metallic,
+  TextureType.Height,
+  TextureType.Displacement,
+  TextureType.Bump,
+  TextureType.Alpha,
+]
+
+// Alpha channel can also be used for Height-related types
+const ALPHA_TYPES = [
+  TextureType.Alpha,
+  TextureType.Height,
+  TextureType.Displacement,
+  TextureType.Bump,
+]
 
 function MergeTextureSetDialog({
   visible,
@@ -23,79 +72,166 @@ function MergeTextureSetDialog({
   onHide,
   onMerge,
 }: MergeTextureSetDialogProps) {
-  const [selectedTextureType, setSelectedTextureType] =
-    useState<TextureType | null>(null)
+  const [fileMappings, setFileMappings] = useState<FileChannelMapping[]>([])
   const [merging, setMerging] = useState(false)
   const toast = useRef<Toast>(null)
 
-  // Reset selected texture type when dialog is hidden or source/target changes
+  // Initialize file mappings when dialog opens
   useEffect(() => {
-    if (!visible) {
-      setSelectedTextureType(null)
+    if (visible && sourceTextureSet) {
+      // Get unique files from source textures
+      const uniqueFiles = new Map<number, string>()
+      sourceTextureSet.textures?.forEach(t => {
+        if (t.fileId && !uniqueFiles.has(t.fileId)) {
+          uniqueFiles.set(t.fileId, t.fileName || `File ${t.fileId}`)
+        }
+      })
+
+      const mappings: FileChannelMapping[] = Array.from(uniqueFiles.entries()).map(
+        ([fileId, fileName]) => ({
+          fileId,
+          fileName,
+          rgbOption: 'none',
+          rChannel: null,
+          gChannel: null,
+          bChannel: null,
+          aChannel: null,
+        })
+      )
+      setFileMappings(mappings)
+    } else if (!visible) {
+      setFileMappings([])
     }
-  }, [visible])
+  }, [visible, sourceTextureSet])
 
-  // Get all texture types for the dropdown
-  const getAllTextureTypes = () => {
-    const allTypes = [
-      TextureType.Albedo,
-      TextureType.Normal,
-      TextureType.Height,
-      TextureType.AO,
-      TextureType.Roughness,
-      TextureType.Metallic,
-      TextureType.Diffuse,
-      TextureType.Specular,
-      TextureType.Emissive,
-      TextureType.Bump,
-      TextureType.Alpha,
-      TextureType.Displacement,
-    ]
+  // RGB dropdown options
+  const rgbOptions = [
+    { label: 'None', value: 'none' as RgbOption },
+    { label: 'Albedo', value: 'albedo' as RgbOption },
+    { label: 'Normal', value: 'normal' as RgbOption },
+    { label: 'Emissive', value: 'emissive' as RgbOption },
+    { label: 'Split Channels', value: 'split' as RgbOption },
+  ]
 
-    return allTypes.map(type => ({
-      label: getTextureTypeLabel(type),
-      value: type,
-    }))
+  // Grayscale channel options
+  const grayscaleOptions = [
+    { label: 'None', value: null },
+    ...GRAYSCALE_TYPES.map(t => ({ label: getTextureTypeLabel(t), value: t })),
+  ]
+
+  const alphaOptions = [
+    { label: 'None', value: null },
+    ...ALPHA_TYPES.map(t => ({ label: getTextureTypeLabel(t), value: t })),
+  ]
+
+  // Get all selected texture types across all files
+  const getAllSelectedTypes = (): TextureType[] => {
+    const types: TextureType[] = []
+    fileMappings.forEach(fm => {
+      if (fm.rgbOption === 'albedo') types.push(TextureType.Albedo)
+      if (fm.rgbOption === 'normal') types.push(TextureType.Normal)
+      if (fm.rgbOption === 'emissive') types.push(TextureType.Emissive)
+      if (fm.rgbOption === 'split') {
+        if (fm.rChannel) types.push(fm.rChannel)
+        if (fm.gChannel) types.push(fm.gChannel)
+        if (fm.bChannel) types.push(fm.bChannel)
+      }
+      if (fm.aChannel) types.push(fm.aChannel)
+    })
+    return types
   }
 
-  // Check if a texture type already exists in the target set
-  const textureTypeExists = (textureType: TextureType) => {
-    if (!targetTextureSet) return false
-    const existingTypes =
-      targetTextureSet.textures?.map(t => t.textureType) || []
-    return existingTypes.includes(textureType)
+  // Check for conflicts with target set
+  const overrideWarnings = useMemo(() => {
+    if (!targetTextureSet) return []
+    const existingTypes = targetTextureSet.textures?.map(t => t.textureType) || []
+    const selectedTypes = getAllSelectedTypes()
+    return selectedTypes.filter(t => existingTypes.includes(t))
+  }, [fileMappings, targetTextureSet])
+
+  // Check Height exclusivity
+  const heightConflict = useMemo(() => {
+    const selectedTypes = getAllSelectedTypes()
+    const targetHeightType = targetTextureSet?.textures?.find(t =>
+      isHeightRelatedType(t.textureType)
+    )?.textureType
+
+    // Check if we're selecting multiple height types
+    const selectedHeightTypes = selectedTypes.filter(t => isHeightRelatedType(t))
+    if (selectedHeightTypes.length > 1) {
+      return 'Cannot select multiple Height/Displacement/Bump types'
+    }
+
+    // Check if target already has a height type and we're adding a different one
+    if (targetHeightType && selectedHeightTypes.length > 0) {
+      const selectedHeight = selectedHeightTypes[0]
+      if (selectedHeight !== targetHeightType) {
+        return `Target already has ${getTextureTypeLabel(targetHeightType)}. Cannot add ${getTextureTypeLabel(selectedHeight)}.`
+      }
+    }
+
+    return null
+  }, [fileMappings, targetTextureSet])
+
+  const updateFileMapping = (
+    fileId: number,
+    updates: Partial<FileChannelMapping>
+  ) => {
+    setFileMappings(prev =>
+      prev.map(fm => (fm.fileId === fileId ? { ...fm, ...updates } : fm))
+    )
   }
 
   const handleMerge = async () => {
-    if (!selectedTextureType) {
+    if (heightConflict) {
       toast.current?.show({
-        severity: 'warn',
-        summary: 'Warning',
-        detail: 'Please select a texture type',
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: heightConflict,
         life: 3000,
       })
       return
     }
 
-    // Check if texture type already exists and confirm replacement
-    if (textureTypeExists(selectedTextureType)) {
-      confirmDialog({
-        message: `Are you sure you want to replace the ${getTextureTypeLabel(selectedTextureType)} texture in "${targetTextureSet?.name}" texture set?`,
-        header: 'Replace Texture',
-        icon: 'pi pi-exclamation-triangle',
-        accept: async () => {
-          await performMerge()
-        },
-      })
-    } else {
-      await performMerge()
-    }
-  }
+    const requests: ChannelMergeRequest[] = []
 
-  const performMerge = async () => {
+    fileMappings.forEach(fm => {
+      const mappings: ChannelMergeRequest['mappings'] = []
+
+      if (fm.rgbOption === 'albedo') {
+        mappings.push({ channel: TextureChannel.RGB, textureType: TextureType.Albedo })
+      } else if (fm.rgbOption === 'normal') {
+        mappings.push({ channel: TextureChannel.RGB, textureType: TextureType.Normal })
+      } else if (fm.rgbOption === 'emissive') {
+        mappings.push({ channel: TextureChannel.RGB, textureType: TextureType.Emissive })
+      } else if (fm.rgbOption === 'split') {
+        if (fm.rChannel) mappings.push({ channel: TextureChannel.R, textureType: fm.rChannel })
+        if (fm.gChannel) mappings.push({ channel: TextureChannel.G, textureType: fm.gChannel })
+        if (fm.bChannel) mappings.push({ channel: TextureChannel.B, textureType: fm.bChannel })
+      }
+
+      if (fm.aChannel) {
+        mappings.push({ channel: TextureChannel.A, textureType: fm.aChannel })
+      }
+
+      if (mappings.length > 0) {
+        requests.push({ fileId: fm.fileId, mappings })
+      }
+    })
+
+    if (requests.length === 0) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'No Mappings',
+        detail: 'Please select at least one channel mapping',
+        life: 3000,
+      })
+      return
+    }
+
     try {
       setMerging(true)
-      await onMerge(selectedTextureType!)
+      await onMerge(requests)
       onHide()
     } catch (error) {
       console.error('Failed to merge texture sets:', error)
@@ -110,8 +246,6 @@ function MergeTextureSetDialog({
     }
   }
 
-  const availableTypes = getAllTextureTypes()
-
   const footer = (
     <div>
       <Button
@@ -122,10 +256,10 @@ function MergeTextureSetDialog({
         disabled={merging}
       />
       <Button
-        label="Merge"
+        label="Merge Textures"
         icon="pi pi-check"
         onClick={handleMerge}
-        disabled={!selectedTextureType || merging}
+        disabled={merging || !!heightConflict}
         loading={merging}
       />
     </div>
@@ -135,9 +269,9 @@ function MergeTextureSetDialog({
     <>
       <Toast ref={toast} />
       <Dialog
-        header="Merge Texture Sets"
+        header={`Merge "${sourceTextureSet?.name}" into "${targetTextureSet?.name}"`}
         visible={visible}
-        style={{ width: '500px' }}
+        style={{ width: '600px' }}
         footer={footer}
         onHide={onHide}
         modal
@@ -146,38 +280,106 @@ function MergeTextureSetDialog({
           {!sourceTextureSet || !targetTextureSet ? (
             <div className="merge-error">
               <p>Error: Unable to load texture set information.</p>
-              <p>
-                Source:{' '}
-                {sourceTextureSet ? sourceTextureSet.name : 'Not loaded'}
-              </p>
-              <p>
-                Target:{' '}
-                {targetTextureSet ? targetTextureSet.name : 'Not loaded'}
-              </p>
             </div>
           ) : (
             <>
-              <div className="merge-info">
-                <p>
-                  You are merging the <strong>Albedo</strong> texture from{' '}
-                  <strong>"{sourceTextureSet.name}"</strong> into{' '}
-                  <strong>"{targetTextureSet.name}"</strong>.
-                </p>
-                <p>Select which texture type to add it as:</p>
-              </div>
+              <p className="merge-description">
+                Map channels from source files to texture types:
+              </p>
 
-              <div className="field">
-                <label htmlFor="textureType">Texture Type</label>
-                <Dropdown
-                  id="textureType"
-                  value={selectedTextureType}
-                  options={availableTypes}
-                  onChange={e => setSelectedTextureType(e.value)}
-                  placeholder="Select a texture type"
-                  disabled={merging}
-                  className="w-full"
+              {fileMappings.map(fm => (
+                <div key={fm.fileId} className="file-channel-mapping">
+                  <div className="file-header">
+                    <i className="pi pi-image" />
+                    <span className="file-name">{fm.fileName}</span>
+                  </div>
+
+                  <div className="channel-row">
+                    <label>RGB:</label>
+                    <Dropdown
+                      value={fm.rgbOption}
+                      options={rgbOptions}
+                      onChange={e =>
+                        updateFileMapping(fm.fileId, {
+                          rgbOption: e.value,
+                          rChannel: null,
+                          gChannel: null,
+                          bChannel: null,
+                        })
+                      }
+                      disabled={merging}
+                      className="channel-dropdown"
+                      data-testid={`rgb-dropdown-${fm.fileId}`}
+                    />
+                  </div>
+
+                  {fm.rgbOption === 'split' && (
+                    <div className="split-channels">
+                      <div className="channel-row indent">
+                        <label>R:</label>
+                        <Dropdown
+                          value={fm.rChannel}
+                          options={grayscaleOptions}
+                          onChange={e => updateFileMapping(fm.fileId, { rChannel: e.value })}
+                          disabled={merging}
+                          className="channel-dropdown"
+                          placeholder="None"
+                        />
+                      </div>
+                      <div className="channel-row indent">
+                        <label>G:</label>
+                        <Dropdown
+                          value={fm.gChannel}
+                          options={grayscaleOptions}
+                          onChange={e => updateFileMapping(fm.fileId, { gChannel: e.value })}
+                          disabled={merging}
+                          className="channel-dropdown"
+                          placeholder="None"
+                        />
+                      </div>
+                      <div className="channel-row indent">
+                        <label>B:</label>
+                        <Dropdown
+                          value={fm.bChannel}
+                          options={grayscaleOptions}
+                          onChange={e => updateFileMapping(fm.fileId, { bChannel: e.value })}
+                          disabled={merging}
+                          className="channel-dropdown"
+                          placeholder="None"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="channel-row">
+                    <label>A:</label>
+                    <Dropdown
+                      value={fm.aChannel}
+                      options={alphaOptions}
+                      onChange={e => updateFileMapping(fm.fileId, { aChannel: e.value })}
+                      disabled={merging}
+                      className="channel-dropdown"
+                      placeholder="None"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {overrideWarnings.length > 0 && (
+                <Message
+                  severity="warn"
+                  text={`Will replace: ${overrideWarnings.map(t => getTextureTypeLabel(t)).join(', ')}`}
+                  className="override-warning"
                 />
-              </div>
+              )}
+
+              {heightConflict && (
+                <Message
+                  severity="error"
+                  text={heightConflict}
+                  className="height-conflict-error"
+                />
+              )}
             </>
           )}
         </div>

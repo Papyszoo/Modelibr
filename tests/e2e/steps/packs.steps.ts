@@ -58,6 +58,18 @@ Given("the following packs exist in shared state:", async ({ page }, dataTable: 
     }
 });
 
+Given("the pack {string} exists", async ({ page }, packName: string) => {
+    const pack = sharedState.getPack(packName);
+    
+    if (!pack) {
+        throw new Error(
+            `Pack "${packName}" not found in shared state. ` +
+            `Ensure pack creation scenarios have run first.`
+        );
+    }
+    console.log(`[SharedState] Verified pack exists: ${packName} (ID: ${pack.id})`);
+});
+
 // ============= Pack CRUD Steps =============
 
 When(
@@ -433,4 +445,94 @@ Then("I take a screenshot of the pack viewer", async ({ page }) => {
 Then("I take a screenshot showing model in pack", async ({ page }) => {
     await page.screenshot({ path: "test-results/screenshots/pack-with-model.png" });
     console.log("[Screenshot] Captured pack with model");
+});
+
+Then("I take a screenshot of pack with sprite", async ({ page }) => {
+    await page.screenshot({ path: "test-results/screenshots/pack-with-sprite.png" });
+    console.log("[Screenshot] Captured pack with sprite");
+});
+
+Then("I take a screenshot of pack after sprite removed", async ({ page }) => {
+    await page.screenshot({ path: "test-results/screenshots/pack-sprite-removed.png" });
+    console.log("[Screenshot] Captured pack after sprite removed");
+});
+
+// ============= Pack Sprite Association Steps =============
+
+When("I click add sprites button", async ({ page }) => {
+    // The Sprites section has <h3>Sprites</h3> and the Add Sprite card is inside with class .pack-card-add
+    // Structure: .pack-section > h3[Sprites] > ... > .pack-card-add > span[Add Sprite]
+    
+    // Try to find the add card in the Sprites section specifically
+    const spritesSection = page.locator('.pack-section').filter({ hasText: 'Sprites' }).last();
+    const addSpriteCard = spritesSection.locator('.pack-card-add:has-text("Add Sprite")');
+    
+    if (await addSpriteCard.count() > 0) {
+        await addSpriteCard.click();
+        console.log("[Action] Clicked Add Sprite card in Sprites section");
+    } else {
+        // Fallback: find any .pack-card-add with "Add Sprite" text
+        const fallbackCard = page.locator('.pack-card-add:has-text("Add Sprite")').first();
+        if (await fallbackCard.count() > 0) {
+            await fallbackCard.click();
+            console.log("[Action] Clicked Add Sprite card (fallback)");
+        } else {
+            throw new Error("Could not find Add Sprite button in Pack/Project viewer");
+        }
+    }
+    
+    // Wait for dialog
+    await page.waitForSelector('.p-dialog:has-text("Add Sprites")', { state: 'visible', timeout: 5000 });
+    await page.waitForTimeout(500);
+    console.log("[Action] Add Sprites dialog opened");
+});
+
+When("I select the first available sprite", async ({ page }) => {
+    // Wait for dialog to load sprites
+    await page.waitForTimeout(1000);
+    
+    // Click the first sprite in the selection dialog
+    const spriteItem = page.locator('.p-dialog .add-item-card').first();
+    await spriteItem.click();
+    console.log("[Action] Selected first available sprite");
+});
+
+When("I confirm adding sprites", async ({ page }) => {
+    const addButton = page.locator('.p-dialog-footer button:has-text("Add")');
+    await addButton.click();
+    await page.waitForTimeout(1000);
+    console.log("[Action] Confirmed adding sprites");
+});
+
+Then("the pack sprite count should be {int}", async ({ page }, expectedCount: number) => {
+    // Check sprite count in pack stats
+    const statSpan = page.locator('.pack-stats span:has-text("sprite")');
+    const text = await statSpan.textContent() || "0";
+    const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
+    expect(count).toBe(expectedCount);
+    console.log(`[UI] Pack sprite count is ${count} ✓`);
+});
+
+
+Given("the pack has at least {int} sprite", async ({ page }, minCount: number) => {
+    const statSpan = page.locator('.pack-stats span:has-text("sprite")');
+    const text = await statSpan.textContent() || "0";
+    const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
+    if (count < minCount) {
+        throw new Error(`Pack has only ${count} sprites, but at least ${minCount} required`);
+    }
+    console.log(`[Precondition] Pack has ${count} sprite(s) ✓`);
+});
+
+When("I remove the first sprite from the pack", async ({ page }) => {
+    // Right-click on first sprite card to open context menu
+    const spriteCard = page.locator('.pack-section:has(h3:has-text("Sprite")) .pack-card:not(.pack-card-add)').first();
+    await spriteCard.click({ button: "right" });
+    await page.waitForTimeout(300);
+    
+    // Click Remove from pack option
+    const removeOption = page.locator('.p-contextmenu .p-menuitem:has-text("Remove")');
+    await removeOption.click();
+    await page.waitForTimeout(500);
+    console.log("[Action] Removed first sprite from pack");
 });

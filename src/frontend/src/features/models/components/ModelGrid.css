@@ -75,6 +75,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .filter-placeholder {
@@ -82,6 +83,24 @@
   font-size: 0.875rem;
   font-style: italic;
 }
+
+.filter-multiselect {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.filter-multiselect .p-multiselect-label {
+  padding: 0.5rem 0.75rem;
+}
+
+.filter-multiselect .p-multiselect-token {
+  font-size: 0.75rem;
+}
+
+.clear-filters-btn {
+  padding: 0.5rem;
+}
+
 
 /* Model Grid */
 .model-grid {

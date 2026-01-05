@@ -116,9 +116,8 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
         )).ToList();
 
         var textureSetDtos = textureSets.Select(ts => {
-            // Find albedo texture first, then fallback to diffuse for preview
-            var previewTexture = ts.Textures.FirstOrDefault(t => t.TextureType == Domain.ValueObjects.TextureType.Albedo)
-                              ?? ts.Textures.FirstOrDefault(t => t.TextureType == Domain.ValueObjects.TextureType.Diffuse);
+            // Find albedo texture for preview
+            var previewTexture = ts.Textures.FirstOrDefault(t => t.TextureType == Domain.ValueObjects.TextureType.Albedo);
             
             return new RecycledTextureSetDto(
                 ts.Id,
