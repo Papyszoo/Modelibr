@@ -29,6 +29,7 @@ jest.mock('./services/ApiClient', () => ({
     addTextureToSetEndpoint: jest.fn(),
     removeTextureFromSet: jest.fn(),
     changeTextureType: jest.fn(),
+    changeTextureChannel: jest.fn(),
     associateTextureSetWithModelVersion: jest.fn(),
     disassociateTextureSetFromModelVersion: jest.fn(),
     getSettings: jest.fn(),

@@ -666,6 +666,7 @@ function ModelViewer({
                 key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
                 shadows
                 className="viewer-canvas"
+                data-testid="model-viewer-canvas"
                 gl={{
                   antialias: true,
                   alpha: true,

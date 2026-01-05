@@ -158,12 +158,13 @@ function VersionStrip({
     selectedVersion && selectedVersion.id === versions[versions.length - 1]?.id
 
   return (
-    <div className="version-strip">
+    <div className="version-strip" data-testid="version-strip">
       {/* Version Dropdown */}
       <div className="version-dropdown-container" ref={dropdownRef}>
         <button
           className="version-dropdown-trigger"
           onClick={() => setDropdownOpen(!dropdownOpen)}
+          data-testid="version-dropdown-trigger"
         >
           <div className="version-dropdown-info">
             <span className="version-dropdown-number">
@@ -184,12 +185,13 @@ function VersionStrip({
         </button>
 
         {dropdownOpen && (
-          <div className="version-dropdown-menu">
+          <div className="version-dropdown-menu" data-testid="version-dropdown-menu">
             {versions.map(version => (
               <div
                 key={version.id}
                 className={`version-dropdown-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
                 onClick={() => handleVersionClick(version)}
+                data-testid={`version-dropdown-item-${version.versionNumber}`}
               >
                 <VersionThumbnail 
                   modelId={model.id} 

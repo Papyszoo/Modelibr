@@ -53,7 +53,10 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
             }
 
             // Create the texture using domain factory method
-            var texture = Domain.Models.Texture.Create(file, command.TextureType, _dateTimeProvider.UtcNow);
+            // If SourceChannel is provided, use the overload with channel; otherwise use default
+            var texture = command.SourceChannel.HasValue
+                ? Domain.Models.Texture.Create(file, command.TextureType, command.SourceChannel.Value, _dateTimeProvider.UtcNow)
+                : Domain.Models.Texture.Create(file, command.TextureType, _dateTimeProvider.UtcNow);
 
             // Remove existing texture of the same type if it exists (for replacement)
             textureSet.RemoveTextureOfType(command.TextureType, _dateTimeProvider.UtcNow);
@@ -72,7 +75,7 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
                 await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
             }
 
-            return Result.Success(new AddTextureToPackResponse(texture.Id, texture.TextureType));
+            return Result.Success(new AddTextureToPackResponse(texture.Id, texture.TextureType, texture.SourceChannel));
         }
         catch (ArgumentException ex)
         {
@@ -87,5 +90,21 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
     }
 }
 
-public record AddTextureToPackCommand(int TextureSetId, int FileId, TextureType TextureType) : ICommand<AddTextureToPackResponse>;
-public record AddTextureToPackResponse(int TextureId, TextureType TextureType);
+/// <summary>
+/// Command to add a texture to a texture set with optional source channel.
+/// </summary>
+/// <param name="TextureSetId">The texture set to add to</param>
+/// <param name="FileId">The file containing the texture</param>
+/// <param name="TextureType">The type of texture (Albedo, Normal, etc.)</param>
+/// <param name="SourceChannel">Optional source channel for channel-packed textures (R, G, B, A, or RGB)</param>
+public record AddTextureToPackCommand(
+    int TextureSetId, 
+    int FileId, 
+    TextureType TextureType,
+    TextureChannel? SourceChannel = null
+) : ICommand<AddTextureToPackResponse>;
+
+/// <summary>
+/// Response from adding a texture to a set.
+/// </summary>
+public record AddTextureToPackResponse(int TextureId, TextureType TextureType, TextureChannel SourceChannel);

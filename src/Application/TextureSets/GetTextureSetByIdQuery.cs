@@ -36,6 +36,7 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
             {
                 Id = t.Id,
                 TextureType = t.TextureType,
+                SourceChannel = t.SourceChannel,
                 FileId = t.FileId,
                 FileName = t.File?.OriginalFileName,
                 CreatedAt = t.CreatedAt
@@ -87,6 +88,10 @@ public record TextureDto
 {
     public int Id { get; init; }
     public required TextureType TextureType { get; init; }
+    /// <summary>
+    /// The source channel from the file (R, G, B, A for grayscale, RGB for color)
+    /// </summary>
+    public TextureChannel SourceChannel { get; init; }
     public int FileId { get; init; }
     public string? FileName { get; init; }
     public DateTime CreatedAt { get; init; }

@@ -11,6 +11,7 @@ import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload
 // eslint-disable-next-line no-restricted-imports -- ApiClient needed for file operations
 import ApiClient from '../../../services/ApiClient'
 import './TextureCard.css'
+import TexturePreview from './TexturePreview'
 
 interface TextureCardProps {
   textureType: TextureType
@@ -317,9 +318,10 @@ function TextureCard({
               onDragStart={handleTextureDragStart}
               onDragEnd={handleTextureDragEnd}
             >
-              <img
+              <TexturePreview
                 src={ApiClient.getFileUrl(texture.fileId.toString())}
                 alt={texture.fileName || typeInfo.label}
+                sourceChannel={texture.sourceChannel}
                 className="texture-preview-image"
               />
               <div className="texture-card-overlay">

@@ -5,7 +5,7 @@
   "source": "@site/docs/features/texture-sets.md",
   "sourceDirName": "features",
   "slug": "/features/texture-sets",
-  "permalink": "/features/texture-sets",
+  "permalink": "/docs/features/texture-sets",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Model Management",
-    "permalink": "/features/models"
+    "permalink": "/docs/features/models"
   },
   "next": {
     "title": "Recycled Files",
-    "permalink": "/features/recycled-files"
+    "permalink": "/docs/features/recycled-files"
   }
 }

@@ -325,6 +325,73 @@ When writing new E2E tests:
 
 These practices ensure reliable, maintainable, and reviewable E2E tests.
 
+### 0. Selector Best Practices (IMPORTANT)
+
+**Use stable selectors to prevent test breakage when UI styling changes.**
+
+#### Selector Priority (Best to Worst)
+
+| Priority | Selector Type | Example | When to Use |
+|:--------:|:--------------|:--------|:------------|
+| **1** | `data-testid` | `[data-testid="category-dialog-save"]` | **Always preferred** - explicit test hook |
+| **2** | Element ID | `#categoryName` | Good for form fields with IDs |
+| **3** | Semantic class | `.version-dropdown-trigger` | OK if class is specific to element |
+| **4** | Generic selector | `.p-dialog input[type='text']` | **AVOID** - breaks easily |
+
+#### Available data-testid Attributes
+
+These are already defined in the codebase:
+
+| Component | Attribute | Element |
+|:----------|:----------|:--------|
+| Sprite Category Dialog | `data-testid="category-dialog"` | Dialog container |
+| | `data-testid="category-name-input"` | Name input |
+| | `data-testid="category-description-input"` | Description textarea |
+| | `data-testid="category-dialog-save"` | Save button |
+| | `data-testid="category-dialog-cancel"` | Cancel button |
+| Model Viewer | `data-testid="model-viewer-canvas"` | 3D canvas |
+| Version Strip | `data-testid="version-strip"` | Version strip container |
+| | `data-testid="version-dropdown-trigger"` | Dropdown button |
+| | `data-testid="version-dropdown-menu"` | Dropdown menu |
+| | `data-testid="version-dropdown-item-{n}"` | Version item (n = version number) |
+
+#### Examples
+
+```typescript
+// ✅ GOOD - data-testid
+await page.locator('[data-testid="category-dialog-save"]').click();
+
+// ✅ GOOD - ID
+await page.locator('#categoryName').fill('Test Category');
+
+// ⚠️ OK - Semantic class
+await page.locator('.version-dropdown-trigger').click();
+
+// ❌ BAD - Generic selector (AVOID)
+await page.locator('.p-dialog input[type="text"]').first().fill('Test');
+```
+
+#### Adding New data-testid Attributes
+
+When creating new UI components, add `data-testid` to interactive elements:
+
+```tsx
+// In React component
+<Button 
+  onClick={handleSave}
+  data-testid="my-feature-save-button"
+>
+  Save
+</Button>
+```
+
+**Naming convention:** `{component}-{element}-{variant?}`
+- `category-dialog-save`
+- `version-dropdown-item-1`
+- `model-card-thumbnail`
+
+---
+
 ### 1. Screenshots at Checkpoints for User Review
 
 **Every test should capture screenshots at key checkpoints** so users can visually verify the test is working correctly.

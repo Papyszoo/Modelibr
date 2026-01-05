@@ -5,7 +5,7 @@
   "source": "@site/docs/roadmap.md",
   "sourceDirName": ".",
   "slug": "/roadmap",
-  "permalink": "/roadmap",
+  "permalink": "/docs/roadmap",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -18,10 +18,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Getting Started",
-    "permalink": "/"
+    "permalink": "/docs/"
   },
   "next": {
     "title": "Features",
-    "permalink": "/category/features"
+    "permalink": "/docs/category/features"
   }
 }

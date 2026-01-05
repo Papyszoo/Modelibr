@@ -1,88 +1,103 @@
 {
   "docusaurus-plugin-content-docs": {
     "default": {
-      "path": "/",
+      "path": "/docs",
       "versions": [
         {
           "name": "current",
           "label": "Next",
           "isLast": true,
-          "path": "/",
+          "path": "/docs",
           "mainDocId": "intro",
           "docs": [
             {
+              "id": "ai-documentation/API_CONTRACTS",
+              "path": "/docs/ai-documentation/API_CONTRACTS",
+              "sidebar": "tutorialSidebar"
+            },
+            {
               "id": "ai-documentation/BACKEND_API",
-              "path": "/ai-documentation/BACKEND_API",
+              "path": "/docs/ai-documentation/BACKEND_API",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "ai-documentation/BLENDER_ADDON",
-              "path": "/ai-documentation/BLENDER_ADDON",
+              "path": "/docs/ai-documentation/BLENDER_ADDON",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "ai-documentation/FRONTEND",
-              "path": "/ai-documentation/FRONTEND",
+              "path": "/docs/ai-documentation/FRONTEND",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "ai-documentation/MCP_TESTING_REPORT",
-              "path": "/ai-documentation/MCP_TESTING_REPORT",
+              "path": "/docs/ai-documentation/MCP_TESTING_REPORT",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "ai-documentation/TESTING",
-              "path": "/ai-documentation/TESTING",
+              "path": "/docs/ai-documentation/TESTING",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "ai-documentation/TEXTURE_CHANNEL_MAPPING",
+              "path": "/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "ai-documentation/WORKER",
-              "path": "/ai-documentation/WORKER",
+              "path": "/docs/ai-documentation/WORKER",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "changelog",
+              "path": "/docs/changelog",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "features/blender-addon",
-              "path": "/features/blender-addon",
+              "path": "/docs/features/blender-addon",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "features/models",
-              "path": "/features/models",
+              "path": "/docs/features/models",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "features/recycled-files",
-              "path": "/features/recycled-files",
+              "path": "/docs/features/recycled-files",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "features/texture-sets",
-              "path": "/features/texture-sets",
+              "path": "/docs/features/texture-sets",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "features/user-interface",
-              "path": "/features/user-interface",
+              "path": "/docs/features/user-interface",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "intro",
-              "path": "/",
+              "path": "/docs/",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "roadmap",
-              "path": "/roadmap",
+              "path": "/docs/roadmap",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "/category/features",
-              "path": "/category/features",
+              "path": "/docs/category/features",
               "sidebar": "tutorialSidebar"
             },
             {
               "id": "/category/ai-documentation",
-              "path": "/category/ai-documentation",
+              "path": "/docs/category/ai-documentation",
               "sidebar": "tutorialSidebar"
             }
           ],
@@ -90,7 +105,7 @@
           "sidebars": {
             "tutorialSidebar": {
               "link": {
-                "path": "/",
+                "path": "/docs/",
                 "label": "intro"
               }
             }

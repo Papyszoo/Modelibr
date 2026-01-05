@@ -25,5 +25,8 @@
         "clean-architecture"
     ],
     "author": "Modelibr Team",
-    "license": "MIT"
+    "license": "MIT",
+    "devDependencies": {
+        "playwright-bdd": "^8.4.2"
+    }
 }

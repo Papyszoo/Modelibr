@@ -312,6 +312,7 @@ namespace Infrastructure.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     FileId = table.Column<int>(type: "integer", nullable: false),
                     TextureType = table.Column<int>(type: "integer", nullable: false),
+                    SourceChannel = table.Column<int>(type: "integer", nullable: false, defaultValue: 5),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
@@ -791,9 +792,9 @@ namespace Infrastructure.Migrations
                 column: "Name");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Textures_FileId_TextureType",
+                name: "IX_Textures_FileId_TextureType_SourceChannel",
                 table: "Textures",
-                columns: new[] { "FileId", "TextureType" },
+                columns: new[] { "FileId", "TextureType", "SourceChannel" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

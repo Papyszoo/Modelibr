@@ -38,6 +38,19 @@ interface ProjectData {
     description?: string;
 }
 
+interface SpriteData {
+    id: number;
+    name: string;
+    fileId: number;
+    categoryId?: number;
+}
+
+interface SpriteCategoryData {
+    id: number;
+    name: string;
+    description?: string;
+}
+
 interface VersionState {
     thumbnailDetails: any;
     thumbnailSrc: string | null;
@@ -48,6 +61,8 @@ interface StateData {
     textureSets: Record<string, TextureSetData>;
     packs: Record<string, PackData>;
     projects: Record<string, ProjectData>;
+    sprites: Record<string, SpriteData>;
+    spriteCategories: Record<string, SpriteCategoryData>;
     versionStates: Record<string, VersionState>;
 }
 
@@ -61,8 +76,9 @@ class SharedState {
         } catch (e) {
             console.error('Error loading shared state:', e);
         }
-        return { models: {}, textureSets: {}, packs: {}, projects: {}, versionStates: {} };
+        return { models: {}, textureSets: {}, packs: {}, projects: {}, sprites: {}, spriteCategories: {}, versionStates: {} };
     }
+
 
     private saveState(state: StateData): void {
         fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
@@ -150,9 +166,45 @@ class SharedState {
         return state.projects ? name in state.projects : false;
     }
 
+    // Sprite management
+    saveSprite(name: string, data: SpriteData): void {
+        const state = this.loadState();
+        if (!state.sprites) state.sprites = {};
+        state.sprites[name] = data;
+        this.saveState(state);
+    }
+
+    getSprite(name: string): SpriteData | undefined {
+        const state = this.loadState();
+        return state.sprites?.[name];
+    }
+
+    hasSprite(name: string): boolean {
+        const state = this.loadState();
+        return state.sprites ? name in state.sprites : false;
+    }
+
+    // Sprite category management
+    saveSpriteCategory(name: string, data: SpriteCategoryData): void {
+        const state = this.loadState();
+        if (!state.spriteCategories) state.spriteCategories = {};
+        state.spriteCategories[name] = data;
+        this.saveState(state);
+    }
+
+    getSpriteCategory(name: string): SpriteCategoryData | undefined {
+        const state = this.loadState();
+        return state.spriteCategories?.[name];
+    }
+
+    hasSpriteCategory(name: string): boolean {
+        const state = this.loadState();
+        return state.spriteCategories ? name in state.spriteCategories : false;
+    }
+
     // Clear all state (called at start of test run)
     clear(): void {
-        this.saveState({ models: {}, textureSets: {}, packs: {}, projects: {}, versionStates: {} });
+        this.saveState({ models: {}, textureSets: {}, packs: {}, projects: {}, sprites: {}, spriteCategories: {}, versionStates: {} });
     }
 
     // Debug info
@@ -164,6 +216,8 @@ class SharedState {
                 textureSets: Object.keys(state.textureSets),
                 packs: Object.keys(state.packs || {}),
                 projects: Object.keys(state.projects || {}),
+                sprites: Object.keys(state.sprites || {}),
+                spriteCategories: Object.keys(state.spriteCategories || {}),
                 versionStates: Object.keys(state.versionStates),
             },
             null,

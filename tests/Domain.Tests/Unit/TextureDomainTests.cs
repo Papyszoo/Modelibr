@@ -72,8 +72,7 @@ public class TextureDomainTests
     [InlineData(TextureType.AO)]
     [InlineData(TextureType.Roughness)]
     [InlineData(TextureType.Metallic)]
-    [InlineData(TextureType.Diffuse)]
-    [InlineData(TextureType.Specular)]
+    [InlineData(TextureType.Emissive)]
     public void UpdateTextureType_WithValidType_UpdatesTypeAndTimestamp(TextureType newTextureType)
     {
         // Arrange
@@ -136,7 +135,7 @@ public class TextureDomainTests
 
         // Assert
         Assert.Contains(file.OriginalFileName, description);
-        Assert.Contains("Base color or diffuse map", description); // Description of Albedo type
+        Assert.Contains("Base color map", description); // Description of Albedo type
     }
 
     private static DomainFile CreateValidTextureFile()

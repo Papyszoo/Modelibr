@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { TabView, TabPanel } from 'primereact/tabview'
 import { TextureSetDto, TextureType } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
-import { getAllTextureTypes } from '../../../utils/textureTypeUtils'
+import { getNonHeightTypes } from '../../../utils/textureTypeUtils'
 import SetHeader from '../dialogs/SetHeader'
 import SetStats from '../dialogs/SetStats'
 import ModelsCardGrid from '../dialogs/ModelsCardGrid'
 import TextureCard from './TextureCard'
+import HeightCard from './HeightCard'
+import FilesTab from './FilesTab'
 import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
 import TexturePreviewPanel from './TexturePreviewPanel'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
@@ -104,8 +106,8 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
     return <div className="texture-set-viewer-error">Texture set not found</div>
   }
 
-  // Get all texture types for cards
-  const allTextureTypes = getAllTextureTypes()
+  // Get texture types excluding Height/Displacement/Bump (those are handled by HeightCard)
+  const nonHeightTypes = getNonHeightTypes()
 
   return (
     <div className="texture-set-viewer">
@@ -129,9 +131,10 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
         activeIndex={activeTabIndex}
         onTabChange={e => setActiveTabIndex(e.index)}
       >
-        <TabPanel header="Textures" leftIcon="pi pi-image">
+        <TabPanel header="Texture Types" leftIcon="pi pi-image">
           <div className="texture-cards-grid">
-            {allTextureTypes.map((textureType: TextureType) => {
+            {/* Regular texture type cards (excluding Height/Displacement/Bump) */}
+            {nonHeightTypes.map((textureType: TextureType) => {
               const texture =
                 textureSet.textures.find(t => t.textureType === textureType) ||
                 null
@@ -146,7 +149,19 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
                 />
               )
             })}
+
+            {/* Special HeightCard with mode dropdown for Height/Displacement/Bump */}
+            <HeightCard
+              textures={textureSet.textures}
+              setId={textureSet.id}
+              onTextureUpdated={loadTextureSet}
+            />
           </div>
+        </TabPanel>
+
+        {/* Files Tab - channel mapping for source files */}
+        <TabPanel header="Files" leftIcon="pi pi-file">
+          <FilesTab textureSet={textureSet} onMappingChanged={loadTextureSet} />
         </TabPanel>
 
         <TabPanel header="Models" leftIcon="pi pi-box">
@@ -180,3 +195,4 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
 }
 
 export default TextureSetViewer
+

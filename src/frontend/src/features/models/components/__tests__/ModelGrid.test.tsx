@@ -101,7 +101,7 @@ describe('ModelGrid', () => {
     )
 
     expect(screen.getByPlaceholderText('Search models...')).toBeInTheDocument()
-    expect(screen.getByText('Filters (Coming Soon)')).toBeInTheDocument()
+    expect(screen.getByText('No packs or projects to filter by')).toBeInTheDocument()
   })
 
   it('renders all models in grid', () => {

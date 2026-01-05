@@ -228,3 +228,179 @@ Given("the project contains model {string}", async ({ page }, modelStateName: st
     }
     console.log(`[Precondition] Project contains model "${model.name}" ✓`);
 });
+
+// ============= Texture Set Association Steps =============
+
+When(
+    "I add texture set {string} to the project",
+    async ({ page }, textureSetName: string) => {
+        const textureSet = sharedState.getTextureSet(textureSetName);
+        
+        if (!textureSet) {
+            throw new Error(`Texture set "${textureSetName}" not found in shared state`);
+        }
+        
+        // Click "Add" card in Texture Sets section
+        const addCard = page.locator('.project-section:has-text("Texture Sets") .project-card-add').first();
+        await addCard.waitFor({ state: 'visible', timeout: 10000 });
+        await addCard.click();
+        console.log('[Action] Clicked Add Texture Set card');
+        
+        // Wait for dialog
+        await page.waitForSelector('.p-dialog:has-text("Add Texture Sets")', { state: 'visible', timeout: 5000 });
+        console.log('[Action] Add Texture Sets dialog opened');
+        
+        // Find and click texture set item
+        const textureItems = page.locator('.p-dialog div[data-pc-section="content"] > div').filter({
+            hasText: textureSet.name
+        });
+        
+        const firstItem = textureItems.first();
+        await firstItem.waitFor({ state: 'visible', timeout: 5000 });
+        await firstItem.click();
+        console.log(`[Action] Clicked texture set item: ${textureSet.name}`);
+        
+        await page.waitForTimeout(300);
+        const addButton = page.locator('.p-dialog-footer button:has-text("Add Selected")').first();
+        await addButton.waitFor({ state: 'visible', timeout: 5000 });
+        
+        const buttonText = await addButton.textContent();
+        console.log(`[Action] Add button text: ${buttonText}`);
+        
+        if (buttonText?.includes('(0)')) {
+            const checkbox = firstItem.locator('input[type="checkbox"], .p-checkbox-box').first();
+            await checkbox.click({ force: true });
+            console.log('[Action] Clicked checkbox directly');
+            await page.waitForTimeout(300);
+        }
+        
+        await addButton.click();
+        console.log('[Action] Clicked Add button');
+        
+        await page.waitForSelector('.p-dialog:has-text("Add Texture Sets")', { state: 'hidden', timeout: 10000 });
+        console.log('[Action] Dialog closed');
+        
+        await page.waitForTimeout(500);
+        console.log(`[Action] Added texture set "${textureSet.name}" to project`);
+    }
+);
+
+When(
+    "I remove texture set {string} from the project",
+    async ({ page }, textureSetName: string) => {
+        const textureSet = sharedState.getTextureSet(textureSetName);
+        
+        if (!textureSet) {
+            throw new Error(`Texture set "${textureSetName}" not found in shared state`);
+        }
+        
+        // Find and right-click texture set card
+        const textureCard = page.locator(`.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`).first();
+        await textureCard.click({ button: 'right' });
+        console.log('[Action] Right-clicked on texture set card');
+        
+        // Click remove option
+        const removeOption = page.locator('.p-contextmenu-item:has-text("Remove from project"), .p-menuitem:has-text("Remove")').first();
+        await removeOption.waitFor({ state: 'visible', timeout: 3000 });
+        await removeOption.click();
+        console.log('[Action] Clicked Remove from project');
+        
+        await page.waitForTimeout(500);
+        console.log(`[Action] Removed texture set "${textureSet.name}" from project`);
+    }
+);
+
+// Texture set in project assertions
+Then("the project should contain texture set {string}", async ({ page }, textureSetName: string) => {
+    const textureSet = sharedState.getTextureSet(textureSetName);
+    
+    if (!textureSet) {
+        throw new Error(`Texture set "${textureSetName}" not found in shared state`);
+    }
+    
+    const textureCard = page.locator(`.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`).first();
+    await expect(textureCard).toBeVisible({ timeout: 5000 });
+    console.log(`[UI] Project contains texture set "${textureSet.name}" ✓`);
+});
+
+Then("the project should not contain texture set {string}", async ({ page }, textureSetName: string) => {
+    const textureSet = sharedState.getTextureSet(textureSetName);
+    
+    if (!textureSet) {
+        throw new Error(`Texture set "${textureSetName}" not found in shared state`);
+    }
+    
+    const textureCard = page.locator(`.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`).first();
+    await expect(textureCard).not.toBeVisible({ timeout: 5000 });
+    console.log(`[UI] Project does not contain texture set "${textureSet.name}" ✓`);
+});
+
+// Precondition: project contains texture set
+Given("the project contains texture set {string}", async ({ page }, textureSetName: string) => {
+    const textureSet = sharedState.getTextureSet(textureSetName);
+    
+    if (!textureSet) {
+        throw new Error(`Texture set "${textureSetName}" not found in shared state`);
+    }
+    
+    const textureCard = page.locator(`.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`).first();
+    const isPresent = await textureCard.isVisible().catch(() => false);
+    
+    if (!isPresent) {
+        throw new Error(`Project does not contain texture set "${textureSet.name}". Add it first.`);
+    }
+    console.log(`[Precondition] Project contains texture set "${textureSet.name}" ✓`);
+});
+
+// Texture set existence check
+Given("the texture set {string} exists", async ({ page }, textureSetName: string) => {
+    if (!sharedState.hasTextureSet(textureSetName)) {
+        throw new Error(`Texture set "${textureSetName}" not found in shared state. Create it first.`);
+    }
+    console.log(`[SharedState] Verified texture set exists: ${textureSetName}`);
+});
+
+// ============= Project Sprite Association Steps =============
+
+Then("I take a screenshot of project with sprite", async ({ page }) => {
+    await page.screenshot({ path: "test-results/screenshots/project-with-sprite.png" });
+    console.log("[Screenshot] Captured project with sprite");
+});
+
+Then("I take a screenshot of project after sprite removed", async ({ page }) => {
+    await page.screenshot({ path: "test-results/screenshots/project-sprite-removed.png" });
+    console.log("[Screenshot] Captured project after sprite removed");
+});
+
+Then("the project sprite count should be {int}", async ({ page }, expectedCount: number) => {
+    // Check sprite count in project stats
+    const statSpan = page.locator('.project-stats span:has-text("sprite")');
+    const text = await statSpan.textContent() || "0";
+    const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
+    expect(count).toBe(expectedCount);
+    console.log(`[UI] Project sprite count is ${count} ✓`);
+});
+
+
+Given("the project has at least {int} sprite", async ({ page }, minCount: number) => {
+    const statSpan = page.locator('.project-stats span:has-text("sprite")');
+    const text = await statSpan.textContent() || "0";
+    const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
+    if (count < minCount) {
+        throw new Error(`Project has only ${count} sprites, but at least ${minCount} required`);
+    }
+    console.log(`[Precondition] Project has ${count} sprite(s) ✓`);
+});
+
+When("I remove the first sprite from the project", async ({ page }) => {
+    // Right-click on first sprite card to open context menu
+    const spriteCard = page.locator('.project-section:has(h3:has-text("Sprite")) .project-card:not(.project-card-add)').first();
+    await spriteCard.click({ button: "right" });
+    await page.waitForTimeout(300);
+    
+    // Click Remove from project option
+    const removeOption = page.locator('.p-contextmenu .p-menuitem:has-text("Remove")');
+    await removeOption.click();
+    await page.waitForTimeout(500);
+    console.log("[Action] Removed first sprite from project");
+});
