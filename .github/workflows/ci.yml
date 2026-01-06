@@ -107,6 +107,18 @@ jobs:
         run: |
           docker compose -f tests/e2e/docker-compose.e2e.yml up -d --build
 
+      - name: Show container status
+        if: always()
+        run: |
+          echo "=== Container status ==="
+          docker compose -f tests/e2e/docker-compose.e2e.yml ps -a
+          echo ""
+          echo "=== webapi-e2e logs ==="
+          docker compose -f tests/e2e/docker-compose.e2e.yml logs webapi-e2e 2>&1 | tail -100 || true
+          echo ""
+          echo "=== postgres-e2e logs ==="
+          docker compose -f tests/e2e/docker-compose.e2e.yml logs postgres-e2e 2>&1 | tail -50 || true
+
       - name: Wait for services to be ready
         run: |
           echo "Waiting for services to be healthy..."
@@ -159,6 +171,15 @@ jobs:
       - name: Stop services
         if: always()
         run: |
+          echo "=== Final container status ==="
+          docker compose -f tests/e2e/docker-compose.e2e.yml ps -a || true
+          echo ""
+          echo "=== webapi-e2e logs (full) ==="
+          docker compose -f tests/e2e/docker-compose.e2e.yml logs webapi-e2e 2>&1 || true
+          echo ""
+          echo "=== frontend-e2e logs ==="
+          docker compose -f tests/e2e/docker-compose.e2e.yml logs frontend-e2e 2>&1 | tail -50 || true
+          echo ""
           docker compose -f tests/e2e/docker-compose.e2e.yml down -v
 
       - name: Fail if E2E tests failed

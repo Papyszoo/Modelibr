@@ -105,7 +105,7 @@ public class BatchUploadDomainTests
     [Theory]
     [InlineData("invalid")]
     [InlineData("random")]
-    [InlineData("file")]
+    [InlineData("unsupported")]
     public void Create_WithUnsupportedUploadType_ThrowsArgumentException(string uploadType)
     {
         // Arrange
