@@ -12,6 +12,7 @@ import {
 describe('textureTypeUtils', () => {
   describe('TEXTURE_TYPE_INFO constant', () => {
     it('should have info for all TextureType enum values', () => {
+      // Note: Diffuse (7) and Specular (8) have been removed (not PBR standard)
       const allTextureTypes = [
         TextureType.Albedo,
         TextureType.Normal,
@@ -19,8 +20,6 @@ describe('textureTypeUtils', () => {
         TextureType.AO,
         TextureType.Roughness,
         TextureType.Metallic,
-        TextureType.Diffuse,
-        TextureType.Specular,
         TextureType.Emissive,
         TextureType.Bump,
         TextureType.Alpha,
@@ -105,16 +104,15 @@ describe('textureTypeUtils', () => {
       expect(allTypes).toContain(TextureType.Metallic)
       expect(allTypes).toContain(TextureType.AO)
       expect(allTypes).toContain(TextureType.Height)
-      expect(allTypes).toContain(TextureType.Diffuse)
-      expect(allTypes).toContain(TextureType.Specular)
       expect(allTypes).toContain(TextureType.Emissive)
       expect(allTypes).toContain(TextureType.Bump)
       expect(allTypes).toContain(TextureType.Alpha)
       expect(allTypes).toContain(TextureType.Displacement)
     })
 
-    it('should return exactly 12 texture types', () => {
-      expect(getAllTextureTypes()).toHaveLength(12)
+    it('should return exactly 10 texture types', () => {
+      // Note: Diffuse and Specular have been removed (not PBR standard)
+      expect(getAllTextureTypes()).toHaveLength(10)
     })
 
     it('should return only valid numeric enum values', () => {
@@ -132,7 +130,8 @@ describe('textureTypeUtils', () => {
       const options = getTextureTypeOptions()
 
       expect(Array.isArray(options)).toBe(true)
-      expect(options.length).toBe(12)
+      // Note: Diffuse and Specular have been removed (not PBR standard)
+      expect(options.length).toBe(10)
     })
 
     it('should include label, value, color, and icon for each option', () => {
