@@ -5,7 +5,7 @@
   "source": "@site/docs/intro.md",
   "sourceDirName": ".",
   "slug": "/",
-  "permalink": "/docs/",
+  "permalink": "/Modelibr/docs/",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -18,6 +18,6 @@
   "sidebar": "tutorialSidebar",
   "next": {
     "title": "Roadmap",
-    "permalink": "/docs/roadmap"
+    "permalink": "/Modelibr/docs/roadmap"
   }
 }

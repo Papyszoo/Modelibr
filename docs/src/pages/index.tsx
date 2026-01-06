@@ -144,7 +144,6 @@ const FeatureList: FeatureItem[] = [
     title: 'Animated Thumbnails',
     icon: '🎬',
     description: 'Every model gets a rotating 360° preview. No more guessing what\'s inside a file.',
-    highlight: true,
   },
   {
     title: 'Version Control',
@@ -160,7 +159,6 @@ const FeatureList: FeatureItem[] = [
     title: 'Blender Addon',
     icon: '🔌',
     description: 'Import and export directly from Blender. Your library, one click away.',
-    highlight: true,
   },
   {
     title: 'Smart Deduplication',
@@ -222,13 +220,14 @@ const StepList: StepItem[] = [
   },
   {
     number: '02',
-    title: 'Drag & Drop',
-    description: 'Upload your models by dragging them into the browser. That\'s it.',
+    title: 'Access the App',
+    description: 'Open your browser and go to:',
+    code: 'http://localhost:3000',
   },
   {
     number: '03',
-    title: 'Browse & Preview',
-    description: 'Explore your library with animated thumbnails and a full 3D viewer.',
+    title: 'Drag & Drop',
+    description: 'Upload your 3D models by dragging them into the browser. Browse with animated thumbnails.',
   },
 ];
 
@@ -242,7 +241,12 @@ function StepCard({ number, title, description, code }: StepItem) {
         {code && (
           <div className={styles.stepCodeBlock}>
             <code>{code}</code>
-            <button className={styles.copyButton} title="Copy">📋</button>
+            <button className={styles.copyButton} title="Copy" onClick={() => navigator.clipboard.writeText(code)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
           </div>
         )}
       </div>
@@ -282,7 +286,7 @@ function CTASection() {
             <Link className={clsx('button button--lg', styles.primaryButton)} to="/docs">
               Read the Documentation
             </Link>
-            <Link className={clsx('button button--lg', styles.ghostButton)} href="#">
+            <Link className={clsx('button button--lg', styles.ghostButton)} href="https://discord.gg/KgwgTDVP3F">
               Join our Discord
             </Link>
           </div>
