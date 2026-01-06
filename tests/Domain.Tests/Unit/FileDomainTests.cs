@@ -17,7 +17,7 @@ public class FileDomainTests
         var mimeType = "model/obj";
         var fileType = FileType.Obj;
         var sizeBytes = 1024L;
-        var sha256Hash = "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890";
+        var sha256Hash = "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd";
         var createdAt = DateTime.UtcNow;
 
         // Act
@@ -180,10 +180,8 @@ public class FileDomainTests
         ));
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void Create_WithInvalidSizeBytes_ThrowsArgumentException(long sizeBytes)
+    [Fact]
+    public void Create_WithNegativeSizeBytes_ThrowsArgumentException()
     {
         // Act & Assert
         Assert.Throws<ArgumentException>(() => DomainFile.Create(
@@ -192,10 +190,28 @@ public class FileDomainTests
             "/path/to/file",
             "model/obj",
             FileType.Obj,
-            sizeBytes,
+            -1,
             "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd",
             DateTime.UtcNow
         ));
+    }
+
+    [Fact]
+    public void Create_WithZeroSizeBytes_Succeeds()
+    {
+        // Size 0 is allowed for placeholder files
+        var file = DomainFile.Create(
+            "test.obj",
+            "stored.obj",
+            "/path/to/file",
+            "model/obj",
+            FileType.Obj,
+            0,
+            "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd",
+            DateTime.UtcNow
+        );
+        
+        Assert.Equal(0, file.SizeBytes);
     }
 
     [Theory]

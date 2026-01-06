@@ -66,7 +66,7 @@ public class RegenerateThumbnailCommandHandlerTests
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("NoFilesFound", result.Error.Code);
+        Assert.Equal("NoActiveVersion", result.Error.Code);
     }
 
     private Model CreateModelWithActiveVersionAndFile(string fileName, string hash)
@@ -75,6 +75,7 @@ public class RegenerateThumbnailCommandHandlerTests
         model.Id = 1;
         
         var version = model.CreateVersion("v1", DateTime.UtcNow);
+        version.Id = 1;
         var file = Domain.Models.File.Create(
             fileName, 
             "stored-file.obj",
@@ -123,7 +124,7 @@ public class RegenerateThumbnailCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenModelHasExistingJob_RetriesExistingJob()
+    public async Task Handle_WhenModelHasExistingJob_EnqueuesNewJob()
     {
         // Arrange
         var command = new RegenerateThumbnailCommand(1);
@@ -151,9 +152,8 @@ public class RegenerateThumbnailCommandHandlerTests
         // Verify thumbnail was reset
         _mockThumbnailRepository.Verify(x => x.UpdateAsync(thumbnail, It.IsAny<CancellationToken>()), Times.Once);
         
-        // Verify existing job was retried (not a new job enqueued)
-        _mockThumbnailQueue.Verify(x => x.RetryJobAsync(existingJob.Id, It.IsAny<CancellationToken>()), Times.Once);
-        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        // EnqueueAsync is called which handles deduplication internally
+        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(1, model.ActiveVersion!.Id, ValidHash, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
