@@ -53,6 +53,6 @@ Click on any model card to open it in the 3D viewer:
 
 ## Next Steps
 
-- [Model Management](./features/models) - Learn about versions and organization
-- [Texture Sets](./features/texture-sets) - Apply PBR textures to your models
-- [Blender Addon](./features/blender-addon) - Integrate with your Blender workflow
+- [Model Management](/docs/features/models) - Learn about versions and organization
+- [Texture Sets](/docs/features/texture-sets) - Apply PBR textures to your models
+- [Blender Addon](/docs/features/blender-addon) - Integrate with your Blender workflow
