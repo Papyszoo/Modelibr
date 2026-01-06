@@ -98,10 +98,10 @@ jobs:
 
       - name: Prepare data directories
         run: |
-          mkdir -p data/uploads
-          mkdir -p data/thumbnails
-          mkdir -p data/postgres
-          sudo chown -R 1000:1000 data
+          mkdir -p tests/e2e/data/uploads
+          mkdir -p tests/e2e/data/thumbnails
+          mkdir -p tests/e2e/data/postgres
+          sudo chown -R 1000:1000 tests/e2e/data
 
       - name: Build and start services
         run: |
