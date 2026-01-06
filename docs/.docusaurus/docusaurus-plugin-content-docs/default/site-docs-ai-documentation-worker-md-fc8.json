@@ -5,7 +5,7 @@
   "source": "@site/docs/ai-documentation/WORKER.md",
   "sourceDirName": "ai-documentation",
   "slug": "/ai-documentation/WORKER",
-  "permalink": "/docs/ai-documentation/WORKER",
+  "permalink": "/Modelibr/docs/ai-documentation/WORKER",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Testing Documentation",
-    "permalink": "/docs/ai-documentation/TESTING"
+    "permalink": "/Modelibr/docs/ai-documentation/TESTING"
   },
   "next": {
     "title": "API Contracts Documentation",
-    "permalink": "/docs/ai-documentation/API_CONTRACTS"
+    "permalink": "/Modelibr/docs/ai-documentation/API_CONTRACTS"
   }
 }

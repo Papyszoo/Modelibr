@@ -5,7 +5,7 @@
   "source": "@site/docs/ai-documentation/FRONTEND.md",
   "sourceDirName": "ai-documentation",
   "slug": "/ai-documentation/FRONTEND",
-  "permalink": "/docs/ai-documentation/FRONTEND",
+  "permalink": "/Modelibr/docs/ai-documentation/FRONTEND",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Blender Addon",
-    "permalink": "/docs/ai-documentation/BLENDER_ADDON"
+    "permalink": "/Modelibr/docs/ai-documentation/BLENDER_ADDON"
   },
   "next": {
     "title": "Testing Documentation",
-    "permalink": "/docs/ai-documentation/TESTING"
+    "permalink": "/Modelibr/docs/ai-documentation/TESTING"
   }
 }

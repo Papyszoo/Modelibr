@@ -28,8 +28,12 @@ export default {
     },
     "experimental_router": "browser"
   },
-  "url": "https://modelibr.com",
-  "baseUrl": "/",
+  "url": "https://Papyszoo.github.io",
+  "baseUrl": "/Modelibr/",
+  "organizationName": "Papyszoo",
+  "projectName": "Modelibr",
+  "deploymentBranch": "gh-pages",
+  "trailingSlash": false,
   "onBrokenLinks": "throw",
   "i18n": {
     "defaultLocale": "en",
@@ -57,9 +61,9 @@ export default {
   "themeConfig": {
     "image": "img/screenshots/model-viewer.png",
     "colorMode": {
-      "respectPrefersColorScheme": true,
-      "defaultMode": "light",
-      "disableSwitch": false
+      "defaultMode": "dark",
+      "disableSwitch": false,
+      "respectPrefersColorScheme": false
     },
     "navbar": {
       "title": "Modelibr",
@@ -71,17 +75,12 @@ export default {
           "label": "Documentation"
         },
         {
-          "href": "/docs/ai-documentation/BACKEND_API",
-          "label": "AI Docs",
-          "position": "left"
-        },
-        {
           "href": "https://github.com/Papyszoo/Modelibr",
           "label": "GitHub",
           "position": "right"
         },
         {
-          "href": "#",
+          "href": "https://discord.gg/KgwgTDVP3F",
           "label": "Discord",
           "position": "right"
         }
@@ -130,7 +129,7 @@ export default {
             },
             {
               "label": "Discord",
-              "href": "#"
+              "href": "https://discord.gg/KgwgTDVP3F"
             }
           ]
         }

@@ -5,7 +5,7 @@
   "source": "@site/docs/features/models.md",
   "sourceDirName": "features",
   "slug": "/features/models",
-  "permalink": "/docs/features/models",
+  "permalink": "/Modelibr/docs/features/models",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -17,10 +17,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Features",
-    "permalink": "/docs/category/features"
+    "permalink": "/Modelibr/docs/category/features"
   },
   "next": {
     "title": "Texture Sets",
-    "permalink": "/docs/features/texture-sets"
+    "permalink": "/Modelibr/docs/features/texture-sets"
   }
 }

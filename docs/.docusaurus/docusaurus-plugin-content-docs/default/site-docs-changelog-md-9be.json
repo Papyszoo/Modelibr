@@ -5,7 +5,7 @@
   "source": "@site/docs/changelog.md",
   "sourceDirName": ".",
   "slug": "/changelog",
-  "permalink": "/docs/changelog",
+  "permalink": "/Modelibr/docs/changelog",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -18,6 +18,6 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "Texture Type Channel Mapping - Design Specification",
-    "permalink": "/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING"
+    "permalink": "/Modelibr/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING"
   }
 }

@@ -5,7 +5,7 @@
   "source": "@site/docs/ai-documentation/BACKEND_API.md",
   "sourceDirName": "ai-documentation",
   "slug": "/ai-documentation/BACKEND_API",
-  "permalink": "/docs/ai-documentation/BACKEND_API",
+  "permalink": "/Modelibr/docs/ai-documentation/BACKEND_API",
   "draft": false,
   "unlisted": false,
   "tags": [],
@@ -18,10 +18,10 @@
   "sidebar": "tutorialSidebar",
   "previous": {
     "title": "AI Documentation",
-    "permalink": "/docs/category/ai-documentation"
+    "permalink": "/Modelibr/docs/category/ai-documentation"
   },
   "next": {
     "title": "Blender Addon",
-    "permalink": "/docs/ai-documentation/BLENDER_ADDON"
+    "permalink": "/Modelibr/docs/ai-documentation/BLENDER_ADDON"
   }
 }

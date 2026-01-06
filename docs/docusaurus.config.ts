@@ -11,9 +11,13 @@ const config: Config = {
     v4: true,
   },
 
-  // Set in deployment - placeholder for now
-  url: 'https://modelibr.com',
-  baseUrl: '/',
+  // GitHub Pages deployment
+  url: 'https://Papyszoo.github.io',
+  baseUrl: '/Modelibr/',
+  organizationName: 'Papyszoo',
+  projectName: 'Modelibr',
+  deploymentBranch: 'gh-pages',
+  trailingSlash: false,
 
   onBrokenLinks: 'throw',
 
@@ -41,7 +45,9 @@ const config: Config = {
   themeConfig: {
     image: 'img/screenshots/model-viewer.png',
     colorMode: {
-      respectPrefersColorScheme: true,
+      defaultMode: 'dark',
+      disableSwitch: false,
+      respectPrefersColorScheme: false,
     },
     navbar: {
       title: 'Modelibr',
@@ -52,18 +58,14 @@ const config: Config = {
           position: 'left',
           label: 'Documentation',
         },
-        {
-          href: '/docs/ai-documentation/BACKEND_API',
-          label: 'AI Docs',
-          position: 'left',
-        },
+
         {
           href: 'https://github.com/Papyszoo/Modelibr',
           label: 'GitHub',
           position: 'right',
         },
         {
-          href: '#', // TODO: Add Discord invite link
+          href: 'https://discord.gg/KgwgTDVP3F',
           label: 'Discord',
           position: 'right',
         },
@@ -111,7 +113,7 @@ const config: Config = {
             },
             {
               label: 'Discord',
-              href: '#', // TODO: Add Discord invite link
+              href: 'https://discord.gg/KgwgTDVP3F',
             },
           ],
         },
