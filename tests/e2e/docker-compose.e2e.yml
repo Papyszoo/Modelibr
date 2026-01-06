@@ -20,7 +20,7 @@ services:
             timeout: 5s
             retries: 10
         volumes:
-            - ./data/uploads:/var/lib/modelibr/uploads
+            - webapi-uploads:/var/lib/modelibr/uploads
         depends_on:
             postgres-e2e:
                 condition: service_healthy
@@ -61,7 +61,7 @@ services:
             timeout: 5s
             retries: 10
         volumes:
-            - ./data/thumbnails:/var/lib/modelibr/thumbnails
+            - worker-thumbnails:/var/lib/modelibr/thumbnails
         depends_on:
             webapi-e2e:
                 condition: service_healthy
@@ -82,10 +82,15 @@ services:
             timeout: 5s
             retries: 10
         volumes:
-            - ./data/postgres:/var/lib/postgresql/data
+            - postgres-data:/var/lib/postgresql/data
         networks:
             - modelibr-e2e
 
 networks:
     modelibr-e2e:
         driver: bridge
+
+volumes:
+    webapi-uploads:
+    worker-thumbnails:
+    postgres-data:
