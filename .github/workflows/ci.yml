@@ -96,6 +96,13 @@ jobs:
       - name: Create .env file
         run: cp .env.example .env
 
+      - name: Prepare data directories
+        run: |
+          mkdir -p data/uploads
+          mkdir -p data/thumbnails
+          mkdir -p data/postgres
+          sudo chown -R 1000:1000 data
+
       - name: Build and start services
         run: |
           docker compose -f tests/e2e/docker-compose.e2e.yml up -d --build
