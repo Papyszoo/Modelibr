@@ -31,15 +31,15 @@ public class FileTypeValueObjectTests
     [Theory]
     [InlineData("unknown.xyz")]
     [InlineData("file.unknown")]
-    [InlineData("test")]
-    public void FromFileName_WithUnknownExtensions_ReturnsFailure(string fileName)
+    [InlineData("test.abc")]
+    public void FromFileName_WithUnknownExtensions_ReturnsOtherFileType(string fileName)
     {
         // Act
         var result = FileType.FromFileName(fileName);
 
         // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Equal("UnsupportedFileType", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("other", result.Value.Value);
     }
 
     [Theory]
@@ -57,14 +57,14 @@ public class FileTypeValueObjectTests
     }
 
     [Fact]
-    public void ValidateForUpload_WithUnsupportedFile_ReturnsFailure()
+    public void ValidateForUpload_WithUnknownExtension_ReturnsOtherFileType()
     {
         // Act
         var result = FileType.ValidateForUpload("unknown.xyz");
 
         // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Equal("UnsupportedFileType", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("other", result.Value.Value);
     }
 
     [Theory]

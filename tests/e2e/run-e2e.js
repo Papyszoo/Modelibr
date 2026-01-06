@@ -53,12 +53,6 @@ function cleanup() {
     console.log('\n🧹 Cleaning up...\n');
     run(`docker compose -f ${COMPOSE_FILE} down -v`);
     
-    const dataPath = path.join(__dirname, 'data');
-    if (fs.existsSync(dataPath)) {
-        fs.rmSync(dataPath, { recursive: true, force: true });
-        console.log('Removed data directory');
-    }
-    
     // Clear shared state file
     const statePath = path.join(__dirname, 'fixtures', '.shared-state.json');
     if (fs.existsSync(statePath)) {
@@ -72,20 +66,13 @@ async function main() {
     
     console.log('🚀 Starting E2E test environment...\n');
     
-    // Always clean up data and state before starting for a fresh run
-    const dataPath = path.join(__dirname, 'data');
+    // Always clean up state before starting for a fresh run
     const statePath = path.join(__dirname, '.shared-state.json');
     
     // Stop any running containers first
     if (isE2ERunning()) {
         console.log('⚠️  E2E environment is already running. Stopping containers...\n');
         run(`docker compose -f ${COMPOSE_FILE} down -v`);
-    }
-    
-    // Always clean data directory if it exists
-    if (fs.existsSync(dataPath)) {
-        fs.rmSync(dataPath, { recursive: true, force: true });
-        console.log('🗑️  Removed stale data directory');
     }
     
     // Always clean shared state file if it exists

@@ -54,5 +54,7 @@ COPY --from=publish /app/publish .
 RUN chown -R app:app /app && \
     chmod -R 755 /app
 ENV UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+ENV DOTNET_EnableDiagnostics=0
 USER app
 ENTRYPOINT ["dotnet", "WebApi.dll"]

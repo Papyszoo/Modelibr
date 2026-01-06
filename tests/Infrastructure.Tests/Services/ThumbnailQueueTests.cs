@@ -33,12 +33,11 @@ public class ThumbnailQueueTests
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         var expectedJob = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow);
 
-        _mockRepository.Setup(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()))
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ThumbnailJob?)null);
         _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedJob);
 
-        // Act
         // Act
         var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash);
 
@@ -49,13 +48,13 @@ public class ThumbnailQueueTests
         Assert.Equal(modelHash, result.ModelHash);
         Assert.Equal(ThumbnailJobStatus.Pending, result.Status);
 
-        _mockRepository.Verify(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task EnqueueAsync_WhenJobExists_ShouldReturnExistingJob()
+    public async Task EnqueueAsync_WhenJobExists_ShouldResetAndReturnExistingJob()
     {
         // Arrange
         var modelId = 1;
@@ -63,19 +62,19 @@ public class ThumbnailQueueTests
         var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         var existingJob = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow);
 
-        _mockRepository.Setup(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()))
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingJob);
 
-        // Act
         // Act
         var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash);
 
         // Assert
         Assert.Same(existingJob, result);
 
-        _mockRepository.Verify(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.UpdateAsync(existingJob, It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
-        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(existingJob, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
