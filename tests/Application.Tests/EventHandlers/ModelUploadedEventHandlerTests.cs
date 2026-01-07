@@ -18,7 +18,9 @@ public class ModelUploadedEventHandlerTests
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
         var mockLogger = new Mock<ILogger<ModelUploadedEventHandler>>();
 
-        var job = ThumbnailJob.Create(1, 10, "test-hash", DateTime.UtcNow);
+        // Use a valid 64-character SHA256 hash
+        var validHash = "a".PadRight(64, 'b'); // Valid SHA256 hash format (64 characters)
+        var job = ThumbnailJob.Create(1, 10, validHash, DateTime.UtcNow);
         mockThumbnailQueue.Setup(x => x.EnqueueAsync(
                 It.IsAny<int>(),
                 It.IsAny<int>(),
@@ -29,7 +31,7 @@ public class ModelUploadedEventHandlerTests
             .ReturnsAsync(job);
 
         var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockLogger.Object);
-        var domainEvent = new ModelUploadedEvent(1, 10, "test-hash", true);
+        var domainEvent = new ModelUploadedEvent(1, 10, validHash, true);
 
         // Act
         var result = await handler.Handle(domainEvent, CancellationToken.None);
@@ -39,7 +41,7 @@ public class ModelUploadedEventHandlerTests
         mockThumbnailQueue.Verify(x => x.EnqueueAsync(
             1,
             10,
-            "test-hash",
+            validHash,
             It.IsAny<int>(),
             It.IsAny<int>(),
             CancellationToken.None), Times.Once);
