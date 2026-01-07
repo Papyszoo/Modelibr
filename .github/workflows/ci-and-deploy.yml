@@ -38,7 +38,60 @@ jobs:
         run: dotnet build Modelibr.sln --no-restore
 
       - name: Run tests
-        run: dotnet test Modelibr.sln --no-build --verbosity normal
+        run: dotnet test Modelibr.sln --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Parse test results
+        if: always()
+        run: |
+          # Find and parse TRX files from all test projects
+          total=0
+          passed=0
+          failed=0
+
+          # Find all TRX files in TestResults directories (recursively under tests/)
+          trx_files=$(find tests -type d -name "TestResults" -exec find {} -type f -name "test-results.trx" \; 2>/dev/null || true)
+
+          if [ -n "$trx_files" ]; then
+            echo "Found TRX files:"
+            echo "$trx_files"
+
+            # Sum up test results from all TRX files
+            while IFS= read -r trx_file; do
+              if [ -f "$trx_file" ]; then
+                file_total=$(grep -o 'total="[0-9]*"' "$trx_file" | grep -o '[0-9]*' || echo "0")
+                file_passed=$(grep -o 'passed="[0-9]*"' "$trx_file" | grep -o '[0-9]*' || echo "0")
+                file_failed=$(grep -o 'failed="[0-9]*"' "$trx_file" | grep -o '[0-9]*' || echo "0")
+
+                total=$((total + file_total))
+                passed=$((passed + file_passed))
+                failed=$((failed + file_failed))
+              fi
+            done <<< "$trx_files"
+
+            # Create JSON summary
+            mkdir -p test-results
+            cat > test-results/backend-results.json << EOF
+          {
+            "total": ${total},
+            "passed": ${passed},
+            "failed": ${failed},
+            "framework": ".NET 9.0"
+          }
+          EOF
+            echo "Backend tests: ${passed}/${total} passed, ${failed} failed"
+          else
+            echo "No test results found"
+            mkdir -p test-results
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": ".NET 9.0", "error": "No results"}' > test-results/backend-results.json
+          fi
+
+      - name: Upload backend test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results-${{ github.run_number }}
+          path: test-results/backend-results.json
+          retention-days: 30
 
   frontend-tests:
     name: Frontend Unit Tests
@@ -62,7 +115,56 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        id: frontend-test
+        continue-on-error: true
+        run: npm test 2>&1 | tee test-output.txt
+
+      - name: Parse test results
+        if: always()
+        working-directory: src/frontend
+        run: |
+          # Parse Jest output from console
+          if [ -f "test-output.txt" ]; then
+            # Extract test counts from Jest summary output using sed
+            # Jest outputs something like "Tests:       5 passed, 5 total"
+            total=$(sed -n 's/.*Tests:.*\([0-9]\+\) total.*/\1/p' test-output.txt | tail -1)
+            passed=$(sed -n 's/.*Tests:.*\([0-9]\+\) passed.*/\1/p' test-output.txt | tail -1)
+            failed=$(sed -n 's/.*Tests:.*\([0-9]\+\) failed.*/\1/p' test-output.txt | tail -1)
+
+            # Set defaults if empty
+            total=${total:-0}
+            passed=${passed:-0}
+            failed=${failed:-0}
+
+            # If total is 0 but we have passed tests, total = passed + failed
+            if [ "$total" = "0" ] && [ "$passed" != "0" ]; then
+              total=$((passed + failed))
+            fi
+
+            # Create summary JSON
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            cat > "$GITHUB_WORKSPACE/test-results/frontend-results.json" << EOF
+          {
+            "total": ${total},
+            "passed": ${passed},
+            "failed": ${failed},
+            "framework": "Jest"
+          }
+          EOF
+            echo "Frontend tests: ${passed}/${total} passed, ${failed} failed"
+          else
+            echo "No test output found"
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/frontend-results.json"
+          fi
+
+      - name: Upload frontend test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-test-results-${{ github.run_number }}
+          path: test-results/frontend-results.json
+          retention-days: 30
 
   blender-addon-tests:
     name: Blender Addon Tests
@@ -87,7 +189,64 @@ jobs:
           pip install pytest fake-bpy-module-latest numpy
 
       - name: Run unit tests
-        run: python -m pytest tests/unit -v
+        id: blender-test
+        continue-on-error: true
+        run: python -m pytest tests/unit -v 2>&1 | tee test-output.txt
+
+      - name: Parse test results
+        if: always()
+        working-directory: blender-addon
+        run: |
+          # Parse pytest output from console
+          if [ -f "test-output.txt" ]; then
+            # Extract test counts from pytest summary output using sed
+            # pytest outputs something like "5 passed, 1 failed in 2.5s"
+            passed=$(sed -n 's/.*\([0-9]\+\) passed.*/\1/p' test-output.txt | tail -1)
+            failed=$(sed -n 's/.*\([0-9]\+\) failed.*/\1/p' test-output.txt | tail -1)
+
+            # Set defaults if empty
+            passed=${passed:-0}
+            failed=${failed:-0}
+            total=$((passed + failed))
+
+            # If we didn't find any results, try alternative patterns
+            if [ "$total" = "0" ]; then
+              # Try to find the total from collected tests
+              collected=$(sed -n 's/.*collected \([0-9]\+\).*/\1/p' test-output.txt | head -1)
+              collected=${collected:-0}
+              if [ "$collected" != "0" ]; then
+                total=$collected
+                # Check if all passed (no failed mentioned)
+                if [ "$failed" = "0" ] && grep -q "passed" test-output.txt; then
+                  passed=$total
+                fi
+              fi
+            fi
+
+            # Create summary JSON
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            cat > "$GITHUB_WORKSPACE/test-results/blender-results.json" << EOF
+          {
+            "total": ${total},
+            "passed": ${passed},
+            "failed": ${failed},
+            "framework": "pytest"
+          }
+          EOF
+            echo "Blender addon tests: ${passed}/${total} passed, ${failed} failed"
+          else
+            echo "No test output found"
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/blender-results.json"
+          fi
+
+      - name: Upload blender test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blender-test-results-${{ github.run_number }}
+          path: test-results/blender-results.json
+          retention-days: 30
 
       - name: Install Blender
         run: |

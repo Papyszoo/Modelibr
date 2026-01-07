@@ -4,7 +4,7 @@ This directory contains utility scripts used by GitHub Actions workflows.
 
 ## fetch-playwright-reports.sh
 
-Fetches the last 5 Playwright E2E test reports from GitHub Actions artifacts and organizes them for deployment with the documentation site.
+Fetches the last 10 Playwright E2E test reports along with unit test results from GitHub Actions artifacts and organizes them for deployment with the documentation site.
 
 **Usage:**
 ```bash
@@ -20,8 +20,14 @@ export GITHUB_REPOSITORY_OWNER="Papyszoo"
 
 **Output:**
 - Creates `docs/static/playwright-reports/` directory
-- Downloads up to 5 most recent Playwright reports
-- Generates an index.html with report listing
+- Downloads up to 10 most recent Playwright reports
+- Downloads unit test results (backend .NET, frontend Jest, Blender addon pytest)
+- Generates an index.html with comprehensive report listing including:
+  - Branch information for each test run
+  - E2E test status (passed/failed)
+  - Backend unit test results
+  - Frontend unit test results
+  - Blender addon test results
 
 **Dependencies:**
 - curl
