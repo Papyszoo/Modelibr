@@ -6,21 +6,21 @@ This document explains how the unified CI/CD pipeline works and how to access E2
 
 Modelibr uses a unified GitHub Actions workflow that:
 1. Runs all test suites (backend, frontend, Blender addon, and E2E tests)
-2. Automatically collects the latest 5 Playwright E2E test reports
+2. Automatically collects the latest 10 test reports
 3. Deploys them alongside the documentation to GitHub Pages
 
 ## Accessing Test Reports
 
 The latest Playwright E2E test reports are always available on the documentation site, updated after every test run (from any branch):
 
-**[View E2E Test Reports](/playwright-reports)**
+**[View Test Reports](/test-reports)**
 
 You can also access them from the navigation bar at the top of this site.
 
 ### How Reports Are Updated
 
 - **After any CI run completes** (from any branch, whether tests pass or fail):
-  - The workflow fetches the last 5 Playwright reports from all workflow runs
+  - The workflow fetches the last 10 test reports from all workflow runs
   - Builds the documentation using the **main branch** content
   - Deploys to GitHub Pages with the updated reports
 
@@ -28,7 +28,7 @@ You can also access them from the navigation bar at the top of this site.
   1. Go to the workflow run in GitHub Actions
   2. Scroll to the "Artifacts" section at the bottom
   3. Download the `docs-with-reports` artifact
-  4. Extract the zip file and open `playwright-reports/index.html` in your browser
+  4. Extract the zip file and open `test-reports/index.html` in your browser
 
 ## How It Works
 
@@ -48,7 +48,7 @@ The workflow is defined in `.github/workflows/ci-and-deploy.yml` and consists of
    - Checks out the **main branch** for documentation content
    - Copies scripts from current branch (ensures latest tooling)
    - Copies docs from main branch (ensures stable content)
-   - Fetches the last 5 Playwright reports from **all workflow runs** (any branch)
+   - Fetches the last 10 test reports from **all workflow runs** (any branch)
    - Builds the Docusaurus documentation site
    - Uploads docs with reports as artifact (`docs-with-reports`) for download
    - **Always deploys to GitHub Pages** after successful build
@@ -57,13 +57,13 @@ This means the documentation site is continuously updated with the latest test r
 
 ### Report Collection Process
 
-The `.github/scripts/fetch-playwright-reports.sh` script:
+The `.github/scripts/fetch-test-reports.sh` script:
 
 1. Uses the GitHub API to fetch recent workflow runs from all branches
-2. Downloads the `playwright-report` artifacts from the last 5 completed E2E test runs
-3. Extracts them to `docs/static/playwright-reports/run-{number}/`
+2. Downloads the `playwright-report` artifacts from the last 10 completed E2E test runs
+3. Extracts them to `docs/static/test-reports/run-{number}/`
 4. Generates an index page that displays all reports with metadata (date, time, pass/fail status)
-5. Reports are automatically cleaned up - only the last 5 are kept
+5. Reports are automatically cleaned up - only the last 10 are kept
 
 ### Report Storage
 
@@ -88,8 +88,8 @@ You can also manually trigger a deployment:
 
 To change the number of reports displayed:
 
-1. Edit `.github/scripts/fetch-playwright-reports.sh`
-2. Change the condition `if [ ${REPORT_COUNT} -ge 5 ];` to your desired number
+1. Edit `.github/scripts/fetch-test-reports.sh`
+2. Change the condition `if [ ${REPORT_COUNT} -ge 10 ];` to your desired number
 3. Update this documentation accordingly
 
 ### Troubleshooting
@@ -99,7 +99,7 @@ To change the number of reports displayed:
 If no reports appear on the E2E Reports page:
 - Check that E2E tests are running successfully in CI
 - Verify the workflow run has the `playwright-report` artifact
-- Check the workflow logs for the "Fetch last 5 Playwright reports" step
+- Check the workflow logs for the "Fetch last 10 test reports" step
 
 #### Reports Not Updating
 
