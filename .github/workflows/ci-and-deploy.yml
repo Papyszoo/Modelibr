@@ -208,10 +208,25 @@ jobs:
     if: always()
 
     steps:
+      - name: Checkout current branch for scripts
+        uses: actions/checkout@v4
+        with:
+          path: current-branch
+
       - name: Checkout main branch for docs
         uses: actions/checkout@v4
         with:
           ref: main
+          path: main-branch
+
+      - name: Copy scripts from current branch
+        run: |
+          mkdir -p .github/scripts
+          cp -r current-branch/.github/scripts/* .github/scripts/ || true
+
+      - name: Copy docs from main branch
+        run: |
+          cp -r main-branch/docs ./docs
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

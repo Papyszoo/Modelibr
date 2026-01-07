@@ -44,7 +44,10 @@ The workflow is defined in `.github/workflows/ci-and-deploy.yml` and consists of
    - `ci-status`: Aggregates results from all tests
 
 2. **Documentation Building and Deployment** (runs after all tests, even if they fail):
+   - Checks out the **current branch** for workflow scripts
    - Checks out the **main branch** for documentation content
+   - Copies scripts from current branch (ensures latest tooling)
+   - Copies docs from main branch (ensures stable content)
    - Fetches the last 5 Playwright reports from **all workflow runs** (any branch)
    - Builds the Docusaurus documentation site
    - Uploads docs with reports as artifact (`docs-with-reports`) for download
