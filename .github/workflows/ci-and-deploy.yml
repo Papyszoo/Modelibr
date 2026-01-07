@@ -48,8 +48,8 @@ jobs:
           passed=0
           failed=0
 
-          # Find all TRX files in TestResults directories
-          trx_files=$(find tests -type f -name "test-results.trx" 2>/dev/null || true)
+          # Find all TRX files in TestResults directories (recursively under tests/)
+          trx_files=$(find tests -type d -name "TestResults" -exec find {} -type f -name "test-results.trx" \; 2>/dev/null || true)
 
           if [ -n "$trx_files" ]; then
             echo "Found TRX files:"
