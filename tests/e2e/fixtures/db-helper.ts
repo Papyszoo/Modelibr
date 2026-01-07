@@ -11,7 +11,7 @@ export class DbHelper {
                 host: process.env.POSTGRES_HOST || "localhost",
                 database: process.env.POSTGRES_DB || "Modelibr",
                 password:
-                    process.env.POSTGRES_PASSWORD || "ChangeThisStrongPassword123!",
+                    process.env.POSTGRES_PASSWORD || "e2e_password",
                 port: parseInt(process.env.POSTGRES_PORT || "5433"),
                 // Keep connections alive and limit pool size
                 max: 5,

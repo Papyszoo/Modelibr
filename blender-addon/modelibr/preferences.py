@@ -36,6 +36,12 @@ class ModelibrPreferences(AddonPreferences):
         default=True,
     )
 
+    show_channel_packing_ui: BoolProperty(
+        name="Show Channel Packing UI",
+        description="Show dialog to pack separate textures (Roughness, Metallic, AO) into single ORM file on export",
+        default=True,
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -48,6 +54,7 @@ class ModelibrPreferences(AddonPreferences):
         box = layout.box()
         box.prop(self, "default_export_format")
         box.prop(self, "always_include_blend")
+        box.prop(self, "show_channel_packing_ui")
 
 
 def get_preferences():

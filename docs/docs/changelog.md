@@ -9,6 +9,26 @@ History of completed features and improvements.
 
 ---
 
+## 2026-01-07
+
+### Blender Addon: Selective Upload & Channel Packing
+- Implemented selective texture upload - only uploads modified textures, references unchanged by file ID
+- Added `classify_textures_for_export()` for modification detection with per-file hash comparison
+- Added `_create_texture_set_selective()` for mixed source texture sets
+- Added channel packing dialog with "Pack into ORM" option in upload UI
+- Created `pack_textures_to_orm()` to combine AO/Roughness/Metallic
+
+### Blender Addon: Test Infrastructure
+- Created `test_texture_flow.py` with 6 integration tests for shader analysis
+- Updated CI to install Blender via snap + Xvfb for headless testing
+
+### Texture Type Improvements (Phase 3)
+- Blender Addon: Import with channel mapping support for ORM packed textures
+- Added `extract_channel_from_image()` function to extract R/G/B/A channels
+- Integrated `sourceChannel` data from API into texture import workflow
+
+---
+
 ## 2026-01-05
 
 ### Texture Type Improvements (Phases 0-2 Complete)

@@ -49,6 +49,19 @@ class MODELIBR_OT_upload_version(Operator):
         default=False,
     )
 
+    pack_textures: EnumProperty(
+        name="Pack Textures",
+        description="How to handle separate grayscale textures (Roughness, Metallic, AO)",
+        items=[
+            ('SEPARATE', "Upload Separately", "Upload each texture as a separate file"),
+            ('PACK_ORM', "Pack into ORM", "Combine into single ORM texture (R=AO, G=Roughness, B=Metallic)"),
+        ],
+        default='SEPARATE',
+    )
+    
+    # Internal flag set during invoke
+    has_packable_textures: BoolProperty(default=False, options={'HIDDEN'})
+
     def invoke(self, context: Context, event) -> Set[str]:
         props = context.scene.modelibr
         prefs = get_preferences()
@@ -72,6 +85,15 @@ class MODELIBR_OT_upload_version(Operator):
         if not has_modifications:
             self.report({'WARNING'}, "No changes detected. Uploading unchanged model may cause issues.")
 
+        # Detect packable textures for dialog
+        self.has_packable_textures = False
+        if prefs.show_channel_packing_ui:
+            from ..texture_utils import analyze_material_textures
+            model_objects = get_modelibr_objects(context.scene, props.current_model_id)
+            if model_objects:
+                analysis = analyze_material_textures(model_objects)
+                self.has_packable_textures = len(analysis.get("packable", [])) >= 2
+
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context: Context) -> None:
@@ -83,6 +105,13 @@ class MODELIBR_OT_upload_version(Operator):
         layout.prop(self, "export_format")
         layout.prop(self, "set_as_active")
         layout.prop(self, "include_blend")
+        
+        # Show packing option if packable textures detected
+        if self.has_packable_textures:
+            layout.separator()
+            box = layout.box()
+            box.label(text="Texture Packing", icon='TEXTURE')
+            box.prop(self, "pack_textures")
 
     def execute(self, context: Context) -> Set[str]:
         props = context.scene.modelibr
@@ -186,76 +215,92 @@ class MODELIBR_OT_upload_version(Operator):
             
         try:
             from ..texture_utils import (
-                extract_textures_from_materials,
+                analyze_material_textures,
+                classify_textures_for_export,
                 export_textures,
                 calculate_material_textures_hash,
-                is_texture_modified,
                 get_objects_texture_set_id
             )
+            from ..preferences import get_preferences
             
             model_objects = [
                 obj for obj in get_modelibr_objects(context.scene)
                 if obj.get("modelibr_model_id") == model_id
             ]
             
-            textures_info = extract_textures_from_materials(model_objects)
-            if not textures_info:
+            # Use new shader analysis
+            analysis = analyze_material_textures(model_objects)
+            total_textures = len(analysis["textures"]) + len(analysis["packed"])
+            
+            if total_textures == 0:
                 debug_log("No textures found in model materials")
                 return None
             
-            debug_log(f"Found {len(textures_info)} textures in model materials")
+            debug_log(f"Found {total_textures} textures ({len(analysis['packed'])} packed, {len(analysis['packable'])} packable)")
             
-            # Get original texture set ID
+            # Check for packing opportunities
+            prefs = get_preferences()
+            if analysis["packable"] and prefs.show_channel_packing_ui:
+                packable_types = [t.get("texture_type") for t in analysis["packable"]]
+                print(f"[Modelibr] Packing possible for: {', '.join(packable_types)}")
+                
+                if self.pack_textures == 'PACK_ORM' and len(analysis["packable"]) >= 2:
+                    # Pack textures into ORM
+                    from ..texture_utils import pack_textures_to_orm
+                    packed_image = pack_textures_to_orm(analysis["packable"], f"{safe_name}_orm")
+                    if packed_image:
+                        print(f"[Modelibr] Created packed ORM texture: {packed_image.name}")
+                        # Add packed image to analysis for export
+                        analysis["textures"].append({
+                            "image": packed_image,
+                            "texture_type": "ORM",
+                            "is_packed": True
+                        })
+                        # Mark individual textures as not needing separate export
+                        for tex in analysis["packable"]:
+                            tex["skip_export"] = True
+                else:
+                    print(f"[Modelibr] Uploading textures separately (user choice)")
+            
+            # Get original texture set info
             original_set_id = get_objects_texture_set_id(model_objects)
             print(f"[Modelibr] Checking textures for {len(model_objects)} objects")
             print(f"[Modelibr] Original texture set ID: {original_set_id}")
             
-            # Check if any texture IMAGES were actually modified
-            # We check multiple signals:
-            # 1. image.is_dirty - set when image is edited in Blender
-            # 2. Hash comparison - recalculate material hash and compare with stored
-            textures_modified = False
+            # Classify textures for export
+            classification = classify_textures_for_export(analysis)
             
-            # First check is_dirty flag on all textures
-            for tex_info in textures_info:
-                image = tex_info.get("image")
-                if image:
-                    print(f"[Modelibr] Checking texture: {image.name}, is_dirty={image.is_dirty}")
-                    if image.is_dirty:
-                        print(f"[Modelibr]   -> MODIFIED (is_dirty=True)")
-                        textures_modified = True
-                        break
+            print(f"[Modelibr] Classification: unchanged={len(classification['unchanged'])}, "
+                  f"modified={len(classification['modified'])}, new={len(classification['new'])}, "
+                  f"removed={len(classification['removed'])}")
+            print(f"[Modelibr] any_from_modelibr={classification['any_from_modelibr']}, "
+                  f"any_changed={classification['any_changed']}")
             
-            # If not dirty, compare calculated hash with stored hash
-            if not textures_modified:
-                for obj in model_objects:
-                    stored_hash = obj.get("modelibr_texture_hash", "")
-                    if stored_hash:
-                        current_hash = calculate_material_textures_hash(obj)
-                        print(f"[Modelibr] Object '{obj.name}' hash comparison:")
-                        print(f"[Modelibr]   - stored:  {stored_hash[:16]}...")
-                        print(f"[Modelibr]   - current: {current_hash[:16] if current_hash else '(none)'}...")
-                        if current_hash and stored_hash != current_hash:
-                            print(f"[Modelibr]   -> MODIFIED (hash mismatch)")
-                            textures_modified = True
-                            break
-            
-            print(f"[Modelibr] Textures modified: {textures_modified}")
-            
-            # Decision logic:
-            # - If textures were modified, create new texture set
-            # - If we have original set and textures aren't modified, reuse it
-            # - If no original set, create new one
-            if textures_modified:
-                print(f"[Modelibr] -> Creating NEW texture set (textures modified)")
-                return self._create_texture_set(
-                    client, model_id, version_id, model_objects, temp_dir, safe_name
-                )
-            elif original_set_id:
+            # Decision logic based on classification
+            if not classification["any_changed"] and original_set_id:
+                # No changes - reuse existing set
                 print(f"[Modelibr] -> REUSING existing texture set {original_set_id}")
                 return self._link_texture_set(client, model_id, version_id, original_set_id)
+            elif classification["any_changed"]:
+                # Changes detected - use selective upload if possible
+                if classification["unchanged"]:
+                    # Selective upload: upload modified/new, reference unchanged
+                    print(f"[Modelibr] -> Creating NEW texture set (SELECTIVE: "
+                          f"{len(classification['modified']) + len(classification['new'])} upload, "
+                          f"{len(classification['unchanged'])} reuse)")
+                    return self._create_texture_set_selective(
+                        client, model_id, version_id, model_objects, 
+                        classification, temp_dir, safe_name
+                    )
+                else:
+                    # All textures are new/modified - upload all
+                    print(f"[Modelibr] -> Creating NEW texture set (full upload)")
+                    return self._create_texture_set(
+                        client, model_id, version_id, model_objects, temp_dir, safe_name
+                    )
             else:
-                print(f"[Modelibr] -> Creating NEW texture set (no original set)")
+                # No original set - upload all
+                print(f"[Modelibr] -> Creating NEW texture set (no original)")
                 return self._create_texture_set(
                     client, model_id, version_id, model_objects, temp_dir, safe_name
                 )
@@ -324,6 +369,124 @@ class MODELIBR_OT_upload_version(Operator):
             
         except Exception as e:
             debug_log(f"Failed to create texture set: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def _create_texture_set_selective(
+        self,
+        client: ModelibrApiClient,
+        model_id: int,
+        version_id: int,
+        model_objects: List[Object],
+        classification: dict,
+        temp_dir: str,
+        safe_name: str
+    ) -> Optional[int]:
+        """
+        Create a new texture set with selective upload.
+        
+        Uploads only modified/new textures and references unchanged textures by file_id.
+        This avoids re-uploading textures that haven't changed.
+        """
+        from ..texture_utils import export_textures, calculate_material_textures_hash
+        
+        debug_log("Creating texture set with selective upload...")
+        debug_log(f"  - Unchanged (ref by file_id): {len(classification['unchanged'])}")
+        debug_log(f"  - Modified (re-upload): {len(classification['modified'])}")
+        debug_log(f"  - New (upload): {len(classification['new'])}")
+        
+        # Collect all textures to upload (modified + new)
+        textures_to_upload = classification['modified'] + classification['new']
+        
+        # Collect unchanged textures to reference by file_id
+        textures_to_reference = classification['unchanged']
+        
+        if not textures_to_upload and not textures_to_reference:
+            debug_log("No textures to process")
+            return None
+        
+        try:
+            texture_set_id = None
+            texture_set_name = f"{safe_name}_textures_v{version_id}"
+            
+            # First, handle textures that need uploading
+            if textures_to_upload:
+                # Export modified/new textures
+                objects_for_export = model_objects
+                exported_textures = export_textures(objects_for_export, temp_dir)
+                
+                if exported_textures:
+                    # Create texture set with first uploaded texture
+                    first_tex = exported_textures[0]
+                    ts_result = client.create_texture_set_with_file(
+                        first_tex["filepath"],
+                        texture_set_name,
+                        first_tex["texture_type"]
+                    )
+                    texture_set_id = ts_result.get("textureSetId", 0)
+                    debug_log(f"Created texture set {texture_set_id} with first uploaded texture")
+                    
+                    # Add remaining uploaded textures
+                    for tex in exported_textures[1:]:
+                        try:
+                            file_result = client.add_file_to_version(model_id, version_id, tex["filepath"])
+                            file_id = file_result.get("id", 0)
+                            if file_id > 0:
+                                client.add_texture_to_set(texture_set_id, file_id, tex["texture_type"])
+                                debug_log(f"Added uploaded texture {tex['original_name']} to set")
+                        except Exception as tex_e:
+                            debug_log(f"Failed to add uploaded texture: {tex_e}")
+            
+            # If no uploads, create empty texture set and reference all unchanged
+            if not texture_set_id and textures_to_reference:
+                # Create empty texture set first
+                ts_result = client._make_request(
+                    "POST", "/texture-sets",
+                    data=f'{{"name": "{texture_set_name}"}}'.encode('utf-8'),
+                    content_type="application/json"
+                )
+                texture_set_id = ts_result.get("id", 0)
+                debug_log(f"Created empty texture set {texture_set_id}")
+            
+            # Add unchanged textures by referencing file_id
+            if texture_set_id and textures_to_reference:
+                for tex in textures_to_reference:
+                    file_id = tex.get("file_id")
+                    texture_type = tex.get("texture_type", "Albedo")
+                    source_channel = tex.get("source_channel", 0)
+                    
+                    if file_id:
+                        try:
+                            client.add_texture_to_set(
+                                texture_set_id, 
+                                file_id, 
+                                texture_type,
+                                source_channel
+                            )
+                            debug_log(f"Referenced existing file {file_id} as {texture_type}")
+                        except Exception as ref_e:
+                            debug_log(f"Failed to reference file {file_id}: {ref_e}")
+            
+            if texture_set_id:
+                # Associate and set as default
+                client.associate_texture_set_with_version(texture_set_id, version_id)
+                client.set_default_texture_set(model_id, texture_set_id, version_id)
+                
+                # Update metadata on objects
+                new_hash = calculate_material_textures_hash(model_objects[0]) if model_objects else ""
+                for obj in model_objects:
+                    obj[METADATA_TEXTURE_SET_ID] = texture_set_id
+                    if new_hash:
+                        obj[METADATA_TEXTURE_HASH] = new_hash
+                
+                debug_log(f"Set texture set {texture_set_id} as default for version {version_id}")
+                return texture_set_id
+            
+            return None
+            
+        except Exception as e:
+            debug_log(f"Failed to create selective texture set: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -497,16 +660,32 @@ class MODELIBR_OT_upload_new_model(Operator):
             return False
             
         try:
-            from ..texture_utils import export_textures, extract_textures_from_materials
+            from ..texture_utils import (
+                analyze_material_textures,
+                export_textures
+            )
+            from ..preferences import get_preferences
             
             scene_objects = list(context.scene.objects)
-            textures_info = extract_textures_from_materials(scene_objects)
             
-            if not textures_info:
+            # Use new shader analysis for packing detection
+            analysis = analyze_material_textures(scene_objects)
+            total_textures = len(analysis["textures"]) + len(analysis["packed"])
+            
+            if total_textures == 0:
                 debug_log("No textures found in scene materials")
                 return False
             
-            debug_log(f"Found {len(textures_info)} textures in scene materials")
+            debug_log(f"Found {total_textures} textures ({len(analysis['packed'])} packed, {len(analysis['packable'])} packable)")
+            
+            # Check for packing opportunities
+            prefs = get_preferences()
+            if analysis["packable"] and prefs.show_channel_packing_ui:
+                packable_types = [t.get("texture_type") for t in analysis["packable"]]
+                print(f"[Modelibr] Packing possible for: {', '.join(packable_types)}")
+                # TODO: Show packing dialog - for now, just log
+                print(f"[Modelibr] (Packing dialog not yet implemented - uploading as separate)")
+            
             exported_textures = export_textures(scene_objects, temp_dir)
             
             if not exported_textures:
