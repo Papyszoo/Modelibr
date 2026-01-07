@@ -38,7 +38,42 @@ jobs:
         run: dotnet build Modelibr.sln --no-restore
 
       - name: Run tests
-        run: dotnet test Modelibr.sln --no-build --verbosity normal
+        run: dotnet test Modelibr.sln --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Parse test results
+        if: always()
+        run: |
+          # Extract test results from TRX file
+          if [ -f "tests/UnitTests/TestResults/test-results.trx" ]; then
+            # Parse TRX XML to get test counts
+            total=$(grep -o 'total="[0-9]*"' tests/UnitTests/TestResults/test-results.trx | grep -o '[0-9]*' || echo "0")
+            passed=$(grep -o 'passed="[0-9]*"' tests/UnitTests/TestResults/test-results.trx | grep -o '[0-9]*' || echo "0")
+            failed=$(grep -o 'failed="[0-9]*"' tests/UnitTests/TestResults/test-results.trx | grep -o '[0-9]*' || echo "0")
+            
+            # Create JSON summary
+            mkdir -p test-results
+            cat > test-results/backend-results.json << EOF
+          {
+            "total": ${total},
+            "passed": ${passed},
+            "failed": ${failed},
+            "framework": ".NET 9.0"
+          }
+          EOF
+            echo "Backend tests: ${passed}/${total} passed, ${failed} failed"
+          else
+            echo "No test results found"
+            mkdir -p test-results
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": ".NET 9.0", "error": "No results"}' > test-results/backend-results.json
+          fi
+
+      - name: Upload backend test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results-${{ github.run_number }}
+          path: test-results/backend-results.json
+          retention-days: 30
 
   frontend-tests:
     name: Frontend Unit Tests
@@ -62,7 +97,42 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        run: npm test -- --json --outputFile=test-results.json || true
+
+      - name: Parse test results
+        if: always()
+        run: |
+          # Check if test results exist
+          if [ -f "test-results.json" ]; then
+            # Extract test summary from Jest JSON output
+            total=$(jq -r '.numTotalTests // 0' test-results.json)
+            passed=$(jq -r '.numPassedTests // 0' test-results.json)
+            failed=$(jq -r '.numFailedTests // 0' test-results.json)
+            
+            # Create summary JSON
+            mkdir -p ../../test-results
+            cat > ../../test-results/frontend-results.json << EOF
+          {
+            "total": ${total},
+            "passed": ${passed},
+            "failed": ${failed},
+            "framework": "Jest"
+          }
+          EOF
+            echo "Frontend tests: ${passed}/${total} passed, ${failed} failed"
+          else
+            echo "No test results found"
+            mkdir -p ../../test-results
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "error": "No results"}' > ../../test-results/frontend-results.json
+          fi
+
+      - name: Upload frontend test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-test-results-${{ github.run_number }}
+          path: test-results/frontend-results.json
+          retention-days: 30
 
   blender-addon-tests:
     name: Blender Addon Tests
@@ -87,7 +157,44 @@ jobs:
           pip install pytest fake-bpy-module-latest
 
       - name: Run unit tests
-        run: python -m pytest tests/unit -v
+        run: python -m pytest tests/unit -v --json-report --json-report-file=test-results.json || true
+
+      - name: Parse test results
+        if: always()
+        run: |
+          # Check if JSON report exists (requires pytest-json-report plugin)
+          # If not available, parse pytest output manually
+          if [ -f "test-results.json" ]; then
+            total=$(jq -r '.summary.total // 0' test-results.json)
+            passed=$(jq -r '.summary.passed // 0' test-results.json)
+            failed=$(jq -r '.summary.failed // 0' test-results.json)
+          else
+            # Fallback: Run pytest again with verbose output and parse
+            output=$(python -m pytest tests/unit -v 2>&1 || true)
+            passed=$(echo "$output" | grep -oP '\d+(?= passed)' | head -1 || echo "0")
+            failed=$(echo "$output" | grep -oP '\d+(?= failed)' | head -1 || echo "0")
+            total=$((passed + failed))
+          fi
+          
+          # Create summary JSON
+          mkdir -p ../test-results
+          cat > ../test-results/blender-results.json << EOF
+          {
+            "total": ${total},
+            "passed": ${passed},
+            "failed": ${failed},
+            "framework": "pytest"
+          }
+          EOF
+          echo "Blender addon tests: ${passed}/${total} passed, ${failed} failed"
+
+      - name: Upload blender test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blender-test-results-${{ github.run_number }}
+          path: test-results/blender-results.json
+          retention-days: 30
 
   e2e-tests:
     name: E2E Tests
