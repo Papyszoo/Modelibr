@@ -43,13 +43,31 @@ jobs:
       - name: Parse test results
         if: always()
         run: |
-          # Extract test results from TRX file
-          if [ -f "tests/UnitTests/TestResults/test-results.trx" ]; then
-            # Parse TRX XML to get test counts
-            total=$(grep -o 'total="[0-9]*"' tests/UnitTests/TestResults/test-results.trx | grep -o '[0-9]*' || echo "0")
-            passed=$(grep -o 'passed="[0-9]*"' tests/UnitTests/TestResults/test-results.trx | grep -o '[0-9]*' || echo "0")
-            failed=$(grep -o 'failed="[0-9]*"' tests/UnitTests/TestResults/test-results.trx | grep -o '[0-9]*' || echo "0")
-            
+          # Find and parse TRX files from all test projects
+          total=0
+          passed=0
+          failed=0
+
+          # Find all TRX files
+          trx_files=$(find tests -name "test-results.trx" 2>/dev/null || true)
+
+          if [ -n "$trx_files" ]; then
+            echo "Found TRX files:"
+            echo "$trx_files"
+
+            # Sum up test results from all TRX files
+            while IFS= read -r trx_file; do
+              if [ -f "$trx_file" ]; then
+                file_total=$(grep -o 'total="[0-9]*"' "$trx_file" | grep -o '[0-9]*' || echo "0")
+                file_passed=$(grep -o 'passed="[0-9]*"' "$trx_file" | grep -o '[0-9]*' || echo "0")
+                file_failed=$(grep -o 'failed="[0-9]*"' "$trx_file" | grep -o '[0-9]*' || echo "0")
+
+                total=$((total + file_total))
+                passed=$((passed + file_passed))
+                failed=$((failed + file_failed))
+              fi
+            done <<< "$trx_files"
+
             # Create JSON summary
             mkdir -p test-results
             cat > test-results/backend-results.json << EOF
@@ -97,18 +115,26 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test -- --json --outputFile=test-results.json || true
+        id: frontend-test
+        continue-on-error: true
+        run: npm test 2>&1 | tee test-output.txt
 
       - name: Parse test results
         if: always()
         run: |
-          # Check if test results exist
-          if [ -f "test-results.json" ]; then
-            # Extract test summary from Jest JSON output
-            total=$(jq -r '.numTotalTests // 0' test-results.json)
-            passed=$(jq -r '.numPassedTests // 0' test-results.json)
-            failed=$(jq -r '.numFailedTests // 0' test-results.json)
-            
+          # Parse Jest output from console
+          if [ -f "test-output.txt" ]; then
+            # Extract test counts from Jest summary output
+            # Jest outputs something like "Tests:       5 passed, 5 total"
+            total=$(grep -oP 'Tests:.*?\K\d+(?= total)' test-output.txt | tail -1 || echo "0")
+            passed=$(grep -oP 'Tests:.*?\K\d+(?= passed)' test-output.txt | tail -1 || echo "0")
+            failed=$(grep -oP 'Tests:.*?\K\d+(?= failed)' test-output.txt | tail -1 || echo "0")
+
+            # If total is 0 but we have passed tests, total = passed + failed
+            if [ "$total" = "0" ] && [ "$passed" != "0" ]; then
+              total=$((passed + failed))
+            fi
+
             # Create summary JSON
             mkdir -p ../../test-results
             cat > ../../test-results/frontend-results.json << EOF
@@ -121,7 +147,7 @@ jobs:
           EOF
             echo "Frontend tests: ${passed}/${total} passed, ${failed} failed"
           else
-            echo "No test results found"
+            echo "No test output found"
             mkdir -p ../../test-results
             echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "error": "No results"}' > ../../test-results/frontend-results.json
           fi
@@ -175,7 +201,7 @@ jobs:
             failed=$(echo "$output" | grep -oP '\d+(?= failed)' | head -1 || echo "0")
             total=$((passed + failed))
           fi
-          
+
           # Create summary JSON
           mkdir -p ../test-results
           cat > ../test-results/blender-results.json << EOF
