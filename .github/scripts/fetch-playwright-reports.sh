@@ -73,6 +73,7 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
     echo "${CONCLUSION}" > "${REPORT_DIR}/conclusion.txt"
     echo "${RUN_NUMBER}" > "${REPORT_DIR}/run-number.txt"
     echo "${BRANCH}" > "${REPORT_DIR}/branch.txt"
+    echo "${RUN_ID}" > "${REPORT_DIR}/run-id.txt"
     
     # Download backend test results
     BACKEND_ARTIFACT_URL=$(echo "${ARTIFACTS}" | jq -r '.artifacts[] | select(.name | startswith("backend-test-results")) | .archive_download_url' | head -1)
@@ -326,6 +327,45 @@ cat > "${REPORTS_DIR}/index.html" << 'EOF'
       color: #666;
       line-height: 1.6;
     }
+    .info-banner {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .info-banner-text {
+      flex: 1;
+      min-width: 250px;
+    }
+    .info-banner-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 0.5rem;
+    }
+    .info-banner-desc {
+      font-size: 0.9rem;
+      color: #666;
+    }
+    .info-banner-link {
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: opacity 0.3s ease;
+      white-space: nowrap;
+    }
+    .info-banner-link:hover {
+      opacity: 0.9;
+    }
     @media (max-width: 640px) {
       body {
         padding: 1rem;
@@ -336,6 +376,10 @@ cat > "${REPORTS_DIR}/index.html" << 'EOF'
       .reports-grid {
         grid-template-columns: 1fr;
       }
+      .info-banner {
+        flex-direction: column;
+        text-align: center;
+      }
     }
   </style>
 </head>
@@ -343,6 +387,17 @@ cat > "${REPORTS_DIR}/index.html" << 'EOF'
   <div class="container">
     <h1>🎭 Playwright Test Reports</h1>
     <p class="subtitle">Latest E2E & Unit Test Results for Modelibr (Last 10 Runs)</p>
+
+    <div class="info-banner">
+      <div class="info-banner-text">
+        <div class="info-banner-title">📋 Test Reports Archive</div>
+        <div class="info-banner-desc">Browse through the latest test execution results including E2E, backend, frontend, and Blender addon tests</div>
+      </div>
+      <a href="https://github.com/Papyszoo/Modelibr/actions" class="info-banner-link" target="_blank">
+        View All Workflows →
+      </a>
+    </div>
+
     <div class="reports-grid" id="reports-container">
       <!-- Reports will be inserted here -->
     </div>
@@ -357,25 +412,27 @@ FIRST=true
 for DIR in "${REPORTS_DIR}"/run-*; do
   if [ -d "${DIR}" ]; then
     RUN_NUM=$(cat "${DIR}/run-number.txt")
+    RUN_ID=$(cat "${DIR}/run-id.txt" 2>/dev/null || echo "")
     TIMESTAMP=$(cat "${DIR}/timestamp.txt")
     CONCLUSION=$(cat "${DIR}/conclusion.txt")
     BRANCH=$(cat "${DIR}/branch.txt" 2>/dev/null || echo "unknown")
-    
+
     # Read test results JSON files
     BACKEND_RESULTS=$(cat "${DIR}/backend-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"error":"Not found"}')
     FRONTEND_RESULTS=$(cat "${DIR}/frontend-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"error":"Not found"}')
     BLENDER_RESULTS=$(cat "${DIR}/blender-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"error":"Not found"}')
-    
+
     # Convert timestamp to readable format using JavaScript
     if [ "${FIRST}" = true ]; then
       FIRST=false
     else
       echo "," >> "${REPORTS_DIR}/index.html"
     fi
-    
+
     cat >> "${REPORTS_DIR}/index.html" << REPORT_EOF
       {
         runNumber: ${RUN_NUM},
+        runId: '${RUN_ID}',
         timestamp: '${TIMESTAMP}',
         conclusion: '${CONCLUSION}',
         branch: '${BRANCH}',
@@ -466,6 +523,12 @@ cat >> "${REPORTS_DIR}/index.html" << 'EOF'
               <span class="info-label">Time:</span>
               <span>${formattedTime}</span>
             </div>
+            ${report.runId ? `
+            <div class="info-row">
+              <span class="info-label">Workflow:</span>
+              <span><a href="https://github.com/Papyszoo/Modelibr/actions/runs/${report.runId}" target="_blank" style="color: #667eea; text-decoration: none;">View Run →</a></span>
+            </div>
+            ` : ''}
           </div>
           <div class="test-results">
             <div class="test-results-title">
