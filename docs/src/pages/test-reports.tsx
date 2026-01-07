@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
-export default function PlaywrightReports(): JSX.Element {
+export default function TestReports(): JSX.Element {
   const { siteConfig } = useDocusaurusContext();
   
   useEffect(() => {
     // Redirect to the static HTML page
-    window.location.href = `${siteConfig.baseUrl}playwright-reports/index.html`;
+    window.location.href = `${siteConfig.baseUrl}test-reports/index.html`;
   }, [siteConfig.baseUrl]);
 
   return (
