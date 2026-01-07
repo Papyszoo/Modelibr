@@ -20,6 +20,15 @@ const config: Config = {
   trailingSlash: false,
 
   onBrokenLinks: 'throw',
+  
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
+  
+  // Custom fields for static paths that will exist after build
+  staticDirectories: ['static'],
 
   i18n: {
     defaultLocale: 'en',
@@ -57,6 +66,11 @@ const config: Config = {
           sidebarId: 'tutorialSidebar',
           position: 'left',
           label: 'Documentation',
+        },
+        {
+          to: '/playwright-reports',
+          label: 'E2E Reports',
+          position: 'left',
         },
 
         {
