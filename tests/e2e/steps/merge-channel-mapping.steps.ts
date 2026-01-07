@@ -40,10 +40,11 @@ Given('texture set {string} exists with file {string}', async ({ page }, setName
 });
 
 Given('texture set {string} exists with a {string} texture', async ({ page }, setName: string, textureType: string) => {
-    // Map texture type name to API enum value
+    // Map texture type name to API enum value (must match Domain/ValueObjects/TextureType.cs)
     const typeMap: { [key: string]: number } = {
-        'Albedo': 1, 'Normal': 2, 'Roughness': 3, 'Metallic': 4,
-        'AO': 5, 'Emissive': 6, 'Height': 7, 'Displacement': 8, 'Bump': 9
+        'Albedo': 1, 'Normal': 2, 'Height': 3, 'AO': 4, 
+        'Roughness': 5, 'Metallic': 6, 'Emissive': 9, 
+        'Bump': 10, 'Alpha': 11, 'Displacement': 12
     };
     const typeValue = typeMap[textureType] || 1;
     
