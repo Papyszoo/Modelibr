@@ -393,7 +393,7 @@ cat > "${REPORTS_DIR}/index.html" << 'EOF'
         <div class="info-banner-title">📋 Test Reports Archive</div>
         <div class="info-banner-desc">Browse through the latest test execution results including E2E, backend, frontend, and Blender addon tests</div>
       </div>
-      <a href="https://github.com/Papyszoo/Modelibr/actions" class="info-banner-link" target="_blank">
+      <a href="#" id="workflow-link" class="info-banner-link" target="_blank">
         View All Workflows →
       </a>
     </div>
@@ -403,6 +403,10 @@ cat > "${REPORTS_DIR}/index.html" << 'EOF'
     </div>
   </div>
   <script>
+    // Repository information
+    const REPO_OWNER = '${REPO_OWNER}';
+    const REPO_NAME = '${REPO_NAME}';
+
     // This will be populated by the bash script
     const reports = [
 EOF
@@ -479,7 +483,13 @@ cat >> "${REPORTS_DIR}/index.html" << 'EOF'
         </div>
       `;
     }
-    
+
+    // Set the workflow link URL dynamically
+    const workflowLink = document.getElementById('workflow-link');
+    if (workflowLink && REPO_OWNER && REPO_NAME) {
+      workflowLink.href = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions`;
+    }
+
     if (reports.length === 0) {
       container.innerHTML = `
         <div class="no-reports">
@@ -526,7 +536,7 @@ cat >> "${REPORTS_DIR}/index.html" << 'EOF'
             ${report.runId ? `
             <div class="info-row">
               <span class="info-label">Workflow:</span>
-              <span><a href="https://github.com/Papyszoo/Modelibr/actions/runs/${report.runId}" target="_blank" style="color: #667eea; text-decoration: none;">View Run →</a></span>
+              <span><a href="https://github.com/\${REPO_OWNER}/\${REPO_NAME}/actions/runs/\${report.runId}" target="_blank" style="color: #667eea; text-decoration: none;">View Run →</a></span>
             </div>
             ` : ''}
           </div>
