@@ -11,11 +11,24 @@ Modelibr uses a unified GitHub Actions workflow that:
 
 ## Accessing Test Reports
 
+### On Main Branch (Deployed to GitHub Pages)
+
 The latest Playwright E2E test reports are available directly from the documentation site:
 
 **[View E2E Test Reports](/playwright-reports)**
 
 You can also access them from the navigation bar at the top of this site.
+
+### On Feature Branches and PRs
+
+When working on feature branches or pull requests, the documentation with embedded reports is built but not deployed to GitHub Pages. Instead:
+
+1. Go to the workflow run in GitHub Actions
+2. Scroll to the "Artifacts" section at the bottom
+3. Download the `docs-with-reports` artifact
+4. Extract the zip file and open `playwright-reports/index.html` in your browser
+
+This allows you to preview test reports even when tests fail, without deploying to the live site.
 
 ## How It Works
 
@@ -30,10 +43,11 @@ The workflow is defined in `.github/workflows/ci-and-deploy.yml` and consists of
    - `e2e-tests`: Playwright end-to-end tests
    - `ci-status`: Aggregates results from all tests
 
-2. **Documentation Deployment** (runs only on main branch after all tests pass):
+2. **Documentation Building** (runs on all branches, even if tests fail):
    - Fetches the last 5 Playwright reports from previous workflow runs
    - Builds the Docusaurus documentation site
-   - Deploys to GitHub Pages with embedded reports
+   - Uploads docs with reports as artifact (`docs-with-reports`) for preview
+   - Only deploys to GitHub Pages on main branch
 
 ### Report Collection Process
 
