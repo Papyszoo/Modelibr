@@ -68,8 +68,8 @@ const config: Config = {
           label: 'Documentation',
         },
         {
-          to: '/playwright-reports',
-          label: 'E2E Reports',
+          to: '/test-reports',
+          label: 'Test Reports',
           position: 'left',
         },
 
