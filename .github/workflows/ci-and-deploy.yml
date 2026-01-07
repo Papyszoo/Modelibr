@@ -97,9 +97,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create .env file
-        run: cp .env.example .env
-
       - name: Build and start services
         run: |
           docker compose -f tests/e2e/docker-compose.e2e.yml up -d --build
