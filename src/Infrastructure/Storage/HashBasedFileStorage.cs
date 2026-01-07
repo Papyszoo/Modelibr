@@ -54,7 +54,7 @@ public sealed class HashBasedFileStorage : IFileStorage
             {
                 File.Move(tempFile, finalPath);
             }
-            catch (IOException) when (File.Exists(finalPath))
+            catch (IOException ex) when (File.Exists(finalPath))
             {
                 // Race condition: another thread created the file between our check and move
                 // This is fine - the content is identical (same hash)
@@ -63,9 +63,15 @@ public sealed class HashBasedFileStorage : IFileStorage
                 {
                     File.Delete(tempFile);
                 }
-                catch
+                catch (IOException cleanupEx)
                 {
-                    // Ignore cleanup errors
+                    // Log cleanup failure but don't fail the operation since the file was already stored
+                    Console.Error.WriteLine($"Warning: Failed to delete temp file {tempFile}: {cleanupEx.Message}");
+                }
+                catch (UnauthorizedAccessException cleanupEx)
+                {
+                    // Log cleanup failure but don't fail the operation  
+                    Console.Error.WriteLine($"Warning: Failed to delete temp file {tempFile}: {cleanupEx.Message}");
                 }
             }
         }
