@@ -16,6 +16,10 @@
       "id": 1,
       "name": "test-cube"
     },
+    "test-cube.glb": {
+      "id": 1,
+      "name": "test-cube"
+    },
     "multi-version-test-model": {
       "id": 24,
       "name": "Test Model"
@@ -73,11 +77,11 @@
     },
     "Source ORM": {
       "id": 5,
-      "name": "Source ORM_q4vn"
+      "name": "Source ORM_d6ot"
     },
     "ORM Target": {
       "id": 6,
-      "name": "ORM Target_q4vn"
+      "name": "ORM Target_d6ot"
     }
   },
   "packs": {
@@ -181,17 +185,17 @@
         "Id": 3,
         "ModelVersionId": 2,
         "Status": 2,
-        "ThumbnailPath": "/var/lib/modelibr/uploads/92/3f/923ff0f655bf374b9e1ea16b982ba07d2ed933bcf7884155c7a0d77eb4d6a986",
+        "ThumbnailPath": "/var/lib/modelibr/uploads/44/68/44687e0b4fc74db9b942ffcba81ef299b6e23002c7a5a9e7dfbe38a461796816",
         "PngThumbnailPath": null,
-        "SizeBytes": "19832",
+        "SizeBytes": "20048",
         "Width": 256,
         "Height": 256,
         "ErrorMessage": null,
-        "CreatedAt": "2026-01-05T15:37:13.080Z",
-        "UpdatedAt": "2026-01-05T15:37:50.054Z",
-        "ProcessedAt": "2026-01-05T15:37:50.054Z"
+        "CreatedAt": "2026-01-06T22:42:44.888Z",
+        "UpdatedAt": "2026-01-06T22:43:21.979Z",
+        "ProcessedAt": "2026-01-06T22:43:21.979Z"
       },
-      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=1767627486963"
+      "thumbnailSrc": "http://localhost:8090/model-versions/2/thumbnail/file?t=1767739420097"
     }
   }
 }

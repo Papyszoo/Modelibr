@@ -256,154 +256,265 @@ export class PuppeteerRenderer {
 
   /**
    * Apply textures to the loaded model
-   * @param {Object} texturePaths - Map of texture types to file paths
+   * @param {Object} texturePaths - Map of texture types to texture info {filePath, sourceChannel}
+   * @param {string} fileType - Model file type (gltf, glb, obj, fbx) for flipY setting
    * @returns {Promise<boolean>} Success status
    */
-  async applyTextures(texturePaths) {
+  async applyTextures(texturePaths, fileType = 'gltf') {
     if (!texturePaths || Object.keys(texturePaths).length === 0) {
       logger.info('No textures to apply')
       return true
     }
 
+    // Determine flipY based on file type
+    // GLTF/GLB expect flipY=false, OBJ/FBX expect flipY=true
+    const flipY = fileType === 'gltf' || fileType === 'glb' ? false : true
+
     logger.info('Applying textures to model', {
       textureTypes: Object.keys(texturePaths),
+      fileType,
+      flipY,
     })
 
     try {
-      // Read texture files and convert to base64 data URLs
-      const textureDataUrls = {}
-      for (const [textureType, filePath] of Object.entries(texturePaths)) {
+      // Read texture files and convert to base64 data URLs with channel info
+      const textureData = {}
+      for (const [textureType, textureInfo] of Object.entries(texturePaths)) {
         try {
+          // Handle both new {filePath, sourceChannel} objects and legacy plain strings
+          const filePath =
+            typeof textureInfo === 'string'
+              ? textureInfo
+              : textureInfo.filePath
+          const sourceChannel =
+            typeof textureInfo === 'string' ? 0 : textureInfo.sourceChannel ?? 0
+
           const fileBuffer = fs.readFileSync(filePath)
           const base64Data = fileBuffer.toString('base64')
           // Detect image format from file extension
           const ext = path.extname(filePath).toLowerCase()
           const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg'
-          textureDataUrls[textureType] = `data:${mimeType};base64,${base64Data}`
-          logger.debug('Prepared texture data URL', {
+          textureData[textureType] = {
+            dataUrl: `data:${mimeType};base64,${base64Data}`,
+            sourceChannel, // 0=RGB, 1=R, 2=G, 3=B, 4=A
+          }
+          logger.debug('Prepared texture data', {
             textureType,
             filePath,
-            dataUrlLength: textureDataUrls[textureType].length,
+            sourceChannel,
+            dataUrlLength: textureData[textureType].dataUrl.length,
           })
         } catch (error) {
           logger.warn('Failed to read texture file, skipping', {
             textureType,
-            filePath,
             error: error.message,
           })
         }
       }
 
-      // Apply textures in the browser
-      const result = await this.page.evaluate(async textureUrls => {
-        try {
-          if (!window.modelRenderer.model) {
-            return { success: false, error: 'No model loaded' }
-          }
-
-          const THREE = window.THREE
-          const model = window.modelRenderer.model
-          const textureLoader = new THREE.TextureLoader()
-
-          // Map texture type enum values to material properties
-          // TextureType enum: Albedo=1, Normal=2, Height=3, AO=4, Roughness=5, Metallic=6, Diffuse=7, Specular=8
-          const textureTypeMap = {
-            1: 'map', // Albedo -> base color map
-            2: 'normalMap', // Normal
-            3: 'displacementMap', // Height
-            4: 'aoMap', // AO
-            5: 'roughnessMap', // Roughness
-            6: 'metalnessMap', // Metallic
-            7: 'map', // Diffuse -> base color map (legacy)
-            8: 'specularMap', // Specular
-            // Also support string names for backward compatibility
-            Albedo: 'map',
-            Normal: 'normalMap',
-            Height: 'displacementMap',
-            AO: 'aoMap',
-            Roughness: 'roughnessMap',
-            Metallic: 'metalnessMap',
-            Diffuse: 'map',
-            Specular: 'specularMap',
-            BaseColor: 'map',
-            AmbientOcclusion: 'aoMap',
-            Emissive: 'emissiveMap',
-          }
-
-          // Load textures asynchronously
-          const loadTexture = url => {
-            return new Promise((resolve, reject) => {
-              textureLoader.load(
-                url,
-                texture => {
-                  texture.colorSpace = THREE.SRGBColorSpace
-                  // Use default flipY=true (web standard)
-                  // Blender addon handles UV conversion on export/import
-                  resolve(texture)
-                },
-                undefined,
-                error => reject(error)
-              )
-            })
-          }
-
-          const loadedTextures = {}
-          for (const [type, url] of Object.entries(textureUrls)) {
-            try {
-              const texture = await loadTexture(url)
-              const materialProperty = textureTypeMap[type] || type
-              loadedTextures[materialProperty] = texture
-              console.log(`Loaded ${type} texture -> ${materialProperty}`)
-            } catch (error) {
-              console.warn(`Failed to load ${type} texture:`, error)
+      // Apply textures in the browser with channel extraction
+      const result = await this.page.evaluate(
+        async (textures, shouldFlipY) => {
+          try {
+            if (!window.modelRenderer.model) {
+              return { success: false, error: 'No model loaded' }
             }
-          }
 
-          // Apply textures to all meshes in the model
-          let meshCount = 0
-          model.traverse(child => {
-            if (child.isMesh) {
-              meshCount++
+            const THREE = window.THREE
+            const model = window.modelRenderer.model
+            const renderer = window.modelRenderer.renderer
+            const textureLoader = new THREE.TextureLoader()
 
-              // Create or update material
-              if (
-                !child.material ||
-                !(child.material instanceof THREE.MeshStandardMaterial)
-              ) {
-                child.material = new THREE.MeshStandardMaterial()
+            // Map texture type enum values to material properties
+            const textureTypeMap = {
+              1: 'map', // Albedo
+              2: 'normalMap',
+              3: 'displacementMap',
+              4: 'aoMap',
+              5: 'roughnessMap',
+              6: 'metalnessMap',
+              7: 'map', // Diffuse (legacy)
+              8: 'specularMap',
+              9: 'emissiveMap', // Emissive
+              Albedo: 'map',
+              Normal: 'normalMap',
+              Height: 'displacementMap',
+              AO: 'aoMap',
+              Roughness: 'roughnessMap',
+              Metallic: 'metalnessMap',
+              Diffuse: 'map',
+              Specular: 'specularMap',
+              BaseColor: 'map',
+              AmbientOcclusion: 'aoMap',
+              Emissive: 'emissiveMap',
+            }
+
+            // Channel extraction shader
+            const extractChannelShader = {
+              vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                  vUv = uv;
+                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `,
+              fragmentShader: `
+                uniform sampler2D sourceTexture;
+                uniform int channel; // 1=R, 2=G, 3=B, 4=A
+                varying vec2 vUv;
+                void main() {
+                  vec4 texColor = texture2D(sourceTexture, vUv);
+                  float value;
+                  if (channel == 1) value = texColor.r;
+                  else if (channel == 2) value = texColor.g;
+                  else if (channel == 3) value = texColor.b;
+                  else if (channel == 4) value = texColor.a;
+                  else value = texColor.r; // Default to R
+                  gl_FragColor = vec4(value, value, value, 1.0);
+                }
+              `,
+            }
+
+            // Function to extract a single channel to grayscale texture
+            function extractChannel(sourceTexture, channelIndex) {
+              const size = 512 // Output texture size
+              const renderTarget = new THREE.WebGLRenderTarget(size, size, {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat,
+              })
+
+              const scene = new THREE.Scene()
+              const camera = new THREE.OrthographicCamera(
+                -1,
+                1,
+                1,
+                -1,
+                0.1,
+                10
+              )
+              camera.position.z = 1
+
+              const material = new THREE.ShaderMaterial({
+                uniforms: {
+                  sourceTexture: { value: sourceTexture },
+                  channel: { value: channelIndex },
+                },
+                vertexShader: extractChannelShader.vertexShader,
+                fragmentShader: extractChannelShader.fragmentShader,
+              })
+
+              const geometry = new THREE.PlaneGeometry(2, 2)
+              const mesh = new THREE.Mesh(geometry, material)
+              scene.add(mesh)
+
+              renderer.setRenderTarget(renderTarget)
+              renderer.render(scene, camera)
+              renderer.setRenderTarget(null)
+
+              const extractedTexture = renderTarget.texture
+              extractedTexture.wrapS = sourceTexture.wrapS
+              extractedTexture.wrapT = sourceTexture.wrapT
+              extractedTexture.flipY = sourceTexture.flipY
+              extractedTexture.needsUpdate = true
+
+              // Cleanup
+              geometry.dispose()
+              material.dispose()
+
+              return extractedTexture
+            }
+
+            // Load texture with proper flipY
+            const loadTexture = (url, flip) => {
+              return new Promise((resolve, reject) => {
+                textureLoader.load(
+                  url,
+                  texture => {
+                    texture.flipY = flip
+                    texture.colorSpace = THREE.SRGBColorSpace
+                    resolve(texture)
+                  },
+                  undefined,
+                  error => reject(error)
+                )
+              })
+            }
+
+            const loadedTextures = {}
+            for (const [type, data] of Object.entries(textures)) {
+              try {
+                let texture = await loadTexture(data.dataUrl, shouldFlipY)
+                const sourceChannel = data.sourceChannel
+
+                // Extract channel if not RGB (0)
+                if (sourceChannel > 0 && sourceChannel <= 4) {
+                  console.log(
+                    `Extracting channel ${sourceChannel} for ${type}`
+                  )
+                  texture = extractChannel(texture, sourceChannel)
+                  // For grayscale textures, use linear color space
+                  texture.colorSpace = THREE.LinearSRGBColorSpace
+                }
+
+                const materialProperty = textureTypeMap[type] || type
+                loadedTextures[materialProperty] = texture
+                console.log(
+                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel})`
+                )
+              } catch (error) {
+                console.warn(`Failed to load ${type} texture:`, error)
               }
+            }
 
-              // Apply each loaded texture to the material
-              for (const [property, texture] of Object.entries(
-                loadedTextures
-              )) {
-                if (child.material[property] !== undefined) {
-                  child.material[property] = texture
-                  child.material.needsUpdate = true
-                  console.log(`Applied ${property} to mesh`)
+            // Apply textures to all meshes with proper material setup
+            let meshCount = 0
+            model.traverse(child => {
+              if (child.isMesh) {
+                meshCount++
 
-                  // Special handling for emissive
-                  if (property === 'emissiveMap' && !child.material.emissive) {
-                    child.material.emissive = new THREE.Color(0xffffff)
+                // Create new material with white base color for textures
+                child.material = new THREE.MeshStandardMaterial({
+                  color: loadedTextures.map ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
+                  metalness: loadedTextures.metalnessMap ? 1 : 0.3,
+                  roughness: loadedTextures.roughnessMap ? 1 : 0.4,
+                  envMapIntensity: 1.0,
+                })
+
+                // Apply each loaded texture
+                for (const [property, texture] of Object.entries(
+                  loadedTextures
+                )) {
+                  if (child.material[property] !== undefined) {
+                    child.material[property] = texture
+                    child.material.needsUpdate = true
+                    console.log(`Applied ${property} to mesh`)
+
+                    // Special handling for emissive
+                    if (property === 'emissiveMap') {
+                      child.material.emissive = new THREE.Color(0xffffff)
+                    }
                   }
                 }
               }
-            }
-          })
+            })
 
-          return {
-            success: true,
-            meshCount,
-            appliedTextures: Object.keys(loadedTextures),
+            return {
+              success: true,
+              meshCount,
+              appliedTextures: Object.keys(loadedTextures),
+            }
+          } catch (error) {
+            console.error('Texture application error:', error)
+            return {
+              success: false,
+              error: error.message,
+            }
           }
-        } catch (error) {
-          console.error('Texture application error:', error)
-          return {
-            success: false,
-            error: error.message,
-          }
-        }
-      }, textureDataUrls)
+        },
+        textureData,
+        flipY
+      )
 
       if (!result.success) {
         logger.warn('Failed to apply textures in browser', {
@@ -415,6 +526,7 @@ export class PuppeteerRenderer {
       logger.info('Textures applied successfully', {
         meshCount: result.meshCount,
         appliedTextures: result.appliedTextures,
+        flipY,
       })
 
       return true

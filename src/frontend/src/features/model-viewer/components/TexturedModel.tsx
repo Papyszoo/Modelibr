@@ -1,12 +1,15 @@
-import { useRef, useEffect } from 'react'
-import { useFrame, useLoader } from '@react-three/fiber'
+import { useRef, useEffect, useMemo } from 'react'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
-import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import { useModelObject } from '../hooks/useModelObject'
-import { TextureSetDto, TextureType } from '../../../types'
+import {
+  useChannelExtractedTextures,
+  TextureConfig,
+} from '../hooks/useChannelExtractedTextures'
+import { TextureSetDto, TextureType, TextureChannel } from '../../../types'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 
@@ -17,94 +20,46 @@ interface TexturedModelProps {
   textureSet: TextureSetDto | null
 }
 
-// Build texture URLs from texture set
-function buildTextureUrls(textureSet: TextureSetDto | null) {
+// Build texture configs with channel information from texture set
+function buildTextureConfigs(
+  textureSet: TextureSetDto | null
+): Record<string, TextureConfig> {
   if (!textureSet) return {}
 
-  const urls: Record<string, string> = {}
+  const configs: Record<string, TextureConfig> = {}
 
-  // Albedo or Diffuse for base color
-  const albedo = textureSet.textures?.find(
-    t => t.textureType === TextureType.Albedo
-  )
-  const diffuse = textureSet.textures?.find(
-    t => t.textureType === TextureType.Diffuse
-  )
-  if (albedo) {
-    urls.map = ApiClient.getFileUrl(albedo.fileId.toString())
-  } else if (diffuse) {
-    urls.map = ApiClient.getFileUrl(diffuse.fileId.toString())
+  // Helper to add texture config
+  const addConfig = (
+    slotName: string,
+    textureType: TextureType,
+    fallbackType?: TextureType
+  ) => {
+    let texture = textureSet.textures?.find(t => t.textureType === textureType)
+    if (!texture && fallbackType) {
+      texture = textureSet.textures?.find(t => t.textureType === fallbackType)
+    }
+    if (texture) {
+      configs[slotName] = {
+        url: ApiClient.getFileUrl(texture.fileId.toString()),
+        sourceChannel: texture.sourceChannel ?? TextureChannel.RGB,
+      }
+    }
   }
 
-  // Normal map
-  const normal = textureSet.textures?.find(
-    t => t.textureType === TextureType.Normal
-  )
-  if (normal) {
-    urls.normalMap = ApiClient.getFileUrl(normal.fileId.toString())
-  }
+  // Add all texture types (Diffuse removed - use Albedo instead)
+  addConfig('map', TextureType.Albedo)
+  addConfig('normalMap', TextureType.Normal)
+  addConfig('roughnessMap', TextureType.Roughness)
+  addConfig('metalnessMap', TextureType.Metallic)
+  addConfig('aoMap', TextureType.AO)
+  addConfig('emissiveMap', TextureType.Emissive)
+  addConfig('bumpMap', TextureType.Bump)
+  addConfig('alphaMap', TextureType.Alpha)
+  addConfig('displacementMap', TextureType.Displacement, TextureType.Height)
 
-  // Roughness map
-  const roughness = textureSet.textures?.find(
-    t => t.textureType === TextureType.Roughness
-  )
-  if (roughness) {
-    urls.roughnessMap = ApiClient.getFileUrl(roughness.fileId.toString())
-  }
-
-  // Metallic map
-  const metallic = textureSet.textures?.find(
-    t => t.textureType === TextureType.Metallic
-  )
-  if (metallic) {
-    urls.metalnessMap = ApiClient.getFileUrl(metallic.fileId.toString())
-  }
-
-  // AO map
-  const ao = textureSet.textures?.find(t => t.textureType === TextureType.AO)
-  if (ao) {
-    urls.aoMap = ApiClient.getFileUrl(ao.fileId.toString())
-  }
-
-  // Emissive map
-  const emissive = textureSet.textures?.find(
-    t => t.textureType === TextureType.Emissive
-  )
-  if (emissive) {
-    urls.emissiveMap = ApiClient.getFileUrl(emissive.fileId.toString())
-  }
-
-  // Bump map
-  const bump = textureSet.textures?.find(
-    t => t.textureType === TextureType.Bump
-  )
-  if (bump) {
-    urls.bumpMap = ApiClient.getFileUrl(bump.fileId.toString())
-  }
-
-  // Alpha map
-  const alpha = textureSet.textures?.find(
-    t => t.textureType === TextureType.Alpha
-  )
-  if (alpha) {
-    urls.alphaMap = ApiClient.getFileUrl(alpha.fileId.toString())
-  }
-
-  // Displacement map (also check Height for backwards compatibility)
-  const displacement = textureSet.textures?.find(
-    t => t.textureType === TextureType.Displacement
-  )
-  const height = textureSet.textures?.find(
-    t => t.textureType === TextureType.Height
-  )
-  if (displacement) {
-    urls.displacementMap = ApiClient.getFileUrl(displacement.fileId.toString())
-  } else if (height) {
-    urls.displacementMap = ApiClient.getFileUrl(height.fileId.toString())
-  }
-
-  return urls
+  return configs
 }
+
 
 // OBJ Model with textures
 function OBJModelWithTextures({
@@ -119,6 +74,7 @@ function OBJModelWithTextures({
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
+  const { gl: renderer } = useThree()
 
   useFrame(() => {
     if (meshRef.current && rotationSpeed > 0) {
@@ -127,33 +83,21 @@ function OBJModelWithTextures({
   })
 
   const model = useLoader(OBJLoader, modelUrl)
-  const textureUrls = buildTextureUrls(textureSet)
-  const hasTextures = Object.keys(textureUrls).length > 0
 
-  // Configure texture properties
-  let loadedTextures:
-    | Record<string, THREE.Texture>
-    | THREE.Texture[]
-    | THREE.Texture = {}
-  if (hasTextures) {
-    loadedTextures = useTexture(textureUrls)
-  }
+  // Build texture configs with channel info
+  const textureConfigs = useMemo(
+    () => buildTextureConfigs(textureSet),
+    [textureSet]
+  )
+  const hasTextures = Object.keys(textureConfigs).length > 0
 
-  // Configure texture properties
-  if (hasTextures) {
-    Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
-      if (texture && texture.wrapS !== undefined) {
-        texture.wrapS = THREE.RepeatWrapping
-        texture.wrapT = THREE.RepeatWrapping
-        // Use default flipY=true (web standard)
-        // Blender addon handles UV conversion on export/import
-      }
-    })
-  }
+  // Load textures with channel extraction
+  const loadedTextures = useChannelExtractedTextures(textureConfigs, renderer, true) // OBJ uses flipY=true
+  const texturesReady = Object.keys(loadedTextures).length > 0
 
   useEffect(() => {
     scaledRef.current = false
-  }, [modelUrl, textureSet])
+  }, [modelUrl, textureSet, texturesReady])
 
   useEffect(() => {
     if (model && !scaledRef.current) {
@@ -161,30 +105,32 @@ function OBJModelWithTextures({
 
       // Apply material with textures
       const material = new THREE.MeshStandardMaterial({
-        color: hasTextures ? undefined : new THREE.Color(0.7, 0.7, 0.9),
+        color: hasTextures ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
         metalness: hasTextures ? 1 : 0.3,
         roughness: hasTextures ? 1 : 0.4,
         envMapIntensity: 1.0,
       })
 
-      if (hasTextures) {
-        const textures = loadedTextures as Record<string, THREE.Texture>
-        if (textures.map) material.map = textures.map
-        if (textures.normalMap) material.normalMap = textures.normalMap
-        if (textures.roughnessMap) material.roughnessMap = textures.roughnessMap
-        if (textures.metalnessMap) material.metalnessMap = textures.metalnessMap
-        if (textures.aoMap) material.aoMap = textures.aoMap
-        if (textures.emissiveMap) {
-          material.emissiveMap = textures.emissiveMap
+      if (hasTextures && texturesReady) {
+        if (loadedTextures.map) material.map = loadedTextures.map
+        if (loadedTextures.normalMap)
+          material.normalMap = loadedTextures.normalMap
+        if (loadedTextures.roughnessMap)
+          material.roughnessMap = loadedTextures.roughnessMap
+        if (loadedTextures.metalnessMap)
+          material.metalnessMap = loadedTextures.metalnessMap
+        if (loadedTextures.aoMap) material.aoMap = loadedTextures.aoMap
+        if (loadedTextures.emissiveMap) {
+          material.emissiveMap = loadedTextures.emissiveMap
           material.emissive = new THREE.Color(0xffffff)
         }
-        if (textures.bumpMap) material.bumpMap = textures.bumpMap
-        if (textures.alphaMap) {
-          material.alphaMap = textures.alphaMap
+        if (loadedTextures.bumpMap) material.bumpMap = loadedTextures.bumpMap
+        if (loadedTextures.alphaMap) {
+          material.alphaMap = loadedTextures.alphaMap
           material.transparent = true
         }
-        if (textures.displacementMap)
-          material.displacementMap = textures.displacementMap
+        if (loadedTextures.displacementMap)
+          material.displacementMap = loadedTextures.displacementMap
       }
 
       clonedModel.traverse(child => {
@@ -217,7 +163,7 @@ function OBJModelWithTextures({
 
       scaledRef.current = true
     }
-  }, [model, loadedTextures, hasTextures])
+  }, [model, loadedTextures, hasTextures, texturesReady])
 
   useEffect(() => {
     if (model) {
@@ -242,6 +188,7 @@ function GLTFModelWithTextures({
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
+  const { gl: renderer } = useThree()
 
   useFrame(() => {
     if (meshRef.current && rotationSpeed > 0) {
@@ -251,26 +198,21 @@ function GLTFModelWithTextures({
 
   const gltf = useLoader(GLTFLoader, modelUrl)
   const model = gltf?.scene
-  const textureUrls = buildTextureUrls(textureSet)
-  const hasTextures = Object.keys(textureUrls).length > 0
 
-  const loadedTextures = useTexture(hasTextures ? textureUrls : { dummy: '' })
+  // Build texture configs with channel info
+  const textureConfigs = useMemo(
+    () => buildTextureConfigs(textureSet),
+    [textureSet]
+  )
+  const hasTextures = Object.keys(textureConfigs).length > 0
 
-  // Configure texture properties
-  if (hasTextures) {
-    Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
-      if (texture && texture.wrapS !== undefined) {
-        texture.wrapS = THREE.RepeatWrapping
-        texture.wrapT = THREE.RepeatWrapping
-        // Use default flipY=true (web standard)
-        // Blender addon handles UV conversion on export/import
-      }
-    })
-  }
+  // Load textures with channel extraction
+  const loadedTextures = useChannelExtractedTextures(textureConfigs, renderer, false) // GLTF uses flipY=false
+  const texturesReady = Object.keys(loadedTextures).length > 0
 
   useEffect(() => {
     scaledRef.current = false
-  }, [modelUrl, textureSet])
+  }, [modelUrl, textureSet, texturesReady])
 
   useEffect(() => {
     if (model && !scaledRef.current) {
@@ -278,30 +220,32 @@ function GLTFModelWithTextures({
 
       // Apply material with textures
       const material = new THREE.MeshStandardMaterial({
-        color: hasTextures ? undefined : new THREE.Color(0.7, 0.7, 0.9),
+        color: hasTextures ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
         metalness: hasTextures ? 1 : 0.3,
         roughness: hasTextures ? 1 : 0.4,
         envMapIntensity: 1.0,
       })
 
-      if (hasTextures) {
-        const textures = loadedTextures as Record<string, THREE.Texture>
-        if (textures.map) material.map = textures.map
-        if (textures.normalMap) material.normalMap = textures.normalMap
-        if (textures.roughnessMap) material.roughnessMap = textures.roughnessMap
-        if (textures.metalnessMap) material.metalnessMap = textures.metalnessMap
-        if (textures.aoMap) material.aoMap = textures.aoMap
-        if (textures.emissiveMap) {
-          material.emissiveMap = textures.emissiveMap
+      if (hasTextures && texturesReady) {
+        if (loadedTextures.map) material.map = loadedTextures.map
+        if (loadedTextures.normalMap)
+          material.normalMap = loadedTextures.normalMap
+        if (loadedTextures.roughnessMap)
+          material.roughnessMap = loadedTextures.roughnessMap
+        if (loadedTextures.metalnessMap)
+          material.metalnessMap = loadedTextures.metalnessMap
+        if (loadedTextures.aoMap) material.aoMap = loadedTextures.aoMap
+        if (loadedTextures.emissiveMap) {
+          material.emissiveMap = loadedTextures.emissiveMap
           material.emissive = new THREE.Color(0xffffff)
         }
-        if (textures.bumpMap) material.bumpMap = textures.bumpMap
-        if (textures.alphaMap) {
-          material.alphaMap = textures.alphaMap
+        if (loadedTextures.bumpMap) material.bumpMap = loadedTextures.bumpMap
+        if (loadedTextures.alphaMap) {
+          material.alphaMap = loadedTextures.alphaMap
           material.transparent = true
         }
-        if (textures.displacementMap)
-          material.displacementMap = textures.displacementMap
+        if (loadedTextures.displacementMap)
+          material.displacementMap = loadedTextures.displacementMap
       }
 
       clonedModel.traverse(child => {
@@ -334,7 +278,7 @@ function GLTFModelWithTextures({
 
       scaledRef.current = true
     }
-  }, [model, loadedTextures, hasTextures])
+  }, [model, loadedTextures, hasTextures, texturesReady])
 
   useEffect(() => {
     if (model) {
@@ -359,6 +303,7 @@ function FBXModelWithTextures({
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
+  const { gl: renderer } = useThree()
 
   useFrame(() => {
     if (meshRef.current && rotationSpeed > 0) {
@@ -367,26 +312,21 @@ function FBXModelWithTextures({
   })
 
   const model = useLoader(FBXLoader, modelUrl)
-  const textureUrls = buildTextureUrls(textureSet)
-  const hasTextures = Object.keys(textureUrls).length > 0
 
-  const loadedTextures = useTexture(hasTextures ? textureUrls : { dummy: '' })
+  // Build texture configs with channel info
+  const textureConfigs = useMemo(
+    () => buildTextureConfigs(textureSet),
+    [textureSet]
+  )
+  const hasTextures = Object.keys(textureConfigs).length > 0
 
-  // Configure texture properties
-  if (hasTextures) {
-    Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
-      if (texture && texture.wrapS !== undefined) {
-        texture.wrapS = THREE.RepeatWrapping
-        texture.wrapT = THREE.RepeatWrapping
-        // Use default flipY=true (web standard)
-        // Blender addon handles UV conversion on export/import
-      }
-    })
-  }
+  // Load textures with channel extraction
+  const loadedTextures = useChannelExtractedTextures(textureConfigs, renderer, true) // FBX uses flipY=true
+  const texturesReady = Object.keys(loadedTextures).length > 0
 
   useEffect(() => {
     scaledRef.current = false
-  }, [modelUrl, textureSet])
+  }, [modelUrl, textureSet, texturesReady])
 
   useEffect(() => {
     if (model && !scaledRef.current) {
@@ -394,30 +334,32 @@ function FBXModelWithTextures({
 
       // Apply material with textures
       const material = new THREE.MeshStandardMaterial({
-        color: hasTextures ? undefined : new THREE.Color(0.7, 0.7, 0.9),
+        color: hasTextures ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
         metalness: hasTextures ? 1 : 0.3,
         roughness: hasTextures ? 1 : 0.4,
         envMapIntensity: 1.0,
       })
 
-      if (hasTextures) {
-        const textures = loadedTextures as Record<string, THREE.Texture>
-        if (textures.map) material.map = textures.map
-        if (textures.normalMap) material.normalMap = textures.normalMap
-        if (textures.roughnessMap) material.roughnessMap = textures.roughnessMap
-        if (textures.metalnessMap) material.metalnessMap = textures.metalnessMap
-        if (textures.aoMap) material.aoMap = textures.aoMap
-        if (textures.emissiveMap) {
-          material.emissiveMap = textures.emissiveMap
+      if (hasTextures && texturesReady) {
+        if (loadedTextures.map) material.map = loadedTextures.map
+        if (loadedTextures.normalMap)
+          material.normalMap = loadedTextures.normalMap
+        if (loadedTextures.roughnessMap)
+          material.roughnessMap = loadedTextures.roughnessMap
+        if (loadedTextures.metalnessMap)
+          material.metalnessMap = loadedTextures.metalnessMap
+        if (loadedTextures.aoMap) material.aoMap = loadedTextures.aoMap
+        if (loadedTextures.emissiveMap) {
+          material.emissiveMap = loadedTextures.emissiveMap
           material.emissive = new THREE.Color(0xffffff)
         }
-        if (textures.bumpMap) material.bumpMap = textures.bumpMap
-        if (textures.alphaMap) {
-          material.alphaMap = textures.alphaMap
+        if (loadedTextures.bumpMap) material.bumpMap = loadedTextures.bumpMap
+        if (loadedTextures.alphaMap) {
+          material.alphaMap = loadedTextures.alphaMap
           material.transparent = true
         }
-        if (textures.displacementMap)
-          material.displacementMap = textures.displacementMap
+        if (loadedTextures.displacementMap)
+          material.displacementMap = loadedTextures.displacementMap
       }
 
       clonedModel.traverse(child => {
@@ -450,7 +392,7 @@ function FBXModelWithTextures({
 
       scaledRef.current = true
     }
-  }, [model, loadedTextures, hasTextures])
+  }, [model, loadedTextures, hasTextures, texturesReady])
 
   useEffect(() => {
     if (model) {

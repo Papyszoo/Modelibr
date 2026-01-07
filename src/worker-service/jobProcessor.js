@@ -358,7 +358,7 @@ export class JobProcessor {
               })
 
               const texturesApplied =
-                await this.puppeteerRenderer.applyTextures(texturePaths)
+                await this.puppeteerRenderer.applyTextures(texturePaths, fileInfo.fileType)
 
               if (texturesApplied) {
                 await this.jobEventService.logEvent(
