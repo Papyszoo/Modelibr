@@ -13,5 +13,6 @@ node_modules/
 *.log
 webapi_e2e_logs.txt
 
-# Shared state file (used for test data persistence)
+# Shared state files (used for test data persistence)
+.shared-state.json
 fixtures/.shared-state.json

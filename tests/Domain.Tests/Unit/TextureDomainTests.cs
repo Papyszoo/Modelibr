@@ -68,10 +68,6 @@ public class TextureDomainTests
     [Theory]
     [InlineData(TextureType.Albedo)]
     [InlineData(TextureType.Normal)]
-    [InlineData(TextureType.Height)]
-    [InlineData(TextureType.AO)]
-    [InlineData(TextureType.Roughness)]
-    [InlineData(TextureType.Metallic)]
     [InlineData(TextureType.Emissive)]
     public void UpdateTextureType_WithValidType_UpdatesTypeAndTimestamp(TextureType newTextureType)
     {
@@ -89,6 +85,25 @@ public class TextureDomainTests
         Assert.Equal(newTextureType, texture.TextureType);
         Assert.Equal(updatedAt, texture.UpdatedAt);
         Assert.Equal(createdAt, texture.CreatedAt); // CreatedAt should not change
+    }
+
+    [Theory]
+    [InlineData(TextureType.Height)]
+    [InlineData(TextureType.AO)]
+    [InlineData(TextureType.Roughness)]
+    [InlineData(TextureType.Metallic)]
+    public void UpdateTextureType_WithIncompatibleChannel_ThrowsArgumentException(TextureType newTextureType)
+    {
+        // Arrange
+        var file = CreateValidTextureFile();
+        var originalType = TextureType.Albedo; // Creates with RGB channel
+        var createdAt = DateTime.UtcNow.AddHours(-1);
+        var updatedAt = DateTime.UtcNow;
+        var texture = Texture.Create(file, originalType, createdAt);
+
+        // Act & Assert - trying to change to a grayscale type while having RGB channel should fail
+        var exception = Assert.Throws<ArgumentException>(() => texture.UpdateTextureType(newTextureType, updatedAt));
+        Assert.Contains("RGB channel can only be used with color texture types", exception.Message);
     }
 
     [Fact]

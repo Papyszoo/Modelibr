@@ -65,6 +65,7 @@ public class GetThumbnailStatusQueryHandlerTests
         
         // Create a version with thumbnail
         var version = model.CreateVersion("v1", DateTime.UtcNow);
+        version.Id = 10; // Simulate persisted version with valid ID
         var thumbnail = Thumbnail.Create(version.Id, DateTime.UtcNow);
         thumbnail.MarkAsReady("/path/to/thumbnail.png", 1024, 256, 256, DateTime.UtcNow);
         version.SetThumbnail(thumbnail);
