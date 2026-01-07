@@ -536,7 +536,7 @@ cat >> "${REPORTS_DIR}/index.html" << 'EOF'
             ${report.runId ? `
             <div class="info-row">
               <span class="info-label">Workflow:</span>
-              <span><a href="https://github.com/\${REPO_OWNER}/\${REPO_NAME}/actions/runs/\${report.runId}" target="_blank" style="color: #667eea; text-decoration: none;">View Run →</a></span>
+              <span><a href="https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/runs/${report.runId}" target="_blank" style="color: #667eea; text-decoration: none;">View Run →</a></span>
             </div>
             ` : ''}
           </div>
