@@ -183,28 +183,37 @@ jobs:
           pip install pytest fake-bpy-module-latest
 
       - name: Run unit tests
-        run: python -m pytest tests/unit -v --json-report --json-report-file=test-results.json || true
+        id: blender-test
+        continue-on-error: true
+        run: python -m pytest tests/unit -v 2>&1 | tee test-output.txt
 
       - name: Parse test results
         if: always()
         run: |
-          # Check if JSON report exists (requires pytest-json-report plugin)
-          # If not available, parse pytest output manually
-          if [ -f "test-results.json" ]; then
-            total=$(jq -r '.summary.total // 0' test-results.json)
-            passed=$(jq -r '.summary.passed // 0' test-results.json)
-            failed=$(jq -r '.summary.failed // 0' test-results.json)
-          else
-            # Fallback: Run pytest again with verbose output and parse
-            output=$(python -m pytest tests/unit -v 2>&1 || true)
-            passed=$(echo "$output" | grep -oP '\d+(?= passed)' | head -1 || echo "0")
-            failed=$(echo "$output" | grep -oP '\d+(?= failed)' | head -1 || echo "0")
+          # Parse pytest output from console
+          if [ -f "test-output.txt" ]; then
+            # Extract test counts from pytest summary output
+            # pytest outputs something like "5 passed, 1 failed in 2.5s"
+            passed=$(grep -oP '\d+(?= passed)' test-output.txt | tail -1 || echo "0")
+            failed=$(grep -oP '\d+(?= failed)' test-output.txt | tail -1 || echo "0")
             total=$((passed + failed))
-          fi
 
-          # Create summary JSON
-          mkdir -p ../test-results
-          cat > ../test-results/blender-results.json << EOF
+            # If we didn't find any results, try alternative patterns
+            if [ "$total" = "0" ]; then
+              # Try to find the total from collected tests
+              collected=$(grep -oP 'collected \K\d+' test-output.txt | head -1 || echo "0")
+              if [ "$collected" != "0" ]; then
+                total=$collected
+                # Check if all passed (no failed mentioned)
+                if [ "$failed" = "0" ] && grep -q "passed" test-output.txt; then
+                  passed=$total
+                fi
+              fi
+            fi
+
+            # Create summary JSON
+            mkdir -p ../test-results
+            cat > ../test-results/blender-results.json << EOF
           {
             "total": ${total},
             "passed": ${passed},
@@ -212,7 +221,12 @@ jobs:
             "framework": "pytest"
           }
           EOF
-          echo "Blender addon tests: ${passed}/${total} passed, ${failed} failed"
+            echo "Blender addon tests: ${passed}/${total} passed, ${failed} failed"
+          else
+            echo "No test output found"
+            mkdir -p ../test-results
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "error": "No results"}' > ../test-results/blender-results.json
+          fi
 
       - name: Upload blender test results
         uses: actions/upload-artifact@v4
