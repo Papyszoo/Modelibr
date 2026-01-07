@@ -45,14 +45,13 @@ public class DomainEventDispatcherTests
     public async Task PublishAsync_WithEventButNoHandlers_ReturnsSuccess()
     {
         // Arrange
-        var mockServiceProvider = new Mock<IServiceProvider>();
-        var mockLogger = new Mock<ILogger<DomainEventDispatcher>>();
+        var services = new ServiceCollection();
+        services.AddLogging(builder => builder.AddConsole());
         
-        // Mock GetServices to return empty enumerable (no handlers)
-        mockServiceProvider.Setup(x => x.GetServices(It.IsAny<Type>()))
-            .Returns(new List<object>());
+        var serviceProvider = services.BuildServiceProvider();
+        var logger = serviceProvider.GetRequiredService<ILogger<DomainEventDispatcher>>();
 
-        var dispatcher = new DomainEventDispatcher(mockServiceProvider.Object, mockLogger.Object);
+        var dispatcher = new DomainEventDispatcher(serviceProvider, logger);
         var domainEvent = new ModelUploadedEvent(1, 10, "test-hash", true);
 
         // Act
