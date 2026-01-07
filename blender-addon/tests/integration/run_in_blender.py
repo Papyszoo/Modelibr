@@ -67,6 +67,27 @@ def run_tests():
         results['failed'] += 1
         results['errors'].append(('test_panels_registered', str(e), traceback.format_exc()))
     
+    # Run texture flow tests
+    print("\n--- Texture Flow Tests ---")
+    try:
+        from . import test_texture_flow
+        texture_results = test_texture_flow.run_tests()
+        results['passed'] += texture_results['passed']
+        results['failed'] += texture_results['failed']
+        results['errors'].extend(texture_results['errors'])
+    except ImportError:
+        # Try direct import for standalone run
+        try:
+            import test_texture_flow
+            texture_results = test_texture_flow.run_tests()
+            results['passed'] += texture_results['passed']
+            results['failed'] += texture_results['failed']
+            results['errors'].extend(texture_results['errors'])
+        except ImportError as e:
+            print(f"✗ Could not import texture flow tests: {e}")
+            results['failed'] += 1
+            results['errors'].append(('import_texture_flow', str(e), traceback.format_exc()))
+    
     return results
 
 

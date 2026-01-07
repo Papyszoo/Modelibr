@@ -9,17 +9,9 @@ Tasks ordered by priority. AI agents should work from top to bottom.
 
 ---
 
-## Priority 1: Texture Type Improvements - Phase 3
+## Priority 1: Texture Type Improvements - Phase 3 ✅
 
-**Why:** Complete integration with Blender and viewers for channel-packed textures.
-
-> **📋 Detailed Design:** [TEXTURE_CHANNEL_MAPPING.md](./ai-documentation/TEXTURE_CHANNEL_MAPPING.md)
-
-### Tasks
-- [ ] Blender Addon: Import with channel mapping *(user will add as needed)*
-- [ ] Blender Addon: Export packs textures *(user will add as needed)*
-- [ ] Thumbnail Worker: Handle channel-packed textures *(user will add as needed)*
-- [x] Three.js Viewer: Shader-based channel extraction
+**Completed 2026-01-07.** See [Changelog](./changelog.md) for details.
 
 ---
 
@@ -55,6 +47,7 @@ When uploading texture files (png, jpg, etc.) to a model version, prompt user fo
 1. Add to default texture set *(only shown if one exists)*
 2. Create new texture set with these textures
 3. Just store as version files (current behavior)
+4. *To think about - create new version of a model - but what to do with textures?
 
 **Batch behavior:** Apply user's choice to all texture files in batch. Non-texture files always stored on version.
 
@@ -77,6 +70,66 @@ Automatically assign texture type based on filename patterns (albedo, normal, ro
 - User override preferences
 
 ---
+---
+
+## Priority 2.5: Blender Addon Test Improvements
+
+**Why:** Current tests only cover ~20% of functionality (mappings/config). Critical import/export logic is untested and could break silently.
+
+### Current State
+- **80 unit tests** run in CI but use `fake-bpy-module` (type stubs only)
+- **No actual Blender execution** - can't test shader analysis, texture application, export
+- **Coverage gap:** `analyze_material_textures()`, `apply_textures_to_materials()`, `export_textures()` all untested
+
+### Implementation Plan
+
+#### A. Enable Blender in CI (Priority)
+Modify `.github/workflows/ci.yml` to run real Blender tests.
+
+**Tools:**
+- `pytest-blender` - pytest plugin for headless Blender testing
+- Xvfb - virtual framebuffer for display
+
+**CI Changes needed:**
+```yaml
+- name: Install Blender
+  run: |
+    sudo snap install blender --classic
+    blender --version
+
+- name: Run Blender integration tests
+  uses: GabrielBB/xvfb-action@v1
+  with:
+    run: blender -b --python tests/integration/run_in_blender.py
+```
+
+- [x] Add `numpy` to test dependencies
+- [x] Update CI job to install Blender via snap
+- [x] Add Xvfb for headless display
+- [x] Run integration tests inside Blender
+
+#### B. Integration Test Suite ✅
+Tests that run inside Blender with real materials.
+
+**Created:** `blender-addon/tests/integration/test_texture_flow.py`
+- Create Blender scene with materials programmatically
+- Test full import/export cycle
+- Verify shader connections are correct
+
+- [x] Create test scene builder helper
+- [x] Test `analyze_material_textures()` with real nodes
+- [x] Test `classify_textures_for_export()` classification
+- [x] Test channel extraction from ORM textures
+
+#### C. Test Categories
+
+| Category | Location | Runs In | Coverage |
+|----------|----------|---------|----------|
+| Unit | `tests/unit/` | Python | Mappings, config, logic |
+| Integration | `tests/integration/` | Blender | Shader analysis, texture flow |
+| E2E | `tests/e2e/` | Blender + API | Upload/download cycle |
+
+---
 
 ## Priority 3: User Documentation
 
@@ -87,6 +140,13 @@ Automatically assign texture type based on filename patterns (albedo, normal, ro
 ## Needs Refinement
 
 Features that exist but need design/implementation improvements before E2E testing.
+
+### Multiple Texture Sets per Model
+**Status:** Complex feature with many edge cases. Needs thorough design before implementation.
+
+- [ ] Design how multiple sets work in Blender addon import/export
+- [ ] Handle edge case: which set to use on import?
+- [ ] Handle edge case: creating vs updating sets on export
 
 ### Model Tags & Description
 **Status:** Unhappy with service worker results. Needs refactoring before testing.

@@ -84,10 +84,21 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          pip install pytest fake-bpy-module-latest
+          pip install pytest fake-bpy-module-latest numpy
 
       - name: Run unit tests
         run: python -m pytest tests/unit -v
+
+      - name: Install Blender
+        run: |
+          sudo snap install blender --classic
+          blender --version
+
+      - name: Run Blender integration tests
+        uses: GabrielBB/xvfb-action@v1
+        with:
+          working-directory: blender-addon
+          run: blender -b --python tests/integration/run_in_blender.py
 
   e2e-tests:
     name: E2E Tests

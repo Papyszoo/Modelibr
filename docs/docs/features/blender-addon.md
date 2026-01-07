@@ -76,6 +76,72 @@ python install_uri_handler.py
 
 This registers the `modelibr://` protocol so clicking "Open in Blender" launches Blender with the model context.
 
+---
+
+## Texture Handling
+
+The Modelibr addon automatically manages textures when importing and exporting models.
+
+### Importing Textures
+
+When you import a model with textures:
+
+1. **Texture sets** are downloaded and applied to materials
+2. **Channel-packed textures** (like ORM) are automatically extracted into separate channels
+3. Each texture is tagged with its **Modelibr file ID** for tracking changes
+
+![SCREENSHOT: Import with textures applied to material]
+
+### Texture Reuse
+
+If you import multiple models that share the same texture set, the addon **reuses existing textures** instead of duplicating them. You'll see the user count increase on shared images.
+
+![SCREENSHOT: Shared texture with user count > 1]
+
+---
+
+## Uploading Textures
+
+### Modification Detection
+
+The addon tracks which textures have changed since import:
+
+- **Unchanged textures**: Referenced by file ID (not re-uploaded)
+- **Modified textures**: Re-uploaded to server
+- **New textures**: Uploaded as new files
+
+This **selective upload** saves bandwidth and time when only some textures have changed.
+
+### Channel Packing
+
+When uploading, if the addon detects separate grayscale textures that could be packed (Roughness, Metallic, AO), you'll see a **Texture Packing** option in the upload dialog:
+
+![SCREENSHOT: Upload dialog with Texture Packing box]
+
+| Option | Description |
+|--------|-------------|
+| **Upload Separately** | Keep textures as individual files |
+| **Pack into ORM** | Combine into single ORM texture (R=AO, G=Roughness, B=Metallic) |
+
+> **Tip:** ORM textures are more efficient for real-time rendering and reduce file count.
+
+---
+
+## Addon Preferences
+
+Access via **Edit > Preferences > Add-ons > Modelibr**:
+
+![SCREENSHOT: Addon preferences panel]
+
+| Setting | Description |
+|---------|-------------|
+| **Server URL** | URL of your Modelibr server |
+| **Default Export Format** | GLB, GLTF, or FBX |
+| **Always Include .blend File** | Upload source file with each version |
+| **Show Channel Packing UI** | Show texture packing options on export |
+
+---
+
 ## Troubleshooting
 
 ### Connection Failed
@@ -92,3 +158,9 @@ This registers the `modelibr://` protocol so clicking "Open in Blender" launches
 - Ensure model context is set (import first)
 - Check file size limits
 - Verify API connectivity
+
+### Textures Not Applied
+- Check Blender console for texture loading errors
+- Verify texture files exist in the texture set
+- Ensure materials use Principled BSDF shader
+

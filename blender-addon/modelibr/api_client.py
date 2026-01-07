@@ -215,7 +215,8 @@ class ModelibrApiClient:
         )
 
     def add_texture_to_set(self, texture_set_id: int, file_id: int, 
-                           texture_type: str = "Albedo") -> dict:
+                           texture_type: str = "Albedo",
+                           source_channel: int = 0) -> dict:
         """
         Add an existing file as a texture to a texture set.
         
@@ -223,11 +224,19 @@ class ModelibrApiClient:
             texture_set_id: ID of the texture set
             file_id: ID of the file to add as texture
             texture_type: Type of texture
+            source_channel: Source channel (0=RGB, 1=R, 2=G, 3=B, 4=A)
         """
+        payload = {
+            "fileId": file_id, 
+            "textureType": texture_type,
+        }
+        if source_channel != 0:
+            payload["sourceChannel"] = source_channel
+            
         return self._make_request(
             "POST",
             f"/texture-sets/{texture_set_id}/textures",
-            data=json.dumps({"fileId": file_id, "textureType": texture_type}).encode('utf-8'),
+            data=json.dumps(payload).encode('utf-8'),
             content_type="application/json"
         )
 

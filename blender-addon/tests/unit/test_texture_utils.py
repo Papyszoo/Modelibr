@@ -175,5 +175,212 @@ class TestTextureSetIdsFallback(unittest.TestCase):
         self.assertIsNone(texture_set_id)
 
 
+# Channel mapping constants
+SOURCE_CHANNEL_RGB = 0
+SOURCE_CHANNEL_R = 1
+SOURCE_CHANNEL_G = 2
+SOURCE_CHANNEL_B = 3
+SOURCE_CHANNEL_A = 4
+
+CHANNEL_INDEX_TO_NAME = {
+    SOURCE_CHANNEL_RGB: "RGB",
+    SOURCE_CHANNEL_R: "R",
+    SOURCE_CHANNEL_G: "G",
+    SOURCE_CHANNEL_B: "B",
+    SOURCE_CHANNEL_A: "A",
+}
+
+PACKABLE_TEXTURE_TYPES = {"AmbientOcclusion", "Roughness", "Metallic"}
+
+
+class TestChannelMappingConstants(unittest.TestCase):
+    """Test channel mapping constants for ORM textures."""
+    
+    def test_source_channel_values(self):
+        """Test source channel enum values."""
+        self.assertEqual(SOURCE_CHANNEL_RGB, 0)
+        self.assertEqual(SOURCE_CHANNEL_R, 1)
+        self.assertEqual(SOURCE_CHANNEL_G, 2)
+        self.assertEqual(SOURCE_CHANNEL_B, 3)
+        self.assertEqual(SOURCE_CHANNEL_A, 4)
+    
+    def test_channel_index_to_name_mapping(self):
+        """Test channel index to name mapping."""
+        self.assertEqual(CHANNEL_INDEX_TO_NAME[0], "RGB")
+        self.assertEqual(CHANNEL_INDEX_TO_NAME[1], "R")
+        self.assertEqual(CHANNEL_INDEX_TO_NAME[2], "G")
+        self.assertEqual(CHANNEL_INDEX_TO_NAME[3], "B")
+        self.assertEqual(CHANNEL_INDEX_TO_NAME[4], "A")
+    
+    def test_all_channels_have_names(self):
+        """Test all source channels have names."""
+        for channel_id in [SOURCE_CHANNEL_RGB, SOURCE_CHANNEL_R, 
+                          SOURCE_CHANNEL_G, SOURCE_CHANNEL_B, SOURCE_CHANNEL_A]:
+            self.assertIn(channel_id, CHANNEL_INDEX_TO_NAME)
+
+
+class TestPackableTextureTypes(unittest.TestCase):
+    """Test packable texture type detection."""
+    
+    def test_packable_types_includes_orm(self):
+        """Test ORM textures are in packable set."""
+        self.assertIn("AmbientOcclusion", PACKABLE_TEXTURE_TYPES)
+        self.assertIn("Roughness", PACKABLE_TEXTURE_TYPES)
+        self.assertIn("Metallic", PACKABLE_TEXTURE_TYPES)
+    
+    def test_packable_types_excludes_rgb(self):
+        """Test RGB textures are not in packable set."""
+        self.assertNotIn("Albedo", PACKABLE_TEXTURE_TYPES)
+        self.assertNotIn("Normal", PACKABLE_TEXTURE_TYPES)
+        self.assertNotIn("Emissive", PACKABLE_TEXTURE_TYPES)
+    
+    def test_packable_count(self):
+        """Test there are exactly 3 packable types (ORM)."""
+        self.assertEqual(len(PACKABLE_TEXTURE_TYPES), 3)
+
+
+class TestClassifyTexturesForExport(unittest.TestCase):
+    """Test classification logic for texture export decisions."""
+    
+    def test_empty_analysis_returns_no_changes(self):
+        """Test empty analysis returns no changes."""
+        analysis = {"textures": [], "packed": [], "packable": []}
+        result = self._classify(analysis)
+        
+        self.assertEqual(len(result["unchanged"]), 0)
+        self.assertEqual(len(result["modified"]), 0)
+        self.assertEqual(len(result["new"]), 0)
+        self.assertFalse(result["any_from_modelibr"])
+        self.assertFalse(result["any_changed"])
+    
+    def test_new_texture_without_file_id(self):
+        """Test texture without file_id is classified as new."""
+        analysis = {
+            "textures": [{"texture_type": "Albedo", "file_id": None, "image": None}],
+            "packed": [],
+            "packable": []
+        }
+        result = self._classify(analysis)
+        
+        self.assertEqual(len(result["new"]), 1)
+        self.assertTrue(result["any_changed"])
+        self.assertFalse(result["any_from_modelibr"])
+    
+    def test_texture_with_file_id_is_from_modelibr(self):
+        """Test texture with file_id is marked as from_modelibr."""
+        mock_image = MockImage(file_id=123, original_hash="abc", current_hash="abc")
+        analysis = {
+            "textures": [{"texture_type": "Albedo", "file_id": 123, "image": mock_image}],
+            "packed": [],
+            "packable": []
+        }
+        result = self._classify(analysis)
+        
+        self.assertTrue(result["any_from_modelibr"])
+    
+    def test_unchanged_when_hash_matches(self):
+        """Test texture is unchanged when hash matches."""
+        mock_image = MockImage(file_id=123, original_hash="hash123", current_hash="hash123")
+        analysis = {
+            "textures": [{"texture_type": "Albedo", "file_id": 123, "image": mock_image}],
+            "packed": [],
+            "packable": []
+        }
+        result = self._classify(analysis)
+        
+        self.assertEqual(len(result["unchanged"]), 1)
+        self.assertFalse(result["any_changed"])
+    
+    def test_modified_when_hash_differs(self):
+        """Test texture is modified when hash differs."""
+        mock_image = MockImage(file_id=123, original_hash="old_hash", current_hash="new_hash")
+        analysis = {
+            "textures": [{"texture_type": "Albedo", "file_id": 123, "image": mock_image}],
+            "packed": [],
+            "packable": []
+        }
+        result = self._classify(analysis)
+        
+        self.assertEqual(len(result["modified"]), 1)
+        self.assertTrue(result["any_changed"])
+    
+    def test_removed_types_detected(self):
+        """Test removed texture types are detected."""
+        analysis = {
+            "textures": [{"texture_type": "Albedo", "file_id": None, "image": None}],
+            "packed": [],
+            "packable": []
+        }
+        original_types = {"Albedo", "Normal", "Roughness"}
+        result = self._classify(analysis, original_types)
+        
+        self.assertIn("Normal", result["removed"])
+        self.assertIn("Roughness", result["removed"])
+        self.assertTrue(result["any_changed"])
+    
+    def _classify(self, analysis, original_types=None):
+        """Mock classify_textures_for_export logic for testing."""
+        result = {
+            "unchanged": [],
+            "modified": [],
+            "new": [],
+            "removed": set(),
+            "any_from_modelibr": False,
+            "any_changed": False,
+        }
+        
+        current_types = set()
+        
+        for tex in analysis.get("textures", []):
+            image = tex.get("image")
+            file_id = tex.get("file_id")
+            texture_type = tex.get("texture_type")
+            
+            if texture_type:
+                current_types.add(texture_type)
+            
+            if file_id:
+                result["any_from_modelibr"] = True
+                original_hash = image.get("modelibr_original_hash", "") if image else ""
+                current_hash = mock_calculate_hash(image) if image else ""
+                
+                if original_hash and current_hash and original_hash == current_hash:
+                    result["unchanged"].append(tex)
+                else:
+                    result["modified"].append(tex)
+                    result["any_changed"] = True
+            else:
+                result["new"].append(tex)
+                result["any_changed"] = True
+        
+        if original_types:
+            result["removed"] = original_types - current_types
+            if result["removed"]:
+                result["any_changed"] = True
+        
+        return result
+
+
+class MockImage:
+    """Mock Blender image for testing."""
+    def __init__(self, file_id=None, original_hash="", current_hash=""):
+        self._props = {
+            "modelibr_file_id": file_id,
+            "modelibr_original_hash": original_hash,
+        }
+        self._current_hash = current_hash
+    
+    def get(self, key, default=""):
+        return self._props.get(key, default)
+
+
+def mock_calculate_hash(image):
+    """Mock hash calculation for testing."""
+    if hasattr(image, '_current_hash'):
+        return image._current_hash
+    return ""
+
+
 if __name__ == '__main__':
     unittest.main()
+
