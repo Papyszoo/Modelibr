@@ -50,7 +50,24 @@ public sealed class HashBasedFileStorage : IFileStorage
         }
         else
         {
-            File.Move(tempFile, finalPath);
+            try
+            {
+                File.Move(tempFile, finalPath);
+            }
+            catch (IOException) when (File.Exists(finalPath))
+            {
+                // Race condition: another thread created the file between our check and move
+                // This is fine - the content is identical (same hash)
+                // Clean up our temp file
+                try
+                {
+                    File.Delete(tempFile);
+                }
+                catch
+                {
+                    // Ignore cleanup errors
+                }
+            }
         }
 
         var relativePath = Path.Combine(relativeDir, storedName).Replace('\\', '/');
