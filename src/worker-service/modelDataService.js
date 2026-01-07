@@ -164,7 +164,7 @@ export class ModelDataService {
   /**
    * Download all textures for a texture set
    * @param {Object} textureSet - The texture set data
-   * @returns {Promise<Object>} Map of texture types to file paths
+   * @returns {Promise<Object>} Map of texture types to texture info objects {filePath, sourceChannel}
    */
   async downloadTextureSetFiles(textureSet) {
     const texturePaths = {}
@@ -193,10 +193,16 @@ export class ModelDataService {
         )
 
         if (filePath) {
-          texturePaths[texture.textureType] = filePath
+          // Include sourceChannel for split channel extraction
+          // sourceChannel: 0=RGB (full texture), 1=R, 2=G, 3=B, 4=A
+          texturePaths[texture.textureType] = {
+            filePath,
+            sourceChannel: texture.sourceChannel ?? 0, // Default to RGB (0)
+          }
           logger.debug('Texture downloaded', {
             textureType: texture.textureType,
             fileId: texture.fileId,
+            sourceChannel: texture.sourceChannel ?? 0,
             filePath,
           })
         }
@@ -264,12 +270,15 @@ export class ModelDataService {
 
   /**
    * Clean up all texture files in a map
-   * @param {Object} texturePaths - Map of texture types to file paths
+   * @param {Object} texturePaths - Map of texture types to texture info objects {filePath, sourceChannel}
    */
   async cleanupTextureFiles(texturePaths) {
     if (!texturePaths) return
 
-    for (const filePath of Object.values(texturePaths)) {
+    for (const textureInfo of Object.values(texturePaths)) {
+      // Handle both new {filePath, sourceChannel} objects and legacy plain strings
+      const filePath =
+        typeof textureInfo === 'string' ? textureInfo : textureInfo.filePath
       await this.cleanupTextureFile(filePath)
     }
   }

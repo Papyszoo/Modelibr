@@ -200,6 +200,7 @@ Then("the model should be stored in shared state", async ({ page }) => {
 /**
  * Waits for thumbnail to be generated and verifies it's ready.
  * Uses database polling to confirm thumbnail status.
+ * Queries specifically for the most recently created model version's thumbnail.
  */
 Then(
     "the thumbnail should be generated via SignalR notification",
@@ -212,19 +213,34 @@ Then(
         const maxAttempts = 30;
         const pollInterval = 3000;
         let thumbnailReady = false;
+        let lastStatus = -1;
         
         for (let i = 0; i < maxAttempts && !thumbnailReady; i++) {
+            // Query for the most recently created MODEL VERSION's thumbnail
+            // This ensures we're checking the correct model, not just any recent thumbnail
             const result = await db.query(
-                `SELECT t."Status" 
-                 FROM "Thumbnails" t 
-                 JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
-                 ORDER BY t."CreatedAt" DESC LIMIT 1`
+                `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName"
+                 FROM "ModelVersions" mv
+                 JOIN "Models" m ON m."Id" = mv."ModelId"
+                 LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                 WHERE m."DeletedAt" IS NULL
+                 ORDER BY mv."CreatedAt" DESC 
+                 LIMIT 1`
             );
             
-            if (result.rows.length > 0 && result.rows[0].Status === 2) {
-                thumbnailReady = true;
-                console.log(`[Thumbnail] Ready (status=2)`);
+            if (result.rows.length > 0) {
+                const row = result.rows[0];
+                lastStatus = row.Status;
+                
+                if (row.Status === 2) {
+                    thumbnailReady = true;
+                    console.log(`[Thumbnail] Ready for "${row.ModelName}" v${row.VersionId} (status=2)`);
+                } else {
+                    console.log(`[Thumbnail] Waiting for "${row.ModelName}" v${row.VersionId} (status=${row.Status ?? 'null'})... attempt ${i + 1}/${maxAttempts}`);
+                    await page.waitForTimeout(pollInterval);
+                }
             } else {
+                console.log(`[Thumbnail] No model versions found, waiting... attempt ${i + 1}/${maxAttempts}`);
                 await page.waitForTimeout(pollInterval);
             }
         }

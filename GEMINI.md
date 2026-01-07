@@ -22,6 +22,12 @@
   - **Never mark parent items as complete** when child items are still incomplete (`[x]` only when ALL children are `[x]`)
   - **Order tasks by dependencies** - if task B requires task A, task B must come AFTER task A in the list
   - **Move dependent sub-items** to their own section after the dependency (e.g., "Add sprites to pack" goes after "Sprites CRUD", not inside Packs section)
+- **Proactive feature planning** - When adding new roadmap tasks:
+  - **Suggest edge cases** that could cause issues (e.g., duplicate filenames, race conditions, scale problems)
+  - **Propose UX considerations** (how will users discover/use this feature?)
+  - **Identify potential conflicts** with existing functionality
+  - **Think about large libraries** - will this feature work well with 1000+ models/textures?
+  - **Ask clarifying questions** before finalizing task descriptions
 
 ### 3. Keep Documentation Updated
 - When changing functionality, **update relevant docs** (in `docs/` directory)
@@ -63,6 +69,15 @@ When writing E2E tests, use selectors in this priority order:
 - **Verify tests work after implementation** - run the relevant test suite after implementing features
 - **Update test selectors immediately** when changing UI components
 - **If a test fails after UI changes**, fix the test selector, don't skip the test
+
+#### 5.4 Verify Test Resources Before Use
+- **Always check that test assets exist** before referencing them in tests (e.g., `ls tests/e2e/assets/`)
+- **Never assume filenames** - check the actual files in `tests/e2e/assets/` directory
+- **When writing new E2E tests**, verify:
+  1. All referenced model files exist (`.glb`, `.fbx`, `.obj`)
+  2. All referenced texture files exist (`.png`, `.jpg`)
+  3. Step definitions exist for all steps used
+- **If a test references a non-existent asset**, create the asset or use an existing one
 
 ### 6. Report Status and Implementation Details
 - **Inform user on work done** - explain how the solution was implemented
