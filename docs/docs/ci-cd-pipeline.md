@@ -11,24 +11,24 @@ Modelibr uses a unified GitHub Actions workflow that:
 
 ## Accessing Test Reports
 
-### On Main Branch (Deployed to GitHub Pages)
-
-The latest Playwright E2E test reports are available directly from the documentation site:
+The latest Playwright E2E test reports are always available on the documentation site, updated after every test run (from any branch):
 
 **[View E2E Test Reports](/playwright-reports)**
 
 You can also access them from the navigation bar at the top of this site.
 
-### On Feature Branches and PRs
+### How Reports Are Updated
 
-When working on feature branches or pull requests, the documentation with embedded reports is built but not deployed to GitHub Pages. Instead:
+- **After any CI run completes** (from any branch, whether tests pass or fail):
+  - The workflow fetches the last 5 Playwright reports from all workflow runs
+  - Builds the documentation using the **main branch** content
+  - Deploys to GitHub Pages with the updated reports
 
-1. Go to the workflow run in GitHub Actions
-2. Scroll to the "Artifacts" section at the bottom
-3. Download the `docs-with-reports` artifact
-4. Extract the zip file and open `playwright-reports/index.html` in your browser
-
-This allows you to preview test reports even when tests fail, without deploying to the live site.
+- **Report artifacts** are also available:
+  1. Go to the workflow run in GitHub Actions
+  2. Scroll to the "Artifacts" section at the bottom
+  3. Download the `docs-with-reports` artifact
+  4. Extract the zip file and open `playwright-reports/index.html` in your browser
 
 ## How It Works
 
@@ -43,18 +43,21 @@ The workflow is defined in `.github/workflows/ci-and-deploy.yml` and consists of
    - `e2e-tests`: Playwright end-to-end tests
    - `ci-status`: Aggregates results from all tests
 
-2. **Documentation Building** (runs on all branches, even if tests fail):
-   - Fetches the last 5 Playwright reports from previous workflow runs
+2. **Documentation Building and Deployment** (runs after all tests, even if they fail):
+   - Checks out the **main branch** for documentation content
+   - Fetches the last 5 Playwright reports from **all workflow runs** (any branch)
    - Builds the Docusaurus documentation site
-   - Uploads docs with reports as artifact (`docs-with-reports`) for preview
-   - Only deploys to GitHub Pages on main branch
+   - Uploads docs with reports as artifact (`docs-with-reports`) for download
+   - **Always deploys to GitHub Pages** after successful build
+
+This means the documentation site is continuously updated with the latest test reports from any branch, while the documentation content itself comes from the main branch.
 
 ### Report Collection Process
 
 The `.github/scripts/fetch-playwright-reports.sh` script:
 
-1. Uses the GitHub API to fetch recent workflow runs
-2. Downloads the `playwright-report` artifacts from the last 5 successful E2E test runs
+1. Uses the GitHub API to fetch recent workflow runs from all branches
+2. Downloads the `playwright-report` artifacts from the last 5 completed E2E test runs
 3. Extracts them to `docs/static/playwright-reports/run-{number}/`
 4. Generates an index page that displays all reports with metadata (date, time, pass/fail status)
 5. Reports are automatically cleaned up - only the last 5 are kept

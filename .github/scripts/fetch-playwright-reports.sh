@@ -15,8 +15,8 @@ echo "Fetching recent workflow runs for repository: ${REPO_OWNER}/${REPO_NAME}"
 rm -rf "${REPORTS_DIR}"
 mkdir -p "${REPORTS_DIR}"
 
-# Fetch the last 10 completed workflow runs that have the e2e-tests job
-# We fetch more than 5 to ensure we get 5 with actual reports
+# Fetch the last 20 completed workflow runs from all branches
+# We fetch more than 5 to ensure we get 5 with actual Playwright reports
 WORKFLOW_RUNS=$(curl -s -H "Authorization: token ${TOKEN}" \
   -H "Accept: application/vnd.github.v3+json" \
   "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?status=completed&per_page=20")
