@@ -47,6 +47,7 @@ jobs:
           total=0
           passed=0
           failed=0
+          failures="[]"
 
           # Find all TRX files in TestResults directories (recursively under tests/)
           trx_files=$(find tests -type d -name "TestResults" -exec find {} -type f -name "test-results.trx" \; 2>/dev/null || true)
@@ -65,24 +66,31 @@ jobs:
                 total=$((total + file_total))
                 passed=$((passed + file_passed))
                 failed=$((failed + file_failed))
+                
+                # Extract failed test names and messages from TRX
+                if [ "$file_failed" -gt 0 ]; then
+                  # Parse failed tests - TRX format has UnitTestResult with outcome="Failed"
+                  failed_tests=$(grep -oP 'testName="[^"]+"[^>]*outcome="Failed"' "$trx_file" | grep -oP 'testName="\K[^"]+' || true)
+                  if [ -n "$failed_tests" ]; then
+                    while IFS= read -r test_name; do
+                      # Try to get error message (simplified - may not get full message)
+                      error_msg=$(grep -A5 "testName=\"$test_name\"" "$trx_file" | grep -oP '<Message>\K[^<]+' | head -1 || echo "Test failed")
+                      error_msg=$(echo "$error_msg" | sed 's/"/\\"/g' | tr '\n' ' ' | cut -c1-200)
+                      failures=$(echo "$failures" | jq --arg name "$test_name" --arg msg "$error_msg" '. + [{"name": $name, "message": $msg}]')
+                    done <<< "$failed_tests"
+                  fi
+                fi
               fi
             done <<< "$trx_files"
 
             # Create JSON summary
             mkdir -p test-results
-            cat > test-results/backend-results.json << EOF
-          {
-            "total": ${total},
-            "passed": ${passed},
-            "failed": ${failed},
-            "framework": ".NET 9.0"
-          }
-          EOF
+            echo "{\"total\": ${total}, \"passed\": ${passed}, \"failed\": ${failed}, \"framework\": \".NET 9.0\", \"failures\": ${failures}}" > test-results/backend-results.json
             echo "Backend tests: ${passed}/${total} passed, ${failed} failed"
           else
             echo "No test results found"
             mkdir -p test-results
-            echo '{"total": 0, "passed": 0, "failed": 0, "framework": ".NET 9.0", "error": "No results"}' > test-results/backend-results.json
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": ".NET 9.0", "failures": [], "error": "No results"}' > test-results/backend-results.json
           fi
 
       - name: Upload backend test results
@@ -141,21 +149,32 @@ jobs:
               total=$((passed + failed))
             fi
 
+            # Extract failing test names and messages from Jest output
+            # Jest format: "● TestSuiteName › test name" followed by error
+            failures="[]"
+            if [ "$failed" -gt 0 ]; then
+              # Extract failed test blocks (lines starting with ●)
+              grep -n "^[[:space:]]*●" test-output.txt | while IFS=: read -r line_num line_content; do
+                test_name=$(echo "$line_content" | sed 's/^[[:space:]]*● //' | cut -c1-150)
+                # Get error message from next few lines
+                error_msg=$(sed -n "$((line_num+1)),$((line_num+5))p" test-output.txt | tr '\n' ' ' | sed 's/"/\\"/g' | cut -c1-200)
+                failures=$(echo "$failures" | jq --arg name "$test_name" --arg msg "$error_msg" '. + [{"name": $name, "message": $msg}]')
+              done 2>/dev/null || true
+            fi
+            
+            # Handle case where jq parsing failed
+            if ! echo "$failures" | jq . >/dev/null 2>&1; then
+              failures="[]"
+            fi
+
             # Create summary JSON
             mkdir -p "$GITHUB_WORKSPACE/test-results"
-            cat > "$GITHUB_WORKSPACE/test-results/frontend-results.json" << EOF
-          {
-            "total": ${total},
-            "passed": ${passed},
-            "failed": ${failed},
-            "framework": "Jest"
-          }
-          EOF
+            echo "{\"total\": ${total}, \"passed\": ${passed}, \"failed\": ${failed}, \"framework\": \"Jest\", \"failures\": ${failures}}" > "$GITHUB_WORKSPACE/test-results/frontend-results.json"
             echo "Frontend tests: ${passed}/${total} passed, ${failed} failed"
           else
             echo "No test output found"
             mkdir -p "$GITHUB_WORKSPACE/test-results"
-            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/frontend-results.json"
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "failures": [], "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/frontend-results.json"
           fi
 
       - name: Upload frontend test results
@@ -223,21 +242,30 @@ jobs:
               fi
             fi
 
+            # Extract failing test names and messages from pytest output
+            # pytest format: "FAILED tests/path::test_name - Error message"
+            failures="[]"
+            if [ "$failed" -gt 0 ]; then
+              grep "^FAILED" test-output.txt | while IFS= read -r line; do
+                test_name=$(echo "$line" | sed 's/^FAILED //' | cut -d' ' -f1 | cut -c1-150)
+                error_msg=$(echo "$line" | sed 's/^FAILED [^ ]* - //' | sed 's/"/\\"/g' | cut -c1-200)
+                failures=$(echo "$failures" | jq --arg name "$test_name" --arg msg "$error_msg" '. + [{"name": $name, "message": $msg}]')
+              done 2>/dev/null || true
+            fi
+            
+            # Handle case where jq parsing failed
+            if ! echo "$failures" | jq . >/dev/null 2>&1; then
+              failures="[]"
+            fi
+
             # Create summary JSON
             mkdir -p "$GITHUB_WORKSPACE/test-results"
-            cat > "$GITHUB_WORKSPACE/test-results/blender-results.json" << EOF
-          {
-            "total": ${total},
-            "passed": ${passed},
-            "failed": ${failed},
-            "framework": "pytest"
-          }
-          EOF
+            echo "{\"total\": ${total}, \"passed\": ${passed}, \"failed\": ${failed}, \"framework\": \"pytest\", \"failures\": ${failures}}" > "$GITHUB_WORKSPACE/test-results/blender-results.json"
             echo "Blender addon tests: ${passed}/${total} passed, ${failed} failed"
           else
             echo "No test output found"
             mkdir -p "$GITHUB_WORKSPACE/test-results"
-            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/blender-results.json"
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "failures": [], "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/blender-results.json"
           fi
 
       - name: Upload blender test results
@@ -402,13 +430,13 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
 
-      - name: Fetch last 5 Playwright reports from all branches
+      - name: Fetch last 10 test reports from all branches
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
-          chmod +x .github/scripts/fetch-playwright-reports.sh
-          .github/scripts/fetch-playwright-reports.sh
+          chmod +x .github/scripts/fetch-test-reports.sh
+          .github/scripts/fetch-test-reports.sh
 
       - name: Install dependencies
         working-directory: docs

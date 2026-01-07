@@ -61,6 +61,14 @@ def create_test_material_with_textures():
     links.new(rough_node.outputs["Color"], bsdf.inputs["Roughness"])
     created_images.append(("Roughness", rough_img, rough_node))
     
+    # Create and link Metallic texture (grayscale) - needed for packable detection
+    metal_img = bpy.data.images.new("test_metallic", width=64, height=64)
+    metal_node = nodes.new("ShaderNodeTexImage")
+    metal_node.image = metal_img
+    metal_node.location = (-300, -100)
+    links.new(metal_node.outputs["Color"], bsdf.inputs["Metallic"])
+    created_images.append(("Metallic", metal_img, metal_node))
+    
     # Create and link Normal texture with Normal Map node
     normal_img = bpy.data.images.new("test_normal", width=64, height=64)
     normal_tex = nodes.new("ShaderNodeTexImage")
@@ -160,14 +168,15 @@ def test_analyze_material_textures_basic():
     
     analysis = analyze_material_textures([obj])
     
-    # Should find 3 textures
-    assert len(analysis["textures"]) >= 3, \
-        f"Expected at least 3 textures, got {len(analysis['textures'])}"
+    # Should find 4 textures (Albedo, Roughness, Metallic, Normal)
+    assert len(analysis["textures"]) >= 4, \
+        f"Expected at least 4 textures, got {len(analysis['textures'])}"
     
     # Check texture types detected
     texture_types = {t.get("texture_type") for t in analysis["textures"]}
     assert "Albedo" in texture_types, "Albedo not detected"
     assert "Roughness" in texture_types, "Roughness not detected"
+    assert "Metallic" in texture_types, "Metallic not detected"
     assert "Normal" in texture_types, "Normal not detected"
     
     cleanup_test_scene()
@@ -229,8 +238,8 @@ def test_classify_textures_for_export_new():
     classification = classify_textures_for_export(analysis)
     
     # All textures should be "new" since they have no file_id
-    assert len(classification["new"]) >= 3, \
-        f"Expected at least 3 new textures, got {len(classification['new'])}"
+    assert len(classification["new"]) >= 4, \
+        f"Expected at least 4 new textures, got {len(classification['new'])}"
     assert classification["any_changed"] == True, \
         "any_changed should be True for new textures"
     
