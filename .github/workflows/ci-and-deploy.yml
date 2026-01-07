@@ -48,8 +48,8 @@ jobs:
           passed=0
           failed=0
 
-          # Find all TRX files
-          trx_files=$(find tests -name "test-results.trx" 2>/dev/null || true)
+          # Find all TRX files in TestResults directories
+          trx_files=$(find tests -type f -name "test-results.trx" 2>/dev/null || true)
 
           if [ -n "$trx_files" ]; then
             echo "Found TRX files:"
@@ -121,14 +121,20 @@ jobs:
 
       - name: Parse test results
         if: always()
+        working-directory: src/frontend
         run: |
           # Parse Jest output from console
           if [ -f "test-output.txt" ]; then
-            # Extract test counts from Jest summary output
+            # Extract test counts from Jest summary output using sed
             # Jest outputs something like "Tests:       5 passed, 5 total"
-            total=$(grep -oP 'Tests:.*?\K\d+(?= total)' test-output.txt | tail -1 || echo "0")
-            passed=$(grep -oP 'Tests:.*?\K\d+(?= passed)' test-output.txt | tail -1 || echo "0")
-            failed=$(grep -oP 'Tests:.*?\K\d+(?= failed)' test-output.txt | tail -1 || echo "0")
+            total=$(sed -n 's/.*Tests:.*\([0-9]\+\) total.*/\1/p' test-output.txt | tail -1)
+            passed=$(sed -n 's/.*Tests:.*\([0-9]\+\) passed.*/\1/p' test-output.txt | tail -1)
+            failed=$(sed -n 's/.*Tests:.*\([0-9]\+\) failed.*/\1/p' test-output.txt | tail -1)
+
+            # Set defaults if empty
+            total=${total:-0}
+            passed=${passed:-0}
+            failed=${failed:-0}
 
             # If total is 0 but we have passed tests, total = passed + failed
             if [ "$total" = "0" ] && [ "$passed" != "0" ]; then
@@ -136,8 +142,8 @@ jobs:
             fi
 
             # Create summary JSON
-            mkdir -p ../../test-results
-            cat > ../../test-results/frontend-results.json << EOF
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            cat > "$GITHUB_WORKSPACE/test-results/frontend-results.json" << EOF
           {
             "total": ${total},
             "passed": ${passed},
@@ -148,8 +154,8 @@ jobs:
             echo "Frontend tests: ${passed}/${total} passed, ${failed} failed"
           else
             echo "No test output found"
-            mkdir -p ../../test-results
-            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "error": "No results"}' > ../../test-results/frontend-results.json
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/frontend-results.json"
           fi
 
       - name: Upload frontend test results
@@ -189,19 +195,25 @@ jobs:
 
       - name: Parse test results
         if: always()
+        working-directory: blender-addon
         run: |
           # Parse pytest output from console
           if [ -f "test-output.txt" ]; then
-            # Extract test counts from pytest summary output
+            # Extract test counts from pytest summary output using sed
             # pytest outputs something like "5 passed, 1 failed in 2.5s"
-            passed=$(grep -oP '\d+(?= passed)' test-output.txt | tail -1 || echo "0")
-            failed=$(grep -oP '\d+(?= failed)' test-output.txt | tail -1 || echo "0")
+            passed=$(sed -n 's/.*\([0-9]\+\) passed.*/\1/p' test-output.txt | tail -1)
+            failed=$(sed -n 's/.*\([0-9]\+\) failed.*/\1/p' test-output.txt | tail -1)
+
+            # Set defaults if empty
+            passed=${passed:-0}
+            failed=${failed:-0}
             total=$((passed + failed))
 
             # If we didn't find any results, try alternative patterns
             if [ "$total" = "0" ]; then
               # Try to find the total from collected tests
-              collected=$(grep -oP 'collected \K\d+' test-output.txt | head -1 || echo "0")
+              collected=$(sed -n 's/.*collected \([0-9]\+\).*/\1/p' test-output.txt | head -1)
+              collected=${collected:-0}
               if [ "$collected" != "0" ]; then
                 total=$collected
                 # Check if all passed (no failed mentioned)
@@ -212,8 +224,8 @@ jobs:
             fi
 
             # Create summary JSON
-            mkdir -p ../test-results
-            cat > ../test-results/blender-results.json << EOF
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            cat > "$GITHUB_WORKSPACE/test-results/blender-results.json" << EOF
           {
             "total": ${total},
             "passed": ${passed},
@@ -224,8 +236,8 @@ jobs:
             echo "Blender addon tests: ${passed}/${total} passed, ${failed} failed"
           else
             echo "No test output found"
-            mkdir -p ../test-results
-            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "error": "No results"}' > ../test-results/blender-results.json
+            mkdir -p "$GITHUB_WORKSPACE/test-results"
+            echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/blender-results.json"
           fi
 
       - name: Upload blender test results
