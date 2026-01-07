@@ -3,56 +3,26 @@ import ComponentCreator from '@docusaurus/ComponentCreator';
 
 export default [
   {
-    path: '/Modelibr/__docusaurus/debug',
-    component: ComponentCreator('/Modelibr/__docusaurus/debug', '635'),
-    exact: true
-  },
-  {
-    path: '/Modelibr/__docusaurus/debug/config',
-    component: ComponentCreator('/Modelibr/__docusaurus/debug/config', '40d'),
-    exact: true
-  },
-  {
-    path: '/Modelibr/__docusaurus/debug/content',
-    component: ComponentCreator('/Modelibr/__docusaurus/debug/content', '1fd'),
-    exact: true
-  },
-  {
-    path: '/Modelibr/__docusaurus/debug/globalData',
-    component: ComponentCreator('/Modelibr/__docusaurus/debug/globalData', '0e1'),
-    exact: true
-  },
-  {
-    path: '/Modelibr/__docusaurus/debug/metadata',
-    component: ComponentCreator('/Modelibr/__docusaurus/debug/metadata', '055'),
-    exact: true
-  },
-  {
-    path: '/Modelibr/__docusaurus/debug/registry',
-    component: ComponentCreator('/Modelibr/__docusaurus/debug/registry', '184'),
-    exact: true
-  },
-  {
-    path: '/Modelibr/__docusaurus/debug/routes',
-    component: ComponentCreator('/Modelibr/__docusaurus/debug/routes', 'da8'),
-    exact: true
-  },
-  {
     path: '/Modelibr/markdown-page',
     component: ComponentCreator('/Modelibr/markdown-page', 'fc1'),
     exact: true
   },
   {
+    path: '/Modelibr/playwright-reports',
+    component: ComponentCreator('/Modelibr/playwright-reports', 'e5a'),
+    exact: true
+  },
+  {
     path: '/Modelibr/docs',
-    component: ComponentCreator('/Modelibr/docs', '627'),
+    component: ComponentCreator('/Modelibr/docs', '032'),
     routes: [
       {
         path: '/Modelibr/docs',
-        component: ComponentCreator('/Modelibr/docs', 'aa0'),
+        component: ComponentCreator('/Modelibr/docs', '989'),
         routes: [
           {
             path: '/Modelibr/docs',
-            component: ComponentCreator('/Modelibr/docs', '369'),
+            component: ComponentCreator('/Modelibr/docs', 'a01'),
             routes: [
               {
                 path: '/Modelibr/docs',
@@ -123,6 +93,12 @@ export default [
               {
                 path: '/Modelibr/docs/changelog',
                 component: ComponentCreator('/Modelibr/docs/changelog', '0f5'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/Modelibr/docs/ci-cd-pipeline',
+                component: ComponentCreator('/Modelibr/docs/ci-cd-pipeline', '361'),
                 exact: true,
                 sidebar: "tutorialSidebar"
               },

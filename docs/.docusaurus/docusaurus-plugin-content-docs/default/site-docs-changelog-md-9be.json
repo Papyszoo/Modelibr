@@ -19,5 +19,9 @@
   "previous": {
     "title": "Texture Type Channel Mapping - Design Specification",
     "permalink": "/Modelibr/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING"
+  },
+  "next": {
+    "title": "CI/CD Pipeline and E2E Test Reports",
+    "permalink": "/Modelibr/docs/ci-cd-pipeline"
   }
 }

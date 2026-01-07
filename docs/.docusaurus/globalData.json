@@ -56,6 +56,11 @@
               "sidebar": "tutorialSidebar"
             },
             {
+              "id": "ci-cd-pipeline",
+              "path": "/Modelibr/docs/ci-cd-pipeline",
+              "sidebar": "tutorialSidebar"
+            },
+            {
               "id": "features/blender-addon",
               "path": "/Modelibr/docs/features/blender-addon",
               "sidebar": "tutorialSidebar"

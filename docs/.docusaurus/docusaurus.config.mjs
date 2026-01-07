@@ -35,6 +35,9 @@ export default {
   "deploymentBranch": "gh-pages",
   "trailingSlash": false,
   "onBrokenLinks": "throw",
+  "staticDirectories": [
+    "static"
+  ],
   "i18n": {
     "defaultLocale": "en",
     "locales": [
@@ -73,6 +76,11 @@ export default {
           "sidebarId": "tutorialSidebar",
           "position": "left",
           "label": "Documentation"
+        },
+        {
+          "to": "/playwright-reports",
+          "label": "E2E Reports",
+          "position": "left"
         },
         {
           "href": "https://github.com/Papyszoo/Modelibr",
@@ -361,9 +369,6 @@ export default {
   "baseUrlIssueBanner": true,
   "onBrokenAnchors": "warn",
   "onDuplicateRoutes": "warn",
-  "staticDirectories": [
-    "static"
-  ],
   "customFields": {},
   "plugins": [],
   "themes": [],
