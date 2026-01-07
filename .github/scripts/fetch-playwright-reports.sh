@@ -27,6 +27,13 @@ RUN_DATA=$(echo "${WORKFLOW_RUNS}" | jq -r '.workflow_runs[] | select(.name == "
 echo "Found workflow runs:"
 echo "${RUN_DATA}"
 
+# Check if we found any runs
+if [ -z "${RUN_DATA}" ]; then
+  echo "No CI workflow runs found. Creating placeholder."
+  echo "<html><body><h1>No Playwright Reports Available</h1><p>Reports will appear here after E2E tests run.</p></body></html>" > "${REPORTS_DIR}/index.html"
+  exit 0
+fi
+
 # Process each run to find those with playwright-report artifacts
 REPORT_COUNT=0
 while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION; do
