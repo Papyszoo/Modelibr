@@ -1,0 +1,9 @@
+# Docusaurus
+.docusaurus
+build
+node_modules
+
+# Playwright reports (dynamically fetched during CI)
+# Keep only the placeholder index.html
+static/playwright-reports/*
+!static/playwright-reports/index.html
