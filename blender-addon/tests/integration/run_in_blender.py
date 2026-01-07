@@ -8,6 +8,11 @@ import sys
 import os
 import traceback
 
+# Ensure this script's directory is in sys.path for sibling imports
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+if _script_dir not in sys.path:
+    sys.path.insert(0, _script_dir)
+
 
 def run_tests():
     """Run integration tests inside Blender."""
