@@ -3,6 +3,7 @@ import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { ApiHelper } from "../helpers/api-helper";
 import { sharedState } from "../fixtures/shared-state";
+import { TextureType } from "../../../src/frontend/src/types/index.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -34,18 +35,14 @@ Given('texture set {string} exists with file {string}', async ({ page }, setName
     // Create texture set with file via API in one step with unique name
     const uniqueName = `${setName}_${runId}`;
     const filePath = path.join(__dirname, "..", "assets", fileName);
-    const result = await apiHelper.createTextureSetWithFile(uniqueName, filePath, 1); // 1 = Albedo
+    const result = await apiHelper.createTextureSetWithFile(uniqueName, filePath, TextureType.Albedo);
     sharedState.saveTextureSet(setName, { id: result.textureSetId, name: uniqueName });
     console.log(`[API] Created texture set "${uniqueName}" with file "${fileName}", ID ${result.textureSetId}`);
 });
 
-Given('texture set {string} exists with a {string} texture', async ({ page }, setName: string, textureType: string) => {
-    // Map texture type name to API enum value
-    const typeMap: { [key: string]: number } = {
-        'Albedo': 1, 'Normal': 2, 'Roughness': 3, 'Metallic': 4,
-        'AO': 5, 'Emissive': 6, 'Height': 7, 'Displacement': 8, 'Bump': 9
-    };
-    const typeValue = typeMap[textureType] || 1;
+Given('texture set {string} exists with a {string} texture', async ({ page }, setName: string, textureTypeName: string) => {
+    // Use shared TextureType enum from frontend types
+    const typeValue = TextureType[textureTypeName as keyof typeof TextureType] || TextureType.Albedo;
     
     // Create texture set with file via API with unique name
     // Use yellow_color.png to avoid file content collision with other scenarios
@@ -53,7 +50,7 @@ Given('texture set {string} exists with a {string} texture', async ({ page }, se
     const filePath = path.join(__dirname, "..", "assets", "yellow_color.png");
     const result = await apiHelper.createTextureSetWithFile(uniqueName, filePath, typeValue);
     sharedState.saveTextureSet(setName, { id: result.textureSetId, name: uniqueName });
-    console.log(`[API] Created texture set "${uniqueName}" with ${textureType} texture, ID ${result.textureSetId}`);
+    console.log(`[API] Created texture set "${uniqueName}" with ${textureTypeName} texture, ID ${result.textureSetId}`);
 });
 
 // ==================== Drag and Drop Steps ====================

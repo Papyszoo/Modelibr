@@ -188,7 +188,9 @@ public class ModelDomainTests
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var textureSet1 = TextureSet.Create("Texture Set 1", DateTime.UtcNow);
+        textureSet1.Id = 1; // Simulate persisted texture set
         var textureSet2 = TextureSet.Create("Texture Set 2", DateTime.UtcNow);
+        textureSet2.Id = 2; // Simulate persisted texture set
         model.AddTextureSet(textureSet1, DateTime.UtcNow.AddMinutes(1));
         model.AddTextureSet(textureSet2, DateTime.UtcNow.AddMinutes(2));
 

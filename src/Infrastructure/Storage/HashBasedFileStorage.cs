@@ -50,7 +50,30 @@ public sealed class HashBasedFileStorage : IFileStorage
         }
         else
         {
-            File.Move(tempFile, finalPath);
+            try
+            {
+                File.Move(tempFile, finalPath);
+            }
+            catch (IOException ex) when (File.Exists(finalPath))
+            {
+                // Race condition: another thread created the file between our check and move
+                // This is fine - the content is identical (same hash)
+                // Clean up our temp file
+                try
+                {
+                    File.Delete(tempFile);
+                }
+                catch (IOException cleanupEx)
+                {
+                    // Log cleanup failure but don't fail the operation since the file was already stored
+                    Console.Error.WriteLine($"Warning: Failed to delete temp file {tempFile}: {cleanupEx.Message}");
+                }
+                catch (UnauthorizedAccessException cleanupEx)
+                {
+                    // Log cleanup failure but don't fail the operation  
+                    Console.Error.WriteLine($"Warning: Failed to delete temp file {tempFile}: {cleanupEx.Message}");
+                }
+            }
         }
 
         var relativePath = Path.Combine(relativeDir, storedName).Replace('\\', '/');
