@@ -495,3 +495,5 @@ $RECYCLE.BIN/
 !docs/*.glb
 
 data/*
+# E2E test state file (generated during test runs)
+tests/e2e/.shared-state.json
