@@ -447,8 +447,8 @@ jobs:
           # Copy playwright report if available
           if [ -d "current-run-artifacts/playwright-report-${{ github.run_number }}" ]; then
             echo "Found current run Playwright report"
-            # Use find to safely copy all contents including hidden files
-            if [ "$(ls -A "current-run-artifacts/playwright-report-${{ github.run_number }}")" ]; then
+            # Check if directory has contents before copying
+            if [ -n "$(find "current-run-artifacts/playwright-report-${{ github.run_number }}" -maxdepth 1 -mindepth 1 2>/dev/null)" ]; then
               cp -r "current-run-artifacts/playwright-report-${{ github.run_number }}/." "docs/static/test-reports/run-${{ github.run_number }}/"
             else
               echo "Playwright report directory is empty"
