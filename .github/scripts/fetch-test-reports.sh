@@ -176,7 +176,7 @@ else
   echo "Total reports: ${TOTAL_REPORTS}"
 fi
 
-if [ ${TOTAL_REPORTS} -eq 0 ]; then
+if [ "${TOTAL_REPORTS}" -eq 0 ]; then
   echo "No test reports found. Creating placeholder."
   echo "<html><body><h1>No Test Reports Available</h1><p>Reports will appear here after tests run.</p></body></html>" > "${REPORTS_DIR}/index.html"
   exit 0
