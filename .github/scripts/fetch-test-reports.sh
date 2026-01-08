@@ -15,6 +15,13 @@ if [ -n "${CURRENT_RUN_NUMBER}" ]; then
   echo "Current run number: ${CURRENT_RUN_NUMBER} (will be included as most recent)"
 fi
 
+# Function to create placeholder test result JSON
+create_placeholder_json() {
+  local filepath="$1"
+  local framework="$2"
+  echo "{\"total\": 0, \"passed\": 0, \"failed\": 0, \"framework\": \"${framework}\", \"failures\": [], \"notAvailable\": true}" > "$filepath"
+}
+
 # Check if current run report already exists (prepared by workflow)
 CURRENT_RUN_EXISTS=false
 if [ -n "${CURRENT_RUN_NUMBER}" ] && [ -d "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}" ]; then
@@ -22,13 +29,13 @@ if [ -n "${CURRENT_RUN_NUMBER}" ] && [ -d "${REPORTS_DIR}/run-${CURRENT_RUN_NUMB
   CURRENT_RUN_EXISTS=true
   # Ensure we have at least placeholder test results for current run
   if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/backend-results.json" ]; then
-    echo '{"total": 0, "passed": 0, "failed": 0, "framework": ".NET 9.0", "failures": [], "notAvailable": true}' > "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/backend-results.json"
+    create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/backend-results.json" ".NET 9.0"
   fi
   if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/frontend-results.json" ]; then
-    echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "failures": [], "notAvailable": true}' > "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/frontend-results.json"
+    create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/frontend-results.json" "Jest"
   fi
   if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json" ]; then
-    echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "failures": [], "notAvailable": true}' > "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json"
+    create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json" "pytest"
   fi
 else
   # No current run directory, ensure reports directory exists
@@ -121,7 +128,7 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
       unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
       rm "${TEMP_ZIP}"
     else
-      echo '{"total": 0, "passed": 0, "failed": 0, "framework": ".NET 9.0", "failures": [], "notAvailable": true}' > "${REPORT_DIR}/backend-results.json"
+      create_placeholder_json "${REPORT_DIR}/backend-results.json" ".NET 9.0"
     fi
     
     # Download frontend test results
@@ -135,7 +142,7 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
       unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
       rm "${TEMP_ZIP}"
     else
-      echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "failures": [], "notAvailable": true}' > "${REPORT_DIR}/frontend-results.json"
+      create_placeholder_json "${REPORT_DIR}/frontend-results.json" "Jest"
     fi
     
     # Download blender test results
@@ -149,7 +156,7 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
       unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
       rm "${TEMP_ZIP}"
     else
-      echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "failures": [], "notAvailable": true}' > "${REPORT_DIR}/blender-results.json"
+      create_placeholder_json "${REPORT_DIR}/blender-results.json" "pytest"
     fi
     
     REPORT_COUNT=$((REPORT_COUNT + 1))

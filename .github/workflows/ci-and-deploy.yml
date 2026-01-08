@@ -447,7 +447,7 @@ jobs:
           # Copy playwright report if available
           if [ -d "current-run-artifacts/playwright-report-${{ github.run_number }}" ]; then
             echo "Found current run Playwright report"
-            cp -r current-run-artifacts/playwright-report-${{ github.run_number }}/* docs/static/test-reports/run-${{ github.run_number }}/
+            cp -r "current-run-artifacts/playwright-report-${{ github.run_number }}/." "docs/static/test-reports/run-${{ github.run_number }}/"
           fi
           
           # Copy backend test results if available
@@ -471,19 +471,19 @@ jobs:
           # Create metadata files for the current run
           # Use current time if head_commit timestamp is not available
           TIMESTAMP="${{ github.event.head_commit.timestamp }}"
-          if [ -z "$TIMESTAMP" ] || [ "$TIMESTAMP" = "" ]; then
+          if [ -z "$TIMESTAMP" ]; then
             TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           fi
           echo "$TIMESTAMP" > docs/static/test-reports/run-${{ github.run_number }}/timestamp.txt
           # Set conclusion based on test results - if any test job failed, mark as failure
+          TEST_CONCLUSION="success"
           if [ "${{ needs.backend-tests.result }}" = "failure" ] || \
              [ "${{ needs.frontend-tests.result }}" = "failure" ] || \
              [ "${{ needs.blender-addon-tests.result }}" = "failure" ] || \
              [ "${{ needs.e2e-tests.result }}" = "failure" ]; then
-            echo "failure" > docs/static/test-reports/run-${{ github.run_number }}/conclusion.txt
-          else
-            echo "success" > docs/static/test-reports/run-${{ github.run_number }}/conclusion.txt
+            TEST_CONCLUSION="failure"
           fi
+          echo "$TEST_CONCLUSION" > docs/static/test-reports/run-${{ github.run_number }}/conclusion.txt
           echo "${{ github.run_number }}" > docs/static/test-reports/run-${{ github.run_number }}/run-number.txt
           echo "${{ github.ref_name }}" > docs/static/test-reports/run-${{ github.run_number }}/branch.txt
           echo "${{ github.run_id }}" > docs/static/test-reports/run-${{ github.run_number }}/run-id.txt
