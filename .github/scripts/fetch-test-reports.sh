@@ -8,12 +8,32 @@ REPO_OWNER="${GITHUB_REPOSITORY_OWNER}"
 REPO_NAME="${GITHUB_REPOSITORY##*/}"
 TOKEN="${GITHUB_TOKEN}"
 REPORTS_DIR="docs/static/test-reports"
+CURRENT_RUN_NUMBER="${CURRENT_RUN_NUMBER:-}"
 
 echo "Fetching recent workflow runs for repository: ${REPO_OWNER}/${REPO_NAME}"
+if [ -n "${CURRENT_RUN_NUMBER}" ]; then
+  echo "Current run number: ${CURRENT_RUN_NUMBER} (will be included as most recent)"
+fi
 
-# Clean up old reports directory
-rm -rf "${REPORTS_DIR}"
-mkdir -p "${REPORTS_DIR}"
+# Check if current run report already exists (prepared by workflow)
+CURRENT_RUN_EXISTS=false
+if [ -n "${CURRENT_RUN_NUMBER}" ] && [ -d "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}" ]; then
+  echo "Current run report found at ${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}"
+  CURRENT_RUN_EXISTS=true
+  # Ensure we have at least placeholder test results for current run
+  if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/backend-results.json" ]; then
+    echo '{"total": 0, "passed": 0, "failed": 0, "framework": ".NET 9.0", "failures": [], "notAvailable": true}' > "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/backend-results.json"
+  fi
+  if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/frontend-results.json" ]; then
+    echo '{"total": 0, "passed": 0, "failed": 0, "framework": "Jest", "failures": [], "notAvailable": true}' > "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/frontend-results.json"
+  fi
+  if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json" ]; then
+    echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "failures": [], "notAvailable": true}' > "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json"
+  fi
+else
+  # No current run directory, ensure reports directory exists
+  mkdir -p "${REPORTS_DIR}"
+fi
 
 # Fetch the last 30 completed workflow runs from all branches
 # We fetch more than 10 to ensure we get 10 with actual Playwright reports
@@ -35,10 +55,25 @@ if [ -z "${RUN_DATA}" ]; then
 fi
 
 # Process each run to find those with playwright-report artifacts
+# If we have the current run, only fetch 9 more; otherwise fetch 10
+MAX_REPORTS=10
+if [ "${CURRENT_RUN_EXISTS}" = true ]; then
+  MAX_REPORTS=9
+  echo "Will fetch up to ${MAX_REPORTS} historical reports (current run already included)"
+else
+  echo "Will fetch up to ${MAX_REPORTS} reports"
+fi
+
 REPORT_COUNT=0
 while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
-  if [ ${REPORT_COUNT} -ge 10 ]; then
+  if [ ${REPORT_COUNT} -ge ${MAX_REPORTS} ]; then
     break
+  fi
+  
+  # Skip the current run number (already included)
+  if [ -n "${CURRENT_RUN_NUMBER}" ] && [ "${RUN_NUMBER}" = "${CURRENT_RUN_NUMBER}" ]; then
+    echo "Skipping run ${RUN_NUMBER} (current run, already included)"
+    continue
   fi
   
   echo "Checking run ${RUN_NUMBER} (ID: ${RUN_ID}, Branch: ${BRANCH})..."
@@ -124,13 +159,19 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
   fi
 done <<< "${RUN_DATA}"
 
-if [ ${REPORT_COUNT} -eq 0 ]; then
-  echo "No Playwright reports found. Creating placeholder."
+TOTAL_REPORTS=${REPORT_COUNT}
+if [ "${CURRENT_RUN_EXISTS}" = true ]; then
+  TOTAL_REPORTS=$((REPORT_COUNT + 1))
+  echo "Total reports: ${TOTAL_REPORTS} (${REPORT_COUNT} historical + 1 current run)"
+else
+  echo "Total reports: ${TOTAL_REPORTS}"
+fi
+
+if [ ${TOTAL_REPORTS} -eq 0 ]; then
+  echo "No test reports found. Creating placeholder."
   echo "<html><body><h1>No Test Reports Available</h1><p>Reports will appear here after tests run.</p></body></html>" > "${REPORTS_DIR}/index.html"
   exit 0
 fi
-
-echo "Downloaded ${REPORT_COUNT} test reports"
 
 # Sort directories by timestamp (newest first) and store sorted list
 SORT_TMP=$(mktemp)

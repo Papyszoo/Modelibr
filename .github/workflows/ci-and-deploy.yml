@@ -402,7 +402,7 @@ jobs:
   build-docs:
     name: Build Documentation with Reports
     runs-on: ubuntu-latest
-    needs: [e2e-tests]
+    needs: [backend-tests, frontend-tests, blender-addon-tests, e2e-tests]
     # Always run to generate reports, even if tests fail
     if: always()
 
@@ -434,10 +434,65 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
 
-      - name: Fetch last 10 test reports from all branches
+      - name: Download current run artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: current-run-artifacts
+
+      - name: Prepare current run artifacts for inclusion
+        run: |
+          mkdir -p docs/static/test-reports/run-${{ github.run_number }}
+          
+          # Copy playwright report if available
+          if [ -d "current-run-artifacts/playwright-report-${{ github.run_number }}" ]; then
+            echo "Found current run Playwright report"
+            cp -r current-run-artifacts/playwright-report-${{ github.run_number }}/* docs/static/test-reports/run-${{ github.run_number }}/
+          fi
+          
+          # Copy backend test results if available
+          if [ -f "current-run-artifacts/backend-test-results-${{ github.run_number }}/backend-results.json" ]; then
+            echo "Found current run backend test results"
+            cp current-run-artifacts/backend-test-results-${{ github.run_number }}/backend-results.json docs/static/test-reports/run-${{ github.run_number }}/
+          fi
+          
+          # Copy frontend test results if available
+          if [ -f "current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json" ]; then
+            echo "Found current run frontend test results"
+            cp current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json docs/static/test-reports/run-${{ github.run_number }}/
+          fi
+          
+          # Copy blender test results if available
+          if [ -f "current-run-artifacts/blender-test-results-${{ github.run_number }}/blender-results.json" ]; then
+            echo "Found current run blender test results"
+            cp current-run-artifacts/blender-test-results-${{ github.run_number }}/blender-results.json docs/static/test-reports/run-${{ github.run_number }}/
+          fi
+          
+          # Create metadata files for the current run
+          # Use current time if head_commit timestamp is not available
+          TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+          if [ -z "$TIMESTAMP" ] || [ "$TIMESTAMP" = "" ]; then
+            TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          fi
+          echo "$TIMESTAMP" > docs/static/test-reports/run-${{ github.run_number }}/timestamp.txt
+          # Set conclusion based on test results - if any test job failed, mark as failure
+          if [ "${{ needs.backend-tests.result }}" = "failure" ] || \
+             [ "${{ needs.frontend-tests.result }}" = "failure" ] || \
+             [ "${{ needs.blender-addon-tests.result }}" = "failure" ] || \
+             [ "${{ needs.e2e-tests.result }}" = "failure" ]; then
+            echo "failure" > docs/static/test-reports/run-${{ github.run_number }}/conclusion.txt
+          else
+            echo "success" > docs/static/test-reports/run-${{ github.run_number }}/conclusion.txt
+          fi
+          echo "${{ github.run_number }}" > docs/static/test-reports/run-${{ github.run_number }}/run-number.txt
+          echo "${{ github.ref_name }}" > docs/static/test-reports/run-${{ github.run_number }}/branch.txt
+          echo "${{ github.run_id }}" > docs/static/test-reports/run-${{ github.run_number }}/run-id.txt
+
+      - name: Fetch last 9 historical test reports from all branches
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          CURRENT_RUN_NUMBER: ${{ github.run_number }}
         run: |
           chmod +x .github/scripts/fetch-test-reports.sh
           .github/scripts/fetch-test-reports.sh
