@@ -10,7 +10,8 @@ Feature: Recycled Model Versions
     Given a model with at least 2 versions exists
     When I open the model viewer for the multi-version model
     And I open the version dropdown
-    And I delete version 1
+    Then I take a screenshot of model before version deletion
+    When I delete version 1
     Then the model should have 1 version remaining
     And I take a screenshot of model version deletion
 
@@ -20,9 +21,16 @@ Feature: Recycled Model Versions
     When I open the model viewer for the multi-version model
     And I open the version dropdown
     And I delete version 1
-    And I navigate to the Recycled Files page
+    Then I take a screenshot showing version not in version strip
+    When I navigate to the Recycled Files page
     Then I should see the version in the recycled model versions section
-    And I take a screenshot of the recycled versions section
+    And I take a screenshot showing version in recycled files
+    When I restore the recycled model version
+    And I navigate to the Recycled Files page
+    Then I take a screenshot showing version not in recycled files
+    When I navigate back to the model viewer
+    And I open the version dropdown
+    Then I take a screenshot showing restored version in version strip
 
   @restore-version @skip
   # Skip: Navigate back to model viewer and verify 2 versions has state issues

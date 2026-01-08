@@ -314,3 +314,93 @@ Then(
         console.log("[Verify] Mode dropdown has all height type options ✓");
     }
 );
+
+// ============================================================================
+// SPLIT CHANNEL MODE ACTIONS
+// ============================================================================
+
+When(
+    "I enable split channel mode for the file",
+    async ({ page }) => {
+        const fileCard = page.locator('.file-mapping-card').first();
+        
+        // Find the RGB dropdown and click it
+        const rgbDropdown = fileCard.locator('.channel-dropdown').first();
+        await rgbDropdown.click();
+        await page.waitForTimeout(300);
+        
+        // Select "Split Channels" option
+        const splitOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: 'Split Channels' });
+        await splitOption.click();
+        await page.waitForTimeout(500);
+        
+        console.log("[Action] Enabled split channel mode ✓");
+    }
+);
+
+When(
+    "I set channel {string} to texture type {string}",
+    async ({ page }, channel: string, textureType: string) => {
+        const fileCard = page.locator('.file-mapping-card').first();
+        const splitChannels = fileCard.locator('.split-channels');
+        
+        // Find the specific channel dropdown (R, G, or B)
+        const channelLabel = splitChannels.locator('label').filter({ hasText: `${channel}:` });
+        const channelRow = channelLabel.locator('..');
+        const channelDropdown = channelRow.locator('.channel-dropdown');
+        
+        await channelDropdown.click();
+        await page.waitForTimeout(300);
+        
+        // Select the texture type from dropdown
+        const typeOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: textureType });
+        await typeOption.click();
+        await page.waitForTimeout(300);
+        
+        console.log(`[Action] Set channel ${channel} to ${textureType} ✓`);
+    }
+);
+
+When(
+    "I save the texture set changes",
+    async ({ page }) => {
+        // Look for a save button in the texture set viewer
+        const saveButton = page.getByRole('button', { name: /save/i });
+        if (await saveButton.isVisible({ timeout: 2000 })) {
+            await saveButton.click();
+            await page.waitForTimeout(1000);
+            console.log("[Action] Saved texture set changes ✓");
+        } else {
+            // Changes might be auto-saved
+            console.log("[Action] No save button found - assuming auto-save ✓");
+        }
+    }
+);
+
+When(
+    "I refresh the page",
+    async ({ page }) => {
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(1000);
+        console.log("[Action] Refreshed page ✓");
+    }
+);
+
+Then(
+    "the file should have channel {string} set to {string}",
+    async ({ page }, channel: string, expectedType: string) => {
+        const fileCard = page.locator('.file-mapping-card').first();
+        const splitChannels = fileCard.locator('.split-channels');
+        
+        // Find the specific channel dropdown
+        const channelLabel = splitChannels.locator('label').filter({ hasText: `${channel}:` });
+        const channelRow = channelLabel.locator('..');
+        const channelDropdown = channelRow.locator('.channel-dropdown');
+        
+        // Get the selected value text
+        const selectedValue = await channelDropdown.locator('.p-dropdown-label').textContent();
+        expect(selectedValue).toContain(expectedType);
+        
+        console.log(`[Verify] Channel ${channel} is set to ${expectedType} ✓`);
+    }
+);

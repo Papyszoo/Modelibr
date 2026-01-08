@@ -21,3 +21,4 @@ Feature: Channel Mapping - Files Tab
     And I switch to the Files tab
     Then the file should show split channels mode
     And I should see R, G, B channel dropdowns
+    And I take a screenshot named "files-tab-channel-dropdown"
