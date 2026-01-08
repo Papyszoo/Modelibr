@@ -9,6 +9,8 @@ import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import MergeTextureSetDialog from '../dialogs/MergeTextureSetDialog'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 
 // Interface for channel merge request (must match MergeTextureSetDialog)
 interface ChannelMergeRequest {
@@ -56,6 +58,9 @@ export default function TextureSetGrid({
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
   const isShowingMergeDialog = useRef(false)
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.textureSets
 
   useEffect(() => {
     loadPacks()
@@ -356,11 +361,20 @@ export default function TextureSetGrid({
         </div>
         <div className="filter-bar">
           <span className="filter-placeholder">Filters (Coming Soon)</span>
+          <CardWidthSlider
+            value={cardWidth}
+            min={120}
+            max={400}
+            onChange={width => setCardWidth('textureSets', width)}
+          />
         </div>
       </div>
 
       {/* Grid of texture set cards */}
-      <div className="texture-set-grid">
+      <div 
+        className="texture-set-grid"
+        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+      >
         {filteredTextureSets.map(textureSet => {
           const albedoUrl = getAlbedoTextureUrl(textureSet)
           const isDraggedOver = dragOverCardId === textureSet.id

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './StageGrid.css'
 
 interface StageDto {
@@ -24,6 +26,9 @@ function StageGrid({
   onStageDelete,
 }: StageGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.stages
 
   const filteredStages = stages.filter(stage => {
     const name = stage.name.toLowerCase()
@@ -68,10 +73,19 @@ function StageGrid({
             className="search-input"
           />
         </div>
+        <CardWidthSlider
+          value={cardWidth}
+          min={200}
+          max={500}
+          onChange={width => setCardWidth('stages', width)}
+        />
       </div>
 
       {/* Grid of stage cards */}
-      <div className="stage-grid">
+      <div 
+        className="stage-grid"
+        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+      >
         {filteredStages.map(stage => (
           <div key={stage.id} className="stage-card">
             <div
