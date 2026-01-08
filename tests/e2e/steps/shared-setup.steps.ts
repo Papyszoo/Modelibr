@@ -20,6 +20,10 @@ const __dirname = path.dirname(__filename);
 
 const { Given, When, Then } = createBdd();
 
+// Track the last uploaded model for thumbnail verification
+let lastUploadedModelName: string | null = null;
+let lastUploadedVersionId: number = 0;
+
 /**
  * Verifies that required models exist in shared state.
  * Usage in Background section to declare dependencies.
@@ -90,10 +94,39 @@ When(
         // Wait for model to appear in list (grid shows name without extension)
         await modelListPage.expectModelVisible(modelName);
 
+        // Query database to get the actual model version ID of the just-uploaded model
+        // This is the most reliable way to identify the specific model we just created
+        const { DbHelper } = await import("../fixtures/db-helper");
+        const db = new DbHelper();
+        const result = await db.query(
+            `SELECT mv."Id" as "VersionId", m."Id" as "ModelId", m."Name"
+             FROM "ModelVersions" mv
+             JOIN "Models" m ON m."Id" = mv."ModelId"
+             WHERE m."Name" = $1 AND m."DeletedAt" IS NULL
+             ORDER BY mv."CreatedAt" DESC
+             LIMIT 1`,
+            [modelName]
+        );
+        
+        let modelId = 0;
+        let versionId = 0;
+        if (result.rows.length > 0) {
+            modelId = result.rows[0].ModelId;
+            versionId = result.rows[0].VersionId;
+            console.log(`[Setup] Uploaded model "${modelName}" -> modelId=${modelId}, versionId=${versionId}`);
+        } else {
+            console.warn(`[Setup] Could not find model "${modelName}" in database after upload`);
+        }
+        
+        // Track this for the thumbnail verification step
+        lastUploadedModelName = modelName;
+        lastUploadedVersionId = versionId;
+
         // Store in shared state
         sharedState.saveModel(stateName, {
-            id: 0, // Will be updated when navigating to viewer
+            id: modelId,
             name: modelName,
+            versionId: versionId,
         });
     }
 );
@@ -217,18 +250,54 @@ Then(
         let lastModelName = "";
         let lastVersionId = 0;
         
+        // Determine query strategy: prefer version ID > model name > global most-recent
+        const hasVersionId = lastUploadedVersionId > 0;
+        const hasModelName = lastUploadedModelName !== null;
+        
+        if (hasVersionId) {
+            console.log(`[Thumbnail] Looking for version ID: ${lastUploadedVersionId} (model: "${lastUploadedModelName}")`);
+        } else if (hasModelName) {
+            console.log(`[Thumbnail] Looking for model by name: "${lastUploadedModelName}" (no version ID)`);
+        } else {
+            console.log(`[Thumbnail] Looking for any most recent model version`);
+        }
+        
         for (let i = 0; i < maxAttempts && !thumbnailReady; i++) {
-            // Query for the most recently created MODEL VERSION's thumbnail
-            // This ensures we're checking the correct model, not just any recent thumbnail
-            const result = await db.query(
-                `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName"
-                 FROM "ModelVersions" mv
-                 JOIN "Models" m ON m."Id" = mv."ModelId"
-                 LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                 WHERE m."DeletedAt" IS NULL
-                 ORDER BY mv."CreatedAt" DESC 
-                 LIMIT 1`
-            );
+            // Query for the specific version's thumbnail, or fall back to name-based or global query
+            let query: string;
+            let params: any[];
+            
+            if (hasVersionId) {
+                // Best case: we have the exact version ID
+                query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
+                         FROM "ModelVersions" mv
+                         JOIN "Models" m ON m."Id" = mv."ModelId"
+                         LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                         WHERE mv."Id" = $1`;
+                params = [lastUploadedVersionId];
+            } else if (hasModelName) {
+                // Fall back to finding most recent version with this name
+                query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
+                         FROM "ModelVersions" mv
+                         JOIN "Models" m ON m."Id" = mv."ModelId"
+                         LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                         WHERE m."DeletedAt" IS NULL AND m."Name" = $1
+                         ORDER BY mv."CreatedAt" DESC 
+                         LIMIT 1`;
+                params = [lastUploadedModelName];
+            } else {
+                // Last resort: find the globally most recent version
+                query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
+                         FROM "ModelVersions" mv
+                         JOIN "Models" m ON m."Id" = mv."ModelId"
+                         LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                         WHERE m."DeletedAt" IS NULL
+                         ORDER BY mv."CreatedAt" DESC 
+                         LIMIT 1`;
+                params = [];
+            }
+            
+            const result = await db.query(query, params);
             
             if (result.rows.length > 0) {
                 const row = result.rows[0];
@@ -238,12 +307,12 @@ Then(
                 
                 if (row.Status === 2) {
                     thumbnailReady = true;
-                    console.log(`[Thumbnail] Ready for "${row.ModelName}" v${row.VersionId} (status=2)`);
+                    console.log(`[Thumbnail] Ready for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=2)`);
                 } else if (row.Status === 3) {
                     // Thumbnail generation failed - fail fast
-                    throw new Error(`Thumbnail generation FAILED for "${row.ModelName}" v${row.VersionId}. Check worker logs.`);
+                    throw new Error(`Thumbnail generation FAILED for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId}. Check worker logs.`);
                 } else {
-                    console.log(`[Thumbnail] Waiting for "${row.ModelName}" v${row.VersionId} (status=${row.Status ?? 'null'})... attempt ${i + 1}/${maxAttempts}`);
+                    console.log(`[Thumbnail] Waiting for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=${row.Status ?? 'null'})... attempt ${i + 1}/${maxAttempts}`);
                     await page.waitForTimeout(pollInterval);
                 }
             } else {
@@ -257,12 +326,18 @@ Then(
             const statusName = lastStatus === null ? 'null (no thumbnail)' : 
                               lastStatus === 0 ? 'Pending' :
                               lastStatus === 1 ? 'Processing' : `Unknown (${lastStatus})`;
+            // Clear the tracking variables before throwing
+            lastUploadedModelName = null;
+            lastUploadedVersionId = 0;
             throw new Error(
                 `Thumbnail generation timed out after ${maxAttempts * pollInterval / 1000}s. ` +
                 `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
                 `Check if thumbnail-worker-e2e container is healthy and processing jobs.`
             );
         }
+        // Clear the tracking variables after successful check
+        lastUploadedModelName = null;
+        lastUploadedVersionId = 0;
         console.log("[Test] Thumbnail generation verified via database");
     }
 );
