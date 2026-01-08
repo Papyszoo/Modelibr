@@ -10,6 +10,8 @@ import { ThumbnailDisplay } from '../../thumbnail'
 import { Model } from '../../../utils/fileUtils'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto, ProjectDto } from '../../../types'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 
 interface ModelGridProps {
   models: Model[]
@@ -48,6 +50,9 @@ export default function ModelGrid({
   const [showPackDialog, setShowPackDialog] = useState(false)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.models
 
   useEffect(() => {
     // Load packs for context menu if not provided via props
@@ -232,11 +237,20 @@ export default function ModelGrid({
           ) : (
             <span className="filter-placeholder">No packs or projects to filter by</span>
           )}
+          <CardWidthSlider
+            value={cardWidth}
+            min={120}
+            max={400}
+            onChange={width => setCardWidth('models', width)}
+          />
         </div>
       </div>
 
       {/* Grid of model cards */}
-      <div className="model-grid">
+      <div 
+        className="model-grid"
+        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+      >
         {filteredModels.map(model => (
           <div
             key={model.id}

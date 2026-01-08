@@ -8,6 +8,8 @@ import { useRef } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import { ProjectDto } from '../../../types'
 import { useTabContext } from '../../../hooks/useTabContext'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './ProjectList.css'
 
 export default function ProjectList() {
@@ -18,6 +20,9 @@ export default function ProjectList() {
   const [newProjectDescription, setNewProjectDescription] = useState('')
   const toast = useRef<Toast>(null)
   const { openTab } = useTabContext()
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.projects
 
   useEffect(() => {
     loadProjects()
@@ -113,11 +118,19 @@ export default function ProjectList() {
 
       <div className="project-list-header">
         <h2>Projects</h2>
-        <Button
-          label="Create Project"
-          icon="pi pi-plus"
-          onClick={() => setShowCreateDialog(true)}
-        />
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <CardWidthSlider
+            value={cardWidth}
+            min={200}
+            max={500}
+            onChange={width => setCardWidth('projects', width)}
+          />
+          <Button
+            label="Create Project"
+            icon="pi pi-plus"
+            onClick={() => setShowCreateDialog(true)}
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -137,7 +150,10 @@ export default function ProjectList() {
           />
         </div>
       ) : (
-        <div className="project-grid">
+        <div 
+          className="project-grid"
+          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+        >
           {projects.map(project => {
             const thumbnail = getProjectThumbnail(project)
             return (
