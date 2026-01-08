@@ -160,7 +160,7 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
     fi
     
     REPORT_COUNT=$((REPORT_COUNT + 1))
-    echo "Downloaded report ${REPORT_COUNT}/10"
+    echo "Downloaded report ${REPORT_COUNT}/${MAX_REPORTS}"
   else
     echo "No Playwright report found for run ${RUN_NUMBER}"
   fi

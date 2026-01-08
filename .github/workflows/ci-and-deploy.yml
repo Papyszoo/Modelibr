@@ -447,7 +447,12 @@ jobs:
           # Copy playwright report if available
           if [ -d "current-run-artifacts/playwright-report-${{ github.run_number }}" ]; then
             echo "Found current run Playwright report"
-            cp -r "current-run-artifacts/playwright-report-${{ github.run_number }}/." "docs/static/test-reports/run-${{ github.run_number }}/"
+            # Use find to safely copy all contents including hidden files
+            if [ "$(ls -A "current-run-artifacts/playwright-report-${{ github.run_number }}")" ]; then
+              cp -r "current-run-artifacts/playwright-report-${{ github.run_number }}/." "docs/static/test-reports/run-${{ github.run_number }}/"
+            else
+              echo "Playwright report directory is empty"
+            fi
           fi
           
           # Copy backend test results if available
