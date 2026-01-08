@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
-# Script to fetch the last 10 test reports from GitHub Actions artifacts
-# and organize them in the docs/static/test-reports directory
+# Script to fetch historical test reports from GitHub Actions artifacts
+# and combine them with the current run's report for a total of up to 10 reports.
+# When CURRENT_RUN_NUMBER is set, fetches 9 historical + 1 current = 10 total.
+# Otherwise, fetches up to 10 historical reports.
 
 REPO_OWNER="${GITHUB_REPOSITORY_OWNER}"
 REPO_NAME="${GITHUB_REPOSITORY##*/}"

@@ -458,19 +458,19 @@ jobs:
           # Copy backend test results if available
           if [ -f "current-run-artifacts/backend-test-results-${{ github.run_number }}/backend-results.json" ]; then
             echo "Found current run backend test results"
-            cp current-run-artifacts/backend-test-results-${{ github.run_number }}/backend-results.json docs/static/test-reports/run-${{ github.run_number }}/
+            cp "current-run-artifacts/backend-test-results-${{ github.run_number }}/backend-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
           fi
           
           # Copy frontend test results if available
           if [ -f "current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json" ]; then
             echo "Found current run frontend test results"
-            cp current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json docs/static/test-reports/run-${{ github.run_number }}/
+            cp "current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
           fi
           
           # Copy blender test results if available
           if [ -f "current-run-artifacts/blender-test-results-${{ github.run_number }}/blender-results.json" ]; then
             echo "Found current run blender test results"
-            cp current-run-artifacts/blender-test-results-${{ github.run_number }}/blender-results.json docs/static/test-reports/run-${{ github.run_number }}/
+            cp "current-run-artifacts/blender-test-results-${{ github.run_number }}/blender-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
           fi
           
           # Create metadata files for the current run
