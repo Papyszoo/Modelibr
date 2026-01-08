@@ -209,11 +209,13 @@ Then(
         const { DbHelper } = await import("../fixtures/db-helper");
         const db = new DbHelper();
         
-        // Poll database for thumbnail status (max 90 seconds)
-        const maxAttempts = 30;
-        const pollInterval = 3000;
+        // Poll database for thumbnail status (max 55 seconds to stay within 60s test timeout)
+        const maxAttempts = 11;
+        const pollInterval = 5000;
         let thumbnailReady = false;
-        let lastStatus = -1;
+        let lastStatus: number | null = null;
+        let lastModelName = "";
+        let lastVersionId = 0;
         
         for (let i = 0; i < maxAttempts && !thumbnailReady; i++) {
             // Query for the most recently created MODEL VERSION's thumbnail
@@ -231,10 +233,15 @@ Then(
             if (result.rows.length > 0) {
                 const row = result.rows[0];
                 lastStatus = row.Status;
+                lastModelName = row.ModelName;
+                lastVersionId = row.VersionId;
                 
                 if (row.Status === 2) {
                     thumbnailReady = true;
                     console.log(`[Thumbnail] Ready for "${row.ModelName}" v${row.VersionId} (status=2)`);
+                } else if (row.Status === 3) {
+                    // Thumbnail generation failed - fail fast
+                    throw new Error(`Thumbnail generation FAILED for "${row.ModelName}" v${row.VersionId}. Check worker logs.`);
                 } else {
                     console.log(`[Thumbnail] Waiting for "${row.ModelName}" v${row.VersionId} (status=${row.Status ?? 'null'})... attempt ${i + 1}/${maxAttempts}`);
                     await page.waitForTimeout(pollInterval);
@@ -245,7 +252,17 @@ Then(
             }
         }
         
-        expect(thumbnailReady).toBe(true);
+        if (!thumbnailReady) {
+            // Provide detailed error about what went wrong
+            const statusName = lastStatus === null ? 'null (no thumbnail)' : 
+                              lastStatus === 0 ? 'Pending' :
+                              lastStatus === 1 ? 'Processing' : `Unknown (${lastStatus})`;
+            throw new Error(
+                `Thumbnail generation timed out after ${maxAttempts * pollInterval / 1000}s. ` +
+                `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
+                `Check if thumbnail-worker-e2e container is healthy and processing jobs.`
+            );
+        }
         console.log("[Test] Thumbnail generation verified via database");
     }
 );

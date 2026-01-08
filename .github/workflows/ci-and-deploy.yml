@@ -133,11 +133,12 @@ jobs:
         run: |
           # Parse Jest output from console
           if [ -f "test-output.txt" ]; then
-            # Extract test counts from Jest summary output using sed
+            # Extract test counts from Jest summary output using grep -oP
             # Jest outputs something like "Tests:       5 passed, 5 total"
-            total=$(sed -n 's/.*Tests:.*\([0-9]\+\) total.*/\1/p' test-output.txt | tail -1)
-            passed=$(sed -n 's/.*Tests:.*\([0-9]\+\) passed.*/\1/p' test-output.txt | tail -1)
-            failed=$(sed -n 's/.*Tests:.*\([0-9]\+\) failed.*/\1/p' test-output.txt | tail -1)
+            # Note: Using grep -oP with look-ahead instead of sed to avoid greedy matching issues
+            total=$(grep -oP '\d+(?= total)' test-output.txt | tail -1 || echo "0")
+            passed=$(grep -oP '\d+(?= passed)' test-output.txt | tail -1 || echo "0")
+            failed=$(grep -oP '\d+(?= failed)' test-output.txt | tail -1 || echo "0")
 
             # Set defaults if empty
             total=${total:-0}
@@ -218,10 +219,11 @@ jobs:
         run: |
           # Parse pytest output from console
           if [ -f "test-output.txt" ]; then
-            # Extract test counts from pytest summary output using sed
+            # Extract test counts from pytest summary output using grep -oP
             # pytest outputs something like "5 passed, 1 failed in 2.5s"
-            passed=$(sed -n 's/.*\([0-9]\+\) passed.*/\1/p' test-output.txt | tail -1)
-            failed=$(sed -n 's/.*\([0-9]\+\) failed.*/\1/p' test-output.txt | tail -1)
+            # Note: Using grep -oP with look-ahead instead of sed to avoid greedy matching issues
+            passed=$(grep -oP '\d+(?= passed)' test-output.txt | tail -1 || echo "0")
+            failed=$(grep -oP '\d+(?= failed)' test-output.txt | tail -1 || echo "0")
 
             # Set defaults if empty
             passed=${passed:-0}
@@ -231,7 +233,7 @@ jobs:
             # If we didn't find any results, try alternative patterns
             if [ "$total" = "0" ]; then
               # Try to find the total from collected tests
-              collected=$(sed -n 's/.*collected \([0-9]\+\).*/\1/p' test-output.txt | head -1)
+              collected=$(grep -oP '(?<=collected )\d+' test-output.txt | head -1 || echo "0")
               collected=${collected:-0}
               if [ "$collected" != "0" ]; then
                 total=$collected
@@ -318,6 +320,8 @@ jobs:
           echo "Backend is ready!"
           timeout 60 bash -c 'until curl -sf http://localhost:3002; do echo "Waiting for frontend..."; sleep 5; done'
           echo "Frontend is ready!"
+          timeout 60 bash -c 'until curl -sf http://localhost:3003/health; do echo "Waiting for thumbnail worker..."; sleep 5; done'
+          echo "Thumbnail worker is ready!"
 
       - name: Setup Node.js for E2E
         uses: actions/setup-node@v4
