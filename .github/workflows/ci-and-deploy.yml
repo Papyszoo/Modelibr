@@ -475,7 +475,9 @@ jobs:
             TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           fi
           echo "$TIMESTAMP" > docs/static/test-reports/run-${{ github.run_number }}/timestamp.txt
-          # Set conclusion based on test results - if any test job failed, mark as failure
+          # Set conclusion based on test results
+          # Mark as failure if any test job failed, otherwise success
+          # (cancelled/skipped jobs are treated as not-failed)
           TEST_CONCLUSION="success"
           if [ "${{ needs.backend-tests.result }}" = "failure" ] || \
              [ "${{ needs.frontend-tests.result }}" = "failure" ] || \

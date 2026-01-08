@@ -8,7 +8,7 @@ REPO_OWNER="${GITHUB_REPOSITORY_OWNER}"
 REPO_NAME="${GITHUB_REPOSITORY##*/}"
 TOKEN="${GITHUB_TOKEN}"
 REPORTS_DIR="docs/static/test-reports"
-CURRENT_RUN_NUMBER="${CURRENT_RUN_NUMBER:-}"
+CURRENT_RUN_NUMBER="${CURRENT_RUN_NUMBER-}"
 
 echo "Fetching recent workflow runs for repository: ${REPO_OWNER}/${REPO_NAME}"
 if [ -n "${CURRENT_RUN_NUMBER}" ]; then
