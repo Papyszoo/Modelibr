@@ -1042,14 +1042,4 @@ Then(
     }
 );
 
-/**
- * Verify the 3D canvas is visible
- */
-Then(
-    "the 3D canvas should be visible",
-    async ({ page }) => {
-        const canvas = page.locator('canvas');
-        await expect(canvas).toBeVisible({ timeout: 10000 });
-        console.log("[UI] 3D canvas is visible ✓");
-    }
-);
+
