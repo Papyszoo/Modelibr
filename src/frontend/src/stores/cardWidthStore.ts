@@ -7,6 +7,8 @@ export type PageType =
   | 'projects'
   | 'textureSets'
   | 'stages'
+  | 'textureSetViewer'
+  | 'recycledFiles'
 
 interface CardWidthSettings {
   models: number
@@ -15,6 +17,8 @@ interface CardWidthSettings {
   projects: number
   textureSets: number
   stages: number
+  textureSetViewer: number
+  recycledFiles: number
 }
 
 interface CardWidthStore {
@@ -30,6 +34,8 @@ const DEFAULT_WIDTHS: CardWidthSettings = {
   projects: 280,
   textureSets: 200,
   stages: 300,
+  textureSetViewer: 280,
+  recycledFiles: 200,
 }
 
 // Get initial settings from localStorage or defaults
