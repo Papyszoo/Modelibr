@@ -377,15 +377,6 @@ When(
     }
 );
 
-When(
-    "I refresh the page",
-    async ({ page }) => {
-        await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(1000);
-        console.log("[Action] Refreshed page ✓");
-    }
-);
-
 Then(
     "the file should have channel {string} set to {string}",
     async ({ page }, channel: string, expectedType: string) => {
