@@ -10,7 +10,8 @@ Feature: Restore From Recycle Bin
     Given I upload and delete a model "restore-test-model"
     And the model "restore-test-model" is in the recycle bin
     When I navigate to the Recycled Files page
-    And I restore the model "restore-test-model"
+    Then I take a screenshot of the recycle bin before restore
+    When I restore the model "restore-test-model"
     Then the model should be removed from the recycle bin
     And I take a screenshot after restore
 
@@ -22,4 +23,5 @@ Feature: Restore From Recycle Bin
     And I restore the model "restore-back-test"
     And I navigate back to the model list
     Then the model "restore-back-test" should be visible in the grid
+    And I scroll to show the restored model "restore-back-test"
     And I take a screenshot of the restored model
