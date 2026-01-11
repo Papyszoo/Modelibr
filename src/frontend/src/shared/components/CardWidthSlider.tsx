@@ -28,7 +28,6 @@ export default function CardWidthSlider({
         onChange={e => onChange(e.value as number)}
         className="card-width-slider"
       />
-      <span className="card-width-value">{value}px</span>
     </div>
   )
 }
