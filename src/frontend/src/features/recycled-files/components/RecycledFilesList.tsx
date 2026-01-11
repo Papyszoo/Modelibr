@@ -7,6 +7,8 @@ import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import { ThumbnailDisplay } from '../../thumbnail'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './RecycledFilesList.css'
 
 interface RecycledModel {
@@ -68,6 +70,9 @@ export default function RecycledFilesList() {
   )
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const toast = useRef<Toast>(null)
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.recycledFiles
 
   useEffect(() => {
     loadRecycledFiles()
@@ -388,12 +393,20 @@ export default function RecycledFilesList() {
           <i className="pi pi-trash" />
           Recycled Files
         </h2>
-        <Button
-          icon="pi pi-refresh"
-          label="Refresh"
-          onClick={loadRecycledFiles}
-          className="p-button-outlined"
-        />
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <CardWidthSlider
+            value={cardWidth}
+            min={120}
+            max={400}
+            onChange={width => setCardWidth('recycledFiles', width)}
+          />
+          <Button
+            icon="pi pi-refresh"
+            label="Refresh"
+            onClick={loadRecycledFiles}
+            className="p-button-outlined"
+          />
+        </div>
       </div>
 
       {isEmpty ? (
@@ -411,7 +424,10 @@ export default function RecycledFilesList() {
                 <i className="pi pi-box" />
                 Models ({models.length})
               </h3>
-              <div className="recycled-cards-grid">
+              <div 
+                className="recycled-cards-grid"
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+              >
                 {models.map(model => (
                   <div key={model.id} className="recycled-card">
                     <div className="recycled-card-thumbnail">
@@ -456,7 +472,10 @@ export default function RecycledFilesList() {
                 <i className="pi pi-clone" />
                 Model Versions ({modelVersions.length})
               </h3>
-              <div className="recycled-cards-grid">
+              <div 
+                className="recycled-cards-grid"
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+              >
                 {modelVersions.map(version => (
                   <div key={version.id} className="recycled-card">
                     <div className="recycled-card-thumbnail">
@@ -528,7 +547,10 @@ export default function RecycledFilesList() {
                 <i className="pi pi-images" />
                 Texture Sets ({textureSets.length})
               </h3>
-              <div className="recycled-cards-grid">
+              <div 
+                className="recycled-cards-grid"
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+              >
                 {textureSets.map(textureSet => {
                   const previewUrl = getTexturePreviewUrl(textureSet)
                   return (
@@ -591,7 +613,10 @@ export default function RecycledFilesList() {
                 <i className="pi pi-image" />
                 Sprites ({sprites.length})
               </h3>
-              <div className="recycled-cards-grid">
+              <div 
+                className="recycled-cards-grid"
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+              >
                 {sprites.map(sprite => (
                   <div key={sprite.id} className="recycled-card">
                     <div className="recycled-card-thumbnail">

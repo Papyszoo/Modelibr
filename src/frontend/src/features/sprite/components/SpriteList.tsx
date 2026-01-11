@@ -19,6 +19,8 @@ import { MenuItem } from 'primereact/menuitem'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './SpriteList.css'
 
 interface SpriteDto {
@@ -80,6 +82,9 @@ function SpriteList() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const contextMenuRef = useRef<ContextMenu>(null)
   const [contextMenuTarget, setContextMenuTarget] = useState<SpriteDto | null>(null)
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.sprites
 
   const loadSprites = useCallback(async () => {
     try {
@@ -646,6 +651,12 @@ function SpriteList() {
           )}
         </div>
         <div className="sprite-list-actions">
+          <CardWidthSlider
+            value={cardWidth}
+            min={120}
+            max={400}
+            onChange={width => setCardWidth('sprites', width)}
+          />
           <Button
             label="Add Category"
             icon="pi pi-plus"
@@ -725,7 +736,10 @@ function SpriteList() {
           onMouseUp={handleGridMouseUp}
           onMouseLeave={handleGridMouseUp}
         >
-          <div className="sprite-grid">
+          <div 
+            className="sprite-grid"
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+          >
             {filteredSprites.map(sprite => (
               <div
                 key={sprite.id}
