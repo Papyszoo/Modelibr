@@ -1,0 +1,49 @@
+.card-width-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-card);
+  border-radius: 6px;
+  border: 1px solid var(--surface-border);
+  min-width: 280px;
+}
+
+.card-width-slider-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.card-width-slider-label i {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.card-width-slider {
+  flex: 1;
+  min-width: 120px;
+}
+
+.card-width-value {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  font-weight: 500;
+  min-width: 45px;
+  text-align: right;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card-width-slider-container {
+    min-width: 220px;
+    gap: 0.75rem;
+  }
+
+  .card-width-slider-label span {
+    display: none;
+  }
+}
