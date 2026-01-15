@@ -18,6 +18,7 @@ export default defineConfig({
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
         trace: "on-first-retry",
         screenshot: "on",
+        video: "retain-on-failure"
     },
     projects: [
         {
