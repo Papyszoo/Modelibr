@@ -332,7 +332,11 @@ When(
         // Select "Split Channels" option
         const splitOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: 'Split Channels' });
         await splitOption.click();
-        await page.waitForTimeout(500);
+        
+        // Wait for split channels UI to appear
+        const splitChannels = fileCard.locator('.split-channels');
+        await expect(splitChannels).toBeVisible({ timeout: 5000 });
+        await page.waitForTimeout(500); // Extra time for dropdowns to initialize
         
         console.log("[Action] Enabled split channel mode ✓");
     }
@@ -344,16 +348,25 @@ When(
         const fileCard = page.locator('.file-mapping-card').first();
         const splitChannels = fileCard.locator('.split-channels');
         
+        // Wait for split channels to be visible
+        await expect(splitChannels).toBeVisible({ timeout: 5000 });
+        
         // Find the specific channel dropdown (R, G, or B)
         const channelLabel = splitChannels.locator('label').filter({ hasText: `${channel}:` });
+        await expect(channelLabel).toBeVisible({ timeout: 3000 });
+        
+        // Get the dropdown in the same row as the label
+        // Try a more specific selector approach
         const channelRow = channelLabel.locator('..');
         const channelDropdown = channelRow.locator('.channel-dropdown');
         
+        await expect(channelDropdown).toBeVisible({ timeout: 3000 });
         await channelDropdown.click();
         await page.waitForTimeout(300);
         
         // Select the texture type from dropdown
         const typeOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: textureType });
+        await expect(typeOption).toBeVisible({ timeout: 3000 });
         await typeOption.click();
         await page.waitForTimeout(300);
         
