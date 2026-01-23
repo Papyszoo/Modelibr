@@ -110,12 +110,19 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  opacity: 0;
   transition: opacity 0.3s ease;
   padding: 0.5rem;
 }
 
-.texture-card-with-preview:hover .texture-card-overlay {
+/* Show buttons only on hover but keep filename visible */
+.texture-overlay-top,
+.texture-overlay-center {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.texture-card-with-preview:hover .texture-overlay-top,
+.texture-card-with-preview:hover .texture-overlay-center {
   opacity: 1;
 }
 
