@@ -88,8 +88,9 @@ When(
         
         await modelListPage.uploadModel(filePath);
         
-        // Store model name without extension (matches UI display)
-        const modelName = fileName.replace(/\.[^/.]+$/, '');
+        // Get the unique model name from the generated file path (includes unique ID)
+        const uniqueFileName = path.basename(filePath);
+        const modelName = uniqueFileName.replace(/\.[^/.]+$/, ''); // Strip extension
         
         // Wait for model to appear in list (grid shows name without extension)
         await modelListPage.expectModelVisible(modelName);

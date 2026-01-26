@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
 import ApiClient from '../../services/ApiClient'
-import { useTabContext } from '../../hooks/useTabContext'
+import { openTabInPanel } from '../../utils/tabNavigation'
 import './History.css'
 
 interface BatchUploadHistory {
@@ -84,12 +84,6 @@ export default function History() {
   const [history, setHistory] = useState<BatchUploadHistory[]>([])
   const [loading, setLoading] = useState(true)
   const [batchGroups, setBatchGroups] = useState<BatchGroup[]>([])
-  const {
-    openModelDetailsTab,
-    openTextureSetDetailsTab,
-    openPackDetailsTab,
-    openProjectDetailsTab,
-  } = useTabContext()
 
   useEffect(() => {
     loadHistory()
@@ -219,7 +213,7 @@ export default function History() {
                   const model = await ApiClient.getModelById(
                     upload.modelId!.toString()
                   )
-                  openModelDetailsTab(model.id, model.name)
+                  openTabInPanel('modelViewer', 'left', model.id.toString(), model.name)
                 } catch (error) {
                   console.error('Failed to open model:', error)
                 }
@@ -238,7 +232,7 @@ export default function History() {
                   const textureSet = await ApiClient.getTextureSetById(
                     upload.textureSetId!
                   )
-                  openTextureSetDetailsTab(textureSet.id, textureSet.name)
+                  openTabInPanel('textureSetViewer', 'left', textureSet.id.toString(), textureSet.name)
                 } catch (error) {
                   console.error('Failed to open texture set:', error)
                 }
@@ -252,7 +246,7 @@ export default function History() {
               text
               rounded
               title="Open Pack"
-              onClick={() => openPackDetailsTab(upload.packId!.toString())}
+              onClick={() => openTabInPanel('packViewer', 'left', upload.packId!.toString())}
             />
           )}
           {upload.projectId && (
@@ -263,7 +257,7 @@ export default function History() {
               rounded
               title="Open Project"
               onClick={() =>
-                openProjectDetailsTab(upload.projectId!.toString())
+                openTabInPanel('projectViewer', 'left', upload.projectId!.toString())
               }
             />
           )}

@@ -7,7 +7,7 @@ import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import { ProjectDto } from '../../../types'
-import { useTabContext } from '../../../hooks/useTabContext'
+import { openTabInPanel } from '../../../utils/tabNavigation'
 import './ProjectList.css'
 
 export default function ProjectList() {
@@ -17,7 +17,6 @@ export default function ProjectList() {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
   const toast = useRef<Toast>(null)
-  const { openTab } = useTabContext()
 
   useEffect(() => {
     loadProjects()
@@ -145,9 +144,7 @@ export default function ProjectList() {
                 key={project.id}
                 className="project-grid-card"
                 onClick={() => {
-                  openTab('projectViewer', project.name, {
-                    id: project.id.toString(),
-                  })
+                  openTabInPanel('projectViewer', 'left', project.id.toString(), project.name)
                 }}
               >
                 <div className="project-grid-card-image">

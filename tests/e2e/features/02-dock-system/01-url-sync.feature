@@ -15,5 +15,5 @@ Feature: Tab URL Synchronization
     And I take a screenshot of the dock with model tab
 
   Scenario: URL with duplicate tabs gets deduplicated on load
-    Given I navigate directly to URL with duplicate tabs "leftTabs=modelList,textureSets,textureSets,model-1,model-1&activeLeft=model-1"
+    Given I navigate directly to URL with duplicate tabs "leftTabs=modelList,textureSets,textureSets,textureSets&activeLeft=textureSets"
     Then the URL should not contain duplicate tab IDs

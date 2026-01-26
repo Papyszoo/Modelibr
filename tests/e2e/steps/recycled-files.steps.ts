@@ -292,19 +292,13 @@ WhenBdd('I click "Delete Forever" for model {string}', async ({ page }, modelNam
 WhenBdd("I confirm the permanent delete", async ({ page }) => {
     const recycleBin = new RecycledFilesPage(page);
     
-    // Mock the API call to ensure test stability in Docker environment
-    // The actual call hangs, but we solved the deduplication issue with UniqueFileGenerator
-    await page.route('**/recycled/**/permanent', async route => {
-        console.log(`[Mock] Intercepting DELETE ${route.request().url()}`);
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({})
-        });
-    });
-    
+    // Let the actual API call happen - no mocking needed since we use UniqueFileGenerator
     await recycleBin.confirmPermanentDelete();
-    console.log("[Action] Confirmed permanent delete (with mocked API)");
+    
+    // Wait for the page to update after delete
+    await page.waitForTimeout(2000);
+    
+    console.log("[Action] Confirmed permanent delete");
 });
 
 WhenBdd("I cancel the delete dialog", async ({ page }) => {

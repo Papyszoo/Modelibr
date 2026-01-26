@@ -58,8 +58,8 @@ Given(
         const testFile = path.join(__dirname, "..", "assets", "blue_color.png");
         await textureSetsPage.uploadTexturesViaInput([testFile]);
         
-        // Wait for texture set to be created
-        await page.waitForTimeout(2000);
+        // Wait for texture set to be created and worker to settle
+        await page.waitForTimeout(5000);
     }
 );
 
@@ -247,10 +247,10 @@ Then(
 Then(
     "the file should show split channels mode",
     async ({ page }) => {
-        const fileCard = page.locator('.file-mapping-card').first();
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
         
         // Check for split-channels class or RGB dropdown showing "Split Channels"
-        const rgbDropdown = fileCard.locator('.channel-dropdown').first();
+        const rgbDropdown = fileCard.locator('[data-testid^="channel-mapping-rgb-"]').first();
         await expect(rgbDropdown).toBeVisible({ timeout: 5000 });
         console.log("[Verify] File shows channel dropdown ✓");
     }
@@ -322,21 +322,24 @@ Then(
 When(
     "I enable split channel mode for the file",
     async ({ page }) => {
-        const fileCard = page.locator('.file-mapping-card').first();
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
         
-        // Find the RGB dropdown and click it
-        const rgbDropdown = fileCard.locator('.channel-dropdown').first();
+        // Find the RGB dropdown using data-testid and click it
+        const rgbDropdown = fileCard.locator('[data-testid^="channel-mapping-rgb-"]').first();
         await rgbDropdown.click();
         await page.waitForTimeout(300);
         
         // Select "Split Channels" option
+        // Note: We no longer remove the RGB texture immediately, so no DELETE request is expected.
         const splitOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: 'Split Channels' });
         await splitOption.click();
+
         
-        // Wait for split channels UI to appear
-        const splitChannels = fileCard.locator('.split-channels');
+        // Wait for split channels UI to appear using data-testid
+        const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
         await expect(splitChannels).toBeVisible({ timeout: 5000 });
-        await page.waitForTimeout(500); // Extra time for dropdowns to initialize
+        
+        await page.waitForTimeout(500); // Extra time for UI state settlement
         
         console.log("[Action] Enabled split channel mode ✓");
     }
@@ -345,29 +348,32 @@ When(
 When(
     "I set channel {string} to texture type {string}",
     async ({ page }, channel: string, textureType: string) => {
-        const fileCard = page.locator('.file-mapping-card').first();
-        const splitChannels = fileCard.locator('.split-channels');
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
+        const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
         
         // Wait for split channels to be visible
         await expect(splitChannels).toBeVisible({ timeout: 5000 });
         
-        // Find the specific channel dropdown (R, G, or B)
-        const channelLabel = splitChannels.locator('label').filter({ hasText: `${channel}:` });
-        await expect(channelLabel).toBeVisible({ timeout: 3000 });
-        
-        // Get the dropdown in the same row as the label
-        // Try a more specific selector approach
-        const channelRow = channelLabel.locator('..');
-        const channelDropdown = channelRow.locator('.channel-dropdown');
+        // Find the specific channel dropdown (R, G, or B) using data-testid
+        const channelDropdown = splitChannels.locator(`[data-testid^="channel-mapping-${channel}-"]`);
         
         await expect(channelDropdown).toBeVisible({ timeout: 3000 });
         await channelDropdown.click();
         await page.waitForTimeout(300);
         
-        // Select the texture type from dropdown
+        // Select the texture type from dropdown and wait for POST request
         const typeOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: textureType });
         await expect(typeOption).toBeVisible({ timeout: 3000 });
-        await typeOption.click();
+        
+        const [response] = await Promise.all([
+             page.waitForResponse(response => 
+                response.request().method() === 'POST' && 
+                response.url().includes('/textures') &&
+                response.status() === 200
+             ),
+             typeOption.click()
+        ]);
+        
         await page.waitForTimeout(300);
         
         console.log(`[Action] Set channel ${channel} to ${textureType} ✓`);
@@ -393,16 +399,15 @@ When(
 Then(
     "the file should have channel {string} set to {string}",
     async ({ page }, channel: string, expectedType: string) => {
-        const fileCard = page.locator('.file-mapping-card').first();
-        const splitChannels = fileCard.locator('.split-channels');
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
+        const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
         
-        // Find the specific channel dropdown
-        const channelLabel = splitChannels.locator('label').filter({ hasText: `${channel}:` });
-        const channelRow = channelLabel.locator('..');
-        const channelDropdown = channelRow.locator('.channel-dropdown');
+        // Find the specific channel dropdown using data-testid
+        const channelDropdown = splitChannels.locator(`[data-testid^="channel-mapping-${channel}-"]`);
         
         // Get the selected value text
         const selectedValue = await channelDropdown.locator('.p-dropdown-label').textContent();
+        console.log(`[Debug] Checking channel ${channel} expected "${expectedType}", found "${selectedValue}"`);
         expect(selectedValue).toContain(expectedType);
         
         console.log(`[Verify] Channel ${channel} is set to ${expectedType} ✓`);

@@ -963,22 +963,27 @@ Then("the applied texture should be different from the previous state", async ({
 Given(
     "I create a complete texture set with all texture types named {string}",
     async ({ page }, setName: string) => {
-        const texturePath = path.join(__dirname, "..", "assets", "blue_color.png");
-        
         // Create texture set via API
         const uniqueName = `${setName}-${Date.now()}`;
         const textureSet = await apiHelper.createTextureSet(uniqueName);
         
-        // Upload textures for all texture types
-        // Albedo, Normal, AO, Roughness, Metallic, Emissive, Alpha, Height
-        const textureTypes = [
-            'Albedo', 'Normal', 'AO', 'Roughness', 
-            'Metallic', 'Emissive', 'Alpha', 'Height'
-        ];
+        // Upload textures for all texture types using DIFFERENT files to avoid constraint violations
+        // Map each texture type to a unique file
+        const textureTypeFiles: Record<string, string> = {
+            'Albedo': 'blue_color.png',
+            'Normal': 'green_color.png',
+            'AO': 'red_color.png',
+            'Roughness': 'yellow_color.png',
+            'Metallic': 'pink_color.png',
+            'Emissive': 'black_color.png',
+            'Alpha': 'texture_blue.png',
+            'Height': 'texture_albedo.png'
+        };
         
-        for (const type of textureTypes) {
+        for (const [type, filename] of Object.entries(textureTypeFiles)) {
+            const texturePath = path.join(__dirname, "..", "assets", filename);
             await apiHelper.uploadTextureToSet(textureSet.id, texturePath, type);
-            console.log(`[Setup] Uploaded ${type} texture to set ${uniqueName}`);
+            console.log(`[Setup] Uploaded ${type} texture (${filename}) to set ${uniqueName}`);
         }
         
         // Store in shared state
@@ -988,6 +993,8 @@ Given(
         });
         
         console.log(`[Setup] Created complete texture set "${setName}" with all texture types ✓`);
+        
+
     }
 );
 

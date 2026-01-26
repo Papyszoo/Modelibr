@@ -119,6 +119,25 @@ internal sealed class ModelRepository : IModelRepository
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
+        // Break the circular FK dependency between Model.ActiveVersionId and ModelVersion.ModelId
+        // EF Core cannot determine deletion order with circular FKs, so we must break the cycle first
+        // Use ExecuteUpdateAsync to bypass the private setter and update directly in the database
+        await _context.Models
+            .Where(m => m.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.ActiveVersionId, (int?)null), cancellationToken);
+        
+        // Detach all tracked Model and ModelVersion entities to clear stale navigation properties
+        // This is necessary because EF Core's change tracker still has the old ActiveVersion reference
+        foreach (var entry in _context.ChangeTracker.Entries<Model>().ToList())
+        {
+            entry.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+        }
+        foreach (var entry in _context.ChangeTracker.Entries<ModelVersion>().ToList())
+        {
+            entry.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+        }
+        
+        // Reload the model with fresh data (now without the circular FK)
         var model = await _context.Models
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
