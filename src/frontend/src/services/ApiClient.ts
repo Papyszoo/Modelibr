@@ -18,6 +18,10 @@ import {
   CreateModelVersionResponse,
   SpriteDto,
   GetAllSpritesResponse,
+  SoundDto,
+  GetAllSoundsResponse,
+  SoundCategoryDto,
+  GetAllSoundCategoriesResponse,
 } from '../types'
 import { useApiCacheStore } from '../stores/apiCacheStore'
 
@@ -1365,6 +1369,131 @@ class ApiClient {
   }> {
     const response = await this.client.put(`/sprites/${id}`, updates)
     return response.data
+  }
+
+  // Sound methods
+  async getAllSounds(options?: {
+    packId?: number
+    projectId?: number
+    categoryId?: number
+  }): Promise<GetAllSoundsResponse> {
+    const params = new URLSearchParams()
+    if (options?.packId) params.append('packId', options.packId.toString())
+    if (options?.projectId)
+      params.append('projectId', options.projectId.toString())
+    if (options?.categoryId)
+      params.append('categoryId', options.categoryId.toString())
+
+    const url = params.toString() ? `/sounds?${params.toString()}` : '/sounds'
+    const response = await this.client.get<GetAllSoundsResponse>(url)
+    return response.data
+  }
+
+  async getSoundById(id: number): Promise<SoundDto> {
+    const response = await this.client.get<SoundDto>(`/sounds/${id}`)
+    return response.data
+  }
+
+  async createSoundWithFile(
+    file: File,
+    options?: {
+      name?: string
+      duration?: number
+      peaks?: string
+      categoryId?: number
+      batchId?: string
+      packId?: number
+      projectId?: number
+    }
+  ): Promise<{
+    soundId: number
+    name: string
+    fileId: number
+    duration: number
+    fileSizeBytes: number
+  }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const params = new URLSearchParams()
+    if (options?.name) params.append('name', options.name)
+    if (options?.duration !== undefined)
+      params.append('duration', options.duration.toString())
+    if (options?.peaks) params.append('peaks', options.peaks)
+    if (options?.categoryId)
+      params.append('categoryId', options.categoryId.toString())
+    if (options?.batchId) params.append('batchId', options.batchId)
+    if (options?.packId) params.append('packId', options.packId.toString())
+    if (options?.projectId)
+      params.append('projectId', options.projectId.toString())
+
+    const response = await this.client.post(
+      `/sounds/with-file?${params.toString()}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+
+    return response.data
+  }
+
+  async updateSound(
+    id: number,
+    updates: {
+      name?: string
+      categoryId?: number | null
+    }
+  ): Promise<{
+    id: number
+    name: string
+  }> {
+    const response = await this.client.put(`/sounds/${id}`, updates)
+    return response.data
+  }
+
+  async deleteSound(id: number): Promise<void> {
+    await this.client.delete(`/sounds/${id}`)
+  }
+
+  async softDeleteSound(id: number): Promise<void> {
+    await this.client.delete(`/sounds/${id}/soft`)
+  }
+
+  // Sound Category methods
+  async getAllSoundCategories(): Promise<GetAllSoundCategoriesResponse> {
+    const response =
+      await this.client.get<GetAllSoundCategoriesResponse>('/sound-categories')
+    return response.data
+  }
+
+  async createSoundCategory(
+    name: string,
+    description?: string
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post('/sound-categories', {
+      name,
+      description,
+    })
+    return response.data
+  }
+
+  async updateSoundCategory(
+    id: number,
+    name: string,
+    description?: string
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.put(`/sound-categories/${id}`, {
+      name,
+      description,
+    })
+    return response.data
+  }
+
+  async deleteSoundCategory(id: number): Promise<void> {
+    await this.client.delete(`/sound-categories/${id}`)
   }
 }
 

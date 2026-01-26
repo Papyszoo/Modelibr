@@ -31,6 +31,11 @@ export const useTabMenuItems = ({
         command: () => onAddTab('sprites', 'Sprites'),
       },
       {
+        label: 'Sounds',
+        icon: 'pi pi-volume-up',
+        command: () => onAddTab('sounds', 'Sounds'),
+      },
+      {
         label: 'Packs',
         icon: 'pi pi-inbox',
         command: () => onAddTab('packs', 'Packs'),
