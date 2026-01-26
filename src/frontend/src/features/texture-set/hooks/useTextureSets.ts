@@ -31,11 +31,11 @@ export function useTextureSets() {
   }, [])
 
   const getTextureSetById = useCallback(
-    async (id: number): Promise<TextureSetDto> => {
+    async (id: number, options: { skipCache?: boolean } = {}): Promise<TextureSetDto> => {
       try {
         setLoading(true)
         setError(null)
-        return await ApiClient.getTextureSetById(id)
+        return await ApiClient.getTextureSetById(id, options)
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to load texture set'

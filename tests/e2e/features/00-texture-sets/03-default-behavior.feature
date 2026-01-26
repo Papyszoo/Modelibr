@@ -36,10 +36,17 @@ Feature: Default Texture Set Behavior
       | red_color   |
     And I am on the model viewer page for "multi-version-model"
     When I select version 1
-    And I set "blue_color" as the default texture set for the current version
-    And I select version 2
+    Then I take a screenshot named "1-version1-no-texture"
+    When I set "blue_color" as the default texture set for the current version
+    Then the texture set selector should be visible
+    And I take a screenshot named "2-version1-blue-texture"
+    When I select version 2
     And I set "red_color" as the default texture set for version 2
     Then version 2 should have "red_color" as default
+    And the texture set selector should be visible
+    And I take a screenshot named "3-version2-red-texture"
     When I select version 1
     Then version 1 should still have "blue_color" as default
+    And the texture set selector should be visible
+    And I take a screenshot named "4-version1-still-blue"
 

@@ -2,6 +2,7 @@ import { createBdd } from "playwright-bdd";
 import { expect, Page, test } from "@playwright/test";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
 import { ModelListPage } from "../pages/ModelListPage";
+import { sharedState } from "../fixtures/shared-state";
 import path from "path";
 import { fileURLToPath } from "url";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
@@ -291,19 +292,13 @@ WhenBdd('I click "Delete Forever" for model {string}', async ({ page }, modelNam
 WhenBdd("I confirm the permanent delete", async ({ page }) => {
     const recycleBin = new RecycledFilesPage(page);
     
-    // Mock the API call to ensure test stability in Docker environment
-    // The actual call hangs, but we solved the deduplication issue with UniqueFileGenerator
-    await page.route('**/recycled/**/permanent', async route => {
-        console.log(`[Mock] Intercepting DELETE ${route.request().url()}`);
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({})
-        });
-    });
-    
+    // Let the actual API call happen - no mocking needed since we use UniqueFileGenerator
     await recycleBin.confirmPermanentDelete();
-    console.log("[Action] Confirmed permanent delete (with mocked API)");
+    
+    // Wait for the page to update after delete
+    await page.waitForTimeout(2000);
+    
+    console.log("[Action] Confirmed permanent delete");
 });
 
 WhenBdd("I cancel the delete dialog", async ({ page }) => {
@@ -399,7 +394,11 @@ ThenBdd("the model {string} should be removed from recycle bin", async ({ page }
     // Refresh to get latest state
     await recycleBin.refresh();
     
-    console.log(`[UI] Model "${modelName}" removed from recycle bin ✓`);
+    // Verify the specific model is no longer present
+    const hasModel = await recycleBin.hasModelWithName(lastRecycledModelName || "test-cube");
+    expect(hasModel).toBe(false);
+    
+    console.log(`[UI] Model "${modelName}" (as "${lastRecycledModelName}") removed from recycle bin ✓`);
 });
 
 ThenBdd("the model {string} should still be in the recycle bin", async ({ page }, modelName: string) => {
@@ -926,4 +925,48 @@ ThenBdd("the sprite {string} should be visible", async ({ page }, spriteName: st
 ThenBdd("I take a screenshot of the restored sprite", async ({ page }) => {
     await page.waitForTimeout(1000);
     await takeScreenshotToReport(page, "Restored Sprite", "restored-sprite");
+});
+
+ThenBdd("I take a screenshot of the recycle bin before restore", async ({ page }) => {
+    await waitForThumbnails(page, "recycle bin before restore");
+    await takeScreenshotToReport(page, "Recycle Bin Before Restore", "recycle-bin-before-restore");
+});
+
+ThenBdd("I scroll to show the restored model {string}", async ({ page }, modelName: string) => {
+    // Try to find the model card (it will likely be at the bottom)
+    const modelCard = page.locator(".model-card").first();
+    
+    if (await modelCard.count() > 0) {
+        // Scroll to the first (or last) model card to ensure it's visible
+        await modelCard.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(500); // Wait for scroll animation
+        console.log(`[Action] Scrolled to show restored model "${modelName}" ✓`);
+    } else {
+        console.log(`[Warning] No model cards found to scroll to`);
+    }
+});
+
+ThenBdd("I take a screenshot of model before version deletion", async ({ page }) => {
+    await page.waitForTimeout(500); // Wait for dropdown to be fully visible
+    await takeScreenshotToReport(page, "Model Before Version Deletion", "model-before-version-deletion");
+});
+
+ThenBdd("I take a screenshot showing version not in version strip", async ({ page }) => {
+    await page.waitForTimeout(500);
+    await takeScreenshotToReport(page, "Version Not In Version Strip", "version-not-in-strip");
+});
+
+ThenBdd("I take a screenshot showing version in recycled files", async ({ page }) => {
+    await waitForThumbnails(page, "recycled version");
+    await takeScreenshotToReport(page, "Version In Recycled Files", "version-in-recycled-files");
+});
+
+ThenBdd("I take a screenshot showing version not in recycled files", async ({ page }) => {
+    await waitForThumbnails(page, "after version restore");
+    await takeScreenshotToReport(page, "Version Not In Recycled Files", "version-not-in-recycled-files");
+});
+
+ThenBdd("I take a screenshot showing restored version in version strip", async ({ page }) => {
+    await page.waitForTimeout(500);
+    await takeScreenshotToReport(page, "Restored Version In Version Strip", "restored-version-in-strip");
 });

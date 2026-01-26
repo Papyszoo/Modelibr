@@ -3,11 +3,12 @@ import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto } from '../../../types'
-import { useTabContext } from '../../../hooks/useTabContext'
+import { openTabInPanel } from '../../../utils/tabNavigation'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './PackList.css'
@@ -15,11 +16,11 @@ import './PackList.css'
 export default function PackList() {
   const [packs, setPacks] = useState<PackDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newPackName, setNewPackName] = useState('')
   const [newPackDescription, setNewPackDescription] = useState('')
   const toast = useRef<Toast>(null)
-  const { openTab } = useTabContext()
   
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.packs
@@ -161,7 +162,7 @@ export default function PackList() {
                 key={pack.id}
                 className="pack-grid-card"
                 onClick={() => {
-                  openTab('packViewer', pack.name, { id: pack.id.toString() })
+                  openTabInPanel('packViewer', 'left', pack.id.toString(), pack.name)
                 }}
               >
                 <div className="pack-grid-card-image">
