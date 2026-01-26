@@ -13,6 +13,8 @@ import ModelAssociationDialog from '../dialogs/ModelAssociationDialog'
 import TexturePreviewPanel from './TexturePreviewPanel'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { ModelSummaryDto } from '../../../types'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './TextureSetViewer.css'
 
 interface TextureSetViewerProps {
@@ -29,6 +31,9 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
     useState(false)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const textureSetsApi = useTextureSets()
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.textureSetViewer
 
   const loadTextureSet = useCallback(async (forceRefresh = false) => {
     try {
@@ -136,7 +141,18 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
         onTabChange={e => setActiveTabIndex(e.index)}
       >
         <TabPanel header="Texture Types" leftIcon="pi pi-image">
-          <div className="texture-cards-grid">
+          <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+            <CardWidthSlider
+              value={cardWidth}
+              min={200}
+              max={500}
+              onChange={width => setCardWidth('textureSetViewer', width)}
+            />
+          </div>
+          <div 
+            className="texture-cards-grid"
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+          >
             {/* Regular texture type cards (excluding Height/Displacement/Bump) */}
             {nonHeightTypes.map((textureType: TextureType) => {
               const texture =

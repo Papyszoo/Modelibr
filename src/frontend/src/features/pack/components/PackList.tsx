@@ -9,6 +9,8 @@ import { useRef } from 'react'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto } from '../../../types'
 import { openTabInPanel } from '../../../utils/tabNavigation'
+import CardWidthSlider from '../../../shared/components/CardWidthSlider'
+import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './PackList.css'
 
 export default function PackList() {
@@ -19,6 +21,9 @@ export default function PackList() {
   const [newPackName, setNewPackName] = useState('')
   const [newPackDescription, setNewPackDescription] = useState('')
   const toast = useRef<Toast>(null)
+  
+  const { settings, setCardWidth } = useCardWidthStore()
+  const cardWidth = settings.packs
 
   useEffect(() => {
     loadPacks()
@@ -114,11 +119,19 @@ export default function PackList() {
 
       <div className="pack-list-header">
         <h2>Packs</h2>
-        <Button
-          label="Create Pack"
-          icon="pi pi-plus"
-          onClick={() => setShowCreateDialog(true)}
-        />
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <CardWidthSlider
+            value={cardWidth}
+            min={200}
+            max={500}
+            onChange={width => setCardWidth('packs', width)}
+          />
+          <Button
+            label="Create Pack"
+            icon="pi pi-plus"
+            onClick={() => setShowCreateDialog(true)}
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -138,7 +151,10 @@ export default function PackList() {
           />
         </div>
       ) : (
-        <div className="pack-grid">
+        <div 
+          className="pack-grid"
+          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+        >
           {packs.map(pack => {
             const thumbnail = getPackThumbnail(pack)
             return (
