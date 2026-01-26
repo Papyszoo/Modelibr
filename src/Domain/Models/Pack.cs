@@ -1,7 +1,7 @@
 namespace Domain.Models;
 
 /// <summary>
-/// Represents a pack/folder that groups models, texture sets, and sprites together.
+/// Represents a pack/folder that groups models, texture sets, sprites, and sounds together.
 /// Provides organization and categorization for 3D assets.
 /// </summary>
 public class Pack : AggregateRoot
@@ -9,6 +9,7 @@ public class Pack : AggregateRoot
     private readonly List<Model> _models = new();
     private readonly List<TextureSet> _textureSets = new();
     private readonly List<Sprite> _sprites = new();
+    private readonly List<Sound> _sounds = new();
 
     public int Id { get; set; }
     public string Name { get; private set; } = string.Empty;
@@ -49,6 +50,18 @@ public class Pack : AggregateRoot
             _sprites.Clear();
             if (value != null)
                 _sprites.AddRange(value);
+        }
+    }
+
+    // Navigation property for many-to-many relationship with Sounds - EF Core requires this to be settable
+    public ICollection<Sound> Sounds
+    {
+        get => _sounds;
+        set
+        {
+            _sounds.Clear();
+            if (value != null)
+                _sounds.AddRange(value);
         }
     }
 
@@ -258,6 +271,60 @@ public class Pack : AggregateRoot
     }
 
     /// <summary>
+    /// Adds a sound to this pack.
+    /// </summary>
+    /// <param name="sound">The sound to add</param>
+    /// <param name="updatedAt">When the association was made</param>
+    /// <exception cref="ArgumentNullException">Thrown when sound is null</exception>
+    public void AddSound(Sound sound, DateTime updatedAt)
+    {
+        if (sound == null)
+            throw new ArgumentNullException(nameof(sound));
+
+        if (_sounds.Any(s => s.Id == sound.Id))
+            return; // Sound already in pack
+
+        _sounds.Add(sound);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a sound from this pack.
+    /// </summary>
+    /// <param name="sound">The sound to remove</param>
+    /// <param name="updatedAt">When the association was removed</param>
+    /// <exception cref="ArgumentNullException">Thrown when sound is null</exception>
+    public void RemoveSound(Sound sound, DateTime updatedAt)
+    {
+        if (sound == null)
+            throw new ArgumentNullException(nameof(sound));
+
+        if (_sounds.Remove(sound))
+        {
+            UpdatedAt = updatedAt;
+        }
+    }
+
+    /// <summary>
+    /// Checks if this pack contains a sound with the specified ID.
+    /// </summary>
+    /// <param name="soundId">The sound ID to check</param>
+    /// <returns>True if the sound is in this pack</returns>
+    public bool HasSound(int soundId)
+    {
+        return _sounds.Any(s => s.Id == soundId);
+    }
+
+    /// <summary>
+    /// Gets all sounds in this pack.
+    /// </summary>
+    /// <returns>Read-only list of sounds</returns>
+    public IReadOnlyList<Sound> GetSounds()
+    {
+        return _sounds.AsReadOnly();
+    }
+
+    /// <summary>
     /// Gets the count of models in this pack.
     /// </summary>
     public int ModelCount => _models.Count;
@@ -273,9 +340,14 @@ public class Pack : AggregateRoot
     public int SpriteCount => _sprites.Count;
 
     /// <summary>
-    /// Checks if the pack is empty (contains no models, texture sets, or sprites).
+    /// Gets the count of sounds in this pack.
     /// </summary>
-    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0 && _sprites.Count == 0;
+    public int SoundCount => _sounds.Count;
+
+    /// <summary>
+    /// Checks if the pack is empty (contains no models, texture sets, sprites, or sounds).
+    /// </summary>
+    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0 && _sprites.Count == 0 && _sounds.Count == 0;
 
     /// <summary>
     /// Gets a human-readable description of the pack.
@@ -283,7 +355,7 @@ public class Pack : AggregateRoot
     /// <returns>Description including name and content counts</returns>
     public string GetSummary()
     {
-        return $"{Name} ({_models.Count} models, {_textureSets.Count} texture sets, {_sprites.Count} sprites)";
+        return $"{Name} ({_models.Count} models, {_textureSets.Count} texture sets, {_sprites.Count} sprites, {_sounds.Count} sounds)";
     }
 
     private static void ValidateName(string name)
