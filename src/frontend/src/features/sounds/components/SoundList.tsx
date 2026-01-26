@@ -21,29 +21,8 @@ import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import { SoundDto, SoundCategoryDto } from '../../../types'
 import './SoundList.css'
-
-interface SoundDto {
-  id: number
-  name: string
-  fileId: number
-  categoryId: number | null
-  categoryName: string | null
-  duration: number
-  peaks: string | null
-  fileName: string
-  fileSizeBytes: number
-  createdAt: string
-  updatedAt: string
-}
-
-interface SoundCategoryDto {
-  id: number
-  name: string
-  description: string | null
-  createdAt: string
-  updatedAt: string
-}
 
 const UNASSIGNED_CATEGORY_ID = -1
 
@@ -159,7 +138,7 @@ function SoundList() {
         const fileName = file.name.replace(/\.[^/.]+$/, '')
         const result = await ApiClient.createSoundWithFile(file, {
           name: fileName,
-          duration: 0, // Duration will be calculated on frontend later
+          duration: 0, // Duration extraction with Web Audio API is planned for future enhancement
           categoryId: categoryIdToAssign,
           batchId: batchId,
         })
