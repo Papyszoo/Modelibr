@@ -4,6 +4,7 @@ import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
 import { PackList, PackViewer } from '../../features/pack'
 import { ProjectList, ProjectViewer } from '../../features/project'
 import { SpriteList } from '../../features/sprite'
+import { SoundList } from '../../features/sounds'
 import { History } from '../../features/history'
 import { StageEditor, StageList } from '../../features/stage-editor'
 import { RecycledFilesList } from '../../features/recycled-files'
@@ -79,6 +80,9 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'sprites':
         return <SpriteList />
+
+      case 'sounds':
+        return <SoundList />
 
       case 'stageList':
         return <StageList />

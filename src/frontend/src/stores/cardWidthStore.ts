@@ -3,6 +3,7 @@ import { create } from 'zustand'
 export type PageType =
   | 'models'
   | 'sprites'
+  | 'sounds'
   | 'packs'
   | 'projects'
   | 'textureSets'
@@ -13,6 +14,7 @@ export type PageType =
 interface CardWidthSettings {
   models: number
   sprites: number
+  sounds: number
   packs: number
   projects: number
   textureSets: number
@@ -30,6 +32,7 @@ interface CardWidthStore {
 const DEFAULT_WIDTHS: CardWidthSettings = {
   models: 180,
   sprites: 200,
+  sounds: 280,
   packs: 280,
   projects: 280,
   textureSets: 200,
