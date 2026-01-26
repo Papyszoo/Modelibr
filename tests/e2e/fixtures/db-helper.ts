@@ -59,4 +59,6 @@ export class DbHelper {
         );
         return res.rows[0]?.DefaultTextureSetId || null;
     }
+
+
 }

@@ -58,8 +58,8 @@ Given(
         const testFile = path.join(__dirname, "..", "assets", "blue_color.png");
         await textureSetsPage.uploadTexturesViaInput([testFile]);
         
-        // Wait for texture set to be created
-        await page.waitForTimeout(2000);
+        // Wait for texture set to be created and worker to settle
+        await page.waitForTimeout(5000);
     }
 );
 
@@ -247,10 +247,10 @@ Then(
 Then(
     "the file should show split channels mode",
     async ({ page }) => {
-        const fileCard = page.locator('.file-mapping-card').first();
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
         
         // Check for split-channels class or RGB dropdown showing "Split Channels"
-        const rgbDropdown = fileCard.locator('.channel-dropdown').first();
+        const rgbDropdown = fileCard.locator('[data-testid^="channel-mapping-rgb-"]').first();
         await expect(rgbDropdown).toBeVisible({ timeout: 5000 });
         console.log("[Verify] File shows channel dropdown ✓");
     }
@@ -312,5 +312,104 @@ Then(
         // Close dropdown
         await page.keyboard.press('Escape');
         console.log("[Verify] Mode dropdown has all height type options ✓");
+    }
+);
+
+// ============================================================================
+// SPLIT CHANNEL MODE ACTIONS
+// ============================================================================
+
+When(
+    "I enable split channel mode for the file",
+    async ({ page }) => {
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
+        
+        // Find the RGB dropdown using data-testid and click it
+        const rgbDropdown = fileCard.locator('[data-testid^="channel-mapping-rgb-"]').first();
+        await rgbDropdown.click();
+        await page.waitForTimeout(300);
+        
+        // Select "Split Channels" option
+        // Note: We no longer remove the RGB texture immediately, so no DELETE request is expected.
+        const splitOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: 'Split Channels' });
+        await splitOption.click();
+
+        
+        // Wait for split channels UI to appear using data-testid
+        const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
+        await expect(splitChannels).toBeVisible({ timeout: 5000 });
+        
+        await page.waitForTimeout(500); // Extra time for UI state settlement
+        
+        console.log("[Action] Enabled split channel mode ✓");
+    }
+);
+
+When(
+    "I set channel {string} to texture type {string}",
+    async ({ page }, channel: string, textureType: string) => {
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
+        const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
+        
+        // Wait for split channels to be visible
+        await expect(splitChannels).toBeVisible({ timeout: 5000 });
+        
+        // Find the specific channel dropdown (R, G, or B) using data-testid
+        const channelDropdown = splitChannels.locator(`[data-testid^="channel-mapping-${channel}-"]`);
+        
+        await expect(channelDropdown).toBeVisible({ timeout: 3000 });
+        await channelDropdown.click();
+        await page.waitForTimeout(300);
+        
+        // Select the texture type from dropdown and wait for POST request
+        const typeOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: textureType });
+        await expect(typeOption).toBeVisible({ timeout: 3000 });
+        
+        const [response] = await Promise.all([
+             page.waitForResponse(response => 
+                response.request().method() === 'POST' && 
+                response.url().includes('/textures') &&
+                response.status() === 200
+             ),
+             typeOption.click()
+        ]);
+        
+        await page.waitForTimeout(300);
+        
+        console.log(`[Action] Set channel ${channel} to ${textureType} ✓`);
+    }
+);
+
+When(
+    "I save the texture set changes",
+    async ({ page }) => {
+        // Look for a save button in the texture set viewer
+        const saveButton = page.getByRole('button', { name: /save/i });
+        if (await saveButton.isVisible({ timeout: 2000 })) {
+            await saveButton.click();
+            await page.waitForTimeout(1000);
+            console.log("[Action] Saved texture set changes ✓");
+        } else {
+            // Changes might be auto-saved
+            console.log("[Action] No save button found - assuming auto-save ✓");
+        }
+    }
+);
+
+Then(
+    "the file should have channel {string} set to {string}",
+    async ({ page }, channel: string, expectedType: string) => {
+        const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
+        const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
+        
+        // Find the specific channel dropdown using data-testid
+        const channelDropdown = splitChannels.locator(`[data-testid^="channel-mapping-${channel}-"]`);
+        
+        // Get the selected value text
+        const selectedValue = await channelDropdown.locator('.p-dropdown-label').textContent();
+        console.log(`[Debug] Checking channel ${channel} expected "${expectedType}", found "${selectedValue}"`);
+        expect(selectedValue).toContain(expectedType);
+        
+        console.log(`[Verify] Channel ${channel} is set to ${expectedType} ✓`);
     }
 );

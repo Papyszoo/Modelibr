@@ -73,14 +73,38 @@ export class ApiHelper {
     }
 
     /**
+     * Map texture type names to their numeric values
+     */
+    private mapTextureType(textureType: string | number): number {
+        if (typeof textureType === 'number') {
+            return textureType;
+        }
+        const mapping: Record<string, number> = {
+            'Albedo': 1,
+            'Normal': 2,
+            'Height': 3,
+            'AO': 4,
+            'Roughness': 5,
+            'Metallic': 6,
+            'Emissive': 9,
+            'Bump': 10,
+            'Alpha': 11,
+            'Displacement': 12
+        };
+        return mapping[textureType] ?? 1; // Default to Albedo
+    }
+
+    /**
      * Upload a texture file to a texture set
      * Two-step process: 1) Upload file via /files endpoint, 2) Add texture to set
      */
     async uploadTextureToSet(
         textureSetId: number,
         filePath: string,
-        textureType: number = 1 // 1 = Albedo
+        textureType: string | number = 1 // 1 = Albedo, or string name like 'Albedo'
     ): Promise<void> {
+        const textureTypeNum = this.mapTextureType(textureType);
+        
         // Step 1: Upload the file with textureSetId parameter
         const formData = new FormData();
         formData.append("file", fs.createReadStream(filePath));
@@ -115,7 +139,7 @@ export class ApiHelper {
             `/texture-sets/${textureSetId}/textures`,
             {
                 FileId: fileId,
-                TextureType: textureType,
+                TextureType: textureTypeNum,
             }
         );
 

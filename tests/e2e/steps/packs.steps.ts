@@ -180,38 +180,68 @@ When(
         await page.waitForSelector('.p-dialog:has-text("Add Models to Pack")', { state: 'visible', timeout: 5000 });
         console.log('[Action] Add Models dialog opened');
         
-        // Model items are clickable divs with cursor=pointer containing checkbox + model name
-        // Use the model's actual file name which is what shows in the dialog
-        // In our test setup, pack-test-model's file is named test-cube.glb, so name is "test-cube"
-        const modelName = model.name; // This is the file name from upload
+        // Wait for dialog content to load
+        await page.waitForTimeout(500);
         
-        // Find the clickable model item container by model name text
-        // Structure: div[cursor=pointer] > checkbox + div > img + div[name]
-        const modelItems = page.locator('.p-dialog div[data-pc-section="content"] > div').filter({
+        const modelName = model.name; // This is the actual file name
+        
+        // Find the model item by its name - items are clickable divs in the content area
+        // The structure is: [data-pc-section="content"] > container div > clickable items
+        // Each item has checkbox + thumbnail + name and is fully clickable
+        const dialogContent = page.locator('.p-dialog [data-pc-section="content"]');
+        
+        // Find ALL divs that contain the model name, then click the one with a checkbox
+        // The clickable container wraps checkbox + model info
+        const items = dialogContent.locator('div').filter({
             hasText: modelName
-        });
+        }).all();
         
-        // Click directly on the first matching item (clickable container)
-        const firstItem = modelItems.first();
-        await firstItem.waitFor({ state: 'visible', timeout: 5000 });
-        await firstItem.click();
-        console.log(`[Action] Clicked model item: ${modelName}`);
+        // Click directly on a getByText match for the model name, which should be within the clickable area
+        const modelText = page.locator('.p-dialog').getByText(modelName, { exact: true });
+        await modelText.waitFor({ state: 'visible', timeout: 5000 });
         
-        // Wait for button to become enabled (shows count > 0)
-        await page.waitForTimeout(300);
+        // Click the parent container (the clickable item)
+        const clickableContainer = modelText.locator('xpath=ancestor::*[@role="option" or contains(@class, "cursor") or position()=1]/..').first();
+        
+        // Try to click using different strategies
+        try {
+            // Strategy 1: Click the text element's grandparent (the clickable container)
+            await modelText.locator('..').locator('..').click();
+            console.log(`[Action] Clicked container for model: ${modelName}`);
+        } catch (e) {
+            // Strategy 2: Click directly on the text
+            await modelText.click();
+            console.log(`[Action] Clicked model text: ${modelName}`);
+        }
+        
+        // Wait for selection to register
+        await page.waitForTimeout(500);
+        
+        // Check the Add button state
         const addButton = page.locator('.p-dialog-footer button:has-text("Add Selected")').first();
         await addButton.waitFor({ state: 'visible', timeout: 5000 });
         
-        // Check if button is enabled (has models selected)
         const buttonText = await addButton.textContent();
         console.log(`[Action] Add button text: ${buttonText}`);
         
+        // If still shows (0), try clicking the checkbox via JavaScript
         if (buttonText?.includes('(0)')) {
-            // Try clicking the checkbox directly
-            const checkbox = firstItem.locator('input[type="checkbox"], .p-checkbox-box').first();
-            await checkbox.click({ force: true });
-            console.log('[Action] Clicked checkbox directly');
+            console.log('[Action] Selection not registered, trying JS click...');
+            
+            // Try to find and toggle the checkbox via JavaScript
+            const checkboxInput = modelItem.locator('input[type="checkbox"]').first();
+            if (await checkboxInput.count() > 0) {
+                await checkboxInput.check({ force: true });
+                console.log('[Action] Force-checked the checkbox');
+            } else {
+                // Click on the item container itself
+                await modelItem.click({ force: true, position: { x: 20, y: 20 } });
+                console.log('[Action] Clicked item at specific position');
+            }
+            
             await page.waitForTimeout(300);
+            const updatedText = await addButton.textContent();
+            console.log(`[Action] Updated button text: ${updatedText}`);
         }
         
         // Click Add button

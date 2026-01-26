@@ -84,44 +84,55 @@ When(
             throw new Error(`Model "${modelStateName}" not found in shared state`);
         }
         
-        // Click "Add Model" card in project viewer
-        const addModelCard = page.locator('.project-section:has-text("Models") .project-card-add').first();
+        // Click "Add Model" card in project viewer (similar to pack viewer)
+        // Try multiple selectors as the class names might vary
+        let addModelCard = page.locator('.project-section:has-text("Models") .project-card-add').first();
+        
+        // Fallback: try pack-style selector (both may use same components)
+        if (await addModelCard.count() === 0) {
+            addModelCard = page.locator('.pack-section:has-text("Models") .pack-card-add').first();
+        }
+        
         await addModelCard.waitFor({ state: 'visible', timeout: 10000 });
         await addModelCard.click();
         console.log('[Action] Clicked Add Model card');
         
-        // Wait for dialog
-        await page.waitForSelector('.p-dialog:has-text("Add Models to Project")', { state: 'visible', timeout: 5000 });
+        // Wait for dialog  - could be "Add Models to Project" or "Add Models to Pack"
+        await page.waitForSelector('.p-dialog:has-text("Add Models")', { state: 'visible', timeout: 5000 });
         console.log('[Action] Add Models dialog opened');
         
-        // Find and click model item
-        const modelItems = page.locator('.p-dialog div[data-pc-section="content"] > div').filter({
-            hasText: model.name
-        });
+        // Wait for content to load
+        await page.waitForTimeout(500);
         
-        const firstItem = modelItems.first();
-        await firstItem.waitFor({ state: 'visible', timeout: 5000 });
-        await firstItem.click();
-        console.log(`[Action] Clicked model item: ${model.name}`);
+        const modelName = model.name;
         
-        await page.waitForTimeout(300);
+        // Click directly on model name text, then click its grandparent (the clickable container)
+        const modelText = page.locator('.p-dialog').getByText(modelName, { exact: true });
+        await modelText.waitFor({ state: 'visible', timeout: 5000 });
+        
+        try {
+            // Click the text element's grandparent (the clickable container)
+            await modelText.locator('..').locator('..').click();
+            console.log(`[Action] Clicked container for model: ${modelName}`);
+        } catch (e) {
+            // Fallback: Click directly on the text
+            await modelText.click();
+            console.log(`[Action] Clicked model text: ${modelName}`);
+        }
+        
+        // Wait for selection to register
+        await page.waitForTimeout(500);
+        
         const addButton = page.locator('.p-dialog-footer button:has-text("Add Selected")').first();
         await addButton.waitFor({ state: 'visible', timeout: 5000 });
         
         const buttonText = await addButton.textContent();
         console.log(`[Action] Add button text: ${buttonText}`);
         
-        if (buttonText?.includes('(0)')) {
-            const checkbox = firstItem.locator('input[type="checkbox"], .p-checkbox-box').first();
-            await checkbox.click({ force: true });
-            console.log('[Action] Clicked checkbox directly');
-            await page.waitForTimeout(300);
-        }
-        
         await addButton.click();
         console.log('[Action] Clicked Add button');
         
-        await page.waitForSelector('.p-dialog:has-text("Add Models to Project")', { state: 'hidden', timeout: 10000 });
+        await page.waitForSelector('.p-dialog:has-text("Add Models")', { state: 'hidden', timeout: 10000 });
         console.log('[Action] Dialog closed');
         
         await page.waitForTimeout(500);

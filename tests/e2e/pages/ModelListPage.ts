@@ -27,6 +27,31 @@ export class ModelListPage {
     }
 
     async uploadModel(filePath: string, keepWindowOpen: boolean = false) {
+        // Wait for page to be fully stable before uploading
+        // This prevents race conditions with page refresh that cause SignalR to miss notifications
+        
+        // 1. Wait for load state
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+        
+        // 2. Wait for network to settle
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
+            console.log('[Upload] Network idle timeout, proceeding anyway');
+        });
+        
+        // 3. Ensure model grid is fully rendered
+        await this.page.waitForSelector('.model-card, .empty-state, .model-grid', { 
+            state: 'visible',
+            timeout: 10000 
+        }).catch(() => {
+            console.log('[Upload] Model grid selector timeout, proceeding anyway');
+        });
+        
+        // 4. Wait for React hydration and any initial data fetching to complete
+        // This is critical to prevent the "upload too fast" race condition
+        // where React re-renders after upload, causing SignalR reconnection
+        console.log('[Upload] Waiting for page to fully stabilize...');
+        await this.page.waitForTimeout(2000);
+        
         const fileChooserPromise = this.page.waitForEvent("filechooser");
         
         // Find the upload button by aria-label
@@ -40,8 +65,18 @@ export class ModelListPage {
         // Wait for upload to complete in the side panel
         // We look for "completed" text in the summary text element
         await expect(
-            this.page.locator(".upload-summary-text").getByText(/completed/i)
+            this.page.locator(".upload-summary-text").getByText(/\d+ completed/i)
         ).toBeVisible({ timeout: 30000 });
+
+        // Ensure we don't match "0 completed"
+        await expect(async () => {
+            const text = await this.page.locator(".upload-summary-text").textContent();
+            const completedMatch = text?.match(/(\d+) completed/i);
+            const count = completedMatch ? parseInt(completedMatch[1], 10) : 0;
+            expect(count).toBeGreaterThan(0);
+        }).toPass({ timeout: 30000 });
+
+
 
         // Optionally close the upload progress window
         if (!keepWindowOpen) {

@@ -106,17 +106,26 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
         
         const modelData = await response.json();
         
+        // Handle both PascalCase (C# API) and camelCase property names
+        const modelId = modelData.id ?? modelData.Id;
+        const versionId = modelData.versionId ?? modelData.VersionId;
+        
+        if (!modelId) {
+            console.error('[Setup] API response:', modelData);
+            throw new Error(`Model creation API did not return an ID. Response: ${JSON.stringify(modelData)}`);
+        }
+        
         // Store in shared state
         sharedState.saveModel(modelName, {
-            id: modelData.id,
+            id: modelId,
             name: modelName,
-            versions: [{
-                id: modelData.versionId,
+            versions: versionId ? [{
+                id: versionId,
                 name: path.basename(modelFile),
-            }],
+            }] : [],
         });
         
-        console.log(`[Setup] Created test model "${modelName}" (ID: ${modelData.id}) via API`);
+        console.log(`[Setup] Created test model "${modelName}" (ID: ${modelId}) via API`);
         model = sharedState.getModel(modelName);
     }
     

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
-import { useTabContext } from '../../../hooks/useTabContext'
+import { openTabInPanel } from '../../../utils/tabNavigation'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import StageGrid from './StageGrid'
@@ -21,7 +21,6 @@ function StageList() {
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const toast = useRef<Toast>(null)
-  const { openTab } = useTabContext()
 
   const loadStages = useCallback(async () => {
     try {
@@ -104,7 +103,7 @@ function StageList() {
 
   const handleEditStage = (stage: StageDto) => {
     // Open stage editor in a new tab
-    openTab('stageEditor', stage.name, { id: stage.id.toString() })
+    openTabInPanel('stageEditor', 'left', stage.id.toString(), stage.name)
   }
 
   return (

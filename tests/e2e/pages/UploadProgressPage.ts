@@ -68,7 +68,7 @@ export class UploadProgressPage {
     /**
      * Get the upload item locator by filename
      */
-    getUploadItem(filename: string) {
+    getUploadItem(filename: string | RegExp) {
         return this.page.locator(this.uploadItem).filter({
             has: this.page.locator(this.uploadItemName, { hasText: filename }),
         });
@@ -112,9 +112,11 @@ export class UploadProgressPage {
     /**
      * Click the "Open in Tab" button for a file
      */
-    async clickOpenInTab(filename: string): Promise<void> {
+    async clickOpenInTab(filename: string | RegExp): Promise<void> {
         const item = this.getUploadItem(filename);
         const button = item.locator(this.openInTabButton);
+        // Hover over the item to ensure action buttons are visible
+        await item.hover();
         await expect(button).toBeVisible();
         await button.click();
         // Wait for navigation/URL change

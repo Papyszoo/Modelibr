@@ -302,8 +302,20 @@ When(
     'I click the "Open in Tab" button for {string} in the batch',
     async ({ page }, filename: string) => {
         const uploadProgress = new UploadProgressPage(page);
-        await uploadProgress.clickOpenInTab(filename);
-        console.log(`[UI] Clicked "Open in Tab" for "${filename}" in batch`);
+        
+        // Create regex to match filename with potential hash (e.g. test-cube.glb -> test-cube.*.glb)
+        // Helper to escape regex special characters except the dot we want to replace
+        const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        const baseName = path.basename(filename, path.extname(filename));
+        const ext = path.extname(filename);
+        
+        // Better approach: Find the actual filename visible on screen that matches the pattern
+        const namePattern = new RegExp(`^${escapeRegExp(baseName)}.*${escapeRegExp(ext)}$`);
+        
+         await uploadProgress.clickOpenInTab(namePattern);
+
+        console.log(`[UI] Clicked "Open in Tab" for "${filename}" (pattern match) in batch`);
     }
 );
 

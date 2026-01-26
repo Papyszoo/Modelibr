@@ -71,13 +71,13 @@ namespace Application.Files
             }
             
             var batchUpload = BatchUpload.Create(
-                batchId,
-                uploadType,
-                fileEntity.Id,
-                _dateTimeProvider.UtcNow,
-                command.PackId,
-                command.ModelId,
-                command.TextureSetId);
+                batchId: batchId,
+                uploadType: uploadType,
+                fileId: fileEntity.Id,
+                uploadedAt: _dateTimeProvider.UtcNow,
+                packId: command.PackId,
+                modelId: command.ModelId,
+                textureSetId: command.TextureSetId);
             
             await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
 

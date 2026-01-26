@@ -22,12 +22,18 @@ export class UniqueFileGenerator {
     static async generate(sourceFilename: string): Promise<string> {
         const sourcePath = path.join(this.ASSETS_DIR, sourceFilename);
         const uniqueId = crypto.randomUUID();
-        const tempDir = path.join(this.TEMP_DIR, uniqueId.substring(0, 8));
+        const shortId = uniqueId.substring(0, 8);
+        const tempDir = path.join(this.TEMP_DIR, shortId);
         
         // Ensure temp directory exists
         await fs.mkdir(tempDir, { recursive: true });
         
-        const targetPath = path.join(tempDir, sourceFilename);
+        // Generate unique filename by adding the short ID before the extension
+        const ext = path.extname(sourceFilename);
+        const baseName = path.basename(sourceFilename, ext);
+        const uniqueFilename = `${baseName}-${shortId}${ext}`;
+        
+        const targetPath = path.join(tempDir, uniqueFilename);
         const originalBuffer = await fs.readFile(sourcePath);
         
         let newBuffer: Buffer;

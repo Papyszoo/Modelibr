@@ -80,33 +80,28 @@ function SplitterLayout(): JSX.Element {
     if (hasCleanedDuplicates.current) return
     hasCleanedDuplicates.current = true
 
-    // Check if leftTabs has duplicates
-    const leftIds = leftTabs.map(t => t.id)
-    const leftUniqueIds = [...new Set(leftIds)]
+    // Get raw URL values to check for duplicates
+    const urlParams = new URLSearchParams(window.location.search)
+    const rawLeftTabs = urlParams.get('leftTabs') || ''
+    const rawRightTabs = urlParams.get('rightTabs') || ''
+
+    // Check if raw URL has duplicate tab IDs (before deduplication)
+    const leftUrlIds = rawLeftTabs.split(',').filter(id => id)
+    const leftUniqueUrlIds = [...new Set(leftUrlIds)]
     
-    if (leftIds.length !== leftUniqueIds.length) {
-      // Deduplicate by keeping first occurrence of each tab
-      const seen = new Set<string>()
-      const dedupedLeft = leftTabs.filter(tab => {
-        if (seen.has(tab.id)) return false
-        seen.add(tab.id)
-        return true
-      })
-      setLeftTabs(dedupedLeft)
+    if (leftUrlIds.length !== leftUniqueUrlIds.length) {
+      // Force update with already-deduplicated tabs to sync URL
+      // The tabs are already deduplicated by parseCompactTabFormat,
+      // but we need to explicitly set them to trigger URL update
+      setLeftTabs([...leftTabs])
     }
 
-    // Check if rightTabs has duplicates
-    const rightIds = rightTabs.map(t => t.id)
-    const rightUniqueIds = [...new Set(rightIds)]
+    // Check if rightTabs raw URL has duplicates
+    const rightUrlIds = rawRightTabs.split(',').filter(id => id)
+    const rightUniqueUrlIds = [...new Set(rightUrlIds)]
     
-    if (rightIds.length !== rightUniqueIds.length) {
-      const seen = new Set<string>()
-      const dedupedRight = rightTabs.filter(tab => {
-        if (seen.has(tab.id)) return false
-        seen.add(tab.id)
-        return true
-      })
-      setRightTabs(dedupedRight)
+    if (rightUrlIds.length !== rightUniqueUrlIds.length) {
+      setRightTabs([...rightTabs])
     }
   }, [leftTabs, rightTabs, setLeftTabs, setRightTabs])
 

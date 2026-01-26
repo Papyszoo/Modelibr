@@ -35,20 +35,24 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.textureSetViewer
 
-  const loadTextureSet = useCallback(async () => {
+  const loadTextureSet = useCallback(async (forceRefresh = false) => {
     try {
-      setLoading(true)
+      if (!textureSet) {
+        setLoading(true)
+      }
       setError('')
-      const set = await textureSetsApi.getTextureSetById(parseInt(setId))
+      const set = await textureSetsApi.getTextureSetById(parseInt(setId), { skipCache: forceRefresh })
       setTextureSet(set)
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load texture set'
       )
     } finally {
-      setLoading(false)
+      if (!textureSet) {
+        setLoading(false)
+      }
     }
-  }, [setId, textureSetsApi])
+  }, [setId, textureSetsApi, textureSet])
 
   useEffect(() => {
     loadTextureSet()
