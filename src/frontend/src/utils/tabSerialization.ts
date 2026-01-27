@@ -54,6 +54,8 @@ export function getTabLabel(
       return projectId ? `Project ${projectId}` : 'Project Viewer'
     case 'sprites':
       return 'Sprites'
+    case 'sounds':
+      return 'Sounds'
     case 'stageList':
       return 'Stages'
     case 'stageEditor':
@@ -174,6 +176,7 @@ export function parseCompactTabFormat(
           'projects',
           'projectViewer',
           'sprites',
+          'sounds',
           'stageList',
           'stageEditor',
           'history',
@@ -336,6 +339,7 @@ export async function parseCompactTabFormatAsync(
           'projects',
           'projectViewer',
           'sprites',
+          'sounds',
           'stageList',
           'stageEditor',
           'history',
