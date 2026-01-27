@@ -143,8 +143,12 @@ function SoundList() {
         try {
           const audioBuffer = await decodeAudio(file)
           duration = audioBuffer.duration
-          const peakData = extractPeaks(audioBuffer, 200)
-          peaks = JSON.stringify(peakData)
+          try {
+            const peakData = extractPeaks(audioBuffer, 200)
+            peaks = JSON.stringify(peakData)
+          } catch (peakError) {
+            console.warn('Could not extract peaks:', peakError)
+          }
         } catch (decodeError) {
           console.warn('Could not decode audio for peaks, using defaults:', decodeError)
         }

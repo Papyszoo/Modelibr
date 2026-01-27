@@ -54,10 +54,15 @@ function SoundCard({
     if (sound.peaks) {
       try {
         const peakData = JSON.parse(sound.peaks)
-        ws.load('', peakData, sound.duration || 0)
-        setIsLoaded(true)
-      } catch {
-        // If peaks parsing fails, show placeholder
+        if (Array.isArray(peakData) && peakData.length > 0) {
+          ws.load('', peakData, sound.duration || 0)
+          setIsLoaded(true)
+        } else {
+          setIsLoaded(false)
+        }
+      } catch (parseError) {
+        // JSON parsing failed - peaks data is invalid
+        console.warn('Failed to parse peaks data:', parseError)
         setIsLoaded(false)
       }
     }

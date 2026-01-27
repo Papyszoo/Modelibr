@@ -67,21 +67,25 @@ export function sliceAudioBuffer(
     (window as unknown as { webkitAudioContext: typeof AudioContext })
       .webkitAudioContext)()
 
-  const newBuffer = audioContext.createBuffer(
-    numberOfChannels,
-    length,
-    sampleRate
-  )
+  try {
+    const newBuffer = audioContext.createBuffer(
+      numberOfChannels,
+      length,
+      sampleRate
+    )
 
-  for (let channel = 0; channel < numberOfChannels; channel++) {
-    const oldData = buffer.getChannelData(channel)
-    const newData = newBuffer.getChannelData(channel)
-    for (let i = 0; i < length; i++) {
-      newData[i] = oldData[startSample + i]
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const oldData = buffer.getChannelData(channel)
+      const newData = newBuffer.getChannelData(channel)
+      for (let i = 0; i < length; i++) {
+        newData[i] = oldData[startSample + i]
+      }
     }
-  }
 
-  return newBuffer
+    return newBuffer
+  } finally {
+    audioContext.close()
+  }
 }
 
 /**
