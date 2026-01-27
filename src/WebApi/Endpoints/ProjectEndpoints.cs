@@ -72,6 +72,17 @@ public static class ProjectEndpoints
             .WithName("Remove Sprite from Project")
             .WithSummary("Removes a sprite from the specified project")
             .WithOpenApi();
+
+        // Project-Sound association
+        app.MapPost("/projects/{projectId}/sounds/{soundId}", AddSoundToProject)
+            .WithName("Add Sound to Project")
+            .WithSummary("Adds a sound to the specified project")
+            .WithOpenApi();
+
+        app.MapDelete("/projects/{projectId}/sounds/{soundId}", RemoveSoundFromProject)
+            .WithName("Remove Sound from Project")
+            .WithSummary("Removes a sound from the specified project")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> GetAllProjects(
@@ -242,6 +253,34 @@ public static class ProjectEndpoints
         CancellationToken cancellationToken)
     {
         var command = new RemoveSpriteFromProjectCommand(projectId, spriteId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddSoundToProject(
+        int projectId,
+        int soundId,
+        ICommandHandler<AddSoundToProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new AddSoundToProjectCommand(projectId, soundId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveSoundFromProject(
+        int projectId,
+        int soundId,
+        ICommandHandler<RemoveSoundFromProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new RemoveSoundFromProjectCommand(projectId, soundId);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess

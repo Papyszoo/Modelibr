@@ -936,6 +936,57 @@ class ApiClient {
     return response.data.sprites
   }
 
+  // Pack-Sound methods
+  async addSoundToPack(packId: number, soundId: number): Promise<void> {
+    await this.client.post(`/packs/${packId}/sounds/${soundId}`)
+
+    // Invalidate packs cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+  }
+
+  async removeSoundFromPack(packId: number, soundId: number): Promise<void> {
+    await this.client.delete(`/packs/${packId}/sounds/${soundId}`)
+
+    // Invalidate packs cache when associations change
+    useApiCacheStore.getState().invalidatePacks()
+    useApiCacheStore.getState().invalidatePackById(packId)
+  }
+
+  async getSoundsByPack(packId: number): Promise<SoundDto[]> {
+    const response = await this.client.get<GetAllSoundsResponse>(
+      `/sounds?packId=${packId}`
+    )
+    return response.data.sounds
+  }
+
+  // Project-Sound methods
+  async addSoundToProject(projectId: number, soundId: number): Promise<void> {
+    await this.client.post(`/projects/${projectId}/sounds/${soundId}`)
+
+    // Invalidate projects cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+  }
+
+  async removeSoundFromProject(
+    projectId: number,
+    soundId: number
+  ): Promise<void> {
+    await this.client.delete(`/projects/${projectId}/sounds/${soundId}`)
+
+    // Invalidate projects cache when associations change
+    useApiCacheStore.getState().invalidateProjects()
+    useApiCacheStore.getState().invalidateProjectById(projectId)
+  }
+
+  async getSoundsByProject(projectId: number): Promise<SoundDto[]> {
+    const response = await this.client.get<GetAllSoundsResponse>(
+      `/sounds?projectId=${projectId}`
+    )
+    return response.data.sounds
+  }
+
   // Batch Upload History API
   async getBatchUploadHistory(): Promise<{
     uploads: Array<{
