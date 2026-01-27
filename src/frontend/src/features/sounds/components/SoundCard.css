@@ -30,6 +30,19 @@
   z-index: 2;
   opacity: 0;
   transition: opacity 0.2s;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sound-select-checkbox i {
+  font-size: 1rem;
+  color: var(--text-color);
 }
 
 .sound-card:hover .sound-select-checkbox,
@@ -37,16 +50,8 @@
   opacity: 1;
 }
 
-.sound-select-checkbox .p-checkbox {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.sound-select-checkbox .p-checkbox .p-checkbox-box {
-  width: 1.25rem;
-  height: 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 4px;
+.sound-card.selected .sound-select-checkbox i {
+  color: var(--primary-color);
 }
 
 .sound-waveform-container {

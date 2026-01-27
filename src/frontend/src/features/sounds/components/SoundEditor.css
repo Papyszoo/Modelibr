@@ -108,19 +108,25 @@
   background: linear-gradient(135deg, var(--primary-100) 0%, var(--primary-50) 100%);
   border: 2px dashed var(--primary-300);
   border-radius: 8px;
-  cursor: grab;
+  cursor: pointer;
   transition: all 0.2s;
   color: var(--primary-700);
   font-weight: 500;
 }
 
-.drag-handle:hover {
+.drag-handle.active:hover {
   background: linear-gradient(135deg, var(--primary-200) 0%, var(--primary-100) 100%);
   border-color: var(--primary-color);
 }
 
-.drag-handle:active {
+.drag-handle.active:active {
   cursor: grabbing;
+}
+
+.drag-handle.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .drag-handle i {
