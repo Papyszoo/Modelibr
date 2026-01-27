@@ -13,7 +13,6 @@ import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
-import { Checkbox } from 'primereact/checkbox'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
@@ -22,6 +21,9 @@ import ApiClient from '../../../services/ApiClient'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import { SoundDto, SoundCategoryDto } from '../../../types'
+import { decodeAudio, extractPeaks, formatDuration } from '../../../utils/audioUtils'
+import SoundCard from './SoundCard'
+import SoundEditor from './SoundEditor'
 import './SoundList.css'
 
 const UNASSIGNED_CATEGORY_ID = -1
@@ -132,13 +134,30 @@ function SoundList() {
           uploadProgressContext?.addUpload(file, 'sound', batchId) || null
 
         if (uploadId && uploadProgressContext) {
+          uploadProgressContext.updateUploadProgress(uploadId, 20)
+        }
+
+        // Decode audio to extract duration and peaks
+        let duration = 0
+        let peaks: string | undefined
+        try {
+          const audioBuffer = await decodeAudio(file)
+          duration = audioBuffer.duration
+          const peakData = extractPeaks(audioBuffer, 200)
+          peaks = JSON.stringify(peakData)
+        } catch (decodeError) {
+          console.warn('Could not decode audio for peaks, using defaults:', decodeError)
+        }
+
+        if (uploadId && uploadProgressContext) {
           uploadProgressContext.updateUploadProgress(uploadId, 50)
         }
 
         const fileName = file.name.replace(/\.[^/.]+$/, '')
         const result = await ApiClient.createSoundWithFile(file, {
           name: fileName,
-          duration: 0, // Duration extraction with Web Audio API is planned for future enhancement
+          duration: duration,
+          peaks: peaks,
           categoryId: categoryIdToAssign,
           batchId: batchId,
         })
@@ -177,13 +196,6 @@ function SoundList() {
 
   const { onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDragAndDrop(handleFileDrop)
-
-  const formatDuration = (seconds: number): string => {
-    if (seconds === 0) return '--:--'
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`
@@ -719,40 +731,17 @@ function SoundList() {
             }}
           >
             {filteredSounds.map(sound => (
-              <div
+              <SoundCard
                 key={sound.id}
-                data-sound-id={sound.id}
-                className={`sound-card ${draggedSoundId === sound.id ? 'dragging' : ''} ${selectedSoundIds.has(sound.id) ? 'selected' : ''}`}
+                sound={sound}
+                isSelected={selectedSoundIds.has(sound.id)}
+                isDragging={draggedSoundId === sound.id}
+                onSelect={e => toggleSoundSelection(sound.id, e)}
                 onClick={() => openSoundModal(sound)}
                 onContextMenu={e => handleSoundContextMenu(e, sound)}
-                draggable
                 onDragStart={e => handleSoundDragStart(e, sound)}
                 onDragEnd={handleSoundDragEnd}
-              >
-                <div
-                  className="sound-select-checkbox"
-                  onClick={e => toggleSoundSelection(sound.id, e)}
-                >
-                  <Checkbox
-                    checked={selectedSoundIds.has(sound.id)}
-                    readOnly
-                  />
-                </div>
-                <div className="sound-waveform">
-                  <i className="pi pi-volume-up sound-icon" />
-                </div>
-                <div className="sound-info">
-                  <h3 className="sound-name">{sound.name}</h3>
-                  <div className="sound-meta">
-                    <span className="sound-duration">
-                      {formatDuration(sound.duration)}
-                    </span>
-                  </div>
-                  <span className="sound-size">
-                    {formatFileSize(sound.fileSizeBytes)}
-                  </span>
-                </div>
-              </div>
+              />
             ))}
           </div>
           {isAreaSelecting && selectionBox && (
@@ -823,51 +812,22 @@ function SoundList() {
         </div>
       </Dialog>
 
-      {/* Sound Detail Modal */}
+      {/* Sound Editor Modal */}
       <Dialog
-        header={selectedSound?.name || 'Sound'}
         visible={showSoundModal}
         onHide={() => setShowSoundModal(false)}
-        style={{ width: '600px' }}
-        className="sound-detail-modal"
+        style={{ width: '800px' }}
+        className="sound-editor-modal"
+        header={null}
+        closable={false}
+        contentStyle={{ padding: 0 }}
       >
         {selectedSound && (
-          <div className="sound-modal-content">
-            <div className="sound-modal-preview">
-              <audio
-                controls
-                src={ApiClient.getFileUrl(selectedSound.fileId.toString())}
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div className="sound-modal-info">
-              <div className="sound-modal-details">
-                <p>
-                  <strong>Duration:</strong>{' '}
-                  {formatDuration(selectedSound.duration)}
-                </p>
-                <p>
-                  <strong>File:</strong> {selectedSound.fileName}
-                </p>
-                <p>
-                  <strong>Size:</strong>{' '}
-                  {formatFileSize(selectedSound.fileSizeBytes)}
-                </p>
-                <p>
-                  <strong>Category:</strong>{' '}
-                  {selectedSound.categoryName || 'Unassigned'}
-                </p>
-              </div>
-              <div className="sound-modal-download">
-                <Button
-                  label="Download"
-                  icon="pi pi-download"
-                  onClick={handleDownload}
-                  className="p-button-success w-full"
-                />
-              </div>
-            </div>
-          </div>
+          <SoundEditor
+            sound={selectedSound}
+            onClose={() => setShowSoundModal(false)}
+            onDownload={handleDownload}
+          />
         )}
       </Dialog>
 
