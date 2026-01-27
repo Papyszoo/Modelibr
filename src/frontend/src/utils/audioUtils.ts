@@ -187,3 +187,37 @@ export function formatDuration(seconds: number): string {
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
+
+/**
+ * Supported audio file extensions.
+ */
+export const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a']
+
+/**
+ * Check if a file is a valid audio file.
+ */
+export function isAudioFile(file: File): boolean {
+  if (file.type.startsWith('audio/')) return true
+  const ext = file.name.split('.').pop()?.toLowerCase() || ''
+  return AUDIO_EXTENSIONS.includes(ext)
+}
+
+/**
+ * Filter an array of files to only include valid audio files.
+ */
+export function filterAudioFiles(files: File[]): File[] {
+  return files.filter(isAudioFile)
+}
+
+/**
+ * Process an audio file to extract duration and peaks.
+ * Returns the processed audio metadata.
+ */
+export async function processAudioFile(
+  file: File
+): Promise<{ duration: number; peaks: string }> {
+  const audioBuffer = await decodeAudio(file)
+  const duration = audioBuffer.duration
+  const peaks = extractPeaks(audioBuffer)
+  return { duration, peaks: JSON.stringify(peaks) }
+}

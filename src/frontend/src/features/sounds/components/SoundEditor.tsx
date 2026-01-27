@@ -101,10 +101,11 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
     ws.on('timeupdate', time => {
       setCurrentTime(time)
       // Stop at end of selection when playing a region
-      if (playingSelectionRef.current && time >= playingSelectionRef.current.end) {
-        ws.pause()
-        ws.setTime(playingSelectionRef.current.start)
+      const selection = playingSelectionRef.current
+      if (selection && time >= selection.end) {
         playingSelectionRef.current = null
+        ws.pause()
+        ws.setTime(selection.start)
       }
     })
 
