@@ -23,6 +23,7 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
   const wavesurferRef = useRef<WaveSurfer | null>(null)
   const regionsRef = useRef<RegionsPlugin | null>(null)
   const audioBufferRef = useRef<AudioBuffer | null>(null)
+  const sliceBlobRef = useRef<Blob | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(0)
@@ -123,6 +124,7 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
       try {
         const slicedBuffer = sliceAudioBuffer(audioBufferRef.current, start, end)
         const wavBlob = audioBufferToWav(slicedBuffer)
+        sliceBlobRef.current = wavBlob
         const url = URL.createObjectURL(wavBlob)
         setSliceUrl(url)
       } catch (err) {
@@ -142,13 +144,15 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
     if (regionsRef.current && wavesurferRef.current) {
       const regions = regionsRef.current.getRegions()
       if (regions.length > 0) {
+        // Always restart from the beginning of the selection
+        wavesurferRef.current.setTime(regions[0].start)
         regions[0].play()
       }
     }
   }
 
   const handleDragStart = (e: React.DragEvent) => {
-    if (!sliceUrl || !selectedRegion) return
+    if (!sliceUrl || !selectedRegion || !sliceBlobRef.current) return
 
     e.stopPropagation()
 
@@ -160,6 +164,11 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
     // Set DownloadURL data for drag-to-desktop/DAW
     const downloadData = `audio/wav:${filename}:${sliceUrl}`
     e.dataTransfer.setData('DownloadURL', downloadData)
+    
+    // Also set text/uri-list for broader compatibility
+    e.dataTransfer.setData('text/uri-list', sliceUrl)
+    e.dataTransfer.setData('text/plain', sliceUrl)
+    
     e.dataTransfer.effectAllowed = 'copy'
   }
 

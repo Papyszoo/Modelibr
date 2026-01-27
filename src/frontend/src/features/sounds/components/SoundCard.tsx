@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
+import { Checkbox } from 'primereact/checkbox'
 import { SoundDto } from '../../../types'
 import ApiClient from '../../../services/ApiClient'
 import { formatDuration } from '../../../utils/audioUtils'
@@ -29,7 +30,7 @@ function SoundCard({
   const waveformRef = useRef<HTMLDivElement>(null)
   const wavesurferRef = useRef<WaveSurfer | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isAudioLoaded, setIsAudioLoaded] = useState(false)
 
   useEffect(() => {
     if (!waveformRef.current) return
@@ -55,21 +56,19 @@ function SoundCard({
       try {
         const peakData = JSON.parse(sound.peaks)
         if (Array.isArray(peakData) && peakData.length > 0) {
+          // Load peaks only for visualization - audio will be loaded on play
           ws.load('', peakData, sound.duration || 0)
-          setIsLoaded(true)
-        } else {
-          setIsLoaded(false)
         }
       } catch (parseError) {
         // JSON parsing failed - peaks data is invalid
         console.warn('Failed to parse peaks data:', parseError)
-        setIsLoaded(false)
       }
     }
 
     ws.on('play', () => setIsPlaying(true))
     ws.on('pause', () => setIsPlaying(false))
     ws.on('finish', () => setIsPlaying(false))
+    ws.on('ready', () => setIsAudioLoaded(true))
 
     return () => {
       ws.destroy()
@@ -81,12 +80,12 @@ function SoundCard({
 
     if (!wavesurferRef.current) return
 
-    // If not loaded yet, load the full audio
-    if (!isLoaded && !isPlaying) {
+    // If audio not loaded yet, load the full audio file
+    if (!isAudioLoaded) {
       const audioUrl = ApiClient.getFileUrl(sound.fileId.toString())
       try {
         await wavesurferRef.current.load(audioUrl)
-        setIsLoaded(true)
+        // The 'ready' event will set isAudioLoaded to true
         wavesurferRef.current.play()
       } catch (error) {
         console.error('Failed to load audio:', error)
@@ -113,12 +112,7 @@ function SoundCard({
       onDragEnd={onDragEnd}
     >
       <div className="sound-select-checkbox" onClick={onSelect}>
-        <input
-          type="checkbox"
-          checked={isSelected}
-          readOnly
-          className="sound-checkbox"
-        />
+        <Checkbox checked={isSelected} readOnly />
       </div>
 
       <div className="sound-waveform-container">
