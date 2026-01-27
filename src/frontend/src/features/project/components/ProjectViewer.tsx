@@ -19,7 +19,7 @@ import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
-import { formatDuration, decodeAudio, extractPeaks } from '../../../utils/audioUtils'
+import { formatDuration, filterAudioFiles, processAudioFile } from '../../../utils/audioUtils'
 import './ProjectViewer.css'
 
 interface ProjectViewerProps {
@@ -645,11 +645,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     if (files.length === 0) return
 
     // Filter for audio files only
-    const audioFiles = files.filter(
-      file =>
-        file.type.startsWith('audio/') ||
-        /\.(mp3|wav|ogg|flac|aac|m4a)$/i.test(file.name)
-    )
+    const audioFiles = filterAudioFiles(files)
 
     if (audioFiles.length === 0) {
       toast.current?.show({
@@ -683,10 +679,8 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
             uploadProgressContext.updateUploadProgress(uploadId, 20)
           }
 
-          // Decode audio to extract duration and peaks
-          const audioBuffer = await decodeAudio(file)
-          const duration = audioBuffer.duration
-          const peaks = extractPeaks(audioBuffer)
+          // Process audio to extract duration and peaks
+          const { duration, peaks } = await processAudioFile(file)
 
           if (uploadId && uploadProgressContext) {
             uploadProgressContext.updateUploadProgress(uploadId, 40)
@@ -698,7 +692,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
           const response = await ApiClient.createSoundWithFile(file, {
             name: soundName,
             duration,
-            peaks: JSON.stringify(peaks),
+            peaks,
           })
 
           if (uploadId && uploadProgressContext) {
