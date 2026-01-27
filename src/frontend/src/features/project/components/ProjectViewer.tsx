@@ -19,7 +19,7 @@ import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
-import { formatDuration } from '../../../utils/audioUtils'
+import { formatDuration, decodeAudio, extractPeaks } from '../../../utils/audioUtils'
 import './ProjectViewer.css'
 
 interface ProjectViewerProps {
@@ -641,6 +641,116 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     handleSpriteUpload(files)
   }
 
+  const handleSoundUpload = async (files: File[]) => {
+    if (files.length === 0) return
+
+    // Filter for audio files only
+    const audioFiles = files.filter(
+      file =>
+        file.type.startsWith('audio/') ||
+        /\.(mp3|wav|ogg|flac|aac|m4a)$/i.test(file.name)
+    )
+
+    if (audioFiles.length === 0) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Invalid Files',
+        detail: 'Please drop audio files only',
+        life: 3000,
+      })
+      return
+    }
+
+    try {
+      setUploadingSound(true)
+
+      let newCount = 0
+
+      // Create batch for all uploads
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
+
+      // Upload all sound files and add them to project
+      const uploadPromises = audioFiles.map(async file => {
+        let uploadId: string | null = null
+        try {
+          // Track the upload with batchId
+          uploadId =
+            uploadProgressContext?.addUpload(file, 'sound', batchId) || null
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 20)
+          }
+
+          // Decode audio to extract duration and peaks
+          const audioBuffer = await decodeAudio(file)
+          const duration = audioBuffer.duration
+          const peaks = extractPeaks(audioBuffer)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 40)
+          }
+
+          const soundName = file.name.replace(/\.[^/.]+$/, '')
+
+          // Create sound with file
+          const response = await ApiClient.createSoundWithFile(file, {
+            name: soundName,
+            duration,
+            peaks: JSON.stringify(peaks),
+          })
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 70)
+          }
+
+          // Add sound to project
+          await ApiClient.addSoundToProject(projectId, response.soundId)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, response)
+          }
+
+          newCount++
+          return response.soundId
+        } catch (error) {
+          // Mark upload as failed
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error as Error)
+          }
+          throw error
+        }
+      })
+
+      await Promise.all(uploadPromises)
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: `${newCount} sound(s) uploaded and added to project`,
+        life: 3000,
+      })
+      loadProjectContent()
+      loadProject()
+    } catch (error) {
+      console.error('Failed to upload sounds:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to upload sounds',
+        life: 3000,
+      })
+    } finally {
+      setUploadingSound(false)
+    }
+  }
+
+  const handleSoundDrop = (files: File[]) => {
+    handleSoundUpload(files)
+  }
+
   const toggleModelSelection = (modelId: number) => {
     setSelectedModelIds(prev =>
       prev.includes(modelId)
@@ -1021,48 +1131,55 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         <div className="project-section">
           <h3>Sounds</h3>
 
-          <div className="project-grid">
-            {sounds.map(sound => (
-              <div
-                key={sound.id}
-                className="project-card"
-                onClick={() => {
-                  setSelectedSound(sound)
-                  setShowSoundModal(true)
-                }}
-                onContextMenu={e => {
-                  e.preventDefault()
-                  setSelectedSound(sound)
-                  soundContextMenu.current?.show(e)
-                }}
-              >
-                <div className="project-card-thumbnail">
-                  <div className="project-card-placeholder">
-                    <i className="pi pi-volume-up" />
-                    <span>{formatDuration(sound.duration)}</span>
-                  </div>
-                  <div className="project-card-overlay">
-                    <span className="project-card-name">{sound.name}</span>
+          <UploadableGrid
+            onFilesDropped={handleSoundDrop}
+            isUploading={uploadingSound}
+            uploadMessage="Drop audio files here to create sounds and add to project"
+            className="project-grid-wrapper"
+          >
+            <div className="project-grid">
+              {sounds.map(sound => (
+                <div
+                  key={sound.id}
+                  className="project-card"
+                  onClick={() => {
+                    setSelectedSound(sound)
+                    setShowSoundModal(true)
+                  }}
+                  onContextMenu={e => {
+                    e.preventDefault()
+                    setSelectedSound(sound)
+                    soundContextMenu.current?.show(e)
+                  }}
+                >
+                  <div className="project-card-thumbnail">
+                    <div className="project-card-placeholder">
+                      <i className="pi pi-volume-up" />
+                      <span>{formatDuration(sound.duration)}</span>
+                    </div>
+                    <div className="project-card-overlay">
+                      <span className="project-card-name">{sound.name}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {/* Add New Card */}
-            <div
-              className="project-card project-card-add"
-              onClick={() => {
-                loadAvailableSounds()
-                setSoundSearchQuery('')
-                setSelectedSoundIds([])
-                setShowAddSoundDialog(true)
-              }}
-            >
-              <div className="project-card-add-content">
-                <i className="pi pi-plus" />
-                <span>Add Sound</span>
+              ))}
+              {/* Add New Card */}
+              <div
+                className="project-card project-card-add"
+                onClick={() => {
+                  loadAvailableSounds()
+                  setSoundSearchQuery('')
+                  setSelectedSoundIds([])
+                  setShowAddSoundDialog(true)
+                }}
+              >
+                <div className="project-card-add-content">
+                  <i className="pi pi-plus" />
+                  <span>Add Sound</span>
+                </div>
               </div>
             </div>
-          </div>
+          </UploadableGrid>
         </div>
       </div>
 

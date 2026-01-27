@@ -24,6 +24,7 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
   const regionsRef = useRef<RegionsPlugin | null>(null)
   const audioBufferRef = useRef<AudioBuffer | null>(null)
   const sliceBlobRef = useRef<Blob | null>(null)
+  const playingSelectionRef = useRef<{ start: number; end: number } | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(0)
@@ -89,9 +90,23 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
     })
 
     ws.on('play', () => setIsPlaying(true))
-    ws.on('pause', () => setIsPlaying(false))
-    ws.on('finish', () => setIsPlaying(false))
-    ws.on('timeupdate', time => setCurrentTime(time))
+    ws.on('pause', () => {
+      setIsPlaying(false)
+      playingSelectionRef.current = null
+    })
+    ws.on('finish', () => {
+      setIsPlaying(false)
+      playingSelectionRef.current = null
+    })
+    ws.on('timeupdate', time => {
+      setCurrentTime(time)
+      // Stop at end of selection when playing a region
+      if (playingSelectionRef.current && time >= playingSelectionRef.current.end) {
+        ws.pause()
+        ws.setTime(playingSelectionRef.current.start)
+        playingSelectionRef.current = null
+      }
+    })
 
     regions.on('region-updated', (region: Region) => {
       setSelectedRegion({ start: region.start, end: region.end })
@@ -136,18 +151,17 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
 
   const handlePlayPause = () => {
     if (wavesurferRef.current) {
+      playingSelectionRef.current = null
       wavesurferRef.current.playPause()
     }
   }
 
   const handlePlayRegion = () => {
-    if (regionsRef.current && wavesurferRef.current) {
-      const regions = regionsRef.current.getRegions()
-      if (regions.length > 0) {
-        // Always restart from the beginning of the selection
-        wavesurferRef.current.setTime(regions[0].start)
-        regions[0].play()
-      }
+    if (wavesurferRef.current && selectedRegion) {
+      // Set the selection boundaries and start playing from beginning
+      playingSelectionRef.current = { start: selectedRegion.start, end: selectedRegion.end }
+      wavesurferRef.current.setTime(selectedRegion.start)
+      wavesurferRef.current.play()
     }
   }
 
@@ -248,23 +262,17 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
 
       <div className="sound-editor-actions">
         <div
-          className="drag-handle"
+          className={`drag-handle ${sliceUrl ? 'active' : 'disabled'}`}
           draggable={!!sliceUrl}
           onDragStart={handleDragStart}
-          title="Drag to DAW or desktop to export selection as WAV"
+          onClick={handleDownloadSlice}
+          title="Click to download or drag to DAW (Chrome only)"
         >
-          <i className="pi pi-arrows-alt" />
-          <span>Drag selection to export</span>
+          <i className="pi pi-download" />
+          <span>Export Selection (.wav)</span>
         </div>
 
         <div className="action-buttons">
-          <Button
-            label="Download Selection"
-            icon="pi pi-download"
-            className="p-button-outlined"
-            onClick={handleDownloadSlice}
-            disabled={!sliceUrl}
-          />
           <Button
             label="Download Full"
             icon="pi pi-download"
