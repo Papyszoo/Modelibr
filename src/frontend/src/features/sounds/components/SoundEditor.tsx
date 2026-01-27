@@ -63,7 +63,10 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
     // Also fetch and decode for slicing
     fetch(audioUrl)
       .then(res => res.blob())
-      .then(blob => new File([blob], sound.fileName, { type: blob.type }))
+      .then(blob => {
+        const mimeType = blob.type || 'audio/mpeg'
+        return new File([blob], sound.fileName, { type: mimeType })
+      })
       .then(file => decodeAudio(file))
       .then(buffer => {
         audioBufferRef.current = buffer
