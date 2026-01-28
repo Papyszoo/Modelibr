@@ -42,10 +42,18 @@ interface RecycledSprite {
   deletedAt: string
 }
 
+interface RecycledSound {
+  id: number
+  name: string
+  fileId: number
+  duration: number
+  deletedAt: string
+}
+
 interface DeletePreviewItem {
   id: number
   name: string
-  type: 'model' | 'modelVersion' | 'textureSet' | 'sprite'
+  type: 'model' | 'modelVersion' | 'textureSet' | 'sprite' | 'sound'
 }
 
 interface DeletePreviewInfo {
@@ -64,6 +72,7 @@ export default function RecycledFilesList() {
   const [modelVersions, setModelVersions] = useState<RecycledModelVersion[]>([])
   const [textureSets, setTextureSets] = useState<RecycledTextureSet[]>([])
   const [sprites, setSprites] = useState<RecycledSprite[]>([])
+  const [sounds, setSounds] = useState<RecycledSound[]>([])
   const [loading, setLoading] = useState(true)
   const [deletePreview, setDeletePreview] = useState<DeletePreviewInfo | null>(
     null
@@ -118,6 +127,16 @@ export default function RecycledFilesList() {
           id: s.id,
           name: s.name,
           fileId: s.fileId,
+          deletedAt: s.deletedAt,
+        }))
+      )
+
+      setSounds(
+        (data.sounds || []).map(s => ({
+          id: s.id,
+          name: s.name,
+          fileId: s.fileId,
+          duration: s.duration,
           deletedAt: s.deletedAt,
         }))
       )
@@ -306,6 +325,46 @@ export default function RecycledFilesList() {
     }
   }
 
+  const handleRestoreSound = async (sound: RecycledSound) => {
+    try {
+      await ApiClient.restoreEntity('sound', sound.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Restored',
+        detail: `${sound.name} has been restored`,
+        life: 3000,
+      })
+      setSounds(prevSounds => prevSounds.filter(s => s.id !== sound.id))
+    } catch (error) {
+      console.error('Failed to restore:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore sound',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleDeletePreviewSound = async (sound: RecycledSound) => {
+    try {
+      const preview = await ApiClient.getDeletePreview('sound', sound.id)
+      setDeletePreview({
+        ...preview,
+        item: { ...sound, type: 'sound' },
+      })
+      setShowPreviewDialog(true)
+    } catch (error) {
+      console.error('Failed to load delete preview:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load delete preview',
+        life: 3000,
+      })
+    }
+  }
+
   const handlePermanentDelete = async () => {
     if (!deletePreview) return
 
@@ -336,6 +395,10 @@ export default function RecycledFilesList() {
       } else if (deletedItem.type === 'sprite') {
         setSprites(prevSprites =>
           prevSprites.filter(s => s.id !== deletedItem.id)
+        )
+      } else if (deletedItem.type === 'sound') {
+        setSounds(prevSounds =>
+          prevSounds.filter(s => s.id !== deletedItem.id)
         )
       }
       setDeletePreview(null)
@@ -381,7 +444,7 @@ export default function RecycledFilesList() {
   }
 
   const isEmpty =
-    models.length === 0 && modelVersions.length === 0 && textureSets.length === 0 && sprites.length === 0
+    models.length === 0 && modelVersions.length === 0 && textureSets.length === 0 && sprites.length === 0 && sounds.length === 0
 
   return (
     <div className="recycled-files-list">
@@ -647,6 +710,55 @@ export default function RecycledFilesList() {
                         </span>
                         <span className="recycled-card-meta">
                           Deleted {formatDate(sprite.deletedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sounds Section */}
+          {sounds.length > 0 && (
+            <div className="recycled-section" data-section="sounds">
+              <h3 className="recycled-section-title">
+                <i className="pi pi-volume-up" />
+                Sounds ({sounds.length})
+              </h3>
+              <div 
+                className="recycled-cards-grid"
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+              >
+                {sounds.map(sound => (
+                  <div key={sound.id} className="recycled-card">
+                    <div className="recycled-card-thumbnail">
+                      <div className="sound-placeholder">
+                        <i className="pi pi-volume-up" />
+                        <span className="sound-duration">{Math.round(sound.duration)}s</span>
+                      </div>
+                      <div className="recycled-card-actions">
+                        <Button
+                          icon="pi pi-replay"
+                          className="p-button-success p-button-rounded"
+                          onClick={() => handleRestoreSound(sound)}
+                          tooltip="Restore"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-danger p-button-rounded"
+                          onClick={() => handleDeletePreviewSound(sound)}
+                          tooltip="Delete Forever"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                      </div>
+                      <div className="recycled-card-overlay">
+                        <span className="recycled-card-name" title={sound.name}>
+                          {sound.name}
+                        </span>
+                        <span className="recycled-card-meta">
+                          Deleted {formatDate(sound.deletedAt)}
                         </span>
                       </div>
                     </div>

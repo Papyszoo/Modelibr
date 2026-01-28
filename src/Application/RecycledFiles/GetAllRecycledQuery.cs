@@ -12,7 +12,8 @@ public record GetAllRecycledQueryResponse(
     IEnumerable<RecycledFileDto> Files,
     IEnumerable<RecycledTextureSetDto> TextureSets,
     IEnumerable<RecycledTextureDto> Textures,
-    IEnumerable<RecycledSpriteDto> Sprites
+    IEnumerable<RecycledSpriteDto> Sprites,
+    IEnumerable<RecycledSoundDto> Sounds
 );
 
 public record RecycledModelDto(
@@ -61,6 +62,14 @@ public record RecycledSpriteDto(
     DateTime DeletedAt
 );
 
+public record RecycledSoundDto(
+    int Id,
+    string Name,
+    int FileId,
+    double Duration,
+    DateTime DeletedAt
+);
+
 internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQuery, GetAllRecycledQueryResponse>
 {
     private readonly IModelRepository _modelRepository;
@@ -68,19 +77,22 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
+    private readonly ISoundRepository _soundRepository;
 
     public GetAllRecycledQueryHandler(
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
         IFileRepository fileRepository,
         ITextureSetRepository textureSetRepository,
-        ISpriteRepository spriteRepository)
+        ISpriteRepository spriteRepository,
+        ISoundRepository soundRepository)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
+        _soundRepository = soundRepository;
     }
 
     public async Task<Result<GetAllRecycledQueryResponse>> Handle(GetAllRecycledQuery request, CancellationToken cancellationToken)
@@ -147,13 +159,24 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             s.DeletedAt!.Value
         )).ToList();
 
+        // Get deleted sounds
+        var sounds = await _soundRepository.GetAllDeletedAsync(cancellationToken);
+        var soundDtos = sounds.Select(s => new RecycledSoundDto(
+            s.Id,
+            s.Name,
+            s.FileId,
+            s.Duration,
+            s.DeletedAt!.Value
+        )).ToList();
+
         var response = new GetAllRecycledQueryResponse(
             modelDtos,
             modelVersionDtos,
             fileDtos,
             textureSetDtos,
             textureDtos,
-            spriteDtos
+            spriteDtos,
+            soundDtos
         );
 
         return Result.Success(response);
