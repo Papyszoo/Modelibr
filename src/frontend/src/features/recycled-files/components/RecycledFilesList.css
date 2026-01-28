@@ -197,6 +197,32 @@
   opacity: 0.95;
 }
 
+/* Sound placeholder */
+.sound-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-color-secondary);
+  background: linear-gradient(135deg, #9333ea, #7c3aed);
+}
+
+.sound-placeholder .pi {
+  font-size: 3rem;
+  opacity: 0.9;
+  color: white;
+}
+
+.sound-placeholder .sound-duration {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  opacity: 0.95;
+}
+
 .recycled-card-overlay .version-description {
   font-size: 0.85rem;
   opacity: 0.8;

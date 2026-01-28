@@ -40,19 +40,22 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
+    private readonly ISoundRepository _soundRepository;
 
     public GetDeletePreviewQueryHandler(
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
         IFileRepository fileRepository,
         ITextureSetRepository textureSetRepository,
-        ISpriteRepository spriteRepository)
+        ISpriteRepository spriteRepository,
+        ISoundRepository soundRepository)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
+        _soundRepository = soundRepository;
     }
 
     public async Task<Result<GetDeletePreviewResponse>> Handle(GetDeletePreviewQuery request, CancellationToken cancellationToken)
@@ -119,6 +122,15 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 filesToDelete.Add(new DeletedFileInfo(sprite.File.FilePath, sprite.File.OriginalFileName, sprite.File.SizeBytes));
                 break;
 
+            case "sound":
+                var sound = await _soundRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (sound == null)
+                    return Result.Failure<GetDeletePreviewResponse>(new Error("SoundNotFound", "Sound not found"));
+                
+                entityName = sound.Name;
+                filesToDelete.Add(new DeletedFileInfo(sound.File.FilePath, sound.File.OriginalFileName, sound.File.SizeBytes));
+                break;
+
             default:
                 return Result.Failure<GetDeletePreviewResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));
         }
@@ -135,6 +147,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
+    private readonly ISoundRepository _soundRepository;
     private readonly IFileStorage _fileStorage;
 
     public PermanentDeleteEntityCommandHandler(
@@ -143,6 +156,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         IFileRepository fileRepository,
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
+        ISoundRepository soundRepository,
         IFileStorage fileStorage)
     {
         _modelRepository = modelRepository;
@@ -150,6 +164,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
+        _soundRepository = soundRepository;
         _fileStorage = fileStorage;
     }
 
@@ -244,6 +259,18 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 
                 await _spriteRepository.DeleteAsync(spriteToDelete.Id, cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Sprite permanently deleted", deletedFiles));
+
+            case "sound":
+                var soundToDelete = await _soundRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (soundToDelete == null)
+                    return Result.Failure<PermanentDeleteEntityResponse>(new Error("SoundNotFound", "Sound not found"));
+                
+                // Delete sound file from disk
+                await _fileStorage.DeleteFileAsync(soundToDelete.File.FilePath, cancellationToken);
+                deletedFiles.Add(new DeletedFileInfo(soundToDelete.File.FilePath, soundToDelete.File.OriginalFileName, soundToDelete.File.SizeBytes));
+                
+                await _soundRepository.DeleteAsync(soundToDelete.Id, cancellationToken);
+                return Result.Success(new PermanentDeleteEntityResponse(true, "Sound permanently deleted", deletedFiles));
 
             default:
                 return Result.Failure<PermanentDeleteEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));
