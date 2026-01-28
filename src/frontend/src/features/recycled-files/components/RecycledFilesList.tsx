@@ -9,6 +9,7 @@ import ApiClient from '../../../services/ApiClient'
 import { ThumbnailDisplay } from '../../thumbnail'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import { formatDuration } from '../../../utils/audioUtils'
 import './RecycledFilesList.css'
 
 interface RecycledModel {
@@ -735,7 +736,7 @@ export default function RecycledFilesList() {
                     <div className="recycled-card-thumbnail">
                       <div className="sound-placeholder">
                         <i className="pi pi-volume-up" />
-                        <span className="sound-duration">{Math.round(sound.duration)}s</span>
+                        <span className="sound-duration">{formatDuration(sound.duration)}</span>
                       </div>
                       <div className="recycled-card-actions">
                         <Button
