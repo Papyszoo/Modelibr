@@ -8,6 +8,7 @@
   cursor: pointer;
   transition: all 0.2s;
   border: 2px solid transparent;
+  user-select: none;
 }
 
 .sound-card:hover {
@@ -57,13 +58,27 @@
 .sound-waveform-container {
   position: relative;
   height: 80px;
-  background: linear-gradient(135deg, var(--surface-ground) 0%, var(--surface-100) 100%);
-  padding: 10px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0;
+  overflow: hidden;
 }
 
 .sound-waveform {
   width: 100%;
   height: 100%;
+  object-fit: fill;
+  display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.sound-waveform-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .sound-waveform-placeholder {
@@ -77,37 +92,6 @@
 .sound-waveform-placeholder i {
   font-size: 2rem;
   opacity: 0.5;
-}
-
-.sound-play-btn {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: var(--primary-color);
-  color: var(--primary-color-text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  z-index: 1;
-}
-
-.sound-play-btn:hover {
-  transform: scale(1.1);
-  background: var(--primary-600);
-}
-
-.sound-play-btn.playing {
-  background: var(--orange-500);
-}
-
-.sound-play-btn i {
-  font-size: 0.75rem;
 }
 
 .sound-info {
@@ -128,6 +112,7 @@
   gap: 0.5rem;
   font-size: 0.75rem;
   color: var(--text-color-secondary);
+  align-items: center;
 }
 
 .sound-duration {
@@ -138,4 +123,46 @@
 
 .sound-size {
   opacity: 0.7;
+}
+
+.sound-control-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--primary-400);
+  background: var(--primary-50);
+  color: var(--primary-800);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+
+.sound-control-btn:hover:not(:disabled) {
+  background: var(--primary-100);
+  transform: translateY(-1px);
+}
+
+.sound-control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sound-control-btn.playing {
+  background: var(--orange-100);
+  border-color: var(--orange-300);
+  color: var(--orange-900);
+}
+
+.sound-control-btn.ghost {
+  background: transparent;
+  border-color: var(--primary-300);
+  color: var(--text-color);
+}
+
+.sound-control-btn i {
+  font-size: 0.85rem;
 }

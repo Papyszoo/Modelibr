@@ -7,16 +7,43 @@
   border-radius: 8px;
 }
 
+.sound-editor-modal .p-dialog-header {
+  padding: 0;
+  height: 0;
+  min-height: 0;
+  border: none;
+  display: none;
+}
+
 .sound-editor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.sound-editor-header h2 {
+.sound-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sound-editor-title h2 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sound-title-input {
+  width: min(420px, 70vw);
+}
+
+.sound-title-actions {
+  display: flex;
+  gap: 0.25rem;
 }
 
 .sound-editor-waveform {
@@ -105,18 +132,33 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, var(--primary-100) 0%, var(--primary-50) 100%);
-  border: 2px dashed var(--primary-300);
+  background: linear-gradient(
+    135deg,
+    var(--primary-300) 0%,
+    var(--primary-100) 100%
+  );
+  border: 2px dashed var(--primary-500);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
-  color: var(--primary-700);
+  color: var(--primary-900);
   font-weight: 500;
 }
 
+.drag-handle.active {
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
 .drag-handle.active:hover {
-  background: linear-gradient(135deg, var(--primary-200) 0%, var(--primary-100) 100%);
-  border-color: var(--primary-color);
+  background: linear-gradient(
+    135deg,
+    var(--primary-400) 0%,
+    var(--primary-200) 100%
+  );
+  border-color: var(--primary-700);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .drag-handle.active:active {
@@ -124,7 +166,7 @@
 }
 
 .drag-handle.disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: not-allowed;
   pointer-events: none;
 }

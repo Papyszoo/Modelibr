@@ -45,6 +45,20 @@ public class ThumbnailJobRepository : IThumbnailJobRepository
             .FirstOrDefaultAsync(tj => tj.ModelHash == modelHash, cancellationToken);
     }
 
+    public async Task<ThumbnailJob?> GetBySoundHashAsync(string soundHash, CancellationToken cancellationToken = default)
+    {
+        return await _context.ThumbnailJobs
+            .Include(tj => tj.Sound)
+            .FirstOrDefaultAsync(tj => tj.SoundHash == soundHash, cancellationToken);
+    }
+
+    public async Task<IEnumerable<ThumbnailJob>> GetBySoundIdsAsync(IEnumerable<int> soundIds, CancellationToken cancellationToken = default)
+    {
+        return await _context.ThumbnailJobs
+            .Where(tj => tj.SoundId.HasValue && soundIds.Contains(tj.SoundId.Value))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<ThumbnailJob>> GetActiveJobsByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
     {
         return await _context.ThumbnailJobs

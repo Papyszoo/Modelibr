@@ -1,11 +1,13 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
 using SharedKernel;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Sounds;
 
@@ -15,17 +17,23 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ILogger<CreateSoundWithFileCommandHandler> _logger;
 
     public CreateSoundWithFileCommandHandler(
         ISoundRepository soundRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IThumbnailQueue thumbnailQueue,
+        ILogger<CreateSoundWithFileCommandHandler> logger)
     {
         _soundRepository = soundRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _thumbnailQueue = thumbnailQueue;
+        _logger = logger;
     }
 
     public async Task<Result<CreateSoundWithFileResponse>> Handle(CreateSoundWithFileCommand command, CancellationToken cancellationToken)
@@ -93,7 +101,30 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
 
             var createdSound = await _soundRepository.AddAsync(sound, cancellationToken);
 
-            // 5. Track batch upload if batchId provided
+            // 5. Enqueue waveform thumbnail generation job
+            try
+            {
+                _logger.LogInformation("Enqueueing waveform thumbnail job for sound {SoundId} with hash {SoundHash}",
+                    createdSound.Id, file.Sha256Hash);
+
+                var job = await _thumbnailQueue.EnqueueSoundWaveformAsync(
+                    createdSound.Id,
+                    file.Sha256Hash,
+                    maxAttempts: 3,
+                    lockTimeoutMinutes: 10,
+                    cancellationToken: cancellationToken);
+
+                _logger.LogInformation("Successfully enqueued waveform thumbnail job {JobId} for sound {SoundId} with status {Status}",
+                    job.Id, createdSound.Id, job.Status);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to enqueue waveform thumbnail job for sound {SoundId} with hash {SoundHash}",
+                    createdSound.Id, file.Sha256Hash);
+                // Don't fail the sound creation if thumbnail job fails to enqueue
+            }
+
+            // 6. Track batch upload if batchId provided
             if (!string.IsNullOrWhiteSpace(command.BatchId))
             {
                 var batchUpload = BatchUpload.Create(

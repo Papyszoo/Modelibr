@@ -59,7 +59,7 @@ export class ThumbnailJobService {
   }
 
   /**
-   * Finish a job (mark as completed or failed)
+   * Finish a thumbnail job (mark as completed or failed) - for model thumbnails
    * @param {number} jobId - The job ID
    * @param {boolean} success - Whether the job succeeded
    * @param {Object} metadata - Thumbnail metadata (required when success=true)
@@ -77,20 +77,67 @@ export class ThumbnailJobService {
         sizeBytes: metadata?.sizeBytes || null,
         width: metadata?.width || null,
         height: metadata?.height || null,
-        errorMessage
+        errorMessage,
       }
 
       await this.apiClient.post(
         `/api/thumbnail-jobs/${jobId}/finish`,
         requestData
       )
-      logger.info(success ? 'Marked job as completed' : 'Marked job as failed', {
+      logger.info(
+        success
+          ? 'Marked thumbnail job as completed'
+          : 'Marked thumbnail job as failed',
+        {
+          jobId,
+          success,
+          ...(success ? { thumbnailMetadata: metadata } : { errorMessage }),
+        }
+      )
+    } catch (error) {
+      logger.error('Failed to finish thumbnail job', {
         jobId,
         success,
-        ...(success ? { thumbnailMetadata: metadata } : { errorMessage })
+        error: error.message,
       })
+      throw error
+    }
+  }
+
+  /**
+   * Finish a sound waveform job (mark as completed or failed)
+   * @param {number} jobId - The job ID
+   * @param {boolean} success - Whether the job succeeded
+   * @param {Object} metadata - Waveform metadata (required when success=true)
+   * @param {string} metadata.waveformPath - Path to the stored waveform
+   * @param {number} metadata.sizeBytes - Size of the waveform in bytes
+   * @param {string} errorMessage - Error message (required when success=false)
+   */
+  async finishSoundJob(jobId, success, metadata = {}, errorMessage = null) {
+    try {
+      const requestData = {
+        success,
+        waveformPath: metadata?.waveformPath || null,
+        sizeBytes: metadata?.sizeBytes || null,
+        errorMessage,
+      }
+
+      await this.apiClient.post(
+        `/api/thumbnail-jobs/sounds/${jobId}/finish`,
+        requestData
+      )
+      logger.info(
+        success
+          ? 'Marked sound waveform job as completed'
+          : 'Marked sound waveform job as failed',
+        {
+          jobId,
+          success,
+          ...(success ? { waveformMetadata: metadata } : { errorMessage }),
+        }
+      )
     } catch (error) {
-      logger.error('Failed to finish job', {
+      logger.error('Failed to finish sound waveform job', {
         jobId,
         success,
         error: error.message,
@@ -127,7 +174,7 @@ export class ThumbnailJobService {
       const endpoint = modelVersionId
         ? `/models/${modelId}/versions/${modelVersionId}/file`
         : `/models/${modelId}/file`
-      
+
       const response = await this.apiClient.get(endpoint, {
         responseType: 'stream',
       })
@@ -136,6 +183,26 @@ export class ThumbnailJobService {
       logger.error('Failed to get model file', {
         modelId,
         modelVersionId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Get sound file for processing
+   * @param {number} soundId - The sound ID
+   * @returns {Promise<Object>} Sound file response with stream
+   */
+  async getSoundFile(soundId) {
+    try {
+      const response = await this.apiClient.get(`/sounds/${soundId}/file`, {
+        responseType: 'stream',
+      })
+      return response
+    } catch (error) {
+      logger.error('Failed to get sound file', {
+        soundId,
         error: error.message,
       })
       throw error

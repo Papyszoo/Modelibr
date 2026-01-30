@@ -115,6 +115,9 @@ export class SignalRQueueService {
         jobId: jobNotification.JobId,
         modelId: jobNotification.ModelId,
         modelHash: jobNotification.ModelHash,
+        soundId: jobNotification.SoundId,
+        soundHash: jobNotification.SoundHash,
+        assetType: jobNotification.AssetType,
       })
 
       if (this.jobReceivedCallback) {
@@ -123,6 +126,9 @@ export class SignalRQueueService {
           id: jobNotification.JobId,
           modelId: jobNotification.ModelId,
           modelHash: jobNotification.ModelHash,
+          soundId: jobNotification.SoundId,
+          soundHash: jobNotification.SoundHash,
+          assetType: jobNotification.AssetType,
           status: jobNotification.Status,
           attemptCount: jobNotification.AttemptCount,
           createdAt: jobNotification.CreatedAt,

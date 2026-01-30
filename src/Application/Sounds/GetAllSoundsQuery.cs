@@ -1,5 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Domain.Models;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.Sounds;
@@ -7,10 +9,14 @@ namespace Application.Sounds;
 internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAllSoundsResponse>
 {
     private readonly ISoundRepository _soundRepository;
+    private readonly IThumbnailJobRepository _thumbnailJobRepository;
 
-    public GetAllSoundsQueryHandler(ISoundRepository soundRepository)
+    public GetAllSoundsQueryHandler(
+        ISoundRepository soundRepository,
+        IThumbnailJobRepository thumbnailJobRepository)
     {
         _soundRepository = soundRepository;
+        _thumbnailJobRepository = thumbnailJobRepository;
     }
 
     public async Task<Result<GetAllSoundsResponse>> Handle(GetAllSoundsQuery query, CancellationToken cancellationToken)
@@ -37,7 +43,19 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
             filteredSounds = filteredSounds.Where(s => s.SoundCategoryId == query.CategoryId.Value);
         }
 
-        var soundDtos = filteredSounds
+        var soundsList = filteredSounds.ToList();
+        
+        // Get completed waveform jobs for all sounds in one query
+        var soundIds = soundsList.Select(s => s.Id).ToList();
+        var completedJobs = await _thumbnailJobRepository.GetBySoundIdsAsync(soundIds, cancellationToken);
+        var completedSoundIds = completedJobs
+            .Where(j => j.Status == ThumbnailJobStatus.Done)
+            .Select(j => j.SoundId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .ToHashSet();
+
+        var soundDtos = soundsList
             .Select(s => new SoundDto(
                 s.Id,
                 s.Name,
@@ -49,7 +67,8 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
                 s.File?.OriginalFileName ?? "",
                 s.File?.SizeBytes ?? 0,
                 s.CreatedAt,
-                s.UpdatedAt))
+                s.UpdatedAt,
+                completedSoundIds.Contains(s.Id) ? $"/sounds/{s.Id}/waveform" : null))
             .ToList();
 
         return Result.Success(new GetAllSoundsResponse(soundDtos));
@@ -71,4 +90,5 @@ public record SoundDto(
     string FileName,
     long FileSizeBytes,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    string? WaveformUrl);

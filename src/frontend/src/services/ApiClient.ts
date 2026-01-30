@@ -138,10 +138,13 @@ class ApiClient {
     return response.data
   }
 
-  async getModels(options: { skipCache?: boolean; packId?: number; projectId?: number } = {}): Promise<Model[]> {
+  async getModels(
+    options: { skipCache?: boolean; packId?: number; projectId?: number } = {}
+  ): Promise<Model[]> {
     // Check cache first unless skipCache is true or filters are applied
     // When filtering, always fetch fresh data
-    const hasFilters = options.packId !== undefined || options.projectId !== undefined
+    const hasFilters =
+      options.packId !== undefined || options.projectId !== undefined
     if (!options.skipCache && !hasFilters) {
       const cached = useApiCacheStore.getState().getModels()
       if (cached) {
@@ -243,6 +246,10 @@ class ApiClient {
     return `${this.baseURL}/model-versions/${versionId}/thumbnail/file`
   }
 
+  getWaveformUrl(soundId: string): string {
+    return `${this.baseURL}/sounds/${soundId}/waveform`
+  }
+
   async getThumbnailFile(
     modelId: string,
     options: { skipCache?: boolean } = {}
@@ -266,11 +273,14 @@ class ApiClient {
     return response.data
   }
 
-  async regenerateThumbnail(modelId: string, versionId?: number): Promise<void> {
-    const url = versionId 
+  async regenerateThumbnail(
+    modelId: string,
+    versionId?: number
+  ): Promise<void> {
+    const url = versionId
       ? `/models/${modelId}/thumbnail/regenerate?versionId=${versionId}`
-      : `/models/${modelId}/thumbnail/regenerate`;
-    
+      : `/models/${modelId}/thumbnail/regenerate`
+
     const response: AxiosResponse<void> = await this.client.post(url)
 
     // Invalidate thumbnail cache for this model
@@ -447,21 +457,25 @@ class ApiClient {
     textureId: number,
     sourceChannel: number
   ): Promise<void> {
-    await this.client.put(`/texture-sets/${setId}/textures/${textureId}/channel`, {
-      sourceChannel,
-    })
+    await this.client.put(
+      `/texture-sets/${setId}/textures/${textureId}/channel`,
+      {
+        sourceChannel,
+      }
+    )
 
     // Invalidate texture sets cache when texture channels change
     useApiCacheStore.getState().invalidateTextureSets()
     useApiCacheStore.getState().invalidateTextureSetById(setId)
   }
 
-
   async associateTextureSetWithModelVersion(
     setId: number,
     modelVersionId: number
   ): Promise<void> {
-    await this.client.post(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
+    await this.client.post(
+      `/texture-sets/${setId}/model-versions/${modelVersionId}`
+    )
 
     // Invalidate texture sets and models cache when associations change
     useApiCacheStore.getState().invalidateTextureSets()
@@ -473,7 +487,9 @@ class ApiClient {
     setId: number,
     modelVersionId: number
   ): Promise<void> {
-    await this.client.delete(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
+    await this.client.delete(
+      `/texture-sets/${setId}/model-versions/${modelVersionId}`
+    )
 
     // Invalidate texture sets and models cache when associations change
     useApiCacheStore.getState().invalidateTextureSets()
@@ -485,7 +501,9 @@ class ApiClient {
     setId: number,
     modelId: number
   ): Promise<void> {
-    await this.client.post(`/texture-sets/${setId}/models/${modelId}/all-versions`)
+    await this.client.post(
+      `/texture-sets/${setId}/models/${modelId}/all-versions`
+    )
 
     // Invalidate texture sets and models cache when associations change
     useApiCacheStore.getState().invalidateTextureSets()

@@ -1,6 +1,8 @@
 import { ThumbnailJobService } from './thumbnailJobService.js'
 import { SignalRQueueService } from './signalrQueueService.js'
 import { ModelFileService } from './modelFileService.js'
+import { SoundFileService } from './soundFileService.js'
+import { WaveformGeneratorService } from './waveformGeneratorService.js'
 import { ModelDataService } from './modelDataService.js'
 import { PuppeteerRenderer } from './puppeteerRenderer.js'
 import { FrameEncoderService } from './frameEncoderService.js'
@@ -21,6 +23,8 @@ export class JobProcessor {
     this.jobService = new ThumbnailJobService()
     this.signalrQueueService = new SignalRQueueService()
     this.modelFileService = new ModelFileService()
+    this.soundFileService = new SoundFileService()
+    this.waveformGenerator = new WaveformGeneratorService()
     this.modelDataService = new ModelDataService()
     this.thumbnailStorage = new ThumbnailStorageService()
     this.jobEventService = new JobEventService()
@@ -77,6 +81,59 @@ export class JobProcessor {
     }
 
     logger.info('SignalR job processor started successfully')
+
+    // Poll for any existing pending jobs on startup
+    logger.info('Checking for existing pending jobs on startup')
+    await this.pollForExistingJobs()
+  }
+
+  /**
+   * Poll for existing pending jobs on startup
+   * @private
+   */
+  async pollForExistingJobs() {
+    try {
+      let jobsProcessed = 0
+      let job = null
+
+      // Keep polling until no more jobs are available
+      do {
+        job = await this.jobService.pollForJob()
+        if (job) {
+          jobsProcessed++
+          logger.info('Found existing pending job on startup', {
+            jobId: job.id,
+            assetType: job.assetType,
+            modelId: job.modelId,
+            soundId: job.soundId,
+          })
+
+          // Add job to queue for sequential processing
+          this.jobQueue.push({
+            job: job,
+            processor:
+              job.assetType === 'Sound'
+                ? this.processSoundJobAsync.bind(this)
+                : this.processModelJobAsync.bind(this),
+          })
+        }
+      } while (job !== null && jobsProcessed < 100) // Safety limit
+
+      if (jobsProcessed > 0) {
+        logger.info('Startup job polling complete', {
+          jobsFound: jobsProcessed,
+        })
+        // Start processing the queue
+        this.processQueue()
+      } else {
+        logger.info('No pending jobs found on startup')
+      }
+    } catch (error) {
+      logger.error('Error during startup job polling', {
+        error: error.message,
+        stack: error.stack,
+      })
+    }
   }
 
   /**
@@ -112,9 +169,16 @@ export class JobProcessor {
         )
 
         // Add job to queue for sequential processing
-        this.jobQueue.push(claimedJob)
+        this.jobQueue.push({
+          job: claimedJob,
+          processor:
+            claimedJob.assetType === 'Sound'
+              ? this.processSoundJobAsync.bind(this)
+              : this.processModelJobAsync.bind(this),
+        })
         logger.debug('Job added to queue', {
           jobId: claimedJob.id,
+          assetType: claimedJob.assetType,
           queuePosition: this.jobQueue.length,
         })
 
@@ -127,7 +191,13 @@ export class JobProcessor {
         })
 
         // Still add the claimed job to queue
-        this.jobQueue.push(claimedJob)
+        this.jobQueue.push({
+          job: claimedJob,
+          processor:
+            claimedJob.assetType === 'Sound'
+              ? this.processSoundJobAsync.bind(this)
+              : this.processModelJobAsync.bind(this),
+        })
         this.processQueue()
       } else {
         logger.debug('Job was already claimed by another worker', {
@@ -156,13 +226,13 @@ export class JobProcessor {
 
     try {
       while (this.jobQueue.length > 0 && !this.isShuttingDown) {
-        const job = this.jobQueue.shift()
+        const { job, processor } = this.jobQueue.shift()
         logger.info('Processing job from queue', {
           jobId: job.id,
           remainingInQueue: this.jobQueue.length,
         })
 
-        await this.processJobAsync(job)
+        await processor(job)
       }
     } finally {
       this.isProcessingQueue = false
@@ -170,10 +240,10 @@ export class JobProcessor {
   }
 
   /**
-   * Process a job asynchronously
+   * Process a model thumbnail job asynchronously
    * @param {Object} job - The job to process
    */
-  async processJobAsync(job) {
+  async processModelJobAsync(job) {
     const jobLogger = withJobContext(job.id, job.modelId)
     this.activeJobs.set(job.id, job)
 
@@ -187,7 +257,7 @@ export class JobProcessor {
         job.modelHash
       )
 
-      // Process the model and get thumbnail metadata
+      // Process the model
       const thumbnailMetadata = await this.processModel(job, jobLogger)
 
       await this.jobService.markJobCompleted(job.id, thumbnailMetadata)
@@ -213,6 +283,61 @@ export class JobProcessor {
         await this.jobService.markJobFailed(job.id, error.message)
       } catch (markFailedError) {
         jobLogger.error('Failed to mark job as failed', {
+          markFailedError: markFailedError.message,
+        })
+      }
+    } finally {
+      this.activeJobs.delete(job.id)
+    }
+  }
+
+  /**
+   * Process a sound waveform job asynchronously
+   * @param {Object} job - The job to process
+   */
+  async processSoundJobAsync(job) {
+    const jobLogger = withJobContext(job.id, job.soundId)
+    this.activeJobs.set(job.id, job)
+
+    try {
+      jobLogger.info('Starting waveform generation')
+
+      // Log job started event
+      await this.jobEventService.logJobStarted(
+        job.id,
+        job.soundId,
+        job.soundHash
+      )
+
+      // Process the sound
+      const thumbnailMetadata = await this.processSound(job, jobLogger)
+
+      await this.jobService.finishSoundJob(job.id, true, thumbnailMetadata)
+
+      // Log job completed event
+      await this.jobEventService.logJobCompleted(job.id, thumbnailMetadata)
+
+      jobLogger.info(
+        'Waveform generation completed successfully',
+        thumbnailMetadata
+      )
+    } catch (error) {
+      jobLogger.error('Waveform generation failed', {
+        error: error.message,
+        stack: error.stack,
+      })
+
+      // Log job failed event
+      await this.jobEventService.logJobFailed(
+        job.id,
+        error.message,
+        error.stack
+      )
+
+      try {
+        await this.jobService.finishSoundJob(job.id, false, {}, error.message)
+      } catch (markFailedError) {
+        jobLogger.error('Failed to mark sound job as failed', {
           markFailedError: markFailedError.message,
         })
       }
@@ -358,7 +483,10 @@ export class JobProcessor {
               })
 
               const texturesApplied =
-                await this.puppeteerRenderer.applyTextures(texturePaths, fileInfo.fileType)
+                await this.puppeteerRenderer.applyTextures(
+                  texturePaths,
+                  fileInfo.fileType
+                )
 
               if (texturesApplied) {
                 await this.jobEventService.logEvent(
@@ -699,6 +827,95 @@ export class JobProcessor {
       // Clean up temporary texture files
       if (texturePaths) {
         await this.modelDataService.cleanupTextureFiles(texturePaths)
+      }
+    }
+  }
+
+  /**
+   * Process a sound for waveform thumbnail generation
+   * @param {Object} job - The job being processed
+   * @param {Object} jobLogger - Logger with job context
+   */
+  async processSound(job, jobLogger) {
+    let tempFilePath = null
+
+    try {
+      jobLogger.info('Starting sound waveform processing', {
+        soundId: job.soundId,
+        soundHash: job.soundHash,
+      })
+
+      // Step 1: Fetch the sound file
+      jobLogger.info('Fetching sound file from API')
+
+      const fileInfo = await this.soundFileService.fetchSoundFile(job.soundId)
+      tempFilePath = fileInfo.filePath
+
+      jobLogger.info('Sound file fetched successfully', {
+        originalFileName: fileInfo.originalFileName,
+        fileType: fileInfo.fileType,
+        filePath: fileInfo.filePath,
+      })
+
+      // Step 2: Generate waveform PNG
+      jobLogger.info('Generating waveform thumbnail')
+
+      const tempOutputPath = `${tempFilePath}.waveform.png`
+      const { peaks, duration } = await this.waveformGenerator.generateWaveform(
+        tempFilePath,
+        tempOutputPath,
+        {
+          width: 800,
+          height: 150,
+          peakCount: 200,
+          color: '#3b82f6',
+        }
+      )
+
+      jobLogger.info('Waveform thumbnail generated', {
+        outputPath: tempOutputPath,
+        duration,
+        peakCount: peaks.length,
+      })
+
+      // Step 3: Upload waveform thumbnail to backend API
+      jobLogger.info('Uploading waveform thumbnail to backend')
+
+      const uploadResult = await this.thumbnailApiService.uploadSoundWaveform(
+        job.soundId,
+        tempOutputPath,
+        job.soundHash
+      )
+
+      if (!uploadResult.success) {
+        throw new Error(
+          `Failed to upload waveform thumbnail: ${uploadResult.error}`
+        )
+      }
+
+      jobLogger.info('Waveform thumbnail uploaded successfully', {
+        storagePath: uploadResult.storagePath,
+        sizeBytes: uploadResult.sizeBytes,
+      })
+
+      return {
+        waveformPath: uploadResult.storagePath,
+        sizeBytes: uploadResult.sizeBytes,
+      }
+    } catch (error) {
+      jobLogger.error('Sound waveform generation failed', {
+        error: error.message,
+        stack: error.stack,
+      })
+      throw error
+    } finally {
+      // Clean up temporary files
+      if (tempFilePath) {
+        this.soundFileService.cleanupFile(tempFilePath)
+
+        // Also cleanup the waveform output file
+        const tempOutputPath = `${tempFilePath}.waveform.png`
+        this.soundFileService.cleanupFile(tempOutputPath)
       }
     }
   }

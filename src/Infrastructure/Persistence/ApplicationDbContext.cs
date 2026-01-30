@@ -295,8 +295,12 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<ThumbnailJob>(entity =>
             {
                 entity.HasKey(tj => tj.Id);
-                entity.Property(tj => tj.ModelId).IsRequired();
-                entity.Property(tj => tj.ModelHash).IsRequired().HasMaxLength(64);
+                entity.Property(tj => tj.AssetType).IsRequired().HasMaxLength(20);
+                entity.Property(tj => tj.ModelId).IsRequired(false);
+                entity.Property(tj => tj.ModelVersionId).IsRequired(false);
+                entity.Property(tj => tj.ModelHash).IsRequired(false).HasMaxLength(64);
+                entity.Property(tj => tj.SoundId).IsRequired(false);
+                entity.Property(tj => tj.SoundHash).IsRequired(false).HasMaxLength(64);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -308,7 +312,14 @@ namespace Infrastructure.Persistence
 
                 // Create composite unique index for ModelHash + ModelVersionId to prevent duplicate jobs per version
                 // This allows different versions to have separate thumbnail jobs even when sharing the same model file
-                entity.HasIndex(tj => new { tj.ModelHash, tj.ModelVersionId }).IsUnique();
+                entity.HasIndex(tj => new { tj.ModelHash, tj.ModelVersionId })
+                    .IsUnique()
+                    .HasFilter("[ModelHash] IS NOT NULL AND [ModelVersionId] IS NOT NULL");
+                
+                // Create unique index for SoundHash to prevent duplicate waveform jobs
+                entity.HasIndex(tj => tj.SoundHash)
+                    .IsUnique()
+                    .HasFilter("[SoundHash] IS NOT NULL");
                 
                 // Create index for efficient job querying
                 entity.HasIndex(tj => new { tj.Status, tj.CreatedAt });
@@ -317,7 +328,22 @@ namespace Infrastructure.Persistence
                 entity.HasOne(tj => tj.Model)
                     .WithMany()
                     .HasForeignKey(tj => tj.ModelId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Configure relationship with ModelVersion
+                entity.HasOne(tj => tj.ModelVersion)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.ModelVersionId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Configure relationship with Sound
+                entity.HasOne(tj => tj.Sound)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.SoundId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
             });
 
             // Configure ThumbnailJobEvent entity
