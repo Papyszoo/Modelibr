@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
     gnupg \
+    ffmpeg \
     chromium \
     chromium-driver \
     fonts-liberation \

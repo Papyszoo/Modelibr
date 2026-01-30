@@ -22,6 +22,18 @@ public interface IThumbnailQueue
     Task<ThumbnailJob> EnqueueAsync(int modelId, int modelVersionId, string modelHash, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Enqueues a new waveform thumbnail generation job for the given sound.
+    /// Prevents duplicate jobs for the same sound hash.
+    /// </summary>
+    /// <param name="soundId">The sound ID</param>
+    /// <param name="soundHash">The SHA256 hash of the sound file for deduplication</param>
+    /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
+    /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The created job or existing job if already exists</returns>
+    Task<ThumbnailJob> EnqueueSoundWaveformAsync(int soundId, string soundHash, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Attempts to dequeue and claim the next pending job for processing.
     /// Includes automatic retry of jobs with expired locks.
     /// </summary>

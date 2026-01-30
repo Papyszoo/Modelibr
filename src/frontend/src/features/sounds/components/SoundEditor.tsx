@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import RegionsPlugin, { Region } from 'wavesurfer.js/dist/plugins/regions.js'
 import { Button } from 'primereact/button'
+import { InputText } from 'primereact/inputtext'
 import { SoundDto } from '../../../types'
 import ApiClient from '../../../services/ApiClient'
 import {
@@ -16,24 +17,40 @@ interface SoundEditorProps {
   sound: SoundDto
   onClose: () => void
   onDownload: () => void
+  onSoundUpdated?: (soundId: number, name: string) => void
 }
 
-function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
+function SoundEditor({
+  sound,
+  onClose,
+  onDownload,
+  onSoundUpdated,
+}: SoundEditorProps) {
   const waveformRef = useRef<HTMLDivElement>(null)
   const wavesurferRef = useRef<WaveSurfer | null>(null)
   const regionsRef = useRef<RegionsPlugin | null>(null)
   const audioBufferRef = useRef<AudioBuffer | null>(null)
   const sliceBlobRef = useRef<Blob | null>(null)
-  const playingSelectionRef = useRef<{ start: number; end: number } | null>(null)
+  const playingSelectionRef = useRef<{ start: number; end: number } | null>(
+    null
+  )
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(sound.duration || 0)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(sound.name)
+  const [isSavingName, setIsSavingName] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState<{
     start: number
     end: number
   } | null>(null)
   const [sliceUrl, setSliceUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    setNameDraft(sound.name)
+    setIsEditingName(false)
+  }, [sound.id, sound.name])
 
   // Load audio and initialize wavesurfer
   useEffect(() => {
@@ -138,7 +155,11 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
       }
 
       try {
-        const slicedBuffer = sliceAudioBuffer(audioBufferRef.current, start, end)
+        const slicedBuffer = sliceAudioBuffer(
+          audioBufferRef.current,
+          start,
+          end
+        )
         const wavBlob = audioBufferToWav(slicedBuffer)
         sliceBlobRef.current = wavBlob
         const url = URL.createObjectURL(wavBlob)
@@ -160,9 +181,47 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
   const handlePlayRegion = () => {
     if (wavesurferRef.current && selectedRegion) {
       // Set the selection boundaries and start playing from beginning
-      playingSelectionRef.current = { start: selectedRegion.start, end: selectedRegion.end }
+      playingSelectionRef.current = {
+        start: selectedRegion.start,
+        end: selectedRegion.end,
+      }
       wavesurferRef.current.setTime(selectedRegion.start)
       wavesurferRef.current.play()
+    }
+  }
+
+  const handleStartEditName = () => {
+    setIsEditingName(true)
+  }
+
+  const handleCancelEditName = () => {
+    setNameDraft(sound.name)
+    setIsEditingName(false)
+  }
+
+  const handleSaveName = async () => {
+    const trimmedName = nameDraft.trim()
+    if (!trimmedName || trimmedName === sound.name) {
+      setIsEditingName(false)
+      setNameDraft(sound.name)
+      return
+    }
+
+    try {
+      setIsSavingName(true)
+      const updated = await ApiClient.updateSound(sound.id, {
+        name: trimmedName,
+        categoryId: sound.categoryId,
+      })
+      setNameDraft(updated.name)
+      onSoundUpdated?.(sound.id, updated.name)
+      setIsEditingName(false)
+    } catch (error) {
+      console.error('Failed to update sound name:', error)
+      setNameDraft(sound.name)
+      setIsEditingName(false)
+    } finally {
+      setIsSavingName(false)
     }
   }
 
@@ -179,11 +238,11 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
     // Set DownloadURL data for drag-to-desktop/DAW
     const downloadData = `audio/wav:${filename}:${sliceUrl}`
     e.dataTransfer.setData('DownloadURL', downloadData)
-    
+
     // Also set text/uri-list for broader compatibility
     e.dataTransfer.setData('text/uri-list', sliceUrl)
     e.dataTransfer.setData('text/plain', sliceUrl)
-    
+
     e.dataTransfer.effectAllowed = 'copy'
   }
 
@@ -205,7 +264,47 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
   return (
     <div className="sound-editor">
       <div className="sound-editor-header">
-        <h2>{sound.name}</h2>
+        <div className="sound-editor-title">
+          {isEditingName ? (
+            <InputText
+              value={nameDraft}
+              onChange={e => setNameDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSaveName()
+                if (e.key === 'Escape') handleCancelEditName()
+              }}
+              autoFocus
+              className="sound-title-input"
+            />
+          ) : (
+            <h2>{sound.name}</h2>
+          )}
+          {isEditingName ? (
+            <div className="sound-title-actions">
+              <Button
+                icon="pi pi-check"
+                className="p-button-text p-button-rounded"
+                onClick={handleSaveName}
+                disabled={isSavingName}
+                tooltip="Save"
+              />
+              <Button
+                icon="pi pi-times"
+                className="p-button-text p-button-rounded"
+                onClick={handleCancelEditName}
+                disabled={isSavingName}
+                tooltip="Cancel"
+              />
+            </div>
+          ) : (
+            <Button
+              icon="pi pi-pencil"
+              className="p-button-text p-button-rounded"
+              onClick={handleStartEditName}
+              tooltip="Edit name"
+            />
+          )}
+        </div>
         <Button
           icon="pi pi-times"
           className="p-button-text p-button-rounded"
@@ -277,7 +376,7 @@ function SoundEditor({ sound, onClose, onDownload }: SoundEditorProps) {
           <Button
             label="Download Full"
             icon="pi pi-download"
-            className="p-button-success"
+            className="p-button-outlined"
             onClick={onDownload}
           />
         </div>

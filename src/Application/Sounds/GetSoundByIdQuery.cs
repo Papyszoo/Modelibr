@@ -1,5 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Domain.Models;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.Sounds;
@@ -7,10 +9,14 @@ namespace Application.Sounds;
 internal class GetSoundByIdQueryHandler : IQueryHandler<GetSoundByIdQuery, GetSoundByIdResponse>
 {
     private readonly ISoundRepository _soundRepository;
+    private readonly IThumbnailJobRepository _thumbnailJobRepository;
 
-    public GetSoundByIdQueryHandler(ISoundRepository soundRepository)
+    public GetSoundByIdQueryHandler(
+        ISoundRepository soundRepository,
+        IThumbnailJobRepository thumbnailJobRepository)
     {
         _soundRepository = soundRepository;
+        _thumbnailJobRepository = thumbnailJobRepository;
     }
 
     public async Task<Result<GetSoundByIdResponse>> Handle(GetSoundByIdQuery query, CancellationToken cancellationToken)
@@ -21,6 +27,16 @@ internal class GetSoundByIdQueryHandler : IQueryHandler<GetSoundByIdQuery, GetSo
         {
             return Result.Failure<GetSoundByIdResponse>(
                 new Error("SoundNotFound", $"Sound with ID {query.Id} not found."));
+        }
+
+        // Check if waveform job is completed in database
+        string? waveformUrl = null;
+        var jobs = await _thumbnailJobRepository.GetBySoundIdsAsync(new[] { sound.Id }, cancellationToken);
+        var hasCompletedJob = jobs.Any(j => j.Status == ThumbnailJobStatus.Done);
+        
+        if (hasCompletedJob)
+        {
+            waveformUrl = $"/sounds/{sound.Id}/waveform";
         }
 
         var soundDto = new SoundDto(
@@ -34,7 +50,8 @@ internal class GetSoundByIdQueryHandler : IQueryHandler<GetSoundByIdQuery, GetSo
             sound.File?.OriginalFileName ?? "",
             sound.File?.SizeBytes ?? 0,
             sound.CreatedAt,
-            sound.UpdatedAt);
+            sound.UpdatedAt,
+            waveformUrl);
 
         return Result.Success(new GetSoundByIdResponse(soundDto));
     }

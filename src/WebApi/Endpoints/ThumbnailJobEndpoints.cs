@@ -29,10 +29,13 @@ public static class ThumbnailJobEndpoints
             return Results.Ok(new
             {
                 Id = response.Job.Id,
+                AssetType = response.Job.AssetType,
                 ModelId = response.Job.ModelId,
                 ModelVersionId = response.Job.ModelVersionId,
                 ModelHash = response.Job.ModelHash,
-                DefaultTextureSetId = response.Job.ModelVersion.DefaultTextureSetId,
+                SoundId = response.Job.SoundId,
+                SoundHash = response.Job.SoundHash,
+                DefaultTextureSetId = response.Job.ModelVersion?.DefaultTextureSetId,
                 Status = response.Job.Status.ToString(),
                 AttemptCount = response.Job.AttemptCount,
                 CreatedAt = response.Job.CreatedAt,
@@ -63,13 +66,40 @@ public static class ThumbnailJobEndpoints
 
             return Results.Ok(new
             {
-                ModelId = result.Value.ModelId,
-                ModelVersionId = result.Value.ModelVersionId,
+                result.Value.ModelId,
+                result.Value.ModelVersionId,
                 Status = result.Value.Status.ToString(),
                 Message = request.Success ? "Thumbnail job completed successfully" : "Thumbnail job marked as failed"
             });
         })
         .WithName("Finish Thumbnail Job")
+        .WithTags("ThumbnailJobs");
+
+        app.MapPost("/api/thumbnail-jobs/sounds/{jobId:int}/finish", async (
+            int jobId,
+            [FromBody] FinishSoundJobRequest request,
+            ICommandHandler<FinishSoundWaveformJobCommand, FinishSoundWaveformJobResponse> commandHandler) =>
+        {
+            var result = await commandHandler.Handle(new FinishSoundWaveformJobCommand(
+                jobId,
+                request.Success,
+                request.WaveformPath,
+                request.SizeBytes,
+                request.ErrorMessage), CancellationToken.None);
+            
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(result.Error.Message);
+            }
+
+            return Results.Ok(new
+            {
+                result.Value.JobId,
+                Status = result.Value.Status,
+                Message = request.Success ? "Sound waveform job completed successfully" : "Sound waveform job marked as failed"
+            });
+        })
+        .WithName("Finish Sound Waveform Job")
         .WithTags("ThumbnailJobs");
 
         app.MapPost("/api/thumbnail-jobs/{jobId:int}/events", async (
@@ -138,6 +168,15 @@ public record FinishJobRequest(
     long? SizeBytes = null,
     int? Width = null,
     int? Height = null,
+    string? ErrorMessage = null);
+
+/// <summary>
+/// Request model for finishing sound waveform jobs (unified complete/fail).
+/// </summary>
+public record FinishSoundJobRequest(
+    bool Success,
+    string? WaveformPath = null,
+    long? SizeBytes = null,
     string? ErrorMessage = null);
 
 /// <summary>

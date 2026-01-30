@@ -34,7 +34,12 @@ export class ThumbnailApiService {
    * @param {number} [versionId] - Optional version ID to upload for specific version
    * @returns {Promise<Object>} Upload result
    */
-  async uploadThumbnail(modelId, thumbnailPath, metadata = {}, versionId = null) {
+  async uploadThumbnail(
+    modelId,
+    thumbnailPath,
+    metadata = {},
+    versionId = null
+  ) {
     try {
       if (!fs.existsSync(thumbnailPath)) {
         throw new Error(`Thumbnail file not found: ${thumbnailPath}`)
@@ -66,16 +71,12 @@ export class ThumbnailApiService {
         metadata,
       })
 
-      const response = await this.client.post(
-        uploadUrl,
-        formData,
-        {
-          headers: {
-            ...formData.getHeaders(),
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      )
+      const response = await this.client.post(uploadUrl, formData, {
+        headers: {
+          ...formData.getHeaders(),
+          'Content-Type': 'multipart/form-data',
+        },
+      })
 
       logger.info('Thumbnail uploaded successfully', {
         modelId,
@@ -145,16 +146,12 @@ export class ThumbnailApiService {
         metadata,
       })
 
-      const response = await this.client.post(
-        uploadUrl,
-        formData,
-        {
-          headers: {
-            ...formData.getHeaders(),
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      )
+      const response = await this.client.post(uploadUrl, formData, {
+        headers: {
+          ...formData.getHeaders(),
+          'Content-Type': 'multipart/form-data',
+        },
+      })
 
       logger.info('PNG thumbnail uploaded successfully', {
         modelId,
@@ -410,6 +407,67 @@ export class ThumbnailApiService {
     } catch (error) {
       logger.error('Failed to update model tags via API', {
         modelId,
+        error: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+      })
+
+      return {
+        success: false,
+        error: error.message,
+        details: error.response?.data,
+      }
+    }
+  }
+
+  /**
+   * Upload a sound waveform thumbnail to the backend API
+   * @param {number} soundId - The sound ID to upload waveform for
+   * @param {string} waveformPath - Path to the waveform PNG file
+   * @param {string} soundHash - Hash of the sound file for deduplication
+   * @returns {Promise<Object>} Upload result with storagePath and sizeBytes
+   */
+  async uploadSoundWaveform(soundId, waveformPath, soundHash) {
+    try {
+      if (!fs.existsSync(waveformPath)) {
+        throw new Error(`Waveform file not found: ${waveformPath}`)
+      }
+
+      const formData = new FormData()
+      formData.append('file', fs.createReadStream(waveformPath))
+      formData.append('soundHash', soundHash)
+
+      const uploadUrl = `/sounds/${soundId}/waveform/upload`
+
+      logger.info('Uploading waveform thumbnail to API', {
+        soundId,
+        soundHash,
+        waveformPath,
+        apiUrl: `${this.apiBaseUrl}${uploadUrl}`,
+      })
+
+      const response = await this.client.post(uploadUrl, formData, {
+        headers: {
+          ...formData.getHeaders(),
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      logger.info('Waveform thumbnail uploaded successfully', {
+        soundId,
+        responseData: response.data,
+      })
+
+      return {
+        success: true,
+        storagePath: response.data.storagePath,
+        sizeBytes: response.data.sizeBytes,
+      }
+    } catch (error) {
+      logger.error('Failed to upload waveform thumbnail to API', {
+        soundId,
+        soundHash,
+        waveformPath,
         error: error.message,
         stack: error.stack,
         response: error.response?.data,

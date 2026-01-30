@@ -308,6 +308,7 @@ export interface SoundDto {
   fileSizeBytes: number
   createdAt: string
   updatedAt: string
+  waveformUrl: string | null
 }
 
 export interface GetAllSoundsResponse {

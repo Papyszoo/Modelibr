@@ -21,7 +21,11 @@ import ApiClient from '../../../services/ApiClient'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import { SoundDto, SoundCategoryDto } from '../../../types'
-import { decodeAudio, extractPeaks, formatDuration } from '../../../utils/audioUtils'
+import {
+  decodeAudio,
+  extractPeaks,
+  formatDuration,
+} from '../../../utils/audioUtils'
 import SoundCard from './SoundCard'
 import SoundEditor from './SoundEditor'
 import './SoundList.css'
@@ -150,7 +154,10 @@ function SoundList() {
             console.warn('Could not extract peaks:', peakError)
           }
         } catch (decodeError) {
-          console.warn('Could not decode audio for peaks, using defaults:', decodeError)
+          console.warn(
+            'Could not decode audio for peaks, using defaults:',
+            decodeError
+          )
         }
 
         if (uploadId && uploadProgressContext) {
@@ -831,6 +838,16 @@ function SoundList() {
             sound={selectedSound}
             onClose={() => setShowSoundModal(false)}
             onDownload={handleDownload}
+            onSoundUpdated={(soundId, name) => {
+              setSelectedSound(prev =>
+                prev && prev.id === soundId ? { ...prev, name } : prev
+              )
+              setSounds(prev =>
+                prev.map(sound =>
+                  sound.id === soundId ? { ...sound, name } : sound
+                )
+              )
+            }}
           />
         )}
       </Dialog>
