@@ -67,6 +67,44 @@ public class ThumbnailQueue : IThumbnailQueue
         return createdJob;
     }
 
+    public async Task<ThumbnailJob> EnqueueSoundWaveformAsync(
+        int soundId,
+        string soundHash,
+        int maxAttempts = 3,
+        int lockTimeoutMinutes = 10,
+        CancellationToken cancellationToken = default)
+    {
+        // Check for existing waveform job for this sound hash
+        var existingJob = await _thumbnailJobRepository.GetBySoundHashAsync(soundHash, cancellationToken);
+
+        if (existingJob != null)
+        {
+            // Reset the existing job to trigger fresh waveform generation
+            var currentTime = DateTime.UtcNow;
+            existingJob.Reset(currentTime);
+            await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+
+            _logger.LogInformation("Reset existing waveform job {JobId} (status: {OldStatus}) for sound {SoundId} for regeneration",
+                existingJob.Id, existingJob.Status, soundId);
+
+            // Send real-time notification to workers
+            await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+
+            return existingJob;
+        }
+
+        var job = ThumbnailJob.CreateForSound(soundId, soundHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+
+        _logger.LogInformation("Enqueued waveform thumbnail job {JobId} for sound {SoundId} with hash {SoundHash}",
+            createdJob.Id, soundId, soundHash);
+
+        // Send real-time notification to workers
+        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
+
+        return createdJob;
+    }
+
     public async Task<ThumbnailJob?> DequeueAsync(string workerId, CancellationToken cancellationToken = default)
     {
         var job = await _thumbnailJobRepository.GetNextPendingJobAsync(cancellationToken);

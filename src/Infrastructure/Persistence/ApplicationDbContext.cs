@@ -22,6 +22,8 @@ namespace Infrastructure.Persistence
         public DbSet<BatchUpload> BatchUploads => Set<BatchUpload>();
         public DbSet<Sprite> Sprites => Set<Sprite>();
         public DbSet<SpriteCategory> SpriteCategories => Set<SpriteCategory>();
+        public DbSet<Sound> Sounds => Set<Sound>();
+        public DbSet<SoundCategory> SoundCategories => Set<SoundCategory>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -72,6 +74,18 @@ namespace Infrastructure.Persistence
                 .HasMany(s => s.Projects)
                 .WithMany(p => p.Sprites)
                 .UsingEntity(j => j.ToTable("ProjectSprites"));
+
+            // Configure many-to-many relationship between Sound and Pack
+            modelBuilder.Entity<Sound>()
+                .HasMany(s => s.Packs)
+                .WithMany(p => p.Sounds)
+                .UsingEntity(j => j.ToTable("PackSounds"));
+
+            // Configure many-to-many relationship between Sound and Project
+            modelBuilder.Entity<Sound>()
+                .HasMany(s => s.Projects)
+                .WithMany(p => p.Sounds)
+                .UsingEntity(j => j.ToTable("ProjectSounds"));
 
             // Configure Model entity
             modelBuilder.Entity<Model>(entity =>
@@ -281,8 +295,12 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<ThumbnailJob>(entity =>
             {
                 entity.HasKey(tj => tj.Id);
-                entity.Property(tj => tj.ModelId).IsRequired();
-                entity.Property(tj => tj.ModelHash).IsRequired().HasMaxLength(64);
+                entity.Property(tj => tj.AssetType).IsRequired().HasMaxLength(20);
+                entity.Property(tj => tj.ModelId).IsRequired(false);
+                entity.Property(tj => tj.ModelVersionId).IsRequired(false);
+                entity.Property(tj => tj.ModelHash).IsRequired(false).HasMaxLength(64);
+                entity.Property(tj => tj.SoundId).IsRequired(false);
+                entity.Property(tj => tj.SoundHash).IsRequired(false).HasMaxLength(64);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -294,7 +312,14 @@ namespace Infrastructure.Persistence
 
                 // Create composite unique index for ModelHash + ModelVersionId to prevent duplicate jobs per version
                 // This allows different versions to have separate thumbnail jobs even when sharing the same model file
-                entity.HasIndex(tj => new { tj.ModelHash, tj.ModelVersionId }).IsUnique();
+                entity.HasIndex(tj => new { tj.ModelHash, tj.ModelVersionId })
+                    .IsUnique()
+                    .HasFilter("[ModelHash] IS NOT NULL AND [ModelVersionId] IS NOT NULL");
+                
+                // Create unique index for SoundHash to prevent duplicate waveform jobs
+                entity.HasIndex(tj => tj.SoundHash)
+                    .IsUnique()
+                    .HasFilter("[SoundHash] IS NOT NULL");
                 
                 // Create index for efficient job querying
                 entity.HasIndex(tj => new { tj.Status, tj.CreatedAt });
@@ -303,7 +328,22 @@ namespace Infrastructure.Persistence
                 entity.HasOne(tj => tj.Model)
                     .WithMany()
                     .HasForeignKey(tj => tj.ModelId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Configure relationship with ModelVersion
+                entity.HasOne(tj => tj.ModelVersion)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.ModelVersionId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Configure relationship with Sound
+                entity.HasOne(tj => tj.Sound)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.SoundId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
             });
 
             // Configure ThumbnailJobEvent entity
@@ -409,6 +449,12 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(bu => bu.SpriteId)
                     .OnDelete(DeleteBehavior.SetNull);
+                
+                // Configure optional relationship with Sound
+                entity.HasOne(bu => bu.Sound)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.SoundId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // Configure Sprite entity
@@ -455,6 +501,51 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(c => c.Name).IsUnique();
             });
 
+            // Configure Sound entity
+            modelBuilder.Entity<Sound>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.FileId).IsRequired();
+                entity.Property(s => s.Duration).IsRequired();
+                entity.Property(s => s.Peaks);
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+                entity.Property(s => s.IsDeleted).IsRequired();
+                entity.Property(s => s.DeletedAt);
+
+                // Configure relationship with File
+                entity.HasOne(s => s.File)
+                    .WithMany()
+                    .HasForeignKey(s => s.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure optional relationship with SoundCategory
+                entity.HasOne(s => s.Category)
+                    .WithMany()
+                    .HasForeignKey(s => s.SoundCategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Create index for efficient querying by name
+                entity.HasIndex(s => s.Name);
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(s => s.IsDeleted);
+            });
+
+            // Configure SoundCategory entity
+            modelBuilder.Entity<SoundCategory>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.Description).HasMaxLength(500);
+                entity.Property(c => c.CreatedAt).IsRequired();
+                entity.Property(c => c.UpdatedAt).IsRequired();
+
+                // Create unique index on Name
+                entity.HasIndex(c => c.Name).IsUnique();
+            });
+
             base.OnModelCreating(modelBuilder);
         }
 
@@ -476,6 +567,12 @@ namespace Infrastructure.Persistence
                 "gif" => FileType.Gif,
                 "apng" => FileType.Apng,
                 "webp" => FileType.WebP,
+                "mp3" => FileType.Mp3,
+                "wav" => FileType.Wav,
+                "ogg" => FileType.Ogg,
+                "flac" => FileType.Flac,
+                "aac" => FileType.Aac,
+                "m4a" => FileType.M4a,
                 "other" => FileType.Other,
                 _ => FileType.Unknown
             };

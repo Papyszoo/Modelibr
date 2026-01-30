@@ -1,0 +1,48 @@
+using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
+using Domain.Services;
+using SharedKernel;
+
+namespace Application.Packs;
+
+internal class RemoveSoundFromPackCommandHandler : ICommandHandler<RemoveSoundFromPackCommand>
+{
+    private readonly IPackRepository _packRepository;
+    private readonly ISoundRepository _soundRepository;
+    private readonly IDateTimeProvider _dateTimeProvider;
+
+    public RemoveSoundFromPackCommandHandler(
+        IPackRepository packRepository,
+        ISoundRepository soundRepository,
+        IDateTimeProvider dateTimeProvider)
+    {
+        _packRepository = packRepository;
+        _soundRepository = soundRepository;
+        _dateTimeProvider = dateTimeProvider;
+    }
+
+    public async Task<Result> Handle(RemoveSoundFromPackCommand command, CancellationToken cancellationToken)
+    {
+        var pack = await _packRepository.GetByIdAsync(command.PackId, cancellationToken);
+        if (pack == null)
+        {
+            return Result.Failure(
+                new Error("PackNotFound", $"Pack with ID {command.PackId} was not found."));
+        }
+
+        var sound = await _soundRepository.GetByIdAsync(command.SoundId, cancellationToken);
+        if (sound == null)
+        {
+            return Result.Failure(
+                new Error("SoundNotFound", $"Sound with ID {command.SoundId} was not found."));
+        }
+
+        pack.RemoveSound(sound, _dateTimeProvider.UtcNow);
+
+        await _packRepository.UpdateAsync(pack, cancellationToken);
+
+        return Result.Success();
+    }
+}
+
+public record RemoveSoundFromPackCommand(int PackId, int SoundId) : ICommand;

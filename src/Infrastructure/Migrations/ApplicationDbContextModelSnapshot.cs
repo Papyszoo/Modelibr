@@ -90,6 +90,9 @@ namespace Infrastructure.Migrations
                     b.Property<int?>("ProjectId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("SoundId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("SpriteId")
                         .HasColumnType("integer");
 
@@ -115,6 +118,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("PackId");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("SoundId");
 
                     b.HasIndex("SpriteId");
 
@@ -381,6 +386,87 @@ namespace Infrastructure.Migrations
                     b.ToTable("Settings");
                 });
 
+            modelBuilder.Entity("Domain.Models.Sound", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double>("Duration")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Peaks")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("SoundCategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("Name");
+
+                    b.HasIndex("SoundCategoryId");
+
+                    b.ToTable("Sounds");
+                });
+
+            modelBuilder.Entity("Domain.Models.SoundCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("SoundCategories");
+                });
+
             modelBuilder.Entity("Domain.Models.Sprite", b =>
                 {
                     b.Property<int>("Id")
@@ -638,6 +724,11 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer");
 
@@ -665,14 +756,20 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("ModelHash")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<int>("ModelId")
+                    b.Property<int?>("ModelId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ModelVersionId")
+                    b.Property<int?>("ModelVersionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SoundHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("SoundId")
                         .HasColumnType("integer");
 
                     b.Property<int>("Status")
@@ -687,8 +784,15 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ModelVersionId");
 
+                    b.HasIndex("SoundHash")
+                        .IsUnique()
+                        .HasFilter("[SoundHash] IS NOT NULL");
+
+                    b.HasIndex("SoundId");
+
                     b.HasIndex("ModelHash", "ModelVersionId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[ModelHash] IS NOT NULL AND [ModelVersionId] IS NOT NULL");
 
                     b.HasIndex("Status", "CreatedAt");
 
@@ -794,6 +898,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("ModelVersionTextureSets", (string)null);
                 });
 
+            modelBuilder.Entity("PackSound", b =>
+                {
+                    b.Property<int>("PacksId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoundsId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PacksId", "SoundsId");
+
+                    b.HasIndex("SoundsId");
+
+                    b.ToTable("PackSounds", (string)null);
+                });
+
             modelBuilder.Entity("PackSprite", b =>
                 {
                     b.Property<int>("PacksId")
@@ -822,6 +941,21 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TextureSetsId");
 
                     b.ToTable("PackTextureSets", (string)null);
+                });
+
+            modelBuilder.Entity("ProjectSound", b =>
+                {
+                    b.Property<int>("ProjectsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoundsId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ProjectsId", "SoundsId");
+
+                    b.HasIndex("SoundsId");
+
+                    b.ToTable("ProjectSounds", (string)null);
                 });
 
             modelBuilder.Entity("ProjectSprite", b =>
@@ -877,6 +1011,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Domain.Models.Sound", "Sound")
+                        .WithMany()
+                        .HasForeignKey("SoundId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Domain.Models.Sprite", "Sprite")
                         .WithMany()
                         .HasForeignKey("SpriteId")
@@ -894,6 +1033,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Pack");
 
                     b.Navigation("Project");
+
+                    b.Navigation("Sound");
 
                     b.Navigation("Sprite");
 
@@ -947,6 +1088,24 @@ namespace Infrastructure.Migrations
                     b.Navigation("Thumbnail");
                 });
 
+            modelBuilder.Entity("Domain.Models.Sound", b =>
+                {
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.SoundCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("SoundCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("File");
+                });
+
             modelBuilder.Entity("Domain.Models.Sprite", b =>
                 {
                     b.HasOne("Domain.Models.File", "File")
@@ -992,18 +1151,23 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Models.Model", "Model")
                         .WithMany()
                         .HasForeignKey("ModelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
                         .WithMany()
                         .HasForeignKey("ModelVersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Domain.Models.Sound", "Sound")
+                        .WithMany()
+                        .HasForeignKey("SoundId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Model");
 
                     b.Navigation("ModelVersion");
+
+                    b.Navigation("Sound");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJobEvent", b =>
@@ -1077,6 +1241,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PackSound", b =>
+                {
+                    b.HasOne("Domain.Models.Pack", null)
+                        .WithMany()
+                        .HasForeignKey("PacksId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Sound", null)
+                        .WithMany()
+                        .HasForeignKey("SoundsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PackSprite", b =>
                 {
                     b.HasOne("Domain.Models.Pack", null)
@@ -1103,6 +1282,21 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Models.TextureSet", null)
                         .WithMany()
                         .HasForeignKey("TextureSetsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ProjectSound", b =>
+                {
+                    b.HasOne("Domain.Models.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Sound", null)
+                        .WithMany()
+                        .HasForeignKey("SoundsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -1,0 +1,181 @@
+.sound-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--surface-card);
+  border-radius: 8px;
+}
+
+.sound-editor-modal .p-dialog-header {
+  padding: 0;
+  height: 0;
+  min-height: 0;
+  border: none;
+  display: none;
+}
+
+.sound-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sound-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sound-editor-title h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sound-title-input {
+  width: min(420px, 70vw);
+}
+
+.sound-title-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.sound-editor-waveform {
+  position: relative;
+  min-height: 140px;
+  background: var(--surface-ground);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.sound-editor-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--surface-ground);
+  z-index: 1;
+}
+
+.sound-editor-loading i {
+  font-size: 2rem;
+  color: var(--primary-color);
+}
+
+.waveform-container {
+  width: 100%;
+}
+
+.sound-editor-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--surface-ground);
+  border-radius: 8px;
+}
+
+.time-display {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.time-separator {
+  margin: 0 0.25rem;
+  opacity: 0.5;
+}
+
+.playback-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.selection-label {
+  color: var(--text-color-secondary);
+}
+
+.selection-range {
+  font-family: monospace;
+  background: var(--primary-100);
+  color: var(--primary-700);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.sound-editor-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--surface-border);
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(
+    135deg,
+    var(--primary-300) 0%,
+    var(--primary-100) 100%
+  );
+  border: 2px dashed var(--primary-500);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--primary-900);
+  font-weight: 500;
+}
+
+.drag-handle.active {
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+.drag-handle.active:hover {
+  background: linear-gradient(
+    135deg,
+    var(--primary-400) 0%,
+    var(--primary-200) 100%
+  );
+  border-color: var(--primary-700);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.drag-handle.active:active {
+  cursor: grabbing;
+}
+
+.drag-handle.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.drag-handle i {
+  font-size: 1.25rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}

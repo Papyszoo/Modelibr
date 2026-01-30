@@ -90,6 +90,8 @@ namespace WebApi
             app.MapRecycledFilesEndpoints();
             app.MapSpriteEndpoints();
             app.MapSpriteCategoryEndpoints();
+            app.MapSoundEndpoints();
+            app.MapSoundCategoryEndpoints();
             app.MapBlenderEndpoints();
 
             // Map SignalR hubs

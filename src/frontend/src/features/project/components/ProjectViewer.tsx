@@ -13,11 +13,13 @@ import {
   TextureSetDto,
   TextureType,
   SpriteDto,
+  SoundDto,
 } from '../../../types'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { UploadableGrid } from '../../../shared/components'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
+import { formatDuration, filterAudioFiles, processAudioFile } from '../../../utils/audioUtils'
 import './ProjectViewer.css'
 
 interface ProjectViewerProps {
@@ -29,33 +31,42 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
   const [models, setModels] = useState<Model[]>([])
   const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
   const [sprites, setSprites] = useState<SpriteDto[]>([])
+  const [sounds, setSounds] = useState<SoundDto[]>([])
   const [allModels, setAllModels] = useState<Model[]>([])
   const [allTextureSets, setAllTextureSets] = useState<TextureSetDto[]>([])
   const [allSprites, setAllSprites] = useState<SpriteDto[]>([])
+  const [allSounds, setAllSounds] = useState<SoundDto[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModelDialog, setShowAddModelDialog] = useState(false)
   const [showAddTextureSetDialog, setShowAddTextureSetDialog] = useState(false)
   const [showAddSpriteDialog, setShowAddSpriteDialog] = useState(false)
+  const [showAddSoundDialog, setShowAddSoundDialog] = useState(false)
   const [showSpriteModal, setShowSpriteModal] = useState(false)
+  const [showSoundModal, setShowSoundModal] = useState(false)
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [textureSetSearchQuery, setTextureSetSearchQuery] = useState('')
   const [spriteSearchQuery, setSpriteSearchQuery] = useState('')
+  const [soundSearchQuery, setSoundSearchQuery] = useState('')
   const [selectedModelIds, setSelectedModelIds] = useState<number[]>([])
   const [selectedTextureSetIds, setSelectedTextureSetIds] = useState<number[]>(
     []
   )
   const [selectedSpriteIds, setSelectedSpriteIds] = useState<number[]>([])
+  const [selectedSoundIds, setSelectedSoundIds] = useState<number[]>([])
   const [uploadingModel, setUploadingModel] = useState(false)
   const [uploadingTextureSet, setUploadingTextureSet] = useState(false)
   const [uploadingSprite, setUploadingSprite] = useState(false)
+  const [uploadingSound, setUploadingSound] = useState(false)
   const toast = useRef<Toast>(null)
   const modelContextMenu = useRef<ContextMenu>(null)
   const textureSetContextMenu = useRef<ContextMenu>(null)
   const spriteContextMenu = useRef<ContextMenu>(null)
+  const soundContextMenu = useRef<ContextMenu>(null)
   const [selectedModel, setSelectedModel] = useState<Model | null>(null)
   const [selectedTextureSet, setSelectedTextureSet] =
     useState<TextureSetDto | null>(null)
   const [selectedSprite, setSelectedSprite] = useState<SpriteDto | null>(null)
+  const [selectedSound, setSelectedSound] = useState<SoundDto | null>(null)
   const { openModelDetailsTab, openTextureSetDetailsTab } = useTabContext()
   const uploadProgressContext = useUploadProgress()
 
@@ -82,14 +93,16 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
   const loadProjectContent = async () => {
     try {
       setLoading(true)
-      const [modelsData, textureSetsData, spritesData] = await Promise.all([
+      const [modelsData, textureSetsData, spritesData, soundsData] = await Promise.all([
         ApiClient.getModelsByProject(projectId),
         ApiClient.getTextureSetsByProject(projectId),
         ApiClient.getSpritesByProject(projectId),
+        ApiClient.getSoundsByProject(projectId),
       ])
       setModels(modelsData)
       setTextureSets(textureSetsData)
       setSprites(spritesData)
+      setSounds(soundsData)
     } catch (error) {
       console.error('Failed to load project content:', error)
       toast.current?.show({
@@ -138,6 +151,20 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
       setAllSprites(available)
     } catch (error) {
       console.error('Failed to load sprites:', error)
+    }
+  }
+
+  const loadAvailableSounds = async () => {
+    try {
+      const response = await ApiClient.getAllSounds()
+      // Filter out sounds already in this project
+      const soundIds = sounds.map(s => s.id)
+      const available = (response.sounds || []).filter(
+        s => !soundIds.includes(s.id)
+      )
+      setAllSounds(available)
+    } catch (error) {
+      console.error('Failed to load sounds:', error)
     }
   }
 
@@ -202,6 +229,28 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to remove sprite from project',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleRemoveSound = async (soundId: number) => {
+    try {
+      await ApiClient.removeSoundFromProject(projectId, soundId)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Sound removed from project',
+        life: 3000,
+      })
+      loadProjectContent()
+      loadProject()
+    } catch (error) {
+      console.error('Failed to remove sound:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to remove sound from project',
         life: 3000,
       })
     }
@@ -292,6 +341,36 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to add sprites to project',
+        life: 3000,
+      })
+    }
+  }
+
+  const handleAddSounds = async () => {
+    if (selectedSoundIds.length === 0) return
+
+    try {
+      await Promise.all(
+        selectedSoundIds.map(soundId =>
+          ApiClient.addSoundToProject(projectId, soundId)
+        )
+      )
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: `${selectedSoundIds.length} sound(s) added to project`,
+        life: 3000,
+      })
+      setShowAddSoundDialog(false)
+      setSelectedSoundIds([])
+      loadProjectContent()
+      loadProject()
+    } catch (error) {
+      console.error('Failed to add sounds:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to add sounds to project',
         life: 3000,
       })
     }
@@ -562,6 +641,110 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     handleSpriteUpload(files)
   }
 
+  const handleSoundUpload = async (files: File[]) => {
+    if (files.length === 0) return
+
+    // Filter for audio files only
+    const audioFiles = filterAudioFiles(files)
+
+    if (audioFiles.length === 0) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Invalid Files',
+        detail: 'Please drop audio files only',
+        life: 3000,
+      })
+      return
+    }
+
+    try {
+      setUploadingSound(true)
+
+      let newCount = 0
+
+      // Create batch for all uploads
+      const batchId = uploadProgressContext
+        ? uploadProgressContext.createBatch()
+        : undefined
+
+      // Upload all sound files and add them to project
+      const uploadPromises = audioFiles.map(async file => {
+        let uploadId: string | null = null
+        try {
+          // Track the upload with batchId
+          uploadId =
+            uploadProgressContext?.addUpload(file, 'sound', batchId) || null
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 20)
+          }
+
+          // Process audio to extract duration and peaks
+          const { duration, peaks } = await processAudioFile(file)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 40)
+          }
+
+          const soundName = file.name.replace(/\.[^/.]+$/, '')
+
+          // Create sound with file
+          const response = await ApiClient.createSoundWithFile(file, {
+            name: soundName,
+            duration,
+            peaks,
+          })
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 70)
+          }
+
+          // Add sound to project
+          await ApiClient.addSoundToProject(projectId, response.soundId)
+
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, response)
+          }
+
+          newCount++
+          return response.soundId
+        } catch (error) {
+          // Mark upload as failed
+          if (uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error as Error)
+          }
+          throw error
+        }
+      })
+
+      await Promise.all(uploadPromises)
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: `${newCount} sound(s) uploaded and added to project`,
+        life: 3000,
+      })
+      loadProjectContent()
+      loadProject()
+    } catch (error) {
+      console.error('Failed to upload sounds:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to upload sounds',
+        life: 3000,
+      })
+    } finally {
+      setUploadingSound(false)
+    }
+  }
+
+  const handleSoundDrop = (files: File[]) => {
+    handleSoundUpload(files)
+  }
+
   const toggleModelSelection = (modelId: number) => {
     setSelectedModelIds(prev =>
       prev.includes(modelId)
@@ -697,6 +880,18 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     },
   ]
 
+  const soundContextMenuItems: MenuItem[] = [
+    {
+      label: 'Remove from project',
+      icon: 'pi pi-times',
+      command: () => {
+        if (selectedSound) {
+          handleRemoveSound(selectedSound.id)
+        }
+      },
+    },
+  ]
+
   const filteredAvailableModels = allModels.filter(model => {
     const modelName = getModelName(model).toLowerCase()
     return modelName.includes(modelSearchQuery.toLowerCase())
@@ -712,6 +907,11 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     return name.includes(spriteSearchQuery.toLowerCase())
   })
 
+  const filteredAvailableSounds = allSounds.filter(sound => {
+    const name = sound.name.toLowerCase()
+    return name.includes(soundSearchQuery.toLowerCase())
+  })
+
   if (!project) {
     return <div>Loading...</div>
   }
@@ -725,6 +925,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         ref={textureSetContextMenu}
       />
       <ContextMenu model={spriteContextMenuItems} ref={spriteContextMenu} />
+      <ContextMenu model={soundContextMenuItems} ref={soundContextMenu} />
 
       <div className="project-header">
         <div>
@@ -914,6 +1115,61 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                 <div className="project-card-add-content">
                   <i className="pi pi-plus" />
                   <span>Add Sprite</span>
+                </div>
+              </div>
+            </div>
+          </UploadableGrid>
+        </div>
+
+        {/* Sounds Section */}
+        <div className="project-section">
+          <h3>Sounds</h3>
+
+          <UploadableGrid
+            onFilesDropped={handleSoundDrop}
+            isUploading={uploadingSound}
+            uploadMessage="Drop audio files here to create sounds and add to project"
+            className="project-grid-wrapper"
+          >
+            <div className="project-grid">
+              {sounds.map(sound => (
+                <div
+                  key={sound.id}
+                  className="project-card"
+                  onClick={() => {
+                    setSelectedSound(sound)
+                    setShowSoundModal(true)
+                  }}
+                  onContextMenu={e => {
+                    e.preventDefault()
+                    setSelectedSound(sound)
+                    soundContextMenu.current?.show(e)
+                  }}
+                >
+                  <div className="project-card-thumbnail">
+                    <div className="project-card-placeholder">
+                      <i className="pi pi-volume-up" />
+                      <span>{formatDuration(sound.duration)}</span>
+                    </div>
+                    <div className="project-card-overlay">
+                      <span className="project-card-name">{sound.name}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Add New Card */}
+              <div
+                className="project-card project-card-add"
+                onClick={() => {
+                  loadAvailableSounds()
+                  setSoundSearchQuery('')
+                  setSelectedSoundIds([])
+                  setShowAddSoundDialog(true)
+                }}
+              >
+                <div className="project-card-add-content">
+                  <i className="pi pi-plus" />
+                  <span>Add Sound</span>
                 </div>
               </div>
             </div>
@@ -1215,6 +1471,126 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
                   onClick={handleDownloadSprite}
                   className="p-button-success w-full"
                 />
+              </div>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Add Sound Dialog */}
+      <Dialog
+        header="Add Sounds to Project"
+        visible={showAddSoundDialog}
+        style={{ width: '80vw', maxWidth: '1200px', maxHeight: '80vh' }}
+        onHide={() => {
+          setShowAddSoundDialog(false)
+          setSelectedSoundIds([])
+        }}
+        footer={
+          <div>
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              onClick={() => {
+                setShowAddSoundDialog(false)
+                setSelectedSoundIds([])
+              }}
+              className="p-button-text"
+            />
+            <Button
+              label={`Add Selected (${selectedSoundIds.length})`}
+              icon="pi pi-check"
+              onClick={handleAddSounds}
+              disabled={selectedSoundIds.length === 0}
+            />
+          </div>
+        }
+      >
+        <div className="add-dialog-content">
+          <div className="search-bar">
+            <i className="pi pi-search" />
+            <InputText
+              type="text"
+              placeholder="Search sounds..."
+              value={soundSearchQuery}
+              onChange={e => setSoundSearchQuery(e.target.value)}
+              className="search-input"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="project-grid scrollable-grid">
+            {filteredAvailableSounds.map(sound => {
+              const isSelected = selectedSoundIds.includes(sound.id)
+              return (
+                <div
+                  key={sound.id}
+                  className={`project-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedSoundIds(prev =>
+                      prev.includes(sound.id)
+                        ? prev.filter(id => id !== sound.id)
+                        : [...prev, sound.id]
+                    )
+                  }}
+                >
+                  <div className="project-card-checkbox">
+                    <Checkbox checked={isSelected} readOnly />
+                  </div>
+                  <div className="project-card-thumbnail">
+                    <div className="project-card-placeholder">
+                      <i className="pi pi-volume-up" />
+                      <span>{formatDuration(sound.duration)}</span>
+                    </div>
+                    <div className="project-card-overlay">
+                      <span className="project-card-name">{sound.name}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {filteredAvailableSounds.length === 0 && (
+            <div className="no-results">
+              <i className="pi pi-inbox" />
+              <p>No sounds available to add</p>
+            </div>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Sound Detail Modal */}
+      <Dialog
+        header={selectedSound?.name || 'Sound'}
+        visible={showSoundModal}
+        onHide={() => setShowSoundModal(false)}
+        style={{ width: '600px' }}
+        className="sound-detail-modal"
+      >
+        {selectedSound && (
+          <div className="sound-modal-content">
+            <div className="sound-modal-preview">
+              <audio
+                controls
+                src={ApiClient.getFileUrl(selectedSound.fileId.toString())}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div className="sound-modal-info">
+              <div className="sound-modal-details">
+                <p>
+                  <strong>Duration:</strong> {formatDuration(selectedSound.duration)}
+                </p>
+                <p>
+                  <strong>File:</strong> {selectedSound.fileName}
+                </p>
+                <p>
+                  <strong>Size:</strong>{' '}
+                  {formatFileSize(selectedSound.fileSizeBytes)}
+                </p>
+                <p>
+                  <strong>Category:</strong>{' '}
+                  {selectedSound.categoryName || 'Unassigned'}
+                </p>
               </div>
             </div>
           </div>

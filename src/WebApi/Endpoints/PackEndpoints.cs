@@ -72,6 +72,17 @@ public static class PackEndpoints
             .WithName("Remove Sprite from Pack")
             .WithSummary("Removes a sprite from the specified pack")
             .WithOpenApi();
+
+        // Pack-Sound association
+        app.MapPost("/packs/{packId}/sounds/{soundId}", AddSoundToPack)
+            .WithName("Add Sound to Pack")
+            .WithSummary("Adds a sound to the specified pack")
+            .WithOpenApi();
+
+        app.MapDelete("/packs/{packId}/sounds/{soundId}", RemoveSoundFromPack)
+            .WithName("Remove Sound from Pack")
+            .WithSummary("Removes a sound from the specified pack")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> GetAllPacks(
@@ -242,6 +253,34 @@ public static class PackEndpoints
         CancellationToken cancellationToken)
     {
         var command = new RemoveSpriteFromPackCommand(packId, spriteId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddSoundToPack(
+        int packId,
+        int soundId,
+        ICommandHandler<AddSoundToPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new AddSoundToPackCommand(packId, soundId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveSoundFromPack(
+        int packId,
+        int soundId,
+        ICommandHandler<RemoveSoundFromPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new RemoveSoundFromPackCommand(packId, soundId);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess
