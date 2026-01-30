@@ -19,6 +19,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
     private readonly IFileRepository _fileRepository;
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
+    private readonly ISoundRepository _soundRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public RestoreEntityCommandHandler(
@@ -27,6 +28,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         IFileRepository fileRepository,
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
+        ISoundRepository soundRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _modelRepository = modelRepository;
@@ -34,6 +36,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         _fileRepository = fileRepository;
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
+        _soundRepository = soundRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -87,6 +90,15 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 sprite.Restore(now);
                 await _spriteRepository.UpdateAsync(sprite, cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Sprite restored successfully"));
+
+            case "sound":
+                var sound = await _soundRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (sound == null)
+                    return Result.Failure<RestoreEntityResponse>(new Error("SoundNotFound", "Sound not found"));
+                
+                sound.Restore(now);
+                await _soundRepository.UpdateAsync(sound, cancellationToken);
+                return Result.Success(new RestoreEntityResponse(true, "Sound restored successfully"));
 
             default:
                 return Result.Failure<RestoreEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));
