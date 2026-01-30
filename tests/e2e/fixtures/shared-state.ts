@@ -51,6 +51,20 @@ interface SpriteCategoryData {
     description?: string;
 }
 
+interface SoundData {
+    id: number;
+    name: string;
+    fileId: number;
+    duration: number;
+    categoryId?: number;
+}
+
+interface SoundCategoryData {
+    id: number;
+    name: string;
+    description?: string;
+}
+
 interface VersionState {
     thumbnailDetails: any;
     thumbnailSrc: string | null;
@@ -63,6 +77,8 @@ interface StateData {
     projects: Record<string, ProjectData>;
     sprites: Record<string, SpriteData>;
     spriteCategories: Record<string, SpriteCategoryData>;
+    sounds: Record<string, SoundData>;
+    soundCategories: Record<string, SoundCategoryData>;
     versionStates: Record<string, VersionState>;
 }
 
@@ -76,7 +92,7 @@ class SharedState {
         } catch (e) {
             console.error('Error loading shared state:', e);
         }
-        return { models: {}, textureSets: {}, packs: {}, projects: {}, sprites: {}, spriteCategories: {}, versionStates: {} };
+        return { models: {}, textureSets: {}, packs: {}, projects: {}, sprites: {}, spriteCategories: {}, sounds: {}, soundCategories: {}, versionStates: {} };
     }
 
 
@@ -202,9 +218,45 @@ class SharedState {
         return state.spriteCategories ? name in state.spriteCategories : false;
     }
 
+    // Sound management
+    saveSound(name: string, data: SoundData): void {
+        const state = this.loadState();
+        if (!state.sounds) state.sounds = {};
+        state.sounds[name] = data;
+        this.saveState(state);
+    }
+
+    getSound(name: string): SoundData | undefined {
+        const state = this.loadState();
+        return state.sounds?.[name];
+    }
+
+    hasSound(name: string): boolean {
+        const state = this.loadState();
+        return state.sounds ? name in state.sounds : false;
+    }
+
+    // Sound category management
+    saveSoundCategory(name: string, data: SoundCategoryData): void {
+        const state = this.loadState();
+        if (!state.soundCategories) state.soundCategories = {};
+        state.soundCategories[name] = data;
+        this.saveState(state);
+    }
+
+    getSoundCategory(name: string): SoundCategoryData | undefined {
+        const state = this.loadState();
+        return state.soundCategories?.[name];
+    }
+
+    hasSoundCategory(name: string): boolean {
+        const state = this.loadState();
+        return state.soundCategories ? name in state.soundCategories : false;
+    }
+
     // Clear all state (called at start of test run)
     clear(): void {
-        this.saveState({ models: {}, textureSets: {}, packs: {}, projects: {}, sprites: {}, spriteCategories: {}, versionStates: {} });
+        this.saveState({ models: {}, textureSets: {}, packs: {}, projects: {}, sprites: {}, spriteCategories: {}, sounds: {}, soundCategories: {}, versionStates: {} });
     }
 
     // Debug info
@@ -218,6 +270,8 @@ class SharedState {
                 projects: Object.keys(state.projects || {}),
                 sprites: Object.keys(state.sprites || {}),
                 spriteCategories: Object.keys(state.spriteCategories || {}),
+                sounds: Object.keys(state.sounds || {}),
+                soundCategories: Object.keys(state.soundCategories || {}),
                 versionStates: Object.keys(state.versionStates),
             },
             null,
