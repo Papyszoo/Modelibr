@@ -43,6 +43,8 @@ namespace Infrastructure
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();
             services.AddScoped<ISpriteRepository, SpriteRepository>();
             services.AddScoped<ISpriteCategoryRepository, SpriteCategoryRepository>();
+            services.AddScoped<ISoundRepository, SoundRepository>();
+            services.AddScoped<ISoundCategoryRepository, SoundCategoryRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 

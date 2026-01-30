@@ -28,6 +28,12 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-trash'
     case 'sprites':
       return 'pi pi-image'
+    case 'sounds':
+      return 'pi pi-volume-up'
+    case 'stageList':
+      return 'pi pi-th-large'
+    case 'stageEditor':
+      return 'pi pi-th-large'
     default:
       return 'pi pi-file'
   }
@@ -61,6 +67,8 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Recycled Files'
     case 'sprites':
       return 'Sprites'
+    case 'sounds':
+      return 'Sounds'
     case 'stageEditor':
       return 'Stage Editor'
     case 'stageList':

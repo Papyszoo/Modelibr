@@ -87,8 +87,18 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
                 new Error("ThumbnailJobNotFound", $"Thumbnail job {command.JobId} not found"));
         }
 
+        var now = _dateTimeProvider.UtcNow;
+
+        // Verify this is a model job (not sound job)
+        if (!job.ModelId.HasValue || !job.ModelVersionId.HasValue)
+        {
+            _logger.LogWarning("Job {JobId} is not a model thumbnail job - use FinishSoundWaveformJobCommand instead", command.JobId);
+            return Result.Failure<FinishThumbnailJobResponse>(
+                new Error("InvalidJobType", "Job must have ModelId and ModelVersionId. Use FinishSoundWaveformJobCommand for sound jobs"));
+        }
+
         // Get the model
-        var model = await _modelRepository.GetByIdAsync(job.ModelId, cancellationToken);
+        var model = await _modelRepository.GetByIdAsync(job.ModelId.Value, cancellationToken);
         if (model == null)
         {
             _logger.LogWarning("Model {ModelId} not found for thumbnail job {JobId}", job.ModelId, command.JobId);
@@ -96,19 +106,17 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
                 new Error("ModelNotFound", $"Model {job.ModelId} not found"));
         }
 
-        var now = _dateTimeProvider.UtcNow;
-
         try
         {
             // Get or create the thumbnail entity for this version
-            var thumbnail = await _thumbnailRepository.GetByModelVersionIdAsync(job.ModelVersionId, cancellationToken);
+            var thumbnail = await _thumbnailRepository.GetByModelVersionIdAsync(job.ModelVersionId.Value, cancellationToken);
             if (thumbnail == null)
             {
-                thumbnail = Thumbnail.Create(job.ModelVersionId, now);
+                thumbnail = Thumbnail.Create(job.ModelVersionId.Value, now);
                 thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
                 
                 // Set ThumbnailId on the ModelVersion
-                var targetVersion = model.Versions.FirstOrDefault(v => v.Id == job.ModelVersionId);
+                var targetVersion = model.Versions.FirstOrDefault(v => v.Id == job.ModelVersionId.Value);
                 if (targetVersion != null)
                 {
                     targetVersion.SetThumbnail(thumbnail);
@@ -154,7 +162,7 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
             await _domainEventDispatcher.PublishAsync(thumbnail.DomainEvents, cancellationToken);
             thumbnail.ClearDomainEvents();
 
-            return Result.Success(new FinishThumbnailJobResponse(job.ModelId, job.ModelVersionId, status));
+            return Result.Success(new FinishThumbnailJobResponse(job.ModelId.Value, job.ModelVersionId.Value, status));
         }
         catch (Exception ex)
         {

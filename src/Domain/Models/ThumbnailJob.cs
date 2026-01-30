@@ -11,19 +11,34 @@ public class ThumbnailJob
     public int Id { get; set; }
     
     /// <summary>
-    /// The ID of the model this thumbnail job is for.
+    /// The ID of the model this thumbnail job is for (null for sound jobs).
     /// </summary>
-    public int ModelId { get; private set; }
+    public int? ModelId { get; private set; }
     
     /// <summary>
-    /// The ID of the model version this thumbnail job is for.
+    /// The ID of the model version this thumbnail job is for (null for sound jobs).
     /// </summary>
-    public int ModelVersionId { get; private set; }
+    public int? ModelVersionId { get; private set; }
     
     /// <summary>
-    /// The SHA256 hash of the model for deduplication.
+    /// The SHA256 hash of the model for deduplication (null for sound jobs).
     /// </summary>
-    public string ModelHash { get; private set; } = string.Empty;
+    public string? ModelHash { get; private set; }
+    
+    /// <summary>
+    /// The ID of the sound this thumbnail job is for (null for model jobs).
+    /// </summary>
+    public int? SoundId { get; private set; }
+    
+    /// <summary>
+    /// The SHA256 hash of the sound file for deduplication (null for model jobs).
+    /// </summary>
+    public string? SoundHash { get; private set; }
+    
+    /// <summary>
+    /// Type of asset this job is for: "Model" or "Sound".
+    /// </summary>
+    public string AssetType { get; private set; } = "Model";
     
     /// <summary>
     /// Current status of the thumbnail job.
@@ -76,11 +91,12 @@ public class ThumbnailJob
     public DateTime? CompletedAt { get; private set; }
     
     // Navigation properties
-    public Model Model { get; set; } = null!;
-    public ModelVersion ModelVersion { get; set; } = null!;
+    public Model? Model { get; set; }
+    public ModelVersion? ModelVersion { get; set; }
+    public Sound? Sound { get; set; }
 
     /// <summary>
-    /// Creates a new thumbnail job for processing.
+    /// Creates a new thumbnail job for model processing.
     /// </summary>
     public static ThumbnailJob Create(int modelId, int modelVersionId, string modelHash, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
     {
@@ -92,9 +108,35 @@ public class ThumbnailJob
 
         return new ThumbnailJob
         {
+            AssetType = "Model",
             ModelId = modelId,
             ModelVersionId = modelVersionId,
             ModelHash = modelHash.Trim(),
+            Status = ThumbnailJobStatus.Pending,
+            MaxAttempts = maxAttempts,
+            LockTimeoutMinutes = lockTimeoutMinutes,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+    }
+
+    /// <summary>
+    /// Creates a new thumbnail job for sound waveform processing.
+    /// </summary>
+    public static ThumbnailJob CreateForSound(int soundId, string soundHash, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
+    {
+        if (soundId <= 0)
+            throw new ArgumentException("Sound ID must be a positive integer.", nameof(soundId));
+        if (string.IsNullOrWhiteSpace(soundHash))
+            throw new ArgumentException("Sound hash cannot be null or whitespace.", nameof(soundHash));
+        ValidateMaxAttempts(maxAttempts);
+        ValidateLockTimeoutMinutes(lockTimeoutMinutes);
+
+        return new ThumbnailJob
+        {
+            AssetType = "Sound",
+            SoundId = soundId,
+            SoundHash = soundHash.Trim(),
             Status = ThumbnailJobStatus.Pending,
             MaxAttempts = maxAttempts,
             LockTimeoutMinutes = lockTimeoutMinutes,
@@ -214,21 +256,21 @@ public class ThumbnailJob
         return currentTime >= LockedAt.Value.AddMinutes(LockTimeoutMinutes);
     }
 
-    private static void ValidateModelId(int modelId)
+    private static void ValidateModelId(int? modelId)
     {
-        if (modelId <= 0)
+        if (modelId.HasValue && modelId.Value <= 0)
             throw new ArgumentException("Model ID must be greater than 0.", nameof(modelId));
     }
 
-    private static void ValidateModelVersionId(int modelVersionId)
+    private static void ValidateModelVersionId(int? modelVersionId)
     {
-        if (modelVersionId <= 0)
+        if (modelVersionId.HasValue && modelVersionId.Value <= 0)
             throw new ArgumentException("Model version ID must be greater than 0.", nameof(modelVersionId));
     }
 
-    private static void ValidateModelHash(string modelHash)
+    private static void ValidateModelHash(string? modelHash)
     {
-        if (string.IsNullOrWhiteSpace(modelHash))
+        if (modelHash != null && string.IsNullOrWhiteSpace(modelHash))
             throw new ArgumentException("Model hash cannot be null or empty.", nameof(modelHash));
         
         if (modelHash.Length != 64) // SHA256 hash length

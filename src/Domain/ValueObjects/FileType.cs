@@ -42,6 +42,14 @@ public sealed class FileType : IEquatable<FileType>
     public static readonly FileType Gif = new("gif", "Animated GIF", false, FileTypeCategory.Sprite);
     public static readonly FileType Apng = new("apng", "Animated PNG", false, FileTypeCategory.Sprite);
     public static readonly FileType WebP = new("webp", "WebP Image", false, FileTypeCategory.Sprite);
+    
+    // Audio types
+    public static readonly FileType Mp3 = new("mp3", "MP3 Audio", false, FileTypeCategory.Audio);
+    public static readonly FileType Wav = new("wav", "WAV Audio", false, FileTypeCategory.Audio);
+    public static readonly FileType Ogg = new("ogg", "OGG Audio", false, FileTypeCategory.Audio);
+    public static readonly FileType Flac = new("flac", "FLAC Audio", false, FileTypeCategory.Audio);
+    public static readonly FileType Aac = new("aac", "AAC Audio", false, FileTypeCategory.Audio);
+    public static readonly FileType M4a = new("m4a", "M4A Audio", false, FileTypeCategory.Audio);
 
     private static readonly Dictionary<string, FileType> ExtensionMapping = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -60,11 +68,18 @@ public sealed class FileType : IEquatable<FileType>
         { ".bmp", Texture },
         { ".mtl", Material },
         { ".gif", Gif },
-        { ".webp", WebP }
+        { ".webp", WebP },
+        { ".mp3", Mp3 },
+        { ".wav", Wav },
+        { ".ogg", Ogg },
+        { ".flac", Flac },
+        { ".aac", Aac },
+        { ".m4a", M4a }
     };
 
     private static readonly FileType[] RenderableTypes = { Obj, Fbx, Gltf, Glb };
     private static readonly FileType[] SpriteTypes = { Sprite, SpriteSheet, Gif, Apng, WebP, Texture };
+    private static readonly FileType[] AudioTypes = { Mp3, Wav, Ogg, Flac, Aac, M4a };
 
     public static Result<FileType> FromExtension(string extension)
     {
@@ -124,6 +139,8 @@ public sealed class FileType : IEquatable<FileType>
     
     public static IReadOnlyList<FileType> GetSpriteTypes() => SpriteTypes;
     
+    public static IReadOnlyList<FileType> GetAudioTypes() => AudioTypes;
+    
     public static Result<FileType> ValidateForSpriteUpload(string fileName)
     {
         var fileTypeResult = FromFileName(fileName);
@@ -135,6 +152,22 @@ public sealed class FileType : IEquatable<FileType>
         {
             return Result.Failure<FileType>(
                 new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for sprite upload. Only image files (.png, .jpg, .gif, .webp, etc.) are allowed."));
+        }
+
+        return Result.Success(fileType);
+    }
+    
+    public static Result<FileType> ValidateForSoundUpload(string fileName)
+    {
+        var fileTypeResult = FromFileName(fileName);
+        if (!fileTypeResult.IsSuccess)
+            return fileTypeResult;
+
+        var fileType = fileTypeResult.Value;
+        if (fileType.Category != FileTypeCategory.Audio)
+        {
+            return Result.Failure<FileType>(
+                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for sound upload. Only audio files (.mp3, .wav, .ogg, .flac, .aac, .m4a) are allowed."));
         }
 
         return Result.Success(fileType);
@@ -187,6 +220,12 @@ public sealed class FileType : IEquatable<FileType>
             "gif" => "image/gif",
             "apng" => "image/apng",
             "webp" => "image/webp",
+            "mp3" => "audio/mpeg",
+            "wav" => "audio/wav",
+            "ogg" => "audio/ogg",
+            "flac" => "audio/flac",
+            "aac" => "audio/aac",
+            "m4a" => "audio/mp4",
             _ => "application/octet-stream"
         };
     }
@@ -199,5 +238,6 @@ public enum FileTypeCategory
     Texture,
     Material,
     Sprite,
+    Audio,
     Other
 }

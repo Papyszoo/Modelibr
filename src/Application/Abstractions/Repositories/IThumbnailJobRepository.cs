@@ -28,6 +28,16 @@ public interface IThumbnailJobRepository
     Task<ThumbnailJob?> GetByModelHashAsync(string modelHash, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets a thumbnail job by sound hash.
+    /// </summary>
+    Task<ThumbnailJob?> GetBySoundHashAsync(string soundHash, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets completed thumbnail jobs for multiple sound IDs.
+    /// </summary>
+    Task<IEnumerable<ThumbnailJob>> GetBySoundIdsAsync(IEnumerable<int> soundIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets active (pending or processing) thumbnail jobs for a specific model.
     /// </summary>
     Task<IEnumerable<ThumbnailJob>> GetActiveJobsByModelIdAsync(int modelId, CancellationToken cancellationToken = default);
