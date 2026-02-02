@@ -3,6 +3,7 @@ using Application.Abstractions.Services;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Infrastructure.WebDav;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,6 +48,9 @@ namespace Infrastructure
             services.AddScoped<ISoundCategoryRepository, SoundCategoryRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+
+            // Add WebDAV virtual asset store services
+            services.AddVirtualAssetStore();
 
             return services;
         }

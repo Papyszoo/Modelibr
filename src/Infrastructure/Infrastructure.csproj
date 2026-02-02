@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="NWebDav.Server.AspNetCore" Version="0.1.36" />
   </ItemGroup>
 
   <ItemGroup>

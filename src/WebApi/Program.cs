@@ -8,6 +8,8 @@ using WebApi.Hubs;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Services;
 using Infrastructure.Storage;
+using NWebDav.Server;
+using NWebDav.Server.Handlers;
 
 namespace WebApi
 {
@@ -45,6 +47,9 @@ namespace WebApi
                 .AddApplication()
                 .AddInfrastructure(builder.Configuration);
 
+            // Add NWebDav request handler factory for WebDAV support
+            builder.Services.AddSingleton<IRequestHandlerFactory, RequestHandlerFactory>();
+
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
@@ -73,6 +78,9 @@ namespace WebApi
             app.UseCors();
 
             app.UseAuthorization();
+
+            // Map WebDAV endpoint for virtual asset drive
+            app.UseWebDav("/dav");
 
             // Map endpoints
             app.MapModelEndpoints();
