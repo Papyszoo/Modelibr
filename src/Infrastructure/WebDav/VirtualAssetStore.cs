@@ -213,7 +213,7 @@ public sealed class VirtualAssetStore : IStore
         {
             foreach (var texture in textureSet.Textures)
             {
-                var textureName = $"{textureSet.Name}_{texture.TextureType}.{GetExtension(texture.File.OriginalFileName)}";
+                var textureName = $"{textureSet.Name}_{texture.TextureType}.{WebDavUtilities.GetExtension(texture.File.OriginalFileName)}";
                 if (textureName == fileName)
                 {
                     return new VirtualAssetFile(
@@ -269,12 +269,6 @@ public sealed class VirtualAssetStore : IStore
             sound.File.CreatedAt,
             sound.File.UpdatedAt,
             _pathProvider);
-    }
-
-    private static string GetExtension(string fileName)
-    {
-        var dotIndex = fileName.LastIndexOf('.');
-        return dotIndex >= 0 ? fileName[(dotIndex + 1)..] : "";
     }
 
     // Internal methods for creating collections accessible to child items

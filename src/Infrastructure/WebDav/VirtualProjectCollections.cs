@@ -198,7 +198,7 @@ public sealed class VirtualProjectTextureSetsCollection : VirtualCollectionBase
         {
             foreach (var texture in textureSet.Textures)
             {
-                var textureName = $"{textureSet.Name}_{texture.TextureType}.{GetExtension(texture.File.OriginalFileName)}";
+                var textureName = $"{textureSet.Name}_{texture.TextureType}.{WebDavUtilities.GetExtension(texture.File.OriginalFileName)}";
                 if (textureName == name)
                 {
                     return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
@@ -226,7 +226,7 @@ public sealed class VirtualProjectTextureSetsCollection : VirtualCollectionBase
         {
             foreach (var texture in textureSet.Textures)
             {
-                var textureName = $"{textureSet.Name}_{texture.TextureType}.{GetExtension(texture.File.OriginalFileName)}";
+                var textureName = $"{textureSet.Name}_{texture.TextureType}.{WebDavUtilities.GetExtension(texture.File.OriginalFileName)}";
                 items.Add(new VirtualAssetFile(
                     _itemPropertyManager,
                     LockingManager,
@@ -241,12 +241,6 @@ public sealed class VirtualProjectTextureSetsCollection : VirtualCollectionBase
         }
 
         return Task.FromResult<IEnumerable<IStoreItem>>(items);
-    }
-
-    private static string GetExtension(string fileName)
-    {
-        var dotIndex = fileName.LastIndexOf('.');
-        return dotIndex >= 0 ? fileName[(dotIndex + 1)..] : "";
     }
 }
 

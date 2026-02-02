@@ -75,7 +75,7 @@ public sealed class VirtualAssetFile : IStoreItem
         // Hash-based storage: root/aa/bb/hash
         var hash = Sha256Hash.ToLowerInvariant();
         var a = hash[..2];
-        var b = hash.Substring(2, 2);
+        var b = hash[2..4];
         return Path.Combine(_pathProvider.UploadRootPath, a, b, hash);
     }
 }
