@@ -80,14 +80,16 @@ public sealed class VirtualAudioSelectionFile : IStoreItem
             return Stream.Null;
         }
 
+        // TODO: Implement audio trimming using NAudio or FFMpegCore
+        // Currently returns the full file as a placeholder.
+        // 
         // For a full implementation, we would use an audio processing library here
         // to trim the audio file between selection.StartTime and selection.EndTime.
-        // For now, we return the full file as a placeholder.
         // 
-        // To properly implement audio trimming, consider using:
-        // - NAudio (https://github.com/naudio/NAudio)
-        // - FFmpeg via FFMpegCore
-        // - A custom WAV header manipulation for simple WAV files
+        // Options for implementation:
+        // - NAudio (https://github.com/naudio/NAudio) - Pure .NET audio library
+        // - FFMpegCore - FFmpeg wrapper for C#
+        // - Custom WAV header manipulation for simple WAV files only
         
         return File.OpenRead(physicalPath);
     }

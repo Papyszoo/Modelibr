@@ -1,13 +1,12 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
-using Application.Abstractions.Repositories;
 using Application.Abstractions.Storage;
 using Application.Sprites;
 using Application.Sounds;
 using Domain.Models;
-using Domain.Services;
 using Domain.ValueObjects;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NWebDav.Server;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
@@ -24,6 +23,7 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly IUploadPathProvider _pathProvider;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<WritableProjectSpritesCollection>? _logger;
 
     public WritableProjectSpritesCollection(
         VirtualCollectionPropertyManager propertyManager,
@@ -31,13 +31,15 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
         Project project,
         VirtualItemPropertyManager itemPropertyManager,
         IUploadPathProvider pathProvider,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        ILogger<WritableProjectSpritesCollection>? logger = null)
         : base(propertyManager, lockingManager, "Sprites")
     {
         _project = project;
         _itemPropertyManager = itemPropertyManager;
         _pathProvider = pathProvider;
         _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     public override string UniqueKey => $"project:{_project.Id}:sprites:writable";
@@ -127,6 +129,7 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
 
             if (!result.IsSuccess)
             {
+                _logger?.LogWarning("Failed to create sprite via WebDAV: {Error}", result.Error?.Message);
                 return new StoreItemResult(DavStatusCode.InternalServerError);
             }
 
@@ -134,8 +137,9 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
             // Note: We return Created for new items
             return new StoreItemResult(DavStatusCode.Created);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger?.LogError(ex, "Exception while creating sprite via WebDAV PUT for file {FileName}", name);
             return new StoreItemResult(DavStatusCode.InternalServerError);
         }
     }
@@ -165,6 +169,7 @@ public sealed class WritableProjectSoundsCollection : VirtualCollectionBase
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly IUploadPathProvider _pathProvider;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<WritableProjectSoundsCollection>? _logger;
 
     public WritableProjectSoundsCollection(
         VirtualCollectionPropertyManager propertyManager,
@@ -172,13 +177,15 @@ public sealed class WritableProjectSoundsCollection : VirtualCollectionBase
         Project project,
         VirtualItemPropertyManager itemPropertyManager,
         IUploadPathProvider pathProvider,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        ILogger<WritableProjectSoundsCollection>? logger = null)
         : base(propertyManager, lockingManager, "Sounds")
     {
         _project = project;
         _itemPropertyManager = itemPropertyManager;
         _pathProvider = pathProvider;
         _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     public override string UniqueKey => $"project:{_project.Id}:sounds:writable";
@@ -265,13 +272,15 @@ public sealed class WritableProjectSoundsCollection : VirtualCollectionBase
 
             if (!result.IsSuccess)
             {
+                _logger?.LogWarning("Failed to create sound via WebDAV: {Error}", result.Error?.Message);
                 return new StoreItemResult(DavStatusCode.InternalServerError);
             }
 
             return new StoreItemResult(DavStatusCode.Created);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger?.LogError(ex, "Exception while creating sound via WebDAV PUT for file {FileName}", name);
             return new StoreItemResult(DavStatusCode.InternalServerError);
         }
     }

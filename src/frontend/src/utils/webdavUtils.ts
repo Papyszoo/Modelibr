@@ -216,7 +216,7 @@ export function getMountInstructions(): { os: OperatingSystem; instructions: str
 5. Check "Connect using different credentials" if needed
 6. Click "Finish"
 
-Alternatively, run in Command Prompt:
+Alternatively, run in Command Prompt (replace Z: with an available drive letter):
 net use Z: ${webDavUrl}`,
       }
 
