@@ -9,7 +9,8 @@ export class RecycledFilesPage {
     // Main container selectors
     private readonly recycledFilesList = ".recycled-files-list";
     private readonly recycledFilesHeader = ".recycled-files-header h2";
-    private readonly refreshButton = ".recycled-files-header .p-button-outlined";
+    private readonly refreshButton =
+        ".recycled-files-header .p-button-outlined";
     private readonly emptyState = ".recycled-files-empty";
     private readonly loading = ".recycled-files-loading";
 
@@ -17,7 +18,8 @@ export class RecycledFilesPage {
     private readonly modelsSection = ".recycled-section:has(.pi-box)";
     private readonly modelVersionsSection = ".recycled-section:has(.pi-clone)";
     private readonly textureSetsSection = ".recycled-section:has(.pi-images)";
-    private readonly spritesSection = ".recycled-section[data-section='sprites']";
+    private readonly spritesSection =
+        ".recycled-section[data-section='sprites']";
 
     // Card selectors
     private readonly recycledCard = ".recycled-card";
@@ -39,7 +41,9 @@ export class RecycledFilesPage {
      */
     async goto(): Promise<void> {
         const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await this.page.goto(`${baseUrl}/?leftTabs=recycledFiles&activeLeft=recycledFiles`);
+        await this.page.goto(
+            `${baseUrl}/?leftTabs=recycledFiles&activeLeft=recycledFiles`,
+        );
         await this.waitForLoaded();
     }
 
@@ -50,7 +54,7 @@ export class RecycledFilesPage {
         // Wait for loading to finish - either content or empty state
         await this.page.waitForSelector(
             `${this.recycledFilesList}:not(:has(${this.loading}))`,
-            { state: "visible", timeout: 15000 }
+            { state: "visible", timeout: 15000 },
         );
         // Give UI time to settle
         await this.page.waitForTimeout(500);
@@ -100,7 +104,10 @@ export class RecycledFilesPage {
      * Get a recycled model card by index
      */
     getModelCard(index: number) {
-        return this.page.locator(this.modelsSection).locator(this.recycledCard).nth(index);
+        return this.page
+            .locator(this.modelsSection)
+            .locator(this.recycledCard)
+            .nth(index);
     }
 
     /**
@@ -130,7 +137,9 @@ export class RecycledFilesPage {
         await card.hover();
         await card.locator(this.deleteForeverButton).click();
         // Wait for dialog to appear
-        await this.page.waitForSelector(this.deleteDialog, { state: "visible" });
+        await this.page.waitForSelector(this.deleteDialog, {
+            state: "visible",
+        });
     }
 
     // ===== Model Versions Section =====
@@ -148,7 +157,10 @@ export class RecycledFilesPage {
      * Get a recycled model version card by index
      */
     getModelVersionCard(index: number) {
-        return this.page.locator(this.modelVersionsSection).locator(this.recycledCard).nth(index);
+        return this.page
+            .locator(this.modelVersionsSection)
+            .locator(this.recycledCard)
+            .nth(index);
     }
 
     /**
@@ -162,13 +174,52 @@ export class RecycledFilesPage {
     }
 
     /**
+     * Find a recycled model version by its parent model ID
+     * @returns The index of the version card, or -1 if not found
+     */
+    async findModelVersionByModelId(modelId: number): Promise<number> {
+        const section = this.page.locator(this.modelVersionsSection);
+        if (!(await section.isVisible())) return -1;
+
+        const cards = section.locator(this.recycledCard);
+        const count = await cards.count();
+
+        for (let i = 0; i < count; i++) {
+            const card = cards.nth(i);
+            const cardModelId = await card.getAttribute("data-model-id");
+            if (cardModelId && parseInt(cardModelId) === modelId) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Restore a recycled model version by its parent model ID
+     * @returns true if restored, false if no version found for the model
+     */
+    async restoreModelVersionByModelId(modelId: number): Promise<boolean> {
+        const index = await this.findModelVersionByModelId(modelId);
+        if (index < 0) {
+            console.log(
+                `[RecycledFiles] No recycled version found for model ${modelId}`,
+            );
+            return false;
+        }
+        await this.restoreModelVersion(index);
+        return true;
+    }
+
+    /**
      * Click "Delete Forever" on a recycled model version
      */
     async clickDeleteForeverModelVersion(index: number): Promise<void> {
         const card = this.getModelVersionCard(index);
         await card.hover();
         await card.locator(this.deleteForeverButton).click();
-        await this.page.waitForSelector(this.deleteDialog, { state: "visible" });
+        await this.page.waitForSelector(this.deleteDialog, {
+            state: "visible",
+        });
     }
 
     // ===== Texture Sets Section =====
@@ -186,7 +237,10 @@ export class RecycledFilesPage {
      * Get a recycled texture set card by index
      */
     getTextureSetCard(index: number) {
-        return this.page.locator(this.textureSetsSection).locator(this.recycledCard).nth(index);
+        return this.page
+            .locator(this.textureSetsSection)
+            .locator(this.recycledCard)
+            .nth(index);
     }
 
     /**
@@ -214,7 +268,9 @@ export class RecycledFilesPage {
         const card = this.getTextureSetCard(index);
         await card.hover();
         await card.locator(this.deleteForeverButton).click();
-        await this.page.waitForSelector(this.deleteDialog, { state: "visible" });
+        await this.page.waitForSelector(this.deleteDialog, {
+            state: "visible",
+        });
     }
 
     // ===== Sprites Section =====
@@ -232,7 +288,10 @@ export class RecycledFilesPage {
      * Get a recycled sprite card by index
      */
     getSpriteCard(index: number) {
-        return this.page.locator(this.spritesSection).locator(this.recycledCard).nth(index);
+        return this.page
+            .locator(this.spritesSection)
+            .locator(this.recycledCard)
+            .nth(index);
     }
 
     /**
@@ -261,7 +320,9 @@ export class RecycledFilesPage {
         const card = this.getSpriteCard(index);
         await card.hover();
         await card.locator(this.deleteForeverButton).click();
-        await this.page.waitForSelector(this.deleteDialog, { state: "visible" });
+        await this.page.waitForSelector(this.deleteDialog, {
+            state: "visible",
+        });
     }
 
     // ===== Delete Dialog Methods =====
@@ -278,9 +339,12 @@ export class RecycledFilesPage {
      */
     async getFilesToDeleteList(): Promise<string[]> {
         // Wait for the delete preview to load
-        await this.page.waitForSelector(this.deletePreview, { state: "visible", timeout: 5000 });
+        await this.page.waitForSelector(this.deletePreview, {
+            state: "visible",
+            timeout: 5000,
+        });
         await this.page.waitForTimeout(500); // Wait for content to populate
-        
+
         const fileItems = this.page.locator(this.filesToDelete);
         const count = await fileItems.count();
         const files: string[] = [];
@@ -298,45 +362,49 @@ export class RecycledFilesPage {
         // Find the Delete Forever button in the dialog footer
         const dialogFooter = this.page.locator(".p-dialog-footer");
         await expect(dialogFooter).toBeVisible({ timeout: 5000 });
-        
+
         // The button has class p-button-danger and label "Delete Forever"
         const deleteButton = dialogFooter.locator(".p-button-danger");
         await expect(deleteButton).toBeVisible({ timeout: 5000 });
-        
+
         // Wait for the button to be enabled (not disabled)
         await expect(deleteButton).toBeEnabled({ timeout: 5000 });
-        
+
         console.log("[Delete] Found Delete Forever button, clicking...");
-        
+
         // Regular click - should trigger React onClick properly
         await deleteButton.click();
-        
+
         // Short wait to see if dialog closes quickly
         await this.page.waitForTimeout(2000);
-        
+
         // Check if dialog is already closed
-        const isStillVisible = await this.page.locator(this.deleteDialog).isVisible();
+        const isStillVisible = await this.page
+            .locator(this.deleteDialog)
+            .isVisible();
         if (!isStillVisible) {
             console.log("[Delete] Dialog closed successfully (quick)");
             return;
         }
-        
+
         // Dialog still visible - try clicking via JavaScript
         console.log("[Delete] Dialog still visible, trying JS click...");
         await this.page.evaluate(() => {
-            const button = document.querySelector('.p-dialog-footer .p-button-danger') as HTMLButtonElement;
+            const button = document.querySelector(
+                ".p-dialog-footer .p-button-danger",
+            ) as HTMLButtonElement;
             if (button) {
                 button.click();
             }
         });
-        
+
         console.log("[Delete] Clicked via JS, waiting for dialog to close...");
-        
+
         // Wait for dialog to close - this may take time for API call
         try {
-            await this.page.waitForSelector(this.deleteDialog, { 
-                state: "hidden", 
-                timeout: 40000 
+            await this.page.waitForSelector(this.deleteDialog, {
+                state: "hidden",
+                timeout: 40000,
             });
             console.log("[Delete] Dialog closed successfully");
         } catch (e) {
@@ -347,13 +415,17 @@ export class RecycledFilesPage {
                 console.log(`[Delete] Error occurred: ${errorText}`);
                 throw new Error(`Delete failed: ${errorText}`);
             }
-            
+
             // Take screenshot for debugging
-            await this.page.screenshot({ path: "test-results/delete-dialog-stuck.png" });
-            console.log("[Delete] Dialog still visible after 30s, screenshot saved");
+            await this.page.screenshot({
+                path: "test-results/delete-dialog-stuck.png",
+            });
+            console.log(
+                "[Delete] Dialog still visible after 30s, screenshot saved",
+            );
             throw e;
         }
-        
+
         await this.page.waitForTimeout(1000);
     }
 
@@ -371,12 +443,15 @@ export class RecycledFilesPage {
     async hasModelWithName(name: string): Promise<boolean> {
         const section = this.page.locator(this.modelsSection);
         if (!(await section.isVisible())) return false;
-        
+
         const cards = section.locator(this.recycledCard);
         const count = await cards.count();
-        
+
         for (let i = 0; i < count; i++) {
-            const cardName = await cards.nth(i).locator(this.recycledCardName).textContent();
+            const cardName = await cards
+                .nth(i)
+                .locator(this.recycledCardName)
+                .textContent();
             if (cardName?.includes(name)) return true;
         }
         return false;
@@ -388,12 +463,15 @@ export class RecycledFilesPage {
     async findModelIndexByName(name: string): Promise<number> {
         const section = this.page.locator(this.modelsSection);
         if (!(await section.isVisible())) return -1;
-        
+
         const cards = section.locator(this.recycledCard);
         const count = await cards.count();
-        
+
         for (let i = 0; i < count; i++) {
-            const cardName = await cards.nth(i).locator(this.recycledCardName).textContent();
+            const cardName = await cards
+                .nth(i)
+                .locator(this.recycledCardName)
+                .textContent();
             if (cardName?.includes(name)) return i;
         }
         return -1;

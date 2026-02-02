@@ -135,6 +135,38 @@ function ModelViewer({
     }
   }
 
+  const loadVersionsWithSkipCache = async () => {
+    if (!model?.id) return
+    try {
+      const data = await ApiClient.getModelVersions(parseInt(model.id), { skipCache: true })
+      setVersions(data)
+
+      // Auto-select the active version if no version is currently selected
+      if (data.length > 0 && !selectedVersion) {
+        const activeVersion =
+          data.find(v => v.id === model.activeVersionId) ||
+          data[data.length - 1]
+        handleVersionSelect(activeVersion)
+      } else if (selectedVersion) {
+        // If a version is already selected, refresh its data from the new versions list
+        const updatedVersion = data.find(v => v.id === selectedVersion.id)
+        if (updatedVersion) {
+          handleVersionSelect(updatedVersion)
+        } else {
+          // Selected version no longer exists (was recycled), select the active version
+          const activeVersion =
+            data.find(v => v.id === model.activeVersionId) ||
+            data[data.length - 1]
+          if (activeVersion) {
+            handleVersionSelect(activeVersion)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load versions:', error)
+    }
+  }
+
   // Subscribe to thumbnail status changes to refresh versions when thumbnails are ready
   useEffect(() => {
     if (!model?.id || versions.length === 0) return
@@ -194,6 +226,10 @@ function ModelViewer({
       setError('')
       const model = await ApiClient.getModelById(id, { skipCache })
       setModel(model)
+      // If we're skipping cache for model, also skip cache for versions
+      if (skipCache && model?.id) {
+        await loadVersionsWithSkipCache()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model')
     } finally {

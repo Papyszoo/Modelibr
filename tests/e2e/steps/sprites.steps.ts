@@ -15,6 +15,72 @@ const __dirname = path.dirname(__filename);
 
 // ============= Upload & Create Steps =============
 
+When("I upload a sprite with unique name {string} from {string}", async ({ page }, spriteName: string, filename: string) => {
+    const filePath = path.join(__dirname, "..", "assets", filename);
+    const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+    
+    // Generate unique name with timestamp to avoid hash-based deduplication
+    const uniqueName = `${spriteName}-${Date.now()}`;
+    
+    // Get existing sprite IDs BEFORE upload
+    const beforeResponse = await page.request.get(`${API_BASE}/sprites`);
+    const beforeData = await beforeResponse.json();
+    const existingIds = new Set((beforeData.sprites || []).map((s: any) => s.id));
+    
+    // Find file input for sprite upload
+    const fileInput = page.locator("input[type='file']");
+    await fileInput.setInputFiles(filePath);
+    
+    // Wait for upload to complete (3 seconds for processing)
+    await page.waitForTimeout(3000);
+    
+    // Get sprites AFTER upload and find the new one
+    const afterResponse = await page.request.get(`${API_BASE}/sprites`);
+    const afterData = await afterResponse.json();
+    
+    // Find the NEW sprite (one that wasn't in the before list)
+    let sprite = (afterData.sprites || []).find((s: any) => !existingIds.has(s.id));
+    
+    // If not found by diff, fall back to highest ID (most recent)
+    if (!sprite && afterData.sprites?.length > 0) {
+        sprite = afterData.sprites.reduce((max: any, s: any) => s.id > max.id ? s : max, afterData.sprites[0]);
+        console.log(`[Upload] Found sprite by highest ID: ${sprite.id} (${sprite.name})`);
+    }
+    
+    // Rename the sprite to the unique name
+    if (sprite) {
+        const renameResponse = await page.request.put(`${API_BASE}/sprites/${sprite.id}`, {
+            data: { name: uniqueName }
+        });
+        
+        if (renameResponse.ok()) {
+            console.log(`[Upload] Renamed sprite to unique name "${uniqueName}"`);
+            sprite.name = uniqueName;
+        } else {
+            console.log(`[Warning] Rename failed: ${renameResponse.status()} ${await renameResponse.text()}`);
+        }
+    }
+    
+    // Save to shared state using original name key for test reference
+    if (sprite) {
+        sharedState.saveSprite(spriteName, {
+            id: sprite.id,
+            name: uniqueName,
+            fileId: sprite.fileId,
+            categoryId: undefined
+        });
+        console.log(`[State] Saved sprite "${spriteName}" (ID: ${sprite.id}, actual name: "${uniqueName}") to shared state`);
+    } else {
+        console.log(`[Warning] Could not find uploaded sprite in API response`);
+    }
+    
+    // Reload the page to see the renamed sprite
+    await page.reload();
+    await page.waitForTimeout(1000);
+    
+    console.log(`[Upload] Uploaded sprite "${uniqueName}" from "${filename}"`);
+});
+
 When("I upload a sprite named {string} from {string}", async ({ page }, spriteName: string, filename: string) => {
     const filePath = path.join(__dirname, "..", "assets", filename);
     const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
@@ -132,6 +198,9 @@ When("I open the sprite {string} for editing", async ({ page }, spriteName: stri
         throw new Error(`Sprite "${spriteName}" not found in shared state`);
     }
     
+    // Set as current sprite for subsequent actions
+    sharedState.setCurrentSprite(spriteName);
+    
     // Click on the sprite card to open the modal
     const spriteCard = page.locator(".sprite-card").filter({
         has: page.locator(".sprite-name", { hasText: sprite.name })
@@ -152,10 +221,15 @@ When("I change the sprite name to {string}", async ({ page }, newName: string) =
         await page.waitForTimeout(300);
     }
     
-    // Get the sprite from shared state and rename via API
-    const sprite = sharedState.getSprite("crud-test-sprite");
+    // Get the current sprite from context
+    const currentSpriteName = sharedState.getCurrentSprite();
+    if (!currentSpriteName) {
+        throw new Error("No sprite is currently open for editing. Use 'I open the sprite for editing' first.");
+    }
+    
+    const sprite = sharedState.getSprite(currentSpriteName);
     if (!sprite) {
-        throw new Error("Sprite 'crud-test-sprite' not found in shared state for renaming");
+        throw new Error(`Current sprite '${currentSpriteName}' not found in shared state for renaming`);
     }
     
     const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
@@ -169,7 +243,7 @@ When("I change the sprite name to {string}", async ({ page }, newName: string) =
     
     // Update shared state with new name
     sprite.name = newName;
-    sharedState.saveSprite("crud-test-sprite", sprite);
+    sharedState.saveSprite(currentSpriteName, sprite);
     
     console.log(`[Action] Renamed sprite to "${newName}" via API`);
 });
@@ -204,11 +278,15 @@ When("I assign the sprite to category {string}", async ({ page }, categoryName: 
         throw new Error(`Category "${categoryName}" not found in shared state`);
     }
     
-    // Get the sprite from shared state - the modal shows it but doesn't have category dropdown
-    // Use API to assign category
-    const sprite = sharedState.getSprite("crud-test-sprite");
+    // Get the current sprite from context
+    const currentSpriteName = sharedState.getCurrentSprite();
+    if (!currentSpriteName) {
+        throw new Error("No sprite is currently open for editing. Use 'I open the sprite for editing' first.");
+    }
+    
+    const sprite = sharedState.getSprite(currentSpriteName);
     if (!sprite) {
-        throw new Error("Sprite 'crud-test-sprite' not found in shared state for category assignment");
+        throw new Error(`Current sprite '${currentSpriteName}' not found in shared state for category assignment`);
     }
     
     // Close modal if open
@@ -231,7 +309,11 @@ When("I assign the sprite to category {string}", async ({ page }, categoryName: 
         throw new Error(`Failed to assign category: ${response.status()} ${await response.text()}`);
     }
     
-    console.log(`[Action] Assigned sprite to category "${categoryName}" via API`);
+    // Update shared state with new category
+    sprite.categoryId = category.id;
+    sharedState.saveSprite(currentSpriteName, sprite);
+    
+    console.log(`[Action] Assigned sprite "${currentSpriteName}" to category "${categoryName}" via API`);
 });
 
 // ============= Search & Filter Steps =============

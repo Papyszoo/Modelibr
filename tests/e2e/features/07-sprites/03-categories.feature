@@ -28,14 +28,11 @@ Feature: Sprite Categories CRUD Operations
     And I delete the category "Delete Me Category"
     Then the category "Delete Me Category" should not be visible in the category list
 
-  @assign @skip
-  # Skip: File upload in sprites page may not be working correctly in this test context
-  # The upload step finds existing sprites instead of creating new ones
-  # TODO: Investigate sprite file input selector and upload mechanics
+  @assign
   Scenario: Assign sprite to category
     Given I create a test sprite category named "Assign Test Category" via API
     And I am on the sprites page
-    When I upload a sprite named "assign-test-sprite" from "blue_color.png"
+    When I upload a sprite with unique name "assign-test-sprite" from "pink_color.png"
     When I open the sprite "assign-test-sprite" for editing
     And I assign the sprite to category "Assign Test Category"
     And I save the sprite changes

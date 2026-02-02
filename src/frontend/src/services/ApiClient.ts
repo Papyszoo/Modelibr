@@ -1108,10 +1108,16 @@ class ApiClient {
   }
 
   // Model Version API methods
-  async getModelVersions(modelId: number): Promise<ModelVersionDto[]> {
-    const response = await this.client.get<ModelVersionDto[]>(
-      `/models/${modelId}/versions`
-    )
+  async getModelVersions(
+    modelId: number,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ModelVersionDto[]> {
+    // Add cache buster when skipCache is true
+    const url = options.skipCache
+      ? `/models/${modelId}/versions?_=${Date.now()}`
+      : `/models/${modelId}/versions`
+    
+    const response = await this.client.get<ModelVersionDto[]>(url)
     return response.data
   }
 

@@ -141,11 +141,14 @@ When("I open the sound {string} for viewing", async ({ page }, soundName: string
         throw new Error(`Sound "${soundName}" not found in shared state`);
     }
     
-    // Click on the sound card to open the modal
-    const soundCard = page.locator(".sound-card").filter({
-        has: page.locator(".sound-name", { hasText: sound.name })
-    });
-    await soundCard.first().click();
+    // Wait for the sounds list to load and click on the matching sound card
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector(".sound-card", { timeout: 10000 });
+
+    const soundCard = page.locator(`[data-sound-id="${sound.id}"]`);
+    await expect(soundCard).toBeVisible({ timeout: 10000 });
+    await soundCard.scrollIntoViewIfNeeded();
+    await soundCard.click();
     
     // Wait for the sound modal to appear
     await expect(page.locator(".p-dialog")).toBeVisible({ timeout: 5000 });

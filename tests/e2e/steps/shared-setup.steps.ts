@@ -31,7 +31,9 @@ let lastUploadedVersionId: number = 0;
 Given(
     "the following models exist in shared state:",
     async ({ page }, dataTable: DataTable) => {
-        console.log(`[SharedState Debug] Checking models. Current state: ${sharedState.getDebugInfo()}`);
+        console.log(
+            `[SharedState Debug] Checking models. Current state: ${sharedState.getDebugInfo()}`,
+        );
         const models = dataTable.hashes();
 
         for (const row of models) {
@@ -42,11 +44,11 @@ Given(
                 throw new Error(
                     `Model "${modelName}" not found in shared state. ` +
                         `Available models: ${sharedState.getDebugInfo()}. ` +
-                        `Ensure setup scenarios have run first.`
+                        `Ensure setup scenarios have run first.`,
                 );
             }
         }
-    }
+    },
 );
 
 /**
@@ -56,7 +58,9 @@ Given(
 Given(
     "the following texture sets exist in shared state:",
     async ({ page }, dataTable: DataTable) => {
-        console.log(`[SharedState Debug] Checking texture sets. Current state: ${sharedState.getDebugInfo()}`);
+        console.log(
+            `[SharedState Debug] Checking texture sets. Current state: ${sharedState.getDebugInfo()}`,
+        );
         const textureSets = dataTable.hashes();
 
         for (const row of textureSets) {
@@ -67,11 +71,11 @@ Given(
                 throw new Error(
                     `Texture set "${textureSetName}" not found in shared state. ` +
                         `Available texture sets: ${sharedState.getDebugInfo()}. ` +
-                        `Ensure setup scenarios have run first.`
+                        `Ensure setup scenarios have run first.`,
                 );
             }
         }
-    }
+    },
 );
 
 /**
@@ -82,16 +86,18 @@ When(
     "I upload a model {string} and store it as {string}",
     async ({ page }, fileName: string, stateName: string) => {
         const modelListPage = new ModelListPage(page);
-        
-        console.log(`[Setup] Generating unique model file from "${fileName}"...`);
+
+        console.log(
+            `[Setup] Generating unique model file from "${fileName}"...`,
+        );
         const filePath = await UniqueFileGenerator.generate(fileName);
-        
+
         await modelListPage.uploadModel(filePath);
-        
+
         // Get the unique model name from the generated file path (includes unique ID)
         const uniqueFileName = path.basename(filePath);
-        const modelName = uniqueFileName.replace(/\.[^/.]+$/, ''); // Strip extension
-        
+        const modelName = uniqueFileName.replace(/\.[^/.]+$/, ""); // Strip extension
+
         // Wait for model to appear in list (grid shows name without extension)
         await modelListPage.expectModelVisible(modelName);
 
@@ -106,19 +112,23 @@ When(
              WHERE m."Name" = $1 AND m."DeletedAt" IS NULL
              ORDER BY mv."CreatedAt" DESC
              LIMIT 1`,
-            [modelName]
+            [modelName],
         );
-        
+
         let modelId = 0;
         let versionId = 0;
         if (result.rows.length > 0) {
             modelId = result.rows[0].ModelId;
             versionId = result.rows[0].VersionId;
-            console.log(`[Setup] Uploaded model "${modelName}" -> modelId=${modelId}, versionId=${versionId}`);
+            console.log(
+                `[Setup] Uploaded model "${modelName}" -> modelId=${modelId}, versionId=${versionId}`,
+            );
         } else {
-            console.warn(`[Setup] Could not find model "${modelName}" in database after upload`);
+            console.warn(
+                `[Setup] Could not find model "${modelName}" in database after upload`,
+            );
         }
-        
+
         // Track this for the thumbnail verification step
         lastUploadedModelName = modelName;
         lastUploadedVersionId = versionId;
@@ -129,10 +139,8 @@ When(
             name: modelName,
             versionId: versionId,
         });
-    }
+    },
 );
-
-
 
 /**
  * Navigates to model viewer page using a model from shared state or by name.
@@ -141,22 +149,22 @@ Given(
     "I am on the model viewer page for {string}",
     async ({ page }, stateName: string) => {
         let model = sharedState.getModel(stateName);
-        
+
         // If not found by exact name, try stripping extension
         if (!model) {
-            const nameWithoutExt = stateName.replace(/\.[^/.]+$/, '');
+            const nameWithoutExt = stateName.replace(/\.[^/.]+$/, "");
             model = sharedState.getModel(nameWithoutExt);
         }
 
         const modelListPage = new ModelListPage(page);
-        
+
         if (!model) {
             // Not in shared state - try to open directly by name
             // Strip extension for model name lookup
-            const modelName = stateName.replace(/\.[^/.]+$/, '');
+            const modelName = stateName.replace(/\.[^/.]+$/, "");
             await modelListPage.goto();
             await modelListPage.openModel(modelName);
-            
+
             // Store in shared state for future lookups
             const url = page.url();
             const match = url.match(/model-(\d+)/);
@@ -171,9 +179,11 @@ Given(
 
         // If we have the model ID, navigate directly via URL (more reliable)
         if (model.id) {
-            console.log(`[Navigation] Using cached ID ${model.id} for ${stateName}`);
+            console.log(
+                `[Navigation] Using cached ID ${model.id} for ${stateName}`,
+            );
             const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-            
+
             // Clear storage to prevent sticky tabs (like Texture Sets) from overriding the URL
             await page.goto(baseUrl);
             await page.evaluate(() => {
@@ -185,16 +195,25 @@ Given(
                 }
             });
 
-            await page.goto(`${baseUrl}/?leftTabs=modelList,model-${model.id}&activeLeft=model-${model.id}`);
-            await page.waitForSelector(".viewer-canvas canvas, .version-dropdown-trigger", { 
-                state: "visible", 
-                timeout: 30000 
-            });
-            console.log(`[Navigation] Opened model ${model.id} (${model.name}) via direct URL`);
+            await page.goto(
+                `${baseUrl}/?leftTabs=modelList,model-${model.id}&activeLeft=model-${model.id}`,
+            );
+            await page.waitForSelector(
+                ".viewer-canvas canvas, .version-dropdown-trigger",
+                {
+                    state: "visible",
+                    timeout: 30000,
+                },
+            );
+            console.log(
+                `[Navigation] Opened model ${model.id} (${model.name}) via direct URL`,
+            );
             return;
         }
 
-        console.log(`[Navigation] ID missing for ${stateName} (id=${model.id}), using fallback (click card)`);
+        console.log(
+            `[Navigation] ID missing for ${stateName} (id=${model.id}), using fallback (click card)`,
+        );
 
         // Fallback: open by clicking on model card
         // Ensure we are on the model list page first
@@ -217,9 +236,11 @@ Given(
                 sharedState.saveModel(model.name, model);
             }
         } else {
-             console.warn(`[Navigation] Could not capture ID for ${stateName} after click`);
+            console.warn(
+                `[Navigation] Could not capture ID for ${stateName} after click`,
+            );
         }
-    }
+    },
 );
 
 /**
@@ -242,7 +263,7 @@ Then(
         // Import DbHelper inline to avoid circular dependencies
         const { DbHelper } = await import("../fixtures/db-helper");
         const db = new DbHelper();
-        
+
         // Poll database for thumbnail status (max 55 seconds to stay within 60s test timeout)
         const maxAttempts = 11;
         const pollInterval = 5000;
@@ -250,24 +271,30 @@ Then(
         let lastStatus: number | null = null;
         let lastModelName = "";
         let lastVersionId = 0;
-        
+
         // Determine query strategy: prefer version ID > model name > global most-recent
         const hasVersionId = lastUploadedVersionId > 0;
         const hasModelName = lastUploadedModelName !== null;
-        
+
         if (hasVersionId) {
-            console.log(`[Thumbnail] Looking for version ID: ${lastUploadedVersionId} (model: "${lastUploadedModelName}")`);
+            console.log(
+                `[Thumbnail] Looking for version ID: ${lastUploadedVersionId} (model: "${lastUploadedModelName}")`,
+            );
         } else if (hasModelName) {
-            console.log(`[Thumbnail] Looking for model by name: "${lastUploadedModelName}" (no version ID)`);
+            console.log(
+                `[Thumbnail] Looking for model by name: "${lastUploadedModelName}" (no version ID)`,
+            );
         } else {
-            console.log(`[Thumbnail] Looking for any most recent model version`);
+            console.log(
+                `[Thumbnail] Looking for any most recent model version`,
+            );
         }
-        
+
         for (let i = 0; i < maxAttempts && !thumbnailReady; i++) {
             // Query for the specific version's thumbnail, or fall back to name-based or global query
             let query: string;
             let params: any[];
-            
+
             if (hasVersionId) {
                 // Best case: we have the exact version ID
                 query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
@@ -297,50 +324,63 @@ Then(
                          LIMIT 1`;
                 params = [];
             }
-            
+
             const result = await db.query(query, params);
-            
+
             if (result.rows.length > 0) {
                 const row = result.rows[0];
                 lastStatus = row.Status;
                 lastModelName = row.ModelName;
                 lastVersionId = row.VersionId;
-                
+
                 if (row.Status === 2) {
                     thumbnailReady = true;
-                    console.log(`[Thumbnail] Ready for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=2)`);
+                    console.log(
+                        `[Thumbnail] Ready for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=2)`,
+                    );
                 } else if (row.Status === 3) {
                     // Thumbnail generation failed - fail fast
-                    throw new Error(`Thumbnail generation FAILED for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId}. Check worker logs.`);
+                    throw new Error(
+                        `Thumbnail generation FAILED for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId}. Check worker logs.`,
+                    );
                 } else {
-                    console.log(`[Thumbnail] Waiting for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=${row.Status ?? 'null'})... attempt ${i + 1}/${maxAttempts}`);
+                    console.log(
+                        `[Thumbnail] Waiting for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=${row.Status ?? "null"})... attempt ${i + 1}/${maxAttempts}`,
+                    );
                     await page.waitForTimeout(pollInterval);
                 }
             } else {
-                console.log(`[Thumbnail] No model versions found, waiting... attempt ${i + 1}/${maxAttempts}`);
+                console.log(
+                    `[Thumbnail] No model versions found, waiting... attempt ${i + 1}/${maxAttempts}`,
+                );
                 await page.waitForTimeout(pollInterval);
             }
         }
-        
+
         if (!thumbnailReady) {
             // Provide detailed error about what went wrong
-            const statusName = lastStatus === null ? 'null (no thumbnail)' : 
-                              lastStatus === 0 ? 'Pending' :
-                              lastStatus === 1 ? 'Processing' : `Unknown (${lastStatus})`;
+            const statusName =
+                lastStatus === null
+                    ? "null (no thumbnail)"
+                    : lastStatus === 0
+                      ? "Pending"
+                      : lastStatus === 1
+                        ? "Processing"
+                        : `Unknown (${lastStatus})`;
             // Clear the tracking variables before throwing
             lastUploadedModelName = null;
             lastUploadedVersionId = 0;
             throw new Error(
-                `Thumbnail generation timed out after ${maxAttempts * pollInterval / 1000}s. ` +
-                `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
-                `Check if thumbnail-worker-e2e container is healthy and processing jobs.`
+                `Thumbnail generation timed out after ${(maxAttempts * pollInterval) / 1000}s. ` +
+                    `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
+                    `Check if thumbnail-worker-e2e container is healthy and processing jobs.`,
             );
         }
         // Clear the tracking variables after successful check
         lastUploadedModelName = null;
         lastUploadedVersionId = 0;
         console.log("[Test] Thumbnail generation verified via database");
-    }
+    },
 );
 
 /**
@@ -364,7 +404,7 @@ Then(
         // Note: This is a simplified check - in practice you'd query the API or page
         // For now, we trust that the upload was successful
         expect(expectedCount).toBeGreaterThan(0);
-    }
+    },
 );
 
 /**
@@ -377,134 +417,148 @@ Then(
 
         expect(textureSet).toBeDefined();
         expect(textureSet?.name).toBe(textureSetName);
-    }
+    },
 );
 
 /**
  * Verifies the texture set was linked to the model (simple verification that linking step succeeded)
  */
-Then(
-    "the texture set should be linked to the model",
-    async ({ page }) => {
-        // The linking step already validated the API response, 
-        // this step just confirms we reached this point successfully
-        expect(true).toBe(true);
-    }
-);
+Then("the texture set should be linked to the model", async ({ page }) => {
+    // The linking step already validated the API response,
+    // this step just confirms we reached this point successfully
+    expect(true).toBe(true);
+});
 
 /**
  * Opens the version dropdown and leaves it open for the screenshot.
  * This allows the test screenshot to show all available versions.
  */
-Then(
-    "the version dropdown should be open",
-    async ({ page }) => {
-        // Close any open dialogs first (e.g., upload confirmation)
-        const closeButtons = page.locator('button[aria-label="Close"], .p-dialog-header-close');
-        for (let i = 0; i < await closeButtons.count(); i++) {
-            const btn = closeButtons.nth(i);
-            if (await btn.isVisible({ timeout: 500 })) {
-                await btn.click();
-                await page.waitForTimeout(300);
-            }
+Then("the version dropdown should be open", async ({ page }) => {
+    // Close any open dialogs first (e.g., upload confirmation)
+    const closeButtons = page.locator(
+        'button[aria-label="Close"], .p-dialog-header-close',
+    );
+    for (let i = 0; i < (await closeButtons.count()); i++) {
+        const btn = closeButtons.nth(i);
+        if (await btn.isVisible({ timeout: 500 })) {
+            await btn.click();
+            await page.waitForTimeout(300);
         }
-        
-        // Also press Escape to close any dialogs
-        await page.keyboard.press("Escape");
-        await page.waitForTimeout(500);
-        
-        // Wait for page to be stable (no loading spinners)
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
-        // Wait for dropdown trigger to be visible with longer timeout
-        const dropdownTrigger = page.locator(".version-dropdown-trigger");
-        await dropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
-        
-        // Small delay to ensure UI is stable
-        await page.waitForTimeout(300);
-        
-        // Click with retry logic
-        try {
-            await dropdownTrigger.click();
-        } catch (e) {
-            console.log("[Screenshot] First click failed, retrying after delay...");
-            await page.waitForTimeout(500);
-            await dropdownTrigger.click({ force: true });
-        }
-        
-        await page.waitForSelector(".version-dropdown-menu", { state: "visible", timeout: 5000 });
-        console.log("[Screenshot] Version dropdown opened to show available versions");
     }
-);
 
-Then(
-    "I take a screenshot named {string}", 
-    async ({ page }, name: string) => {
-        const filename = name.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
-        
-        const screenshot = await page.screenshot({ 
-            path: `test-results/screenshots/${filename}.png`,
-            fullPage: false 
-        });
-        
-        // Use global test info
-        const testInfo = test.info();
-        if (testInfo) {
-            await testInfo.attach(name, { body: screenshot, contentType: "image/png" });
-        }
-        console.log(`[Screenshot] Taken: ${name}`);
+    // Also press Escape to close any dialogs
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+
+    // Wait for page to be stable (no loading spinners)
+    await page
+        .waitForLoadState("networkidle", { timeout: 10000 })
+        .catch(() => {});
+
+    // Wait for dropdown trigger to be visible with longer timeout
+    const dropdownTrigger = page.locator(".version-dropdown-trigger");
+    await dropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
+
+    // Small delay to ensure UI is stable
+    await page.waitForTimeout(300);
+
+    // Click with retry logic
+    try {
+        await dropdownTrigger.click();
+    } catch (e) {
+        console.log("[Screenshot] First click failed, retrying after delay...");
+        await page.waitForTimeout(500);
+        await dropdownTrigger.click({ force: true });
     }
-);
+
+    await page.waitForSelector(".version-dropdown-menu", {
+        state: "visible",
+        timeout: 5000,
+    });
+    console.log(
+        "[Screenshot] Version dropdown opened to show available versions",
+    );
+});
+
+Then("I take a screenshot named {string}", async ({ page }, name: string) => {
+    const filename = name.replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+
+    const screenshot = await page.screenshot({
+        path: `test-results/screenshots/${filename}.png`,
+        fullPage: false,
+    });
+
+    // Use global test info
+    const testInfo = test.info();
+    if (testInfo) {
+        await testInfo.attach(name, {
+            body: screenshot,
+            contentType: "image/png",
+        });
+    }
+    console.log(`[Screenshot] Taken: ${name}`);
+});
 
 /**
  * Verifies that the thumbnail is actually visible in the model list card UI.
  * This goes beyond DB verification to ensure the image actually loads in the browser.
  */
-Then(
-    "the thumbnail should be visible in the model card",
-    async ({ page }) => {
-        const modelListPage = new ModelListPage(page);
-        
-        // Navigate to model list to see the card
-        await modelListPage.goto();
-        await page.waitForLoadState("networkidle");
-        
-        // Wait for any thumbnail image in a model card to be visible
-        const thumbnailImg = page.locator(".model-grid .thumbnail-image, .model-card .thumbnail-image").first();
-        
-        // First check if there's a thumbnail image (not placeholder)
-        const hasImage = await thumbnailImg.count() > 0;
-        
-        if (!hasImage) {
-            // Take a screenshot to show the issue
-            await page.screenshot({ path: 'test-results/thumbnail-missing-in-card.png' });
-            throw new Error("No thumbnail image found in model card - only placeholder is showing. See test-results/thumbnail-missing-in-card.png");
-        }
-        
-        await expect(thumbnailImg).toBeVisible({ timeout: 15000 });
-        
-        // Verify the image actually loaded (naturalWidth > 0)
-        const isLoaded = await expect.poll(async () => {
-            return await thumbnailImg.evaluate((img: HTMLImageElement) => {
-                return img.complete && img.naturalWidth > 0;
-            });
-        }, {
-            message: "Waiting for thumbnail image to load in model card",
-            timeout: 15000,
-        }).toBe(true);
-        
-        // Log details for debugging
-        const src = await thumbnailImg.getAttribute("src");
-        const dimensions = await thumbnailImg.evaluate((img: HTMLImageElement) => ({
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight,
-        }));
-        console.log(`[UI] Model card thumbnail loaded: ${dimensions.naturalWidth}x${dimensions.naturalHeight}`);
-        console.log(`[UI] Thumbnail src: ${src?.substring(0, 80)}...`);
-        
-        // Take screenshot to confirm thumbnail is visible
-        await page.screenshot({ path: 'test-results/thumbnail-visible-in-card.png' });
-        console.log("[Screenshot] Captured: thumbnail-visible-in-card.png ✓");
-    }
-);
+Then("the thumbnail should be visible in the model card", async ({ page }) => {
+    const modelListPage = new ModelListPage(page);
 
+    // Navigate to model list to see the card
+    await modelListPage.goto();
+    await page.waitForLoadState("networkidle");
+
+    // Wait for any thumbnail image in a model card to be visible
+    const thumbnailImg = page
+        .locator(".model-grid .thumbnail-image, .model-card .thumbnail-image")
+        .first();
+
+    // First check if there's a thumbnail image (not placeholder)
+    const hasImage = (await thumbnailImg.count()) > 0;
+
+    if (!hasImage) {
+        // Take a screenshot to show the issue
+        await page.screenshot({
+            path: "test-results/thumbnail-missing-in-card.png",
+        });
+        throw new Error(
+            "No thumbnail image found in model card - only placeholder is showing. See test-results/thumbnail-missing-in-card.png",
+        );
+    }
+
+    await expect(thumbnailImg).toBeVisible({ timeout: 15000 });
+
+    // Verify the image actually loaded (naturalWidth > 0)
+    const isLoaded = await expect
+        .poll(
+            async () => {
+                return await thumbnailImg.evaluate((img: HTMLImageElement) => {
+                    return img.complete && img.naturalWidth > 0;
+                });
+            },
+            {
+                message: "Waiting for thumbnail image to load in model card",
+                timeout: 15000,
+            },
+        )
+        .toBe(true);
+
+    // Log details for debugging
+    const src = await thumbnailImg.getAttribute("src");
+    const dimensions = await thumbnailImg.evaluate((img: HTMLImageElement) => ({
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+    }));
+    console.log(
+        `[UI] Model card thumbnail loaded: ${dimensions.naturalWidth}x${dimensions.naturalHeight}`,
+    );
+    console.log(`[UI] Thumbnail src: ${src?.substring(0, 80)}...`);
+
+    // Take screenshot to confirm thumbnail is visible
+    await page.screenshot({
+        path: "test-results/thumbnail-visible-in-card.png",
+    });
+    console.log("[Screenshot] Captured: thumbnail-visible-in-card.png ✓");
+});

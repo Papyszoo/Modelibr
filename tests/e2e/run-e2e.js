@@ -7,6 +7,7 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +42,43 @@ function runSilent(command) {
     } catch {
         return '';
     }
+}
+
+function httpGet(url) {
+    return new Promise((resolve, reject) => {
+        const request = http.get(url, res => {
+            res.resume();
+            resolve(res.statusCode || 0);
+        });
+        request.on('error', reject);
+        request.setTimeout(5000, () => {
+            request.destroy(new Error('Request timed out'));
+        });
+    });
+}
+
+async function waitForHealth(url, label, timeoutMs = 120000) {
+    const start = Date.now();
+    const pollInterval = 2000;
+    process.stdout.write(`⏳ Waiting for ${label} at ${url}...`);
+
+    while (Date.now() - start < timeoutMs) {
+        try {
+            const status = await httpGet(url);
+            if (status >= 200 && status < 300) {
+                process.stdout.write(' ready\n');
+                return;
+            }
+        } catch {
+            // Ignore and retry
+        }
+
+        process.stdout.write('.');
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    process.stdout.write('\n');
+    throw new Error(`Timed out waiting for ${label} at ${url}`);
 }
 
 function isE2ERunning() {
@@ -85,6 +123,16 @@ async function main() {
     const startResult = run(`docker compose -f ${COMPOSE_FILE} up -d --build`);
     if (startResult !== 0) {
         console.error('❌ Failed to start containers');
+        cleanup();
+        process.exit(1);
+    }
+
+    try {
+        await waitForHealth('http://localhost:8090/health', 'WebApi');
+        await waitForHealth('http://localhost:3003/health', 'Thumbnail worker');
+        await waitForHealth('http://localhost:3002', 'Frontend');
+    } catch (error) {
+        console.error(`\n❌ ${error.message}`);
         cleanup();
         process.exit(1);
     }
