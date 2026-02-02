@@ -80,7 +80,7 @@ export default function RecycledFilesList() {
   )
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const toast = useRef<Toast>(null)
-  
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.recycledFiles
 
@@ -241,7 +241,10 @@ export default function RecycledFilesList() {
     version: RecycledModelVersion
   ) => {
     try {
-      const preview = await ApiClient.getDeletePreview('modelVersion', version.id)
+      const preview = await ApiClient.getDeletePreview(
+        'modelVersion',
+        version.id
+      )
       setDeletePreview({
         ...preview,
         item: {
@@ -398,9 +401,7 @@ export default function RecycledFilesList() {
           prevSprites.filter(s => s.id !== deletedItem.id)
         )
       } else if (deletedItem.type === 'sound') {
-        setSounds(prevSounds =>
-          prevSounds.filter(s => s.id !== deletedItem.id)
-        )
+        setSounds(prevSounds => prevSounds.filter(s => s.id !== deletedItem.id))
       }
       setDeletePreview(null)
     } catch (error) {
@@ -445,7 +446,11 @@ export default function RecycledFilesList() {
   }
 
   const isEmpty =
-    models.length === 0 && modelVersions.length === 0 && textureSets.length === 0 && sprites.length === 0 && sounds.length === 0
+    models.length === 0 &&
+    modelVersions.length === 0 &&
+    textureSets.length === 0 &&
+    sprites.length === 0 &&
+    sounds.length === 0
 
   return (
     <div className="recycled-files-list">
@@ -488,9 +493,11 @@ export default function RecycledFilesList() {
                 <i className="pi pi-box" />
                 Models ({models.length})
               </h3>
-              <div 
+              <div
                 className="recycled-cards-grid"
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
               >
                 {models.map(model => (
                   <div key={model.id} className="recycled-card">
@@ -536,12 +543,18 @@ export default function RecycledFilesList() {
                 <i className="pi pi-clone" />
                 Model Versions ({modelVersions.length})
               </h3>
-              <div 
+              <div
                 className="recycled-cards-grid"
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
               >
                 {modelVersions.map(version => (
-                  <div key={version.id} className="recycled-card">
+                  <div
+                    key={version.id}
+                    className="recycled-card"
+                    data-model-id={version.modelId}
+                  >
                     <div className="recycled-card-thumbnail">
                       <img
                         src={ApiClient.getVersionThumbnailUrl(version.id)}
@@ -550,13 +563,17 @@ export default function RecycledFilesList() {
                         onError={e => {
                           const target = e.target as HTMLImageElement
                           target.style.display = 'none'
-                          const placeholder = target.nextElementSibling as HTMLElement
+                          const placeholder =
+                            target.nextElementSibling as HTMLElement
                           if (placeholder) {
                             placeholder.style.display = 'flex'
                           }
                         }}
                       />
-                      <div className="version-placeholder" style={{ display: 'none' }}>
+                      <div
+                        className="version-placeholder"
+                        style={{ display: 'none' }}
+                      >
                         <i className="pi pi-clone" />
                         <span className="version-number">
                           v{version.versionNumber}
@@ -573,7 +590,9 @@ export default function RecycledFilesList() {
                         <Button
                           icon="pi pi-trash"
                           className="p-button-danger p-button-rounded"
-                          onClick={() => handleDeletePreviewModelVersion(version)}
+                          onClick={() =>
+                            handleDeletePreviewModelVersion(version)
+                          }
                           tooltip="Delete Forever"
                           tooltipOptions={{ position: 'bottom' }}
                         />
@@ -611,9 +630,11 @@ export default function RecycledFilesList() {
                 <i className="pi pi-images" />
                 Texture Sets ({textureSets.length})
               </h3>
-              <div 
+              <div
                 className="recycled-cards-grid"
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
               >
                 {textureSets.map(textureSet => {
                   const previewUrl = getTexturePreviewUrl(textureSet)
@@ -677,9 +698,11 @@ export default function RecycledFilesList() {
                 <i className="pi pi-image" />
                 Sprites ({sprites.length})
               </h3>
-              <div 
+              <div
                 className="recycled-cards-grid"
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
               >
                 {sprites.map(sprite => (
                   <div key={sprite.id} className="recycled-card">
@@ -706,7 +729,10 @@ export default function RecycledFilesList() {
                         />
                       </div>
                       <div className="recycled-card-overlay">
-                        <span className="recycled-card-name" title={sprite.name}>
+                        <span
+                          className="recycled-card-name"
+                          title={sprite.name}
+                        >
                           {sprite.name}
                         </span>
                         <span className="recycled-card-meta">
@@ -727,16 +753,20 @@ export default function RecycledFilesList() {
                 <i className="pi pi-volume-up" />
                 Sounds ({sounds.length})
               </h3>
-              <div 
+              <div
                 className="recycled-cards-grid"
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
               >
                 {sounds.map(sound => (
                   <div key={sound.id} className="recycled-card">
                     <div className="recycled-card-thumbnail">
                       <div className="sound-placeholder">
                         <i className="pi pi-volume-up" />
-                        <span className="sound-duration">{formatDuration(sound.duration)}</span>
+                        <span className="sound-duration">
+                          {formatDuration(sound.duration)}
+                        </span>
                       </div>
                       <div className="recycled-card-actions">
                         <Button

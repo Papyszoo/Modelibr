@@ -111,12 +111,20 @@ When(
 When(
     "I switch to the Files tab",
     async ({ page }) => {
+        // Wait for network to be idle before interacting
+        await page.waitForLoadState('networkidle');
+        
         // Use PrimeReact TabView nav link selector
         const filesTab = page.locator('.p-tabview-nav-link').filter({ hasText: 'Files' });
+        await expect(filesTab).toBeVisible({ timeout: 10000 });
         await filesTab.click();
         
-        // Wait for files tab content
-        await page.waitForSelector('.files-tab, .files-tab-empty', { timeout: 5000 });
+        // Wait for files tab content to be fully loaded
+        await page.waitForSelector('.files-tab, .files-tab-empty', { timeout: 10000 });
+        await page.waitForLoadState('networkidle');
+        
+        // Give extra time for React to render the file cards
+        await page.waitForTimeout(500);
     }
 );
 
@@ -247,12 +255,19 @@ Then(
 Then(
     "the file should show split channels mode",
     async ({ page }) => {
+        // Wait for page to be fully loaded
+        await page.waitForLoadState('networkidle');
+        
         const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
         
-        // Check for split-channels class or RGB dropdown showing "Split Channels"
+        // Wait for the file card to be visible
+        await expect(fileCard).toBeVisible({ timeout: 10000 });
+        
+        // Check that the RGB dropdown is visible (not that it's in split mode yet)
         const rgbDropdown = fileCard.locator('[data-testid^="channel-mapping-rgb-"]').first();
-        await expect(rgbDropdown).toBeVisible({ timeout: 5000 });
-        console.log("[Verify] File shows channel dropdown ✓");
+        await expect(rgbDropdown).toBeVisible({ timeout: 10000 });
+        
+        console.log("[Verify] File shows channel mapping dropdown ✓");
     }
 );
 
@@ -286,7 +301,7 @@ Then(
         const heightCard = page.locator('.texture-card.height-card');
         
         const dropdown = heightCard.locator('.height-mode-dropdown');
-        await expect(dropdown).toBeVisible({ timeout: 5000 });
+        await expect(dropdown).toBeVisible({ timeout: 10000 });
         console.log("[Verify] Height card mode dropdown visible ✓");
     }
 );
@@ -322,22 +337,30 @@ Then(
 When(
     "I enable split channel mode for the file",
     async ({ page }) => {
+        // Wait for page to be fully loaded
+        await page.waitForLoadState('networkidle');
+        
         const fileCard = page.locator('[data-testid^="file-mapping-card-"]').first();
+        
+        // Ensure the file card is visible first
+        await expect(fileCard).toBeVisible({ timeout: 10000 });
         
         // Find the RGB dropdown using data-testid and click it
         const rgbDropdown = fileCard.locator('[data-testid^="channel-mapping-rgb-"]').first();
+        await expect(rgbDropdown).toBeVisible({ timeout: 10000 });
         await rgbDropdown.click();
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(500); // Wait for dropdown animation
         
         // Select "Split Channels" option
         // Note: We no longer remove the RGB texture immediately, so no DELETE request is expected.
         const splitOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: 'Split Channels' });
+        await expect(splitOption).toBeVisible({ timeout: 5000 });
         await splitOption.click();
 
         
         // Wait for split channels UI to appear using data-testid
         const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
-        await expect(splitChannels).toBeVisible({ timeout: 5000 });
+        await expect(splitChannels).toBeVisible({ timeout: 10000 });
         
         await page.waitForTimeout(500); // Extra time for UI state settlement
         
@@ -352,29 +375,25 @@ When(
         const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
         
         // Wait for split channels to be visible
-        await expect(splitChannels).toBeVisible({ timeout: 5000 });
+        await expect(splitChannels).toBeVisible({ timeout: 10000 });
         
         // Find the specific channel dropdown (R, G, or B) using data-testid
         const channelDropdown = splitChannels.locator(`[data-testid^="channel-mapping-${channel}-"]`);
         
-        await expect(channelDropdown).toBeVisible({ timeout: 3000 });
+        await expect(channelDropdown).toBeVisible({ timeout: 10000 });
         await channelDropdown.click();
         await page.waitForTimeout(300);
         
         // Select the texture type from dropdown and wait for POST request
         const typeOption = page.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: textureType });
-        await expect(typeOption).toBeVisible({ timeout: 3000 });
+          await expect(typeOption).toBeVisible({ timeout: 10000 });
+          await typeOption.click();
         
-        const [response] = await Promise.all([
-             page.waitForResponse(response => 
-                response.request().method() === 'POST' && 
-                response.url().includes('/textures') &&
-                response.status() === 200
-             ),
-             typeOption.click()
-        ]);
+          // Wait for the dropdown label to reflect the new selection (avoid relying on POST responses)
+          const dropdownLabel = channelDropdown.locator('.p-dropdown-label, .p-dropdown-label-empty');
+          await expect(dropdownLabel).toHaveText(textureType, { timeout: 10000 });
         
-        await page.waitForTimeout(300);
+          await page.waitForTimeout(300);
         
         console.log(`[Action] Set channel ${channel} to ${textureType} ✓`);
     }

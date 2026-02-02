@@ -32,17 +32,16 @@ Feature: Recycled Model Versions
     And I open the version dropdown
     Then I take a screenshot showing restored version in version strip
 
-  @restore-version @skip
-  # Skip: Navigate back to model viewer and verify 2 versions has state issues
-  # First 2 tests pass (delete version, version in recycle bin) - restore test needs deeper investigation
+  @restore-version
   Scenario: Restoring a version adds it back to the model
     Given a model with at least 2 versions exists
     When I open the model viewer for the multi-version model
     And I open the version dropdown
     And I delete version 1
-    And I navigate to the Recycled Files page
+    Then the model should have 1 version remaining
+    When I navigate to the Recycled Files page
     And I restore the recycled model version
     Then the version should be removed from the recycle bin
-    And I navigate back to the model viewer
+    And I navigate back to the model viewer with force refresh
     Then the model should have 2 versions
     And I take a screenshot of restored version

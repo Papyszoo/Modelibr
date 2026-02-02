@@ -80,6 +80,7 @@ interface StateData {
     sounds: Record<string, SoundData>;
     soundCategories: Record<string, SoundCategoryData>;
     versionStates: Record<string, VersionState>;
+    currentSprite?: string; // Tracks the sprite currently being edited
 }
 
 class SharedState {
@@ -216,6 +217,18 @@ class SharedState {
     hasSpriteCategory(name: string): boolean {
         const state = this.loadState();
         return state.spriteCategories ? name in state.spriteCategories : false;
+    }
+
+    // Current sprite context
+    setCurrentSprite(name: string): void {
+        const state = this.loadState();
+        state.currentSprite = name;
+        this.saveState(state);
+    }
+
+    getCurrentSprite(): string | undefined {
+        const state = this.loadState();
+        return state.currentSprite;
     }
 
     // Sound management

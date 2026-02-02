@@ -37,6 +37,8 @@ export class JobProcessor {
     this.activeJobs = new Map()
     this.jobQueue = [] // Local queue for sequential processing
     this.isProcessingQueue = false // Flag to prevent concurrent queue processing
+    this.isPollingForJobs = false
+    this.pollIntervalHandle = null
   }
 
   /**
@@ -85,6 +87,37 @@ export class JobProcessor {
     // Poll for any existing pending jobs on startup
     logger.info('Checking for existing pending jobs on startup')
     await this.pollForExistingJobs()
+
+    // Start periodic polling as a fallback in case SignalR notifications are missed
+    this.startPeriodicPolling()
+  }
+
+  /**
+   * Start periodic polling for pending jobs as a fallback mechanism.
+   */
+  startPeriodicPolling() {
+    if (this.pollIntervalHandle) {
+      return
+    }
+
+    const pollIntervalMs = 10000
+    this.pollIntervalHandle = setInterval(async () => {
+      if (this.isShuttingDown || this.isPollingForJobs) {
+        return
+      }
+
+      // Only poll when queue is empty to avoid competing with active processing
+      if (this.jobQueue.length > 0 || this.isProcessingQueue) {
+        return
+      }
+
+      this.isPollingForJobs = true
+      try {
+        await this.pollForExistingJobs()
+      } finally {
+        this.isPollingForJobs = false
+      }
+    }, pollIntervalMs)
   }
 
   /**
@@ -990,6 +1023,12 @@ export class JobProcessor {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval)
       this.cleanupInterval = null
+    }
+
+    // Stop periodic polling
+    if (this.pollIntervalHandle) {
+      clearInterval(this.pollIntervalHandle)
+      this.pollIntervalHandle = null
     }
 
     // Log remaining jobs in queue
