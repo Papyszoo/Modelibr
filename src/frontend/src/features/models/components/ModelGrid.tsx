@@ -10,6 +10,11 @@ import { ThumbnailDisplay } from '../../thumbnail'
 import { Model } from '../../../utils/fileUtils'
 import ApiClient from '../../../services/ApiClient'
 import { PackDto, ProjectDto } from '../../../types'
+import {
+  openInFileExplorer,
+  copyPathToClipboard,
+  getProjectAssetPath,
+} from '../../../utils/webdavUtils'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
 
@@ -132,12 +137,84 @@ export default function ModelGrid({
     return `Model ${model.id}`
   }
 
+  const handleShowInFolder = async () => {
+    if (!selectedModel) return
+
+    // Find the project this model belongs to (use first project if multiple)
+    const modelProjects = projects.filter(p =>
+      selectedProjectIds.length === 0 || selectedProjectIds.includes(p.id)
+    )
+
+    if (modelProjects.length === 0) {
+      // If no project context, show the general models folder path
+      toast.current?.show({
+        severity: 'info',
+        summary: 'No Project',
+        detail: 'This model is not associated with a project. Copy WebDAV path instead.',
+        life: 4000,
+      })
+      return
+    }
+
+    const projectName = modelProjects[0].name
+    const result = await openInFileExplorer(`Projects/${projectName}/Models`)
+
+    toast.current?.show({
+      severity: result.success ? 'info' : 'warn',
+      summary: result.success ? 'Opening' : 'Note',
+      detail: result.message,
+      life: 4000,
+    })
+  }
+
+  const handleCopyPath = async () => {
+    if (!selectedModel) return
+
+    const modelProjects = projects.filter(p =>
+      selectedProjectIds.length === 0 || selectedProjectIds.includes(p.id)
+    )
+
+    let virtualPath = 'Projects'
+    if (modelProjects.length > 0) {
+      virtualPath = `Projects/${modelProjects[0].name}/Models`
+    }
+
+    const pathInfo = getProjectAssetPath(modelProjects[0]?.name || '', 'Models')
+    const result = await copyPathToClipboard(virtualPath)
+
+    toast.current?.show({
+      severity: result.success ? 'success' : 'error',
+      summary: result.success ? 'Copied' : 'Failed',
+      detail: result.success
+        ? `Path copied: ${pathInfo.nativePath}`
+        : 'Failed to copy path to clipboard',
+      life: 3000,
+    })
+  }
+
   const filteredModels = models.filter(model => {
     const modelName = getModelName(model).toLowerCase()
     return modelName.includes(searchQuery.toLowerCase())
   })
 
   const contextMenuItems: MenuItem[] = [
+    {
+      label: 'Show in Folder',
+      icon: 'pi pi-folder-open',
+      command: () => {
+        handleShowInFolder()
+      },
+    },
+    {
+      label: 'Copy Path',
+      icon: 'pi pi-copy',
+      command: () => {
+        handleCopyPath()
+      },
+    },
+    {
+      separator: true,
+    },
     {
       label: 'Add to pack',
       icon: 'pi pi-box',

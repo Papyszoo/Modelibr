@@ -101,6 +101,7 @@ namespace WebApi
             app.MapSoundEndpoints();
             app.MapSoundCategoryEndpoints();
             app.MapBlenderEndpoints();
+            app.MapAudioSelectionEndpoints();
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");

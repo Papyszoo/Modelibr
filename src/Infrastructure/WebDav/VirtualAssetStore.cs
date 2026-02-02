@@ -1,4 +1,5 @@
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ public sealed class VirtualAssetStore : IStore
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly VirtualCollectionPropertyManager _collectionPropertyManager;
     private readonly NoLockingManager _lockingManager;
+    private readonly IAudioSelectionService _audioSelectionService;
 
     public VirtualAssetStore(
         IServiceScopeFactory scopeFactory,
@@ -26,6 +28,7 @@ public sealed class VirtualAssetStore : IStore
         VirtualItemPropertyManager itemPropertyManager,
         VirtualCollectionPropertyManager collectionPropertyManager,
         NoLockingManager lockingManager,
+        IAudioSelectionService audioSelectionService,
         ILogger<VirtualAssetStore> logger)
     {
         _scopeFactory = scopeFactory;
@@ -33,6 +36,7 @@ public sealed class VirtualAssetStore : IStore
         _itemPropertyManager = itemPropertyManager;
         _collectionPropertyManager = collectionPropertyManager;
         _lockingManager = lockingManager;
+        _audioSelectionService = audioSelectionService;
         _logger = logger;
     }
 
@@ -80,8 +84,45 @@ public sealed class VirtualAssetStore : IStore
         {
             "projects" => await ResolveProjectPathAsync(sp, segments),
             "sounds" => await ResolveSoundCategoryPathAsync(sp, segments),
+            "selection" => ResolveSelectionPath(segments),
             _ => null
         };
+    }
+
+    private IStoreItem? ResolveSelectionPath(string[] segments)
+    {
+        // /Selection
+        if (segments.Length == 1)
+        {
+            return new VirtualSelectionCollection(
+                _collectionPropertyManager,
+                _lockingManager,
+                _audioSelectionService,
+                _itemPropertyManager,
+                _scopeFactory,
+                _pathProvider);
+        }
+
+        // /Selection/{SoundName}Selection.wav
+        if (segments.Length == 2)
+        {
+            var selection = _audioSelectionService.GetSelection();
+            if (selection == null)
+                return null;
+
+            var expectedName = $"{Path.GetFileNameWithoutExtension(selection.FileName)}Selection.wav";
+            if (!string.Equals(segments[1], expectedName, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return new VirtualAudioSelectionFile(
+                _itemPropertyManager,
+                _lockingManager,
+                _audioSelectionService,
+                _scopeFactory,
+                _pathProvider);
+        }
+
+        return null;
     }
 
     private async Task<IStoreItem?> ResolveProjectPathAsync(IServiceProvider sp, string[] segments)

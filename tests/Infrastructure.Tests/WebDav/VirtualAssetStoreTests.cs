@@ -1,4 +1,5 @@
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Domain.Models;
 using Infrastructure.WebDav;
@@ -19,6 +20,7 @@ public class VirtualAssetStoreTests
     private readonly Mock<IProjectRepository> _mockProjectRepository;
     private readonly Mock<ISoundCategoryRepository> _mockSoundCategoryRepository;
     private readonly Mock<ISoundRepository> _mockSoundRepository;
+    private readonly Mock<IAudioSelectionService> _mockAudioSelectionService;
     private readonly Mock<IHttpContext> _mockHttpContext;
     private readonly Mock<ILogger<VirtualAssetStore>> _mockLogger;
     private readonly VirtualAssetStore _store;
@@ -32,6 +34,7 @@ public class VirtualAssetStoreTests
         _mockProjectRepository = new Mock<IProjectRepository>();
         _mockSoundCategoryRepository = new Mock<ISoundCategoryRepository>();
         _mockSoundRepository = new Mock<ISoundRepository>();
+        _mockAudioSelectionService = new Mock<IAudioSelectionService>();
         _mockHttpContext = new Mock<IHttpContext>();
         _mockLogger = new Mock<ILogger<VirtualAssetStore>>();
 
@@ -57,6 +60,7 @@ public class VirtualAssetStoreTests
             itemPropertyManager,
             collectionPropertyManager,
             lockingManager,
+            _mockAudioSelectionService.Object,
             _mockLogger.Object);
     }
 

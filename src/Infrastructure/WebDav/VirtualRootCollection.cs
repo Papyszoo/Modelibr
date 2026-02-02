@@ -5,7 +5,7 @@ using NWebDav.Server.Stores;
 namespace Infrastructure.WebDav;
 
 /// <summary>
-/// Root collection that exposes the top-level virtual directories: Projects and Sounds.
+/// Root collection that exposes the top-level virtual directories: Projects, Sounds, and Selection.
 /// </summary>
 public sealed class VirtualRootCollection : VirtualCollectionBase
 {
@@ -25,6 +25,7 @@ public sealed class VirtualRootCollection : VirtualCollectionBase
         {
             "projects" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Projects", "projects")),
             "sounds" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Sounds", "sounds")),
+            "selection" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Selection", "selection")),
             _ => Task.FromResult<IStoreItem?>(null)
         };
     }
@@ -34,7 +35,8 @@ public sealed class VirtualRootCollection : VirtualCollectionBase
         var items = new List<IStoreItem>
         {
             new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Projects", "projects"),
-            new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Sounds", "sounds")
+            new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Sounds", "sounds"),
+            new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Selection", "selection")
         };
         return Task.FromResult<IEnumerable<IStoreItem>>(items);
     }

@@ -49,6 +49,9 @@ namespace Infrastructure
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
+            // Add audio selection service for trimmed audio snippets
+            services.AddSingleton<IAudioSelectionService, AudioSelectionService>();
+
             // Add WebDAV virtual asset store services
             services.AddVirtualAssetStore();
 

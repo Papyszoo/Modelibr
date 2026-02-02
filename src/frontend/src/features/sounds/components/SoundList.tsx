@@ -26,6 +26,11 @@ import {
   extractPeaks,
   formatDuration,
 } from '../../../utils/audioUtils'
+import {
+  openInFileExplorer,
+  copyPathToClipboard,
+  getSoundCategoryPath,
+} from '../../../utils/webdavUtils'
 import SoundCard from './SoundCard'
 import SoundEditor from './SoundEditor'
 import './SoundList.css'
@@ -584,6 +589,59 @@ function SoundList() {
     }
   }
 
+  // Handle "Show in Folder" from context menu
+  const handleShowInFolder = async () => {
+    // Get current category name
+    if (activeCategoryId === null || activeCategoryId === UNASSIGNED_CATEGORY_ID) {
+      toast.current?.show({
+        severity: 'info',
+        summary: 'No Category',
+        detail: 'Select a category to show its folder in the file explorer.',
+        life: 4000,
+      })
+      return
+    }
+
+    const category = categories.find(c => c.id === activeCategoryId)
+    if (!category) return
+
+    const result = await openInFileExplorer(`Sounds/${category.name}`)
+    toast.current?.show({
+      severity: result.success ? 'info' : 'warn',
+      summary: result.success ? 'Opening' : 'Note',
+      detail: result.message,
+      life: 4000,
+    })
+  }
+
+  // Handle "Copy Path" from context menu
+  const handleCopyPath = async () => {
+    if (activeCategoryId === null || activeCategoryId === UNASSIGNED_CATEGORY_ID) {
+      toast.current?.show({
+        severity: 'info',
+        summary: 'No Category',
+        detail: 'Select a category to copy its path.',
+        life: 4000,
+      })
+      return
+    }
+
+    const category = categories.find(c => c.id === activeCategoryId)
+    if (!category) return
+
+    const pathInfo = getSoundCategoryPath(category.name)
+    const result = await copyPathToClipboard(`Sounds/${category.name}`)
+
+    toast.current?.show({
+      severity: result.success ? 'success' : 'error',
+      summary: result.success ? 'Copied' : 'Failed',
+      detail: result.success
+        ? `Path copied: ${pathInfo.nativePath}`
+        : 'Failed to copy path to clipboard',
+      life: 3000,
+    })
+  }
+
   // Get context menu items (dynamic label based on selection)
   const getContextMenuItems = (): MenuItem[] => {
     const selectedCount = selectedSoundIds.size
@@ -591,6 +649,19 @@ function SoundList() {
       selectedCount > 1 ? `Recycle ${selectedCount} sounds` : 'Recycle'
 
     return [
+      {
+        label: 'Show in Folder',
+        icon: 'pi pi-folder-open',
+        command: handleShowInFolder,
+      },
+      {
+        label: 'Copy Path',
+        icon: 'pi pi-copy',
+        command: handleCopyPath,
+      },
+      {
+        separator: true,
+      },
       {
         label,
         icon: 'pi pi-trash',
