@@ -21,7 +21,10 @@ namespace WebApi
 
             builder.Services.AddAuthorization();
             builder.Services.AddHttpContextAccessor();
+
             builder.Services.AddHealthChecks();
+
+
 
             // Add CORS for frontend development
             builder.Services.AddCors(options =>
@@ -48,7 +51,7 @@ namespace WebApi
                 .AddInfrastructure(builder.Configuration);
 
             // Add NWebDav request handler factory for WebDAV support
-            builder.Services.AddSingleton<IRequestHandlerFactory, RequestHandlerFactory>();
+            builder.Services.AddSingleton<IRequestHandlerFactory, WebApi.Services.RequestHandlerFactory>();
 
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
@@ -66,6 +69,8 @@ namespace WebApi
                 app.MapOpenApi();
             }
 
+
+
             // Only use HTTPS redirection when not running in a container
             // This prevents certificate issues with internal Docker communication
             var disableHttpsRedirection = builder.Configuration.GetValue<bool>("DisableHttpsRedirection");
@@ -76,6 +81,7 @@ namespace WebApi
 
             // Add CORS for frontend development
             app.UseCors();
+
 
             app.UseAuthorization();
 

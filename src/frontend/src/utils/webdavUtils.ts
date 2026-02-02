@@ -26,7 +26,8 @@ export function detectOS(): OperatingSystem {
  * Generates the WebDAV server URL based on the current API configuration.
  */
 export function getWebDavBaseUrl(): string {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+  const apiBaseUrl =
+    import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
   const url = new URL(apiBaseUrl)
   return `${url.protocol}//${url.host}/dav`
 }
@@ -35,7 +36,8 @@ export function getWebDavBaseUrl(): string {
  * Gets the WebDAV server hostname and port.
  */
 function getWebDavHostInfo(): { host: string; port: string; isHttps: boolean } {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+  const apiBaseUrl =
+    import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
   const url = new URL(apiBaseUrl)
   const isHttps = url.protocol === 'https:'
   const defaultPort = isHttps ? '443' : '80'
@@ -56,7 +58,7 @@ export interface WebDavPathInfo {
 
 /**
  * Generates the native file system path for a WebDAV resource.
- * 
+ *
  * @param virtualPath - The virtual path within the WebDAV namespace (e.g., "Projects/MyProject/Models")
  * @returns PathInfo with native and WebDAV URLs
  */
@@ -64,20 +66,28 @@ export function getWebDavPath(virtualPath: string): WebDavPathInfo {
   const os = detectOS()
   const { host, port, isHttps } = getWebDavHostInfo()
   const cleanPath = virtualPath.replace(/^\/+/, '').replace(/\/+$/, '')
-  
+
   const webDavUrl = `${getWebDavBaseUrl()}/${cleanPath}`
-  
+
   let nativePath: string
   let canOpenNatively = true
 
   switch (os) {
     case 'windows':
       // Windows uses WebDAV via mapped network drives or UNC paths
-      // Format: \\server@port\DavWWWRoot\path or direct URL
-      if (isHttps) {
-        nativePath = `\\\\${host}@SSL@${port}\\DavWWWRoot\\dav\\${cleanPath.replace(/\//g, '\\')}`
+      // Format: \\server@port\path or \\server@SSL@port\path for HTTPS
+      // Windows: Use standard UNC path for WebDAV
+      // Format: \\server\dav\path (works for http on port 80 if allowed, or https trusted)
+      // We recently verified \\localhost\dav works for http://localhost/dav
+      if (host === 'localhost' || host === '127.0.0.1') {
+        nativePath = `\\\\${host}\\dav\\${cleanPath.replace(/\//g, '\\')}`
       } else {
-        nativePath = `\\\\${host}@${port}\\DavWWWRoot\\dav\\${cleanPath.replace(/\//g, '\\')}`
+        // Fallback for remote/other hosts if needed, keeping legacy logic or simplifying
+        // Usually \\host\dav is standard. Port specification in UNC is tricky (e.g. @80),
+        // but user verified basic syntax.
+        const portStr = port === '80' || port === '443' ? '' : `@${port}`
+        const sslStr = isHttps ? '@SSL' : ''
+        nativePath = `\\\\${host}${sslStr}${portStr}\\dav\\${cleanPath.replace(/\//g, '\\')}`
       }
       break
 
@@ -110,8 +120,13 @@ export function getWebDavPath(virtualPath: string): WebDavPathInfo {
 /**
  * Generates the path for a project's asset folder.
  */
-export function getProjectAssetPath(projectName: string, assetType: 'Models' | 'TextureSets' | 'Sprites' | 'Sounds'): WebDavPathInfo {
-  return getWebDavPath(`Projects/${encodeURIComponent(projectName)}/${assetType}`)
+export function getProjectAssetPath(
+  projectName: string,
+  assetType: 'Models' | 'TextureSets' | 'Sprites' | 'Sounds'
+): WebDavPathInfo {
+  return getWebDavPath(
+    `Projects/${encodeURIComponent(projectName)}/${assetType}`
+  )
 }
 
 /**
@@ -124,20 +139,20 @@ export function getSoundCategoryPath(categoryName: string): WebDavPathInfo {
 /**
  * Attempts to open the file explorer at the given WebDAV path.
  * Returns true if the attempt was made (does not guarantee success).
- * 
+ *
  * Note: Due to browser security restrictions, this typically works best when:
  * - The WebDAV drive is already mounted
  * - Using a custom URL scheme handler
  * - Running as a PWA with elevated permissions
  */
-export async function openInFileExplorer(virtualPath: string): Promise<{ success: boolean; message: string }> {
+export async function openInFileExplorer(
+  virtualPath: string
+): Promise<{ success: boolean; message: string }> {
   const pathInfo = getWebDavPath(virtualPath)
 
-  if (!pathInfo.canOpenNatively) {
-    return {
-      success: false,
-      message: `Cannot open file explorer on ${pathInfo.os}. Please use the WebDAV URL: ${pathInfo.webDavUrl}`,
-    }
+  return {
+    success: false,
+    message: `Cannot open file explorer automatically. Please copy the path: ${pathInfo.nativePath}`,
   }
 
   const os = pathInfo.os
@@ -146,10 +161,14 @@ export async function openInFileExplorer(virtualPath: string): Promise<{ success
     if (os === 'windows') {
       // Windows: Try to open using explorer protocol
       // This typically works if the WebDAV share is already mapped
-      window.open(`file:///${pathInfo.nativePath.replace(/\\/g, '/')}`, '_blank')
+      window.open(
+        `file:///${pathInfo.nativePath.replace(/\\/g, '/')}`,
+        '_blank'
+      )
       return {
         success: true,
-        message: 'Opening in Windows Explorer. If nothing happens, mount the WebDAV drive first.',
+        message:
+          'Opening in Windows Explorer. If nothing happens, mount the WebDAV drive first.',
       }
     } else if (os === 'macos') {
       // macOS: Finder can open WebDAV URLs directly
@@ -157,7 +176,8 @@ export async function openInFileExplorer(virtualPath: string): Promise<{ success
       window.location.href = pathInfo.nativePath
       return {
         success: true,
-        message: 'Opening in Finder. You may be prompted to connect to the server.',
+        message:
+          'Opening in Finder. You may be prompted to connect to the server.',
       }
     } else if (os === 'linux') {
       // Linux: Try xdg-open via a custom protocol handler
@@ -165,7 +185,8 @@ export async function openInFileExplorer(virtualPath: string): Promise<{ success
       window.open(pathInfo.nativePath, '_blank')
       return {
         success: true,
-        message: 'Opening in file manager. Ensure your system supports WebDAV URLs.',
+        message:
+          'Opening in file manager. Ensure your system supports WebDAV URLs.',
       }
     }
 
@@ -184,7 +205,9 @@ export async function openInFileExplorer(virtualPath: string): Promise<{ success
 /**
  * Copies the native path to clipboard.
  */
-export async function copyPathToClipboard(virtualPath: string): Promise<{ success: boolean; path: string }> {
+export async function copyPathToClipboard(
+  virtualPath: string
+): Promise<{ success: boolean; path: string }> {
   const pathInfo = getWebDavPath(virtualPath)
 
   try {
@@ -198,7 +221,10 @@ export async function copyPathToClipboard(virtualPath: string): Promise<{ succes
 /**
  * Gets instructions for mounting the WebDAV drive based on the detected OS.
  */
-export function getMountInstructions(): { os: OperatingSystem; instructions: string } {
+export function getMountInstructions(): {
+  os: OperatingSystem
+  instructions: string
+} {
   const os = detectOS()
   const { host, port, isHttps } = getWebDavHostInfo()
   const protocol = isHttps ? 'https' : 'http'
@@ -208,30 +234,28 @@ export function getMountInstructions(): { os: OperatingSystem; instructions: str
     case 'windows':
       return {
         os,
-        instructions: `To mount the WebDAV drive on Windows:
-1. Open File Explorer
-2. Right-click "This PC" and select "Map network drive..."
-3. Choose a drive letter
-4. Enter the address: ${webDavUrl}
-5. Check "Connect using different credentials" if needed
-6. Click "Finish"
-
-Alternatively, run in Command Prompt (replace Z: with an available drive letter):
-net use Z: ${webDavUrl}`,
+        instructions: `Accessing via Windows Explorer:
+ 
+ 1. Open File Explorer
+ 2. Paste this path into the address bar:
+ 
+ ${webDavUrl.replace('http://', '\\\\').replace(/\//g, '\\')}
+ 
+ Or use the legacy mapped drive method:
+ 1. Right-click "This PC" > "Map network drive..."
+ 2. Folder: ${webDavUrl}`,
       }
 
     case 'macos':
       return {
         os,
         instructions: `To mount the WebDAV drive on macOS:
+
 1. Open Finder
 2. Press Cmd+K or select Go > Connect to Server
 3. Enter: ${webDavUrl}
 4. Click "Connect"
-5. Enter credentials if prompted
-
-Alternatively, run in Terminal:
-mount_webdav ${webDavUrl} /Volumes/Modelibr`,
+5. Enter credentials if prompted`,
       }
 
     case 'linux':
@@ -243,10 +267,7 @@ Using GNOME/Nautilus:
 1. Open Files (Nautilus)
 2. Press Ctrl+L to show the location bar
 3. Enter: davs://${host}:${port}/dav
-4. Press Enter and enter credentials
-
-Using davfs2:
-sudo mount -t davfs ${webDavUrl} /mnt/modelibr`,
+4. Press Enter and enter credentials`,
       }
 
     default:

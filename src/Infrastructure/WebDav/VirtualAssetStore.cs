@@ -43,20 +43,38 @@ public sealed class VirtualAssetStore : IStore
     public async Task<IStoreItem?> GetItemAsync(Uri uri, IHttpContext httpContext)
     {
         var path = GetDecodedPath(uri);
+        Console.WriteLine($"[VirtualAssetStore] GetItemAsync: {path}");
         _logger.LogDebug("GetItemAsync: {Path}", path);
 
         using var scope = _scopeFactory.CreateScope();
-        return await ResolvePathAsync(scope.ServiceProvider, path);
+        try 
+        {
+            return await ResolvePathAsync(scope.ServiceProvider, path);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[VirtualAssetStore] ERROR in GetItemAsync: {ex}");
+            throw;
+        }
     }
 
     public async Task<IStoreCollection?> GetCollectionAsync(Uri uri, IHttpContext httpContext)
     {
         var path = GetDecodedPath(uri);
+        Console.WriteLine($"[VirtualAssetStore] GetCollectionAsync: {path}");
         _logger.LogDebug("GetCollectionAsync: {Path}", path);
 
         using var scope = _scopeFactory.CreateScope();
-        var item = await ResolvePathAsync(scope.ServiceProvider, path);
-        return item as IStoreCollection;
+        try
+        {
+            var item = await ResolvePathAsync(scope.ServiceProvider, path);
+            return item as IStoreCollection;
+        }
+        catch (Exception ex)
+        {
+             Console.WriteLine($"[VirtualAssetStore] ERROR in GetCollectionAsync: {ex}");
+             throw;
+        }
     }
 
     private static string GetDecodedPath(Uri uri)
@@ -71,6 +89,12 @@ public sealed class VirtualAssetStore : IStore
     private async Task<IStoreItem?> ResolvePathAsync(IServiceProvider sp, string path)
     {
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        // Handle "dav" prefix if present from Nginx/Middleware
+        if (segments.Length > 0 && segments[0].Equals("dav", StringComparison.OrdinalIgnoreCase))
+        {
+            segments = segments.Skip(1).ToArray();
+        }
 
         // Root collection
         if (segments.Length == 0)
