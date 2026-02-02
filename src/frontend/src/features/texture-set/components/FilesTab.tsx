@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
-import { TextureSetDto, TextureDto, TextureType, TextureChannel } from '../../../types'
+import {
+  TextureSetDto,
+  TextureDto,
+  TextureType,
+  TextureChannel,
+} from '../../../types'
 import { getTextureTypeLabel } from '../../../utils/textureTypeUtils'
 import { useTextureSets } from '../hooks/useTextureSets'
 import './FilesTab.css'
@@ -51,78 +56,90 @@ const alphaTypeOptions = [
 
 function inferRgbOption(textures: TextureDto[]): FileMapping['rgbOption'] {
   // First check if we have any explicit split channels. This is strong signal.
-  const hasSplit = textures.some(t => 
-    t.sourceChannel === TextureChannel.R || 
-    t.sourceChannel === TextureChannel.G || 
-    t.sourceChannel === TextureChannel.B
-  );
-  
+  const hasSplit = textures.some(
+    t =>
+      t.sourceChannel === TextureChannel.R ||
+      t.sourceChannel === TextureChannel.G ||
+      t.sourceChannel === TextureChannel.B
+  )
+
   if (hasSplit) {
-      return 'split';
+    return 'split'
   }
 
+  // If we have a placeholder "None" mapping on RGB channel, treat as split mode enabled
+  // This happens when user explicitly switches to "Split Channels" without assigning specific maps yet
+  const hasNoneMapping = textures.some(
+    t =>
+      t.sourceChannel === TextureChannel.RGB &&
+      t.textureType === TextureType.SplitChannel
+  )
+  if (hasNoneMapping) return 'split'
+
   // Check for implicit split usage (common grayscale types)
-  const hasGrayscale = textures.some(t => 
-    t.textureType === TextureType.AO || 
-    t.textureType === TextureType.Roughness || 
-    t.textureType === TextureType.Metallic ||
-    t.textureType === TextureType.Height ||
-    t.textureType === TextureType.Displacement ||
-    t.textureType === TextureType.Bump
-  );
+  const hasGrayscale = textures.some(
+    t =>
+      t.textureType === TextureType.AO ||
+      t.textureType === TextureType.Roughness ||
+      t.textureType === TextureType.Metallic ||
+      t.textureType === TextureType.Height ||
+      t.textureType === TextureType.Displacement ||
+      t.textureType === TextureType.Bump
+  )
 
   if (hasGrayscale) {
-      return 'split';
+    return 'split'
   }
 
   // If not split, check for full image types
   // We ignore sourceChannel here and trust the type if it's not split
-  const albedo = textures.find(t => t.textureType === TextureType.Albedo);
-  if (albedo) return 'albedo';
-  
-  const normal = textures.find(t => t.textureType === TextureType.Normal);
-  if (normal) return 'normal';
-  
-  const emissive = textures.find(t => t.textureType === TextureType.Emissive);
-  if (emissive) return 'emissive';
+  const albedo = textures.find(t => t.textureType === TextureType.Albedo)
+  if (albedo) return 'albedo'
 
-  return 'none';
+  const normal = textures.find(t => t.textureType === TextureType.Normal)
+  if (normal) return 'normal'
+
+  const emissive = textures.find(t => t.textureType === TextureType.Emissive)
+  if (emissive) return 'emissive'
+
+  return 'none'
 }
 
-function getChannelType(textures: TextureDto[], channel: TextureChannel): TextureType | null {
+function getChannelType(
+  textures: TextureDto[],
+  channel: TextureChannel
+): TextureType | null {
   const texture = textures.find(t => t.sourceChannel === channel)
   if (texture) return texture.textureType
-  
-  // Implicit mappings for common grayscale types if sourceChannel is missing/default
-  if (channel === TextureChannel.R) {
-      const ao = textures.find(t => t.textureType === TextureType.AO)
-      if (ao) return TextureType.AO
-  }
-  if (channel === TextureChannel.G) {
-      const roughness = textures.find(t => t.textureType === TextureType.Roughness)
-      if (roughness) return TextureType.Roughness
-  }
-  if (channel === TextureChannel.B) {
-      const metallic = textures.find(t => t.textureType === TextureType.Metallic)
-      if (metallic) return TextureType.Metallic
-  }
+
+  // We rely strictly on explicit sourceChannel now.
+  // Implicit guessing led to bugs where type assigned to Channel G appeared on Channel R.
+  return null
   return null
 }
 
-function getTextureByChannel(textures: TextureDto[], channel: TextureChannel): TextureDto | undefined {
+function getTextureByChannel(
+  textures: TextureDto[],
+  channel: TextureChannel
+): TextureDto | undefined {
   return textures.find(t => t.sourceChannel === channel)
 }
 
-export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
+export default function FilesTab({
+  textureSet,
+  onMappingChanged,
+}: FilesTabProps) {
   const [fileMappings, setFileMappings] = useState<FileMapping[]>([])
-  const [rgbOptionOverrides, setRgbOptionOverrides] = useState<Record<number, string>>({})
+  const [rgbOptionOverrides, setRgbOptionOverrides] = useState<
+    Record<number, string>
+  >({})
   const toast = useRef<Toast>(null)
-  const { changeTextureType, removeTextureFromSet, addTextureToSetEndpoint } = useTextureSets()
+  const { changeTextureType, addTextureToSetEndpoint } = useTextureSets()
 
   // Group textures by fileId and create mappings
   useEffect(() => {
     const fileMap = new Map<number, TextureDto[]>()
-    
+
     textureSet.textures.forEach(texture => {
       const existing = fileMap.get(texture.fileId) || []
       existing.push(texture)
@@ -135,7 +152,8 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
       mappings.push({
         fileId,
         fileName: firstTexture.fileName || `File ${fileId}`,
-        rgbOption: (rgbOptionOverrides[fileId] as any) || inferRgbOption(textures),
+        rgbOption:
+          (rgbOptionOverrides[fileId] as any) || inferRgbOption(textures),
         rChannel: getChannelType(textures, TextureChannel.R),
         gChannel: getChannelType(textures, TextureChannel.G),
         bChannel: getChannelType(textures, TextureChannel.B),
@@ -154,24 +172,90 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
     // Update local override immediately to show/hide controls
     setRgbOptionOverrides(prev => ({
       ...prev,
-      [fileMapping.fileId]: newOption
+      [fileMapping.fileId]: newOption,
     }))
 
     // Handle cleanup of conflicting textures
+    // Handle cleanup of conflicting textures
     if (newOption === 'split') {
-        // We used to remove the RGB texture here...
-        toast.current?.show({
+      const rgbTexture = getTextureByChannel(
+        fileMapping.existingTextures,
+        TextureChannel.RGB
+      )
+      if (rgbTexture) {
+        try {
+          // Instead of removing, we set to "None" (placeholder) to keep the file linked to the set
+          await changeTextureType(
+            textureSet.id,
+            rgbTexture.id,
+            TextureType.SplitChannel
+          )
+          toast.current?.show({
             severity: 'info',
             summary: 'Mode Changed',
-            detail: 'Switched to Split Channels mode. You can now map individual channels.',
+            detail:
+              'Switched to Split Channels mode. RGB mapping reset to placeholder.',
             life: 2000,
+          })
+          onMappingChanged()
+        } catch (error) {
+          console.error('Failed to update RGB texture:', error)
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to switch mode',
+            life: 3000,
+          })
+        }
+      } else {
+        toast.current?.show({
+          severity: 'info',
+          summary: 'Mode Changed',
+          detail:
+            'Switched to Split Channels mode. You can now map individual channels.',
+          life: 2000,
         })
+      }
     } else if (newOption === 'none') {
-        // Remove all textures for this file
-        // This is complex as we need to remove multiple textures. 
-        // For now, simpler implementation: just let the user see "None" in dropdown but existing textures remain until manually removed?
-        // Or strictly remove them.
-        // Given complexity, maybe just handle the 'split' case which is blocking the test.
+      // Remove all textures for this file
+      // Logic for removing all not implemented yet to avoid accidental data loss without confirmation
+    } else {
+      // Switched to specific RGB type (Albedo, Normal, Emissive)
+      let targetType: TextureType | null = null
+      if (newOption === 'albedo') targetType = TextureType.Albedo
+      else if (newOption === 'normal') targetType = TextureType.Normal
+      else if (newOption === 'emissive') targetType = TextureType.Emissive
+
+      if (targetType) {
+        const rgbTexture = getTextureByChannel(
+          fileMapping.existingTextures,
+          TextureChannel.RGB
+        )
+        try {
+          if (rgbTexture) {
+            if (rgbTexture.textureType !== targetType) {
+              await changeTextureType(textureSet.id, rgbTexture.id, targetType)
+              onMappingChanged()
+            }
+          } else {
+            // Create new RGB mapping
+            await addTextureToSetEndpoint(textureSet.id, {
+              fileId: fileMapping.fileId,
+              textureType: Number(targetType),
+              sourceChannel: Number(TextureChannel.RGB),
+            })
+            onMappingChanged()
+          }
+        } catch (error) {
+          console.error('Failed to set RGB mapping:', error)
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to update mapping',
+            life: 3000,
+          })
+        }
+      }
     }
   }
 
@@ -181,40 +265,44 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
     newTextureType: TextureType | null
   ) => {
     const texture = getTextureByChannel(fileMapping.existingTextures, channel)
-    
+
+    if (!texture) {
       // No texture for this channel yet - create one
       if (newTextureType !== null) {
         try {
-            await addTextureToSetEndpoint(textureSet.id, {
-                fileId: Number(fileMapping.fileId),
-                textureType: Number(newTextureType),
-                sourceChannel: Number(channel)
-            })
-            toast.current?.show({
-                severity: 'success',
-                summary: 'Created',
-                detail: `Assigned ${getTextureTypeLabel(newTextureType)} to channel`,
-                life: 2000,
-            })
-            onMappingChanged()
+          await addTextureToSetEndpoint(textureSet.id, {
+            fileId: Number(fileMapping.fileId),
+            textureType: Number(newTextureType),
+            sourceChannel: Number(channel),
+          })
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Created',
+            detail: `Assigned ${getTextureTypeLabel(newTextureType)} to channel`,
+            life: 2000,
+          })
+          onMappingChanged()
         } catch (error) {
-            console.error('Failed to create texture mapping:', error)
-            toast.current?.show({
-              severity: 'error',
-              summary: 'Error',
-              detail: 'Failed to create channel mapping',
-              life: 3000,
-            })
+          console.error('Failed to create texture mapping:', error)
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to create channel mapping',
+            life: 3000,
+          })
         }
       }
       return
+    }
 
+    // Texture exists for this channel
     if (newTextureType === null) {
       // User selected "None" - would need to delete the texture
       toast.current?.show({
         severity: 'info',
         summary: 'Info',
-        detail: 'Removing texture mappings is not yet implemented. Use the Texture Types tab to remove textures.',
+        detail:
+          'Removing texture mappings is not yet implemented. Use the Texture Types tab to remove textures.',
         life: 4000,
       })
       return
@@ -264,20 +352,24 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
 
       <div className="file-mapping-list">
         {fileMappings.map(fm => (
-          <div key={fm.fileId} className="file-mapping-card" data-testid={`file-mapping-card-${fm.fileId}`}>
+          <div
+            key={fm.fileId}
+            className="file-mapping-card"
+            data-testid={`file-mapping-card-${fm.fileId}`}
+          >
             <div className="file-preview">
-              <img 
+              <img
                 src={`/api/files/${fm.fileId}/data`}
                 alt={fm.fileName}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
+                onError={e => {
+                  ;(e.target as HTMLImageElement).style.display = 'none'
                 }}
               />
             </div>
-            
+
             <div className="file-info">
               <span className="file-name">{fm.fileName}</span>
-              
+
               <div className="channel-row">
                 <label>RGB:</label>
                 <Dropdown
@@ -290,13 +382,18 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
               </div>
 
               {fm.rgbOption === 'split' && (
-                <div className="split-channels" data-testid={`split-channels-${fm.fileId}`}>
+                <div
+                  className="split-channels"
+                  data-testid={`split-channels-${fm.fileId}`}
+                >
                   <div className="channel-row indent">
                     <label>R:</label>
                     <Dropdown
                       value={fm.rChannel}
                       options={grayscaleTypeOptions}
-                      onChange={e => handleTextureTypeChange(fm, TextureChannel.R, e.value)}
+                      onChange={e =>
+                        handleTextureTypeChange(fm, TextureChannel.R, e.value)
+                      }
                       className="channel-dropdown"
                       placeholder="None"
                       data-testid={`channel-mapping-R-${fm.fileId}`}
@@ -307,7 +404,9 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
                     <Dropdown
                       value={fm.gChannel}
                       options={grayscaleTypeOptions}
-                      onChange={e => handleTextureTypeChange(fm, TextureChannel.G, e.value)}
+                      onChange={e =>
+                        handleTextureTypeChange(fm, TextureChannel.G, e.value)
+                      }
                       className="channel-dropdown"
                       placeholder="None"
                       data-testid={`channel-mapping-G-${fm.fileId}`}
@@ -318,7 +417,9 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
                     <Dropdown
                       value={fm.bChannel}
                       options={grayscaleTypeOptions}
-                      onChange={e => handleTextureTypeChange(fm, TextureChannel.B, e.value)}
+                      onChange={e =>
+                        handleTextureTypeChange(fm, TextureChannel.B, e.value)
+                      }
                       className="channel-dropdown"
                       placeholder="None"
                       data-testid={`channel-mapping-B-${fm.fileId}`}
@@ -333,7 +434,9 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
                   <Dropdown
                     value={fm.aChannel}
                     options={alphaTypeOptions}
-                    onChange={e => handleTextureTypeChange(fm, TextureChannel.A, e.value)}
+                    onChange={e =>
+                      handleTextureTypeChange(fm, TextureChannel.A, e.value)
+                    }
                     className="channel-dropdown"
                     placeholder="None"
                     data-testid={`channel-mapping-A-${fm.fileId}`}
@@ -345,14 +448,11 @@ export default function FilesTab({ textureSet, onMappingChanged }: FilesTabProps
               <div className="file-textures">
                 <span className="textures-label">Used as:</span>
                 <span className="texture-types">
-                  {fm.existingTextures.map(t => getTextureTypeLabel(t.textureType)).join(', ')}
+                  {fm.existingTextures
+                    .filter(t => t.textureType !== TextureType.SplitChannel)
+                    .map(t => getTextureTypeLabel(t.textureType))
+                    .join(', ')}
                 </span>
-                
-                {/* DEBUG INFO */}
-                <div style={{ fontSize: '10px', color: 'red', marginTop: '4px', whiteSpace: 'pre-wrap' }}>
-                  DEBUG KEYS: {JSON.stringify(fm.existingTextures.map(t => Object.keys(t)), null, 2)}
-                  DEBUG OBJ: {JSON.stringify(fm.existingTextures, null, 2)}
-                </div>
               </div>
             </div>
           </div>

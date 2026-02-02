@@ -2,7 +2,9 @@ using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Domain.Models;
+using Infrastructure.Persistence;
 using Infrastructure.WebDav;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -11,7 +13,7 @@ using Xunit;
 
 namespace Infrastructure.Tests.WebDav;
 
-public class VirtualAssetStoreTests
+public class VirtualAssetStoreTests : IDisposable
 {
     private readonly Mock<IServiceScopeFactory> _mockScopeFactory;
     private readonly Mock<IServiceScope> _mockScope;
@@ -23,6 +25,7 @@ public class VirtualAssetStoreTests
     private readonly Mock<IAudioSelectionService> _mockAudioSelectionService;
     private readonly Mock<IHttpContext> _mockHttpContext;
     private readonly Mock<ILogger<VirtualAssetStore>> _mockLogger;
+    private readonly ApplicationDbContext _dbContext;
     private readonly VirtualAssetStore _store;
 
     public VirtualAssetStoreTests()
@@ -38,6 +41,13 @@ public class VirtualAssetStoreTests
         _mockHttpContext = new Mock<IHttpContext>();
         _mockLogger = new Mock<ILogger<VirtualAssetStore>>();
 
+        // Create in-memory database for testing
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+        _dbContext = new ApplicationDbContext(options);
+        _dbContext.Database.EnsureCreated();
+
         _mockPathProvider.Setup(p => p.UploadRootPath).Returns("/tmp/uploads");
         
         _mockScopeFactory.Setup(f => f.CreateScope()).Returns(_mockScope.Object);
@@ -49,6 +59,8 @@ public class VirtualAssetStoreTests
             .Returns(_mockSoundCategoryRepository.Object);
         _mockServiceProvider.Setup(sp => sp.GetService(typeof(ISoundRepository)))
             .Returns(_mockSoundRepository.Object);
+        _mockServiceProvider.Setup(sp => sp.GetService(typeof(ApplicationDbContext)))
+            .Returns(_dbContext);
 
         var itemPropertyManager = new VirtualItemPropertyManager();
         var collectionPropertyManager = new VirtualCollectionPropertyManager();
@@ -62,6 +74,11 @@ public class VirtualAssetStoreTests
             lockingManager,
             _mockAudioSelectionService.Object,
             _mockLogger.Object);
+    }
+
+    public void Dispose()
+    {
+        _dbContext.Dispose();
     }
 
     [Fact]
@@ -150,10 +167,9 @@ public class VirtualAssetStoreTests
         var uri = new Uri($"http://localhost/Projects/{projectName}");
         var project = Project.Create(projectName, "Test Description", DateTime.UtcNow);
         
-        _mockProjectRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Project>());
-        _mockProjectRepository.Setup(r => r.GetByNameAsync(projectName, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(project);
+        // Add project to in-memory database
+        _dbContext.Projects.Add(project);
+        await _dbContext.SaveChangesAsync();
 
         // Act
         var result = await _store.GetCollectionAsync(uri, _mockHttpContext.Object);
@@ -171,8 +187,7 @@ public class VirtualAssetStoreTests
         var projectName = "NonExistent";
         var uri = new Uri($"http://localhost/Projects/{projectName}");
         
-        _mockProjectRepository.Setup(r => r.GetByNameAsync(projectName, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Project?)null);
+        // No project added to database - it should not exist
 
         // Act
         var result = await _store.GetCollectionAsync(uri, _mockHttpContext.Object);

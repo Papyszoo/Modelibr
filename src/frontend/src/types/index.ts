@@ -32,6 +32,7 @@ export interface SplitterEvent {
 
 // TextureSet related types
 export enum TextureType {
+  SplitChannel = 0,
   Albedo = 1,
   Normal = 2,
   Height = 3,

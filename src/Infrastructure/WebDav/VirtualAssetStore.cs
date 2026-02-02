@@ -1,6 +1,8 @@
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NWebDav.Server.Http;
@@ -113,6 +115,30 @@ public sealed class VirtualAssetStore : IStore
         };
     }
 
+    /// <summary>
+    /// WebDAV-specific query that loads a project with the full asset graph.
+    /// Uses AsNoTracking for read-only access and AsSplitQuery to avoid cartesian explosion.
+    /// </summary>
+    private static async Task<Domain.Models.Project?> GetProjectForWebDavAsync(IServiceProvider sp, string name)
+    {
+        var dbContext = sp.GetRequiredService<ApplicationDbContext>();
+
+        return await dbContext.Projects
+            .AsNoTracking()
+            .Include(p => p.Models)
+                .ThenInclude(m => m.Versions)
+                    .ThenInclude(v => v.Files)
+            .Include(p => p.TextureSets)
+                .ThenInclude(ts => ts.Textures)
+                    .ThenInclude(t => t.File)
+            .Include(p => p.Sprites)
+                .ThenInclude(s => s.File)
+            .Include(p => p.Sounds)
+                .ThenInclude(s => s.File)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(p => p.Name == name);
+    }
+
     private IStoreItem? ResolveSelectionPath(string[] segments)
     {
         // /Selection
@@ -160,9 +186,9 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualProjectsCollection(_collectionPropertyManager, _lockingManager, projects.ToList());
         }
 
-        // /Projects/{ProjectName}
+        // /Projects/{ProjectName} - use WebDAV-specific query with full includes
         var projectName = Uri.UnescapeDataString(segments[1]);
-        var project = await projectRepo.GetByNameAsync(projectName);
+        var project = await GetProjectForWebDavAsync(sp, projectName);
         if (project == null)
             return null;
 
@@ -191,13 +217,166 @@ public sealed class VirtualAssetStore : IStore
 
         return assetType switch
         {
-            "models" => ResolveProjectModelFile(project, assetName),
-            "texturesets" => ResolveProjectTextureSetFile(project, assetName),
+            "models" => ResolveModelPath(project, assetName, segments),
+            "texturesets" => ResolveTextureSetPath(project, assetName, segments),
             "sprites" => ResolveProjectSpriteFile(project, assetName),
             "sounds" => ResolveProjectSoundFile(project, assetName),
             _ => null
         };
     }
+
+    /// <summary>
+    /// Resolves model paths with hierarchical structure:
+    /// /Projects/{P}/Models/{ModelName} → model directory with versions
+    /// /Projects/{P}/Models/{ModelName}/v{N} → version directory with files
+    /// /Projects/{P}/Models/{ModelName}/v{N}/{FileName} → actual file
+    /// </summary>
+    private IStoreItem? ResolveModelPath(Domain.Models.Project project, string modelName, string[] segments)
+    {
+        var model = project.Models.FirstOrDefault(m => !m.IsDeleted && m.Name == modelName);
+        if (model == null)
+            return null;
+
+        // /Projects/{P}/Models/{ModelName} → show versions
+        if (segments.Length == 4)
+        {
+            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
+        }
+
+        // /Projects/{P}/Models/{ModelName}/v{N}
+        var versionName = Uri.UnescapeDataString(segments[4]);
+        if (!versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) ||
+            !int.TryParse(versionName[1..], out var versionNumber))
+            return null;
+
+        var version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        if (version == null)
+            return null;
+
+        // /Projects/{P}/Models/{ModelName}/v{N} → show files in version
+        if (segments.Length == 5)
+        {
+            return new VirtualModelVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
+        }
+
+        // /Projects/{P}/Models/{ModelName}/v{N}/{FileName} → actual file
+        var fileName = Uri.UnescapeDataString(segments[5]);
+        var file = version.Files.FirstOrDefault(f => f.OriginalFileName == fileName);
+        if (file == null)
+            return null;
+
+        return new VirtualAssetFile(
+            _itemPropertyManager,
+            _lockingManager,
+            file.OriginalFileName,
+            file.Sha256Hash,
+            file.SizeBytes,
+            file.MimeType,
+            file.CreatedAt,
+            file.UpdatedAt,
+            _pathProvider);
+    }
+
+    /// <summary>
+    /// Resolves texture set paths with hierarchical structure:
+    /// /Projects/{P}/TextureSets/{SetName} → set directory with TextureTypes/Files subdirs
+    /// /Projects/{P}/TextureSets/{SetName}/TextureTypes → files named by type (AO.png, Roughness.png)
+    /// /Projects/{P}/TextureSets/{SetName}/Files → original uploaded files
+    /// </summary>
+    private IStoreItem? ResolveTextureSetPath(Domain.Models.Project project, string setName, string[] segments)
+    {
+        var textureSet = project.TextureSets.FirstOrDefault(ts => !ts.IsDeleted && ts.Name == setName);
+        if (textureSet == null)
+            return null;
+
+        // /Projects/{P}/TextureSets/{SetName} → show TextureTypes and Files subdirs
+        if (segments.Length == 4)
+        {
+            return new VirtualTextureSetCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider);
+        }
+
+        // /Projects/{P}/TextureSets/{SetName}/{SubDir}
+        var subDir = Uri.UnescapeDataString(segments[4]).ToLowerInvariant();
+
+        if (segments.Length == 5)
+        {
+            return subDir switch
+            {
+                "texturetypes" => new VirtualTextureTypesCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider),
+                "files" => new VirtualTextureFilesCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider),
+                _ => null
+            };
+        }
+
+        // /Projects/{P}/TextureSets/{SetName}/{SubDir}/{FileName}
+        var fileName = Uri.UnescapeDataString(segments[5]);
+
+        return subDir switch
+        {
+            "texturetypes" => ResolveTextureTypeFile(textureSet, fileName),
+            "files" => ResolveTextureOriginalFile(textureSet, fileName),
+            _ => null
+        };
+    }
+
+    private IStoreItem? ResolveTextureTypeFile(Domain.Models.TextureSet textureSet, string fileName)
+    {
+        // fileName is like "Roughness.png" - parse to find the texture type
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+        if (!Enum.TryParse<Domain.ValueObjects.TextureType>(nameWithoutExt, ignoreCase: true, out var textureType))
+            return null;
+
+        var texture = textureSet.Textures.FirstOrDefault(t => t.TextureType == textureType);
+        if (texture == null)
+            return null;
+
+        if (texture.SourceChannel == Domain.ValueObjects.TextureChannel.R ||
+            texture.SourceChannel == Domain.ValueObjects.TextureChannel.G ||
+            texture.SourceChannel == Domain.ValueObjects.TextureChannel.B ||
+            texture.SourceChannel == Domain.ValueObjects.TextureChannel.A)
+        {
+            return new VirtualExtractedTextureFile(
+                _itemPropertyManager,
+                _lockingManager,
+                fileName,
+                texture.File.Sha256Hash,
+                texture.File.SizeBytes,
+                texture.File.CreatedAt,
+                texture.File.UpdatedAt,
+                _pathProvider,
+                texture.SourceChannel);
+        }
+
+        return new VirtualAssetFile(
+            _itemPropertyManager,
+            _lockingManager,
+            fileName,
+            texture.File.Sha256Hash,
+            texture.File.SizeBytes,
+            texture.File.MimeType,
+            texture.File.CreatedAt,
+            texture.File.UpdatedAt,
+            _pathProvider);
+    }
+
+    private IStoreItem? ResolveTextureOriginalFile(Domain.Models.TextureSet textureSet, string fileName)
+    {
+        var texture = textureSet.Textures.FirstOrDefault(t => t.File.OriginalFileName == fileName);
+        if (texture == null)
+            return null;
+
+        return new VirtualAssetFile(
+            _itemPropertyManager,
+            _lockingManager,
+            texture.File.OriginalFileName,
+            texture.File.Sha256Hash,
+            texture.File.SizeBytes,
+            texture.File.MimeType,
+            texture.File.CreatedAt,
+            texture.File.UpdatedAt,
+            _pathProvider);
+    }
+
 
     private async Task<IStoreItem?> ResolveSoundCategoryPathAsync(IServiceProvider sp, string[] segments)
     {
@@ -247,55 +426,6 @@ public sealed class VirtualAssetStore : IStore
             sound.CreatedAt,
             sound.UpdatedAt,
             _pathProvider);
-    }
-
-    private IStoreItem? ResolveProjectModelFile(Domain.Models.Project project, string fileName)
-    {
-        var model = project.Models.FirstOrDefault(m =>
-            !m.IsDeleted &&
-            m.ActiveVersion?.Files.Any(f => f.OriginalFileName == fileName) == true);
-
-        if (model == null)
-            return null;
-
-        var file = model.ActiveVersion!.Files.First(f => f.OriginalFileName == fileName);
-
-        return new VirtualAssetFile(
-            _itemPropertyManager,
-            _lockingManager,
-            file.OriginalFileName,
-            file.Sha256Hash,
-            file.SizeBytes,
-            file.MimeType,
-            file.CreatedAt,
-            file.UpdatedAt,
-            _pathProvider);
-    }
-
-    private IStoreItem? ResolveProjectTextureSetFile(Domain.Models.Project project, string fileName)
-    {
-        foreach (var textureSet in project.TextureSets.Where(ts => !ts.IsDeleted))
-        {
-            foreach (var texture in textureSet.Textures)
-            {
-                var textureName = $"{textureSet.Name}_{texture.TextureType}.{WebDavUtilities.GetExtension(texture.File.OriginalFileName)}";
-                if (textureName == fileName)
-                {
-                    return new VirtualAssetFile(
-                        _itemPropertyManager,
-                        _lockingManager,
-                        textureName,
-                        texture.File.Sha256Hash,
-                        texture.File.SizeBytes,
-                        texture.File.MimeType,
-                        texture.File.CreatedAt,
-                        texture.File.UpdatedAt,
-                        _pathProvider);
-                }
-            }
-        }
-
-        return null;
     }
 
     private IStoreItem? ResolveProjectSpriteFile(Domain.Models.Project project, string fileName)

@@ -1,5 +1,6 @@
 using Application.Abstractions.Storage;
 using Domain.Models;
+using Domain.ValueObjects;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
 using NWebDav.Server.Stores;
@@ -99,7 +100,7 @@ public sealed class VirtualPlaceholderCollection : VirtualCollectionBase
 }
 
 /// <summary>
-/// Collection of models for a project.
+/// Collection of models for a project - shows model name directories.
 /// </summary>
 public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
 {
@@ -119,62 +120,147 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        foreach (var model in _project.Models.Where(m => !m.IsDeleted))
-        {
-            var activeVersion = model.ActiveVersion;
-            if (activeVersion?.Files == null)
-                continue;
+        var model = _project.Models.FirstOrDefault(m => !m.IsDeleted && m.Name == name);
+        if (model == null)
+            return Task.FromResult<IStoreItem?>(null);
 
-            var file = activeVersion.Files.FirstOrDefault(f => f.OriginalFileName == name);
-            if (file != null)
-            {
-                return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
-                    _itemPropertyManager,
-                    LockingManager,
-                    file.OriginalFileName,
-                    file.Sha256Hash,
-                    file.SizeBytes,
-                    file.MimeType,
-                    file.CreatedAt,
-                    file.UpdatedAt,
-                    _pathProvider));
-            }
-        }
-
-        return Task.FromResult<IStoreItem?>(null);
+        return Task.FromResult<IStoreItem?>(new VirtualModelCollection(
+            (VirtualCollectionPropertyManager)PropertyManager,
+            LockingManager,
+            model,
+            _itemPropertyManager,
+            _pathProvider));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = new List<IStoreItem>();
+        var items = _project.Models
+            .Where(m => !m.IsDeleted)
+            .Select(m => (IStoreItem)new VirtualModelCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                m,
+                _itemPropertyManager,
+                _pathProvider));
 
-        foreach (var model in _project.Models.Where(m => !m.IsDeleted))
-        {
-            var activeVersion = model.ActiveVersion;
-            if (activeVersion?.Files == null)
-                continue;
-
-            foreach (var file in activeVersion.Files)
-            {
-                items.Add(new VirtualAssetFile(
-                    _itemPropertyManager,
-                    LockingManager,
-                    file.OriginalFileName,
-                    file.Sha256Hash,
-                    file.SizeBytes,
-                    file.MimeType,
-                    file.CreatedAt,
-                    file.UpdatedAt,
-                    _pathProvider));
-            }
-        }
-
-        return Task.FromResult<IEnumerable<IStoreItem>>(items);
+        return Task.FromResult(items);
     }
 }
 
 /// <summary>
-/// Collection of texture sets for a project.
+/// Collection representing a single model - shows version subdirectories (v1, v2, etc.).
+/// </summary>
+public sealed class VirtualModelCollection : VirtualCollectionBase
+{
+    private readonly Model _model;
+    private readonly VirtualItemPropertyManager _itemPropertyManager;
+    private readonly IUploadPathProvider _pathProvider;
+
+    public VirtualModelCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+        : base(propertyManager, lockingManager, model.Name)
+    {
+        _model = model;
+        _itemPropertyManager = itemPropertyManager;
+        _pathProvider = pathProvider;
+    }
+
+    public override string UniqueKey => $"model:{_model.Id}";
+
+    public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
+    {
+        // Parse version name like "v1", "v2"
+        if (!name.StartsWith("v", StringComparison.OrdinalIgnoreCase) ||
+            !int.TryParse(name[1..], out var versionNumber))
+            return Task.FromResult<IStoreItem?>(null);
+
+        var version = _model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        if (version == null)
+            return Task.FromResult<IStoreItem?>(null);
+
+        return Task.FromResult<IStoreItem?>(new VirtualModelVersionCollection(
+            (VirtualCollectionPropertyManager)PropertyManager,
+            LockingManager,
+            _model,
+            version,
+            _itemPropertyManager,
+            _pathProvider));
+    }
+
+    public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
+    {
+        var items = _model.Versions
+            .Where(v => !v.IsDeleted)
+            .OrderBy(v => v.VersionNumber)
+            .Select(v => (IStoreItem)new VirtualModelVersionCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                _model,
+                v,
+                _itemPropertyManager,
+                _pathProvider));
+
+        return Task.FromResult(items);
+    }
+}
+
+/// <summary>
+/// Collection representing a model version - shows files within that version.
+/// </summary>
+public sealed class VirtualModelVersionCollection : VirtualCollectionBase
+{
+    private readonly Model _model;
+    private readonly ModelVersion _version;
+    private readonly VirtualItemPropertyManager _itemPropertyManager;
+    private readonly IUploadPathProvider _pathProvider;
+
+    public VirtualModelVersionCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, ModelVersion version, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+        : base(propertyManager, lockingManager, $"v{version.VersionNumber}")
+    {
+        _model = model;
+        _version = version;
+        _itemPropertyManager = itemPropertyManager;
+        _pathProvider = pathProvider;
+    }
+
+    public override string UniqueKey => $"model:{_model.Id}:version:{_version.Id}";
+
+    public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
+    {
+        var file = _version.Files.FirstOrDefault(f => f.OriginalFileName == name);
+        if (file == null)
+            return Task.FromResult<IStoreItem?>(null);
+
+        return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
+            _itemPropertyManager,
+            LockingManager,
+            file.OriginalFileName,
+            file.Sha256Hash,
+            file.SizeBytes,
+            file.MimeType,
+            file.CreatedAt,
+            file.UpdatedAt,
+            _pathProvider));
+    }
+
+    public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
+    {
+        var items = _version.Files.Select(f => (IStoreItem)new VirtualAssetFile(
+            _itemPropertyManager,
+            LockingManager,
+            f.OriginalFileName,
+            f.Sha256Hash,
+            f.SizeBytes,
+            f.MimeType,
+            f.CreatedAt,
+            f.UpdatedAt,
+            _pathProvider));
+
+        return Task.FromResult(items);
+    }
+}
+
+/// <summary>
+/// Collection of texture sets for a project - shows texture set name directories.
 /// </summary>
 public sealed class VirtualProjectTextureSetsCollection : VirtualCollectionBase
 {
@@ -194,53 +280,214 @@ public sealed class VirtualProjectTextureSetsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        foreach (var textureSet in _project.TextureSets.Where(ts => !ts.IsDeleted))
-        {
-            foreach (var texture in textureSet.Textures)
-            {
-                var textureName = $"{textureSet.Name}_{texture.TextureType}.{WebDavUtilities.GetExtension(texture.File.OriginalFileName)}";
-                if (textureName == name)
-                {
-                    return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
-                        _itemPropertyManager,
-                        LockingManager,
-                        textureName,
-                        texture.File.Sha256Hash,
-                        texture.File.SizeBytes,
-                        texture.File.MimeType,
-                        texture.File.CreatedAt,
-                        texture.File.UpdatedAt,
-                        _pathProvider));
-                }
-            }
-        }
+        var textureSet = _project.TextureSets.FirstOrDefault(ts => !ts.IsDeleted && ts.Name == name);
+        if (textureSet == null)
+            return Task.FromResult<IStoreItem?>(null);
 
-        return Task.FromResult<IStoreItem?>(null);
+        return Task.FromResult<IStoreItem?>(new VirtualTextureSetCollection(
+            (VirtualCollectionPropertyManager)PropertyManager,
+            LockingManager,
+            textureSet,
+            _itemPropertyManager,
+            _pathProvider));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = new List<IStoreItem>();
+        var items = _project.TextureSets
+            .Where(ts => !ts.IsDeleted)
+            .Select(ts => (IStoreItem)new VirtualTextureSetCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                ts,
+                _itemPropertyManager,
+                _pathProvider));
 
-        foreach (var textureSet in _project.TextureSets.Where(ts => !ts.IsDeleted))
+        return Task.FromResult(items);
+    }
+}
+
+/// <summary>
+/// Collection representing a single texture set - shows TextureTypes and Files subdirectories.
+/// </summary>
+public sealed class VirtualTextureSetCollection : VirtualCollectionBase
+{
+    private readonly TextureSet _textureSet;
+    private readonly VirtualItemPropertyManager _itemPropertyManager;
+    private readonly IUploadPathProvider _pathProvider;
+
+    public VirtualTextureSetCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, TextureSet textureSet, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+        : base(propertyManager, lockingManager, textureSet.Name)
+    {
+        _textureSet = textureSet;
+        _itemPropertyManager = itemPropertyManager;
+        _pathProvider = pathProvider;
+    }
+
+    public override string UniqueKey => $"textureset:{_textureSet.Id}";
+
+    public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
+    {
+        return name.ToLowerInvariant() switch
         {
-            foreach (var texture in textureSet.Textures)
-            {
-                var textureName = $"{textureSet.Name}_{texture.TextureType}.{WebDavUtilities.GetExtension(texture.File.OriginalFileName)}";
-                items.Add(new VirtualAssetFile(
-                    _itemPropertyManager,
-                    LockingManager,
-                    textureName,
-                    texture.File.Sha256Hash,
-                    texture.File.SizeBytes,
-                    texture.File.MimeType,
-                    texture.File.CreatedAt,
-                    texture.File.UpdatedAt,
-                    _pathProvider));
-            }
-        }
+            "texturetypes" => Task.FromResult<IStoreItem?>(new VirtualTextureTypesCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                _textureSet,
+                _itemPropertyManager,
+                _pathProvider)),
+            "files" => Task.FromResult<IStoreItem?>(new VirtualTextureFilesCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                _textureSet,
+                _itemPropertyManager,
+                _pathProvider)),
+            _ => Task.FromResult<IStoreItem?>(null)
+        };
+    }
 
+    public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
+    {
+        var items = new List<IStoreItem>
+        {
+            new VirtualTextureTypesCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                _textureSet,
+                _itemPropertyManager,
+                _pathProvider),
+            new VirtualTextureFilesCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                _textureSet,
+                _itemPropertyManager,
+                _pathProvider)
+        };
         return Task.FromResult<IEnumerable<IStoreItem>>(items);
+    }
+}
+
+/// <summary>
+/// Collection showing textures by their type name (e.g., Roughness.png, AO.png).
+/// </summary>
+public sealed class VirtualTextureTypesCollection : VirtualCollectionBase
+{
+    private readonly TextureSet _textureSet;
+    private readonly VirtualItemPropertyManager _itemPropertyManager;
+    private readonly IUploadPathProvider _pathProvider;
+
+    public VirtualTextureTypesCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, TextureSet textureSet, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+        : base(propertyManager, lockingManager, "TextureTypes")
+    {
+        _textureSet = textureSet;
+        _itemPropertyManager = itemPropertyManager;
+        _pathProvider = pathProvider;
+    }
+
+    public override string UniqueKey => $"textureset:{_textureSet.Id}:types";
+
+    public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
+    {
+        // Parse type from filename like "Roughness.png"
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(name);
+        if (!Enum.TryParse<TextureType>(nameWithoutExt, ignoreCase: true, out var textureType))
+            return Task.FromResult<IStoreItem?>(null);
+
+        if (textureType == TextureType.SplitChannel)
+            return Task.FromResult<IStoreItem?>(null);
+
+        var texture = _textureSet.Textures.FirstOrDefault(t => t.TextureType == textureType);
+        if (texture == null)
+            return Task.FromResult<IStoreItem?>(null);
+
+        return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
+            _itemPropertyManager,
+            LockingManager,
+            name,
+            texture.File.Sha256Hash,
+            texture.File.SizeBytes,
+            texture.File.MimeType,
+            texture.File.CreatedAt,
+            texture.File.UpdatedAt,
+            _pathProvider));
+    }
+
+    public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
+    {
+        var items = _textureSet.Textures
+            .Where(t => t.TextureType != TextureType.SplitChannel)
+            .Select(t =>
+        {
+            var fileName = $"{t.TextureType}.{WebDavUtilities.GetExtension(t.File.OriginalFileName)}";
+            return (IStoreItem)new VirtualAssetFile(
+                _itemPropertyManager,
+                LockingManager,
+                fileName,
+                t.File.Sha256Hash,
+                t.File.SizeBytes,
+                t.File.MimeType,
+                t.File.CreatedAt,
+                t.File.UpdatedAt,
+                _pathProvider);
+        });
+
+        return Task.FromResult(items);
+    }
+}
+
+/// <summary>
+/// Collection showing original uploaded texture files.
+/// </summary>
+public sealed class VirtualTextureFilesCollection : VirtualCollectionBase
+{
+    private readonly TextureSet _textureSet;
+    private readonly VirtualItemPropertyManager _itemPropertyManager;
+    private readonly IUploadPathProvider _pathProvider;
+
+    public VirtualTextureFilesCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, TextureSet textureSet, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+        : base(propertyManager, lockingManager, "Files")
+    {
+        _textureSet = textureSet;
+        _itemPropertyManager = itemPropertyManager;
+        _pathProvider = pathProvider;
+    }
+
+    public override string UniqueKey => $"textureset:{_textureSet.Id}:files";
+
+    public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
+    {
+        var texture = _textureSet.Textures.FirstOrDefault(t => t.File.OriginalFileName == name);
+        if (texture == null)
+            return Task.FromResult<IStoreItem?>(null);
+
+        return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
+            _itemPropertyManager,
+            LockingManager,
+            texture.File.OriginalFileName,
+            texture.File.Sha256Hash,
+            texture.File.SizeBytes,
+            texture.File.MimeType,
+            texture.File.CreatedAt,
+            texture.File.UpdatedAt,
+            _pathProvider));
+    }
+
+    public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
+    {
+        var items = _textureSet.Textures
+            .DistinctBy(t => t.File.OriginalFileName)
+            .Select(t => (IStoreItem)new VirtualAssetFile(
+            _itemPropertyManager,
+            LockingManager,
+            t.File.OriginalFileName,
+            t.File.Sha256Hash,
+            t.File.SizeBytes,
+            t.File.MimeType,
+            t.File.CreatedAt,
+            t.File.UpdatedAt,
+            _pathProvider));
+
+        return Task.FromResult(items);
     }
 }
 
