@@ -26,6 +26,10 @@ import {
   extractPeaks,
   formatDuration,
 } from '../../../utils/audioUtils'
+import {
+  openInFileExplorer,
+  copyPathToClipboard,
+} from '../../../utils/webdavUtils'
 import SoundCard from './SoundCard'
 import SoundEditor from './SoundEditor'
 import './SoundList.css'
@@ -584,6 +588,57 @@ function SoundList() {
     }
   }
 
+  // Handle "Show in Folder" from context menu
+  const handleShowInFolder = async () => {
+    // For unassigned sounds, show root Sounds folder
+    // For categorized sounds, show the category folder
+    let virtualPath = 'Sounds'
+    if (
+      activeCategoryId !== null &&
+      activeCategoryId !== UNASSIGNED_CATEGORY_ID
+    ) {
+      const category = categories.find(c => c.id === activeCategoryId)
+      if (category) {
+        virtualPath = `Sounds/${category.name}`
+      }
+    }
+
+    const result = await openInFileExplorer(virtualPath)
+    toast.current?.show({
+      severity: result.success ? 'info' : 'warn',
+      summary: result.success ? 'Opening' : 'Note',
+      detail: result.message,
+      life: 4000,
+    })
+  }
+
+  // Handle "Copy Path" from context menu
+  const handleCopyPath = async () => {
+    // For unassigned sounds, copy path to root Sounds folder
+    // For categorized sounds, copy path to the category folder
+    let virtualPath = 'Sounds'
+    if (
+      activeCategoryId !== null &&
+      activeCategoryId !== UNASSIGNED_CATEGORY_ID
+    ) {
+      const category = categories.find(c => c.id === activeCategoryId)
+      if (category) {
+        virtualPath = `Sounds/${category.name}`
+      }
+    }
+
+    const result = await copyPathToClipboard(virtualPath)
+
+    toast.current?.show({
+      severity: result.success ? 'success' : 'error',
+      summary: result.success ? 'Copied' : 'Failed',
+      detail: result.success
+        ? `Path copied: ${result.path}`
+        : 'Failed to copy path to clipboard',
+      life: 3000,
+    })
+  }
+
   // Get context menu items (dynamic label based on selection)
   const getContextMenuItems = (): MenuItem[] => {
     const selectedCount = selectedSoundIds.size
@@ -591,6 +646,19 @@ function SoundList() {
       selectedCount > 1 ? `Recycle ${selectedCount} sounds` : 'Recycle'
 
     return [
+      {
+        label: 'Show in Folder',
+        icon: 'pi pi-folder-open',
+        command: handleShowInFolder,
+      },
+      {
+        label: 'Copy Folder Path',
+        icon: 'pi pi-copy',
+        command: handleCopyPath,
+      },
+      {
+        separator: true,
+      },
       {
         label,
         icon: 'pi pi-trash',

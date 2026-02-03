@@ -21,6 +21,10 @@ import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import {
+  openInFileExplorer,
+  copyPathToClipboard,
+} from '../../../utils/webdavUtils'
 import './SpriteList.css'
 
 interface SpriteDto {
@@ -81,8 +85,10 @@ function SpriteList() {
   const uploadProgressContext = useUploadProgress()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const contextMenuRef = useRef<ContextMenu>(null)
-  const [contextMenuTarget, setContextMenuTarget] = useState<SpriteDto | null>(null)
-  
+  const [contextMenuTarget, setContextMenuTarget] = useState<SpriteDto | null>(
+    null
+  )
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sprites
 
@@ -554,22 +560,79 @@ function SpriteList() {
     return sprite.categoryId === activeCategoryId
   })
 
+  // Handle "Show in Folder" from context menu
+  const handleShowInFolder = async () => {
+    // For unassigned sprites, show root Sprites folder
+    // For categorized sprites, show the category folder
+    let virtualPath = 'Sprites'
+    if (
+      activeCategoryId !== null &&
+      activeCategoryId !== UNASSIGNED_CATEGORY_ID
+    ) {
+      const category = categories.find(c => c.id === activeCategoryId)
+      if (category) {
+        virtualPath = `Sprites/${category.name}`
+      }
+    }
+
+    const result = await openInFileExplorer(virtualPath)
+    toast.current?.show({
+      severity: result.success ? 'info' : 'warn',
+      summary: result.success ? 'Opening' : 'Note',
+      detail: result.message,
+      life: 4000,
+    })
+  }
+
+  // Handle "Copy Path" from context menu
+  const handleCopyPath = async () => {
+    // For unassigned sprites, copy path to root Sprites folder
+    // For categorized sprites, copy path to the category folder
+    let virtualPath = 'Sprites'
+    if (
+      activeCategoryId !== null &&
+      activeCategoryId !== UNASSIGNED_CATEGORY_ID
+    ) {
+      const category = categories.find(c => c.id === activeCategoryId)
+      if (category) {
+        virtualPath = `Sprites/${category.name}`
+      }
+    }
+
+    const result = await copyPathToClipboard(virtualPath)
+
+    toast.current?.show({
+      severity: result.success ? 'success' : 'error',
+      summary: result.success ? 'Copied' : 'Failed',
+      detail: result.success
+        ? `Path copied: ${result.path}`
+        : 'Failed to copy path to clipboard',
+      life: 3000,
+    })
+  }
+
   // Handle recycling sprites via context menu
   const handleRecycleSprites = async () => {
-    const spriteIdsToRecycle = selectedSpriteIds.size > 0
-      ? Array.from(selectedSpriteIds)
-      : contextMenuTarget ? [contextMenuTarget.id] : []
+    const spriteIdsToRecycle =
+      selectedSpriteIds.size > 0
+        ? Array.from(selectedSpriteIds)
+        : contextMenuTarget
+          ? [contextMenuTarget.id]
+          : []
 
     if (spriteIdsToRecycle.length === 0) return
 
     try {
-      await Promise.all(spriteIdsToRecycle.map(id => ApiClient.softDeleteSprite(id)))
+      await Promise.all(
+        spriteIdsToRecycle.map(id => ApiClient.softDeleteSprite(id))
+      )
       toast.current?.show({
         severity: 'success',
         summary: 'Recycled',
-        detail: spriteIdsToRecycle.length > 1
-          ? `${spriteIdsToRecycle.length} sprites moved to recycle bin`
-          : 'Sprite moved to recycle bin',
+        detail:
+          spriteIdsToRecycle.length > 1
+            ? `${spriteIdsToRecycle.length} sprites moved to recycle bin`
+            : 'Sprite moved to recycle bin',
         life: 3000,
       })
       setSelectedSpriteIds(new Set())
@@ -589,9 +652,23 @@ function SpriteList() {
   // Get context menu items (dynamic label based on selection)
   const getContextMenuItems = (): MenuItem[] => {
     const selectedCount = selectedSpriteIds.size
-    const label = selectedCount > 1 ? `Recycle ${selectedCount} sprites` : 'Recycle'
+    const label =
+      selectedCount > 1 ? `Recycle ${selectedCount} sprites` : 'Recycle'
 
     return [
+      {
+        label: 'Show in Folder',
+        icon: 'pi pi-folder-open',
+        command: handleShowInFolder,
+      },
+      {
+        label: 'Copy Folder Path',
+        icon: 'pi pi-copy',
+        command: handleCopyPath,
+      },
+      {
+        separator: true,
+      },
       {
         label,
         icon: 'pi pi-trash',
@@ -736,9 +813,11 @@ function SpriteList() {
           onMouseUp={handleGridMouseUp}
           onMouseLeave={handleGridMouseUp}
         >
-          <div 
+          <div
             className="sprite-grid"
-            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+            style={{
+              gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+            }}
           >
             {filteredSprites.map(sprite => (
               <div

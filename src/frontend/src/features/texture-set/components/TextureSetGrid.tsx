@@ -4,13 +4,22 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import './TextureSetGrid.css'
-import { TextureSetDto, TextureType, TextureChannel, PackDto } from '../../../types'
+import {
+  TextureSetDto,
+  TextureType,
+  TextureChannel,
+  PackDto,
+} from '../../../types'
 import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
 import MergeTextureSetDialog from '../dialogs/MergeTextureSetDialog'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import {
+  openInFileExplorer,
+  copyPathToClipboard,
+} from '../../../utils/webdavUtils'
 
 // Interface for channel merge request (must match MergeTextureSetDialog)
 interface ChannelMergeRequest {
@@ -58,7 +67,7 @@ export default function TextureSetGrid({
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
   const isShowingMergeDialog = useRef(false)
-  
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.textureSets
 
@@ -194,7 +203,10 @@ export default function TextureSetGrid({
       }
 
       // Check if source has any textures
-      if (!draggedTextureSet.textures || draggedTextureSet.textures.length === 0) {
+      if (
+        !draggedTextureSet.textures ||
+        draggedTextureSet.textures.length === 0
+      ) {
         toast.current?.show({
           severity: 'warn',
           summary: 'Warning',
@@ -238,7 +250,10 @@ export default function TextureSetGrid({
       // Hard delete the source texture set after successful merge (keeps the files)
       await ApiClient.hardDeleteTextureSet(draggedTextureSet.id)
 
-      const textureCount = requests.reduce((sum, r) => sum + r.mappings.length, 0)
+      const textureCount = requests.reduce(
+        (sum, r) => sum + r.mappings.length,
+        0
+      )
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -288,7 +303,49 @@ export default function TextureSetGrid({
     return name.includes(searchQuery.toLowerCase())
   })
 
+  // Handle "Show in Folder" from context menu
+  const handleShowInFolder = async () => {
+    // Texture sets are in the TextureSets folder
+    const virtualPath = 'TextureSets'
+    const result = await openInFileExplorer(virtualPath)
+    toast.current?.show({
+      severity: result.success ? 'info' : 'warn',
+      summary: result.success ? 'Opening' : 'Note',
+      detail: result.message,
+      life: 4000,
+    })
+  }
+
+  // Handle "Copy Path" from context menu
+  const handleCopyPath = async () => {
+    // Texture sets are in the TextureSets folder
+    const virtualPath = 'TextureSets'
+    const result = await copyPathToClipboard(virtualPath)
+
+    toast.current?.show({
+      severity: result.success ? 'success' : 'error',
+      summary: result.success ? 'Copied' : 'Failed',
+      detail: result.success
+        ? `Path copied: ${result.path}`
+        : 'Failed to copy path to clipboard',
+      life: 3000,
+    })
+  }
+
   const contextMenuItems: MenuItem[] = [
+    {
+      label: 'Show in Folder',
+      icon: 'pi pi-folder-open',
+      command: handleShowInFolder,
+    },
+    {
+      label: 'Copy Folder Path',
+      icon: 'pi pi-copy',
+      command: handleCopyPath,
+    },
+    {
+      separator: true,
+    },
     {
       label: 'Add to pack',
       icon: 'pi pi-box',
@@ -371,9 +428,11 @@ export default function TextureSetGrid({
       </div>
 
       {/* Grid of texture set cards */}
-      <div 
+      <div
         className="texture-set-grid"
-        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+        }}
       >
         {filteredTextureSets.map(textureSet => {
           const albedoUrl = getAlbedoTextureUrl(textureSet)

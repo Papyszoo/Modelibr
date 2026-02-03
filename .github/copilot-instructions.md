@@ -600,6 +600,47 @@ public async Task<Model> AddAsync(Model model, CancellationToken ct)
 }
 ```
 
+### Performance Optimization Patterns
+
+#### Read-Only Queries for Specialized Components
+
+When infrastructure components need complex data graphs that differ from frontend needs, query `ApplicationDbContext` directly instead of adding loads to shared repositories.
+
+**Problem**: Repository methods are shared across frontend API and specialized infrastructure (e.g., WebDAV). Adding deep includes for one consumer bloats responses for others.
+
+**Solution**: Specialized infrastructure components query DbContext directly with `AsNoTracking()` and `AsSplitQuery()`.
+
+```csharp
+// In specialized infrastructure component (e.g., VirtualAssetStore.cs)
+private static async Task<Project?> GetProjectForWebDavAsync(IServiceProvider sp, string name)
+{
+    var dbContext = sp.GetRequiredService<ApplicationDbContext>();
+    return await dbContext.Projects
+        .AsNoTracking()
+        .Include(p => p.Models)
+            .ThenInclude(m => m.Versions)
+                .ThenInclude(v => v.Files)
+        .Include(p => p.TextureSets)
+            .ThenInclude(ts => ts.Textures)
+                .ThenInclude(t => t.File)
+        .AsSplitQuery()
+        .FirstOrDefaultAsync(p => p.Name == name);
+}
+```
+
+**Benefits**:
+
+- Repositories stay lean for frontend consumers
+- Specialized components get exactly the data they need
+- `AsNoTracking()` improves query performance for read-only scenarios
+- `AsSplitQuery()` prevents cartesian explosion with multiple includes
+
+**When to Use**:
+
+- WebDAV file browsing (needs full asset hierarchy)
+- Export functionality (needs complete data graphs)
+- Read-only diagnostic/reporting tools
+
 ### Checklist for New Code
 
 Before adding any new code, ask yourself:

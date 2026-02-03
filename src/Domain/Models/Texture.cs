@@ -160,6 +160,12 @@ public class Texture
         var isRgbChannel = channel.IsRgbChannel();
         var isColorType = IsColorTextureType(textureType);
 
+        // SplitChannel type is allowed with any channel configuration
+        if (textureType == TextureType.SplitChannel)
+        {
+            return;
+        }
+
         if (isRgbChannel && !isColorType)
         {
             throw new ArgumentException(
