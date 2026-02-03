@@ -8,6 +8,9 @@ namespace Domain.ValueObjects;
 /// </summary>
 public enum TextureType
 {
+    /// <summary>Placeholder type indicating the file is used for split channels (R/G/B/A)</summary>
+    SplitChannel = 0,
+
     /// <summary>Base color map - the main surface color</summary>
     Albedo = 1,
     
@@ -49,6 +52,7 @@ public static class TextureTypeExtensions
 {
     private static readonly TextureType[] SupportedTypes = 
     {
+        TextureType.SplitChannel,
         TextureType.Albedo,
         TextureType.Normal, 
         TextureType.Height,
@@ -110,6 +114,7 @@ public static class TextureTypeExtensions
     {
         return textureType switch
         {
+            TextureType.SplitChannel => "Split Channel Source",
             TextureType.Albedo => "Base color map",
             TextureType.Normal => "Normal map for surface detail",
             TextureType.Height => "Height map for parallax/displacement",

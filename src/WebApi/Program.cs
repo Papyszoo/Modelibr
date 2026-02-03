@@ -8,6 +8,8 @@ using WebApi.Hubs;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Services;
 using Infrastructure.Storage;
+using NWebDav.Server;
+using NWebDav.Server.Handlers;
 
 namespace WebApi
 {
@@ -19,7 +21,10 @@ namespace WebApi
 
             builder.Services.AddAuthorization();
             builder.Services.AddHttpContextAccessor();
+
             builder.Services.AddHealthChecks();
+
+
 
             // Add CORS for frontend development
             builder.Services.AddCors(options =>
@@ -45,6 +50,9 @@ namespace WebApi
                 .AddApplication()
                 .AddInfrastructure(builder.Configuration);
 
+            // Add NWebDav request handler factory for WebDAV support
+            builder.Services.AddSingleton<IRequestHandlerFactory, WebApi.Services.RequestHandlerFactory>();
+
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
@@ -61,6 +69,8 @@ namespace WebApi
                 app.MapOpenApi();
             }
 
+
+
             // Only use HTTPS redirection when not running in a container
             // This prevents certificate issues with internal Docker communication
             var disableHttpsRedirection = builder.Configuration.GetValue<bool>("DisableHttpsRedirection");
@@ -72,7 +82,11 @@ namespace WebApi
             // Add CORS for frontend development
             app.UseCors();
 
+
             app.UseAuthorization();
+
+            // Map WebDAV endpoint for virtual asset drive
+            app.UseWebDav("/modelibr");
 
             // Map endpoints
             app.MapModelEndpoints();
@@ -93,6 +107,7 @@ namespace WebApi
             app.MapSoundEndpoints();
             app.MapSoundCategoryEndpoints();
             app.MapBlenderEndpoints();
+            app.MapAudioSelectionEndpoints();
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");

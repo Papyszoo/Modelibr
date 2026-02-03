@@ -128,7 +128,8 @@ public class TextureSet : AggregateRoot
         if (texture == null)
             throw new ArgumentNullException(nameof(texture), "Texture cannot be null.");
 
-        if (HasTextureOfType(texture.TextureType))
+        // Check for duplicates - TextureType.SplitChannel is exempt from uniqueness rule
+        if (texture.TextureType != TextureType.SplitChannel && HasTextureOfType(texture.TextureType))
         {
             throw new InvalidOperationException(
                 $"A texture of type '{texture.TextureType.GetDescription()}' already exists in this set. " +

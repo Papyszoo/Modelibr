@@ -59,7 +59,11 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
                 : Domain.Models.Texture.Create(file, command.TextureType, _dateTimeProvider.UtcNow);
 
             // Remove existing texture of the same type if it exists (for replacement)
-            textureSet.RemoveTextureOfType(command.TextureType, _dateTimeProvider.UtcNow);
+            // But skip this for "SplitChannel" type, as we allow multiple unassigned textures
+            if (command.TextureType != TextureType.SplitChannel)
+            {
+                textureSet.RemoveTextureOfType(command.TextureType, _dateTimeProvider.UtcNow);
+            }
 
             // Add texture to the set (domain will enforce business rules)
             textureSet.AddTexture(texture, _dateTimeProvider.UtcNow);

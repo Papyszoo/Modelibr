@@ -51,8 +51,8 @@ public class ChangeTextureTypeCommandHandler : ICommandHandler<ChangeTextureType
             return Result.Success();
         }
 
-        // Check if the target type already exists in the set
-        if (textureSet.HasTextureOfType(request.NewTextureType))
+        // Check if the target type already exists in the set (unless it's SplitChannel)
+        if (request.NewTextureType != TextureType.SplitChannel && textureSet.HasTextureOfType(request.NewTextureType))
         {
             return Result.Failure(
                 new Error("TextureType.AlreadyExists", 

@@ -198,9 +198,11 @@ namespace Infrastructure.Persistence
                 // Create index for efficient querying by texture type
                 entity.HasIndex(t => t.TextureType);
                 
-                // Create composite index for texture set, file, texture type, and source channel to ensure uniqueness within a texture set
-                // This allows the same file to be used in different texture sets with the same channel/type mapping
-                entity.HasIndex(t => new { t.TextureSetId, t.FileId, t.TextureType, t.SourceChannel }).IsUnique();
+                // Create composite index for texture set, file, and source channel to ensure uniqueness within a texture set
+                // This ensures a specific channel of a file can only be mapped to one texture type
+                entity.HasIndex(t => new { t.TextureSetId, t.FileId, t.SourceChannel })
+                    .IsUnique()
+                    .HasFilter("\"TextureSetId\" IS NOT NULL AND \"IsDeleted\" = false");
 
                 // Create composite index to ensure unique texture type per texture set (for non-deleted textures)
                 entity.HasIndex(t => new { t.TextureSetId, t.TextureType })
