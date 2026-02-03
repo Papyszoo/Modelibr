@@ -29,7 +29,7 @@ export function getWebDavBaseUrl(): string {
   const apiBaseUrl =
     import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
   const url = new URL(apiBaseUrl)
-  return `${url.protocol}//${url.host}/dav`
+  return `${url.protocol}//${url.host}/modelibr`
 }
 
 /**
@@ -76,18 +76,10 @@ export function getWebDavPath(virtualPath: string): WebDavPathInfo {
     case 'windows':
       // Windows uses WebDAV via mapped network drives or UNC paths
       // Format: \\server@port\path or \\server@SSL@port\path for HTTPS
-      // Windows: Use standard UNC path for WebDAV
-      // Format: \\server\dav\path (works for http on port 80 if allowed, or https trusted)
-      // We recently verified \\localhost\dav works for http://localhost/dav
-      if (host === 'localhost' || host === '127.0.0.1') {
-        nativePath = `\\\\${host}\\dav\\${cleanPath.replace(/\//g, '\\')}`
-      } else {
-        // Fallback for remote/other hosts if needed, keeping legacy logic or simplifying
-        // Usually \\host\dav is standard. Port specification in UNC is tricky (e.g. @80),
-        // but user verified basic syntax.
+      {
         const portStr = port === '80' || port === '443' ? '' : `@${port}`
         const sslStr = isHttps ? '@SSL' : ''
-        nativePath = `\\\\${host}${sslStr}${portStr}\\dav\\${cleanPath.replace(/\//g, '\\')}`
+        nativePath = `\\\\${host}${sslStr}${portStr}\\modelibr\\${cleanPath.replace(/\//g, '\\')}`
       }
       break
 
@@ -100,8 +92,10 @@ export function getWebDavPath(virtualPath: string): WebDavPathInfo {
     case 'linux':
       // Linux uses davfs2 or gvfs, typically mounted at a path
       // For GNOME/gvfs: dav(s)://server:port/path
-      const davProtocol = isHttps ? 'davs' : 'dav'
-      nativePath = `${davProtocol}://${host}:${port}/dav/${cleanPath}`
+      {
+        const davProtocol = isHttps ? 'davs' : 'dav'
+        nativePath = `${davProtocol}://${host}:${port}/modelibr/${cleanPath}`
+      }
       break
 
     default:
@@ -228,7 +222,7 @@ export function getMountInstructions(): {
   const os = detectOS()
   const { host, port, isHttps } = getWebDavHostInfo()
   const protocol = isHttps ? 'https' : 'http'
-  const webDavUrl = `${protocol}://${host}:${port}/dav`
+  const webDavUrl = `${protocol}://${host}:${port}/modelibr`
 
   switch (os) {
     case 'windows':
@@ -266,7 +260,7 @@ export function getMountInstructions(): {
 Using GNOME/Nautilus:
 1. Open Files (Nautilus)
 2. Press Ctrl+L to show the location bar
-3. Enter: davs://${host}:${port}/dav
+3. Enter: davs://${host}:${port}/modelibr
 4. Press Enter and enter credentials`,
       }
 

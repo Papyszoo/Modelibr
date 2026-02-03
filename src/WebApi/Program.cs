@@ -86,7 +86,7 @@ namespace WebApi
             app.UseAuthorization();
 
             // Map WebDAV endpoint for virtual asset drive
-            app.UseWebDav("/dav");
+            app.UseWebDav("/modelibr");
 
             // Map endpoints
             app.MapModelEndpoints();

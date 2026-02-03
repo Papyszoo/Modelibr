@@ -92,8 +92,8 @@ public sealed class VirtualAssetStore : IStore
     {
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-        // Handle "dav" prefix if present from Nginx/Middleware
-        if (segments.Length > 0 && segments[0].Equals("dav", StringComparison.OrdinalIgnoreCase))
+        // Handle "modelibr" prefix if present from Nginx/Middleware
+        if (segments.Length > 0 && segments[0].Equals("modelibr", StringComparison.OrdinalIgnoreCase))
         {
             segments = segments.Skip(1).ToArray();
         }

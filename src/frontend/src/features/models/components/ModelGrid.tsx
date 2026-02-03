@@ -13,7 +13,6 @@ import { PackDto, ProjectDto } from '../../../types'
 import {
   openInFileExplorer,
   copyPathToClipboard,
-  getProjectAssetPath,
 } from '../../../utils/webdavUtils'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
@@ -55,7 +54,7 @@ export default function ModelGrid({
   const [showPackDialog, setShowPackDialog] = useState(false)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
-  
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.models
 
@@ -76,12 +75,11 @@ export default function ModelGrid({
       console.error('Failed to load packs:', error)
     }
   }
-
   const handleAddToPack = async (packId: number) => {
     if (!selectedModel) return
 
     try {
-      await ApiClient.addModelToPack(packId, selectedModel.id)
+      await ApiClient.addModelToPack(packId, Number(selectedModel.id))
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -104,7 +102,7 @@ export default function ModelGrid({
     if (!selectedModel) return
 
     try {
-      await ApiClient.softDeleteModel(selectedModel.id)
+      await ApiClient.softDeleteModel(Number(selectedModel.id))
       toast.current?.show({
         severity: 'success',
         summary: 'Recycled',
@@ -113,7 +111,7 @@ export default function ModelGrid({
       })
       // Call the callback to remove the model from the list without making a new request
       if (onModelRecycled) {
-        onModelRecycled(selectedModel.id)
+        onModelRecycled(Number(selectedModel.id))
       }
     } catch (error) {
       console.error('Failed to recycle model:', error)
@@ -140,24 +138,9 @@ export default function ModelGrid({
   const handleShowInFolder = async () => {
     if (!selectedModel) return
 
-    // Find the project this model belongs to (use first project if multiple)
-    const modelProjects = projects.filter(p =>
-      selectedProjectIds.length === 0 || selectedProjectIds.includes(p.id)
-    )
-
-    if (modelProjects.length === 0) {
-      // If no project context, show the general models folder path
-      toast.current?.show({
-        severity: 'info',
-        summary: 'No Project',
-        detail: 'This model is not associated with a project. Copy WebDAV path instead.',
-        life: 4000,
-      })
-      return
-    }
-
-    const projectName = modelProjects[0].name
-    const result = await openInFileExplorer(`Projects/${projectName}/Models`)
+    const modelName = getModelName(selectedModel)
+    const virtualPath = `Models/${modelName}`
+    const result = await openInFileExplorer(virtualPath)
 
     toast.current?.show({
       severity: result.success ? 'info' : 'warn',
@@ -170,23 +153,15 @@ export default function ModelGrid({
   const handleCopyPath = async () => {
     if (!selectedModel) return
 
-    const modelProjects = projects.filter(p =>
-      selectedProjectIds.length === 0 || selectedProjectIds.includes(p.id)
-    )
-
-    let virtualPath = 'Projects'
-    if (modelProjects.length > 0) {
-      virtualPath = `Projects/${modelProjects[0].name}/Models`
-    }
-
-    const pathInfo = getProjectAssetPath(modelProjects[0]?.name || '', 'Models')
+    const modelName = getModelName(selectedModel)
+    const virtualPath = `Models/${modelName}`
     const result = await copyPathToClipboard(virtualPath)
 
     toast.current?.show({
       severity: result.success ? 'success' : 'error',
       summary: result.success ? 'Copied' : 'Failed',
       detail: result.success
-        ? `Path copied: ${pathInfo.nativePath}`
+        ? `Path copied: ${result.path}`
         : 'Failed to copy path to clipboard',
       life: 3000,
     })
@@ -206,7 +181,7 @@ export default function ModelGrid({
       },
     },
     {
-      label: 'Copy Path',
+      label: 'Copy Folder Path',
       icon: 'pi pi-copy',
       command: () => {
         handleCopyPath()
@@ -244,7 +219,8 @@ export default function ModelGrid({
   }))
 
   const hasFilters = packs.length > 0 || projects.length > 0
-  const hasActiveFilters = selectedPackIds.length > 0 || selectedProjectIds.length > 0
+  const hasActiveFilters =
+    selectedPackIds.length > 0 || selectedProjectIds.length > 0
 
   return (
     <div
@@ -312,7 +288,9 @@ export default function ModelGrid({
               )}
             </>
           ) : (
-            <span className="filter-placeholder">No packs or projects to filter by</span>
+            <span className="filter-placeholder">
+              No packs or projects to filter by
+            </span>
           )}
           <CardWidthSlider
             value={cardWidth}
@@ -324,9 +302,11 @@ export default function ModelGrid({
       </div>
 
       {/* Grid of model cards */}
-      <div 
+      <div
         className="model-grid"
-        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+        }}
       >
         {filteredModels.map(model => (
           <div
