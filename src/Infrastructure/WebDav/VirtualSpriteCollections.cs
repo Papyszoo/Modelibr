@@ -7,34 +7,34 @@ using NWebDav.Server.Stores;
 namespace Infrastructure.WebDav;
 
 /// <summary>
-/// Collection that lists all sound categories under /Sounds, including "Unassigned".
+/// Collection that lists all sprite categories under /Sprites, including "Unassigned".
 /// </summary>
-public sealed class VirtualSoundCategoriesCollection : VirtualCollectionBase
+public sealed class VirtualSpriteCategoriesCollection : VirtualCollectionBase
 {
-    private readonly List<SoundCategory> _categories;
+    private readonly List<SpriteCategory> _categories;
     private readonly bool _hasUnassigned;
 
-    public VirtualSoundCategoriesCollection(
+    public VirtualSpriteCategoriesCollection(
         VirtualCollectionPropertyManager propertyManager,
         ILockingManager lockingManager,
-        List<SoundCategory> categories,
-        bool hasUnassigned = true)
-        : base(propertyManager, lockingManager, "Sounds")
+        List<SpriteCategory> categories,
+        bool hasUnassigned)
+        : base(propertyManager, lockingManager, "Sprites")
     {
         _categories = categories;
         _hasUnassigned = hasUnassigned;
     }
 
-    public override string UniqueKey => "soundcategories";
+    public override string UniqueKey => "spritecategories";
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
         if (name.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
         {
-            return Task.FromResult<IStoreItem?>(new VirtualUnassignedSoundsCollection(
+            return Task.FromResult<IStoreItem?>(new VirtualUnassignedSpritesCollection(
                 (VirtualCollectionPropertyManager)PropertyManager,
                 LockingManager,
-                new List<Sound>(),
+                new List<Sprite>(),
                 null!,
                 null!));
         }
@@ -43,12 +43,11 @@ public sealed class VirtualSoundCategoriesCollection : VirtualCollectionBase
         if (category == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        // Placeholder - actual sounds need to be resolved by the store
-        return Task.FromResult<IStoreItem?>(new VirtualSoundCategoryCollection(
+        return Task.FromResult<IStoreItem?>(new VirtualSpriteCategoryCollection(
             (VirtualCollectionPropertyManager)PropertyManager,
             LockingManager,
             category,
-            new List<Sound>(),
+            new List<Sprite>(),
             null!,
             null!));
     }
@@ -60,20 +59,20 @@ public sealed class VirtualSoundCategoriesCollection : VirtualCollectionBase
         // Add Unassigned folder first
         if (_hasUnassigned)
         {
-            items.Add(new VirtualUnassignedSoundsCollection(
+            items.Add(new VirtualUnassignedSpritesCollection(
                 (VirtualCollectionPropertyManager)PropertyManager,
                 LockingManager,
-                new List<Sound>(),
+                new List<Sprite>(),
                 null!,
                 null!));
         }
 
         // Add category folders
-        items.AddRange(_categories.Select(c => (IStoreItem)new VirtualSoundCategoryCollection(
+        items.AddRange(_categories.Select(c => (IStoreItem)new VirtualSpriteCategoryCollection(
             (VirtualCollectionPropertyManager)PropertyManager,
             LockingManager,
             c,
-            new List<Sound>(),
+            new List<Sprite>(),
             null!,
             null!)));
 
@@ -82,50 +81,50 @@ public sealed class VirtualSoundCategoriesCollection : VirtualCollectionBase
 }
 
 /// <summary>
-/// Collection that represents a single sound category with its sounds.
+/// Collection that represents a single sprite category with its sprites.
 /// </summary>
-public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
+public sealed class VirtualSpriteCategoryCollection : VirtualCollectionBase
 {
-    private readonly SoundCategory _category;
-    private readonly List<Sound> _sounds;
+    private readonly SpriteCategory _category;
+    private readonly List<Sprite> _sprites;
     private readonly VirtualItemPropertyManager? _itemPropertyManager;
     private readonly IUploadPathProvider? _pathProvider;
 
-    public VirtualSoundCategoryCollection(
+    public VirtualSpriteCategoryCollection(
         VirtualCollectionPropertyManager propertyManager,
         ILockingManager lockingManager,
-        SoundCategory category,
-        List<Sound> sounds,
+        SpriteCategory category,
+        List<Sprite> sprites,
         VirtualItemPropertyManager? itemPropertyManager,
         IUploadPathProvider? pathProvider)
         : base(propertyManager, lockingManager, category.Name)
     {
         _category = category;
-        _sounds = sounds;
+        _sprites = sprites;
         _itemPropertyManager = itemPropertyManager;
         _pathProvider = pathProvider;
     }
 
-    public override string UniqueKey => $"soundcategory:{_category.Id}";
+    public override string UniqueKey => $"spritecategory:{_category.Id}";
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sound = _sounds.FirstOrDefault(s => s.File.OriginalFileName == name);
-        if (sound == null)
+        var sprite = _sprites.FirstOrDefault(s => s.File.OriginalFileName == name);
+        if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sound.File.OriginalFileName,
-            sound.File.Sha256Hash,
-            sound.File.SizeBytes,
-            sound.File.MimeType,
-            sound.File.CreatedAt,
-            sound.File.UpdatedAt,
+            sprite.File.OriginalFileName,
+            sprite.File.Sha256Hash,
+            sprite.File.SizeBytes,
+            sprite.File.MimeType,
+            sprite.File.CreatedAt,
+            sprite.File.UpdatedAt,
             _pathProvider));
     }
 
@@ -134,7 +133,7 @@ public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IEnumerable<IStoreItem>>(Array.Empty<IStoreItem>());
 
-        var items = _sounds.Select(s => (IStoreItem)new VirtualAssetFile(
+        var items = _sprites.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
             s.File.OriginalFileName,
@@ -150,47 +149,47 @@ public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
 }
 
 /// <summary>
-/// Collection that represents unassigned sounds (sounds without a category).
+/// Collection that represents unassigned sprites (sprites without a category).
 /// </summary>
-public sealed class VirtualUnassignedSoundsCollection : VirtualCollectionBase
+public sealed class VirtualUnassignedSpritesCollection : VirtualCollectionBase
 {
-    private readonly List<Sound> _sounds;
+    private readonly List<Sprite> _sprites;
     private readonly VirtualItemPropertyManager? _itemPropertyManager;
     private readonly IUploadPathProvider? _pathProvider;
 
-    public VirtualUnassignedSoundsCollection(
+    public VirtualUnassignedSpritesCollection(
         VirtualCollectionPropertyManager propertyManager,
         ILockingManager lockingManager,
-        List<Sound> sounds,
+        List<Sprite> sprites,
         VirtualItemPropertyManager? itemPropertyManager,
         IUploadPathProvider? pathProvider)
         : base(propertyManager, lockingManager, "Unassigned")
     {
-        _sounds = sounds;
+        _sprites = sprites;
         _itemPropertyManager = itemPropertyManager;
         _pathProvider = pathProvider;
     }
 
-    public override string UniqueKey => "soundcategory:unassigned";
+    public override string UniqueKey => "spritecategory:unassigned";
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sound = _sounds.FirstOrDefault(s => s.File.OriginalFileName == name);
-        if (sound == null)
+        var sprite = _sprites.FirstOrDefault(s => s.File.OriginalFileName == name);
+        if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sound.File.OriginalFileName,
-            sound.File.Sha256Hash,
-            sound.File.SizeBytes,
-            sound.File.MimeType,
-            sound.File.CreatedAt,
-            sound.File.UpdatedAt,
+            sprite.File.OriginalFileName,
+            sprite.File.Sha256Hash,
+            sprite.File.SizeBytes,
+            sprite.File.MimeType,
+            sprite.File.CreatedAt,
+            sprite.File.UpdatedAt,
             _pathProvider));
     }
 
@@ -199,7 +198,7 @@ public sealed class VirtualUnassignedSoundsCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IEnumerable<IStoreItem>>(Array.Empty<IStoreItem>());
 
-        var items = _sounds.Select(s => (IStoreItem)new VirtualAssetFile(
+        var items = _sprites.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
             s.File.OriginalFileName,
