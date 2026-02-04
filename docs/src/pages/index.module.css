@@ -469,16 +469,22 @@
 }
 
 .copyButton {
-    background: none;
+    background: transparent;
     border: none;
     cursor: pointer;
-    padding: 0.25rem;
-    opacity: 0.5;
-    transition: opacity 0.2s;
+    padding: 0.4rem;
+    border-radius: 4px;
+    opacity: 0.8;
+    color: inherit;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .copyButton:hover {
     opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* CTA Section */
