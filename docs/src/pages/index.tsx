@@ -47,10 +47,10 @@ function HomepageHeader() {
                                 "button button--lg",
                                 styles.secondaryButton,
                             )}
-                            href="https://github.com/Papyszoo/Modelibr"
+                            href="https://discord.gg/KgwgTDVP3F"
                         >
-                            <span className={styles.buttonIcon}>⭐</span>
-                            Star on GitHub
+                            <span className={styles.buttonIcon}>💬</span>
+                            Join Discord
                         </Link>
                     </div>
                     <div className={styles.heroStats}>
@@ -60,13 +60,13 @@ function HomepageHeader() {
                         </div>
                         <div className={styles.statDivider}></div>
                         <div className={styles.stat}>
-                            <span className={styles.statValue}>MIT</span>
-                            <span className={styles.statLabel}>Licensed</span>
+                            <span className={styles.statValue}>Free</span>
+                            <span className={styles.statLabel}>Forever</span>
                         </div>
                         <div className={styles.statDivider}></div>
                         <div className={styles.stat}>
-                            <span className={styles.statValue}>∞</span>
-                            <span className={styles.statLabel}>Models</span>
+                            <span className={styles.statValue}>Open</span>
+                            <span className={styles.statLabel}>Source</span>
                         </div>
                     </div>
                 </div>
@@ -88,9 +88,9 @@ const AudienceList: AudienceItem[] = [
         title: "3D Artists",
         emoji: "🎨",
         painPoint:
-            "Assets scattered across folders, impossible to find that perfect model",
+            "Fear of ruining a model with destructive changes or losing previous iterations",
         solution:
-            "Visual library with search, tags, and automatic 360° thumbnails",
+            "Save versions before applying breaking changes. Experiment freely with full rollback capability and preview each version",
         gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
     },
     {

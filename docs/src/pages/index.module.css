@@ -466,6 +466,9 @@
 .stepCodeBlock code {
     font-size: 0.9rem;
     color: #a5b4fc;
+    background-color: transparent;
+    border: 0;
+    vertical-align: middle;
 }
 
 .copyButton {
