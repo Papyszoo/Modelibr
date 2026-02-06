@@ -494,7 +494,11 @@ $RECYCLE.BIN/
 !docs/*.gltf
 !docs/*.glb
 
-data/*
+# Environment files (secrets) — keep .env.example
+.env
+!.env.example
+
+data/
 # E2E test state file (generated during test runs)
 tests/e2e/.shared-state.json
 
