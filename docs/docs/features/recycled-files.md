@@ -6,6 +6,13 @@ sidebar_position: 3
 
 The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, and sprites.
 
+<div className="feature-video-container">
+  <video controls width="100%" autoPlay muted loop>
+    <source src="/Modelibr/videos/recycled-files.webm" type="video/webm" />
+    <p className="video-fallback">Demo video is being generated...</p>
+  </video>
+</div>
+
 ## Accessing the Recycle Bin
 
 Navigate to the **Recycled Files** tab in the left panel.
@@ -14,12 +21,12 @@ Navigate to the **Recycled Files** tab in the left panel.
 
 ## What Can Be Recycled?
 
-| Item Type | What Happens |
-|-----------|--------------|
-| **Models** | All versions move to recycle bin |
+| Item Type          | What Happens                           |
+| ------------------ | -------------------------------------- |
+| **Models**         | All versions move to recycle bin       |
 | **Model Versions** | Single version recycled, model remains |
-| **Texture Sets** | Unlinked from all models |
-| **Sprites** | Removed from sprite sheets |
+| **Texture Sets**   | Unlinked from all models               |
+| **Sprites**        | Removed from sprite sheets             |
 
 ## Restoring Items
 

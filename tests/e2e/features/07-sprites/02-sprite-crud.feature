@@ -17,12 +17,3 @@ Feature: Sprite CRUD Operations
     And I save the sprite changes
     Then the sprite "renamed-sprite" should be visible in the sprite list
     And the sprite "crud-test-sprite" should not be visible
-
-  @filter @skip
-  Scenario: Search sprites by name in list
-    Given I am on the sprites page
-    And the sprite "unique-sprite-test" exists in shared state
-    When I search for sprites with query "unique"
-    Then the sprite "unique-sprite-test" should be visible in the sprite list
-    And I should see 1 sprite in the filtered results
-

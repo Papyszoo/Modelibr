@@ -275,9 +275,10 @@ function SoundEditor({
               }}
               autoFocus
               className="sound-title-input"
+              data-testid="sound-name-input"
             />
           ) : (
-            <h2>{sound.name}</h2>
+            <h2 data-testid="sound-name-display">{sound.name}</h2>
           )}
           {isEditingName ? (
             <div className="sound-title-actions">
@@ -287,6 +288,7 @@ function SoundEditor({
                 onClick={handleSaveName}
                 disabled={isSavingName}
                 tooltip="Save"
+                data-testid="sound-name-save"
               />
               <Button
                 icon="pi pi-times"
@@ -294,6 +296,7 @@ function SoundEditor({
                 onClick={handleCancelEditName}
                 disabled={isSavingName}
                 tooltip="Cancel"
+                data-testid="sound-name-cancel"
               />
             </div>
           ) : (
@@ -302,6 +305,7 @@ function SoundEditor({
               className="p-button-text p-button-rounded"
               onClick={handleStartEditName}
               tooltip="Edit name"
+              data-testid="sound-name-edit"
             />
           )}
         </div>
@@ -320,7 +324,11 @@ function SoundEditor({
             <span>Loading audio...</span>
           </div>
         )}
-        <div ref={waveformRef} className="waveform-container" />
+        <div
+          ref={waveformRef}
+          className="waveform-container"
+          data-testid="sound-waveform"
+        />
       </div>
 
       <div className="sound-editor-controls">
@@ -337,6 +345,7 @@ function SoundEditor({
             onClick={handlePlayPause}
             tooltip={isPlaying ? 'Pause' : 'Play'}
             disabled={isLoading}
+            data-testid="sound-play-pause"
           />
           <Button
             icon="pi pi-replay"

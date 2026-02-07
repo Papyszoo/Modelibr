@@ -27,6 +27,7 @@ public class PackRepository : IPackRepository
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
+            .Include(p => p.Sounds)
             .ToListAsync(cancellationToken);
     }
 
@@ -36,6 +37,7 @@ public class PackRepository : IPackRepository
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
+            .Include(p => p.Sounds)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
@@ -45,6 +47,7 @@ public class PackRepository : IPackRepository
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
+            .Include(p => p.Sounds)
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }
 

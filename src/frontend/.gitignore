@@ -28,3 +28,7 @@ coverage
 
 *storybook.log
 storybook-static
+
+# Environment files (may contain secrets)
+.env
+!.env.example

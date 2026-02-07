@@ -168,6 +168,26 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
+        // Handle "newest" folder - returns the highest version number
+        if (name.Equals("newest", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVersion = _model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            if (newestVersion == null)
+                return Task.FromResult<IStoreItem?>(null);
+
+            return Task.FromResult<IStoreItem?>(new VirtualNewestVersionCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                _model,
+                newestVersion,
+                _itemPropertyManager,
+                _pathProvider));
+        }
+
         // Parse version name like "v1", "v2"
         if (!name.StartsWith("v", StringComparison.OrdinalIgnoreCase) ||
             !int.TryParse(name[1..], out var versionNumber))
@@ -188,7 +208,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _model.Versions
+        var versionItems = _model.Versions
             .Where(v => !v.IsDeleted)
             .OrderBy(v => v.VersionNumber)
             .Select(v => (IStoreItem)new VirtualModelVersionCollection(
@@ -197,9 +217,27 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                 _model,
                 v,
                 _itemPropertyManager,
-                _pathProvider));
+                _pathProvider))
+            .ToList();
 
-        return Task.FromResult(items);
+        // Add "newest" folder that mirrors the highest version
+        var newestVersion = _model.Versions
+            .Where(v => !v.IsDeleted)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstOrDefault();
+
+        if (newestVersion != null)
+        {
+            versionItems.Add(new VirtualNewestVersionCollection(
+                (VirtualCollectionPropertyManager)PropertyManager,
+                LockingManager,
+                _model,
+                newestVersion,
+                _itemPropertyManager,
+                _pathProvider));
+        }
+
+        return Task.FromResult<IEnumerable<IStoreItem>>(versionItems);
     }
 }
 
@@ -223,6 +261,63 @@ public sealed class VirtualModelVersionCollection : VirtualCollectionBase
     }
 
     public override string UniqueKey => $"model:{_model.Id}:version:{_version.Id}";
+
+    public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
+    {
+        var file = _version.Files.FirstOrDefault(f => f.OriginalFileName == name);
+        if (file == null)
+            return Task.FromResult<IStoreItem?>(null);
+
+        return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
+            _itemPropertyManager,
+            LockingManager,
+            file.OriginalFileName,
+            file.Sha256Hash,
+            file.SizeBytes,
+            file.MimeType,
+            file.CreatedAt,
+            file.UpdatedAt,
+            _pathProvider));
+    }
+
+    public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
+    {
+        var items = _version.Files.Select(f => (IStoreItem)new VirtualAssetFile(
+            _itemPropertyManager,
+            LockingManager,
+            f.OriginalFileName,
+            f.Sha256Hash,
+            f.SizeBytes,
+            f.MimeType,
+            f.CreatedAt,
+            f.UpdatedAt,
+            _pathProvider));
+
+        return Task.FromResult(items);
+    }
+}
+
+/// <summary>
+/// Collection representing the "newest" folder - shows files from the highest version number.
+/// This provides a consistent path to always access the latest model version.
+/// </summary>
+public sealed class VirtualNewestVersionCollection : VirtualCollectionBase
+{
+    private readonly Model _model;
+    private readonly ModelVersion _version;
+    private readonly VirtualItemPropertyManager _itemPropertyManager;
+    private readonly IUploadPathProvider _pathProvider;
+
+    public VirtualNewestVersionCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, ModelVersion version, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+        : base(propertyManager, lockingManager, "newest")
+    {
+        _model = model;
+        _version = version;
+        _itemPropertyManager = itemPropertyManager;
+        _pathProvider = pathProvider;
+    }
+
+    public override string UniqueKey => $"model:{_model.Id}:newest:{_version.Id}";
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {

@@ -46,7 +46,7 @@ class ApiClient {
   private client: AxiosInstance
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,

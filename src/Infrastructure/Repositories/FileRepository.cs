@@ -17,7 +17,6 @@ internal sealed class FileRepository : IFileRepository
     public async Task<Domain.Models.File?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Files
-            .Where(f => !f.IsDeleted)
             .Include(f => f.Models)
             .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
     }
@@ -25,7 +24,6 @@ internal sealed class FileRepository : IFileRepository
     public async Task<Domain.Models.File?> GetBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default)
     {
         return await _context.Files
-            .Where(f => !f.IsDeleted)
             .Include(f => f.Models)
             .FirstOrDefaultAsync(f => f.Sha256Hash == sha256Hash, cancellationToken);
     }
@@ -33,7 +31,6 @@ internal sealed class FileRepository : IFileRepository
     public async Task<IEnumerable<Domain.Models.File>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Files
-            .Where(f => !f.IsDeleted)
             .Include(f => f.Models)
             .ToListAsync(cancellationToken);
     }
@@ -41,6 +38,7 @@ internal sealed class FileRepository : IFileRepository
     public async Task<IEnumerable<Domain.Models.File>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Files
+            .IgnoreQueryFilters()
             .Where(f => f.IsDeleted)
             .Include(f => f.Models)
             .ToListAsync(cancellationToken);
@@ -49,6 +47,7 @@ internal sealed class FileRepository : IFileRepository
     public async Task<Domain.Models.File?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Files
+            .IgnoreQueryFilters()
             .Where(f => f.IsDeleted)
             .Include(f => f.Models)
             .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
@@ -63,7 +62,6 @@ internal sealed class FileRepository : IFileRepository
     public async Task<IEnumerable<Domain.Models.File>> GetFilesByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
     {
         return await _context.Files
-            .Where(f => !f.IsDeleted)
             .Include(f => f.Models)
             .Where(f => f.Models.Any(m => m.Id == modelId))
             .ToListAsync(cancellationToken);
@@ -71,7 +69,8 @@ internal sealed class FileRepository : IFileRepository
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var file = await _context.Files.FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+        // Must use IgnoreQueryFilters() because the file may be soft-deleted (called from PermanentDeleteEntityCommandHandler)
+        var file = await _context.Files.IgnoreQueryFilters().FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
         if (file != null)
         {
             _context.Files.Remove(file);
@@ -95,7 +94,6 @@ internal sealed class FileRepository : IFileRepository
             .Where(f => f.Sha256Hash == file.Sha256Hash)
             .Where(f => f.Id != fileId)
             .Where(f => f.ModelVersionId != excludeVersionId || f.ModelVersionId == null)
-            .Where(f => !f.IsDeleted)
             .AnyAsync(cancellationToken);
     }
 }

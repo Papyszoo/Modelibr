@@ -1,10 +1,12 @@
 @depends-on:setup
 Feature: Upload History Page
   Tests the Upload History page displays and navigates correctly.
-  These tests run after @setup tests which upload models, so history should exist.
 
   Background:
     Given I am on the model list page
+    And the following models exist in shared state:
+      | name                |
+      | single-version-model |
 
   @history-display
   Scenario: Upload History page shows previous uploads

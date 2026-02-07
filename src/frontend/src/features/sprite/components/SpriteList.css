@@ -169,7 +169,9 @@
   border: 1px solid var(--surface-border);
   border-radius: 8px;
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   cursor: pointer;
 }
 
@@ -296,6 +298,23 @@
 .sprite-modal-download {
   padding-top: 0.5rem;
   border-top: 1px solid var(--surface-border);
+}
+
+.sprite-modal-header {
+  display: flex;
+  align-items: center;
+}
+
+.sprite-name-display {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sprite-name-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .w-full {

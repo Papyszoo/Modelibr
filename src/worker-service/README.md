@@ -28,7 +28,7 @@ The service is configured via environment variables. See `.env.example` for all 
 
 - `WORKER_ID`: Unique worker identifier (default: `worker-{pid}`)
 - `WORKER_PORT`: Health check server port (default: `3001`)
-- `API_BASE_URL`: Base URL for the main API (default: `http://localhost:5009`)
+- `API_BASE_URL`: Base URL for the main API (default: `http://localhost:8080`)
 
 ### Job Processing
 
@@ -81,6 +81,7 @@ The service uses a local BLIP (Bootstrapping Language-Image Pre-training) model 
 6. The final tags and description are saved to the model metadata
 
 **Example output:**
+
 ```
 Tags: model, object, 3d, render, design
 Description: a 3d model of an object (100.0%, 4x), render (100.0%, 3x), design (100.0%, 2x)
@@ -230,6 +231,7 @@ docker compose up -d --scale thumbnail-worker=3
 ### Browser-based Rendering
 
 The worker uses a browser-based rendering approach:
+
 - HTML template with Three.js from CDN
 - No need for native WebGL bindings (gl, canvas modules)
 - True browser environment for maximum compatibility

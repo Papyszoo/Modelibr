@@ -3,6 +3,7 @@ import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { ApiHelper } from "../helpers/api-helper";
 import { sharedState } from "../fixtures/shared-state";
+import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { TextureType } from "../../../src/frontend/src/types/index.js";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -34,7 +35,7 @@ Given('texture set {string} exists', async ({ page }, name: string) => {
 Given('texture set {string} exists with file {string}', async ({ page }, setName: string, fileName: string) => {
     // Create texture set with file via API in one step with unique name
     const uniqueName = `${setName}_${runId}`;
-    const filePath = path.join(__dirname, "..", "assets", fileName);
+    const filePath = await UniqueFileGenerator.generate(fileName);
     const result = await apiHelper.createTextureSetWithFile(uniqueName, filePath, TextureType.Albedo);
     sharedState.saveTextureSet(setName, { id: result.textureSetId, name: uniqueName });
     console.log(`[API] Created texture set "${uniqueName}" with file "${fileName}", ID ${result.textureSetId}`);
@@ -44,10 +45,9 @@ Given('texture set {string} exists with a {string} texture', async ({ page }, se
     // Use shared TextureType enum from frontend types
     const typeValue = TextureType[textureTypeName as keyof typeof TextureType] || TextureType.Albedo;
     
-    // Create texture set with file via API with unique name
-    // Use yellow_color.png to avoid file content collision with other scenarios
+    // Create texture set with unique file via API
     const uniqueName = `${setName}_${runId}`;
-    const filePath = path.join(__dirname, "..", "assets", "yellow_color.png");
+    const filePath = await UniqueFileGenerator.generate("yellow_color.png");
     const result = await apiHelper.createTextureSetWithFile(uniqueName, filePath, typeValue);
     sharedState.saveTextureSet(setName, { id: result.textureSetId, name: uniqueName });
     console.log(`[API] Created texture set "${uniqueName}" with ${textureTypeName} texture, ID ${result.textureSetId}`);

@@ -111,6 +111,9 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(m => m.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(m => !m.IsDeleted);
             });
 
             // Configure ModelVersion entity
@@ -129,6 +132,9 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(v => v.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(v => !v.IsDeleted);
 
                 // Configure optional relationship with default TextureSet
                 entity.HasOne<TextureSet>()
@@ -173,6 +179,9 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(f => f.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(f => !f.IsDeleted);
             });
 
             // Configure Texture entity
@@ -210,6 +219,9 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(t => t.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(t => !t.IsDeleted);
             });
 
             // Configure TextureSet entity
@@ -233,6 +245,9 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(tp => tp.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(tp => !tp.IsDeleted);
             });
 
             // Configure Pack entity
@@ -488,6 +503,9 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(s => s.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(s => !s.IsDeleted);
             });
 
             // Configure SpriteCategory entity
@@ -533,6 +551,9 @@ namespace Infrastructure.Persistence
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(s => s.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(s => !s.IsDeleted);
             });
 
             // Configure SoundCategory entity

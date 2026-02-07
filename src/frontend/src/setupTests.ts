@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom'
 
 // Mock Vite environment variables for Jest (import.meta.env -> process.env)
-process.env.VITE_API_BASE_URL = 'http://localhost:5009'
+process.env.VITE_API_BASE_URL = 'http://localhost:8080'
 process.env.DEV = 'true'
 process.env.PROD = 'false'
 process.env.MODE = 'test'
@@ -10,15 +10,22 @@ process.env.MODE = 'test'
 jest.mock('./services/ApiClient', () => ({
   __esModule: true,
   default: {
-    getBaseURL: jest.fn(() => 'http://localhost:5009'),
+    getBaseURL: jest.fn(() => 'http://localhost:8080'),
     uploadModel: jest.fn(),
     uploadFile: jest.fn(),
     getModels: jest.fn().mockResolvedValue([]),
     getModelById: jest.fn(),
-    getModelFileUrl: jest.fn((modelId: string) => `http://localhost:5009/models/${modelId}/file`),
-    getFileUrl: jest.fn((fileId: string) => `http://localhost:5009/files/${fileId}`),
+    getModelFileUrl: jest.fn(
+      (modelId: string) => `http://localhost:8080/models/${modelId}/file`
+    ),
+    getFileUrl: jest.fn(
+      (fileId: string) => `http://localhost:8080/files/${fileId}`
+    ),
     getThumbnailStatus: jest.fn(),
-    getThumbnailUrl: jest.fn((modelId: string) => `http://localhost:5009/models/${modelId}/thumbnail/file`),
+    getThumbnailUrl: jest.fn(
+      (modelId: string) =>
+        `http://localhost:8080/models/${modelId}/thumbnail/file`
+    ),
     getThumbnailFile: jest.fn(),
     regenerateThumbnail: jest.fn(),
     getAllTextureSets: jest.fn().mockResolvedValue([]),
@@ -93,7 +100,6 @@ jest.mock('./services/ThumbnailSignalRService', () => ({
   ThumbnailStatusChangedEvent: {},
   ActiveVersionChangedEvent: {},
 }))
-
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {

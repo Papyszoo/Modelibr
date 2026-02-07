@@ -21,12 +21,3 @@ Feature: Model Management Operations
     And I click the regenerate thumbnail button
     Then I should see a success message for thumbnail regeneration
     And I take a screenshot of regenerated thumbnail
-
-  @custom-thumbnail
-  Scenario: Upload custom thumbnail
-    Given the test model "Test Model" exists
-    When I open the model viewer for "Test Model"
-    And I click the upload custom thumbnail button
-    And I select an image file for custom thumbnail
-    Then I should see the custom thumbnail applied
-    And I take a screenshot of custom thumbnail

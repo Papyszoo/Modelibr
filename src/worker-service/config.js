@@ -5,11 +5,12 @@ export const config = {
   workerId: process.env.WORKER_ID || `worker-${process.pid}`,
 
   // API connection settings
-  apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:5009',
+  apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:8080',
   rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
 
   // Job processing settings
   maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS) || 3,
+  jobTimeout: parseInt(process.env.JOB_TIMEOUT_MS) || 300000, // 5 minutes default
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',

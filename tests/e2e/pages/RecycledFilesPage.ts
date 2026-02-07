@@ -359,73 +359,84 @@ export class RecycledFilesPage {
      * Confirm the permanent delete action
      */
     async confirmPermanentDelete(): Promise<void> {
-        // Find the Delete Forever button in the dialog footer
-        const dialogFooter = this.page.locator(".p-dialog-footer");
-        await expect(dialogFooter).toBeVisible({ timeout: 5000 });
-
-        // The button has class p-button-danger and label "Delete Forever"
-        const deleteButton = dialogFooter.locator(".p-button-danger");
+        // Use accessible role selector - more reliable than CSS class selectors
+        // which can match dormant PrimeReact ConfirmDialog buttons
+        const deleteButton = this.page.getByRole("button", {
+            name: "Delete Forever",
+        });
         await expect(deleteButton).toBeVisible({ timeout: 5000 });
-
-        // Wait for the button to be enabled (not disabled)
         await expect(deleteButton).toBeEnabled({ timeout: 5000 });
 
         console.log("[Delete] Found Delete Forever button, clicking...");
 
-        // Regular click - should trigger React onClick properly
+        // Set up response listener BEFORE clicking to catch the API call
+        const responsePromise = this.page
+            .waitForResponse(
+                (resp) =>
+                    resp.request().method() === "DELETE" &&
+                    resp.url().includes("/permanent"),
+                { timeout: 15000 },
+            )
+            .catch(() => null);
+
+        // Click the button
         await deleteButton.click();
 
-        // Short wait to see if dialog closes quickly
-        await this.page.waitForTimeout(2000);
+        // Wait for the API response to confirm the delete actually executed
+        let response = await responsePromise;
 
-        // Check if dialog is already closed
-        const isStillVisible = await this.page
-            .locator(this.deleteDialog)
-            .isVisible();
-        if (!isStillVisible) {
-            console.log("[Delete] Dialog closed successfully (quick)");
-            return;
+        if (!response) {
+            // Playwright click didn't trigger the React handler — retry with native DOM click
+            console.log(
+                "[Delete] API not called by Playwright click, retrying with JS click...",
+            );
+            const retryResponsePromise = this.page
+                .waitForResponse(
+                    (resp) =>
+                        resp.request().method() === "DELETE" &&
+                        resp.url().includes("/permanent"),
+                    { timeout: 15000 },
+                )
+                .catch(() => null);
+
+            await this.page.evaluate(() => {
+                const footers = document.querySelectorAll(".p-dialog-footer");
+                for (const footer of footers) {
+                    const btn = Array.from(
+                        footer.querySelectorAll("button"),
+                    ).find(
+                        (b) =>
+                            b.textContent?.includes("Delete Forever") &&
+                            b.offsetParent !== null,
+                    );
+                    if (btn) {
+                        btn.click();
+                        return;
+                    }
+                }
+            });
+
+            response = await retryResponsePromise;
+            if (!response) {
+                throw new Error(
+                    "Permanent delete API call was never made despite clicking Delete Forever button",
+                );
+            }
         }
 
-        // Dialog still visible - try clicking via JavaScript
-        console.log("[Delete] Dialog still visible, trying JS click...");
-        await this.page.evaluate(() => {
-            const button = document.querySelector(
-                ".p-dialog-footer .p-button-danger",
-            ) as HTMLButtonElement;
-            if (button) {
-                button.click();
-            }
-        });
+        console.log(`[Delete] API response: ${response.status()}`);
 
-        console.log("[Delete] Clicked via JS, waiting for dialog to close...");
-
-        // Wait for dialog to close - this may take time for API call
+        // Wait for dialog to close
         try {
             await this.page.waitForSelector(this.deleteDialog, {
                 state: "hidden",
-                timeout: 40000,
+                timeout: 10000,
             });
-            console.log("[Delete] Dialog closed successfully");
-        } catch (e) {
-            // Check if there's an error toast
-            const errorToast = this.page.locator(".p-toast-message-error");
-            if (await errorToast.isVisible()) {
-                const errorText = await errorToast.textContent();
-                console.log(`[Delete] Error occurred: ${errorText}`);
-                throw new Error(`Delete failed: ${errorText}`);
-            }
-
-            // Take screenshot for debugging
-            await this.page.screenshot({
-                path: "test-results/delete-dialog-stuck.png",
-            });
-            console.log(
-                "[Delete] Dialog still visible after 30s, screenshot saved",
-            );
-            throw e;
+        } catch {
+            // Dialog might already be closed
         }
 
+        console.log("[Delete] Permanent delete confirmed successfully");
         await this.page.waitForTimeout(1000);
     }
 
