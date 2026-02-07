@@ -19,6 +19,7 @@ import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import {
   openInFileExplorer,
   copyPathToClipboard,
+  getCopyPathSuccessMessage,
 } from '../../../utils/webdavUtils'
 
 // Interface for channel merge request (must match MergeTextureSetDialog)
@@ -326,9 +327,9 @@ export default function TextureSetGrid({
       severity: result.success ? 'success' : 'error',
       summary: result.success ? 'Copied' : 'Failed',
       detail: result.success
-        ? `Path copied: ${result.path}`
+        ? getCopyPathSuccessMessage()
         : 'Failed to copy path to clipboard',
-      life: 3000,
+      life: 5000,
     })
   }
 
