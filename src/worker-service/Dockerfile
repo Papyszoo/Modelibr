@@ -48,9 +48,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # =============================================================================
 FROM node:20-bookworm-slim AS builder
 
-# Install build dependencies and CA certificates
+# Install build dependencies, CA certificates, and canvas native dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget git \
+    # Python and build tools for node-gyp
+    python3 build-essential \
+    # Canvas native dependencies
+    pkg-config \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    libpixman-1-dev \
   && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
