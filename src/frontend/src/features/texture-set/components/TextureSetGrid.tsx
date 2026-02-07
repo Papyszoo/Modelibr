@@ -502,18 +502,18 @@ export default function TextureSetGrid({
       >
         <div className="pack-selection-dialog">
           <p>Select a pack to add this texture set to:</p>
-          <div className="pack-list">
+          <div className="pack-select-list">
             {packs.map(pack => (
               <div
                 key={pack.id}
-                className="pack-item"
+                className="pack-select-item"
                 onClick={() => handleAddToPack(pack.id)}
               >
                 <i className="pi pi-box" />
-                <div className="pack-item-content">
-                  <span className="pack-item-name">{pack.name}</span>
+                <div className="pack-select-item-content">
+                  <span className="pack-select-item-name">{pack.name}</span>
                   {pack.description && (
-                    <span className="pack-item-description">
+                    <span className="pack-select-item-description">
                       {pack.description}
                     </span>
                   )}
@@ -523,7 +523,7 @@ export default function TextureSetGrid({
             ))}
           </div>
           {packs.length === 0 && (
-            <div className="no-packs">
+            <div className="pack-select-no-packs">
               <i className="pi pi-inbox" />
               <p>No packs available. Create a pack first.</p>
             </div>

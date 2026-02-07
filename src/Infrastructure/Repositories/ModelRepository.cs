@@ -27,7 +27,6 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<IEnumerable<Model>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Models
-            .Where(m => !m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
@@ -44,7 +43,6 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models
-            .Where(m => !m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
@@ -61,7 +59,6 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<Model?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
     {
         return await _context.Models
-            .Where(m => !m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
@@ -84,6 +81,7 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<IEnumerable<Model>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Models
+            .IgnoreQueryFilters()
             .Where(m => m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
@@ -102,6 +100,7 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<Model?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models
+            .IgnoreQueryFilters()
             .Where(m => m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
@@ -122,7 +121,9 @@ internal sealed class ModelRepository : IModelRepository
         // Break the circular FK dependency between Model.ActiveVersionId and ModelVersion.ModelId
         // EF Core cannot determine deletion order with circular FKs, so we must break the cycle first
         // Use ExecuteUpdateAsync to bypass the private setter and update directly in the database
+        // Must use IgnoreQueryFilters() because the model is soft-deleted (IsDeleted = true)
         await _context.Models
+            .IgnoreQueryFilters()
             .Where(m => m.Id == id)
             .ExecuteUpdateAsync(s => s.SetProperty(m => m.ActiveVersionId, (int?)null), cancellationToken);
         
@@ -138,7 +139,9 @@ internal sealed class ModelRepository : IModelRepository
         }
         
         // Reload the model with fresh data (now without the circular FK)
+        // Must use IgnoreQueryFilters() because the model is soft-deleted (IsDeleted = true)
         var model = await _context.Models
+            .IgnoreQueryFilters()
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .Include(m => m.Versions)

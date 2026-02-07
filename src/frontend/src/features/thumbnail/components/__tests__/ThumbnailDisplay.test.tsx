@@ -32,7 +32,7 @@ describe('ThumbnailDisplay', () => {
   it('renders thumbnail image when ready', async () => {
     mockUseThumbnail.mockReturnValue({
       thumbnailDetails: { status: 'Ready' },
-      imgSrc: 'http://localhost:5009/models/1/thumbnail/file?t=123',
+      imgSrc: 'http://localhost:8080/models/1/thumbnail/file?t=123',
       refreshThumbnail: jest.fn(),
     })
 
@@ -43,7 +43,7 @@ describe('ThumbnailDisplay', () => {
       expect(image).toBeInTheDocument()
       expect(image).toHaveAttribute(
         'src',
-        'http://localhost:5009/models/1/thumbnail/file?t=123'
+        'http://localhost:8080/models/1/thumbnail/file?t=123'
       )
     })
   })
@@ -67,7 +67,7 @@ describe('ThumbnailDisplay', () => {
   it('calls useThumbnail with correct parameters', async () => {
     mockUseThumbnail.mockReturnValue({
       thumbnailDetails: { status: 'Ready' },
-      imgSrc: 'http://localhost:5009/models/1/thumbnail/file?t=123',
+      imgSrc: 'http://localhost:8080/models/1/thumbnail/file?t=123',
       refreshThumbnail: jest.fn(),
     })
 
@@ -81,7 +81,7 @@ describe('ThumbnailDisplay', () => {
   it('calls useThumbnail with versionId when provided', async () => {
     mockUseThumbnail.mockReturnValue({
       thumbnailDetails: { status: 'Ready' },
-      imgSrc: 'http://localhost:5009/model-versions/5/thumbnail/file?t=123',
+      imgSrc: 'http://localhost:8080/model-versions/5/thumbnail/file?t=123',
       refreshThumbnail: jest.fn(),
     })
 
@@ -95,7 +95,7 @@ describe('ThumbnailDisplay', () => {
   it('uses model name in alt text and title when provided', async () => {
     mockUseThumbnail.mockReturnValue({
       thumbnailDetails: { status: 'Ready' },
-      imgSrc: 'http://localhost:5009/models/1/thumbnail/file?t=123',
+      imgSrc: 'http://localhost:8080/models/1/thumbnail/file?t=123',
       refreshThumbnail: jest.fn(),
     })
 
@@ -112,7 +112,7 @@ describe('ThumbnailDisplay', () => {
   it('uses default alt text when model name is not provided', async () => {
     mockUseThumbnail.mockReturnValue({
       thumbnailDetails: { status: 'Ready' },
-      imgSrc: 'http://localhost:5009/models/1/thumbnail/file?t=123',
+      imgSrc: 'http://localhost:8080/models/1/thumbnail/file?t=123',
       refreshThumbnail: jest.fn(),
     })
 

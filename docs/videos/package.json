@@ -1,0 +1,27 @@
+{
+    "name": "modelibr-doc-videos",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Playwright scripts for generating Modelibr documentation videos",
+    "type": "module",
+    "scripts": {
+        "generate": "npx playwright test --config=playwright.config.ts",
+        "generate:models": "npx playwright test --config=playwright.config.ts --grep \"Model Management\"",
+        "generate:recycled": "npx playwright test --config=playwright.config.ts --grep \"Recycled Files\"",
+        "generate:ui": "npx playwright test --config=playwright.config.ts --grep \"User Interface\"",
+        "generate:sprites": "npx playwright test --config=playwright.config.ts --grep \"Sprites\"",
+        "generate:sounds": "npx playwright test --config=playwright.config.ts --grep \"Sounds\"",
+        "generate:projects": "npx playwright test --config=playwright.config.ts --grep \"Projects\"",
+        "generate:packs": "npx playwright test --config=playwright.config.ts --grep \"Packs\"",
+        "postgenerate": "node collect-videos.js"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.49.1",
+        "@types/node": "^22.19.3",
+        "typescript": "^5.7.2"
+    },
+    "dependencies": {
+        "axios": "^1.13.2",
+        "form-data": "^4.0.5"
+    }
+}

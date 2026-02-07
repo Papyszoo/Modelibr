@@ -7,232 +7,243 @@ tools:
         "read",
         "edit",
         "search",
-        "web",
         "agent",
         "copilot-container-tools/*",
         "github/*",
         "playwright/*",
-        "github.vscode-pull-request-github/copilotCodingAgent",
-        "github.vscode-pull-request-github/issue_fetch",
-        "github.vscode-pull-request-github/suggest-fix",
-        "github.vscode-pull-request-github/searchSyntax",
-        "github.vscode-pull-request-github/doSearch",
-        "github.vscode-pull-request-github/renderIssues",
-        "github.vscode-pull-request-github/activePullRequest",
-        "github.vscode-pull-request-github/openPullRequest",
-        "ms-ossdata.vscode-pgsql/pgsql_listServers",
-        "ms-ossdata.vscode-pgsql/pgsql_connect",
-        "ms-ossdata.vscode-pgsql/pgsql_disconnect",
-        "ms-ossdata.vscode-pgsql/pgsql_open_script",
-        "ms-ossdata.vscode-pgsql/pgsql_visualizeSchema",
-        "ms-ossdata.vscode-pgsql/pgsql_query",
-        "ms-ossdata.vscode-pgsql/pgsql_modifyDatabase",
-        "ms-ossdata.vscode-pgsql/database",
-        "ms-ossdata.vscode-pgsql/pgsql_listDatabases",
-        "ms-ossdata.vscode-pgsql/pgsql_describeCsv",
-        "ms-ossdata.vscode-pgsql/pgsql_bulkLoadCsv",
-        "ms-ossdata.vscode-pgsql/pgsql_getDashboardContext",
-        "ms-ossdata.vscode-pgsql/pgsql_getMetricData",
-        "ms-ossdata.vscode-pgsql/pgsql_migration_oracle_app",
-        "ms-ossdata.vscode-pgsql/pgsql_migration_show_report",
         "todo",
+        "ms-ossdata.vscode-pgsql/pgsql_query",
     ]
 ---
 
 # Modelibr E2E Testing Agent
 
-This agent specializes in E2E testing for Modelibr using Playwright-BDD and Docker Compose. Tests should be **short, focused, and human-readable**.
+> **Prerequisites**: Read `.github/copilot-instructions.md` for core rules. This agent adds E2E-specific guidance.
+
+Specializes in Playwright-BDD E2E tests for Modelibr. Tests should be **short, focused, and human-readable**.
+
+## When to Use This Agent
+
+Use `@e2e` when:
+
+- Writing new E2E test scenarios
+- Fixing broken or flaky E2E tests
+- Adding `data-testid` attributes to UI components for testability
+- Debugging test failures (check `test-results/error-context.md` first)
+- Running the E2E test suite
+
+Do NOT use for unit tests, integration tests, or non-test code changes.
+
+---
 
 ## Test Design Principles
 
 ### Structure
-- **Granular tests**: One test per scenario, each testing a single behavior
-- **Dependencies via tags**: Use `@setup` for setup scenarios, `@depends-on:setup` for dependent tests
-- **Shared state**: Use `sharedState` fixture to pass data (models, texture sets) between scenarios
-- **Page Objects**: Use dedicated page objects (`ModelListPage`, `ModelViewerPage`, `TextureSetsPage`) for UI interactions
 
-### Verification Layers
-Each test should verify through appropriate layers:
+- **One behavior per scenario**: Granular, focused tests
+- **Dependencies via tags**: `@setup` for setup scenarios, `@depends-on:setup` for dependent tests
+- **Shared state**: Use `sharedState` fixture to pass data between scenarios
+- **Page Objects**: Use dedicated page objects for UI interactions
+
+### Verification — Every Test Must Verify Through Multiple Layers
+
 - **UI**: Visual confirmation of changes
-- **API**: Direct API response validation
-- **SignalR**: Real-time event verification
-- **Database**: Data persistence checks
-- **File System**: File creation/modification verification
+- **API**: Direct API response validation (not just UI)
+- **Database**: Data persistence checks via `dbHelper` fixture
+- **NEVER** use `expect(true).toBe(true)` or similar no-op assertions
+- **NEVER** use `page.reload()` to mask SignalR/real-time update failures
+- **NEVER** bypass UI by calling REST API directly when the test should exercise UI behavior
 
-### Test File Organization
-```
-tests/e2e/
-├── features/
-│   ├── health-check.feature          # Basic connectivity
-│   ├── model-upload.feature          # Model upload tests
-│   ├── texture-sets/
-│   │   ├── 01-setup.feature          # @setup - create models
-│   │   ├── 02-create-texture-sets.feature  # @setup - create texture sets
-│   │   ├── 03-default-behavior.feature     # @depends-on tests
-│   │   └── 04-version-independence.feature # @depends-on tests
-├── pages/                             # Page objects
-├── steps/                             # Step definitions
-├── fixtures/                          # Playwright fixtures (shared-state, db-helper, signalr-helper)
-└── helpers/                           # API helpers
-```
+### Selectors — Priority Order
 
-## Environment Configuration
+1. **BEST**: `getByRole('button', { name: '...' })` — accessible, stable
+2. **GOOD**: `[data-testid="..."]` — explicit test hook
+3. **ACCEPTABLE**: `#elementId` — HTML ID
+4. **AVOID**: CSS class selectors (`.p-dialog input`) — fragile
 
-### Docker Compose
-- **ALWAYS** use `tests/e2e/docker-compose.e2e.yml` - NEVER the root `docker-compose.yml`
-- E2E ports (isolated from development):
-  - **WebApi**: `http://localhost:8090`
-  - **Frontend**: `http://localhost:3002`
-  - **PostgreSQL**: `localhost:5433`
-  - **Worker**: `http://localhost:3003`
+### data-testid Format
 
-### Running Tests
+`{component}-{element}-{variant?}` (e.g., `category-dialog-save`, `version-dropdown-item-1`)
+
+---
+
+## Environment
+
+### Docker Compose — Always Use E2E Config
+
 ```bash
 cd tests/e2e
-npm run test:e2e    # Runs cross-platform node run-e2e.js script
-npm run test:report # Opens HTML report in browser
+docker compose -f docker-compose.e2e.yml up -d --build
 ```
 
-The `run-e2e.js` script handles:
-1. Starting containers with fresh database
-2. Running tests with proper environment variables
-3. Cleaning up containers and data after tests
+### Ports (Isolated from Development)
 
-## Test Assets
+| Service    | Port | URL                   |
+| ---------- | ---- | --------------------- |
+| WebApi     | 8090 | http://localhost:8090 |
+| Frontend   | 3002 | http://localhost:3002 |
+| PostgreSQL | 5433 | localhost:5433        |
+| Worker     | 3003 | http://localhost:3003 |
 
-Located in `tests/e2e/assets/`:
-- **Models**: `test-cube.glb` (GLB only - safe to modify), `test-cone.fbx`, `test-cylinder.fbx`, `test-icosphere.fbx`, `test-torus.fbx`
+### Running Tests
+
+```bash
+cd tests/e2e
+npm run test:setup                       # Start Docker + wait for health
+npm run test:quick                       # Run ALL tests (existing containers)
+npm run test:quick -- --grep "Sprite"    # Run only tests matching pattern
+npx bddgen && npx playwright test <file> # Run a specific spec file
+npm run test:teardown                    # Stop containers + clean volumes
+npm run test:e2e                         # Full run (setup → all tests → teardown)
+npm run test:report                      # Open HTML report
+```
+
+### Running Only Related Tests (Preferred)
+
+When fixing or writing tests, **run only the affected test files**, not the full suite.
+
+```bash
+# By spec file path (after bddgen):
+npx bddgen && npx playwright test .features-gen/features/07-sprites/
+
+# By grep pattern on test title:
+npx bddgen && npx playwright test --grep "SignalR|Shared File"
+```
+
+### Cleanup
+
+```bash
+npm run test:teardown
+# Or manually:
+cd tests/e2e
+docker compose -f docker-compose.e2e.yml down -v
+Remove-Item -Recurse -Force ./data   # Windows
+rm -rf ./data                         # Linux/Mac
+```
+
+---
+
+## File Organization
+
+```
+tests/e2e/
+├── features/              # Gherkin feature files
+│   ├── health-check.feature
+│   ├── 00-texture-sets/   # Numbered for execution order
+│   │   ├── 01-setup.feature
+│   │   └── 02-crud.feature
+├── pages/                 # Page objects
+├── steps/                 # Step definitions
+├── fixtures/              # shared-state, db-helper, signalr-helper, unique-file-generator
+├── helpers/               # api-helper, docker-helper
+└── assets/                # Test files (.glb, .fbx, .png)
+```
+
+### Test Assets
+
+- **Models**: `test-cube.glb`, `test-cone.fbx`, `test-cylinder.fbx`, `test-icosphere.fbx`, `test-torus.fbx`
 - **Textures**: `blue_color.png`, `red_color.png`, `green_color.png`, `yellow_color.png`, `pink_color.png`, `black_color.png`
+- **Sounds**: `test-tone.wav`
+- **WARNING**: FBX/OBJ are binary — modifying them will corrupt. GLB, PNG, and WAV are all supported by UniqueFileGenerator.
+- **ALWAYS** verify assets exist before referencing: `ls tests/e2e/assets/`
 
-> **WARNING**: Only `.glb` files can be safely modified for uniqueness via `UniqueFileGenerator`. FBX/OBJ files are binary and will corrupt if modified.
+### File Uniqueness — MANDATORY
 
-## Critical Selector Patterns
-
-### Use Accessible Selectors
-Always prefer role-based and accessible selectors over CSS classes:
+The server uses SHA256 hash-based file deduplication. Uploading the same file twice returns the existing record instead of creating a new one. **Always use `UniqueFileGenerator.generate(filename)` when uploading any file** to ensure each upload produces a unique hash.
 
 ```typescript
-// ✅ GOOD - Uses role and name
-await page.getByRole('button', { name: 'Add Version' }).click();
-await page.getByRole('button', { name: 'Upload textures' }).click();
+import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 
-// ❌ BAD - Fragile CSS selectors
-await page.locator('.viewer-controls button:has(.pi-plus)').click();
+// ✅ Correct — always generate unique file
+const filePath = await UniqueFileGenerator.generate("blue_color.png");
+await page.locator("input[type='file']").setInputFiles(filePath);
+
+// ❌ Wrong — reuses static file, deduplication prevents new record
+const filePath = path.join(__dirname, "..", "assets", "blue_color.png");
 ```
 
-### URL Patterns
-The application uses query parameter-based routing:
+Supported formats:
+
+- **GLB**: Injects unique `extras` into JSON chunk (spec-compliant)
+- **PNG**: Injects unique `tEXt` metadata chunk before IEND (spec-compliant)
+- **WAV**: Appends unique RIFF sub-chunk (parsers skip unknown chunks)
+- **FBX/OBJ**: Copies without modification (binary formats cannot be safely altered)
+
+### Self-Provisioning — MANDATORY
+
+Every `Given` step that checks for existence must **create the resource via API if not found**. Never throw an error saying "upload it first" — auto-provision instead.
+
 ```typescript
-// ✅ CORRECT - Query param format
-const match = url.match(/model-(\d+)/);
+// ✅ Correct — auto-provisions if missing
+Given("the sprite {string} exists in shared state", async ({ page }, name) => {
+    let sprite = sharedState.getSprite(name);
+    if (!sprite) {
+        // Look up via API, or create via API if not found
+        const uniqueFile = await UniqueFileGenerator.generate("blue_color.png");
+        // ... create via POST /sprites/with-file ...
+    }
+});
 
-// ❌ WRONG - Old path format
-const match = url.match(/\/models\/(\d+)/);
+// ❌ Wrong — throws if not found (breaks test isolation)
+if (!sprite) throw new Error("Upload it first.");
 ```
 
-### Texture Sets Page Navigation
-Navigate to Texture Sets tab using direct URL:
+---
+
+## Shared State
+
 ```typescript
-await page.goto('http://localhost:3002/?leftTabs=modelList,textureSets&activeLeft=textureSets');
+// Store after creation
+sharedState.saveModel("my-model", { id: modelId, name: fileName });
+
+// Retrieve (throws if missing)
+const model = sharedState.getModel("my-model");
 ```
 
-## Page Object Guidelines
-
-### TextureSetsPage
-- Navigate via direct URL, not UI click-through
-- Upload textures via hidden file input: `page.locator('input[data-testid="texture-upload-input"]').setInputFiles()`
-- App creates texture set with file basename as name
-
-### ModelViewerPage
-- Wait for canvas to be visible and loading to disappear
-- Use `getByRole('button', { name: 'Add Version' })` for version upload
-- Version dropdown uses `.version-dropdown-trigger` and `.version-dropdown-menu`
-
-### ModelListPage
-- Close upload progress window after uploads to prevent click blocking
-
-## Shared State Management
-
-### Storing Data
-```typescript
-// Store model after creation
-sharedState.saveModel('single-version-model', { id: modelId, name: fileName });
-
-// Store texture set after creation
-sharedState.saveTextureSet('blue_color', { id: textureSetId, name: 'blue_color' });
-```
-
-### Retrieving Data
-```typescript
-const model = sharedState.getModel('single-version-model');
-if (!model) {
-    throw new Error(`Model not found in shared state`);
-}
-```
-
-### Feature File Patterns
 ```gherkin
-# Setup scenarios create data
+# Setup creates data
 @setup
 Feature: Create Models
-  Scenario: Create single-version model
-    When I upload a model "test-cube.glb" and store it as "single-version-model"
+  Scenario: Upload model
+    When I upload "test-cube.glb" and store it as "my-model"
 
-# Dependent scenarios verify state first
+# Dependent test verifies prerequisite exists
 @depends-on:setup
-Feature: Default Behavior
+Feature: Model Behavior
   Background:
     Given the following models exist in shared state:
-      | name                 |
-      | single-version-model |
+      | name     |
+      | my-model |
 ```
 
-## Debugging Workflow
+---
 
-### When Tests Fail
-1. **Check error-context.md** in `test-results/` directories for page snapshots
-2. **View screenshots** captured on test failures
-3. **Check WebApi logs**: `docker logs webapi-e2e`
-4. **Test API directly**: 
-   ```bash
-   curl http://localhost:8090/health
-   curl http://localhost:8090/texture-sets
-   ```
+## URL Patterns
 
-### Common Issues
+The app uses query parameter routing:
 
-| Issue | Solution |
-|-------|----------|
-| 500 errors from API | Check webapi logs, verify database connectivity, ensure fresh database |
-| Selector not found | Check error-context.md for actual DOM structure, use getByRole() |
-| Model not in shared state | Verify setup scenarios run before dependent scenarios |
-| Unique constraint errors | Clean database: `docker compose -f docker-compose.e2e.yml down -v` |
-| Port already allocated | Stop conflicting containers, check for running dev environment |
+```typescript
+// ✅ Correct — query params
+await page.goto(
+    "http://localhost:3002/?leftTabs=modelList,textureSets&activeLeft=textureSets",
+);
 
-### Database Cleanup
-Always clean up before running tests:
-```bash
-docker compose -f docker-compose.e2e.yml down -v
-rm -rf ./data  # or Remove-Item -Recurse -Force ./data on Windows
+// ❌ Wrong — path-based (old format)
+await page.goto("http://localhost:3002/models/1");
 ```
 
-## SignalR & Real-time Updates
+---
 
-Use `SignalRHelper` fixture for:
-- `ThumbnailStatusChanged`: When thumbnails finish rendering
-- `ModelProcessed`: When model processing completes
+## Debugging Failures
 
-## Screenshots
+1. Check `test-results/*/error-context.md` for page snapshots
+2. Check screenshots in test results
+3. Check API logs: `docker logs webapi-e2e`
+4. Test API directly: `curl http://localhost:8090/health`
 
-Tests capture screenshots on pass and fail (`screenshot: "on"` in config). These appear in the HTML report for visual verification.
-
-## Files to Ignore (in .gitignore)
-
-```
-test-results/
-playwright-report/
-.features-gen/
-data/
-node_modules/
-*.log
-```
+| Issue                    | Solution                                                     |
+| ------------------------ | ------------------------------------------------------------ |
+| 500 errors               | Check webapi logs, verify DB connectivity                    |
+| Selector not found       | Check error-context.md for actual DOM, use `getByRole()`     |
+| Unique constraint errors | Clean DB: `docker compose -f docker-compose.e2e.yml down -v` |
+| Port already allocated   | Stop conflicting containers                                  |

@@ -6,19 +6,31 @@ sidebar_position: 4
 
 Modelibr uses a flexible panel system that lets you organize your workspace and share layouts with URLs.
 
+<div className="feature-video-container">
+  <video controls width="100%" autoPlay muted loop>
+    <source src="/Modelibr/videos/user-interface.webm" type="video/webm" />
+    <p className="video-fallback">Demo video is being generated...</p>
+  </video>
+</div>
+
 ## Panel Layout
 
 The interface is split into **two panels** (left and right), each containing multiple **tabs**.
 
 ### Tab Types
 
-| Tab | Icon | Description |
-|-----|------|-------------|
-| **Models** | List | Your model library grid |
-| **Texture Sets** | Folder | Browse and manage texture sets |
-| **Settings** | Cog | Application settings |
-| **Model Viewer** | Cube | 3D viewer for a specific model |
-| **Texture Set Viewer** | Image | Preview a texture set |
+| Tab                    | Icon      | Description                    |
+| ---------------------- | --------- | ------------------------------ |
+| **Models**             | List      | Your model library grid        |
+| **Texture Sets**       | Folder    | Browse and manage texture sets |
+| **Sprites**            | Image     | Your sprite/image library      |
+| **Sounds**             | Volume    | Your audio asset library       |
+| **Packs**              | Inbox     | Reusable asset bundles         |
+| **Projects**           | Briefcase | Project workspaces             |
+| **Settings**           | Cog       | Application settings           |
+| **Recycled Files**     | Trash     | Recover deleted items          |
+| **Model Viewer**       | Cube      | 3D viewer for a specific model |
+| **Texture Set Viewer** | Image     | Preview a texture set          |
 
 ### Working with Tabs
 
@@ -69,6 +81,7 @@ While duplicates are prevented within a single panel, you **can** open the same 
 - Compare different views or settings side-by-side
 
 This is useful for:
+
 - Comparing model versions
 - Viewing model while adjusting texture sets
 - Side-by-side texture comparisons

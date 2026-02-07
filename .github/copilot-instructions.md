@@ -1,1328 +1,290 @@
-# ⚠️ CRITICAL: NO DOCUMENTATION GENERATION ⚠️
+# Modelibr — AI Agent Instructions
 
-**NEVER CREATE, GENERATE, OR ADD ANY DOCUMENTATION FILES (_.md, _.txt, \*.doc, README, CHANGELOG, etc.) TO THIS REPOSITORY.**
+> **This is the single source of truth for all AI agents.** Both GitHub Copilot and Gemini/Antigravity must follow these rules.
+> For specialized workflows, see `.github/agents/` (e2e testing, feature implementation).
 
-**DO NOT:**
+## Identity
 
-- Create implementation documentation
-- Generate architecture documents
-- Write setup guides or tutorials
-- Add API documentation files
-- Create summary or overview documents
-- Generate any standalone documentation files
+Modelibr is a .NET 9.0 C# Web API with a React/TypeScript frontend, Node.js worker service, and Python Blender addon. Clean Architecture with DDD. PostgreSQL database. Docker Compose for orchestration. Hash-based file storage with deduplication.
 
-**EXCEPTIONS:**
+---
 
-- Only update existing documentation if explicitly requested
-- Only modify .github/copilot-instructions.md when necessary for configuration
+## Hard Rules
 
-# Modelibr
+These rules are non-negotiable. Violating any of them is a blocking error.
 
-Modelibr is a .NET 9.0 C# Web API application built using Clean Architecture principles. It provides a file upload service for 3D models with hash-based storage and deduplication. The application is containerized using Docker and includes database integration with PostgreSQL.
+### OFFLINE-FIRST
 
-Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+The application MUST work completely offline. Never suggest or implement solutions requiring external API calls (cloud AI, CDNs, external APIs, `googleapis.com`, `openai`, `anthropic`, `azure.cognitive`).
 
-## Core Principles
-
-### Offline-First Design
-
-**CRITICAL**: The application MUST work completely offline without any internet connection or external API calls. All features, including AI/ML capabilities, must use local models and resources. Never suggest or implement solutions that require external API calls (e.g., cloud AI services, external APIs).
-
-## Code Style Guidelines
-
-### Keep Code Simple
-
-- Code should be as simple as possible without unnecessary clutter
-- Only implement what is specifically requested in the issue or PR comments
-- Avoid excessive comments, documentation, or examples unless explicitly requested
-- Do not add JSDoc comments or extensive inline documentation
-- Focus on clean, readable code that speaks for itself
-
-## Working Effectively
-
-### Prerequisites and Setup
-
-- Install .NET 9.0 SDK - REQUIRED (the project targets net9.0):
-    - `curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 9.0`
-    - `export PATH="$HOME/.dotnet:$PATH"`
-- Verify installation: `dotnet --version` (should show 9.0.x)
-
-### Build and Test
-
-- Bootstrap and build the repository:
-    - `cd /home/runner/work/Modelibr/Modelibr`
-    - `dotnet restore Modelibr.sln` -- takes 9-10 seconds. Set timeout to 15+ minutes for safety.
-    - `dotnet build Modelibr.sln` -- takes 9-10 seconds. NEVER CANCEL. Set timeout to 15+ minutes.
-- Run tests:
-    - `dotnet test Modelibr.sln --no-build` -- takes 1-2 seconds when using --no-build flag
-    - NOTE: Tests may have Azure.Core dependency issues when rebuilding. Use `--no-build` flag to avoid this.
-
-### Run the Application
-
-- ALWAYS set upload directory environment variable first:
-    - `export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads"`
-- Run the Web API:
-    - `cd src/WebApi`
-    - `dotnet run` -- application starts on http://localhost:5009
-- Available endpoints:
-    - POST `/uploadModel` - Upload 3D model files
-    - The application requires PostgreSQL connection for full functionality
-
-### Docker Support
-
-- Docker Compose setup available:
-    - `docker compose version` -- verify Docker Compose v2.x is available
-    - Configuration in `docker-compose.yml` with PostgreSQL database
-    - Uses ports 8080 (HTTP) and 8081 (HTTPS) in containers
-    - **REQUIRED**: Create `.env` file from `.env.example` before running docker-compose
-    - `cp .env.example .env` -- copy environment configuration
-    - Environment variables in `.env.example` contain all required parameters
-
-## Validation
-
-- ALWAYS manually test the Web API after changes by running `dotnet run` and verifying it starts successfully
-- Test the upload endpoint: `curl -X POST -F "file=@test.txt" http://localhost:5009/uploadModel`
-- ALWAYS build with `dotnet build Modelibr.sln` before committing changes
-- Use `dotnet test Modelibr.sln --no-build` to run tests without rebuild issues
-
-## Clean Architecture and Domain-Driven Design (DDD) Guidelines
-
-### Architecture Overview
-
-Modelibr implements Clean Architecture with Domain-Driven Design principles, ensuring clear separation of concerns and dependency inversion:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        WebApi Layer                         │
-│            (Presentation - Controllers/Endpoints)           │
-├─────────────────────────────────────────────────────────────┤
-│                     Application Layer                       │
-│        (Use Cases, Commands, Queries, Services)             │
-├─────────────────────────────────────────────────────────────┤
-│                       Domain Layer                          │
-│     (Entities, Value Objects, Domain Services)              │
-│                                                             │
-│                    SharedKernel                             │
-│              (Common Domain Primitives)                     │
-├─────────────────────────────────────────────────────────────┤
-│                   Infrastructure Layer                      │
-│    (Data Access, External Services, Implementation)         │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Layer Responsibilities and Code Placement
-
-#### 1. Domain Layer (`src/Domain/`)
-
-**PURPOSE**: Contains the core business logic and domain model. This is the heart of the application.
-
-**WHAT BELONGS HERE:**
-
-- **Entities** (`Models/`): Core business objects with identity
-    - Example: `Model.cs`, `File.cs`, `Thumbnail.cs`
-    - Must contain business logic and invariants
-    - Should have factory methods (e.g., `Model.Create()`)
-    - Methods that enforce business rules (e.g., `AddFile()`, `UpdateName()`)
-- **Value Objects** (`ValueObjects/`): Immutable objects that describe domain concepts
-    - Example: `FileType.cs` with validation logic
-    - Must be immutable and implement equality
-    - Contain domain validation (e.g., `ValidateForModelUpload()`)
-- **Domain Services** (`Services/`): Domain logic that doesn't naturally fit in entities
-    - Example: `IDateTimeProvider.cs` (abstractions for testability)
-    - Cross-entity operations
-    - Complex business rules involving multiple entities
-
-**WHAT DOES NOT BELONG HERE:**
-
-- Database concerns (EF Core attributes, DbContext)
-- External service dependencies
-- Framework-specific code
-- Infrastructure concerns (file I/O, HTTP, etc.)
-
-**DEPENDENCIES**: Only SharedKernel. No dependencies on other layers.
-
-#### 2. SharedKernel (`src/SharedKernel/`)
-
-**PURPOSE**: Common building blocks shared across the domain.
-
-**WHAT BELONGS HERE:**
-
-- **Result Pattern** (`Result.cs`): For error handling without exceptions
-- **Error Types** (`Error.cs`): Structured error representation
-- **Base Classes**: Common domain primitives
-- **Common Interfaces**: Shared across all layers
-
-**DEPENDENCIES**: None (standalone).
-
-#### 3. Application Layer (`src/Application/`)
-
-**PURPOSE**: Orchestrates domain objects to fulfill use cases. Contains application logic but no business rules.
-
-**WHAT BELONGS HERE:**
-
-- **Commands/Queries** (`Models/`): CQRS pattern implementation
-    - Commands: `AddModelCommand`, `AddFileToModelCommand`
-    - Queries: `GetAllModelsQuery`
-    - Must be simple DTOs with no logic
-- **Command/Query Handlers** (`Models/`): Execute use cases
-    - Example: `AddModelCommandHandler.cs`
-    - Orchestrate domain objects
-    - Handle transaction boundaries
-    - Validate business rules using domain objects
-- **Application Services** (`Services/`): Complex application logic
-    - Example: `FileCreationService.cs`
-    - Coordinate multiple repositories/domain services
-    - Handle application-specific workflows
-- **Abstractions** (`Abstractions/`): Interfaces for infrastructure concerns
-    - **Repositories** (`Abstractions/Repositories/`): Data access contracts
-    - **Services** (`Abstractions/Services/`): External service contracts
-    - **Storage** (`Abstractions/Storage/`): File storage contracts
-    - **Files** (`Abstractions/Files/`): File handling contracts
-    - **Messaging** (`Abstractions/Messaging/`): CQRS contracts
-
-**WHAT DOES NOT BELONG HERE:**
-
-- Business rules (belong in Domain)
-- Infrastructure implementation details
-- Framework-specific code (except for DI registration)
-
-**DEPENDENCIES**: Domain, SharedKernel only. Infrastructure injects implementations.
-
-#### 4. Infrastructure Layer (`src/Infrastructure/`)
-
-**PURPOSE**: Implements application abstractions and handles external concerns.
-
-**WHAT BELONGS HERE:**
-
-- **Repositories** (`Repositories/`): Data access implementations
-    - Example: `ModelRepository.cs`, `FileRepository.cs`
-    - Implement Application layer interfaces
-    - Handle Entity Framework concerns
-    - Mapping between domain entities and data models
-- **Persistence** (`Persistence/`): Database configuration
-    - Example: `ApplicationDbContext.cs`
-    - Entity Framework configuration
-    - Database migrations
-    - Value object conversions
-- **Storage** (`Storage/`): File system operations
-    - Example: `HashBasedFileStorage.cs`
-    - Implement storage abstractions from Application layer
-    - Handle file deduplication logic
-- **Services** (`Services/`): External service implementations
-    - Example: `ThumbnailQueue.cs`
-    - Implement Application layer service abstractions
-    - Third-party integrations
-- **Extensions** (`Extensions/`): Infrastructure utilities
-    - Database initialization
-    - Migration helpers
-
-**WHAT DOES NOT BELONG HERE:**
-
-- Business logic (belongs in Domain)
-- Application workflow logic (belongs in Application)
-- Presentation concerns (belongs in WebApi)
-
-**DEPENDENCIES**: All layers (Domain, Application, SharedKernel, external packages).
-
-#### 5. WebApi Layer (`src/WebApi/`)
-
-**PURPOSE**: Handles HTTP concerns and user interface. Entry point for external requests.
-
-**WHAT BELONGS HERE:**
-
-- **Endpoints** (`Endpoints/`): HTTP endpoint definitions
-    - Example: `ModelEndpoints.cs`, `FilesEndpoints.cs`
-    - Handle HTTP-specific concerns (routing, status codes)
-    - Map between HTTP requests and Application commands/queries
-    - Validate requests using domain objects
-    - Handle authentication/authorization
-- **Files** (`Files/`): Web-specific file handling
-    - Example: `FormFileUpload.cs`
-    - Adapt web framework types to Application abstractions
-    - Handle multipart form data
-- **Services** (`Services/`): Web-specific services
-    - Caching, logging, health checks
-    - Web-specific configuration providers
-- **Infrastructure** (`Infrastructure/`): Web app configuration
-    - Example: `UploadDirectoryInitializer.cs`
-    - Startup services
-    - Hosted services
-
-**WHAT DOES NOT BELONG HERE:**
-
-- Business logic (belongs in Domain)
-- Data access logic (belongs in Infrastructure)
-- Complex application workflows (belongs in Application)
-
-**DEPENDENCIES**: Application, Infrastructure (for DI registration only), SharedKernel.
-
-### Key Design Patterns and Principles
-
-#### 1. CQRS (Command Query Responsibility Segregation)
-
-- **Commands**: Modify state, return success/failure
-- **Queries**: Read data, return DTOs
-- **Handlers**: One handler per command/query
-- **Example**: `AddModelCommand` → `AddModelCommandHandler`
-
-#### 2. Repository Pattern
-
-- **Purpose**: Abstract data access from business logic
-- **Interface**: Defined in Application layer (`IModelRepository`)
-- **Implementation**: In Infrastructure layer (`ModelRepository`)
-- **Benefits**: Testability, technology independence
-
-#### 3. Result Pattern
-
-- **Purpose**: Explicit error handling without exceptions
-- **Usage**: All operations that can fail return `Result<T>`
-- **Example**: `FileType.ValidateForModelUpload()` returns `Result<FileType>`
-
-#### 4. Value Objects
-
-- **Purpose**: Encapsulate domain concepts with validation
-- **Characteristics**: Immutable, equality by value, self-validating
-- **Example**: `FileType` with built-in validation and behavior
-
-#### 5. Dependency Inversion
-
-- **Rule**: High-level modules don't depend on low-level modules
-- **Implementation**: Application defines interfaces, Infrastructure implements
-- **Benefits**: Testability, flexibility, maintainability
-
-### Code Organization Rules
-
-#### Dependencies Flow (Critical Rule)
+### CLEAN ARCHITECTURE — Dependency Flow
 
 ```
 WebApi → Application → Domain ← Infrastructure
-              ↓              ↑
-         SharedKernel ← ← ← ← ↑
+                ↓              ↑
+           SharedKernel ← ← ← ←
 ```
 
-- **Domain** and **SharedKernel**: No dependencies on other layers
-- **Application**: Only depends on Domain and SharedKernel
-- **Infrastructure**: Can depend on all layers
-- **WebApi**: Depends on Application and Infrastructure (for DI only)
-
-#### Naming Conventions
-
-- **Commands**: End with `Command` (e.g., `AddModelCommand`)
-- **Queries**: End with `Query` (e.g., `GetAllModelsQuery`)
-- **Handlers**: End with `Handler` (e.g., `AddModelCommandHandler`)
-- **Interfaces**: Start with `I` (e.g., `IModelRepository`)
-- **Value Objects**: Descriptive names (e.g., `FileType`, not `FileTypeVO`)
-
-#### File Organization
-
-- **Group by feature**: Related commands, queries, and handlers in same namespace
-- **Separate concerns**: Don't mix reading and writing operations
-- **Co-locate**: Put related interfaces and implementations near each other
-
-### Testing Strategy by Layer
-
-#### Domain Layer Testing
-
-- **Unit Tests**: Test business logic in isolation
-- **Focus Areas**: Entity behavior, value object validation, domain services
-- **Example**: Test `FileType.ValidateForModelUpload()` with various file extensions
-- **Mock Strategy**: Minimal mocking, pure business logic testing
-
-#### Application Layer Testing
-
-- **Integration Tests**: Test use case orchestration
-- **Focus Areas**: Command/query handlers, application services
-- **Mock Strategy**: Mock repository interfaces and external services
-- **Example**: Test `AddModelCommandHandler` with mocked `IModelRepository`
-
-#### Infrastructure Layer Testing
-
-- **Integration Tests**: Test against real database (in-memory for speed)
-- **Focus Areas**: Repository implementations, data mapping
-- **Mock Strategy**: Use in-memory database for EF Core testing
-- **Example**: Test `ModelRepository.AddAsync()` against real DbContext
-
-#### WebApi Layer Testing
-
-- **Integration Tests**: Test full HTTP pipeline
-- **Focus Areas**: Endpoints, request/response mapping, validation
-- **Mock Strategy**: Mock application layer services
-- **Example**: Test POST `/models` endpoint with file upload
-
-### Common Development Scenarios
-
-#### Adding a New Asset Type
-
-The codebase follows a consistent pattern for asset types (Models, Sprites, Sounds, etc.). When adding a new asset type:
-
-1. **Domain Layer** - Create entity with:
-    - Factory method (e.g., `Sound.Create()`)
-    - Update methods (e.g., `UpdateName()`, `UpdateCategory()`)
-    - Soft delete support (`SoftDelete()`, `Restore()`)
-    - Many-to-many navigation properties for Packs and Projects
-    - Optional category foreign key (e.g., `SoundCategoryId`)
-
-2. **Domain Layer** - Create optional category entity (e.g., `SoundCategory`):
-    - Simple entity with Name, Description, audit fields
-    - Factory method `Create()`
-    - Update method `Update()`
-
-3. **Application Layer** - Create repository interfaces:
-    - `IAssetRepository` with GetAll, GetById, Add, Update, Delete methods
-    - `IAssetCategoryRepository` with similar CRUD methods
-    - Filter by Pack/Project in GetAll query
-
-4. **Application Layer** - Create CQRS handlers:
-    - `CreateAssetCommand` and `CreateAssetWithFileCommand`
-    - `UpdateAssetCommand`, `DeleteAssetCommand`, `SoftDeleteAssetCommand`
-    - `GetAllAssetsQuery`, `GetAssetByIdQuery`
-    - Category CRUD commands/queries
-    - Pack/Project association commands (Add/Remove)
-
-5. **Infrastructure Layer** - Implement repositories and configure EF Core:
-    - Repository implementations in `Repositories/`
-    - DbSet in `ApplicationDbContext`
-    - Entity configuration (relationships, indexes) in `OnModelCreating`
-    - Migration with `dotnet ef migrations add`
-
-6. **WebApi Layer** - Create endpoints:
-    - RESTful endpoints at `/assets` and `/asset-categories`
-    - Pack/Project integration: `/packs/{id}/assets/{assetId}`, `/projects/{id}/assets/{assetId}`
-    - File upload endpoint: `POST /assets/with-file` with multipart form data
-
-7. **Frontend** - Create feature with consistent pattern:
-    - `AssetList.tsx` - Main page with category tabs, grid view, drag-drop upload
-    - `AssetCard.tsx` - Card component with thumbnail, metadata, selection checkbox
-    - `AssetEditor.tsx` - Optional detail/editor modal for complex interactions
-    - URL state management using `nuqs` for tab persistence
-    - Integration with `PackViewer` and `ProjectViewer` for associations
-    - Context menu for operations (remove, recycle, etc.)
-
-8. **Frontend** - Update navigation:
-    - Add tab type to `Tab['type']` union in `types/index.ts`
-    - Add icon mapping in `DraggableTab.tsx` `getTabIcon()`
-    - Add tooltip text in `DraggableTab.tsx` `getTabTooltip()`
-    - Add to tab menu items in `useTabMenuItems.tsx`
-    - Add route handling in `TabContent.tsx`
-
-**Example Asset Types:**
-
-- **Models**: 3D model files with thumbnail generation, version control
-- **Sprites**: Static/animated 2D images with thumbnails
-- **Sounds**: Audio files with waveform visualization, duration/peaks metadata
-- **TextureSets**: PBR texture collections with material preview
-
-#### Adding a New Entity
-
-1. **Domain Layer**:
-
-    ```csharp
-    // Domain/Models/NewEntity.cs
-    public class NewEntity
-    {
-        public static NewEntity Create(/* parameters */) { /* factory logic */ }
-        public void UpdateSomething(/* parameters */) { /* business logic */ }
-    }
-    ```
-
-2. **Application Layer**:
-
-    ```csharp
-    // Application/Abstractions/Repositories/INewEntityRepository.cs
-    public interface INewEntityRepository
-    {
-        Task<NewEntity> AddAsync(NewEntity entity, CancellationToken ct = default);
-    }
-    ```
-
-3. **Infrastructure Layer**:
-
-    ```csharp
-    // Infrastructure/Repositories/NewEntityRepository.cs
-    internal sealed class NewEntityRepository : INewEntityRepository
-    {
-        // Implementation using EF Core
-    }
-
-    // Infrastructure/Persistence/ApplicationDbContext.cs - Add DbSet
-    public DbSet<NewEntity> NewEntities => Set<NewEntity>();
-    ```
-
-4. **WebApi Layer**:
-    ```csharp
-    // WebApi/Endpoints/NewEntityEndpoints.cs
-    public static class NewEntityEndpoints
-    {
-        public static void MapNewEntityEndpoints(this IEndpointRouteBuilder app) { }
-    }
-    ```
-
-#### Adding a New Use Case (Command/Query)
-
-1. **Define Command/Query**:
-
-    ```csharp
-    // Application/NewFeature/DoSomethingCommand.cs
-    public record DoSomethingCommand(/* parameters */) : ICommand<DoSomethingResponse>;
-    public record DoSomethingResponse(/* response data */);
-    ```
-
-2. **Implement Handler**:
-
-    ```csharp
-    // Application/NewFeature/DoSomethingCommandHandler.cs
-    internal class DoSomethingCommandHandler : ICommandHandler<DoSomethingCommand, DoSomethingResponse>
-    {
-        public async Task<Result<DoSomethingResponse>> Handle(DoSomethingCommand command, CancellationToken ct)
-        {
-            // 1. Validate using domain objects
-            // 2. Orchestrate domain operations
-            // 3. Save changes via repositories
-            // 4. Return response
-        }
-    }
-    ```
-
-3. **Expose via Endpoint**:
-    ```csharp
-    // WebApi/Endpoints/NewFeatureEndpoints.cs
-    app.MapPost("/new-feature", async (DoSomethingRequest request, ICommandHandler<DoSomethingCommand, DoSomethingResponse> handler) =>
-    {
-        var command = new DoSomethingCommand(/* map from request */);
-        var result = await handler.Handle(command, cancellationToken);
-        return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-    });
-    ```
-
-#### Adding a New Value Object
-
-```csharp
-// Domain/ValueObjects/NewValueObject.cs
-public sealed class NewValueObject : IEquatable<NewValueObject>
-{
-    public string Value { get; }
-
-    private NewValueObject(string value) => Value = value;
-
-    public static Result<NewValueObject> Create(string value)
-    {
-        // Validation logic
-        if (string.IsNullOrWhiteSpace(value))
-            return Result.Failure<NewValueObject>(new Error("Invalid", "Value cannot be empty"));
-
-        return Result.Success(new NewValueObject(value));
-    }
-
-    // Implement equality, GetHashCode, operators
-}
-```
-
-### Anti-Patterns to Avoid
-
-#### Domain Layer Violations
-
-❌ **Don't**: Add EF Core attributes directly to entities
-
-```csharp
-public class Model
-{
-    [Key] // Don't do this
-    public int Id { get; set; }
-}
-```
-
-✅ **Do**: Configure in ApplicationDbContext
-
-```csharp
-modelBuilder.Entity<Model>(entity =>
-{
-    entity.HasKey(m => m.Id);
-});
-```
-
-❌ **Don't**: Reference infrastructure concerns in domain
-
-```csharp
-public class Model
-{
-    public void SaveToDatabase() { /* Don't do this */ }
-}
-```
-
-✅ **Do**: Keep domain pure, use repositories in application layer
-
-#### Application Layer Violations
-
-❌ **Don't**: Put business logic in command handlers
-
-```csharp
-public async Task<Result<AddModelResponse>> Handle(AddModelCommand command, CancellationToken ct)
-{
-    // Don't validate file types here - that's domain logic
-    if (command.File.FileName.EndsWith(".exe"))
-        return Result.Failure<AddModelResponse>(new Error("InvalidFile", "EXE files not allowed"));
-}
-```
-
-✅ **Do**: Use domain objects for validation
-
-```csharp
-public async Task<Result<AddModelResponse>> Handle(AddModelCommand command, CancellationToken ct)
-{
-    var fileTypeResult = FileType.ValidateForModelUpload(command.File.FileName);
-    if (!fileTypeResult.IsSuccess)
-        return Result.Failure<AddModelResponse>(fileTypeResult.Error);
-}
-```
-
-#### Infrastructure Layer Violations
-
-❌ **Don't**: Put application logic in repositories
-
-```csharp
-public async Task<Model> AddModelWithBusinessLogic(Model model, CancellationToken ct)
-{
-    // Don't do complex workflows in repositories
-    model.ValidateComplexBusinessRules();
-    var result = await SomeExternalService.DoSomething();
-    // ...
-}
-```
-
-✅ **Do**: Keep repositories simple and focused
-
-```csharp
-public async Task<Model> AddAsync(Model model, CancellationToken ct)
-{
-    _context.Models.Add(model);
-    await _context.SaveChangesAsync(ct);
-    return model;
-}
-```
-
-### Performance Optimization Patterns
-
-#### Read-Only Queries for Specialized Components
-
-When infrastructure components need complex data graphs that differ from frontend needs, query `ApplicationDbContext` directly instead of adding loads to shared repositories.
-
-**Problem**: Repository methods are shared across frontend API and specialized infrastructure (e.g., WebDAV). Adding deep includes for one consumer bloats responses for others.
-
-**Solution**: Specialized infrastructure components query DbContext directly with `AsNoTracking()` and `AsSplitQuery()`.
-
-```csharp
-// In specialized infrastructure component (e.g., VirtualAssetStore.cs)
-private static async Task<Project?> GetProjectForWebDavAsync(IServiceProvider sp, string name)
-{
-    var dbContext = sp.GetRequiredService<ApplicationDbContext>();
-    return await dbContext.Projects
-        .AsNoTracking()
-        .Include(p => p.Models)
-            .ThenInclude(m => m.Versions)
-                .ThenInclude(v => v.Files)
-        .Include(p => p.TextureSets)
-            .ThenInclude(ts => ts.Textures)
-                .ThenInclude(t => t.File)
-        .AsSplitQuery()
-        .FirstOrDefaultAsync(p => p.Name == name);
-}
-```
-
-**Benefits**:
-
-- Repositories stay lean for frontend consumers
-- Specialized components get exactly the data they need
-- `AsNoTracking()` improves query performance for read-only scenarios
-- `AsSplitQuery()` prevents cartesian explosion with multiple includes
-
-**When to Use**:
-
-- WebDAV file browsing (needs full asset hierarchy)
-- Export functionality (needs complete data graphs)
-- Read-only diagnostic/reporting tools
-
-### Checklist for New Code
-
-Before adding any new code, ask yourself:
-
-#### For Domain Code:
-
-- [ ] Does this represent a core business concept?
-- [ ] Does it contain business rules or invariants?
-- [ ] Is it free of infrastructure dependencies?
-- [ ] Does it use value objects for domain concepts?
-
-#### For Application Code:
-
-- [ ] Does this orchestrate domain objects to fulfill a use case?
-- [ ] Does it coordinate multiple repositories/services?
-- [ ] Is business logic delegated to domain objects?
-- [ ] Are abstractions defined for infrastructure concerns?
-
-#### For Infrastructure Code:
-
-- [ ] Does this implement an Application layer abstraction?
-- [ ] Is it focused on external concerns (database, files, APIs)?
-- [ ] Does it avoid business logic?
-- [ ] Is it easily replaceable/mockable?
-
-#### For WebApi Code:
-
-- [ ] Does this handle HTTP-specific concerns only?
-- [ ] Are requests/responses mapped to Application layer types?
-- [ ] Is validation done using domain objects?
-- [ ] Are complex workflows delegated to Application layer?
-
-## Common Tasks and Architecture
-
-### Key Implementation Details
-
-- **Clean Architecture**: Strict layer separation with dependency inversion
-- **Domain-Driven Design**: Rich domain model with entities, value objects, and domain services
-- **CQRS Pattern**: Commands for writes, queries for reads with dedicated handlers
-- **Result Pattern**: Explicit error handling without exceptions (SharedKernel)
-- **Value Objects**: Domain concepts with built-in validation (e.g., `FileType.ValidateForModelUpload()`)
-- **Entity Factory Methods**: Controlled object creation (e.g., `Model.Create()`, `File.Create()`)
-- **Repository Pattern**: Data access abstraction with Application interfaces, Infrastructure implementations
-- **File Storage**: Hash-based deduplication in `Infrastructure/Storage/HashBasedFileStorage`
-- **Upload Directory**: Initialization via hosted service in `WebApi/Infrastructure/UploadDirectoryInitializer`
-- **Database**: PostgreSQL with Entity Framework Core, value object conversions
-- **Dependency Injection**: Layer-specific registration in `DependencyInjection.cs` files
-- **Minimal APIs**: Endpoint mapping in WebApi layer with clear request/response handling
-- **Asset Types**: Multiple asset types (Models, TextureSets, Sprites, Sounds) follow consistent patterns:
-    - Domain entities with factory methods and business logic
-    - Optional categories for user-defined organization (e.g., `SoundCategory`, `SpriteCategory`)
-    - Many-to-many relationships with Packs and Projects for grouping
-    - Soft delete support with `IsDeleted` and `DeletedAt` fields
-    - Frontend with list view, card grid, category tabs, drag-drop upload, and detail modals
-    - Pack/Project integration with add/remove operations and drag-drop support
-
-### Environment Configuration
-
-- **RULE #1**: **NEVER override parameters from .env file in docker-compose.yml or other configuration files.** Always use `${VARIABLE_NAME}` syntax to read from .env file to keep the entire project configurable from a single source.
-- **RULE #2**: **ALWAYS update .env.example when adding or modifying variables in .env file.** The .env.example file serves as documentation and template for all required environment variables.
-- Upload storage path: `UPLOAD_STORAGE_PATH` (defaults to `/var/lib/modelibr/uploads`)
-- ASP.NET Core environment: `ASPNETCORE_ENVIRONMENT`
-- Database connection string configured in Infrastructure layer
-- Frontend API base URL: `VITE_API_BASE_URL` (defaults to `https://localhost:8081`)
-- **ALL environment variables are centralized in the main `.env` file** - users should only configure this single file, not separate files for individual projects
-
-#### Environment Variable Priority and Configuration
-
-**ALWAYS prioritize environment variables that are defined in .env files.** If something is parameterized in .env file, use that variable rather than hardcoding values.
-
-Environment variables override configuration values automatically in ASP.NET Core:
-
-- Use double underscore (`__`) to represent nested configuration: `ConnectionStrings__Default`
-- Environment variables from .env file take precedence over appsettings.json values
-- Docker Compose automatically substitutes `${VARIABLE_NAME}` with values from .env file
-
-#### Frontend Environment Variables
-
-Frontend environment variables (prefixed with `VITE_`) are injected at build time through Docker build arguments:
-
-- `VITE_API_BASE_URL` - Frontend API base URL (from main .env file)
-- Docker Compose passes these as build arguments to the frontend container
-- **NEVER create separate .env files in src/frontend/ - use only the main .env file**
-
-#### Database Connection String Environment Variables
-
-The database connection string supports environment variable substitution using `Environment.ExpandEnvironmentVariables()`:
-
-- `POSTGRES_PORT` - PostgreSQL server port (default: 5432)
-- `POSTGRES_USER` - PostgreSQL username (from .env file)
-- `POSTGRES_PASSWORD` - PostgreSQL password (from .env file)
-- Format: Use `%VARIABLE_NAME%` syntax in connection strings for environment variable expansion
-- Example: `Host=localhost;Port=%POSTGRES_PORT%;Database=Modelibr;Username=%POSTGRES_USER%;Password=%POSTGRES_PASSWORD%;`
-
-For development, create .env file from .env.example:
+- **Domain + SharedKernel**: Zero dependencies on other layers. No EF Core, no HTTP, no framework code.
+- **Application**: Only depends on Domain and SharedKernel. Defines interfaces — never implements infrastructure.
+- **Infrastructure**: Implements Application interfaces. Contains EF Core, file I/O, external integrations.
+- **WebApi**: HTTP concerns only. Maps requests to Application commands/queries.
+
+### ENVIRONMENT VARIABLES
+
+- All config lives in the root `.env` file. Never create `.env` files in subdirectories.
+- Always update `.env.example` when adding or modifying variables.
+- Never hardcode URLs or override `.env` values in `docker-compose.yml`. Use `${VARIABLE_NAME}` syntax.
+
+### DATABASE
+
+- Never use in-memory database. Always PostgreSQL via Docker Compose.
+- Never remove connection strings from `appsettings.Development.json`.
+
+### NO FILE CREATION WITHOUT PURPOSE
+
+- Never create standalone documentation files (`.md`, `.txt`, `.doc`) unless explicitly requested.
+- Never create files in the repository root (only `README.md` lives there).
+- Exception: `docs/RESEARCH/` is allowed for audit/analysis artifacts.
+
+---
+
+## Code Style
+
+### Style Anchors — Follow These Patterns
+
+When writing new code, match the structure and style of these reference files:
+
+- **Command handler**: `src/Application/Models/AddModelCommandHandler.cs`
+- **Domain entity**: `src/Domain/Models/Model.cs`
+- **Endpoint**: `src/WebApi/Endpoints/ModelEndpoints.cs`
+- **Repository**: `src/Infrastructure/Repositories/ModelRepository.cs`
+- **React component**: Keep simple, single-responsibility, minimal props. Use `useState` by default. Use `ApiClient` for all HTTP calls.
+
+### Naming Conventions
+
+- Commands: `{Verb}{Noun}Command` (e.g., `AddModelCommand`)
+- Queries: `{Get}{Noun}Query` (e.g., `GetAllModelsQuery`)
+- Handlers: `{CommandName}Handler` (e.g., `AddModelCommandHandler`)
+- Interfaces: `I{Name}` (e.g., `IModelRepository`)
+- Value Objects: Descriptive noun (e.g., `FileType`, not `FileTypeVO`)
+
+### Keep It Simple
+
+- Implement only what is specifically requested. Suggest improvements as comments to the user — never auto-apply unrequested changes.
+- Add comments only for non-obvious business logic. No JSDoc on self-explanatory methods.
+- Frontend: Don't create custom hooks unless logic is reused in 3+ places. Use `ApiClient` from `src/frontend/src/services/ApiClient.ts` — never raw `fetch()` or hardcoded URLs.
+- Frontend: Use `nuqs` (`useQueryState`) for tab/URL state persistence. Follow `SplitterLayout.tsx` pattern.
+
+---
+
+## Guardrails & Stop Conditions
+
+### Scope Creep
+
+If the task requires modifying more than 3 files not mentioned in the original request, **PAUSE**. Present a scope expansion proposal to the user before proceeding.
+
+### Build Verification
+
+After every backend edit: `dotnet build Modelibr.sln`. After every frontend edit: check for lint/type errors. If the build fails, **revert the last edit** and ask the user for guidance — do not attempt speculative fixes.
+
+### Confidence Signaling
+
+Prefix implementation proposals with a confidence level:
+
+- **[CERTAIN]** — I've read the exact code and know the pattern.
+- **[EXPLORING]** — I'm inferring from naming conventions or partial context.
+- **[GUESSING]** — I haven't found relevant code; this is best-effort. **PAUSE and ask the user.**
+
+### Large File Reads
+
+If a file exceeds 200 lines, read method signatures first (use symbol overview tools if available). Read full method bodies only for the specific method you need to edit.
+
+### Rabbit Hole Prevention
+
+If you perform more than 5 sequential searches without producing an edit, **PAUSE**. Summarize what you found and ask the user if the direction is correct.
+
+---
+
+## Documentation Maintenance
+
+### CRITICAL: Update Docs After Every Task
+
+This is a mandatory completion step. Before marking any task complete, check:
+
+1. **Did the task change any API endpoint?** → Update `docs/docs/ai-documentation/BACKEND_API.md`
+2. **Did the task change frontend behavior or components?** → Update `docs/docs/ai-documentation/FRONTEND.md`
+3. **Did the task change worker service behavior?** → Update `docs/docs/ai-documentation/WORKER.md`
+4. **Did the task change Blender addon behavior?** → Update `docs/docs/ai-documentation/BLENDER_ADDON.md`
+5. **Did the task change test infrastructure or patterns?** → Update `docs/docs/ai-documentation/TESTING.md`
+6. **Did the task change environment variables or Docker config?** → Update `.env.example` and relevant doc
+7. **Did the task change API contracts between services?** → Update `docs/docs/ai-documentation/API_CONTRACTS.md`
+
+If none of the above apply, no doc update is needed. But you MUST explicitly check.
+
+### Documentation Locations (Canonical)
+
+| What                       | Where                                                   |
+| -------------------------- | ------------------------------------------------------- |
+| User-facing README         | `README.md`                                             |
+| AI agent instructions      | `.github/copilot-instructions.md` (this file)           |
+| Backend API reference      | `docs/docs/ai-documentation/BACKEND_API.md`             |
+| Frontend development guide | `docs/docs/ai-documentation/FRONTEND.md`                |
+| Worker service guide       | `docs/docs/ai-documentation/WORKER.md`                  |
+| Blender addon guide        | `docs/docs/ai-documentation/BLENDER_ADDON.md`           |
+| Testing guide              | `docs/docs/ai-documentation/TESTING.md`                 |
+| API contracts              | `docs/docs/ai-documentation/API_CONTRACTS.md`           |
+| Texture channel mapping    | `docs/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING.md` |
+| E2E tests                  | `tests/e2e/` (see `tests/e2e/README.md`)                |
+| Audit/research artifacts   | `docs/RESEARCH/`                                        |
+| User documentation site    | `docs/` (Docusaurus)                                    |
+
+---
+
+## Build & Test Commands
+
+### Backend (.NET)
 
 ```bash
-cp .env.example .env
+dotnet restore Modelibr.sln          # ~10 seconds. Never cancel.
+dotnet build Modelibr.sln            # ~10 seconds. Never cancel.
+dotnet test Modelibr.sln --no-build  # ~2 seconds. Always use --no-build.
 ```
 
-#### Code Simplicity Guidelines
-
-**Keep code as simple, readable, and minimalistic as possible:**
-
-- Avoid unnecessary abstraction layers when environment variables work natively
-- Use ASP.NET Core's built-in configuration system rather than custom logic
-- Remove duplicate configuration files when one can serve multiple environments
-- Leverage framework features (like environment variable overrides) instead of custom code
-
-### Common File Locations
-
-- Main application entry point: `src/WebApi/Program.cs`
-- Application setup: `src/Application/DependencyInjection.cs`
-- Infrastructure setup: `src/Infrastructure/DependencyInjection.cs`
-- Docker configuration: `docker-compose.yml`, `src/WebApi/Dockerfile`
-- Launch settings: `src/WebApi/Properties/launchSettings.json`
-
-### Build Timing Expectations
-
-- **NEVER CANCEL BUILDS OR TESTS** - All operations complete quickly
-- Package restore: 9-10 seconds
-- Full solution build: 9-10 seconds
-- Test execution (with --no-build): 1-2 seconds
-- Application startup: 3-4 seconds
-
-### Common Issues and Solutions
-
-- Azure.Core dependency error in tests: Use `dotnet test --no-build` instead of rebuilding
-- Permission denied on upload directory: Set `UPLOAD_STORAGE_PATH` to writable location like `/tmp/modelibr/uploads`
-- .NET version errors: Ensure .NET 9.0 SDK is installed and in PATH
-- Missing packages: Run `dotnet restore Modelibr.sln` to restore all dependencies
-- Thumbnail worker "exec: no such file" error: This issue is **now fixed** with a dual-layer solution (`.gitattributes` + `dos2unix` in Dockerfile). Simply rebuild the container with `docker compose build thumbnail-worker` and it will work regardless of line endings in your local checkout. The Dockerfile automatically converts line endings during build. See `docs/worker/entrypoint-line-endings-fix.md` for details.
-
-### Important: Database Configuration
-
-- **NEVER modify `src/Infrastructure/DependencyInjection.cs` to use in-memory database** - The application is designed to work with PostgreSQL via Docker Compose
-- **NEVER remove connection strings from `src/WebApi/appsettings.Development.json`** - These are required for proper database connectivity
-- If database connectivity issues occur, use Docker Compose to start the PostgreSQL service rather than falling back to in-memory databases
-- For development database issues, create a separate GitHub issue to investigate Docker Compose setup
-
-### Development Workflow
-
-1. Make code changes
-2. Build: `dotnet build Modelibr.sln`
-3. Test: `dotnet test Modelibr.sln --no-build`
-4. Run: `cd src/WebApi && export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads" && dotnet run`
-5. Validate application starts and responds on http://localhost:5009
-
-## Full Environment Setup for Integration Testing
-
-### IMPORTANT: Test Changes Before Creating Pull Requests
-
-**All changes MUST be tested in the full environment before creating a pull request.** This ensures frontend, backend, database, and worker services work together correctly.
-
-### Starting All Services
-
-#### 1. Start PostgreSQL Database
+### Frontend (React)
 
 ```bash
-docker run --name modelibr-postgres -d \
-  -e POSTGRES_USER=modelibr \
-  -e POSTGRES_PASSWORD=ChangeThisStrongPassword123! \
-  -e POSTGRES_DB=Modelibr \
-  -p 5432:5432 \
-  postgres:16-alpine
+cd src/frontend
+npm install
+npm test                             # Jest unit tests
+npm run lint                         # ESLint
 ```
 
-#### 2. Build and Start WebApi Backend
+### E2E Tests
 
 ```bash
-cd /home/runner/work/Modelibr/Modelibr
-dotnet build src/WebApi/WebApi.csproj
+cd tests/e2e
+npm run test:setup                   # Start Docker containers + wait for health
+npm run test:quick                   # Run ALL tests (existing containers)
+npm run test:quick -- --grep "Pack"  # Run only matching tests
+npm run test:teardown                # Stop containers + clean volumes
+npm run test:e2e                     # Full run (setup → all tests → teardown)
+```
 
-# Start the WebApi
-cd src/WebApi
-mkdir -p /tmp/modelibr/uploads
+When fixing tests, run only the affected files — not the full suite.
+
+### Run Locally
+
+```bash
+# Backend
 export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads"
-export ASPNETCORE_ENVIRONMENT=Development
-export ASPNETCORE_URLS="http://0.0.0.0:8080"
-export ConnectionStrings__Default="Host=localhost;Port=5432;Database=Modelibr;Username=modelibr;******"
-./bin/Debug/net9.0/WebApi
-```
+cd src/WebApi && dotnet run          # http://localhost:5009
 
-#### 3. Start Frontend Dev Server
-
-```bash
-cd /home/runner/work/Modelibr/Modelibr/src/frontend
-npm install
-VITE_API_BASE_URL="http://localhost:8080" npm run dev
-```
-
-#### 4. Start Worker Service
-
-```bash
-cd /home/runner/work/Modelibr/Modelibr/src/worker-service
-npm install
-WORKER_ID=worker-1 \
-WORKER_PORT=3001 \
-API_BASE_URL=http://localhost:8080 \
-npm start
+# Or full stack via Docker Compose
+cp .env.example .env                 # First time only
+docker compose up -d --build
 ```
 
 ### Service Ports
 
-| Service    | Port | URL                   |
-| ---------- | ---- | --------------------- |
-| PostgreSQL | 5432 | localhost:5432        |
-| WebApi     | 8080 | http://localhost:8080 |
-| Frontend   | 3000 | http://localhost:3000 |
-| Worker     | 3001 | http://localhost:3001 |
+| Service        | Dev Port | Docker Port |
+| -------------- | -------- | ----------- |
+| WebApi         | 5009     | 8080        |
+| Frontend       | 3000     | 3000        |
+| Worker         | 3001     | 3001        |
+| PostgreSQL     | 5432     | 5432        |
+| E2E WebApi     | —        | 8090        |
+| E2E Frontend   | —        | 3002        |
+| E2E PostgreSQL | —        | 5433        |
 
-### Verification Commands
+### Build Timing — Never Cancel
 
-```bash
-# Check WebApi is running
-curl -s http://localhost:8080/openapi/v1.json | head -10
+- Package restore: ~10s
+- Build: ~10s
+- Tests (--no-build): ~2s
+- App startup: ~4s
 
-# Check Frontend is serving
-curl -s http://localhost:3000 | head -5
+---
 
-# Check Worker health
-curl -s http://localhost:3001/health
+## Architecture Quick Reference
 
-# Check Database container
-docker ps --filter name=modelibr-postgres
-```
+### Design Patterns
 
-### Testing the Full Workflow
+- **CQRS**: Commands (write, return `Result<T>`), Queries (read, return DTOs), one Handler per operation.
+- **Result Pattern**: All fallible operations return `Result<T>` from SharedKernel. No exceptions for flow control.
+- **Value Objects**: Immutable, self-validating, equality by value (e.g., `FileType`).
+- **Entity Factory Methods**: `Entity.Create(...)` — controlled construction with validation.
+- **Repository Pattern**: Interface in Application, implementation in Infrastructure.
 
-1. **Upload a model via API:**
+### Key Code Locations
 
-    ```bash
-    curl -X POST http://localhost:8080/models -F "file=@your-model.glb"
-    ```
+| What                  | Where                                                     |
+| --------------------- | --------------------------------------------------------- |
+| Entry point           | `src/WebApi/Program.cs`                                   |
+| DI registration       | `src/*/DependencyInjection.cs`                            |
+| API client (frontend) | `src/frontend/src/services/ApiClient.ts`                  |
+| File storage          | `src/Infrastructure/Storage/HashBasedFileStorage.cs`      |
+| Upload init           | `src/WebApi/Infrastructure/UploadDirectoryInitializer.cs` |
+| Docker config         | `docker-compose.yml`, `src/WebApi/Dockerfile`             |
 
-2. **Verify in UI:** Open http://localhost:3000 and check if the model appears in the grid
+### Asset Type Pattern
 
-3. **Check thumbnail generation:** The worker should process thumbnail jobs automatically
+All asset types (Models, Sprites, Sounds, TextureSets) follow the same structure:
 
-### Pre-Pull Request Checklist
+- Domain entity with factory method, soft delete, Pack/Project navigation properties
+- Optional category entity for user organization
+- Application CQRS handlers for CRUD + associations
+- Infrastructure repository + EF Core config
+- WebApi RESTful endpoints
+- Frontend list page with category tabs, card grid, drag-drop upload
 
-Before creating a pull request, verify:
+For the full step-by-step template, use the `@feature` agent: `.github/agents/feature.agent.md`
 
-- [ ] All services start without errors
-- [ ] Frontend can fetch and display models from backend
-- [ ] Model upload works via API and UI
-- [ ] .NET tests pass: `dotnet test Modelibr.sln --no-build`
-- [ ] Frontend tests pass: `cd src/frontend && npm test`
-- [ ] No regression in existing functionality
+---
 
-## Documentation Maintenance
+## Agent Workflows
 
-### Documentation Structure
+Use specialized agents for specific task types:
 
-The project maintains a **minimal documentation structure**:
+| Task Type                     | Agent                                          | When to Use                                                      |
+| ----------------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
+| E2E testing                   | `@e2e` (`.github/agents/e2e.agent.md`)         | Writing, fixing, or running Playwright-BDD E2E tests             |
+| New feature/entity/asset type | `@feature` (`.github/agents/feature.agent.md`) | Implementing new entities, asset types, CQRS handlers, endpoints |
+| General coding                | Default (this file)                            | Bug fixes, refactoring, configuration changes, investigations    |
 
-**Essential Documentation (ONLY):**
+### Workflow: Planning
 
-- **README.md** - User-facing: Features, screenshots, quick start, basic usage
-- **.github/copilot-instructions.md** - Developer-focused: Build details, architecture, troubleshooting
-- **docs/BACKEND_API.md** - Backend API reference (minimal, essential information only)
-- **docs/FRONTEND.md** - Frontend development guide (minimal, essential information only)
-- **docs/WORKER.md** - Thumbnail worker service guide (minimal, essential information only)
+1. Read this file and relevant `docs/docs/ai-documentation/` files for context.
+2. Search existing code for similar patterns before creating anything new.
+3. Present a plan with files to create/modify. Get user approval if >3 files.
 
-### Guidelines for Documentation Updates
+### Workflow: Implementation
 
-**CRITICAL RULES:**
+1. Follow the style anchors above. Match existing patterns exactly.
+2. Build after every backend change. Lint after every frontend change.
+3. If build fails, revert and ask — don't speculate.
+4. Signal confidence level on every proposal.
 
-1. **NEVER create new documentation files** - Use only the 5 files listed above
-2. **NEVER create files in the root folder** - Root folder should only contain README.md
-3. **NEVER create subdirectories in docs/** - Keep docs folder flat with only 3 files
-4. **Keep documentation MINIMAL** - Only essential information that developers absolutely need
-5. **Update existing documentation only** - Never create separate fix/summary/detail files
+### Workflow: Testing
 
-#### When to Update Documentation
+1. Write unit tests for domain/application logic.
+2. For E2E tests, use the `@e2e` agent and follow `tests/e2e/README.md`.
+3. Run `dotnet test Modelibr.sln --no-build` before considering backend work complete.
+4. Run `npm test` in `src/frontend` before considering frontend work complete.
 
-Update existing docs **only** when changes affect:
+### Workflow: Completion
 
-- Prerequisites or setup requirements
-- Build or test procedures
-- Environment variables or configuration
-- Docker setup or deployment
-- Core architecture patterns
-- Development workflow
+1. Verify build passes across all affected layers.
+2. **Check the documentation update checklist** (§Documentation Maintenance above).
+3. Summarize what was done, what was changed, and any trade-offs.
 
-#### How to Document Fixes
+---
 
-**Do NOT create separate fix documentation files.**
+## Common Pitfalls
 
-#### Content Separation
-
-- **README.md**: High-level, user-friendly, features and quick start
-- **copilot-instructions.md**: Detailed build/test commands, architecture patterns, essential developer info
-- **docs/BACKEND_API.md**: Backend API endpoints and usage (minimal)
-- **docs/FRONTEND.md**: Frontend development essentials (minimal)
-- **docs/WORKER.md**: Worker service essentials (minimal)
-
-### Example of Good Documentation Organization
-
-❌ **Don't do this:**
-
-```
-# Creating files in root folder
-CODE_QUALITY.md
-test-thumbnail-api.sh
-CRASHPAD_FIX_SUMMARY.md
-
-# Creating subdirectories or detailed docs
-docs/README.md
-docs/backend/endpoints/models.md
-docs/frontend/components/ModelList.md
-docs/worker/troubleshooting.md
-docs/worker-api-integration.md
-```
-
-✅ **Do this instead:**
-
-```
-# Keep root folder clean - only README.md
-# Keep docs folder flat - only 3 essential files
-docs/BACKEND_API.md (all backend info, minimal)
-docs/FRONTEND.md (all frontend info, minimal)
-docs/WORKER.md (all worker info, minimal)
-```
-
-All documentation is consolidated and minimal and only in files listed above.
-
-## Frontend Development Guidelines
-
-### Philosophy: Simplicity and Focus
-
-The frontend application follows a principle of **simplicity and single responsibility**. Each component should do one thing well, without unnecessary complexity, error handling fallbacks, or feature bloat.
-
-**Key Principles:**
-
-1. **Keep it simple** - Components should be easy to understand and maintain
-2. **Single responsibility** - Each component does one thing
-3. **No over-engineering** - Avoid unnecessary abstractions and complexity
-4. **Direct API usage** - Fetch data directly when needed, don't over-abstract
-5. **Minimal state management** - Use local state unless global state is truly needed
-
-### Component Simplification Examples
-
-#### Example: ThumbnailDisplay (Simplified in commit c31705e)
-
-**Before (Complex):**
-
-- Custom `useThumbnailManager` hook with SignalR real-time updates
-- Multiple props: size, showAnimation, showControls, onError, alt
-- Complex state management with loading/error/ready states
-- Fallback mechanisms for SignalR failures
-- Animation state with hover detection
-
-**After (Simple):**
-
-```typescript
-interface ThumbnailDisplayProps {
-  modelId: string
-  className?: string
-}
-
-function ThumbnailDisplay({ modelId }: ThumbnailDisplayProps) {
-  const [thumbnailDetails, setThumbnailDetails] = useState<ThumbnailStatus | null>(null)
-  const [imgSrc, setImgSrc] = useState<string | null>(null)
-
-  // Fetch status
-  useEffect(() => {
-    const fetchThumbnailDetails = async () => {
-      const details = await ApiClient.getThumbnailStatus(modelId)
-      setThumbnailDetails(details)
-    }
-    fetchThumbnailDetails()
-  }, [modelId])
-
-  // Fetch image when ready
-  useEffect(() => {
-    const fetchImg = async () => {
-      try {
-        const blob = await ApiClient.getThumbnailFile(modelId)
-        const url = URL.createObjectURL(blob)
-        setImgSrc(url)
-      } catch (error) {
-        setImgSrc(null)
-      }
-    }
-    if (thumbnailDetails?.status === 'Ready') {
-      fetchImg()
-    }
-    return () => {
-      if (imgSrc) URL.revokeObjectURL(imgSrc)
-    }
-  }, [modelId, thumbnailDetails])
-
-  // Show image or placeholder
-  if (thumbnailDetails?.status === 'Ready' && imgSrc) {
-    return <div className="thumbnail-image-container">
-      <img src={imgSrc} alt="Model Thumbnail" className="thumbnail-image" loading="lazy" />
-    </div>
-  }
-  return <div className="thumbnail-placeholder" aria-label="No thumbnail available">
-    <i className="pi pi-image" aria-hidden="true" />
-  </div>
-}
-```
-
-**What was removed:**
-
-- Custom hook abstraction (useThumbnailManager)
-- SignalR real-time updates (will be handled separately if needed)
-- Size variants (styling should be handled via CSS/className)
-- Animation on hover (unnecessary complexity)
-- Error callbacks (component handles errors internally)
-- Complex state flags (isLoading, isProcessing, isFailed, etc.)
-
-**Benefits:**
-
-- 70 lines vs 200+ lines with hook
-- Easy to understand and debug
-- Direct API calls - clear data flow
-- Self-contained - no external hook dependencies
-- Works perfectly in both ModelList and ThumbnailSidebar
-
-### Guidelines for New Components
-
-When creating or refactoring frontend components:
-
-1. **Start Simple**
-    - Begin with the minimal implementation
-    - Add complexity only when absolutely necessary
-    - Question every feature: "Do we really need this?"
-
-2. **Avoid Premature Abstraction**
-    - Don't create custom hooks unless the logic is reused in 3+ places
-    - Use inline API calls unless abstraction provides clear value
-    - Prefer duplication over wrong abstraction
-
-3. **Props Design**
-    - Minimal required props only
-    - Optional props should have clear use cases
-    - Remove props that aren't actually used
-    - Don't add props "just in case" - YAGNI (You Aren't Gonna Need It)
-
-4. **State Management**
-    - Use local state (`useState`) by default
-    - Only lift state up when multiple components need it
-    - Avoid global state unless truly global
-    - Don't create complex state machines for simple UIs
-
-5. **Error Handling**
-    - Handle errors internally when possible
-    - Don't expose error callbacks unless the parent truly needs them
-    - Show simple error states in the UI
-    - Don't create elaborate error recovery mechanisms unless required
-
-6. **Real-Time Updates**
-    - Don't add SignalR/WebSocket unless real-time is critical
-    - Polling or manual refresh is often sufficient
-    - Real-time features can be added later in dedicated components
-    - Keep real-time logic separate from display logic
-
-### Testing Simplified Components
-
-When testing simple components:
-
-- Mock only external dependencies (API calls)
-- Test actual component behavior, not implementation details
-- Focus on user-visible outcomes
-- Remove tests for removed features/complexity
-
-Example test pattern:
-
-```typescript
-describe('ThumbnailDisplay', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-    global.URL.createObjectURL = jest.fn(() => 'blob:mock-url')
-    global.URL.revokeObjectURL = jest.fn()
-  })
-
-  it('renders placeholder when thumbnail is not ready', async () => {
-    mockApiClient.getThumbnailStatus.mockResolvedValue({ status: 'Processing' })
-    render(<ThumbnailDisplay modelId="1" />)
-    await waitFor(() => {
-      expect(screen.getByLabelText('No thumbnail available')).toBeInTheDocument()
-    })
-  })
-
-  it('renders thumbnail image when ready', async () => {
-    mockApiClient.getThumbnailStatus.mockResolvedValue({ status: 'Ready' })
-    mockApiClient.getThumbnailFile.mockResolvedValue(new Blob(['test']))
-    render(<ThumbnailDisplay modelId="1" />)
-    await waitFor(() => {
-      expect(screen.getByRole('img')).toBeInTheDocument()
-    })
-  })
-})
-```
-
-### Storybook for Simple Components
-
-When creating Storybook stories for simple components:
-
-- Use the actual component, not a demo/mock version
-- Mock dependencies with decorators
-- Keep stories minimal and focused
-- Use different prop values to demonstrate behavior
-
-Example:
-
-```typescript
-export default {
-  title: 'Components/ThumbnailDisplay',
-  component: ThumbnailDisplay,
-  decorators: [(Story, context) => {
-    const modelId = context.args.modelId || '1'
-    mockApiClient.getThumbnailStatus = jest.fn().mockResolvedValue({
-      status: modelId === 'processing' ? 'Processing' : 'Ready',
-    })
-    return <Story />
-  }],
-}
-
-export const Ready: Story = { args: { modelId: '1' } }
-export const Processing: Story = { args: { modelId: 'processing' } }
-```
-
-### Documentation for Simple Components
-
-Keep documentation concise and accurate:
-
-- Document actual props, not aspirational ones
-- Show real usage examples
-- Remove outdated features from docs
-- Focus on what the component does, not what it could do
-
-### When to Break Down Components
-
-Break a component into smaller pieces when:
-
-1. It handles multiple unrelated concerns (violates single responsibility)
-2. It exceeds ~150 lines of actual logic (excluding types/styles)
-3. Logic can be clearly separated into independent pieces
-4. You find yourself writing complex conditional rendering
-
-**Example - When to split:**
-
-- A component that fetches data AND displays it AND handles real-time updates → Split into DataFetcher + Display + RealtimeUpdater
-- A form with validation, submission, and real-time preview → Split into Form + Validator + Submitter + Preview
-
-### Frontend Structure
-
-```
-src/frontend/src/
-├── components/           # UI components
-│   ├── Component.tsx    # Keep simple, focused
-│   ├── __tests__/       # Test actual behavior
-│   └── *.stories.tsx    # Storybook stories
-├── hooks/               # Only create when reused 3+ times
-├── services/            # API clients, utilities
-│   └── ApiClient.ts     # Central API service
-├── utils/               # Pure functions, helpers
-└── contexts/            # Global state (use sparingly)
-```
-
-### API Integration Guidelines
-
-**ALWAYS use the existing ApiClient for API calls:**
-
-- ApiClient is a singleton exported from `src/services/ApiClient.ts`
-- Import the default export: `import apiClient from '../../services/ApiClient'`
-- All API endpoints should be defined as methods in ApiClient
-- ApiClient handles base URL configuration and axios instance
-- Never use fetch() directly or hardcode URLs like `http://localhost:5009`
-
-**Adding new API endpoints:**
-
-1. Define the method in ApiClient class with proper TypeScript types
-2. Use `this.client.get/post/put/delete` for HTTP calls
-3. Return typed responses
-
-**Example - Correct Usage:**
-
-```typescript
-// In ApiClient.ts - define the endpoint
-async getSettings(): Promise<SettingsResponse> {
-  const response = await this.client.get('/settings')
-  return response.data
-}
-
-// In component - use the method
-import apiClient from '../../services/ApiClient'
-
-const settings = await apiClient.getSettings()
-```
-
-**Wrong - Don't do this:**
-
-```typescript
-// Never use fetch with constructed URLs
-const response = await fetch(`${apiClient.getBaseURL()}/settings`);
-
-// Never hardcode URLs
-const response = await fetch("http://localhost:5009/settings");
-```
-
-### URL State Management for Tabs
-
-**All tab-based components must preserve their state in the URL:**
-
-- Use `nuqs` library's `useQueryState` hook for URL state
-- Tab type, active tab, and tab-specific data should be in URL parameters
-- This ensures tabs persist across page refreshes
-- Follow the pattern in `SplitterLayout.tsx` for managing tab state
-
-**When adding a new tab type:**
-
-1. Add the tab type to the `Tab['type']` union in `src/types/index.ts`
-2. Update `TabContent.tsx` to handle the new tab type
-3. Add icon mapping in `DraggableTab.tsx` `getTabIcon()` function
-4. Add tooltip text in `DraggableTab.tsx` `getTabTooltip()` function
-5. Ensure any tab-specific state is stored in URL query parameters
-
-**Example - Settings tab:**
-
-```typescript
-// types/index.ts
-export interface Tab {
-  id: string
-  type: 'modelList' | 'modelViewer' | 'texture' | 'settings' | ...
-  label?: string
-}
-
-// DraggableTab.tsx
-const getTabIcon = (tabType: Tab['type']): string => {
-  switch (tabType) {
-    case 'settings':
-      return 'pi pi-cog'
-    // ...
-  }
-}
-```
-
-### Common Anti-Patterns to Avoid
-
-❌ **Don't do this:**
-
-```typescript
-// Over-abstracted hook for single use
-const useThumbnail = (modelId) => {
-  // 100 lines of complex logic
-  // SignalR, polling, caching, retry logic
-  // Only used in one component
-}
-
-// Too many props "just in case"
-<ThumbnailDisplay
-  modelId={id}
-  size="large"
-  variant="square"
-  showAnimation={true}
-  onHover={...}
-  onLoad={...}
-  onError={...}
-  enableRetry={true}
-  retryAttempts={3}
-/>
-```
-
-✅ **Do this instead:**
-
-```typescript
-// Simple, direct implementation
-function ThumbnailDisplay({ modelId }: { modelId: string }) {
-  const [thumbnail, setThumbnail] = useState(null)
-
-  useEffect(() => {
-    ApiClient.getThumbnail(modelId).then(setThumbnail)
-  }, [modelId])
-
-  return thumbnail ? <img src={thumbnail} /> : <Placeholder />
-}
-
-// Minimal props
-<ThumbnailDisplay modelId={id} />
-```
+- Azure.Core dependency error in tests → use `--no-build` flag
+- Permission denied on upload dir → set `UPLOAD_STORAGE_PATH=/tmp/modelibr/uploads`
+- .NET version errors → ensure .NET 9.0 SDK is installed
+- Frontend API calls → always use `ApiClient`, never `fetch()` or hardcoded URLs
+- EF Core in Domain layer → never. Configure entities in `ApplicationDbContext.OnModelCreating`
+- Business logic in repositories → never. Keep repositories as thin data access wrappers

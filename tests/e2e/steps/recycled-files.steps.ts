@@ -6,14 +6,22 @@ import { sharedState } from "../fixtures/shared-state";
 import path from "path";
 import { fileURLToPath } from "url";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import { DbHelper } from "../fixtures/db-helper";
+import fs from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const { Given: GivenBdd, When: WhenBdd, Then: ThenBdd } = createBdd();
 
-// Shared state for tracking recycled models
-let lastRecycledModelName = "";
+// Tracking state for recycling tests - scoped to prevent cross-scenario leakage
+const recycleTracker = {
+    modelName: "",
+    modelId: null as number | null,
+    modelCountBeforeAction: -1,
+    versionCountBeforeAction: -1,
+    modelCardCountBeforeRecycle: -1,
+};
 
 // Helper: Wait for all visible thumbnails to load before taking screenshots
 async function waitForThumbnails(
@@ -78,49 +86,40 @@ async function waitForThumbnails(
 GivenBdd(
     "I upload and delete a model {string}",
     async ({ page }, modelName: string) => {
-        const modelList = new ModelListPage(page);
-        await modelList.goto();
-
-        // Use unique model file to avoid deduplication issues
+        // Upload via API to capture exact model ID (avoids name-matching ambiguity)
+        const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
         const filePath = await UniqueFileGenerator.generate("test-cube.glb");
+        const fs = await import("fs");
+        const fileBuffer = fs.readFileSync(filePath);
 
-        // Upload the model
-        await modelList.uploadModel(filePath, false);
-        console.log(`[Setup] Uploaded model for "${modelName}"`);
+        const uploadResponse = await page.request.post(`${API_BASE}/models`, {
+            multipart: {
+                file: {
+                    name: "test-cube.glb",
+                    mimeType: "model/gltf-binary",
+                    buffer: fileBuffer,
+                },
+            },
+        });
+        expect(uploadResponse.ok()).toBe(true);
+        const uploadData = await uploadResponse.json();
+        recycleTracker.modelId = uploadData.id;
+        recycleTracker.modelName = "test-cube";
+        console.log(
+            `[Setup] Uploaded model for "${modelName}" (ID: ${recycleTracker.modelId})`,
+        );
 
-        // Wait for model to appear and processing to likely complete (avoid file locks)
-        await page.waitForTimeout(5000);
-
-        // Refresh the page to ensure model cards are loaded
-        await modelList.goto();
-        await page.waitForTimeout(1000);
-
-        // Find the first model card (newest upload should appear)
-        const modelCard = page.locator(".model-card").first();
-        await expect(modelCard).toBeVisible({ timeout: 10000 });
-
-        // Get the model name from the card for tracking
-        const cardName = await modelCard
-            .locator(".model-card-name")
-            .textContent();
-        lastRecycledModelName = cardName || "test-cube";
-        console.log(`[Setup] Found model card: "${lastRecycledModelName}"`);
-
-        // Right-click to open context menu
-        await modelCard.click({ button: "right" });
-
-        // Wait for context menu and click "Recycle"
-        const recycleMenuItem = page
-            .locator(".p-contextmenu")
-            .locator("text=Recycle");
-        await expect(recycleMenuItem).toBeVisible({ timeout: 5000 });
-        await recycleMenuItem.click();
+        // Soft-delete via API to ensure we recycle the exact model we uploaded
+        const deleteResponse = await page.request.delete(
+            `${API_BASE}/models/${recycleTracker.modelId}`,
+        );
+        expect(deleteResponse.ok()).toBe(true);
 
         // Wait for the recycle action to complete
         await page.waitForTimeout(1500);
 
         console.log(
-            `[Setup] Recycled model "${lastRecycledModelName}" for test "${modelName}"`,
+            `[Setup] Recycled model "${recycleTracker.modelName}" (ID: ${recycleTracker.modelId}) for test "${modelName}"`,
         );
     },
 );
@@ -129,34 +128,27 @@ GivenBdd(
 GivenBdd(
     "I upload a model for recycling test {string}",
     async ({ page }, modelName: string) => {
-        const modelList = new ModelListPage(page);
-        await modelList.goto();
-
-        // Use unique model file to avoid deduplication issues
+        // Upload via API to capture exact model ID
+        const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
         const filePath = await UniqueFileGenerator.generate("test-cube.glb");
+        const fs = await import("fs");
+        const fileBuffer = fs.readFileSync(filePath);
 
-        // Upload the model
-        await modelList.uploadModel(filePath, false);
-        console.log(`[Setup] Uploaded model for "${modelName}"`);
-
-        // Wait for model to appear
-        await page.waitForTimeout(2000);
-
-        // Refresh the page to ensure model cards are loaded
-        await modelList.goto();
-        await page.waitForTimeout(1000);
-
-        // Find the first model card (newest upload should appear)
-        const modelCard = page.locator(".model-card").first();
-        await expect(modelCard).toBeVisible({ timeout: 10000 });
-
-        // Get the model name from the card for tracking
-        const cardName = await modelCard
-            .locator(".model-card-name")
-            .textContent();
-        lastRecycledModelName = cardName || "test-cube";
+        const uploadResponse = await page.request.post(`${API_BASE}/models`, {
+            multipart: {
+                file: {
+                    name: "test-cube.glb",
+                    mimeType: "model/gltf-binary",
+                    buffer: fileBuffer,
+                },
+            },
+        });
+        expect(uploadResponse.ok()).toBe(true);
+        const uploadData = await uploadResponse.json();
+        recycleTracker.modelId = uploadData.id;
+        recycleTracker.modelName = "test-cube";
         console.log(
-            `[Setup] Found model card: "${lastRecycledModelName}" (not yet recycled)`,
+            `[Setup] Uploaded model for "${modelName}" (ID: ${recycleTracker.modelId}, not yet recycled)`,
         );
     },
 );
@@ -165,6 +157,11 @@ GivenBdd(
 WhenBdd("I recycle the uploaded model", async ({ page }) => {
     const modelList = new ModelListPage(page);
     await modelList.goto();
+
+    // Count model cards before recycling for count-based assertion
+    const cardCountBefore = await page.locator(".model-card").count();
+    recycleTracker.modelCardCountBeforeRecycle = cardCountBefore;
+    console.log(`[Setup] Model card count before recycle: ${cardCountBefore}`);
 
     // Find the model card with the tracked name
     const modelCard = page.locator(".model-card").first();
@@ -183,7 +180,7 @@ WhenBdd("I recycle the uploaded model", async ({ page }) => {
     // Wait for the recycle action to complete
     await page.waitForTimeout(1500);
 
-    console.log(`[Action] Recycled model "${lastRecycledModelName}"`);
+    console.log(`[Action] Recycled model "${recycleTracker.modelName}"`);
 });
 
 // Screenshot: Before recycling
@@ -229,11 +226,11 @@ GivenBdd(
 
         // The model should be there - we use the actual model name that was tracked
         const hasModel = await recycleBin.hasModelWithName(
-            lastRecycledModelName || "test-cube",
+            recycleTracker.modelName || "test-cube",
         );
         expect(hasModel).toBe(true);
         console.log(
-            `[Verify] Model for "${modelName}" (as "${lastRecycledModelName}") is in recycle bin ✓`,
+            `[Verify] Model for "${modelName}" (as "${recycleTracker.modelName}") is in recycle bin ✓`,
         );
     },
 );
@@ -242,6 +239,7 @@ GivenBdd("I note the recycled model count", async ({ page }) => {
     const recycleBin = new RecycledFilesPage(page);
     await recycleBin.goto();
     const count = await recycleBin.getRecycledModelCount();
+    recycleTracker.modelCountBeforeAction = count;
     console.log(`[Setup] Initial recycled model count: ${count}`);
 });
 
@@ -252,7 +250,15 @@ GivenBdd("I note the recycled model count", async ({ page }) => {
 WhenBdd("I navigate to the Recycled Files page", async ({ page }) => {
     const recycleBin = new RecycledFilesPage(page);
     await recycleBin.goto();
-    console.log("[Navigation] Navigated to Recycled Files page");
+
+    // Snapshot counts before any action for count-based assertions
+    recycleTracker.modelCountBeforeAction =
+        await recycleBin.getRecycledModelCount();
+    recycleTracker.versionCountBeforeAction =
+        await recycleBin.getRecycledModelVersionCount();
+    console.log(
+        `[Navigation] Navigated to Recycled Files page (models: ${recycleTracker.modelCountBeforeAction}, versions: ${recycleTracker.versionCountBeforeAction})`,
+    );
 });
 
 WhenBdd("I navigate back to the model list", async ({ page }) => {
@@ -262,6 +268,7 @@ WhenBdd("I navigate back to the model list", async ({ page }) => {
 });
 
 WhenBdd("I navigate back to the model viewer", async ({ page }) => {
+    const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
     // Try multiple possible model keys from shared state
     const modelKeys = [
         "multi-version-test-model",
@@ -283,7 +290,7 @@ WhenBdd("I navigate back to the model viewer", async ({ page }) => {
 
     if (modelId) {
         await page.goto(
-            `http://localhost:3002/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
+            `${baseUrl}/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
         );
         await page.waitForTimeout(1500);
         console.log(
@@ -306,7 +313,7 @@ WhenBdd("I navigate back to the model viewer", async ({ page }) => {
             const latestModel = models[models.length - 1];
             modelId = latestModel.id;
             await page.goto(
-                `http://localhost:3002/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
+                `${baseUrl}/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
             );
             await page.waitForTimeout(1500);
             console.log(
@@ -321,6 +328,7 @@ WhenBdd("I navigate back to the model viewer", async ({ page }) => {
 WhenBdd(
     "I navigate back to the model viewer with force refresh",
     async ({ page }) => {
+        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
         // Try multiple possible model keys from shared state
         const modelKeys = [
             "multi-version-test-model",
@@ -343,7 +351,7 @@ WhenBdd(
         if (modelId) {
             // Navigate to model viewer
             await page.goto(
-                `http://localhost:3002/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
+                `${baseUrl}/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
             );
 
             // Wait for initial page load
@@ -385,7 +393,7 @@ WhenBdd(
                 const latestModel = models[models.length - 1];
                 modelId = latestModel.id;
                 await page.goto(
-                    `http://localhost:3002/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
+                    `${baseUrl}/?leftTabs=modelList,model-${modelId}&activeLeft=model-${modelId}`,
                 );
                 await page.waitForLoadState("domcontentloaded");
                 await page.reload({ waitUntil: "domcontentloaded" });
@@ -412,7 +420,7 @@ WhenBdd("I restore the model {string}", async ({ page }, modelName: string) => {
 
     // Find the model
     const index = await recycleBin.findModelIndexByName(
-        lastRecycledModelName || "test-cube",
+        recycleTracker.modelName || "test-cube",
     );
     expect(index).toBeGreaterThanOrEqual(0);
 
@@ -430,7 +438,7 @@ WhenBdd(
 
         // Find the model
         const index = await recycleBin.findModelIndexByName(
-            lastRecycledModelName || "test-cube",
+            recycleTracker.modelName || "test-cube",
         );
 
         if (index < 0) {
@@ -447,11 +455,37 @@ WhenBdd(
 WhenBdd("I confirm the permanent delete", async ({ page }) => {
     const recycleBin = new RecycledFilesPage(page);
 
+    // Capture the DELETE response to track which model was actually deleted
+    const deleteResponsePromise = page
+        .waitForResponse(
+            (resp) =>
+                resp.request().method() === "DELETE" &&
+                resp.url().includes("/permanent") &&
+                resp.status() === 200,
+            { timeout: 20000 },
+        )
+        .catch(() => null);
+
     // Let the actual API call happen - no mocking needed since we use UniqueFileGenerator
     await recycleBin.confirmPermanentDelete();
 
+    // Extract the model ID that was actually permanently deleted from the response URL
+    const deleteResponse = await deleteResponsePromise;
+    if (deleteResponse) {
+        const urlMatch = deleteResponse
+            .url()
+            .match(/\/recycled\/model\/(\d+)\/permanent/);
+        if (urlMatch) {
+            const deletedId = parseInt(urlMatch[1], 10);
+            console.log(
+                `[Delete] Actually permanently deleted model ID: ${deletedId} (tracker had: ${recycleTracker.modelId})`,
+            );
+            recycleTracker.modelId = deletedId;
+        }
+    }
+
     // Wait for the page to update after delete
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     console.log("[Action] Confirmed permanent delete");
 });
@@ -486,10 +520,10 @@ ThenBdd(
         const recycleBin = new RecycledFilesPage(page);
 
         // Wait for content to load
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         const hasModel = await recycleBin.hasModelWithName(
-            lastRecycledModelName || "test-cube",
+            recycleTracker.modelName || "test-cube",
         );
         expect(hasModel).toBe(true);
         console.log(`[UI] Model "${modelName}" found in recycle bin ✓`);
@@ -499,17 +533,26 @@ ThenBdd(
 ThenBdd(
     "the model {string} should not be visible in the grid",
     async ({ page }, modelName: string) => {
-        // Check that the model list doesn't contain the specific model
-        // Since we're using test-cube, look for the name we tracked
-        const modelCard = page
-            .locator(".model-card")
-            .filter({ hasText: lastRecycledModelName || "test-cube" });
-        const count = await modelCard.count();
+        // Use count-based verification: after recycling one model, the total
+        // model card count should decrease by 1. Name-based matching is unreliable
+        // because multiple models share the same filename (e.g., "test-cube").
+        const expectedCount = recycleTracker.modelCardCountBeforeRecycle - 1;
 
-        // The model might still exist if there are other uploads with same name
-        // Just verify the grid still has some models (not all were deleted)
+        await expect
+            .poll(
+                async () => {
+                    return await page.locator(".model-card").count();
+                },
+                {
+                    message: `Waiting for model card count to decrease from ${recycleTracker.modelCardCountBeforeRecycle} to ${expectedCount}`,
+                    timeout: 10000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toBe(expectedCount);
+
         console.log(
-            `[UI] Found ${count} cards matching "${lastRecycledModelName}" - model recycled ✓`,
+            `[UI] Model card count decreased: ${recycleTracker.modelCardCountBeforeRecycle} → ${expectedCount} ✓`,
         );
     },
 );
@@ -524,6 +567,23 @@ ThenBdd(
         console.log(`[UI] Model "${modelName}" visible in grid ✓`);
     },
 );
+
+ThenBdd("the database should show the model as soft-deleted", async () => {
+    // ISSUE-08: Verify soft-delete at the database level
+    if (recycleTracker.modelId) {
+        const db = new DbHelper();
+        try {
+            await db.assertModelSoftDeleted(recycleTracker.modelId);
+            console.log(
+                `[DB] Model ID ${recycleTracker.modelId} is soft-deleted (DeletedAt populated) ✓`,
+            );
+        } finally {
+            await db.close();
+        }
+    } else {
+        console.log("[DB] No model ID tracked — skipping DB verification");
+    }
+});
 
 ThenBdd("the delete confirmation dialog should appear", async ({ page }) => {
     const recycleBin = new RecycledFilesPage(page);
@@ -552,8 +612,28 @@ ThenBdd(
     "the model should be removed from the recycle bin",
     async ({ page }) => {
         const recycleBin = new RecycledFilesPage(page);
-        await recycleBin.refresh();
-        console.log("[UI] Model removed from recycle bin ✓");
+        const countBefore = recycleTracker.modelCountBeforeAction;
+
+        // Use count-based verification: the recycled model count should decrease.
+        // Name-based matching is unreliable when multiple models share similar names.
+        await expect
+            .poll(
+                async () => {
+                    await recycleBin.refresh();
+                    return await recycleBin.getRecycledModelCount();
+                },
+                {
+                    message: `Waiting for recycled model count to decrease from ${countBefore}`,
+                    timeout: 15000,
+                    intervals: [1000, 2000, 3000],
+                },
+            )
+            .toBeLessThan(countBefore);
+
+        const countAfter = await recycleBin.getRecycledModelCount();
+        console.log(
+            `[UI] Recycled model count decreased: ${countBefore} → ${countAfter} ✓`,
+        );
     },
 );
 
@@ -561,22 +641,27 @@ ThenBdd(
     "the model {string} should be removed from recycle bin",
     async ({ page }, modelName: string) => {
         const recycleBin = new RecycledFilesPage(page);
-        await recycleBin.waitForLoaded();
+        const countBefore = recycleTracker.modelCountBeforeAction;
 
-        // Wait a moment for UI to update
-        await page.waitForTimeout(1000);
+        // Use count-based verification: the recycled model count should decrease.
+        // Name-based matching is unreliable when multiple models share similar names.
+        await expect
+            .poll(
+                async () => {
+                    await recycleBin.refresh();
+                    return await recycleBin.getRecycledModelCount();
+                },
+                {
+                    message: `Waiting for recycled model count to decrease from ${countBefore} after removing "${modelName}"`,
+                    timeout: 15000,
+                    intervals: [1000, 2000, 3000],
+                },
+            )
+            .toBeLessThan(countBefore);
 
-        // Refresh to get latest state
-        await recycleBin.refresh();
-
-        // Verify the specific model is no longer present
-        const hasModel = await recycleBin.hasModelWithName(
-            lastRecycledModelName || "test-cube",
-        );
-        expect(hasModel).toBe(false);
-
+        const countAfter = await recycleBin.getRecycledModelCount();
         console.log(
-            `[UI] Model "${modelName}" (as "${lastRecycledModelName}") removed from recycle bin ✓`,
+            `[UI] Model "${modelName}" removed — recycled count: ${countBefore} → ${countAfter} ✓`,
         );
     },
 );
@@ -594,12 +679,30 @@ ThenBdd(
 );
 
 ThenBdd("the database should not contain the model", async ({ page }) => {
-    // Verify via recycle bin that the model is truly gone
-    const recycleBin = new RecycledFilesPage(page);
-    await recycleBin.refresh();
-    console.log(
-        "[DB] Model no longer in database (verified via recycle bin) ✓",
-    );
+    // ISSUE-08: Verify via actual database query, not just UI
+    if (recycleTracker.modelId) {
+        const db = new DbHelper();
+        try {
+            await db.assertModelPermanentlyDeleted(recycleTracker.modelId);
+            console.log(
+                `[DB] Model ID ${recycleTracker.modelId} permanently deleted from database ✓`,
+            );
+        } finally {
+            await db.close();
+        }
+    } else {
+        // Fallback: verify via recycle bin UI if model ID not tracked
+        const recycleBin = new RecycledFilesPage(page);
+        await recycleBin.refresh();
+        await page.waitForLoadState("networkidle").catch(() => {});
+
+        const trackedName = recycleTracker.modelName || "test-cube";
+        const hasModel = await recycleBin.hasModelWithName(trackedName);
+        expect(hasModel).toBe(false);
+        console.log(
+            `[DB] Model "${trackedName}" no longer visible after permanent delete (UI check fallback) ✓`,
+        );
+    }
 });
 
 // ============================================
@@ -897,11 +1000,30 @@ WhenBdd("I restore the recycled model version", async ({ page }) => {
 ThenBdd(
     "the version should be removed from the recycle bin",
     async ({ page }) => {
-        await page.waitForTimeout(500);
         const recycledFilesPage = new RecycledFilesPage(page);
-        await recycledFilesPage.refresh();
-        await page.waitForTimeout(1000);
-        console.log("[Verify] Version removed from recycle bin ✓");
+        const countBefore = recycleTracker.versionCountBeforeAction;
+
+        // Use count-based verification: the recycled version count should decrease.
+        // Checking for exactly 0 fails when other recycled versions exist.
+        await expect
+            .poll(
+                async () => {
+                    await recycledFilesPage.refresh();
+                    return await recycledFilesPage.getRecycledModelVersionCount();
+                },
+                {
+                    message: `Waiting for recycled version count to decrease from ${countBefore}`,
+                    timeout: 15000,
+                    intervals: [1000, 2000, 3000],
+                },
+            )
+            .toBeLessThan(countBefore);
+
+        const countAfter =
+            await recycledFilesPage.getRecycledModelVersionCount();
+        console.log(
+            `[Verify] Recycled version count decreased: ${countBefore} → ${countAfter} ✓`,
+        );
     },
 );
 
@@ -934,7 +1056,7 @@ let lastTextureSetName = "";
 GivenBdd(
     "I create a texture set {string} with a color texture",
     async ({ page }, name: string) => {
-        const baseUrl = process.env.API_URL || "http://localhost:8090";
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
 
         // Create texture set via simple API (Note: this creates an empty set without a file)
         // Empty texture sets won't have thumbnails - this is expected behavior
@@ -974,7 +1096,7 @@ ThenBdd("I take a screenshot of the texture sets list", async ({ page }) => {
 });
 
 WhenBdd("I delete the texture set {string}", async ({ page }, name: string) => {
-    const baseUrl = process.env.API_URL || "http://localhost:8090";
+    const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
 
     if (lastTextureSetId) {
         // Note: soft delete endpoint is /texture-sets/{id} - same as regular delete (DELETE method does soft delete)
@@ -1446,3 +1568,256 @@ ThenBdd(
         );
     },
 );
+
+// ============================================
+// API-based Permanent Delete Steps
+// ============================================
+// These test the DELETE /recycled/{entityType}/{id}/permanent endpoint
+// to verify that soft-deleted entities are actually removed from the database.
+
+const apiPermDeleteState = {
+    textureSetId: 0,
+    spriteId: 0,
+    soundId: 0,
+};
+
+GivenBdd(
+    "I create and soft-delete a texture set {string} via API",
+    async ({ page }, name: string) => {
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+
+        // Create a texture set
+        const createRes = await page.request.post(`${baseUrl}/texture-sets`, {
+            data: { Name: name },
+        });
+        expect(createRes.ok()).toBe(true);
+        const created = await createRes.json();
+        apiPermDeleteState.textureSetId = created.id ?? created.Id;
+        console.log(
+            `[Setup] Created texture set "${name}" (ID: ${apiPermDeleteState.textureSetId})`,
+        );
+
+        // Soft-delete via API
+        const deleteRes = await page.request.delete(
+            `${baseUrl}/texture-sets/${apiPermDeleteState.textureSetId}`,
+        );
+        expect(deleteRes.ok()).toBe(true);
+        console.log(`[Setup] Soft-deleted texture set "${name}"`);
+
+        // Verify it appears in the recycled bin
+        const recycledRes = await page.request.get(`${baseUrl}/recycled`);
+        expect(recycledRes.ok()).toBe(true);
+        const recycled = await recycledRes.json();
+        const found = (recycled.textureSets || []).some(
+            (ts: any) => ts.id === apiPermDeleteState.textureSetId,
+        );
+        expect(found).toBe(true);
+        console.log(`[Verify] Texture set appears in recycled bin`);
+    },
+);
+
+WhenBdd(
+    "I permanently delete the recycled texture set via API",
+    async ({ page }) => {
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+        const res = await page.request.delete(
+            `${baseUrl}/recycled/textureSet/${apiPermDeleteState.textureSetId}/permanent`,
+        );
+        expect(res.ok()).toBe(true);
+        const body = await res.json();
+        expect(body.success).toBe(true);
+        console.log(
+            `[Action] Permanently deleted texture set ${apiPermDeleteState.textureSetId}`,
+        );
+    },
+);
+
+ThenBdd("the texture set should no longer exist in the database", async () => {
+    const db = new DbHelper();
+    try {
+        const res = await db.query(
+            'SELECT "Id" FROM "TextureSets" WHERE "Id" = $1',
+            [apiPermDeleteState.textureSetId],
+        );
+        expect(res.rows.length).toBe(0);
+        console.log(
+            `[DB] Texture set ${apiPermDeleteState.textureSetId} permanently deleted from DB`,
+        );
+    } finally {
+        await db.close();
+    }
+});
+
+GivenBdd(
+    "I create and soft-delete a sprite {string} via API",
+    async ({ page }, name: string) => {
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+
+        // Generate unique file to avoid deduplication
+        const filePath = await UniqueFileGenerator.generate("red_color.png");
+        const fileBuffer = await fs.readFile(filePath);
+
+        // Upload a sprite
+        const createRes = await page.request.post(
+            `${baseUrl}/sprites/with-file`,
+            {
+                multipart: {
+                    file: {
+                        name: `${name}.png`,
+                        mimeType: "image/png",
+                        buffer: fileBuffer,
+                    },
+                },
+            },
+        );
+        expect(createRes.ok()).toBe(true);
+
+        // Get the sprite ID from the list
+        const listRes = await page.request.get(`${baseUrl}/sprites`);
+        expect(listRes.ok()).toBe(true);
+        const listData = await listRes.json();
+        const sprites = listData.sprites || [];
+        const sprite = sprites.find(
+            (s: any) => s.name === name || s.name === `${name}.png`,
+        );
+        apiPermDeleteState.spriteId =
+            sprite?.id ?? sprites[sprites.length - 1]?.id;
+        console.log(
+            `[Setup] Created sprite "${name}" (ID: ${apiPermDeleteState.spriteId})`,
+        );
+
+        // Soft-delete via API
+        const deleteRes = await page.request.delete(
+            `${baseUrl}/sprites/${apiPermDeleteState.spriteId}/soft`,
+        );
+        expect(deleteRes.ok()).toBe(true);
+        console.log(`[Setup] Soft-deleted sprite "${name}"`);
+
+        // Verify it appears in the recycled bin
+        const recycledRes = await page.request.get(`${baseUrl}/recycled`);
+        expect(recycledRes.ok()).toBe(true);
+        const recycled = await recycledRes.json();
+        const found = (recycled.sprites || []).some(
+            (s: any) => s.id === apiPermDeleteState.spriteId,
+        );
+        expect(found).toBe(true);
+        console.log(`[Verify] Sprite appears in recycled bin`);
+    },
+);
+
+WhenBdd(
+    "I permanently delete the recycled sprite via API",
+    async ({ page }) => {
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+        const res = await page.request.delete(
+            `${baseUrl}/recycled/sprite/${apiPermDeleteState.spriteId}/permanent`,
+        );
+        expect(res.ok()).toBe(true);
+        const body = await res.json();
+        expect(body.success).toBe(true);
+        console.log(
+            `[Action] Permanently deleted sprite ${apiPermDeleteState.spriteId}`,
+        );
+    },
+);
+
+ThenBdd("the sprite should no longer exist in the database", async () => {
+    const db = new DbHelper();
+    try {
+        const res = await db.query(
+            'SELECT "Id" FROM "Sprites" WHERE "Id" = $1',
+            [apiPermDeleteState.spriteId],
+        );
+        expect(res.rows.length).toBe(0);
+        console.log(
+            `[DB] Sprite ${apiPermDeleteState.spriteId} permanently deleted from DB`,
+        );
+    } finally {
+        await db.close();
+    }
+});
+
+GivenBdd(
+    "I create and soft-delete a sound {string} via API",
+    async ({ page }, name: string) => {
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+
+        // Generate unique file to avoid deduplication
+        const filePath = await UniqueFileGenerator.generate("test-tone.wav");
+        const fileBuffer = await fs.readFile(filePath);
+
+        // Upload a sound
+        const createRes = await page.request.post(
+            `${baseUrl}/sounds/with-file`,
+            {
+                multipart: {
+                    file: {
+                        name: `${name}.wav`,
+                        mimeType: "audio/wav",
+                        buffer: fileBuffer,
+                    },
+                },
+            },
+        );
+        expect(createRes.ok()).toBe(true);
+
+        // Get the sound ID from the list
+        const listRes = await page.request.get(`${baseUrl}/sounds`);
+        expect(listRes.ok()).toBe(true);
+        const listData = await listRes.json();
+        const sounds = listData.sounds || [];
+        const sound = sounds.find(
+            (s: any) => s.name === name || s.name === `${name}.wav`,
+        );
+        apiPermDeleteState.soundId = sound?.id ?? sounds[sounds.length - 1]?.id;
+        console.log(
+            `[Setup] Created sound "${name}" (ID: ${apiPermDeleteState.soundId})`,
+        );
+
+        // Soft-delete via API
+        const deleteRes = await page.request.delete(
+            `${baseUrl}/sounds/${apiPermDeleteState.soundId}/soft`,
+        );
+        expect(deleteRes.ok()).toBe(true);
+        console.log(`[Setup] Soft-deleted sound "${name}"`);
+
+        // Verify it appears in the recycled bin
+        const recycledRes = await page.request.get(`${baseUrl}/recycled`);
+        expect(recycledRes.ok()).toBe(true);
+        const recycled = await recycledRes.json();
+        const found = (recycled.sounds || []).some(
+            (s: any) => s.id === apiPermDeleteState.soundId,
+        );
+        expect(found).toBe(true);
+        console.log(`[Verify] Sound appears in recycled bin`);
+    },
+);
+
+WhenBdd("I permanently delete the recycled sound via API", async ({ page }) => {
+    const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+    const res = await page.request.delete(
+        `${baseUrl}/recycled/sound/${apiPermDeleteState.soundId}/permanent`,
+    );
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    console.log(
+        `[Action] Permanently deleted sound ${apiPermDeleteState.soundId}`,
+    );
+});
+
+ThenBdd("the sound should no longer exist in the database", async () => {
+    const db = new DbHelper();
+    try {
+        const res = await db.query(
+            'SELECT "Id" FROM "Sounds" WHERE "Id" = $1',
+            [apiPermDeleteState.soundId],
+        );
+        expect(res.rows.length).toBe(0);
+        console.log(
+            `[DB] Sound ${apiPermDeleteState.soundId} permanently deleted from DB`,
+        );
+    } finally {
+        await db.close();
+    }
+});

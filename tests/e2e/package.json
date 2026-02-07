@@ -5,7 +5,10 @@
     "type": "module",
     "scripts": {
         "test": "node run-e2e.js",
-        "test:quick": "npx bddgen && npx playwright test",
+        "test:quick": "node -e \"fs.rmSync('data',{recursive:true,force:true})\" && npx bddgen && npx playwright test",
+        "test:setup": "docker compose -f docker-compose.e2e.yml up -d --build && node wait-for-services.js",
+        "test:teardown": "docker compose -f docker-compose.e2e.yml down -v && node -e \"fs.rmSync('data',{recursive:true,force:true})\"",
+        "test:cleanup": "node -e \"fs.rmSync('data',{recursive:true,force:true});fs.rmSync('test-results',{recursive:true,force:true})\"",
         "bdd": "npx bddgen",
         "test:report": "npx playwright show-report"
     },

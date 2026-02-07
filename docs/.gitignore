@@ -7,3 +7,10 @@ node_modules
 # Keep only the placeholder index.html
 static/playwright-reports/*
 !static/playwright-reports/index.html
+
+# Feature demo videos (generated in CI via Playwright)
+static/videos/
+
+# Video generation test results
+videos/test-results/
+videos/node_modules/

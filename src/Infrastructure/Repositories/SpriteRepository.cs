@@ -28,7 +28,6 @@ internal sealed class SpriteRepository : ISpriteRepository
     public async Task<IEnumerable<Sprite>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Sprites
-            .Where(s => !s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)
             .Include(s => s.Packs)
@@ -41,6 +40,7 @@ internal sealed class SpriteRepository : ISpriteRepository
     public async Task<IEnumerable<Sprite>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Sprites
+            .IgnoreQueryFilters()
             .Where(s => s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)
@@ -54,7 +54,6 @@ internal sealed class SpriteRepository : ISpriteRepository
     public async Task<Sprite?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Sprites
-            .Where(s => !s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)
             .Include(s => s.Packs)
@@ -66,6 +65,7 @@ internal sealed class SpriteRepository : ISpriteRepository
     public async Task<Sprite?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Sprites
+            .IgnoreQueryFilters()
             .Where(s => s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)
@@ -81,7 +81,6 @@ internal sealed class SpriteRepository : ISpriteRepository
             return null;
 
         return await _context.Sprites
-            .Where(s => !s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)
             .Include(s => s.Packs)
@@ -96,7 +95,6 @@ internal sealed class SpriteRepository : ISpriteRepository
             return null;
 
         return await _context.Sprites
-            .Where(s => !s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)
             .Include(s => s.Packs)
@@ -118,7 +116,9 @@ internal sealed class SpriteRepository : ISpriteRepository
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
+        // Must use IgnoreQueryFilters() because the sprite may be soft-deleted (called from PermanentDeleteEntityCommandHandler)
         var sprite = await _context.Sprites
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
         if (sprite != null)

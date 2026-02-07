@@ -233,7 +233,9 @@ public sealed class VirtualAssetStore : IStore
     /// Resolves model paths with hierarchical structure:
     /// /Projects/{P}/Models/{ModelName} → model directory with versions
     /// /Projects/{P}/Models/{ModelName}/v{N} → version directory with files
+    /// /Projects/{P}/Models/{ModelName}/newest → newest version directory with files
     /// /Projects/{P}/Models/{ModelName}/v{N}/{FileName} → actual file
+    /// /Projects/{P}/Models/{ModelName}/newest/{FileName} → actual file from newest version
     /// </summary>
     private IStoreItem? ResolveModelPath(Domain.Models.Project project, string modelName, string[] segments)
     {
@@ -247,19 +249,38 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
         }
 
-        // /Projects/{P}/Models/{ModelName}/v{N}
+        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest
         var versionName = Uri.UnescapeDataString(segments[4]);
-        if (!versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) ||
-            !int.TryParse(versionName[1..], out var versionNumber))
-            return null;
+        Domain.Models.ModelVersion? version;
 
-        var version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+        {
+            // Get the highest version number
+            version = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+        }
+        else if (versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) &&
+                 int.TryParse(versionName[1..], out var versionNumber))
+        {
+            version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        }
+        else
+        {
+            return null;
+        }
+
         if (version == null)
             return null;
 
-        // /Projects/{P}/Models/{ModelName}/v{N} → show files in version
+        // /Projects/{P}/Models/{ModelName}/v{N} or newest → show files in version
         if (segments.Length == 5)
         {
+            if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+            {
+                return new VirtualNewestVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
+            }
             return new VirtualModelVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
         }
 
@@ -528,6 +549,40 @@ public sealed class VirtualAssetStore : IStore
             .FirstOrDefaultAsync(p => p.Name == name);
     }
 
+    /// <summary>
+    /// WebDAV-specific query that loads all models with full version information.
+    /// Uses AsNoTracking for read-only access and AsSplitQuery to avoid cartesian explosion.
+    /// </summary>
+    private static async Task<List<Domain.Models.Model>> GetModelsForWebDavAsync(IServiceProvider sp)
+    {
+        var dbContext = sp.GetRequiredService<ApplicationDbContext>();
+
+        return await dbContext.Models
+            .AsNoTracking()
+            .Where(m => !m.IsDeleted)
+            .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
+            .AsSplitQuery()
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// WebDAV-specific query that loads a single model with full version information.
+    /// Uses AsNoTracking for read-only access and AsSplitQuery to avoid cartesian explosion.
+    /// </summary>
+    private static async Task<Domain.Models.Model?> GetModelForWebDavAsync(IServiceProvider sp, string name)
+    {
+        var dbContext = sp.GetRequiredService<ApplicationDbContext>();
+
+        return await dbContext.Models
+            .AsNoTracking()
+            .Where(m => !m.IsDeleted && m.Name == name)
+            .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync();
+    }
+
     private async Task<IStoreItem?> ResolvePackPathAsync(IServiceProvider sp, string[] segments)
     {
         var packRepo = sp.GetRequiredService<IPackRepository>();
@@ -590,16 +645,34 @@ public sealed class VirtualAssetStore : IStore
         }
 
         var versionName = Uri.UnescapeDataString(segments[4]);
-        if (!versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) ||
-            !int.TryParse(versionName[1..], out var versionNumber))
-            return null;
+        Domain.Models.ModelVersion? version;
 
-        var version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+        {
+            version = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+        }
+        else if (versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) &&
+                 int.TryParse(versionName[1..], out var versionNumber))
+        {
+            version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        }
+        else
+        {
+            return null;
+        }
+
         if (version == null)
             return null;
 
         if (segments.Length == 5)
         {
+            if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+            {
+                return new VirtualNewestVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
+            }
             return new VirtualModelVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
         }
 
@@ -691,19 +764,16 @@ public sealed class VirtualAssetStore : IStore
 
     private async Task<IStoreItem?> ResolveGlobalModelsPathAsync(IServiceProvider sp, string[] segments)
     {
-        var modelRepo = sp.GetRequiredService<IModelRepository>();
-
         // /Models
         if (segments.Length == 1)
         {
-            var models = await modelRepo.GetAllAsync();
-            return new VirtualAllModelsCollection(_collectionPropertyManager, _lockingManager, models.ToList(), _itemPropertyManager, _pathProvider);
+            var models = await GetModelsForWebDavAsync(sp);
+            return new VirtualAllModelsCollection(_collectionPropertyManager, _lockingManager, models, _itemPropertyManager, _pathProvider);
         }
 
-        // /Models/{ModelName}
+        // /Models/{ModelName} - use WebDAV-specific query with full includes
         var modelName = Uri.UnescapeDataString(segments[1]);
-        var allModels = await modelRepo.GetAllAsync();
-        var model = allModels.FirstOrDefault(m => m.Name == modelName && !m.IsDeleted);
+        var model = await GetModelForWebDavAsync(sp, modelName);
         if (model == null)
             return null;
 
@@ -712,18 +782,36 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
         }
 
-        // /Models/{ModelName}/v{N}
+        // /Models/{ModelName}/v{N} or /Models/{ModelName}/newest
         var versionName = Uri.UnescapeDataString(segments[2]);
-        if (!versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) ||
-            !int.TryParse(versionName[1..], out var versionNumber))
-            return null;
+        Domain.Models.ModelVersion? version;
 
-        var version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+        {
+            version = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+        }
+        else if (versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) &&
+                 int.TryParse(versionName[1..], out var versionNumber))
+        {
+            version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
+        }
+        else
+        {
+            return null;
+        }
+
         if (version == null)
             return null;
 
         if (segments.Length == 3)
         {
+            if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+            {
+                return new VirtualNewestVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
+            }
             return new VirtualModelVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
         }
 

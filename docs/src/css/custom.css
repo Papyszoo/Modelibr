@@ -5,47 +5,69 @@
 
 /* Dark blue color palette matching Modelibr app */
 :root {
-  --ifm-color-primary: #4f6bff;
-  --ifm-color-primary-dark: #3551ff;
-  --ifm-color-primary-darker: #2844ff;
-  --ifm-color-primary-darkest: #0021ff;
-  --ifm-color-primary-light: #6985ff;
-  --ifm-color-primary-lighter: #7692ff;
-  --ifm-color-primary-lightest: #a3b5ff;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
-  
-  /* Modelibr brand colors */
-  --modelibr-dark: #1e293b;
-  --modelibr-dark-lighter: #334155;
-  --modelibr-accent: #4f6bff;
-  --modelibr-glow: rgba(79, 107, 255, 0.4);
+    --ifm-color-primary: #4f6bff;
+    --ifm-color-primary-dark: #3551ff;
+    --ifm-color-primary-darker: #2844ff;
+    --ifm-color-primary-darkest: #0021ff;
+    --ifm-color-primary-light: #6985ff;
+    --ifm-color-primary-lighter: #7692ff;
+    --ifm-color-primary-lightest: #a3b5ff;
+    --ifm-code-font-size: 95%;
+    --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+
+    /* Modelibr brand colors */
+    --modelibr-dark: #1e293b;
+    --modelibr-dark-lighter: #334155;
+    --modelibr-accent: #4f6bff;
+    --modelibr-glow: rgba(79, 107, 255, 0.4);
 }
 
 /* Dark mode - main theme */
-[data-theme='dark'] {
-  --ifm-color-primary: #6985ff;
-  --ifm-color-primary-dark: #4868ff;
-  --ifm-color-primary-darker: #385aff;
-  --ifm-color-primary-darkest: #0530ff;
-  --ifm-color-primary-light: #8aa2ff;
-  --ifm-color-primary-lighter: #9aafff;
-  --ifm-color-primary-lightest: #ccd8ff;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
-  
-  --ifm-background-color: #0f172a;
-  --ifm-background-surface-color: #1e293b;
-  --ifm-card-background-color: #1e293b;
+[data-theme="dark"] {
+    --ifm-color-primary: #6985ff;
+    --ifm-color-primary-dark: #4868ff;
+    --ifm-color-primary-darker: #385aff;
+    --ifm-color-primary-darkest: #0530ff;
+    --ifm-color-primary-light: #8aa2ff;
+    --ifm-color-primary-lighter: #9aafff;
+    --ifm-color-primary-lightest: #ccd8ff;
+    --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+    --ifm-background-color: #0f172a;
+    --ifm-background-surface-color: #1e293b;
+    --ifm-card-background-color: #1e293b;
 }
 
 /* Override navbar for dark blue theme */
-[data-theme='dark'] .navbar {
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
+[data-theme="dark"] .navbar {
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
 }
 
 /* Override footer for dark blue theme */
-[data-theme='dark'] .footer {
-  background: #0f172a;
-  border-top: 1px solid #334155;
+[data-theme="dark"] .footer {
+    background: #0f172a;
+    border-top: 1px solid #334155;
+}
+
+/* Feature demo videos */
+.feature-video-container {
+    margin: 1.5rem 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--ifm-background-surface-color);
+    border: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.feature-video-container video {
+    display: block;
+    width: 100%;
+    border-radius: 8px;
+}
+
+.video-fallback {
+    padding: 2rem;
+    text-align: center;
+    color: var(--ifm-color-emphasis-600);
+    font-style: italic;
 }

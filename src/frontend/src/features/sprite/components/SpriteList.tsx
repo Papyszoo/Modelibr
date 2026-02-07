@@ -63,6 +63,9 @@ function SpriteList() {
   const [categoryName, setCategoryName] = useState('')
   const [categoryDescription, setCategoryDescription] = useState('')
   const [selectedSprite, setSelectedSprite] = useState<SpriteDto | null>(null)
+  const [isEditingSpriteName, setIsEditingSpriteName] = useState(false)
+  const [spriteNameDraft, setSpriteNameDraft] = useState('')
+  const [isSavingSpriteName, setIsSavingSpriteName] = useState(false)
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
     UNASSIGNED_CATEGORY_ID
   )
@@ -328,7 +331,48 @@ function SpriteList() {
 
   const openSpriteModal = (sprite: SpriteDto) => {
     setSelectedSprite(sprite)
+    setSpriteNameDraft(sprite.name)
+    setIsEditingSpriteName(false)
     setShowSpriteModal(true)
+  }
+
+  const handleSaveSpriteName = async () => {
+    if (!selectedSprite) return
+    const trimmedName = spriteNameDraft.trim()
+    if (!trimmedName || trimmedName === selectedSprite.name) {
+      setIsEditingSpriteName(false)
+      setSpriteNameDraft(selectedSprite.name)
+      return
+    }
+    try {
+      setIsSavingSpriteName(true)
+      await ApiClient.updateSprite(selectedSprite.id, { name: trimmedName })
+      setSelectedSprite({ ...selectedSprite, name: trimmedName })
+      setSprites(prev =>
+        prev.map(s =>
+          s.id === selectedSprite.id ? { ...s, name: trimmedName } : s
+        )
+      )
+      setIsEditingSpriteName(false)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Updated',
+        detail: `Sprite renamed to "${trimmedName}"`,
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to rename sprite:', error)
+      setSpriteNameDraft(selectedSprite.name)
+      setIsEditingSpriteName(false)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to rename sprite',
+        life: 3000,
+      })
+    } finally {
+      setIsSavingSpriteName(false)
+    }
   }
 
   const handleDownload = async () => {
@@ -933,11 +977,75 @@ function SpriteList() {
 
       {/* Sprite Detail Modal */}
       <Dialog
-        header={selectedSprite?.name || 'Sprite'}
+        header={
+          selectedSprite ? (
+            <div
+              className="sprite-modal-header"
+              data-testid="sprite-modal-header"
+            >
+              {isEditingSpriteName ? (
+                <div className="sprite-name-edit">
+                  <InputText
+                    value={spriteNameDraft}
+                    onChange={e => setSpriteNameDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveSpriteName()
+                      if (e.key === 'Escape') {
+                        setIsEditingSpriteName(false)
+                        setSpriteNameDraft(selectedSprite.name)
+                      }
+                    }}
+                    autoFocus
+                    data-testid="sprite-name-input"
+                    style={{ width: '300px' }}
+                  />
+                  <Button
+                    icon="pi pi-check"
+                    className="p-button-text p-button-rounded"
+                    onClick={handleSaveSpriteName}
+                    disabled={isSavingSpriteName}
+                    tooltip="Save"
+                    data-testid="sprite-name-save"
+                  />
+                  <Button
+                    icon="pi pi-times"
+                    className="p-button-text p-button-rounded"
+                    onClick={() => {
+                      setIsEditingSpriteName(false)
+                      setSpriteNameDraft(selectedSprite.name)
+                    }}
+                    disabled={isSavingSpriteName}
+                    tooltip="Cancel"
+                    data-testid="sprite-name-cancel"
+                  />
+                </div>
+              ) : (
+                <div className="sprite-name-display">
+                  <span data-testid="sprite-name-display">
+                    {selectedSprite.name}
+                  </span>
+                  <Button
+                    icon="pi pi-pencil"
+                    className="p-button-text p-button-rounded"
+                    onClick={() => setIsEditingSpriteName(true)}
+                    tooltip="Edit name"
+                    data-testid="sprite-name-edit"
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            'Sprite'
+          )
+        }
         visible={showSpriteModal}
-        onHide={() => setShowSpriteModal(false)}
+        onHide={() => {
+          setShowSpriteModal(false)
+          setIsEditingSpriteName(false)
+        }}
         style={{ width: '600px' }}
         className="sprite-detail-modal"
+        data-testid="sprite-detail-modal"
       >
         {selectedSprite && (
           <div className="sprite-modal-content">

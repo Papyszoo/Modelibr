@@ -4,12 +4,12 @@ export default {
   getModels: jest.fn(),
   getModelById: jest.fn(),
   getModelFileUrl: jest.fn(
-    modelId => `http://localhost:5009/models/${modelId}/file`
+    modelId => `http://localhost:8080/models/${modelId}/file`
   ),
-  getFileUrl: jest.fn(fileId => `http://localhost:5009/files/${fileId}`),
+  getFileUrl: jest.fn(fileId => `http://localhost:8080/files/${fileId}`),
   getThumbnailStatus: jest.fn(),
   getThumbnailUrl: jest.fn(
-    modelId => `http://localhost:5009/models/${modelId}/thumbnail/file`
+    modelId => `http://localhost:8080/models/${modelId}/thumbnail/file`
   ),
   regenerateThumbnail: jest.fn(),
   getTextureSetById: jest.fn(),

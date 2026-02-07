@@ -265,7 +265,36 @@ export class JobProcessor {
           remainingInQueue: this.jobQueue.length,
         })
 
-        await processor(job)
+        const timeoutMs = config.jobTimeout || 300000
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Job processing timed out after ${timeoutMs}ms`)
+              ),
+            timeoutMs
+          )
+        )
+
+        try {
+          await Promise.race([processor(job), timeoutPromise])
+        } catch (error) {
+          if (error.message.includes('timed out')) {
+            logger.error(`Job ${job.id} timed out after ${timeoutMs}ms`, {
+              jobId: job.id,
+              timeoutMs,
+            })
+            try {
+              await this.jobService.markJobFailed(job.id, error.message)
+            } catch (markFailedError) {
+              logger.error('Failed to mark timed-out job as failed', {
+                jobId: job.id,
+                error: markFailedError.message,
+              })
+            }
+            this.activeJobs.delete(job.id)
+          }
+        }
       }
     } finally {
       this.isProcessingQueue = false
@@ -575,6 +604,7 @@ export class JobProcessor {
         )
 
         // Render orbit frames
+        const renderStartTime = Date.now()
         const frames = await this.puppeteerRenderer.renderOrbitFrames(jobLogger)
 
         // Log memory statistics
@@ -595,7 +625,7 @@ export class JobProcessor {
           },
         })
 
-        const renderTime = Date.now() - Date.now() // Approximate
+        const renderTime = Date.now() - renderStartTime
         await this.jobEventService.logFrameRenderingCompleted(
           job.id,
           frames.length,

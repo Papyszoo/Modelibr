@@ -28,7 +28,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<IEnumerable<TextureSet>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
-            .Where(tp => !tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersions)
@@ -43,6 +42,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<IEnumerable<TextureSet>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
+            .IgnoreQueryFilters()
             .Where(tp => tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
@@ -58,6 +58,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<TextureSet?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
+            .IgnoreQueryFilters()
             .Where(tp => tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
@@ -72,7 +73,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<TextureSet?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
-            .Where(tp => !tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersions)
@@ -89,7 +89,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             return null;
 
         return await _context.TextureSets
-            .Where(tp => !tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersions)
@@ -106,7 +105,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             return null;
 
         return await _context.TextureSets
-            .Where(tp => !tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersions)
@@ -130,7 +128,9 @@ internal sealed class TextureSetRepository : ITextureSetRepository
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
+        // Must use IgnoreQueryFilters() because the texture set may be soft-deleted (called from PermanentDeleteEntityCommandHandler)
         var textureSet = await _context.TextureSets
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
 
         if (textureSet != null)
@@ -142,7 +142,9 @@ internal sealed class TextureSetRepository : ITextureSetRepository
 
     public async Task HardDeleteAsync(int id, CancellationToken cancellationToken = default)
     {
+        // Must use IgnoreQueryFilters() because the texture set may be soft-deleted
         var textureSet = await _context.TextureSets
+            .IgnoreQueryFilters()
             .Include(tp => tp.Textures)
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
 

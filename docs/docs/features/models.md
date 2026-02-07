@@ -6,6 +6,13 @@ sidebar_position: 1
 
 Modelibr helps you organize and manage your 3D model library with automatic thumbnails, version control, and easy navigation.
 
+<div className="feature-video-container">
+  <video controls width="100%" autoPlay muted loop>
+    <source src="/Modelibr/videos/model-management.webm" type="video/webm" />
+    <p className="video-fallback">Demo video is being generated...</p>
+  </video>
+</div>
+
 ## Uploading Models
 
 ### Drag and Drop
@@ -34,12 +41,12 @@ Click any model card to open it in the 3D viewer:
 
 ### Viewer Controls
 
-| Control | Action |
-|---------|--------|
-| Left Click + Drag | Rotate camera |
-| Right Click + Drag | Pan camera |
-| Scroll Wheel | Zoom in/out |
-| Double Click | Reset camera |
+| Control            | Action        |
+| ------------------ | ------------- |
+| Left Click + Drag  | Rotate camera |
+| Right Click + Drag | Pan camera    |
+| Scroll Wheel       | Zoom in/out   |
+| Double Click       | Reset camera  |
 
 ### Control Buttons
 
@@ -68,6 +75,7 @@ Each model can have multiple versions, allowing you to track changes over time.
 ### Switching Versions
 
 Use the version dropdown in the viewer header to switch between versions. Each version has its own:
+
 - Thumbnail
 - File(s)
 - Default texture set
