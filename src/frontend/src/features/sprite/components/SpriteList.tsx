@@ -24,6 +24,7 @@ import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import {
   openInFileExplorer,
   copyPathToClipboard,
+  getCopyPathSuccessMessage,
 } from '../../../utils/webdavUtils'
 import './SpriteList.css'
 
@@ -649,9 +650,9 @@ function SpriteList() {
       severity: result.success ? 'success' : 'error',
       summary: result.success ? 'Copied' : 'Failed',
       detail: result.success
-        ? `Path copied: ${result.path}`
+        ? getCopyPathSuccessMessage()
         : 'Failed to copy path to clipboard',
-      life: 3000,
+      life: 5000,
     })
   }
 
