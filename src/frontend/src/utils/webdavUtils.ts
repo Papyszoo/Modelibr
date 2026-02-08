@@ -213,6 +213,24 @@ export async function copyPathToClipboard(
 }
 
 /**
+ * Returns the OS-specific success message for copying the WebDAV path.
+ */
+export function getCopyPathSuccessMessage(): string {
+  const os = detectOS()
+
+  switch (os) {
+    case 'macos':
+      return 'Path copied. Use Finder → Go → Connect to Server (⌘K) to open.'
+    case 'windows':
+      return 'Path copied. Paste it in File Explorer address bar to open.'
+    case 'linux':
+      return 'Path copied. Paste in your file manager (Ctrl+L) to open.'
+    default:
+      return 'Path copied to clipboard.'
+  }
+}
+
+/**
  * Gets instructions for mounting the WebDAV drive based on the detected OS.
  */
 export function getMountInstructions(): {
