@@ -29,6 +29,7 @@ import {
 import {
   openInFileExplorer,
   copyPathToClipboard,
+  getCopyPathSuccessMessage,
 } from '../../../utils/webdavUtils'
 import SoundCard from './SoundCard'
 import SoundEditor from './SoundEditor'
@@ -633,9 +634,9 @@ function SoundList() {
       severity: result.success ? 'success' : 'error',
       summary: result.success ? 'Copied' : 'Failed',
       detail: result.success
-        ? `Path copied: ${result.path}`
+        ? getCopyPathSuccessMessage()
         : 'Failed to copy path to clipboard',
-      life: 3000,
+      life: 5000,
     })
   }
 

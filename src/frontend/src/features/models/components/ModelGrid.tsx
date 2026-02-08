@@ -13,6 +13,7 @@ import { PackDto, ProjectDto } from '../../../types'
 import {
   openInFileExplorer,
   copyPathToClipboard,
+  getCopyPathSuccessMessage,
 } from '../../../utils/webdavUtils'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
@@ -161,9 +162,9 @@ export default function ModelGrid({
       severity: result.success ? 'success' : 'error',
       summary: result.success ? 'Copied' : 'Failed',
       detail: result.success
-        ? `Path copied: ${result.path}`
+        ? getCopyPathSuccessMessage()
         : 'Failed to copy path to clipboard',
-      life: 3000,
+      life: 5000,
     })
   }
 
