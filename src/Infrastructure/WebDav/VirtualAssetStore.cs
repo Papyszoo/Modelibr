@@ -19,6 +19,7 @@ public sealed class VirtualAssetStore : IStore
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IUploadPathProvider _pathProvider;
     private readonly ILogger<VirtualAssetStore> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly VirtualCollectionPropertyManager _collectionPropertyManager;
     private readonly NoLockingManager _lockingManager;
@@ -31,7 +32,8 @@ public sealed class VirtualAssetStore : IStore
         VirtualCollectionPropertyManager collectionPropertyManager,
         NoLockingManager lockingManager,
         IAudioSelectionService audioSelectionService,
-        ILogger<VirtualAssetStore> logger)
+        ILogger<VirtualAssetStore> logger,
+        ILoggerFactory loggerFactory)
     {
         _scopeFactory = scopeFactory;
         _pathProvider = pathProvider;
@@ -40,12 +42,12 @@ public sealed class VirtualAssetStore : IStore
         _lockingManager = lockingManager;
         _audioSelectionService = audioSelectionService;
         _logger = logger;
+        _loggerFactory = loggerFactory;
     }
 
     public async Task<IStoreItem?> GetItemAsync(Uri uri, IHttpContext httpContext)
     {
         var path = GetDecodedPath(uri);
-        Console.WriteLine($"[VirtualAssetStore] GetItemAsync: {path}");
         _logger.LogDebug("GetItemAsync: {Path}", path);
 
         using var scope = _scopeFactory.CreateScope();
@@ -55,7 +57,7 @@ public sealed class VirtualAssetStore : IStore
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[VirtualAssetStore] ERROR in GetItemAsync: {ex}");
+            _logger.LogError(ex, "Error in GetItemAsync for path: {Path}", path);
             throw;
         }
     }
@@ -63,7 +65,6 @@ public sealed class VirtualAssetStore : IStore
     public async Task<IStoreCollection?> GetCollectionAsync(Uri uri, IHttpContext httpContext)
     {
         var path = GetDecodedPath(uri);
-        Console.WriteLine($"[VirtualAssetStore] GetCollectionAsync: {path}");
         _logger.LogDebug("GetCollectionAsync: {Path}", path);
 
         using var scope = _scopeFactory.CreateScope();
@@ -74,7 +75,7 @@ public sealed class VirtualAssetStore : IStore
         }
         catch (Exception ex)
         {
-             Console.WriteLine($"[VirtualAssetStore] ERROR in GetCollectionAsync: {ex}");
+             _logger.LogError(ex, "Error in GetCollectionAsync for path: {Path}", path);
              throw;
         }
     }
@@ -369,7 +370,8 @@ public sealed class VirtualAssetStore : IStore
                 texture.File.CreatedAt,
                 texture.File.UpdatedAt,
                 _pathProvider,
-                texture.SourceChannel);
+                texture.SourceChannel,
+                _loggerFactory.CreateLogger<VirtualExtractedTextureFile>());
         }
 
         return new VirtualAssetFile(

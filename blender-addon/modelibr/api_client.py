@@ -272,7 +272,7 @@ class ModelibrApiClient:
         """
         return self._make_request(
             "PUT",
-            f"/models/{model_id}/defaultTextureSet",
+            f"/models/{model_id}/default-texture-set",
             data=json.dumps({
                 "textureSetId": texture_set_id,
                 "modelVersionId": model_version_id

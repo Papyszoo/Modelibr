@@ -29,6 +29,10 @@ def register():
 
 
 def unregister():
+    # Cancel all background tasks before unregistering
+    from .async_handler import cancel_all_tasks
+    cancel_all_tasks()
+
     # Clean up thumbnails before unregistering
     thumbnail_handler.cleanup_thumbnail_manager()
     

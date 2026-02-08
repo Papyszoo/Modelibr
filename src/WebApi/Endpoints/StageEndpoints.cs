@@ -8,11 +8,11 @@ public static class StageEndpoints
 {
     public static void MapStageEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/stages", async (IQueryHandler<GetAllStagesQuery, GetAllStagesResponse> queryHandler) =>
+        app.MapGet("/stages", async (IQueryHandler<GetAllStagesQuery, GetAllStagesResponse> queryHandler, CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetAllStagesQuery(), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetAllStagesQuery(), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -22,11 +22,11 @@ public static class StageEndpoints
         .WithName("Get All Stages")
         .WithSummary("Get all saved stages");
 
-        app.MapGet("/stages/{id}", async (int id, IQueryHandler<GetStageByIdQuery, GetStageByIdResponse> queryHandler) =>
+        app.MapGet("/stages/{id}", async (int id, IQueryHandler<GetStageByIdQuery, GetStageByIdResponse> queryHandler, CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetStageByIdQuery(id), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetStageByIdQuery(id), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -36,14 +36,14 @@ public static class StageEndpoints
         .WithName("Get Stage By Id")
         .WithSummary("Get a specific stage by ID");
 
-        app.MapPost("/stages", async (CreateStageRequest request, ICommandHandler<CreateStageCommand, CreateStageResponse> commandHandler) =>
+        app.MapPost("/stages", async (CreateStageRequest request, ICommandHandler<CreateStageCommand, CreateStageResponse> commandHandler, CancellationToken cancellationToken) =>
         {
             var result = await commandHandler.Handle(
                 new CreateStageCommand(request.Name, request.ConfigurationJson), 
-                CancellationToken.None
+                cancellationToken
             );
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -53,14 +53,14 @@ public static class StageEndpoints
         .WithName("Create Stage")
         .WithSummary("Create a new stage");
 
-        app.MapPut("/stages/{id}", async (int id, UpdateStageRequest request, ICommandHandler<UpdateStageCommand, UpdateStageResponse> commandHandler) =>
+        app.MapPut("/stages/{id}", async (int id, UpdateStageRequest request, ICommandHandler<UpdateStageCommand, UpdateStageResponse> commandHandler, CancellationToken cancellationToken) =>
         {
             var result = await commandHandler.Handle(
                 new UpdateStageCommand(id, request.ConfigurationJson), 
-                CancellationToken.None
+                cancellationToken
             );
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }

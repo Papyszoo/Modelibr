@@ -14,7 +14,7 @@ public static class RecycledFilesEndpoints
         {
             var result = await queryHandler.Handle(new GetAllRecycledQuery(), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -33,7 +33,7 @@ public static class RecycledFilesEndpoints
             var command = new RestoreEntityCommand(entityType, entityId);
             var result = await commandHandler.Handle(command, cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -52,7 +52,7 @@ public static class RecycledFilesEndpoints
             var query = new GetDeletePreviewQuery(entityType, entityId);
             var result = await queryHandler.Handle(query, cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -71,7 +71,7 @@ public static class RecycledFilesEndpoints
             var command = new PermanentDeleteEntityCommand(entityType, entityId);
             var result = await commandHandler.Handle(command, cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }

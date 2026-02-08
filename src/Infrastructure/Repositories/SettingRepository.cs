@@ -23,6 +23,7 @@ internal sealed class SettingRepository : ISettingRepository
     public async Task<IReadOnlyList<Setting>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Settings
+            .AsNoTracking()
             .OrderBy(s => s.Key)
             .ToListAsync(cancellationToken);
     }

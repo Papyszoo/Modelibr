@@ -38,6 +38,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.ModelVersions
+            .AsNoTracking()
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
             .Include(v => v.TextureSets)
@@ -50,6 +51,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     {
         return await _context.ModelVersions
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(v => v.IsDeleted)
             .Include(v => v.Files)
             .Include(v => v.TextureSets)

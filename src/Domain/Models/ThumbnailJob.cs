@@ -8,7 +8,7 @@ namespace Domain.Models;
 /// </summary>
 public class ThumbnailJob
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
     
     /// <summary>
     /// The ID of the model this thumbnail job is for (null for sound jobs).

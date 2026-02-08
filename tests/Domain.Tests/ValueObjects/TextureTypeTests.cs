@@ -48,8 +48,9 @@ public class TextureTypeTests
         // Act
         var supportedTypes = TextureTypeExtensions.GetSupportedTypes();
 
-        // Assert - Diffuse and Specular have been removed, now 10 types
-        Assert.Equal(10, supportedTypes.Count);
+        // Assert - Diffuse and Specular have been removed, SplitChannel added, now 11 types
+        Assert.Equal(11, supportedTypes.Count);
+        Assert.Contains(TextureType.SplitChannel, supportedTypes);
         Assert.Contains(TextureType.Albedo, supportedTypes);
         Assert.Contains(TextureType.Normal, supportedTypes);
         Assert.Contains(TextureType.Height, supportedTypes);

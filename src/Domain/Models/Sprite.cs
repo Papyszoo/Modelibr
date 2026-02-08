@@ -11,7 +11,7 @@ public class Sprite : AggregateRoot
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
 
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int FileId { get; private set; }
     public SpriteType SpriteType { get; private set; }
@@ -202,7 +202,7 @@ public class Sprite : AggregateRoot
     private static void ValidateSpriteType(SpriteType spriteType)
     {
         var validationResult = spriteType.ValidateForStorage();
-        if (!validationResult.IsSuccess)
+        if (validationResult.IsFailure)
         {
             throw new ArgumentException(validationResult.Error.Message, nameof(spriteType));
         }

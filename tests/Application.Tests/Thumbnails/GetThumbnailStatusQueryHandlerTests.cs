@@ -1,5 +1,6 @@
 using Application.Abstractions.Repositories;
 using Application.Thumbnails;
+using Application.Tests;
 using Domain.Models;
 using Domain.ValueObjects;
 using Moq;
@@ -61,11 +62,11 @@ public class GetThumbnailStatusQueryHandlerTests
         // Arrange
         var query = new GetThumbnailStatusQuery(1);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1;
+        model.WithId(1);
         
         // Create a version with thumbnail
         var version = model.CreateVersion("v1", DateTime.UtcNow);
-        version.Id = 10; // Simulate persisted version with valid ID
+        version.WithId(10); // Simulate persisted version with valid ID
         var thumbnail = Thumbnail.Create(version.Id, DateTime.UtcNow);
         thumbnail.MarkAsReady("/path/to/thumbnail.png", 1024, 256, 256, DateTime.UtcNow);
         version.SetThumbnail(thumbnail);

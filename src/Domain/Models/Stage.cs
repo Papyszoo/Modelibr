@@ -4,7 +4,7 @@ namespace Domain.Models;
 
 public class Stage : AggregateRoot
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string ConfigurationJson { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }

@@ -28,6 +28,7 @@ internal sealed class SpriteCategoryRepository : ISpriteCategoryRepository
     public async Task<IEnumerable<SpriteCategory>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.SpriteCategories
+            .AsNoTracking()
             .OrderBy(c => c.Name)
             .ToListAsync(cancellationToken);
     }

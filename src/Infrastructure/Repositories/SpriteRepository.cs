@@ -28,6 +28,7 @@ internal sealed class SpriteRepository : ISpriteRepository
     public async Task<IEnumerable<Sprite>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Sprites
+            .AsNoTracking()
             .Include(s => s.File)
             .Include(s => s.Category)
             .Include(s => s.Packs)
@@ -41,6 +42,7 @@ internal sealed class SpriteRepository : ISpriteRepository
     {
         return await _context.Sprites
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(s => s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)

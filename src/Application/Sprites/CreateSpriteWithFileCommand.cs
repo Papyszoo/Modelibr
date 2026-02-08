@@ -34,7 +34,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
         {
             // 1. Validate and get file type for sprite
             var fileTypeResult = FileType.ValidateForSpriteUpload(command.FileUpload.FileName);
-            if (!fileTypeResult.IsSuccess)
+            if (fileTypeResult.IsFailure)
             {
                 return Result.Failure<CreateSpriteWithFileResponse>(fileTypeResult.Error);
             }
@@ -45,7 +45,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                 fileTypeResult.Value,
                 cancellationToken);
 
-            if (!fileResult.IsSuccess)
+            if (fileResult.IsFailure)
             {
                 return Result.Failure<CreateSpriteWithFileResponse>(fileResult.Error);
             }

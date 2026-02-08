@@ -5,7 +5,7 @@ public class ModelVersion
     private readonly List<File> _files = new();
     private readonly List<TextureSet> _textureSets = new();
 
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public int ModelId { get; private set; }
     public int VersionNumber { get; private set; }
     public string? Description { get; private set; }

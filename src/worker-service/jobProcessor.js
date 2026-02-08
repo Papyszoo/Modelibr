@@ -47,7 +47,6 @@ export class JobProcessor {
   async start() {
     logger.info('Starting SignalR-based job processor', {
       workerId: config.workerId,
-      maxConcurrentJobs: config.maxConcurrentJobs,
       modelProcessing: config.modelProcessing,
     })
 
@@ -984,33 +983,6 @@ export class JobProcessor {
   }
 
   /**
-   * Simulate processing for the skeleton implementation
-   * @param {Object} job - The job being processed
-   * @param {Object} jobLogger - Logger with job context
-   */
-  async simulateProcessing(job, jobLogger) {
-    jobLogger.info('Simulating thumbnail generation', {
-      renderWidth: config.rendering.outputWidth,
-      renderHeight: config.rendering.outputHeight,
-      outputFormat: config.rendering.outputFormat,
-    })
-
-    // Simulate variable processing time (1-5 seconds)
-    const processingTime = Math.random() * 4000 + 1000
-    await this.sleep(processingTime)
-
-    // Randomly simulate failures for testing error handling
-    if (Math.random() < 0.1) {
-      // 10% failure rate
-      throw new Error('Simulated processing failure for testing')
-    }
-
-    jobLogger.info('Thumbnail generation simulation completed', {
-      processingTimeMs: Math.round(processingTime),
-    })
-  }
-
-  /**
    * Start periodic cleanup of temporary files
    */
   startPeriodicCleanup() {
@@ -1119,7 +1091,6 @@ export class JobProcessor {
       activeJobs: this.activeJobs.size,
       queueSize: this.jobQueue.length,
       isProcessingQueue: this.isProcessingQueue,
-      maxConcurrentJobs: config.maxConcurrentJobs,
       workerId: config.workerId,
       signalrConnected: this.signalrQueueService.connected,
     }

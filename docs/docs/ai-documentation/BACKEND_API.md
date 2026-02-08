@@ -15,7 +15,6 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 - **Development:** `http://localhost:5009`
 - **Docker (HTTP):** `http://localhost:8080`
-- **Docker (HTTPS):** `https://localhost:8081`
 
 ## Quick Reference
 
@@ -29,7 +28,7 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `GET`    | `/models`                                 | List all models (?packId, ?projectId) |
 | `GET`    | `/models/{id}`                            | Get model details                     |
 | `GET`    | `/models/{id}/file`                       | Download model file                   |
-| `PUT`    | `/models/{id}/defaultTextureSet`          | Set default texture for version       |
+| `PUT`    | `/models/{id}/default-texture-set`        | Set default texture for version       |
 | `POST`   | `/models/{id}/active-version/{versionId}` | Set active version                    |
 | `DELETE` | `/models/{id}`                            | Soft delete model                     |
 | `DELETE` | `/models/{modelId}/versions/{versionId}`  | Soft delete version                   |
@@ -90,11 +89,11 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 ### Worker API - Thumbnail Jobs (3 endpoints)
 
-| Method | Endpoint                                 | Description                        |
-| ------ | ---------------------------------------- | ---------------------------------- |
-| `POST` | `/api/thumbnail-jobs/dequeue`            | Dequeue next job (workers only)    |
-| `POST` | `/api/thumbnail-jobs/{jobId}/complete`   | Mark job complete (workers only)   |
-| `POST` | `/api/test/thumbnail-complete/{modelId}` | Test completion notification (dev) |
+| Method | Endpoint                             | Description                        |
+| ------ | ------------------------------------ | ---------------------------------- |
+| `POST` | `/thumbnail-jobs/dequeue`            | Dequeue next job (workers only)    |
+| `POST` | `/thumbnail-jobs/{jobId}/complete`   | Mark job complete (workers only)   |
+| `POST` | `/test/thumbnail-complete/{modelId}` | Test completion notification (dev) |
 
 **Total:** 42 endpoints
 

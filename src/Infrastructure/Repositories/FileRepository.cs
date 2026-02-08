@@ -31,6 +31,7 @@ internal sealed class FileRepository : IFileRepository
     public async Task<IEnumerable<Domain.Models.File>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Files
+            .AsNoTracking()
             .Include(f => f.Models)
             .ToListAsync(cancellationToken);
     }
@@ -39,6 +40,7 @@ internal sealed class FileRepository : IFileRepository
     {
         return await _context.Files
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(f => f.IsDeleted)
             .Include(f => f.Models)
             .ToListAsync(cancellationToken);
@@ -62,6 +64,7 @@ internal sealed class FileRepository : IFileRepository
     public async Task<IEnumerable<Domain.Models.File>> GetFilesByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
     {
         return await _context.Files
+            .AsNoTracking()
             .Include(f => f.Models)
             .Where(f => f.Models.Any(m => m.Id == modelId))
             .ToListAsync(cancellationToken);

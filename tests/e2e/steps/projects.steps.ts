@@ -34,6 +34,13 @@ Given(
             `${baseUrl}/?leftTabs=project-${project.id}&activeLeft=project-${project.id}`,
         );
         await page.waitForLoadState("networkidle");
+
+        // Wait for project viewer content to fully load (not just "Loading...")
+        await page
+            .locator(".project-viewer")
+            .first()
+            .waitFor({ state: "visible", timeout: 15000 });
+
         console.log(
             `[Navigation] Opened project viewer for "${projectName}" (ID: ${project.id})`,
         );

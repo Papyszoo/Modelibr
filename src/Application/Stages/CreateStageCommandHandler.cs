@@ -19,7 +19,7 @@ internal sealed class CreateStageCommandHandler : ICommandHandler<CreateStageCom
     {
         var stageResult = Stage.Create(request.Name, request.ConfigurationJson);
         
-        if (!stageResult.IsSuccess)
+        if (stageResult.IsFailure)
         {
             return Result.Failure<CreateStageResponse>(stageResult.Error);
         }

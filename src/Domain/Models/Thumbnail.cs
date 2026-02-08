@@ -8,7 +8,7 @@ namespace Domain.Models;
 /// </summary>
 public class Thumbnail : AggregateRoot
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
     
     /// <summary>
     /// The ID of the model version this thumbnail was generated for.

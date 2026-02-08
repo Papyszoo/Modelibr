@@ -9,7 +9,7 @@ public class Sound : AggregateRoot
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
 
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int FileId { get; private set; }
     public int? SoundCategoryId { get; private set; }

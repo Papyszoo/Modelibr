@@ -28,6 +28,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<IEnumerable<TextureSet>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
+            .AsNoTracking()
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersions)
@@ -43,6 +44,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     {
         return await _context.TextureSets
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(tp => tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)

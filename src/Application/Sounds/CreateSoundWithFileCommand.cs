@@ -42,7 +42,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
         {
             // 1. Validate and get file type for sound
             var fileTypeResult = FileType.ValidateForSoundUpload(command.FileUpload.FileName);
-            if (!fileTypeResult.IsSuccess)
+            if (fileTypeResult.IsFailure)
             {
                 return Result.Failure<CreateSoundWithFileResponse>(fileTypeResult.Error);
             }
@@ -53,7 +53,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
                 fileTypeResult.Value,
                 cancellationToken);
 
-            if (!fileResult.IsSuccess)
+            if (fileResult.IsFailure)
             {
                 return Result.Failure<CreateSoundWithFileResponse>(fileResult.Error);
             }

@@ -29,12 +29,9 @@ export class ThumbnailJobService {
    */
   async pollForJob() {
     try {
-      const response = await this.apiClient.post(
-        '/api/thumbnail-jobs/dequeue',
-        {
-          workerId: config.workerId,
-        }
-      )
+      const response = await this.apiClient.post('/thumbnail-jobs/dequeue', {
+        workerId: config.workerId,
+      })
 
       if (response.status === 204) {
         // No jobs available
@@ -80,10 +77,7 @@ export class ThumbnailJobService {
         errorMessage,
       }
 
-      await this.apiClient.post(
-        `/api/thumbnail-jobs/${jobId}/finish`,
-        requestData
-      )
+      await this.apiClient.post(`/thumbnail-jobs/${jobId}/finish`, requestData)
       logger.info(
         success
           ? 'Marked thumbnail job as completed'
@@ -123,7 +117,7 @@ export class ThumbnailJobService {
       }
 
       await this.apiClient.post(
-        `/api/thumbnail-jobs/sounds/${jobId}/finish`,
+        `/thumbnail-jobs/sounds/${jobId}/finish`,
         requestData
       )
       logger.info(

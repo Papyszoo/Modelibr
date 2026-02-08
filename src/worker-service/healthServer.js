@@ -31,11 +31,9 @@ export class HealthServer {
         worker: {
           id: config.workerId,
           activeJobs: status.activeJobs,
-          maxConcurrentJobs: status.maxConcurrentJobs,
           isShuttingDown: status.isShuttingDown,
         },
         configuration: {
-          pollIntervalMs: config.pollIntervalMs,
           rendering: {
             outputWidth: config.rendering.outputWidth,
             outputHeight: config.rendering.outputHeight,
@@ -104,10 +102,6 @@ export class HealthServer {
         `# HELP worker_active_jobs Current number of active jobs`,
         `# TYPE worker_active_jobs gauge`,
         `worker_active_jobs ${status.activeJobs}`,
-        '',
-        `# HELP worker_max_concurrent_jobs Maximum number of concurrent jobs`,
-        `# TYPE worker_max_concurrent_jobs gauge`,
-        `worker_max_concurrent_jobs ${status.maxConcurrentJobs}`,
         '',
         `# HELP worker_is_shutting_down Whether the worker is shutting down`,
         `# TYPE worker_is_shutting_down gauge`,

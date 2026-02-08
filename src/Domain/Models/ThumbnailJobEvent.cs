@@ -6,7 +6,7 @@ namespace Domain.Models;
 /// </summary>
 public class ThumbnailJobEvent
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
     
     /// <summary>
     /// The ID of the thumbnail job this event belongs to.

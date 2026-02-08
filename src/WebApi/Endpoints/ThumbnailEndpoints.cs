@@ -15,11 +15,12 @@ public static class ThumbnailEndpoints
     {
         app.MapGet("/models/{id}/thumbnail", async (
             int id, 
-            IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler) =>
+            IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }
@@ -62,11 +63,12 @@ public static class ThumbnailEndpoints
         app.MapPost("/models/{id}/thumbnail/regenerate", async (
             int id,
             [FromQuery] int? versionId,
-            ICommandHandler<RegenerateThumbnailCommand, RegenerateThumbnailCommandResponse> commandHandler) =>
+            ICommandHandler<RegenerateThumbnailCommand, RegenerateThumbnailCommandResponse> commandHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await commandHandler.Handle(new RegenerateThumbnailCommand(id, versionId), CancellationToken.None);
+            var result = await commandHandler.Handle(new RegenerateThumbnailCommand(id, versionId), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }
@@ -84,12 +86,13 @@ public static class ThumbnailEndpoints
             [FromForm] int? versionId,
             ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> commandHandler,
             IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> modelQueryHandler,
-            Application.Settings.ISettingsService settingsService) =>
+            Application.Settings.ISettingsService settingsService,
+            CancellationToken cancellationToken) =>
         {
-            var settings = await settingsService.GetSettingsAsync(CancellationToken.None);
+            var settings = await settingsService.GetSettingsAsync(cancellationToken);
             // Validate file
             var validationResult = ValidateThumbnailFile(file, settings.MaxThumbnailSizeBytes);
-            if (!validationResult.IsSuccess)
+            if (validationResult.IsFailure)
             {
                 return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
             }
@@ -102,8 +105,8 @@ public static class ThumbnailEndpoints
             }
             else
             {
-                var modelResult = await modelQueryHandler.Handle(new GetModelByIdQuery(id), CancellationToken.None);
-                if (!modelResult.IsSuccess || modelResult.Value.Model.ActiveVersionId == null)
+                var modelResult = await modelQueryHandler.Handle(new GetModelByIdQuery(id), cancellationToken);
+                if (modelResult.IsFailure || modelResult.Value.Model.ActiveVersionId == null)
                 {
                     return Results.BadRequest(new { error = "NoActiveVersion", message = "Model has no active version and versionId was not provided." });
                 }
@@ -111,9 +114,9 @@ public static class ThumbnailEndpoints
             }
 
             var command = new UploadThumbnailCommand(id, targetVersionId, new FormFileUpload(file), width, height);
-            var result = await commandHandler.Handle(command, CancellationToken.None);
+            var result = await commandHandler.Handle(command, cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -140,12 +143,13 @@ public static class ThumbnailEndpoints
             [FromForm] int? versionId,
             ICommandHandler<UploadPngThumbnailCommand, UploadPngThumbnailCommandResponse> commandHandler,
             IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> modelQueryHandler,
-            Application.Settings.ISettingsService settingsService) =>
+            Application.Settings.ISettingsService settingsService,
+            CancellationToken cancellationToken) =>
         {
-            var settings = await settingsService.GetSettingsAsync(CancellationToken.None);
+            var settings = await settingsService.GetSettingsAsync(cancellationToken);
             // Validate file
             var validationResult = ValidateThumbnailFile(file, settings.MaxThumbnailSizeBytes);
-            if (!validationResult.IsSuccess)
+            if (validationResult.IsFailure)
             {
                 return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
             }
@@ -158,8 +162,8 @@ public static class ThumbnailEndpoints
             }
             else
             {
-                var modelResult = await modelQueryHandler.Handle(new GetModelByIdQuery(id), CancellationToken.None);
-                if (!modelResult.IsSuccess || modelResult.Value.Model.ActiveVersionId == null)
+                var modelResult = await modelQueryHandler.Handle(new GetModelByIdQuery(id), cancellationToken);
+                if (modelResult.IsFailure || modelResult.Value.Model.ActiveVersionId == null)
                 {
                     return Results.BadRequest(new { error = "NoActiveVersion", message = "Model has no active version and versionId was not provided." });
                 }
@@ -167,9 +171,9 @@ public static class ThumbnailEndpoints
             }
 
             var command = new UploadPngThumbnailCommand(id, targetVersionId, new FormFileUpload(file), width, height);
-            var result = await commandHandler.Handle(command, CancellationToken.None);
+            var result = await commandHandler.Handle(command, cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -190,11 +194,12 @@ public static class ThumbnailEndpoints
 
         app.MapGet("/models/{id}/thumbnail/file", async (
             int id,
-            IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler) =>
+            IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }
@@ -237,11 +242,12 @@ public static class ThumbnailEndpoints
 
         app.MapGet("/models/{id}/thumbnail/png-file", async (
             int id,
-            IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler) =>
+            IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }
@@ -326,11 +332,12 @@ public static class ThumbnailEndpoints
         // Version-specific thumbnail endpoints
         app.MapGet("/model-versions/{versionId}/thumbnail", async (
             int versionId, 
-            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler) =>
+            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }
@@ -370,11 +377,12 @@ public static class ThumbnailEndpoints
 
         app.MapGet("/model-versions/{versionId}/thumbnail/file", async (
             int versionId,
-            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler) =>
+            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }
@@ -416,11 +424,12 @@ public static class ThumbnailEndpoints
 
         app.MapGet("/model-versions/{versionId}/thumbnail/png-file", async (
             int versionId,
-            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler) =>
+            IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }

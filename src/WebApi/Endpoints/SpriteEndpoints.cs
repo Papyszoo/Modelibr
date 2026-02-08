@@ -56,7 +56,7 @@ public static class SpriteEndpoints
     {
         var result = await queryHandler.Handle(new GetAllSpritesQuery(packId, projectId, categoryId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -71,7 +71,7 @@ public static class SpriteEndpoints
     {
         var result = await queryHandler.Handle(new GetSpriteByIdQuery(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -93,7 +93,7 @@ public static class SpriteEndpoints
             new CreateSpriteCommand(request.Name, request.FileId, request.SpriteType, request.CategoryId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -132,7 +132,7 @@ public static class SpriteEndpoints
                 projectId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -150,7 +150,7 @@ public static class SpriteEndpoints
             new UpdateSpriteCommand(id, request.Name, request.SpriteType, request.CategoryId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -165,7 +165,7 @@ public static class SpriteEndpoints
     {
         var result = await commandHandler.Handle(new DeleteSpriteCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -180,7 +180,7 @@ public static class SpriteEndpoints
     {
         var result = await commandHandler.Handle(new SoftDeleteSpriteCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }

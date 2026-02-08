@@ -56,6 +56,7 @@ TEXTURE_TYPE_TO_NODE_INPUT: dict = {
     "Height": "Height",
     "Emissive": "Emission Color",
     "Opacity": "Alpha",
+    "Specular": "Specular Tint",
 }
 
 # Reverse mapping for node input to texture type

@@ -92,7 +92,7 @@ public class TextureSetPersistenceTests
     }
 
     [Fact]
-    public async Task TextureSetRepository_GetAllIncludesModels()
+    public async Task TextureSetRepository_GetAllIncludesModelVersions()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -113,20 +113,28 @@ public class TextureSetPersistenceTests
         context.Models.Add(model);
         await context.SaveChangesAsync();
 
-        // Associate model with both packs
-        textureSet1.AddModel(model, DateTime.UtcNow.AddMinutes(1));
-        textureSet2.AddModel(model, DateTime.UtcNow.AddMinutes(2));
+        var version = ModelVersion.Create(model.Id, 1, null, DateTime.UtcNow);
+        context.ModelVersions.Add(version);
         await context.SaveChangesAsync();
 
+        // Associate model version with both texture sets
+        textureSet1.AddModelVersion(version, DateTime.UtcNow);
+        textureSet2.AddModelVersion(version, DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        // Use a fresh context to verify includes work without change tracker
+        using var freshContext = new ApplicationDbContext(options);
+        var freshRepository = new TextureSetRepository(freshContext);
+
         // Act
-        var allTextureSets = await repository.GetAllAsync();
+        var allTextureSets = await freshRepository.GetAllAsync();
 
         // Assert
         Assert.Equal(2, allTextureSets.Count());
         Assert.All(allTextureSets, tp => 
         {
-            Assert.Single(tp.Models);
-            Assert.Equal("Shared Model", tp.Models.First().Name);
+            Assert.Single(tp.ModelVersions);
+            Assert.Equal("Shared Model", tp.ModelVersions.First().Model.Name);
         });
     }
 }

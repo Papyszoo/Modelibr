@@ -34,7 +34,7 @@ export class JobEventService {
   ) {
     try {
       const response = await this.apiClient.post(
-        `/api/thumbnail-jobs/${jobId}/events`,
+        `/thumbnail-jobs/${jobId}/events`,
         {
           eventType,
           message,

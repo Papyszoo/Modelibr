@@ -45,7 +45,7 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
 
         // Validate file type - allow both renderable models and project files like .blend
         var fileTypeResult = FileType.ValidateForUpload(command.File.FileName);
-        if (!fileTypeResult.IsSuccess)
+        if (fileTypeResult.IsFailure)
         {
             return Result.Failure<CreateModelVersionResponse>(fileTypeResult.Error);
         }
@@ -58,7 +58,7 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
             fileType,
             cancellationToken);
 
-        if (!fileResult.IsSuccess)
+        if (fileResult.IsFailure)
         {
             return Result.Failure<CreateModelVersionResponse>(fileResult.Error);
         }

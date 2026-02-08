@@ -34,7 +34,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
         {
             // 1. Validate and get file type for texture
             var fileTypeResult = FileType.ValidateForUpload(command.FileUpload.FileName);
-            if (!fileTypeResult.IsSuccess)
+            if (fileTypeResult.IsFailure)
             {
                 return Result.Failure<CreateTextureSetWithFileResponse>(fileTypeResult.Error);
             }
@@ -45,7 +45,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
                 fileTypeResult.Value,
                 cancellationToken);
 
-            if (!fileResult.IsSuccess)
+            if (fileResult.IsFailure)
             {
                 return Result.Failure<CreateTextureSetWithFileResponse>(fileResult.Error);
             }

@@ -73,7 +73,8 @@ public class VirtualAssetStoreTests : IDisposable
             collectionPropertyManager,
             lockingManager,
             _mockAudioSelectionService.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            new Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory());
     }
 
     public void Dispose()

@@ -43,33 +43,12 @@ CHANNEL_INDEX_TO_NAME = {
     SOURCE_CHANNEL_A: "A",
 }
 
-# Mapping from texture type names (from API) to Blender shader node inputs
-TEXTURE_TYPE_TO_NODE_INPUT = {
-    "Albedo": "Base Color",
-    "Normal": "Normal",
-    "Roughness": "Roughness",
-    "Metallic": "Metallic",
-    "AmbientOcclusion": "AO",
-    "Height": "Height",
-    "Emissive": "Emission Color",
-    "Opacity": "Alpha",
-    "Specular": "Specular Tint",
-}
-
-# Mapping from shader node inputs to texture type names
-NODE_INPUT_TO_TEXTURE_TYPE = {v: k for k, v in TEXTURE_TYPE_TO_NODE_INPUT.items()}
-
-# Patterns in filenames that indicate texture type
-FILENAME_PATTERNS = {
-    "Albedo": ["albedo", "diffuse", "color", "basecolor", "base_color", "col", "diff"],
-    "Normal": ["normal", "nrm", "nor", "norm", "normalgl", "normaldx"],
-    "Roughness": ["roughness", "rough", "rgh"],
-    "Metallic": ["metallic", "metal", "metalness", "met"],
-    "AmbientOcclusion": ["ao", "ambient", "occlusion", "ambientocclusion"],
-    "Height": ["height", "disp", "displacement", "bump"],
-    "Emissive": ["emissive", "emission", "emit", "glow"],
-    "Opacity": ["opacity", "alpha", "transparency", "mask"],
-}
+# Import shared texture constants from config (single source of truth)
+from .config import (
+    TEXTURE_TYPE_TO_NODE_INPUT,
+    NODE_INPUT_TO_TEXTURE_TYPE,
+    TEXTURE_FILENAME_PATTERNS as FILENAME_PATTERNS,
+)
 
 
 def detect_texture_type_from_filename(filepath: str) -> str:

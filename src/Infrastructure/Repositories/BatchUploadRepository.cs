@@ -28,6 +28,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
     public async Task<IEnumerable<BatchUpload>> GetByBatchIdAsync(string batchId, CancellationToken cancellationToken = default)
     {
         return await _context.BatchUploads
+            .AsNoTracking()
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
             .Include(bu => bu.Project)
@@ -41,6 +42,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
     public async Task<IEnumerable<BatchUpload>> GetByUploadTypeAsync(string uploadType, CancellationToken cancellationToken = default)
     {
         return await _context.BatchUploads
+            .AsNoTracking()
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
             .Include(bu => bu.Project)
@@ -54,6 +56,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
     public async Task<IEnumerable<BatchUpload>> GetByDateRangeAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
         return await _context.BatchUploads
+            .AsNoTracking()
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
             .Include(bu => bu.Project)
@@ -90,6 +93,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
     public async Task<IEnumerable<BatchUpload>> GetByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
     {
         return await _context.BatchUploads
+            .AsNoTracking()
             .Include(bu => bu.File)
             .Include(bu => bu.Pack)
             .Include(bu => bu.Project)
@@ -101,7 +105,18 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
 
     public async Task UpdateAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default)
     {
-        _context.BatchUploads.Update(batchUpload);
+        // Use FindAsync + SetValues to avoid entity graph traversal.
+        // Update() recursively attaches navigation properties, causing tracking
+        // conflicts when related entities (e.g., Model) are already tracked.
+        var tracked = await _context.BatchUploads.FindAsync(new object[] { batchUpload.Id }, cancellationToken);
+        if (tracked != null)
+        {
+            _context.Entry(tracked).CurrentValues.SetValues(batchUpload);
+        }
+        else
+        {
+            _context.BatchUploads.Add(batchUpload);
+        }
         await _context.SaveChangesAsync(cancellationToken);
     }
 }

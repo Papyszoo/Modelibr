@@ -25,7 +25,7 @@ internal sealed class UpdateStageCommandHandler : ICommandHandler<UpdateStageCom
 
         var updateResult = stage.UpdateConfiguration(request.ConfigurationJson);
         
-        if (!updateResult.IsSuccess)
+        if (updateResult.IsFailure)
         {
             return Result.Failure<UpdateStageResponse>(updateResult.Error);
         }

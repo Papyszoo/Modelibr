@@ -5,7 +5,7 @@ namespace Domain.Models;
 /// </summary>
 public class ApplicationSettings : AggregateRoot
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
 
     // File upload settings
     public long MaxFileSizeBytes { get; private set; }

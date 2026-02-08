@@ -1,4 +1,4 @@
-import { pipeline, env } from '@xenova/transformers'
+import { pipeline, env } from '@huggingface/transformers'
 import logger from '../logger.js'
 import path from 'path'
 import { fileURLToPath } from 'url'

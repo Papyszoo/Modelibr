@@ -35,7 +35,7 @@ public static class SoundCategoryEndpoints
     {
         var result = await queryHandler.Handle(new GetAllSoundCategoriesQuery(), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -57,7 +57,7 @@ public static class SoundCategoryEndpoints
             new CreateSoundCategoryCommand(request.Name, request.Description),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -80,7 +80,7 @@ public static class SoundCategoryEndpoints
             new UpdateSoundCategoryCommand(id, request.Name, request.Description),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -95,7 +95,7 @@ public static class SoundCategoryEndpoints
     {
         var result = await commandHandler.Handle(new DeleteSoundCategoryCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }

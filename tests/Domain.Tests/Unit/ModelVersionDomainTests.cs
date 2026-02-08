@@ -1,4 +1,5 @@
 using Domain.Models;
+using Domain.Tests;
 using Xunit;
 using DomainFile = Domain.Models.File;
 
@@ -203,7 +204,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         var updatedAt = DateTime.UtcNow;
 
         // Act
@@ -220,7 +221,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         var updatedAt = DateTime.UtcNow;
 
         // Act
@@ -246,7 +247,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         version.AddTextureSet(textureSet, DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow;
 
@@ -263,7 +264,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         var initialUpdatedAt = version.UpdatedAt;
 
         // Act
@@ -279,7 +280,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         version.AddTextureSet(textureSet, DateTime.UtcNow);
 
         // Act
@@ -307,7 +308,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         version.AddTextureSet(textureSet, DateTime.UtcNow);
 
         // Act
@@ -323,7 +324,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         version.AddTextureSet(textureSet, DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow;
 
@@ -340,7 +341,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = CreateTextureSetWithId(1, "Test Texture Set");
+        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         version.AddTextureSet(textureSet, DateTime.UtcNow);
         version.SetDefaultTextureSet(1, DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow;
@@ -364,11 +365,4 @@ public class ModelVersionDomainTests
             version.SetDefaultTextureSet(1, DateTime.UtcNow));
     }
 
-    private static TextureSet CreateTextureSetWithId(int id, string name)
-    {
-        var textureSet = TextureSet.Create(name, DateTime.UtcNow);
-        // Use reflection as a test helper - this is acceptable for test setup
-        textureSet.GetType().GetProperty("Id")!.SetValue(textureSet, id);
-        return textureSet;
-    }
 }

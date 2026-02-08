@@ -9,7 +9,7 @@ namespace Domain.Models;
 /// </summary>
 public class Texture
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public int FileId { get; private set; }
     public TextureType TextureType { get; private set; }
     
@@ -134,7 +134,7 @@ public class Texture
     private static void ValidateTextureType(TextureType textureType)
     {
         var validationResult = textureType.ValidateForStorage();
-        if (!validationResult.IsSuccess)
+        if (validationResult.IsFailure)
         {
             throw new ArgumentException(validationResult.Error.Message, nameof(textureType));
         }

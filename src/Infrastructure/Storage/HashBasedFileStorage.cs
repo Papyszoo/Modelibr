@@ -2,16 +2,19 @@ using System.Security.Cryptography;
 using Application.Abstractions.Files;
 using Application.Abstractions.Storage;
 using Domain.Files;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Storage;
 
 public sealed class HashBasedFileStorage : IFileStorage
 {
     private readonly IUploadPathProvider _pathProvider;
+    private readonly ILogger<HashBasedFileStorage> _logger;
 
-    public HashBasedFileStorage(IUploadPathProvider pathProvider)
+    public HashBasedFileStorage(IUploadPathProvider pathProvider, ILogger<HashBasedFileStorage> logger)
     {
         _pathProvider = pathProvider;
+        _logger = logger;
     }
 
     public async Task<StoredFileResult> SaveAsync(IFileUpload upload, FileType fileType, CancellationToken ct)
@@ -66,12 +69,12 @@ public sealed class HashBasedFileStorage : IFileStorage
                 catch (IOException cleanupEx)
                 {
                     // Log cleanup failure but don't fail the operation since the file was already stored
-                    Console.Error.WriteLine($"Warning: Failed to delete temp file {tempFile}: {cleanupEx.Message}");
+                    _logger.LogWarning(cleanupEx, "Failed to delete temp file {TempFile}", tempFile);
                 }
                 catch (UnauthorizedAccessException cleanupEx)
                 {
                     // Log cleanup failure but don't fail the operation  
-                    Console.Error.WriteLine($"Warning: Failed to delete temp file {tempFile}: {cleanupEx.Message}");
+                    _logger.LogWarning(cleanupEx, "Failed to delete temp file {TempFile}", tempFile);
                 }
             }
         }

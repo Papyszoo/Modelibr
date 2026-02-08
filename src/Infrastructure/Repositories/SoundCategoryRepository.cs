@@ -28,6 +28,7 @@ internal sealed class SoundCategoryRepository : ISoundCategoryRepository
     public async Task<IEnumerable<SoundCategory>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.SoundCategories
+            .AsNoTracking()
             .OrderBy(c => c.Name)
             .ToListAsync(cancellationToken);
     }

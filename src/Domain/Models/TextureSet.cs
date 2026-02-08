@@ -14,7 +14,7 @@ public class TextureSet : AggregateRoot
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
 
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }

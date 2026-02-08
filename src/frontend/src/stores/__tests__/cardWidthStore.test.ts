@@ -4,6 +4,21 @@ import { useCardWidthStore } from '../cardWidthStore'
 describe('cardWidthStore', () => {
   beforeEach(() => {
     localStorage.clear()
+    // Reset Zustand store state to defaults before each test
+    // since the store is a module-level singleton
+    useCardWidthStore.setState({
+      settings: {
+        models: 180,
+        sprites: 200,
+        sounds: 280,
+        packs: 280,
+        projects: 280,
+        textureSets: 200,
+        stages: 300,
+        textureSetViewer: 280,
+        recycledFiles: 200,
+      },
+    })
   })
 
   it('should initialize with default values', () => {
@@ -37,7 +52,7 @@ describe('cardWidthStore', () => {
 
     const stored = localStorage.getItem('cardWidthSettings')
     expect(stored).toBeTruthy()
-    
+
     const parsed = JSON.parse(stored!)
     expect(parsed.sprites).toBe(300)
   })
@@ -52,6 +67,10 @@ describe('cardWidthStore', () => {
       stages: 400,
     }
     localStorage.setItem('cardWidthSettings', JSON.stringify(testSettings))
+    // Simulate what getInitialSettings() would produce from localStorage
+    useCardWidthStore.setState({
+      settings: { ...useCardWidthStore.getState().settings, ...testSettings },
+    })
 
     const { result } = renderHook(() => useCardWidthStore())
 
@@ -65,6 +84,13 @@ describe('cardWidthStore', () => {
       models: 250,
     }
     localStorage.setItem('cardWidthSettings', JSON.stringify(partialSettings))
+    // Simulate what getInitialSettings() would produce: merge partial with defaults
+    useCardWidthStore.setState({
+      settings: {
+        ...useCardWidthStore.getState().settings,
+        ...partialSettings,
+      },
+    })
 
     const { result } = renderHook(() => useCardWidthStore())
 

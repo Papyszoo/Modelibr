@@ -9,7 +9,6 @@ export const config = {
   rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
 
   // Job processing settings
-  maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS) || 3,
   jobTimeout: parseInt(process.env.JOB_TIMEOUT_MS) || 300000, // 5 minutes default
 
   // Logging
@@ -88,10 +87,6 @@ export const config = {
 // Validate configuration
 export function validateConfig() {
   const errors = []
-
-  if (config.maxConcurrentJobs < 1) {
-    errors.push('MAX_CONCURRENT_JOBS must be at least 1')
-  }
 
   if (
     config.rendering.outputWidth < 64 ||

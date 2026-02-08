@@ -56,7 +56,7 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
 
         // Validate file type - allow both renderable models and project files like .blend
         var fileTypeResult = FileType.ValidateForUpload(command.File.FileName);
-        if (!fileTypeResult.IsSuccess)
+        if (fileTypeResult.IsFailure)
         {
             return Result.Failure<AddFileToVersionResponse>(fileTypeResult.Error);
         }
@@ -69,7 +69,7 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
             fileType,
             cancellationToken);
 
-        if (!fileResult.IsSuccess)
+        if (fileResult.IsFailure)
         {
             return Result.Failure<AddFileToVersionResponse>(fileResult.Error);
         }

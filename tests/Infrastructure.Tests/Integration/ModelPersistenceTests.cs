@@ -47,7 +47,7 @@ public class ModelPersistenceTests
         var root = Path.Combine(Path.GetTempPath(), "modelibr_test", Path.GetRandomFileName());
         Directory.CreateDirectory(root);
         var pathProvider = new FakeUploadPathProvider(root);
-        var storage = new HashBasedFileStorage(pathProvider);
+        var storage = new HashBasedFileStorage(pathProvider, NullLogger<HashBasedFileStorage>.Instance);
         var fileUtilityService = new FileUtilityService();
         
         var fileCreationService = new FileCreationService(storage, fileRepository, fileUtilityService, dateTimeProvider);

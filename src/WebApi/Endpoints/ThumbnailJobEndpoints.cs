@@ -8,13 +8,14 @@ public static class ThumbnailJobEndpoints
 {
     public static void MapThumbnailJobEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/thumbnail-jobs/dequeue", async (
+        app.MapPost("/thumbnail-jobs/dequeue", async (
             [FromBody] DequeueRequest request,
-            ICommandHandler<DequeueThumbnailJobCommand, DequeueThumbnailJobResponse> commandHandler) =>
+            ICommandHandler<DequeueThumbnailJobCommand, DequeueThumbnailJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await commandHandler.Handle(new DequeueThumbnailJobCommand(request.WorkerId), CancellationToken.None);
+            var result = await commandHandler.Handle(new DequeueThumbnailJobCommand(request.WorkerId), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(result.Error.Message);
             }
@@ -45,10 +46,11 @@ public static class ThumbnailJobEndpoints
         .WithName("Dequeue Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
-        app.MapPost("/api/thumbnail-jobs/{jobId:int}/finish", async (
+        app.MapPost("/thumbnail-jobs/{jobId:int}/finish", async (
             int jobId,
             [FromBody] FinishJobRequest request,
-            ICommandHandler<FinishThumbnailJobCommand, FinishThumbnailJobResponse> commandHandler) =>
+            ICommandHandler<FinishThumbnailJobCommand, FinishThumbnailJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
         {
             var result = await commandHandler.Handle(new FinishThumbnailJobCommand(
                 jobId,
@@ -57,9 +59,9 @@ public static class ThumbnailJobEndpoints
                 request.SizeBytes,
                 request.Width,
                 request.Height,
-                request.ErrorMessage), CancellationToken.None);
+                request.ErrorMessage), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(result.Error.Message);
             }
@@ -75,19 +77,20 @@ public static class ThumbnailJobEndpoints
         .WithName("Finish Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
-        app.MapPost("/api/thumbnail-jobs/sounds/{jobId:int}/finish", async (
+        app.MapPost("/thumbnail-jobs/sounds/{jobId:int}/finish", async (
             int jobId,
             [FromBody] FinishSoundJobRequest request,
-            ICommandHandler<FinishSoundWaveformJobCommand, FinishSoundWaveformJobResponse> commandHandler) =>
+            ICommandHandler<FinishSoundWaveformJobCommand, FinishSoundWaveformJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
         {
             var result = await commandHandler.Handle(new FinishSoundWaveformJobCommand(
                 jobId,
                 request.Success,
                 request.WaveformPath,
                 request.SizeBytes,
-                request.ErrorMessage), CancellationToken.None);
+                request.ErrorMessage), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(result.Error.Message);
             }
@@ -102,19 +105,20 @@ public static class ThumbnailJobEndpoints
         .WithName("Finish Sound Waveform Job")
         .WithTags("ThumbnailJobs");
 
-        app.MapPost("/api/thumbnail-jobs/{jobId:int}/events", async (
+        app.MapPost("/thumbnail-jobs/{jobId:int}/events", async (
             int jobId,
             [FromBody] LogJobEventRequest request,
-            ICommandHandler<LogThumbnailJobEventCommand, LogThumbnailJobEventResponse> commandHandler) =>
+            ICommandHandler<LogThumbnailJobEventCommand, LogThumbnailJobEventResponse> commandHandler,
+            CancellationToken cancellationToken) =>
         {
             var result = await commandHandler.Handle(new LogThumbnailJobEventCommand(
                 jobId,
                 request.EventType,
                 request.Message,
                 request.Metadata,
-                request.ErrorMessage), CancellationToken.None);
+                request.ErrorMessage), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(result.Error.Message);
             }
@@ -129,7 +133,7 @@ public static class ThumbnailJobEndpoints
         .WithTags("ThumbnailJobs");
 
         // Test endpoint to simulate thumbnail completion for testing SignalR
-        app.MapPost("/api/test/thumbnail-complete/{modelId:int}", async (
+        app.MapPost("/test/thumbnail-complete/{modelId:int}", async (
             int modelId,
             [FromBody] TestThumbnailCompleteRequest request,
             Application.Abstractions.Services.IThumbnailNotificationService notificationService) =>

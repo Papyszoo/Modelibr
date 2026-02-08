@@ -27,6 +27,7 @@ internal sealed class ModelRepository : IModelRepository
     public async Task<IEnumerable<Model>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Models
+            .AsNoTracking()
             .Include(m => m.Packs)
             .Include(m => m.Projects)
             .Include(m => m.ActiveVersion)
@@ -56,6 +57,13 @@ internal sealed class ModelRepository : IModelRepository
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
+    public async Task<Model?> GetByIdForAssociationAsync(int id, CancellationToken cancellationToken = default)
+    {
+        // Use FindAsync to return already-tracked instance if one exists,
+        // avoiding tracking conflicts when Pack/Project loaded the Model via Include
+        return await _context.Models.FindAsync(new object[] { id }, cancellationToken);
+    }
+
     public async Task<Model?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
     {
         return await _context.Models
@@ -82,6 +90,7 @@ internal sealed class ModelRepository : IModelRepository
     {
         return await _context.Models
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(m => m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)

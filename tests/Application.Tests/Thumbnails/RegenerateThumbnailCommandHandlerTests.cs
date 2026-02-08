@@ -1,6 +1,7 @@
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Thumbnails;
+using Application.Tests;
 using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -72,10 +73,10 @@ public class RegenerateThumbnailCommandHandlerTests
     private Model CreateModelWithActiveVersionAndFile(string fileName, string hash)
     {
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1;
+        model.WithId(1);
         
         var version = model.CreateVersion("v1", DateTime.UtcNow);
-        version.Id = 1;
+        version.WithId(1);
         var file = Domain.Models.File.Create(
             fileName, 
             "stored-file.obj",

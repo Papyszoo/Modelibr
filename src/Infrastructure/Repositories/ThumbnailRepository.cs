@@ -8,7 +8,7 @@ namespace Infrastructure.Repositories;
 /// <summary>
 /// Repository implementation for Thumbnail entity operations.
 /// </summary>
-public class ThumbnailRepository : IThumbnailRepository
+internal sealed class ThumbnailRepository : IThumbnailRepository
 {
     private readonly ApplicationDbContext _context;
 
@@ -48,15 +48,12 @@ public class ThumbnailRepository : IThumbnailRepository
     {
         return await _context.Thumbnails
             .Include(t => t.ModelVersion)
-            .ThenInclude(m => m.Files)
             .FirstOrDefaultAsync(t => t.ModelVersion.Files.Any(f => f.Sha256Hash == modelHash), cancellationToken);
     }
 
     public async Task<bool> ExistsByModelHashAsync(string modelHash, CancellationToken cancellationToken = default)
     {
         return await _context.Thumbnails
-            .Include(t => t.ModelVersion)
-            .ThenInclude(m => m.Files)
             .AnyAsync(t => t.ModelVersion.Files.Any(f => f.Sha256Hash == modelHash), cancellationToken);
     }
 

@@ -52,7 +52,7 @@ public static class ModelVersionEndpoints
 
         var result = await commandHandler.Handle(command, cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -79,7 +79,7 @@ public static class ModelVersionEndpoints
 
         var result = await commandHandler.Handle(command, cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -94,7 +94,7 @@ public static class ModelVersionEndpoints
     {
         var result = await queryHandler.Handle(new GetModelVersionsQuery(modelId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -110,7 +110,7 @@ public static class ModelVersionEndpoints
     {
         var result = await queryHandler.Handle(new GetModelVersionQuery(versionId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -126,7 +126,7 @@ public static class ModelVersionEndpoints
     {
         var result = await queryHandler.Handle(new GetVersionRenderableFileQuery(versionId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.NotFound(result.Error.Message);
         }
@@ -146,7 +146,7 @@ public static class ModelVersionEndpoints
     {
         var result = await queryHandler.Handle(new GetVersionFileQuery(versionId, fileId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.NotFound(result.Error.Message);
         }
