@@ -205,7 +205,7 @@ export class ApiHelper {
         textureSetId: number | null,
     ): Promise<void> {
         const response = await this.client.put(
-            `/models/${modelId}/defaultTextureSet`,
+            `/models/${modelId}/default-texture-set`,
             {
                 TextureSetId: textureSetId,
                 ModelVersionId: modelVersionId,

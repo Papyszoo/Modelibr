@@ -11,7 +11,7 @@ public class Project : AggregateRoot
     private readonly List<Sprite> _sprites = new();
     private readonly List<Sound> _sounds = new();
 
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public DateTime CreatedAt { get; private set; }

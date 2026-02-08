@@ -15,11 +15,11 @@ public static class FilesEndpoints
             .WithSummary("Uploads a file (texture, model, etc.) without associating it to a model")
             .DisableAntiforgery();
 
-        app.MapGet("/files/{id}", async (int id, IQueryHandler<GetFileQuery, GetFileQueryResponse> queryHandler) =>
+        app.MapGet("/files/{id}", async (int id, IQueryHandler<GetFileQuery, GetFileQueryResponse> queryHandler, CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetFileQuery(id), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetFileQuery(id), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
             }
@@ -45,7 +45,7 @@ public static class FilesEndpoints
     {
         var settings = await settingsService.GetSettingsAsync(cancellationToken);
         var validationResult = ValidateFile(file, settings.MaxFileSizeBytes);
-        if (!validationResult.IsSuccess)
+        if (validationResult.IsFailure)
         {
             return Results.BadRequest(new { error = validationResult.Error.Code, message = validationResult.Error.Message });
         }
@@ -60,7 +60,7 @@ public static class FilesEndpoints
                 textureSetId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }

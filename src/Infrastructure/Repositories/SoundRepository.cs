@@ -28,6 +28,7 @@ internal sealed class SoundRepository : ISoundRepository
     public async Task<IEnumerable<Sound>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Sounds
+            .AsNoTracking()
             .Include(s => s.File)
             .Include(s => s.Category)
             .Include(s => s.Packs)
@@ -41,6 +42,7 @@ internal sealed class SoundRepository : ISoundRepository
     {
         return await _context.Sounds
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(s => s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)

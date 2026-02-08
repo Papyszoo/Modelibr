@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NWebDav.Server;
 using NWebDav.Server.Http;
 using NWebDav.Server.Stores;
@@ -9,29 +10,44 @@ namespace WebApi.Services;
 
 public class RequestHandlerFactory : IRequestHandlerFactory
 {
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger<RequestHandlerFactory> _logger;
+
+    public RequestHandlerFactory(ILoggerFactory loggerFactory)
+    {
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<RequestHandlerFactory>();
+    }
+
     public IRequestHandler GetRequestHandler(IHttpContext httpContext)
     {
-        Console.WriteLine($"[RequestHandlerFactory] Returning CustomWebDavHandler unconditionally");
-        return new CustomWebDavHandler();
+        _logger.LogDebug("Returning CustomWebDavHandler");
+        return new CustomWebDavHandler(_loggerFactory.CreateLogger<CustomWebDavHandler>());
     }
 }
 
 public class LoggingPropFindHandler : IRequestHandler
 {
     private readonly PropFindHandler _inner = new PropFindHandler();
+    private readonly ILogger<LoggingPropFindHandler> _logger;
+
+    public LoggingPropFindHandler(ILogger<LoggingPropFindHandler> logger)
+    {
+        _logger = logger;
+    }
 
     public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store)
     {
-        Console.WriteLine("[LoggingPropFindHandler] Starting HandleRequestAsync");
+        _logger.LogDebug("Starting HandleRequestAsync");
         try
         {
             var result = await _inner.HandleRequestAsync(httpContext, store);
-            Console.WriteLine($"[LoggingPropFindHandler] Completed. Result: {result}, Status: {httpContext.Response.Status}");
+            _logger.LogDebug("Completed. Result: {Result}, Status: {Status}", result, httpContext.Response.Status);
             return result;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[LoggingPropFindHandler] ERROR: {ex}");
+            _logger.LogError(ex, "PropFind handler failed");
             throw; 
         }
     }

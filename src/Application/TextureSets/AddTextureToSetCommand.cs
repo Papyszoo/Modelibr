@@ -6,14 +6,14 @@ using SharedKernel;
 
 namespace Application.TextureSets;
 
-internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPackCommand, AddTextureToPackResponse>
+internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTextureToTextureSetCommand, AddTextureToTextureSetResponse>
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
-    public AddTextureToPackCommandHandler(
+    public AddTextureToTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
         IFileRepository fileRepository,
         IBatchUploadRepository batchUploadRepository,
@@ -25,7 +25,7 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
         _dateTimeProvider = dateTimeProvider;
     }
 
-    public async Task<Result<AddTextureToPackResponse>> Handle(AddTextureToPackCommand command, CancellationToken cancellationToken)
+    public async Task<Result<AddTextureToTextureSetResponse>> Handle(AddTextureToTextureSetCommand command, CancellationToken cancellationToken)
     {
         try
         {
@@ -33,7 +33,7 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
             var textureSet = await _textureSetRepository.GetByIdAsync(command.TextureSetId, cancellationToken);
             if (textureSet == null)
             {
-                return Result.Failure<AddTextureToPackResponse>(
+                return Result.Failure<AddTextureToTextureSetResponse>(
                     new Error("TextureSetNotFound", $"Texture set with ID {command.TextureSetId} was not found."));
             }
 
@@ -41,15 +41,15 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
             var file = await _fileRepository.GetByIdAsync(command.FileId, cancellationToken);
             if (file == null)
             {
-                return Result.Failure<AddTextureToPackResponse>(
+                return Result.Failure<AddTextureToTextureSetResponse>(
                     new Error("FileNotFound", $"File with ID {command.FileId} was not found."));
             }
 
             // Validate texture type
             var textureTypeResult = command.TextureType.ValidateForStorage();
-            if (!textureTypeResult.IsSuccess)
+            if (textureTypeResult.IsFailure)
             {
-                return Result.Failure<AddTextureToPackResponse>(textureTypeResult.Error);
+                return Result.Failure<AddTextureToTextureSetResponse>(textureTypeResult.Error);
             }
 
             // Create the texture using domain factory method
@@ -79,16 +79,16 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
                 await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
             }
 
-            return Result.Success(new AddTextureToPackResponse(texture.Id, texture.TextureType, texture.SourceChannel));
+            return Result.Success(new AddTextureToTextureSetResponse(texture.Id, texture.TextureType, texture.SourceChannel));
         }
         catch (ArgumentException ex)
         {
-            return Result.Failure<AddTextureToPackResponse>(
-                new Error("AddTextureToPackFailed", ex.Message));
+            return Result.Failure<AddTextureToTextureSetResponse>(
+                new Error("AddTextureToTextureSetFailed", ex.Message));
         }
         catch (InvalidOperationException ex)
         {
-            return Result.Failure<AddTextureToPackResponse>(
+            return Result.Failure<AddTextureToTextureSetResponse>(
                 new Error("BusinessRuleViolation", ex.Message));
         }
     }
@@ -101,14 +101,14 @@ internal class AddTextureToPackCommandHandler : ICommandHandler<AddTextureToPack
 /// <param name="FileId">The file containing the texture</param>
 /// <param name="TextureType">The type of texture (Albedo, Normal, etc.)</param>
 /// <param name="SourceChannel">Optional source channel for channel-packed textures (R, G, B, A, or RGB)</param>
-public record AddTextureToPackCommand(
+public record AddTextureToTextureSetCommand(
     int TextureSetId, 
     int FileId, 
     TextureType TextureType,
     TextureChannel? SourceChannel = null
-) : ICommand<AddTextureToPackResponse>;
+) : ICommand<AddTextureToTextureSetResponse>;
 
 /// <summary>
 /// Response from adding a texture to a set.
 /// </summary>
-public record AddTextureToPackResponse(int TextureId, TextureType TextureType, TextureChannel SourceChannel);
+public record AddTextureToTextureSetResponse(int TextureId, TextureType TextureType, TextureChannel SourceChannel);

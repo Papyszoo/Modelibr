@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public class PackRepository : IPackRepository
+internal sealed class PackRepository : IPackRepository
 {
     private readonly ApplicationDbContext _context;
 
@@ -24,6 +24,7 @@ public class PackRepository : IPackRepository
     public async Task<IEnumerable<Pack>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Packs
+            .AsNoTracking()
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
@@ -53,7 +54,9 @@ public class PackRepository : IPackRepository
 
     public async Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
-        _context.Packs.Update(pack);
+        // Only call Update for detached entities; tracked entities are saved automatically
+        if (_context.Entry(pack).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+            _context.Packs.Update(pack);
         await _context.SaveChangesAsync(cancellationToken);
     }
 

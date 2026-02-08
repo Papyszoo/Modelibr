@@ -36,8 +36,6 @@ class ThumbnailWorkerApp {
       // Log configuration (excluding sensitive data)
       logger.info('Worker configuration', {
         workerId: config.workerId,
-        pollIntervalMs: config.pollIntervalMs,
-        maxConcurrentJobs: config.maxConcurrentJobs,
         rendering: config.rendering,
         healthcheck: config.healthcheck,
         apiBaseUrl: config.apiBaseUrl,

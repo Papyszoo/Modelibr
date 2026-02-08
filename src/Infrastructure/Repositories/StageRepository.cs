@@ -23,6 +23,7 @@ internal sealed class StageRepository : IStageRepository
     public async Task<IEnumerable<Stage>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Stages
+            .AsNoTracking()
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
     }

@@ -58,7 +58,7 @@ internal sealed class AddTextureToPackWithFileCommandHandler
 
         // Validate file type
         var fileTypeResult = FileType.ValidateForUpload(request.File.FileName);
-        if (!fileTypeResult.IsSuccess)
+        if (fileTypeResult.IsFailure)
         {
             return Result.Failure<int>(fileTypeResult.Error);
         }
@@ -72,7 +72,7 @@ internal sealed class AddTextureToPackWithFileCommandHandler
             cancellationToken
         );
 
-        if (!fileResult.IsSuccess)
+        if (fileResult.IsFailure)
         {
             return Result.Failure<int>(fileResult.Error);
         }

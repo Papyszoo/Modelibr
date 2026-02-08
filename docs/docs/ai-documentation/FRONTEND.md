@@ -61,12 +61,14 @@ src/frontend/src/
 | E2E tests | `tests/e2e/features/00-texture-sets/` |
 
 **Key behaviors (from E2E tests):**
+
 - Create texture sets by uploading images (auto-named from filename)
 - Link texture sets to model versions (versions are independent)
 - Set default texture per version (triggers thumbnail regeneration)
 - Preview different textures in 3D viewer without setting as default
 
 **Effects of changes:**
+
 - Changing default texture set → triggers thumbnail worker job
 - Linking/unlinking → updates ModelVersion associations
 - Deleting texture set → affects all linked model versions
@@ -88,16 +90,18 @@ src/frontend/src/
 | Model hierarchy | `features/model-viewer/components/ModelHierarchy.tsx` |
 | UV map display | `features/model-viewer/components/UVMapWindow.tsx` |
 | Texture selector | `features/model-viewer/components/TextureSetSelectorWindow.tsx` |
-| Backend API | `WebApi/Endpoints/ModelsEndpoints.cs`, `ModelVersionEndpoints.cs` |
+| Backend API | `WebApi/Endpoints/ModelEndpoints.cs`, `ModelVersionEndpoints.cs` |
 | E2E tests | `tests/e2e/features/01-model-viewer/` |
 
 **Key behaviors (from E2E tests):**
+
 - Render models in 3D canvas with controls visible
 - Control buttons: Add Version, Viewer Settings, Model Info, Texture Sets, Model Hierarchy, Thumbnail Details, UV Map
 - Version dropdown with thumbnail previews
 - Switching versions updates viewer and file info
 
 **Effects of changes:**
+
 - Viewer changes → affects thumbnail generation (if settings differ)
 - Version switching → loads different 3D file and associated textures
 - Texture selection → updates 3D preview in real-time
@@ -117,10 +121,11 @@ src/frontend/src/
 | Version history | `features/models/components/ModelVersionHistory.tsx` |
 | Empty/error states | `features/models/components/EmptyState.tsx`, `ErrorState.tsx` |
 | Upload progress | `features/models/components/UploadProgress.tsx` |
-| Backend API | `WebApi/Endpoints/ModelEndpoints.cs` (upload), `ModelsEndpoints.cs` (CRUD) |
+| Backend API | `WebApi/Endpoints/ModelEndpoints.cs` |
 | E2E tests | `tests/e2e/features/00-texture-sets/01-setup.feature` (model creation) |
 
 **Key behaviors:**
+
 - Display model cards with thumbnails
 - Upload via drag-and-drop or file picker
 - Click model card to open in viewer
@@ -128,6 +133,7 @@ src/frontend/src/
 - Context menu for model actions (delete, etc.)
 
 **Effects of changes:**
+
 - Upload → creates thumbnail job, fires SignalR notification
 - Delete → soft deletes to recycled files
 - Click → opens ModelViewer in new tab
@@ -146,6 +152,7 @@ src/frontend/src/
 | E2E tests | `tests/e2e/features/04-recycled-files/` (7 feature files) |
 
 **Key behaviors (from E2E tests):**
+
 - Recycled items disappear from main grids
 - Recycled items appear in Recycle Bin
 - Restore moves items back to main grids
@@ -153,6 +160,7 @@ src/frontend/src/
 - Shared file protection: cannot permanently delete files used elsewhere
 
 **Effects of changes:**
+
 - Soft delete → sets `IsRecycled=true`, removes from main queries
 - Restore → clears `IsRecycled`, item reappears
 - Permanent delete → cascading deletion respects shared files
@@ -173,6 +181,7 @@ src/frontend/src/
 | E2E tests | `tests/e2e/features/03-upload-window/` |
 
 **Key behaviors (from E2E tests):**
+
 - Shows filename and extension during upload
 - "Open in Tab" button navigates to model viewer
 - Clicking "Open in Tab" twice activates existing tab (no duplicates)
@@ -180,6 +189,7 @@ src/frontend/src/
 - Batch uploads group multiple files
 
 **Effects of changes:**
+
 - Upload → creates Model, triggers thumbnail generation
 - Batch upload → groups uploads with shared batchId
 - Open in Tab → creates or activates model viewer tab
@@ -201,12 +211,14 @@ src/frontend/src/
 | E2E tests | `tests/e2e/features/02-dock-system/` |
 
 **Key behaviors (from E2E tests):**
+
 - Tabs persist in URL (e.g., `?leftTabs=modelList,model-1&activeLeft=model-1`)
 - Opening model adds tab to URL automatically
 - Duplicate tabs are deduplicated on URL load
 - URL deduplication removes repeated tab IDs
 
 **Effects of changes:**
+
 - Tab changes → URL updates (enables browser back/forward)
 - URL changes → tabs update (enables bookmarks/sharing)
 - Tab close → removes from URL
@@ -228,6 +240,7 @@ src/frontend/src/
 | SignalR updates | Worker sends status via SignalR hub |
 
 **Key behaviors:**
+
 - Auto-generated on model upload
 - Status: NotGenerated, Pending, Processing, Ready, Failed
 - SignalR broadcasts status changes in real-time
@@ -235,6 +248,7 @@ src/frontend/src/
 - Custom thumbnails can be uploaded
 
 **Effects of changes:**
+
 - Changing default texture → triggers thumbnail regeneration
 - Version upload → new thumbnail job queued
 - Worker failure → status stays at "Failed"
@@ -246,22 +260,22 @@ src/frontend/src/
 **ALWAYS use ApiClient** - never use fetch directly:
 
 ```typescript
-import apiClient from '../../services/ApiClient'
+import apiClient from "../../services/ApiClient";
 
-const models = await apiClient.getModels()
-const textureSet = await apiClient.getTextureSet(id)
+const models = await apiClient.getModels();
+const textureSet = await apiClient.getTextureSet(id);
 ```
 
 ---
 
 ## State Management
 
-| Type | When to use | Example |
-|------|-------------|---------|
-| **URL state** | Tabs, navigation, shareable | `useQueryState` from nuqs |
-| **Context** | Cross-component global state | TabContext |
-| **Local state** | Component-specific | `useState` |
-| **Zustand** | Cached API data | `useApiCacheStore` |
+| Type            | When to use                  | Example                   |
+| --------------- | ---------------------------- | ------------------------- |
+| **URL state**   | Tabs, navigation, shareable  | `useQueryState` from nuqs |
+| **Context**     | Cross-component global state | TabContext                |
+| **Local state** | Component-specific           | `useState`                |
+| **Zustand**     | Cached API data              | `useApiCacheStore`        |
 
 ---
 

@@ -1,6 +1,7 @@
 using Domain.Files;
 using Infrastructure.Storage;
 using Infrastructure.Tests.Fakes;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Infrastructure.Tests.Storage;
@@ -19,7 +20,7 @@ public class HashBasedFileStorageTests
     {
         var root = CreateTempRoot();
         var provider = new FakeUploadPathProvider(root);
-        var storage = new HashBasedFileStorage(provider);
+        var storage = new HashBasedFileStorage(provider, NullLogger<HashBasedFileStorage>.Instance);
 
         var data = new byte[] { 1, 2, 3, 4, 5 };
         var upload = new FakeFileUpload("cube.obj", data);
@@ -41,7 +42,7 @@ public class HashBasedFileStorageTests
     {
         var root = CreateTempRoot();
         var provider = new FakeUploadPathProvider(root);
-        var storage = new HashBasedFileStorage(provider);
+        var storage = new HashBasedFileStorage(provider, NullLogger<HashBasedFileStorage>.Instance);
 
         var data = Enumerable.Range(0, 1024).Select(i => (byte)(i % 256)).ToArray();
 
@@ -72,7 +73,7 @@ public class HashBasedFileStorageTests
     {
         var root = CreateTempRoot();
         var provider = new FakeUploadPathProvider(root);
-        var storage = new HashBasedFileStorage(provider);
+        var storage = new HashBasedFileStorage(provider, NullLogger<HashBasedFileStorage>.Instance);
 
         var data = new byte[32 * 1024];
         new System.Random(42).NextBytes(data);

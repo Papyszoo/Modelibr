@@ -30,13 +30,10 @@ internal sealed class ApplicationSettingsRepository : IApplicationSettingsReposi
         }
         else
         {
-            // Detach the existing entity and attach the new one with the same ID
-            _context.Entry(existing).State = EntityState.Detached;
-            settings.GetType().GetProperty("Id")!.SetValue(settings, existing.Id);
-            _context.ApplicationSettings.Update(settings);
+            _context.Entry(existing).CurrentValues.SetValues(settings);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
-        return settings;
+        return existing ?? settings;
     }
 }

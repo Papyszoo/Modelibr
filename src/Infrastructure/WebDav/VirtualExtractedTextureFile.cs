@@ -1,5 +1,6 @@
 using Application.Abstractions.Storage;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 using NWebDav.Server;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
@@ -18,6 +19,7 @@ public sealed class VirtualExtractedTextureFile : IStoreItem
 {
     private readonly IUploadPathProvider _pathProvider;
     private readonly TextureChannel _channel;
+    private readonly ILogger<VirtualExtractedTextureFile> _logger;
 
     public VirtualExtractedTextureFile(
         VirtualItemPropertyManager propertyManager,
@@ -28,7 +30,8 @@ public sealed class VirtualExtractedTextureFile : IStoreItem
         DateTime createdAt,
         DateTime updatedAt,
         IUploadPathProvider pathProvider,
-        TextureChannel channel)
+        TextureChannel channel,
+        ILogger<VirtualExtractedTextureFile> logger)
     {
         PropertyManager = propertyManager;
         LockingManager = lockingManager;
@@ -42,6 +45,7 @@ public sealed class VirtualExtractedTextureFile : IStoreItem
         UpdatedAt = updatedAt;
         _pathProvider = pathProvider;
         _channel = channel;
+        _logger = logger;
     }
 
     public string Name { get; }
@@ -100,7 +104,7 @@ public sealed class VirtualExtractedTextureFile : IStoreItem
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[VirtualExtractedTextureFile] Error extracting channel {_channel} from {Name}: {ex}");
+            _logger.LogError(ex, "Error extracting channel {Channel} from {Name}", _channel, Name);
             return Stream.Null;
         }
     }

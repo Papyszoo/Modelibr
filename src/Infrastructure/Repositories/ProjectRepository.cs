@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public class ProjectRepository : IProjectRepository
+internal sealed class ProjectRepository : IProjectRepository
 {
     private readonly ApplicationDbContext _context;
 
@@ -24,6 +24,7 @@ public class ProjectRepository : IProjectRepository
     public async Task<IEnumerable<Project>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Projects
+            .AsNoTracking()
             .Include(p => p.Models)
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
@@ -53,7 +54,9 @@ public class ProjectRepository : IProjectRepository
 
     public async Task UpdateAsync(Project project, CancellationToken cancellationToken = default)
     {
-        _context.Projects.Update(project);
+        // Only call Update for detached entities; tracked entities are saved automatically
+        if (_context.Entry(project).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+            _context.Projects.Update(project);
         await _context.SaveChangesAsync(cancellationToken);
     }
 

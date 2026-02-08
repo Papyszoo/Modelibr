@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Microsoft.Extensions.Logging;
 using NWebDav.Server;
 using NWebDav.Server.Http;
 using NWebDav.Server.Stores;
@@ -14,11 +15,17 @@ namespace WebApi.Services;
 public class CustomWebDavHandler : IRequestHandler
 {
     private static readonly XNamespace DavNs = "DAV:";
+    private readonly ILogger<CustomWebDavHandler> _logger;
+
+    public CustomWebDavHandler(ILogger<CustomWebDavHandler> logger)
+    {
+        _logger = logger;
+    }
 
     public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store)
     {
         var request = httpContext.Request;
-        Console.WriteLine($"[CustomWebDavHandler] Handling {request.HttpMethod} {request.Url}");
+        _logger.LogDebug("Handling {HttpMethod} {Url}", request.HttpMethod, request.Url);
 
         switch (request.HttpMethod.ToUpperInvariant())
         {
@@ -126,7 +133,7 @@ public class CustomWebDavHandler : IRequestHandler
         }
         catch(Exception ex)
         {
-            Console.WriteLine($"[CustomWebDavHandler] GET Error: {ex}");
+            _logger.LogError(ex, "GET request failed");
             response.Status = 500;
             return true;
         }
@@ -143,7 +150,7 @@ public class CustomWebDavHandler : IRequestHandler
             var item = await store.GetItemAsync(request.Url, httpContext).ConfigureAwait(false);
             if (item == null)
             {
-                Console.WriteLine("[CustomWebDavHandler] Item not found.");
+                _logger.LogDebug("PROPFIND item not found");
                 response.Status = 404;
                 return true;
             }
@@ -191,7 +198,7 @@ public class CustomWebDavHandler : IRequestHandler
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CustomWebDavHandler] PROPFIND Error: {ex}");
+            _logger.LogError(ex, "PROPFIND request failed");
             response.Status = 500;
             return true;
         }

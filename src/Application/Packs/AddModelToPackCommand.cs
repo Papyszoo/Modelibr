@@ -33,7 +33,7 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
                 new Error("PackNotFound", $"Pack with ID {command.PackId} was not found."));
         }
 
-        var model = await _modelRepository.GetByIdAsync(command.ModelId, cancellationToken);
+        var model = await _modelRepository.GetByIdForAssociationAsync(command.ModelId, cancellationToken);
         if (model == null)
         {
             return Result.Failure(

@@ -105,7 +105,7 @@ public sealed class FileType : IEquatable<FileType>
     public static Result<FileType> ValidateForModelUpload(string fileName)
     {
         var fileTypeResult = FromFileName(fileName);
-        if (!fileTypeResult.IsSuccess)
+        if (fileTypeResult.IsFailure)
             return fileTypeResult;
 
         var fileType = fileTypeResult.Value;
@@ -121,7 +121,7 @@ public sealed class FileType : IEquatable<FileType>
     public static Result<FileType> ValidateForUpload(string fileName)
     {
         var fileTypeResult = FromFileName(fileName);
-        if (!fileTypeResult.IsSuccess)
+        if (fileTypeResult.IsFailure)
             return fileTypeResult;
 
         var fileType = fileTypeResult.Value;
@@ -144,7 +144,7 @@ public sealed class FileType : IEquatable<FileType>
     public static Result<FileType> ValidateForSpriteUpload(string fileName)
     {
         var fileTypeResult = FromFileName(fileName);
-        if (!fileTypeResult.IsSuccess)
+        if (fileTypeResult.IsFailure)
             return fileTypeResult;
 
         var fileType = fileTypeResult.Value;
@@ -160,7 +160,7 @@ public sealed class FileType : IEquatable<FileType>
     public static Result<FileType> ValidateForSoundUpload(string fileName)
     {
         var fileTypeResult = FromFileName(fileName);
-        if (!fileTypeResult.IsSuccess)
+        if (fileTypeResult.IsFailure)
             return fileTypeResult;
 
         var fileType = fileTypeResult.Value;

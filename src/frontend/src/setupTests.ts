@@ -101,6 +101,23 @@ jest.mock('./services/ThumbnailSignalRService', () => ({
   ActiveVersionChangedEvent: {},
 }))
 
+// Mock webdavUtils (uses import.meta.env which Jest/Babel cannot transform)
+jest.mock('./utils/webdavUtils', () => ({
+  __esModule: true,
+  detectOS: jest.fn(() => 'windows'),
+  getWebDavBaseUrl: jest.fn(() => 'https://localhost:8081/modelibr'),
+  getWebDavPath: jest.fn((virtualPath: string) => ({
+    nativePath: `\\\\localhost@8081\\modelibr\\${virtualPath}`,
+    displayPath: `\\\\localhost@8081\\modelibr\\${virtualPath}`,
+    webDavUrl: `https://localhost:8081/modelibr/${virtualPath}`,
+  })),
+  getProjectAssetPath: jest.fn(),
+  getSoundCategoryPath: jest.fn(),
+  openInFileExplorer: jest.fn(),
+  copyPathToClipboard: jest.fn(),
+  getMountInstructions: jest.fn(() => ({ windows: '', macos: '', linux: '' })),
+}))
+
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
   constructor() {}

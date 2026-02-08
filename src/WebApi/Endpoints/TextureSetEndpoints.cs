@@ -52,8 +52,8 @@ public static class TextureSetEndpoints
             .WithOpenApi();
 
         // Texture management
-        app.MapPost("/texture-sets/{id}/textures", AddTextureToPackEndpoint)
-            .WithName("Add Texture to Pack")
+        app.MapPost("/texture-sets/{id}/textures", AddTextureToTextureSetEndpoint)
+            .WithName("Add Texture to Texture Set")
             .WithSummary("Adds a texture to the specified texture set")
             .WithOpenApi();
 
@@ -99,7 +99,7 @@ public static class TextureSetEndpoints
     {
         var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -114,7 +114,7 @@ public static class TextureSetEndpoints
     {
         var result = await queryHandler.Handle(new GetTextureSetByIdQuery(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -129,7 +129,7 @@ public static class TextureSetEndpoints
     {
         var result = await queryHandler.Handle(new GetTextureSetByFileIdQuery(fileId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -149,7 +149,7 @@ public static class TextureSetEndpoints
 
         var result = await commandHandler.Handle(new CreateTextureSetCommand(request.Name), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -182,7 +182,7 @@ public static class TextureSetEndpoints
                 batchId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -203,7 +203,7 @@ public static class TextureSetEndpoints
 
         var result = await commandHandler.Handle(new UpdateTextureSetCommand(id, request.Name), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -218,7 +218,7 @@ public static class TextureSetEndpoints
     {
         var result = await commandHandler.Handle(new DeleteTextureSetCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -233,7 +233,7 @@ public static class TextureSetEndpoints
     {
         var result = await commandHandler.Handle(new HardDeleteTextureSetCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -241,17 +241,17 @@ public static class TextureSetEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> AddTextureToPackEndpoint(
+    private static async Task<IResult> AddTextureToTextureSetEndpoint(
         int id,
-        [FromBody] AddTextureToPackRequest request,
-        ICommandHandler<AddTextureToPackCommand, AddTextureToPackResponse> commandHandler,
+        [FromBody] AddTextureToTextureSetRequest request,
+        ICommandHandler<AddTextureToTextureSetCommand, AddTextureToTextureSetResponse> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new AddTextureToPackCommand(id, request.FileId, request.TextureType, request.SourceChannel), 
+            new AddTextureToTextureSetCommand(id, request.FileId, request.TextureType, request.SourceChannel), 
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -269,7 +269,7 @@ public static class TextureSetEndpoints
             new RemoveTextureFromPackCommand(packId, textureId), 
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -288,7 +288,7 @@ public static class TextureSetEndpoints
             new ChangeTextureTypeCommand(setId, textureId, request.TextureType),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -307,7 +307,7 @@ public static class TextureSetEndpoints
             new UpdateTextureChannelCommand(setId, textureId, request.SourceChannel),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -326,7 +326,7 @@ public static class TextureSetEndpoints
             new AssociateTextureSetWithModelVersionCommand(packId, modelVersionId), 
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -344,7 +344,7 @@ public static class TextureSetEndpoints
             new DisassociateTextureSetFromModelVersionCommand(packId, modelVersionId), 
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -362,7 +362,7 @@ public static class TextureSetEndpoints
             new AssociateTextureSetWithAllModelVersionsCommand(packId, modelId), 
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -374,6 +374,6 @@ public static class TextureSetEndpoints
 // Request DTOs
 public record CreateTextureSetRequest(string Name);
 public record UpdateTextureSetRequest(string Name);
-public record AddTextureToPackRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);
+public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);
 public record ChangeTextureTypeRequest(TextureType TextureType);
 public record ChangeTextureChannelRequest(TextureChannel SourceChannel);

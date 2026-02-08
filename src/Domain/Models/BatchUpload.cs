@@ -5,7 +5,7 @@ namespace Domain.Models;
 /// </summary>
 public class BatchUpload
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
     
     /// <summary>
     /// Unique identifier for the batch. Multiple files uploaded together share the same BatchId.

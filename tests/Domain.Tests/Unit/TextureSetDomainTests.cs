@@ -1,5 +1,6 @@
 using Domain.Models;
 using Domain.ValueObjects;
+using Domain.Tests;
 using Xunit;
 using DomainFile = Domain.Models.File;
 
@@ -449,7 +450,7 @@ public class TextureSetDomainTests
         // Arrange
         var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1; // Set ID to simulate existing entity
+        model.WithId(1); // Set ID to simulate existing entity
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
         textureSet.AddModel(model, updatedAt);
 
@@ -494,7 +495,7 @@ public class TextureSetDomainTests
         // Arrange
         var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 123;
+        model.WithId(123);
         textureSet.AddModel(model, DateTime.UtcNow.AddMinutes(1));
 
         // Act

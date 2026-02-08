@@ -74,7 +74,7 @@ public static class SoundEndpoints
     {
         var result = await queryHandler.Handle(new GetAllSoundsQuery(packId, projectId, categoryId), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -89,7 +89,7 @@ public static class SoundEndpoints
     {
         var result = await queryHandler.Handle(new GetSoundByIdQuery(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -111,7 +111,7 @@ public static class SoundEndpoints
             new CreateSoundCommand(request.Name, request.FileId, request.Duration, request.Peaks, request.CategoryId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -152,7 +152,7 @@ public static class SoundEndpoints
                 projectId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -170,7 +170,7 @@ public static class SoundEndpoints
             new UpdateSoundCommand(id, request.Name, request.CategoryId),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -185,7 +185,7 @@ public static class SoundEndpoints
     {
         var result = await commandHandler.Handle(new DeleteSoundCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -200,7 +200,7 @@ public static class SoundEndpoints
     {
         var result = await commandHandler.Handle(new SoftDeleteSoundCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -216,7 +216,7 @@ public static class SoundEndpoints
     {
         // First get the sound to retrieve its FileId
         var soundResult = await soundQueryHandler.Handle(new GetSoundByIdQuery(id), cancellationToken);
-        if (!soundResult.IsSuccess)
+        if (soundResult.IsFailure)
         {
             return Results.NotFound(new { error = soundResult.Error.Code, message = soundResult.Error.Message });
         }
@@ -225,7 +225,7 @@ public static class SoundEndpoints
 
         // Now get the actual file
         var fileResult = await fileQueryHandler.Handle(new GetFileQuery(fileId), cancellationToken);
-        if (!fileResult.IsSuccess)
+        if (fileResult.IsFailure)
         {
             return Results.NotFound(new { error = fileResult.Error.Code, message = fileResult.Error.Message });
         }
@@ -248,7 +248,7 @@ public static class SoundEndpoints
         {
             // Verify sound exists
             var soundResult = await soundQueryHandler.Handle(new GetSoundByIdQuery(id), cancellationToken);
-            if (!soundResult.IsSuccess)
+            if (soundResult.IsFailure)
             {
                 return Results.NotFound(new { error = soundResult.Error.Code, message = soundResult.Error.Message });
             }
@@ -312,7 +312,7 @@ public static class SoundEndpoints
     {
         // Get the sound to retrieve file hash
         var soundResult = await soundQueryHandler.Handle(new GetSoundByIdQuery(id), cancellationToken);
-        if (!soundResult.IsSuccess)
+        if (soundResult.IsFailure)
         {
             return Results.NotFound(new { error = soundResult.Error.Code, message = soundResult.Error.Message });
         }

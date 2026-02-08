@@ -88,7 +88,7 @@ class NotFoundError(ApiError):
         self.resource_id = resource_id
 
 
-class ImportError(ModelibrError):
+class ModelImportError(ModelibrError):
     """
     Raised when model import fails.
     

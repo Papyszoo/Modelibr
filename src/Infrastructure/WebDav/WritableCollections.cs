@@ -127,7 +127,7 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
                     _project.Id), // projectId
                 CancellationToken.None);
 
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 _logger?.LogWarning("Failed to create sprite via WebDAV: {Error}", result.Error?.Message);
                 return new StoreItemResult(DavStatusCode.InternalServerError);
@@ -270,7 +270,7 @@ public sealed class WritableProjectSoundsCollection : VirtualCollectionBase
                     _project.Id), // projectId
                 CancellationToken.None);
 
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 _logger?.LogWarning("Failed to create sound via WebDAV: {Error}", result.Error?.Message);
                 return new StoreItemResult(DavStatusCode.InternalServerError);

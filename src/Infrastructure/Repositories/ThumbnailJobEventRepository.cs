@@ -8,7 +8,7 @@ namespace Infrastructure.Repositories;
 /// <summary>
 /// Repository implementation for ThumbnailJobEvent entity operations.
 /// </summary>
-public class ThumbnailJobEventRepository : IThumbnailJobEventRepository
+internal sealed class ThumbnailJobEventRepository : IThumbnailJobEventRepository
 {
     private readonly ApplicationDbContext _context;
 
@@ -27,6 +27,7 @@ public class ThumbnailJobEventRepository : IThumbnailJobEventRepository
     public async Task<IEnumerable<ThumbnailJobEvent>> GetByJobIdAsync(int thumbnailJobId, CancellationToken cancellationToken = default)
     {
         return await _context.ThumbnailJobEvents
+            .AsNoTracking()
             .Where(tje => tje.ThumbnailJobId == thumbnailJobId)
             .OrderBy(tje => tje.OccurredAt)
             .ToListAsync(cancellationToken);

@@ -39,7 +39,7 @@ namespace Application.Models
         {
             // Validate file type for model upload using Value Object directly
             var fileTypeResult = FileType.ValidateForModelUpload(command.File.FileName);
-            if (!fileTypeResult.IsSuccess)
+            if (fileTypeResult.IsFailure)
             {
                 return Result.Failure<AddModelCommandResponse>(fileTypeResult.Error);
             }
@@ -50,7 +50,7 @@ namespace Application.Models
                 fileTypeResult.Value, 
                 cancellationToken);
 
-            if (!fileResult.IsSuccess)
+            if (fileResult.IsFailure)
             {
                 return Result.Failure<AddModelCommandResponse>(fileResult.Error);
             }

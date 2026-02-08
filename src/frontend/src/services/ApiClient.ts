@@ -1079,7 +1079,7 @@ class ApiClient {
     modelVersionId?: number
   ): Promise<{ modelId: number; defaultTextureSetId: number | null }> {
     const response = await this.client.put(
-      `/models/${modelId}/defaultTextureSet`,
+      `/models/${modelId}/default-texture-set`,
       {
         TextureSetId: textureSetId,
         ModelVersionId: modelVersionId,
@@ -1116,7 +1116,7 @@ class ApiClient {
     const url = options.skipCache
       ? `/models/${modelId}/versions?_=${Date.now()}`
       : `/models/${modelId}/versions`
-    
+
     const response = await this.client.get<ModelVersionDto[]>(url)
     return response.data
   }

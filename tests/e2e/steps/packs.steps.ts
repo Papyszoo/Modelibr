@@ -40,6 +40,13 @@ Given(
             `${baseUrl}/?leftTabs=pack-${pack.id}&activeLeft=pack-${pack.id}`,
         );
         await page.waitForLoadState("networkidle");
+
+        // Wait for pack viewer content to fully load (not just "Loading...")
+        await page
+            .locator(".pack-viewer")
+            .first()
+            .waitFor({ state: "visible", timeout: 15000 });
+
         console.log(
             `[Navigation] Opened pack viewer for "${packName}" (ID: ${pack.id})`,
         );

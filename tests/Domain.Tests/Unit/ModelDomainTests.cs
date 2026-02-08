@@ -1,5 +1,6 @@
 using Domain.Models;
 using Domain.ValueObjects;
+using Domain.Tests;
 using Xunit;
 using DomainFile = Domain.Models.File;
 
@@ -114,7 +115,7 @@ public class ModelDomainTests
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
-        textureSet.Id = 1; // Set ID to simulate existing entity
+        textureSet.WithId(1); // Set ID to simulate existing entity
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
         model.AddTextureSet(textureSet, updatedAt);
 
@@ -159,7 +160,7 @@ public class ModelDomainTests
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
-        textureSet.Id = 123;
+        textureSet.WithId(123);
         model.AddTextureSet(textureSet, DateTime.UtcNow.AddMinutes(1));
 
         // Act
@@ -188,9 +189,9 @@ public class ModelDomainTests
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var textureSet1 = TextureSet.Create("Texture Set 1", DateTime.UtcNow);
-        textureSet1.Id = 1; // Simulate persisted texture set
+        textureSet1.WithId(1); // Simulate persisted texture set
         var textureSet2 = TextureSet.Create("Texture Set 2", DateTime.UtcNow);
-        textureSet2.Id = 2; // Simulate persisted texture set
+        textureSet2.WithId(2); // Simulate persisted texture set
         model.AddTextureSet(textureSet1, DateTime.UtcNow.AddMinutes(1));
         model.AddTextureSet(textureSet2, DateTime.UtcNow.AddMinutes(2));
 
@@ -209,7 +210,7 @@ public class ModelDomainTests
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1; // Simulate persisted model
+        model.WithId(1); // Simulate persisted model
         var description = "Version 1";
         var createdAt = DateTime.UtcNow;
 
@@ -228,7 +229,7 @@ public class ModelDomainTests
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1;
+        model.WithId(1);
         model.CreateVersion("Version 1", DateTime.UtcNow);
 
         // Act
@@ -244,7 +245,7 @@ public class ModelDomainTests
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1;
+        model.WithId(1);
         model.CreateVersion("V1", DateTime.UtcNow);
         model.CreateVersion("V2", DateTime.UtcNow.AddMinutes(1));
         model.CreateVersion("V3", DateTime.UtcNow.AddMinutes(2));
@@ -265,7 +266,7 @@ public class ModelDomainTests
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1;
+        model.WithId(1);
         model.CreateVersion("V1", DateTime.UtcNow);
         model.CreateVersion("V2", DateTime.UtcNow.AddMinutes(1));
 
@@ -282,7 +283,7 @@ public class ModelDomainTests
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1;
+        model.WithId(1);
 
         // Act
         var version = model.GetVersion(999);
@@ -296,7 +297,7 @@ public class ModelDomainTests
     {
         // Arrange
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        model.Id = 1;
+        model.WithId(1);
         model.CreateVersion("V1", DateTime.UtcNow);
 
         // Act

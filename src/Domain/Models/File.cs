@@ -6,7 +6,7 @@ public class File
 {
     private readonly List<Model> _models = new();
 
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public string OriginalFileName { get; private set; } = string.Empty;
     public string StoredFileName { get; private set; } = string.Empty;
     public string FilePath { get; private set; } = string.Empty;

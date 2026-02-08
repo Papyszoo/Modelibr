@@ -23,7 +23,7 @@ internal class UpdateSettingCommandHandler : ICommandHandler<UpdateSettingComman
     {
         // Validate the setting value based on its key
         var validationResult = SettingValidator.ValidateSetting(command.Key, command.Value);
-        if (!validationResult.IsSuccess)
+        if (validationResult.IsFailure)
         {
             return Result.Failure<UpdateSettingResponse>(validationResult.Error);
         }

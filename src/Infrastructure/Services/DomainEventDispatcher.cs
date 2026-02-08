@@ -41,7 +41,7 @@ public class DomainEventDispatcher : IDomainEventDispatcher
                     domainEvent.GetType().Name, domainEvent.Id);
 
                 var result = await PublishSingleEventAsync(domainEvent, cancellationToken);
-                if (!result.IsSuccess)
+                if (result.IsFailure)
                 {
                     errors.Add(result.Error);
                 }
@@ -94,7 +94,7 @@ public class DomainEventDispatcher : IDomainEventDispatcher
                     {
                         var result = await task;
                         
-                        if (!result.IsSuccess)
+                        if (result.IsFailure)
                         {
                             _logger.LogError("Handler {HandlerType} failed to process {EventType}: {Error}",
                                 handler?.GetType().Name, eventType.Name, result.Error?.Message);

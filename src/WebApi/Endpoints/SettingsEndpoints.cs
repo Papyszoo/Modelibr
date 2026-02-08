@@ -8,11 +8,12 @@ public static class SettingsEndpoints
     public static void MapSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/settings", async (
-            IQueryHandler<GetSettingsQuery, GetSettingsQueryResponse> queryHandler) =>
+            IQueryHandler<GetSettingsQuery, GetSettingsQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetSettingsQuery(), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetSettingsQuery(), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -23,11 +24,12 @@ public static class SettingsEndpoints
         .WithTags("Settings");
 
         app.MapGet("/settings/all", async (
-            IQueryHandler<GetAllSettingsQuery, GetAllSettingsQueryResponse> queryHandler) =>
+            IQueryHandler<GetAllSettingsQuery, GetAllSettingsQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetAllSettingsQuery(), CancellationToken.None);
+            var result = await queryHandler.Handle(new GetAllSettingsQuery(), cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -40,12 +42,13 @@ public static class SettingsEndpoints
         app.MapPut("/settings/{key}", async (
             string key,
             UpdateSettingRequest request,
-            ICommandHandler<UpdateSettingCommand, UpdateSettingResponse> commandHandler) =>
+            ICommandHandler<UpdateSettingCommand, UpdateSettingResponse> commandHandler,
+            CancellationToken cancellationToken) =>
         {
             var command = new UpdateSettingCommand(key, request.Value);
-            var result = await commandHandler.Handle(command, CancellationToken.None);
+            var result = await commandHandler.Handle(command, cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
@@ -57,7 +60,8 @@ public static class SettingsEndpoints
 
         app.MapPut("/settings", async (
             UpdateSettingsRequest request,
-            ICommandHandler<UpdateSettingsCommand, UpdateSettingsResponse> commandHandler) =>
+            ICommandHandler<UpdateSettingsCommand, UpdateSettingsResponse> commandHandler,
+            CancellationToken cancellationToken) =>
         {
             var command = new UpdateSettingsCommand(
                 request.MaxFileSizeBytes,
@@ -69,9 +73,9 @@ public static class SettingsEndpoints
                 request.GenerateThumbnailOnUpload
             );
 
-            var result = await commandHandler.Handle(command, CancellationToken.None);
+            var result = await commandHandler.Handle(command, cancellationToken);
             
-            if (!result.IsSuccess)
+            if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }

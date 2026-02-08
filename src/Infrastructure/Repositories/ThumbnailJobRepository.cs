@@ -9,7 +9,7 @@ namespace Infrastructure.Repositories;
 /// <summary>
 /// Repository implementation for ThumbnailJob entity with concurrency-safe operations.
 /// </summary>
-public class ThumbnailJobRepository : IThumbnailJobRepository
+internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
 {
     private readonly ApplicationDbContext _context;
 
@@ -55,6 +55,7 @@ public class ThumbnailJobRepository : IThumbnailJobRepository
     public async Task<IEnumerable<ThumbnailJob>> GetBySoundIdsAsync(IEnumerable<int> soundIds, CancellationToken cancellationToken = default)
     {
         return await _context.ThumbnailJobs
+            .AsNoTracking()
             .Where(tj => tj.SoundId.HasValue && soundIds.Contains(tj.SoundId.Value))
             .ToListAsync(cancellationToken);
     }

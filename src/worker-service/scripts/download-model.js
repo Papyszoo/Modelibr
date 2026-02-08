@@ -5,7 +5,7 @@
  * Can be skipped in Docker builds by setting SKIP_MODEL_DOWNLOAD=true
  */
 
-import { pipeline, env } from '@xenova/transformers'
+import { pipeline, env } from '@huggingface/transformers'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'

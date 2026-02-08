@@ -111,11 +111,9 @@ The service exposes several endpoints for monitoring:
   "worker": {
     "id": "worker-4171",
     "activeJobs": 0,
-    "maxConcurrentJobs": 3,
     "isShuttingDown": false
   },
   "configuration": {
-    "pollIntervalMs": 5000,
     "rendering": {
       "outputWidth": 256,
       "outputHeight": 256,
@@ -239,10 +237,10 @@ The worker uses a browser-based rendering approach:
 
 ### API Integration Points
 
-- `POST /api/thumbnail-jobs/dequeue` - Poll for next available job
-- `POST /api/thumbnail-jobs/{id}/complete` - Mark job as completed
-- `POST /api/thumbnail-jobs/{id}/fail` - Mark job as failed
-- `POST /api/thumbnail-jobs/{id}/events` - Log detailed job events for audit trail
+- `POST /thumbnail-jobs/dequeue` - Poll for next available job
+- `POST /thumbnail-jobs/{id}/complete` - Mark job as completed
+- `POST /thumbnail-jobs/{id}/fail` - Mark job as failed
+- `POST /thumbnail-jobs/{id}/events` - Log detailed job events for audit trail
 - `GET /models/{id}/file` - Download model file for processing
 - `GET /health` - API health check
 
@@ -353,7 +351,6 @@ Basic metrics are exposed at `/metrics` endpoint in Prometheus format:
 
 - `worker_uptime_seconds` - Total uptime
 - `worker_active_jobs` - Current active jobs
-- `worker_max_concurrent_jobs` - Maximum concurrent jobs
 - `worker_is_shutting_down` - Shutdown status
 
 ### Logging Integration

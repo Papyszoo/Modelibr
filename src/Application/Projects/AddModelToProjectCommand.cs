@@ -34,7 +34,7 @@ internal class AddModelToProjectCommandHandler : ICommandHandler<AddModelToProje
                 new Error("ProjectNotFound", $"Project with ID {command.ProjectId} was not found."));
         }
 
-        var model = await _modelRepository.GetByIdAsync(command.ModelId, cancellationToken);
+        var model = await _modelRepository.GetByIdForAssociationAsync(command.ModelId, cancellationToken);
 
         if (model == null)
         {

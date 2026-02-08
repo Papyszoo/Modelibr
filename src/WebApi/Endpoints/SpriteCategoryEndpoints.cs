@@ -35,7 +35,7 @@ public static class SpriteCategoryEndpoints
     {
         var result = await queryHandler.Handle(new GetAllSpriteCategoriesQuery(), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -57,7 +57,7 @@ public static class SpriteCategoryEndpoints
             new CreateSpriteCategoryCommand(request.Name, request.Description),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -80,7 +80,7 @@ public static class SpriteCategoryEndpoints
             new UpdateSpriteCategoryCommand(id, request.Name, request.Description),
             cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
@@ -95,7 +95,7 @@ public static class SpriteCategoryEndpoints
     {
         var result = await commandHandler.Handle(new DeleteSpriteCategoryCommand(id), cancellationToken);
 
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }

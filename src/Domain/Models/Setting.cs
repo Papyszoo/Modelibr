@@ -5,7 +5,7 @@ namespace Domain.Models;
 /// </summary>
 public class Setting : AggregateRoot
 {
-    public int Id { get; set; }
+    public int Id { get; private set; }
     public string Key { get; private set; } = string.Empty;
     public string Value { get; private set; } = string.Empty;
     public string? Description { get; private set; }

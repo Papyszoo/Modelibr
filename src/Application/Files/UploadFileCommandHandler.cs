@@ -32,7 +32,7 @@ namespace Application.Files
         {
             // Validate file type for upload using Value Object directly
             var fileTypeResult = FileType.ValidateForUpload(command.File.FileName);
-            if (!fileTypeResult.IsSuccess)
+            if (fileTypeResult.IsFailure)
             {
                 return Result.Failure<UploadFileCommandResponse>(fileTypeResult.Error);
             }
@@ -43,7 +43,7 @@ namespace Application.Files
                 fileTypeResult.Value, 
                 cancellationToken);
 
-            if (!fileResult.IsSuccess)
+            if (fileResult.IsFailure)
             {
                 return Result.Failure<UploadFileCommandResponse>(fileResult.Error);
             }
