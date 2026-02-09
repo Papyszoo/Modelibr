@@ -35,7 +35,7 @@ class ThumbnailSignalRService {
   private thumbnailStatusCallbacks: Set<ThumbnailStatusChangedCallback> =
     new Set()
   private activeVersionCallbacks: Set<ActiveVersionChangedCallback> = new Set()
-  private isConnecting: boolean = false
+  private connectPromise: Promise<void> | null = null
   private reconnectAttempts: number = 0
   private maxReconnectAttempts: number = 5
 
@@ -50,12 +50,21 @@ class ThumbnailSignalRService {
       return
     }
 
-    if (this.isConnecting) {
+    // If already connecting, wait for the existing connection attempt
+    if (this.connectPromise) {
+      await this.connectPromise
       return
     }
 
-    this.isConnecting = true
+    this.connectPromise = this.doConnect()
+    try {
+      await this.connectPromise
+    } finally {
+      this.connectPromise = null
+    }
+  }
 
+  private async doConnect(): Promise<void> {
     try {
       this.connection = new signalR.HubConnectionBuilder()
         .withUrl(this.getHubUrl())
@@ -103,9 +112,18 @@ class ThumbnailSignalRService {
         log('ThumbnailSignalR: Reconnecting...')
       })
 
-      this.connection.onreconnected(() => {
-        log('ThumbnailSignalR: Reconnected')
+      this.connection.onreconnected(async () => {
+        log('ThumbnailSignalR: Reconnected, re-joining AllModelsGroup')
         this.reconnectAttempts = 0
+        // Re-join groups after reconnect — server-side group membership is tied to connection ID
+        try {
+          await this.joinAllModelsGroup()
+        } catch (error) {
+          console.error(
+            'ThumbnailSignalR: Failed to re-join AllModelsGroup after reconnect',
+            error
+          )
+        }
       })
 
       this.connection.onclose(() => {
@@ -118,8 +136,6 @@ class ThumbnailSignalRService {
     } catch (error) {
       console.error('ThumbnailSignalR: Failed to connect', error)
       this.reconnectAttempts++
-    } finally {
-      this.isConnecting = false
     }
   }
 

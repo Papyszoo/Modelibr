@@ -94,14 +94,29 @@ public static class TextureSetEndpoints
     private static async Task<IResult> GetAllTextureSets(
         int? packId,
         int? projectId,
+        int? page,
+        int? pageSize,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId), cancellationToken);
+        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId, page, pageSize), cancellationToken);
 
         if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        // When paginated, include pagination metadata
+        if (page.HasValue && pageSize.HasValue)
+        {
+            return Results.Ok(new
+            {
+                textureSets = result.Value.TextureSets,
+                totalCount = result.Value.TotalCount,
+                page = result.Value.Page,
+                pageSize = result.Value.PageSize,
+                totalPages = result.Value.TotalPages
+            });
         }
 
         return Results.Ok(result.Value);

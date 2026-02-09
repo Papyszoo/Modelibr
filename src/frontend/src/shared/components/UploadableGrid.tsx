@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react'
+import { useState, useCallback, useRef, ReactNode } from 'react'
 import './UploadableGrid.css'
 
 interface UploadableGridProps {
@@ -17,42 +17,45 @@ export default function UploadableGrid({
   className = '',
 }: UploadableGridProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const dragCounter = useRef(0)
 
-  const handleDragEnter = (e: React.DragEvent) => {
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setIsDragging(true)
-  }
+    dragCounter.current++
+    if (dragCounter.current === 1) {
+      setIsDragging(true)
+    }
+  }, [])
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-
-    // Check if we're actually leaving the container (not just entering a child)
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX
-    const y = e.clientY
-
-    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+    dragCounter.current--
+    if (dragCounter.current === 0) {
       setIsDragging(false)
     }
-  }
+  }, [])
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-  }
+  }, [])
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dragCounter.current = 0
+      setIsDragging(false)
 
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) {
-      onFilesDropped(files)
-    }
-  }
+      const files = Array.from(e.dataTransfer.files)
+      if (files.length > 0) {
+        onFilesDropped(files)
+      }
+    },
+    [onFilesDropped]
+  )
 
   return (
     <div

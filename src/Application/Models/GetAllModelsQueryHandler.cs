@@ -17,20 +17,41 @@ namespace Application.Models
 
         public async Task<Result<GetAllModelsQueryResponse>> Handle(GetAllModelsQuery query, CancellationToken cancellationToken)
         {
-            var models = await _modelRepository.GetAllAsync(cancellationToken);
-            
-            // Filter by pack if specified
-            if (query.PackId.HasValue)
+            IEnumerable<Model> models;
+            int? totalCount = null;
+
+            if (query.Page.HasValue && query.PageSize.HasValue)
             {
-                models = models.Where(m => m.Packs.Any(p => p.Id == query.PackId.Value));
+                var result = await _modelRepository.GetPagedAsync(
+                    query.Page.Value, query.PageSize.Value,
+                    query.PackId, query.ProjectId, query.TextureSetId,
+                    cancellationToken);
+                models = result.Items;
+                totalCount = result.TotalCount;
             }
-            
-            // Filter by project if specified
-            if (query.ProjectId.HasValue)
+            else
             {
-                models = models.Where(m => m.Projects.Any(p => p.Id == query.ProjectId.Value));
+                models = await _modelRepository.GetAllAsync(cancellationToken);
+
+                // Filter by pack if specified
+                if (query.PackId.HasValue)
+                {
+                    models = models.Where(m => m.Packs.Any(p => p.Id == query.PackId.Value));
+                }
+
+                // Filter by project if specified
+                if (query.ProjectId.HasValue)
+                {
+                    models = models.Where(m => m.Projects.Any(p => p.Id == query.ProjectId.Value));
+                }
+
+                // Filter by texture set if specified
+                if (query.TextureSetId.HasValue)
+                {
+                    models = models.Where(m => m.TextureSets.Any(ts => ts.Id == query.TextureSetId.Value));
+                }
             }
-            
+
             var modelListDtos = models.Select(m => new ModelListDto
             {
                 Id = m.Id,
@@ -48,13 +69,18 @@ namespace Application.Models
                     : null
             }).ToList();
 
-            return Result.Success(new GetAllModelsQueryResponse(modelListDtos));
+            int? totalPages = (totalCount.HasValue && query.PageSize.HasValue)
+                ? (int)Math.Ceiling((double)totalCount.Value / query.PageSize.Value)
+                : null;
+
+            return Result.Success(new GetAllModelsQueryResponse(
+                modelListDtos, totalCount, query.Page, query.PageSize, totalPages));
         }
     }
 
-    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null) : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null, int? TextureSetId = null, int? Page = null, int? PageSize = null) : IQuery<GetAllModelsQueryResponse>;
     
-    public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models);
+    public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
     
     /// <summary>
     /// Minimal DTO for model list - contains only basic information and thumbnails needed for list views

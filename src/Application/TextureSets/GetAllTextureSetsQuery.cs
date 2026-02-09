@@ -16,18 +16,26 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
 
     public async Task<Result<GetAllTextureSetsResponse>> Handle(GetAllTextureSetsQuery query, CancellationToken cancellationToken)
     {
-        var textureSets = await _textureSetRepository.GetAllAsync(cancellationToken);
+        IEnumerable<Domain.Models.TextureSet> textureSets;
+        int? totalCount = null;
 
-        // Filter by pack if specified
-        if (query.PackId.HasValue)
+        if (query.Page.HasValue && query.PageSize.HasValue)
         {
-            textureSets = textureSets.Where(ts => ts.Packs.Any(p => p.Id == query.PackId.Value));
+            var result = await _textureSetRepository.GetPagedAsync(
+                query.Page.Value, query.PageSize.Value,
+                query.PackId, query.ProjectId,
+                cancellationToken);
+            textureSets = result.Items;
+            totalCount = result.TotalCount;
         }
-
-        // Filter by project if specified
-        if (query.ProjectId.HasValue)
+        else
         {
-            textureSets = textureSets.Where(ts => ts.Projects.Any(p => p.Id == query.ProjectId.Value));
+            textureSets = await _textureSetRepository.GetAllAsync(cancellationToken);
+
+            if (query.PackId.HasValue)
+                textureSets = textureSets.Where(ts => ts.Packs.Any(p => p.Id == query.PackId.Value));
+            if (query.ProjectId.HasValue)
+                textureSets = textureSets.Where(ts => ts.Projects.Any(p => p.Id == query.ProjectId.Value));
         }
 
         var textureSetListDtos = textureSets.Select(tp => new TextureSetListDto
@@ -52,12 +60,17 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             }).ToList()
         }).ToList();
 
-        return Result.Success(new GetAllTextureSetsResponse(textureSetListDtos));
+        int? totalPages = (totalCount.HasValue && query.PageSize.HasValue)
+            ? (int)Math.Ceiling((double)totalCount.Value / query.PageSize.Value)
+            : null;
+
+        return Result.Success(new GetAllTextureSetsResponse(
+            textureSetListDtos, totalCount, query.Page, query.PageSize, totalPages));
     }
 }
 
-public record GetAllTextureSetsQuery(int? PackId = null, int? ProjectId = null) : IQuery<GetAllTextureSetsResponse>;
-public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets);
+public record GetAllTextureSetsQuery(int? PackId = null, int? ProjectId = null, int? Page = null, int? PageSize = null) : IQuery<GetAllTextureSetsResponse>;
+public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 
 /// <summary>
 /// Minimal DTO for texture set list - contains only basic information needed for list views

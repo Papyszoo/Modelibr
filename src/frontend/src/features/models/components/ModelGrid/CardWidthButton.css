@@ -1,0 +1,33 @@
+.card-width-toggle-btn {
+  padding: 0.5rem;
+  margin-left: auto;
+}
+
+.card-width-overlay .p-overlaypanel-content {
+  padding: 0.75rem;
+}
+
+.card-width-overlay-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 220px;
+}
+
+.card-width-overlay-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.card-width-overlay-label i {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.card-width-overlay-slider {
+  width: 100%;
+}

@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import { TextureSetDto, TextureType } from '../../../types'
+import { TextureSetDto, TextureType, PaginationState } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
+import { Button } from 'primereact/button'
 import CreateTextureSetDialog from '../dialogs/CreateTextureSetDialog'
 import TextureSetListHeader from './TextureSetListHeader'
 import TextureSetGrid from './TextureSetGrid'
@@ -18,19 +19,48 @@ function TextureSetList() {
   const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    pageSize: 50,
+    totalCount: 0,
+    totalPages: 0,
+    hasMore: false,
+  })
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const toast = useRef<Toast>(null)
   const textureSetsApi = useTextureSets()
   const { openTextureSetDetailsTab } = useTabContext()
   const uploadProgressContext = useUploadProgress()
 
-  const loadTextureSets = useCallback(async () => {
+  const loadTextureSets = useCallback(async (loadMore = false) => {
     try {
-      setLoading(true)
-      const sets = await textureSetsApi.getAllTextureSets()
-      setTextureSets(sets || [])
+      if (loadMore) {
+        setIsLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
+      const page = loadMore ? pagination.page + 1 : 1
+      const result = await ApiClient.getTextureSetsPaginated({
+        page,
+        pageSize: 50,
+      })
+
+      if (loadMore) {
+        setTextureSets(prev => [...prev, ...result.textureSets])
+      } else {
+        setTextureSets(result.textureSets || [])
+      }
+
+      setPagination({
+        page,
+        pageSize: result.pageSize,
+        totalCount: result.totalCount,
+        totalPages: result.totalPages,
+        hasMore: page < result.totalPages,
+      })
     } catch (error) {
       console.error('Failed to load texture sets:', error)
-      setTextureSets([]) // Ensure textureSets is always an array
+      setTextureSets([])
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
@@ -39,8 +69,10 @@ function TextureSetList() {
       })
     } finally {
       setLoading(false)
+      setIsLoadingMore(false)
     }
-  }, [textureSetsApi])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     loadTextureSets()
@@ -177,9 +209,9 @@ function TextureSetList() {
       <ConfirmDialog />
 
       <TextureSetListHeader
-        setCount={textureSets.length}
+        setCount={pagination.totalCount || textureSets.length}
         onCreateSet={() => setShowCreateDialog(true)}
-        onFilesSelected={(files) => handleFileDrop(files)}
+        onFilesSelected={files => handleFileDrop(files)}
       />
 
       <TextureSetGrid
@@ -193,6 +225,26 @@ function TextureSetList() {
         onTextureSetRecycled={handleTextureSetRecycled}
         onTextureSetUpdated={loadTextureSets}
       />
+
+      {pagination.hasMore && (
+        <div
+          style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}
+        >
+          <Button
+            label={
+              isLoadingMore
+                ? 'Loading...'
+                : `Load More (${textureSets.length} of ${pagination.totalCount})`
+            }
+            icon={
+              isLoadingMore ? 'pi pi-spinner pi-spin' : 'pi pi-chevron-down'
+            }
+            onClick={() => loadTextureSets(true)}
+            disabled={isLoadingMore}
+            className="p-button-outlined"
+          />
+        </div>
+      )}
 
       {showCreateDialog && (
         <CreateTextureSetDialog

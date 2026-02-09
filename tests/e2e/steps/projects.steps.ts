@@ -37,7 +37,7 @@ Given(
 
         // Wait for project viewer content to fully load (not just "Loading...")
         await page
-            .locator(".project-viewer")
+            .locator(".container-viewer")
             .first()
             .waitFor({ state: "visible", timeout: 15000 });
 
@@ -124,18 +124,14 @@ When(
             );
         }
 
-        // Click "Add Model" card in project viewer (similar to pack viewer)
-        // Try multiple selectors as the class names might vary
-        let addModelCard = page
-            .locator('.project-section:has-text("Models") .project-card-add')
-            .first();
+        // Click Models tab first, then find Add Model card
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
 
-        // Fallback: try pack-style selector (both may use same components)
-        if ((await addModelCard.count()) === 0) {
-            addModelCard = page
-                .locator('.pack-section:has-text("Models") .pack-card-add')
-                .first();
-        }
+        const addModelCard = page.locator(".model-card-add").first();
 
         await addModelCard.waitFor({ state: "visible", timeout: 10000 });
         await addModelCard.click();
@@ -208,11 +204,15 @@ When(
             );
         }
 
-        // Find and right-click model card
+        // Click Models tab first, then find and right-click model card
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
         const modelCard = page
-            .locator(
-                `.project-section:has-text("Models") .project-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         await modelCard.click({ button: "right" });
         console.log("[Action] Right-clicked on model card");
@@ -262,9 +262,7 @@ Then(
 );
 
 Then("the project viewer should be visible", async ({ page }) => {
-    const projectViewer = page
-        .locator(".project-viewer, .project-content")
-        .first();
+    const projectViewer = page.locator(".container-viewer").first();
     await expect(projectViewer).toBeVisible({ timeout: 10000 });
     console.log("[UI] Project viewer is visible ✓");
 });
@@ -294,10 +292,15 @@ Then(
             );
         }
 
+        // Click Models tab first
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
         const modelCard = page
-            .locator(
-                `.project-section:has-text("Models") .project-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         await expect(modelCard).toBeVisible({ timeout: 5000 });
         console.log(`[UI] Project contains model "${model.name}" ✓`);
@@ -315,10 +318,15 @@ Then(
             );
         }
 
+        // Click Models tab first
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
         const modelCard = page
-            .locator(
-                `.project-section:has-text("Models") .project-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         await expect(modelCard).not.toBeVisible({ timeout: 5000 });
         console.log(`[UI] Project does not contain model "${model.name}" ✓`);
@@ -337,10 +345,15 @@ Given(
             );
         }
 
+        // Click Models tab first
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
         const modelCard = page
-            .locator(
-                `.project-section:has-text("Models") .project-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         const isPresent = await modelCard.isVisible().catch(() => false);
 
@@ -366,12 +379,14 @@ When(
             );
         }
 
-        // Click "Add" card in Texture Sets section
-        const addCard = page
-            .locator(
-                '.project-section:has-text("Texture Sets") .project-card-add',
-            )
-            .first();
+        // Click Texture Sets tab first, then find Add card
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
+        const addCard = page.locator(".container-card-add").first();
         await addCard.waitFor({ state: "visible", timeout: 10000 });
         await addCard.click();
         console.log("[Action] Clicked Add Texture Set card");
@@ -442,10 +457,16 @@ When(
             );
         }
 
-        // Find and right-click texture set card
+        // Click Texture Sets tab first, then find and right-click texture set card
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         const textureCard = page
             .locator(
-                `.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`,
+                `.container-section .container-card:has-text("${textureSet.name}")`,
             )
             .first();
         await textureCard.click({ button: "right" });
@@ -480,13 +501,19 @@ Then(
             );
         }
 
-        // Poll with reload until the card appears
+        // Click Texture Sets tab first, then poll with reload until the card appears
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         await expect
             .poll(
                 async () => {
                     const textureCard = page
                         .locator(
-                            `.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`,
+                            `.container-section .container-card:has-text("${textureSet.name}")`,
                         )
                         .first();
                     return await textureCard.isVisible().catch(() => false);
@@ -513,9 +540,16 @@ Then(
             );
         }
 
+        // Click Texture Sets tab first
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         const textureCard = page
             .locator(
-                `.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`,
+                `.container-section .container-card:has-text("${textureSet.name}")`,
             )
             .first();
         await expect(textureCard).not.toBeVisible({ timeout: 5000 });
@@ -537,9 +571,16 @@ Given(
             );
         }
 
+        // Click Texture Sets tab first
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         const textureCard = page
             .locator(
-                `.project-section:has-text("Texture Sets") .project-card:has-text("${textureSet.name}")`,
+                `.container-section .container-card:has-text("${textureSet.name}")`,
             )
             .first();
         const isPresent = await textureCard.isVisible().catch(() => false);
@@ -636,8 +677,17 @@ Then(
 Then(
     "the project sprite count should be {int}",
     async ({ page }, expectedCount: number) => {
-        // Check sprite count in project stats
-        const statSpan = page.locator('.project-stats span:has-text("sprite")');
+        // Click Details tab to see stats
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Details" })
+            .click();
+        await page.waitForTimeout(300);
+
+        // Check sprite count in container detail assets
+        const statSpan = page.locator(
+            '.container-detail-assets span:has-text("sprite")',
+        );
         const text = (await statSpan.textContent()) || "0";
         const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
         expect(count).toBe(expectedCount);
@@ -648,7 +698,16 @@ Then(
 Given(
     "the project has at least {int} sprite",
     async ({ page }, minCount: number) => {
-        const statSpan = page.locator('.project-stats span:has-text("sprite")');
+        // Click Details tab to see stats
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Details" })
+            .click();
+        await page.waitForTimeout(300);
+
+        const statSpan = page.locator(
+            '.container-detail-assets span:has-text("sprite")',
+        );
         const text = (await statSpan.textContent()) || "0";
         const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
         if (count < minCount) {
@@ -661,11 +720,15 @@ Given(
 );
 
 When("I remove the first sprite from the project", async ({ page }) => {
-    // Right-click on first sprite card to open context menu
+    // Click Sprites tab first, then right-click on first sprite card
+    await page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: "Sprites" })
+        .click();
+    await page.waitForTimeout(300);
+
     const spriteCard = page
-        .locator(
-            '.project-section:has(h3:has-text("Sprite")) .project-card:not(.project-card-add)',
-        )
+        .locator(".container-section .container-card:not(.container-card-add)")
         .first();
     await spriteCard.click({ button: "right" });
     await page.waitForTimeout(300);

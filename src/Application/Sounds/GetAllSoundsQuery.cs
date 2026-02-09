@@ -21,30 +21,33 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
 
     public async Task<Result<GetAllSoundsResponse>> Handle(GetAllSoundsQuery query, CancellationToken cancellationToken)
     {
-        var sounds = await _soundRepository.GetAllAsync(cancellationToken);
+        IEnumerable<Sound> soundsList;
+        int? totalCount = null;
 
-        var filteredSounds = sounds.Where(s => !s.IsDeleted);
-
-        // Filter by packId if provided
-        if (query.PackId.HasValue)
+        if (query.Page.HasValue && query.PageSize.HasValue)
         {
-            filteredSounds = filteredSounds.Where(s => s.Packs.Any(p => p.Id == query.PackId.Value));
+            var result = await _soundRepository.GetPagedAsync(
+                query.Page.Value, query.PageSize.Value,
+                query.PackId, query.ProjectId, query.CategoryId,
+                cancellationToken);
+            soundsList = result.Items;
+            totalCount = result.TotalCount;
+        }
+        else
+        {
+            var sounds = await _soundRepository.GetAllAsync(cancellationToken);
+            var filteredSounds = sounds.Where(s => !s.IsDeleted);
+
+            if (query.PackId.HasValue)
+                filteredSounds = filteredSounds.Where(s => s.Packs.Any(p => p.Id == query.PackId.Value));
+            if (query.ProjectId.HasValue)
+                filteredSounds = filteredSounds.Where(s => s.Projects.Any(p => p.Id == query.ProjectId.Value));
+            if (query.CategoryId.HasValue)
+                filteredSounds = filteredSounds.Where(s => s.SoundCategoryId == query.CategoryId.Value);
+
+            soundsList = filteredSounds.ToList();
         }
 
-        // Filter by projectId if provided
-        if (query.ProjectId.HasValue)
-        {
-            filteredSounds = filteredSounds.Where(s => s.Projects.Any(p => p.Id == query.ProjectId.Value));
-        }
-
-        // Filter by categoryId if provided
-        if (query.CategoryId.HasValue)
-        {
-            filteredSounds = filteredSounds.Where(s => s.SoundCategoryId == query.CategoryId.Value);
-        }
-
-        var soundsList = filteredSounds.ToList();
-        
         // Get completed waveform jobs for all sounds in one query
         var soundIds = soundsList.Select(s => s.Id).ToList();
         var completedJobs = await _thumbnailJobRepository.GetBySoundIdsAsync(soundIds, cancellationToken);
@@ -71,13 +74,17 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
                 completedSoundIds.Contains(s.Id) ? $"/sounds/{s.Id}/waveform" : null))
             .ToList();
 
-        return Result.Success(new GetAllSoundsResponse(soundDtos));
+        int? totalPages = (totalCount.HasValue && query.PageSize.HasValue)
+            ? (int)Math.Ceiling((double)totalCount.Value / query.PageSize.Value)
+            : null;
+
+        return Result.Success(new GetAllSoundsResponse(soundDtos, totalCount, query.Page, query.PageSize, totalPages));
     }
 }
 
-public record GetAllSoundsQuery(int? PackId = null, int? ProjectId = null, int? CategoryId = null) : IQuery<GetAllSoundsResponse>;
+public record GetAllSoundsQuery(int? PackId = null, int? ProjectId = null, int? CategoryId = null, int? Page = null, int? PageSize = null) : IQuery<GetAllSoundsResponse>;
 
-public record GetAllSoundsResponse(IReadOnlyList<SoundDto> Sounds);
+public record GetAllSoundsResponse(IReadOnlyList<SoundDto> Sounds, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 
 public record SoundDto(
     int Id,

@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import thumbnailSignalRService, {
   ThumbnailStatusChangedEvent,
   ActiveVersionChangedEvent,
@@ -13,11 +13,20 @@ import { useApiCacheStore } from '../../../stores/apiCacheStore'
  */
 export function useThumbnailSignalR(_modelIds: number[]) {
   const [isConnected, setIsConnected] = useState(false)
-  const store = useApiCacheStore()
+  const invalidateThumbnails = useApiCacheStore(s => s.invalidateThumbnails)
+  const invalidateThumbnailById = useApiCacheStore(
+    s => s.invalidateThumbnailById
+  )
+  const invalidateModelById = useApiCacheStore(s => s.invalidateModelById)
+  const hasConnected = useRef(false)
 
   // Connect and join the all-models group for broadcast notifications
   useEffect(() => {
     let mounted = true
+
+    // Only connect once across StrictMode double-mount
+    if (hasConnected.current) return
+    hasConnected.current = true
 
     const connectAndSubscribe = async () => {
       try {
@@ -39,8 +48,7 @@ export function useThumbnailSignalR(_modelIds: number[]) {
 
     return () => {
       mounted = false
-      // Leave the all models group when unmounting
-      thumbnailSignalRService.leaveAllModelsGroup().catch(console.error)
+      // Don't leave group on unmount — this is app-level, we want to stay connected
     }
   }, [])
 
@@ -48,23 +56,20 @@ export function useThumbnailSignalR(_modelIds: number[]) {
   const handleThumbnailStatusChanged = useCallback(
     (_event: ThumbnailStatusChangedEvent) => {
       // Invalidate thumbnail cache for the affected model version
-      // Note: We use modelVersionId here, but our cache is keyed by modelId
-      // The thumbnail endpoint uses modelId and returns the active version's thumbnail
-      // So we need to invalidate based on which models have this version as active
-      store.invalidateThumbnails()
+      invalidateThumbnails()
     },
-    [store]
+    [invalidateThumbnails]
   )
 
   // Handle active version changes
   const handleActiveVersionChanged = useCallback(
     (event: ActiveVersionChangedEvent) => {
       // Invalidate thumbnail cache for the affected model
-      store.invalidateThumbnailById(event.modelId.toString())
+      invalidateThumbnailById(event.modelId.toString())
       // Also invalidate model cache since active version changed
-      store.invalidateModelById(event.modelId.toString())
+      invalidateModelById(event.modelId.toString())
     },
-    [store]
+    [invalidateThumbnailById, invalidateModelById]
   )
 
   // Subscribe to events

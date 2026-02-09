@@ -169,6 +169,7 @@ export interface PackDto {
   modelCount: number
   textureSetCount: number
   spriteCount: number
+  soundCount: number
   isEmpty: boolean
   models: PackModelDto[]
   textureSets: PackTextureSetDto[]
@@ -220,6 +221,7 @@ export interface ProjectDto {
   modelCount: number
   textureSetCount: number
   spriteCount: number
+  soundCount: number
   isEmpty: boolean
   models: ProjectModelDto[]
   textureSets: ProjectTextureSetDto[]
@@ -326,4 +328,43 @@ export interface SoundCategoryDto {
 
 export interface GetAllSoundCategoriesResponse {
   categories: SoundCategoryDto[]
+}
+
+// Pagination types
+export interface PaginatedResponse<T> {
+  items: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface PaginationState {
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  hasMore: boolean
+}
+
+export interface GetAllSoundsResponsePaginated extends GetAllSoundsResponse {
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface GetAllSpritesResponsePaginated extends GetAllSpritesResponse {
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface GetAllTextureSetsResponsePaginated {
+  textureSets: TextureSetDto[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
 }

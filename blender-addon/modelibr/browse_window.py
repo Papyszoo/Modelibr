@@ -78,28 +78,48 @@ class MODELIBR_OT_browse_assets(Operator):
         self.model_versions = {}  # Dictionary to store versions per model: {model_id: [versions]}
         self.selected_version_ids = {}  # Dictionary to track selected version per model: {model_id: version_id}
         self.version_enum_cache = {}  # Cache for version enum items per model
+        self.total_count = 0  # Total models available on server
+        self.total_pages = 0  # Total pages available
+        self.has_more = False  # Whether more models can be loaded
         
         # Register this instance as the active browse window
         set_active_browse_window(self)
         
         # Load initial models
+        self.page = 1
         self.load_models(context)
         
         # Use invoke_popup for simple popup (will close when clicking outside)
         wm = context.window_manager
         return wm.invoke_popup(self, width=800)
     
-    def load_models(self, context):
-        """Load models from API"""
+    def load_models(self, context, load_more=False):
+        """Load models from API with server-side pagination.
+        
+        Args:
+            context: Blender context
+            load_more: If True, append results to existing models instead of replacing
+        """
         self.is_loading = True
         self.error_message = ""
         
         try:
             client = get_api_client()
-            models = client.get_models(self.search_query)
+            result = client.get_models_paginated(
+                page=self.page,
+                page_size=self.models_per_page,
+                search=self.search_query,
+            )
             
-            # Store models
-            self.models = models if models else []
+            new_models = result.get('items', [])
+            self.total_count = result.get('totalCount', len(new_models))
+            self.total_pages = result.get('totalPages', 1)
+            self.has_more = self.page < self.total_pages
+            
+            if load_more:
+                self.models.extend(new_models)
+            else:
+                self.models = new_models if new_models else []
             
             # Load versions for each model and initialize selected version
             # Note: This is done sequentially in the main thread for simplicity.
@@ -352,9 +372,23 @@ class MODELIBR_OT_browse_assets(Operator):
         
         layout.separator()
         
-        # Footer with model count
+        # Footer with model count and pagination
         row = layout.row(align=True)
-        row.label(text=f"Showing {len(self.models)} models")
+        row.label(text=f"Showing {len(self.models)} of {self.total_count} models")
+        
+        if self.has_more:
+            load_more_op = row.operator(
+                "modelibr.browse_load_more",
+                text=f"Load More",
+                icon='TRIA_DOWN'
+            )
+    
+    def load_more_models(self, context):
+        """Load the next page of models and append to the current list."""
+        if not self.has_more:
+            return
+        self.page += 1
+        self.load_models(context, load_more=True)
     
     def execute(self, context):
         """Execute (not used, dialog handles interaction)"""
@@ -379,9 +413,25 @@ class MODELIBR_OT_refresh_browse(Operator):
     bl_description = "Refresh model list"
     
     def execute(self, context):
-        # Note: This would need to be linked to the browse window state
-        # For now, just refresh the main model list
-        bpy.ops.modelibr.refresh_models()
+        browse_window = get_active_browse_window()
+        if browse_window:
+            browse_window.page = 1
+            browse_window.load_models(context)
+        else:
+            bpy.ops.modelibr.refresh_models()
+        return {'FINISHED'}
+
+
+class MODELIBR_OT_browse_load_more(Operator):
+    """Load more models in browse window"""
+    bl_idname = "modelibr.browse_load_more"
+    bl_label = "Load More"
+    bl_description = "Load more models from server"
+    
+    def execute(self, context):
+        browse_window = get_active_browse_window()
+        if browse_window:
+            browse_window.load_more_models(context)
         return {'FINISHED'}
 
 
@@ -451,6 +501,7 @@ class MODELIBR_OT_change_model_version(Operator):
 classes = [
     MODELIBR_OT_browse_assets,
     MODELIBR_OT_refresh_browse,
+    MODELIBR_OT_browse_load_more,
     MODELIBR_OT_select_version_dropdown,
     MODELIBR_OT_change_model_version,
 ]

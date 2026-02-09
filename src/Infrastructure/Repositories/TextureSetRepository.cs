@@ -40,6 +40,37 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
+        int page, int pageSize,
+        int? packId = null, int? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.TextureSets.AsNoTracking().AsQueryable();
+
+        if (packId.HasValue)
+            query = query.Where(ts => ts.Packs.Any(p => p.Id == packId.Value));
+
+        if (projectId.HasValue)
+            query = query.Where(ts => ts.Projects.Any(p => p.Id == projectId.Value));
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(ts => ts.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.File)
+            .Include(tp => tp.ModelVersions)
+                .ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Packs)
+            .Include(tp => tp.Projects)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
     public async Task<IEnumerable<TextureSet>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets

@@ -29,10 +29,13 @@ src/frontend/src/
 │   ├── recycled-files/    # Recycle bin functionality
 │   ├── stage-editor/      # Stage/environment editing
 │   ├── sprite/            # Sprite sheets
-│   ├── pack/              # Asset packs
-│   ├── project/           # Project management
+│   ├── pack/              # Asset packs (thin wrapper → ContainerViewer)
+│   ├── project/           # Project management (thin wrapper → ContainerViewer)
 │   ├── thumbnail/         # Thumbnail display
 │   └── history/           # Upload history
+├── shared/                # Shared components and types
+│   ├── components/        # ContainerViewer, UploadableGrid
+│   └── types/             # ContainerTypes (adapter pattern)
 ├── components/            # Shared UI components
 ├── hooks/                 # Shared custom hooks
 ├── contexts/              # React Context providers
@@ -116,7 +119,12 @@ src/frontend/src/
 | Layer | Location |
 |-------|----------|
 | Main list component | `features/models/components/ModelList.tsx` |
-| Grid display | `features/models/components/ModelGrid.tsx` |
+| Grid component | `features/models/components/ModelGrid/ModelGrid.tsx` |
+| Grid types & props | `features/models/components/ModelGrid/types.ts` |
+| Grid hook | `features/models/components/ModelGrid/useModelGrid.ts` |
+| Filters bar | `features/models/components/ModelGrid/ModelsFilters.tsx` |
+| Card width control | `features/models/components/ModelGrid/CardWidthButton.tsx` |
+| Context menu | `features/models/components/ModelGrid/ModelContextMenu.tsx` |
 | Header/controls | `features/models/components/ModelListHeader.tsx` |
 | Version history | `features/models/components/ModelVersionHistory.tsx` |
 | Empty/error states | `features/models/components/EmptyState.tsx`, `ErrorState.tsx` |
@@ -130,7 +138,11 @@ src/frontend/src/
 - Upload via drag-and-drop or file picker
 - Click model card to open in viewer
 - Show upload progress and status
-- Context menu for model actions (delete, etc.)
+- Context menu for model actions (delete, add to pack, add to project)
+- ModelGrid is a reusable standalone component accepting `projectId`, `packId`, `textureSetId` props
+- Filters are additive (pack + project can be combined)
+- When a prop is provided, its corresponding filter is pre-selected and disabled
+- Card width controlled via icon button with OverlayPanel slider
 
 **Effects of changes:**
 
@@ -225,6 +237,45 @@ src/frontend/src/
 
 ---
 
+### Packs & Projects (ContainerViewer)
+
+**Purpose:** Manage asset containers (Packs and Projects) that group Models, Texture Sets, Sprites, and Sounds. Both views share identical behavior via a shared `ContainerViewer` component.
+
+**Architecture:** Strategy/Adapter pattern using `ContainerAdapter` interface.
+
+**Where to look:**
+| Layer | Location |
+|-------|----------|
+| Shared viewer | `shared/components/ContainerViewer.tsx` (~1500 lines - main logic) |
+| Shared types | `shared/types/ContainerTypes.ts` (ContainerDto, ContainerAdapter) |
+| Shared CSS | `shared/components/ContainerViewer.css` (container-\* prefix) |
+| Pack wrapper | `features/pack/components/PackViewer.tsx` (~55 lines - thin adapter) |
+| Project wrapper | `features/project/components/ProjectViewer.tsx` (~55 lines - thin adapter) |
+| Backend API | `WebApi/Endpoints/PackEndpoints.cs`, `ProjectEndpoints.cs` |
+
+**Key behaviors:**
+
+- Pack/Project viewers are thin wrappers that provide a `ContainerAdapter` to `ContainerViewer`
+- `ContainerAdapter` maps container-specific API methods (e.g., `ApiClient.addModelToPack` vs `ApiClient.addModelToProject`)
+- All UI logic, state management, dialogs, and grid rendering live in the shared `ContainerViewer`
+- Add/remove models, texture sets, sprites, sounds via dialog pickers
+- Drag-and-drop file upload for textures, sprites, and sounds directly into container
+- Context menus for item actions (remove from container)
+- Collapsible sections with click-to-toggle headers and count badges
+- Pagination with "Load More" pattern for each asset section (models, textures, sprites, sounds)
+- Drag-and-drop upload works even on collapsed section headers
+- Title displays "Pack: {name}" or "Project: {name}" format
+- Header shows counts for all asset types including sounds
+
+**Effects of changes:**
+
+- Changes to `ContainerViewer.tsx` affect BOTH Pack and Project views
+- To add container-specific behavior, extend the `ContainerAdapter` interface
+- CSS uses `container-` prefix (not `pack-` or `project-`)
+- Pagination uses `ApiClient.*Paginated()` methods directly (not through adapter)
+
+---
+
 ### Thumbnails
 
 **Purpose:** Display model thumbnails with real-time generation status via SignalR.
@@ -234,7 +285,7 @@ src/frontend/src/
 |-------|----------|
 | Frontend components | `features/thumbnail/` |
 | Thumbnail display | `features/model-viewer/components/ThumbnailWindow.tsx` |
-| Model list display | `features/models/components/ModelGrid.tsx` (thumbnail cards) |
+| Model list display | `features/models/components/ModelGrid/ModelGrid.tsx` (thumbnail cards) |
 | Backend API | `WebApi/Endpoints/ThumbnailEndpoints.cs` (487 lines - many endpoints) |
 | Worker service | `src/thumbnail-worker/` (see `docs/WORKER.md`) |
 | SignalR updates | Worker sends status via SignalR hub |
@@ -243,8 +294,11 @@ src/frontend/src/
 
 - Auto-generated on model upload
 - Status: NotGenerated, Pending, Processing, Ready, Failed
-- SignalR broadcasts status changes in real-time
-- Frontend polls or listens for thumbnail completion
+- SignalR broadcasts status changes in real-time via `AllModelsGroup`
+- `ThumbnailSignalRService` is a singleton — `connect()` awaits pending connections to avoid StrictMode races
+- `useThumbnailSignalR([])` in `App.tsx` ensures connection at app startup
+- Auto-reconnect re-joins `AllModelsGroup` automatically
+- `useThumbnail` hook independently subscribes to SignalR for cache-busted thumbnail refresh
 - Custom thumbnails can be uploaded
 
 **Effects of changes:**
@@ -265,6 +319,20 @@ import apiClient from "../../services/ApiClient";
 const models = await apiClient.getModels();
 const textureSet = await apiClient.getTextureSet(id);
 ```
+
+### Pagination
+
+All list endpoints support server-side pagination via "Load More" pattern. Use paginated methods for list views:
+
+```typescript
+// Paginated methods (bypass cache, used in list components)
+const result = await apiClient.getModelsPaginated(page, pageSize); // → PaginatedResponse<Model>
+const result = await apiClient.getSoundsPaginated({ page, pageSize }); // → { sounds, totalCount, page, pageSize, totalPages }
+const result = await apiClient.getSpritesPaginated({ page, pageSize });
+const result = await apiClient.getTextureSetsPaginated({ page, pageSize });
+```
+
+List components use `PaginationState` from `types/index.ts` to track `page`, `totalPages`, `totalCount`, and `hasMore`. The `loadMore` parameter controls whether results append to the existing list (`true`) or replace it (`false` / default). Category filtering for Sounds/Sprites is applied client-side after fetching paginated data.
 
 ---
 

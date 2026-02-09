@@ -33,6 +33,7 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             ModelCount = project.ModelCount,
             TextureSetCount = project.TextureSetCount,
             SpriteCount = project.SpriteCount,
+            SoundCount = project.SoundCount,
             IsEmpty = project.IsEmpty,
             Models = project.Models.Select(m => new ProjectModelDto
             {
@@ -70,6 +71,7 @@ public record ProjectDetailDto
     public int ModelCount { get; init; }
     public int TextureSetCount { get; init; }
     public int SpriteCount { get; init; }
+    public int SoundCount { get; init; }
     public bool IsEmpty { get; init; }
     public ICollection<ProjectModelDto> Models { get; init; } = new List<ProjectModelDto>();
     public ICollection<ProjectTextureSetDto> TextureSets { get; init; } = new List<ProjectTextureSetDto>();

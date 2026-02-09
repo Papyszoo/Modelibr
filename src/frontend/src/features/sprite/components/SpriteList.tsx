@@ -26,6 +26,7 @@ import {
   copyPathToClipboard,
   getCopyPathSuccessMessage,
 } from '../../../utils/webdavUtils'
+import { PaginationState } from '../../../types'
 import './SpriteList.css'
 
 interface SpriteDto {
@@ -77,6 +78,14 @@ function SpriteList() {
   const [selectedSpriteIds, setSelectedSpriteIds] = useState<Set<number>>(
     new Set()
   )
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    pageSize: 50,
+    totalCount: 0,
+    totalPages: 0,
+    hasMore: false,
+  })
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState<{
     startX: number
@@ -96,11 +105,32 @@ function SpriteList() {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sprites
 
-  const loadSprites = useCallback(async () => {
+  const loadSprites = useCallback(async (loadMore = false) => {
     try {
-      setLoading(true)
-      const response = await ApiClient.getAllSprites()
-      setSprites(response.sprites || [])
+      if (loadMore) {
+        setIsLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
+      const page = loadMore ? pagination.page + 1 : 1
+      const result = await ApiClient.getSpritesPaginated({
+        page,
+        pageSize: 50,
+      })
+
+      if (loadMore) {
+        setSprites(prev => [...prev, ...result.sprites])
+      } else {
+        setSprites(result.sprites || [])
+      }
+
+      setPagination({
+        page,
+        pageSize: result.pageSize,
+        totalCount: result.totalCount,
+        totalPages: result.totalPages,
+        hasMore: page < result.totalPages,
+      })
     } catch (error) {
       console.error('Failed to load sprites:', error)
       setSprites([])
@@ -112,7 +142,9 @@ function SpriteList() {
       })
     } finally {
       setLoading(false)
+      setIsLoadingMore(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadCategories = useCallback(async () => {
@@ -919,6 +951,26 @@ function SpriteList() {
               }}
             />
           )}
+        </div>
+      )}
+
+      {pagination.hasMore && (
+        <div
+          style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}
+        >
+          <Button
+            label={
+              isLoadingMore
+                ? 'Loading...'
+                : `Load More (${sprites.length} of ${pagination.totalCount})`
+            }
+            icon={
+              isLoadingMore ? 'pi pi-spinner pi-spin' : 'pi pi-chevron-down'
+            }
+            onClick={() => loadSprites(true)}
+            disabled={isLoadingMore}
+            className="p-button-outlined"
+          />
         </div>
       )}
 
