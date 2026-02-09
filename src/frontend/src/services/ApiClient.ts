@@ -14,14 +14,19 @@ import {
   CreatePackRequest,
   CreatePackResponse,
   UpdatePackRequest,
+  ProjectDto,
+  GetAllProjectsResponse,
+  CreateProjectRequest,
+  CreateProjectResponse,
+  UpdateProjectRequest,
   ModelVersionDto,
   CreateModelVersionResponse,
   SpriteDto,
   GetAllSpritesResponse,
   SoundDto,
   GetAllSoundsResponse,
-  SoundCategoryDto,
   GetAllSoundCategoriesResponse,
+  PaginatedResponse,
 } from '../types'
 import { useApiCacheStore } from '../stores/apiCacheStore'
 
@@ -42,6 +47,7 @@ export interface ThumbnailStatus {
 }
 
 class ApiClient {
+  private static readonly UPLOAD_TIMEOUT = 120000 // 2 minutes per file upload
   private baseURL: string
   private client: AxiosInstance
 
@@ -84,6 +90,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 
@@ -133,6 +140,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       })
 
     return response.data
@@ -172,6 +180,28 @@ class ApiClient {
       useApiCacheStore.getState().setModels(response.data)
     }
 
+    return response.data
+  }
+
+  async getModelsPaginated(options: {
+    page: number
+    pageSize: number
+    packId?: number
+    projectId?: number
+    textureSetId?: number
+  }): Promise<PaginatedResponse<Model>> {
+    const params = new URLSearchParams()
+    params.append('page', options.page.toString())
+    params.append('pageSize', options.pageSize.toString())
+    if (options.packId) params.append('packId', options.packId.toString())
+    if (options.projectId)
+      params.append('projectId', options.projectId.toString())
+    if (options.textureSetId)
+      params.append('textureSetId', options.textureSetId.toString())
+
+    const response = await this.client.get<PaginatedResponse<Model>>(
+      `/models?${params.toString()}`
+    )
     return response.data
   }
 
@@ -310,6 +340,29 @@ class ApiClient {
     return response.data.textureSets
   }
 
+  async getTextureSetsPaginated(options: {
+    page: number
+    pageSize: number
+    packId?: number
+    projectId?: number
+  }): Promise<{
+    textureSets: TextureSetDto[]
+    totalCount: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }> {
+    const params = new URLSearchParams()
+    params.append('page', options.page.toString())
+    params.append('pageSize', options.pageSize.toString())
+    if (options.packId) params.append('packId', options.packId.toString())
+    if (options.projectId)
+      params.append('projectId', options.projectId.toString())
+
+    const response = await this.client.get(`/texture-sets?${params.toString()}`)
+    return response.data
+  }
+
   async getTextureSetById(
     id: number,
     options: { skipCache?: boolean } = {}
@@ -377,6 +430,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 
@@ -691,6 +745,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 
@@ -863,6 +918,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 
@@ -1155,6 +1211,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 
@@ -1182,6 +1239,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 
@@ -1319,6 +1377,32 @@ class ApiClient {
     return response.data
   }
 
+  async getSpritesPaginated(options: {
+    page: number
+    pageSize: number
+    packId?: number
+    projectId?: number
+    categoryId?: number
+  }): Promise<{
+    sprites: SpriteDto[]
+    totalCount: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }> {
+    const params = new URLSearchParams()
+    params.append('page', options.page.toString())
+    params.append('pageSize', options.pageSize.toString())
+    if (options.packId) params.append('packId', options.packId.toString())
+    if (options.projectId)
+      params.append('projectId', options.projectId.toString())
+    if (options.categoryId)
+      params.append('categoryId', options.categoryId.toString())
+
+    const response = await this.client.get(`/sprites?${params.toString()}`)
+    return response.data
+  }
+
   async getSpriteById(id: number): Promise<{
     id: number
     name: string
@@ -1374,6 +1458,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 
@@ -1464,6 +1549,32 @@ class ApiClient {
     return response.data
   }
 
+  async getSoundsPaginated(options: {
+    page: number
+    pageSize: number
+    packId?: number
+    projectId?: number
+    categoryId?: number
+  }): Promise<{
+    sounds: SoundDto[]
+    totalCount: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }> {
+    const params = new URLSearchParams()
+    params.append('page', options.page.toString())
+    params.append('pageSize', options.pageSize.toString())
+    if (options.packId) params.append('packId', options.packId.toString())
+    if (options.projectId)
+      params.append('projectId', options.projectId.toString())
+    if (options.categoryId)
+      params.append('categoryId', options.categoryId.toString())
+
+    const response = await this.client.get(`/sounds?${params.toString()}`)
+    return response.data
+  }
+
   async getSoundById(id: number): Promise<SoundDto> {
     const response = await this.client.get<SoundDto>(`/sounds/${id}`)
     return response.data
@@ -1509,6 +1620,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: ApiClient.UPLOAD_TIMEOUT,
       }
     )
 

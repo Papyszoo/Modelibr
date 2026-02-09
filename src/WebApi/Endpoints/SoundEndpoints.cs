@@ -69,14 +69,29 @@ public static class SoundEndpoints
         int? packId,
         int? projectId,
         int? categoryId,
+        int? page,
+        int? pageSize,
         IQueryHandler<GetAllSoundsQuery, GetAllSoundsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllSoundsQuery(packId, projectId, categoryId), cancellationToken);
+        var result = await queryHandler.Handle(new GetAllSoundsQuery(packId, projectId, categoryId, page, pageSize), cancellationToken);
 
         if (result.IsFailure)
         {
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        // When paginated, include pagination metadata
+        if (page.HasValue && pageSize.HasValue)
+        {
+            return Results.Ok(new
+            {
+                sounds = result.Value.Sounds,
+                totalCount = result.Value.TotalCount,
+                page = result.Value.Page,
+                pageSize = result.Value.PageSize,
+                totalPages = result.Value.TotalPages
+            });
         }
 
         return Results.Ok(result.Value);

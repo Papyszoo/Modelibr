@@ -41,9 +41,9 @@ Given(
         );
         await page.waitForLoadState("networkidle");
 
-        // Wait for pack viewer content to fully load (not just "Loading...")
+        // Wait for container viewer content to fully load (not just "Loading...")
         await page
-            .locator(".pack-viewer")
+            .locator(".container-viewer")
             .first()
             .waitFor({ state: "visible", timeout: 15000 });
 
@@ -199,7 +199,7 @@ Then(
 
 Then("the pack viewer should be visible", async ({ page }) => {
     // Use .first() to avoid strict mode violation when multiple elements match
-    const packViewer = page.locator(".pack-viewer").first();
+    const packViewer = page.locator(".container-viewer").first();
     await expect(packViewer).toBeVisible({ timeout: 10000 });
     console.log("[UI] Pack viewer is visible ✓");
 });
@@ -207,7 +207,7 @@ Then("the pack viewer should be visible", async ({ page }) => {
 Then(
     "the pack name {string} should be displayed",
     async ({ page }, packName: string) => {
-        const header = page.locator(".pack-header h2, .pack-title");
+        const header = page.locator(".container-header h2");
         await expect(header).toContainText(packName);
         console.log(`[UI] Pack name "${packName}" is displayed ✓`);
     },
@@ -226,10 +226,15 @@ When(
             );
         }
 
-        // Click "Add Model" card in pack viewer (PackViewer.tsx uses .pack-card-add)
-        const addModelCard = page
-            .locator('.pack-section:has-text("Models") .pack-card-add')
-            .first();
+        // Click the Models tab first to reveal model content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
+        // Click "Add Model" card in container viewer (ModelGrid uses .model-card-add)
+        const addModelCard = page.locator(".model-card-add").first();
         await addModelCard.waitFor({ state: "visible", timeout: 10000 });
         await addModelCard.click();
         console.log("[Action] Clicked Add Model card");
@@ -355,11 +360,16 @@ When(
             );
         }
 
-        // Right-click on model card in pack viewer (uses .pack-card not .model-card)
+        // Click the Models tab first to reveal model content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
+        // Right-click on model card in container viewer (ModelGrid uses .model-card)
         const modelCard = page
-            .locator(
-                `.pack-section:has-text("Models") .pack-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         await modelCard.waitFor({ state: "visible", timeout: 10000 });
         await modelCard.click({ button: "right" });
@@ -368,10 +378,12 @@ When(
         // Wait for context menu
         await page.waitForTimeout(300);
 
-        // Click remove option
-        const removeOption = page.locator(
-            '.p-contextmenu .p-menuitem:has-text("Remove")',
-        );
+        // Click remove option (ModelContextMenu uses "Remove from pack")
+        const removeOption = page
+            .locator(
+                '.p-contextmenu .p-menuitem:has-text("Remove from pack"), .p-contextmenu .p-menuitem:has-text("Remove")',
+            )
+            .first();
         await removeOption.click();
         console.log("[Action] Clicked Remove from pack");
 
@@ -392,12 +404,15 @@ When(
             );
         }
 
-        // Click add texture set button
-        const addButton = page
-            .locator(
-                'button:has-text("Add"):near(.pack-section:has-text("Texture"))',
-            )
-            .first();
+        // Click the Texture Sets tab first to reveal texture set content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
+        // Click add texture set card
+        const addButton = page.locator(".container-card-add").first();
         await addButton.click();
         await page.waitForTimeout(500);
 
@@ -429,17 +444,26 @@ When(
             );
         }
 
+        // Click the Texture Sets tab first to reveal texture set content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         // Right-click on texture set card
         const textureCard = page.locator(
-            `.pack-textures .texture-card:has-text("${textureSet.name}")`,
+            `.container-section .container-card:has-text("${textureSet.name}")`,
         );
         await textureCard.click({ button: "right" });
         await page.waitForTimeout(300);
 
         // Click remove option
-        const removeOption = page.locator(
-            '.p-contextmenu .p-menuitem:has-text("Remove")',
-        );
+        const removeOption = page
+            .locator(
+                '.p-contextmenu .p-menuitem:has-text("Remove from pack"), .p-contextmenu .p-menuitem:has-text("Remove")',
+            )
+            .first();
         await removeOption.click();
         await page.waitForTimeout(500);
 
@@ -462,11 +486,16 @@ Then(
             );
         }
 
-        // Model cards in pack viewer use .pack-card class
+        // Click the Models tab first to reveal model content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
+        // Model cards in container viewer use .model-card class (ModelGrid)
         const modelCard = page
-            .locator(
-                `.pack-section:has-text("Models") .pack-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         await expect(modelCard).toBeVisible({ timeout: 10000 });
         console.log(`[UI] Pack contains model "${model.name}" ✓`);
@@ -484,11 +513,16 @@ Then(
             );
         }
 
+        // Click the Models tab first to reveal model content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
         // Check model card is not visible
         const modelCard = page
-            .locator(
-                `.pack-section:has-text("Models") .pack-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         await expect(modelCard).not.toBeVisible();
         console.log(`[UI] Pack does not contain model "${model.name}" ✓`);
@@ -498,11 +532,20 @@ Then(
 Then(
     "the pack model count should be {int}",
     async ({ page }, expectedCount: number) => {
-        const stat = page.locator(
-            ".pack-stats span:has(.pi-cube), .pack-grid-card-stats span:has(.pi-cube)",
-        );
+        // Click Details tab to see asset counts
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Details" })
+            .click();
+        await page.waitForTimeout(300);
+
+        const stat = page
+            .locator(
+                '.container-detail-assets span:has-text("models"), .container-detail-assets span:has-text("model")',
+            )
+            .first();
         const text = await stat.textContent();
-        const count = parseInt(text?.trim() || "0", 10);
+        const count = parseInt(text?.match(/\d+/)?.[0] || "0", 10);
         expect(count).toBe(expectedCount);
         console.log(`[UI] Pack model count is ${count} ✓`);
     },
@@ -519,8 +562,15 @@ Then(
             );
         }
 
+        // Click the Texture Sets tab first to reveal texture set content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         const textureCard = page.locator(
-            `.pack-textures .texture-card:has-text("${textureSet.name}")`,
+            `.container-section .container-card:has-text("${textureSet.name}")`,
         );
         await expect(textureCard).toBeVisible({ timeout: 10000 });
         console.log(`[UI] Pack contains texture set "${textureSet.name}" ✓`);
@@ -538,8 +588,15 @@ Then(
             );
         }
 
+        // Click the Texture Sets tab first to reveal texture set content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         const textureCard = page.locator(
-            `.pack-textures .texture-card:has-text("${textureSet.name}")`,
+            `.container-section .container-card:has-text("${textureSet.name}")`,
         );
         await expect(textureCard).not.toBeVisible();
         console.log(
@@ -551,11 +608,20 @@ Then(
 Then(
     "the pack texture set count should be {int}",
     async ({ page }, expectedCount: number) => {
-        const stat = page.locator(
-            ".pack-stats span:has(.pi-palette), .pack-grid-card-stats span:has(.pi-palette)",
-        );
+        // Click Details tab to see asset counts
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Details" })
+            .click();
+        await page.waitForTimeout(300);
+
+        const stat = page
+            .locator(
+                '.container-detail-assets span:has-text("texture sets"), .container-detail-assets span:has-text("texture set")',
+            )
+            .first();
         const text = await stat.textContent();
-        const count = parseInt(text?.trim() || "0", 10);
+        const count = parseInt(text?.match(/\d+/)?.[0] || "0", 10);
         expect(count).toBe(expectedCount);
         console.log(`[UI] Pack texture set count is ${count} ✓`);
     },
@@ -573,10 +639,15 @@ Given(
             );
         }
 
+        // Click the Models tab first to reveal model content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Models" })
+            .click();
+        await page.waitForTimeout(300);
+
         const modelCard = page
-            .locator(
-                `.pack-section:has-text("Models") .pack-card:has-text("${model.name}")`,
-            )
+            .locator(`.model-card:has-text("${model.name}")`)
             .first();
         const isPresent = await modelCard.isVisible();
 
@@ -599,8 +670,15 @@ Given(
             );
         }
 
+        // Click the Texture Sets tab first to reveal texture set content
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" })
+            .click();
+        await page.waitForTimeout(300);
+
         const textureCard = page.locator(
-            `.pack-textures .texture-card:has-text("${textureSet.name}")`,
+            `.container-section .container-card:has-text("${textureSet.name}")`,
         );
         const isPresent = await textureCard.isVisible();
 
@@ -658,34 +736,25 @@ Then("I take a screenshot of pack after sprite removed", async ({ page }) => {
 // ============= Pack Sprite Association Steps =============
 
 When("I click add sprites button", async ({ page }) => {
-    // The Sprites section has <h3>Sprites</h3> and the Add Sprite card is inside with class .pack-card-add
-    // Structure: .pack-section > h3[Sprites] > ... > .pack-card-add > span[Add Sprite]
-
-    // Try to find the add card in the Sprites section specifically
-    const spritesSection = page
-        .locator(".pack-section")
+    // Click the Sprites tab first to reveal sprite content
+    await page
+        .locator(".p-tabview-nav li")
         .filter({ hasText: "Sprites" })
-        .last();
-    const addSpriteCard = spritesSection.locator(
-        '.pack-card-add:has-text("Add Sprite")',
-    );
+        .click();
+    await page.waitForTimeout(300);
+
+    // Find the Add Sprite card in the active tab
+    const addSpriteCard = page
+        .locator('.container-card-add:has-text("Add Sprite")')
+        .first();
 
     if ((await addSpriteCard.count()) > 0) {
         await addSpriteCard.click();
-        console.log("[Action] Clicked Add Sprite card in Sprites section");
+        console.log("[Action] Clicked Add Sprite card");
     } else {
-        // Fallback: find any .pack-card-add with "Add Sprite" text
-        const fallbackCard = page
-            .locator('.pack-card-add:has-text("Add Sprite")')
-            .first();
-        if ((await fallbackCard.count()) > 0) {
-            await fallbackCard.click();
-            console.log("[Action] Clicked Add Sprite card (fallback)");
-        } else {
-            throw new Error(
-                "Could not find Add Sprite button in Pack/Project viewer",
-            );
-        }
+        throw new Error(
+            "Could not find Add Sprite button in Pack/Project viewer",
+        );
     }
 
     // Wait for dialog
@@ -717,8 +786,17 @@ When("I confirm adding sprites", async ({ page }) => {
 Then(
     "the pack sprite count should be {int}",
     async ({ page }, expectedCount: number) => {
-        // Check sprite count in pack stats
-        const statSpan = page.locator('.pack-stats span:has-text("sprite")');
+        // Click Details tab to see asset counts
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Details" })
+            .click();
+        await page.waitForTimeout(300);
+
+        // Check sprite count in container details
+        const statSpan = page
+            .locator('.container-detail-assets span:has-text("sprite")')
+            .first();
         const text = (await statSpan.textContent()) || "0";
         const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
         expect(count).toBe(expectedCount);
@@ -729,7 +807,16 @@ Then(
 Given(
     "the pack has at least {int} sprite",
     async ({ page }, minCount: number) => {
-        const statSpan = page.locator('.pack-stats span:has-text("sprite")');
+        // Click Details tab to see asset counts
+        await page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Details" })
+            .click();
+        await page.waitForTimeout(300);
+
+        const statSpan = page
+            .locator('.container-detail-assets span:has-text("sprite")')
+            .first();
         const text = (await statSpan.textContent()) || "0";
         const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
         if (count < minCount) {
@@ -742,19 +829,26 @@ Given(
 );
 
 When("I remove the first sprite from the pack", async ({ page }) => {
+    // Click the Sprites tab first to reveal sprite content
+    await page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: "Sprites" })
+        .click();
+    await page.waitForTimeout(300);
+
     // Right-click on first sprite card to open context menu
     const spriteCard = page
-        .locator(
-            '.pack-section:has(h3:has-text("Sprite")) .pack-card:not(.pack-card-add)',
-        )
+        .locator(".container-section .container-card:not(.container-card-add)")
         .first();
     await spriteCard.click({ button: "right" });
     await page.waitForTimeout(300);
 
     // Click Remove from pack option
-    const removeOption = page.locator(
-        '.p-contextmenu .p-menuitem:has-text("Remove")',
-    );
+    const removeOption = page
+        .locator(
+            '.p-contextmenu .p-menuitem:has-text("Remove from pack"), .p-contextmenu .p-menuitem:has-text("Remove")',
+        )
+        .first();
     await removeOption.click();
     await page.waitForTimeout(500);
     console.log("[Action] Removed first sprite from pack");

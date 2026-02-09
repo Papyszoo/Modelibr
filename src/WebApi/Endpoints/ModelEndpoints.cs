@@ -23,16 +23,29 @@ public static class ModelEndpoints
         .WithName("Update Model Tags")
         .WithTags("Models");
 
-        app.MapGet("/models", async (int? packId, int? projectId, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, CancellationToken cancellationToken) =>
+        app.MapGet("/models", async (int? packId, int? projectId, int? textureSetId, int? page, int? pageSize, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId), cancellationToken);
+            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId, textureSetId, page, pageSize), cancellationToken);
             
             if (result.IsFailure)
             {
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
             
-            return Results.Ok(result.Value.Models);
+            // Return flat array for backward compatibility when no pagination
+            if (!page.HasValue || !pageSize.HasValue)
+            {
+                return Results.Ok(result.Value.Models);
+            }
+
+            return Results.Ok(new
+            {
+                items = result.Value.Models,
+                totalCount = result.Value.TotalCount,
+                page = result.Value.Page,
+                pageSize = result.Value.PageSize,
+                totalPages = result.Value.TotalPages
+            });
         })
         .WithName("Get All Models");
 

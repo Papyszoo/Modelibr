@@ -38,6 +38,38 @@ internal sealed class SpriteRepository : ISpriteRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(IEnumerable<Sprite> Items, int TotalCount)> GetPagedAsync(
+        int page, int pageSize,
+        int? packId = null, int? projectId = null, int? categoryId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Sprites.AsNoTracking().AsQueryable();
+
+        if (packId.HasValue)
+            query = query.Where(s => s.Packs.Any(p => p.Id == packId.Value));
+
+        if (projectId.HasValue)
+            query = query.Where(s => s.Projects.Any(p => p.Id == projectId.Value));
+
+        if (categoryId.HasValue)
+            query = query.Where(s => s.SpriteCategoryId == categoryId.Value);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(s => s.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(s => s.File)
+            .Include(s => s.Category)
+            .Include(s => s.Packs)
+            .Include(s => s.Projects)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
     public async Task<IEnumerable<Sprite>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Sprites

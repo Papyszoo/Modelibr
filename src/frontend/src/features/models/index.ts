@@ -1,6 +1,7 @@
 // Models feature exports
 export { default as ModelList } from './components/ModelList'
-export { default as ModelGrid } from './components/ModelGrid'
+export { ModelGrid } from './components/ModelGrid'
+export type { ModelGridProps } from './components/ModelGrid'
 export { default as ModelListHeader } from './components/ModelListHeader'
 export { default as EmptyState } from './components/EmptyState'
 export { default as ErrorState } from './components/ErrorState'

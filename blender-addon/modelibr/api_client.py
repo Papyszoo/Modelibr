@@ -126,12 +126,72 @@ class ModelibrApiClient:
         except error.URLError as e:
             raise ApiError(f"Connection error: {e.reason}")
 
-    def get_models(self, search: str = "") -> list:
-        endpoint = "/models"
+    def get_models(self, search: str = "", page: Optional[int] = None, 
+                   page_size: Optional[int] = None) -> list:
+        """Get models, optionally paginated.
+        
+        Args:
+            search: Optional search query
+            page: Page number (1-based). If provided with page_size, returns paginated results.
+            page_size: Number of items per page.
+            
+        Returns:
+            List of models when not paginated, or list of models from the page when paginated.
+        """
+        params = {}
         if search:
-            endpoint += f"?search={parse.quote(search)}"
+            params['search'] = search
+        if page is not None and page_size is not None:
+            params['page'] = str(page)
+            params['pageSize'] = str(page_size)
+        
+        endpoint = "/models"
+        if params:
+            endpoint += f"?{parse.urlencode(params)}"
+        
         result = self._make_request("GET", endpoint)
+        
+        # When paginated, backend returns { items: [...], totalCount, page, pageSize, totalPages }
+        if page is not None and page_size is not None:
+            if isinstance(result, dict) and 'items' in result:
+                return result.get('items', [])
+            return result if isinstance(result, list) else []
+        
         return result if isinstance(result, list) else []
+
+    def get_models_paginated(self, page: int = 1, page_size: int = 50, 
+                             search: str = "") -> Dict[str, Any]:
+        """Get models with full pagination metadata.
+        
+        Args:
+            page: Page number (1-based)
+            page_size: Number of items per page
+            search: Optional search query
+            
+        Returns:
+            Dict with keys: items, totalCount, page, pageSize, totalPages
+        """
+        params = {
+            'page': str(page),
+            'pageSize': str(page_size),
+        }
+        if search:
+            params['search'] = search
+        
+        endpoint = f"/models?{parse.urlencode(params)}"
+        result = self._make_request("GET", endpoint)
+        
+        if isinstance(result, dict) and 'items' in result:
+            return result
+        # Fallback for backward compatibility
+        items = result if isinstance(result, list) else []
+        return {
+            'items': items,
+            'totalCount': len(items),
+            'page': page,
+            'pageSize': page_size,
+            'totalPages': 1,
+        }
 
     def get_model(self, model_id: int) -> dict:
         return self._make_request("GET", f"/models/{model_id}")

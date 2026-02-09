@@ -11,6 +11,10 @@ public interface ITextureSetRepository
     Task<TextureSet?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<TextureSet?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<TextureSet?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
+    Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
+        int page, int pageSize,
+        int? packId = null, int? projectId = null,
+        CancellationToken cancellationToken = default);
     Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
     /// <summary>

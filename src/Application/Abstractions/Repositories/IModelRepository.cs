@@ -12,6 +12,10 @@ public interface IModelRepository
     Task<Model?> GetByIdForAssociationAsync(int id, CancellationToken cancellationToken = default);
     Task<Model?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Model?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
+    Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(
+        int page, int pageSize,
+        int? packId = null, int? projectId = null, int? textureSetId = null,
+        CancellationToken cancellationToken = default);
     Task UpdateAsync(Model model, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }

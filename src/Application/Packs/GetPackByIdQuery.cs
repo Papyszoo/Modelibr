@@ -33,6 +33,7 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDet
             ModelCount = pack.ModelCount,
             TextureSetCount = pack.TextureSetCount,
             SpriteCount = pack.SpriteCount,
+            SoundCount = pack.SoundCount,
             IsEmpty = pack.IsEmpty,
             Models = pack.Models.Select(m => new PackModelDto
             {
@@ -70,6 +71,7 @@ public record PackDetailDto
     public int ModelCount { get; init; }
     public int TextureSetCount { get; init; }
     public int SpriteCount { get; init; }
+    public int SoundCount { get; init; }
     public bool IsEmpty { get; init; }
     public ICollection<PackModelDto> Models { get; init; } = new List<PackModelDto>();
     public ICollection<PackTextureSetDto> TextureSets { get; init; } = new List<PackTextureSetDto>();

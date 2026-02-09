@@ -195,6 +195,42 @@
   margin: 0;
 }
 
+/* Add Model Card */
+.model-card-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--surface-border);
+  background: transparent;
+  box-shadow: none;
+}
+
+.model-card-add:hover {
+  border-color: var(--primary-color);
+  background: rgba(var(--primary-color-rgb), 0.05);
+  transform: translateY(-4px);
+}
+
+.model-card-add-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-color-secondary);
+  padding: 2rem;
+  aspect-ratio: 1;
+  justify-content: center;
+}
+
+.model-card-add-content .pi {
+  font-size: 2rem;
+}
+
+.model-card-add-content span {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 /* Tab content specific styles */
 .model-list-tab .model-grid-container {
   border: none;
@@ -204,8 +240,6 @@
 .model-list-tab .model-grid-container:hover {
   background: transparent;
 }
-
-/* Remove dark theme overrides as we now use CSS variables */
 
 /* Responsive adjustments */
 @media (max-width: 1200px) {
@@ -240,7 +274,7 @@
   }
 }
 
-/* Pack Selection Dialog */
+/* Pack/Project Selection Dialog */
 .pack-selection-dialog {
   padding: 1rem 0;
 }
@@ -274,7 +308,8 @@
   border-color: var(--primary-color);
 }
 
-.pack-select-item > .pi-box {
+.pack-select-item > .pi-box,
+.pack-select-item > .pi-folder {
   font-size: 1.5rem;
   color: var(--primary-color);
 }

@@ -20,7 +20,7 @@ import { useUploadProgress } from '../../../hooks/useUploadProgress'
 import ApiClient from '../../../services/ApiClient'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
-import { SoundDto, SoundCategoryDto } from '../../../types'
+import { SoundDto, SoundCategoryDto, PaginationState } from '../../../types'
 import {
   decodeAudio,
   extractPeaks,
@@ -58,6 +58,14 @@ function SoundList() {
   const [selectedSoundIds, setSelectedSoundIds] = useState<Set<number>>(
     new Set()
   )
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    pageSize: 50,
+    totalCount: 0,
+    totalPages: 0,
+    hasMore: false,
+  })
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState<{
     startX: number
@@ -77,11 +85,32 @@ function SoundList() {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sounds
 
-  const loadSounds = useCallback(async () => {
+  const loadSounds = useCallback(async (loadMore = false) => {
     try {
-      setLoading(true)
-      const response = await ApiClient.getAllSounds()
-      setSounds(response.sounds || [])
+      if (loadMore) {
+        setIsLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
+      const page = loadMore ? pagination.page + 1 : 1
+      const result = await ApiClient.getSoundsPaginated({
+        page,
+        pageSize: 50,
+      })
+
+      if (loadMore) {
+        setSounds(prev => [...prev, ...result.sounds])
+      } else {
+        setSounds(result.sounds || [])
+      }
+
+      setPagination({
+        page,
+        pageSize: result.pageSize,
+        totalCount: result.totalCount,
+        totalPages: result.totalPages,
+        hasMore: page < result.totalPages,
+      })
     } catch (error) {
       console.error('Failed to load sounds:', error)
       setSounds([])
@@ -93,7 +122,9 @@ function SoundList() {
       })
     } finally {
       setLoading(false)
+      setIsLoadingMore(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadCategories = useCallback(async () => {
@@ -835,6 +866,26 @@ function SoundList() {
               }}
             />
           )}
+        </div>
+      )}
+
+      {pagination.hasMore && (
+        <div
+          style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}
+        >
+          <Button
+            label={
+              isLoadingMore
+                ? 'Loading...'
+                : `Load More (${sounds.length} of ${pagination.totalCount})`
+            }
+            icon={
+              isLoadingMore ? 'pi pi-spinner pi-spin' : 'pi pi-chevron-down'
+            }
+            onClick={() => loadSounds(true)}
+            disabled={isLoadingMore}
+            className="p-button-outlined"
+          />
         </div>
       )}
 

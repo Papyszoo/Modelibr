@@ -20,18 +20,18 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 ### Model Upload & Management (10 endpoints)
 
-| Method   | Endpoint                                  | Description                           |
-| -------- | ----------------------------------------- | ------------------------------------- |
-| `POST`   | `/models`                                 | Upload new 3D model                   |
-| `POST`   | `/models/{modelId}/files`                 | Add file to existing model            |
-| `POST`   | `/models/{modelId}/tags`                  | Update model tags/description         |
-| `GET`    | `/models`                                 | List all models (?packId, ?projectId) |
-| `GET`    | `/models/{id}`                            | Get model details                     |
-| `GET`    | `/models/{id}/file`                       | Download model file                   |
-| `PUT`    | `/models/{id}/default-texture-set`        | Set default texture for version       |
-| `POST`   | `/models/{id}/active-version/{versionId}` | Set active version                    |
-| `DELETE` | `/models/{id}`                            | Soft delete model                     |
-| `DELETE` | `/models/{modelId}/versions/{versionId}`  | Soft delete version                   |
+| Method   | Endpoint                                  | Description                                                            |
+| -------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| `POST`   | `/models`                                 | Upload new 3D model                                                    |
+| `POST`   | `/models/{modelId}/files`                 | Add file to existing model                                             |
+| `POST`   | `/models/{modelId}/tags`                  | Update model tags/description                                          |
+| `GET`    | `/models`                                 | List all models (?packId, ?projectId, ?textureSetId, ?page, ?pageSize) |
+| `GET`    | `/models/{id}`                            | Get model details                                                      |
+| `GET`    | `/models/{id}/file`                       | Download model file                                                    |
+| `PUT`    | `/models/{id}/default-texture-set`        | Set default texture for version                                        |
+| `POST`   | `/models/{id}/active-version/{versionId}` | Set active version                                                     |
+| `DELETE` | `/models/{id}`                            | Soft delete model                                                      |
+| `DELETE` | `/models/{modelId}/versions/{versionId}`  | Soft delete version                                                    |
 
 ### Model Versions (6 endpoints)
 
@@ -61,22 +61,22 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 ### Texture Sets (14 endpoints)
 
-| Method   | Endpoint                                                 | Description                         |
-| -------- | -------------------------------------------------------- | ----------------------------------- |
-| `GET`    | `/texture-sets`                                          | List all texture sets               |
-| `GET`    | `/texture-sets/{id}`                                     | Get texture set details             |
-| `GET`    | `/texture-sets/by-file/{fileId}`                         | Get texture set containing a file   |
-| `POST`   | `/texture-sets`                                          | Create new texture set (JSON)       |
-| `POST`   | `/texture-sets/with-file`                                | Create texture set with file upload |
-| `PUT`    | `/texture-sets/{id}`                                     | Update texture set                  |
-| `DELETE` | `/texture-sets/{id}`                                     | Soft delete texture set             |
-| `DELETE` | `/texture-sets/{id}/hard`                                | Hard delete (keeps files)           |
-| `POST`   | `/texture-sets/{id}/textures`                            | Add texture to set                  |
-| `DELETE` | `/texture-sets/{packId}/textures/{textureId}`            | Remove texture from set             |
-| `PUT`    | `/texture-sets/{setId}/textures/{textureId}/type`        | Change texture type                 |
-| `POST`   | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Associate with model version        |
-| `DELETE` | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Disassociate from model version     |
-| `POST`   | `/texture-sets/{packId}/models/{modelId}/all-versions`   | Associate with all model versions   |
+| Method   | Endpoint                                                 | Description                                                   |
+| -------- | -------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET`    | `/texture-sets`                                          | List all texture sets (?packId, ?projectId, ?page, ?pageSize) |
+| `GET`    | `/texture-sets/{id}`                                     | Get texture set details                                       |
+| `GET`    | `/texture-sets/by-file/{fileId}`                         | Get texture set containing a file                             |
+| `POST`   | `/texture-sets`                                          | Create new texture set (JSON)                                 |
+| `POST`   | `/texture-sets/with-file`                                | Create texture set with file upload                           |
+| `PUT`    | `/texture-sets/{id}`                                     | Update texture set                                            |
+| `DELETE` | `/texture-sets/{id}`                                     | Soft delete texture set                                       |
+| `DELETE` | `/texture-sets/{id}/hard`                                | Hard delete (keeps files)                                     |
+| `POST`   | `/texture-sets/{id}/textures`                            | Add texture to set                                            |
+| `DELETE` | `/texture-sets/{packId}/textures/{textureId}`            | Remove texture from set                                       |
+| `PUT`    | `/texture-sets/{setId}/textures/{textureId}/type`        | Change texture type                                           |
+| `POST`   | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Associate with model version                                  |
+| `DELETE` | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Disassociate from model version                               |
+| `POST`   | `/texture-sets/{packId}/models/{modelId}/all-versions`   | Associate with all model versions                             |
 
 ### Recycled Files (4 endpoints)
 
@@ -96,6 +96,29 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `POST` | `/test/thumbnail-complete/{modelId}` | Test completion notification (dev) |
 
 **Total:** 42 endpoints
+
+## Pagination
+
+List endpoints (`/models`, `/texture-sets`, `/sprites`, `/sounds`) support optional server-side pagination via query parameters:
+
+| Parameter  | Type | Description                                      |
+| ---------- | ---- | ------------------------------------------------ |
+| `page`     | int  | Page number (1-based). Required with `pageSize`. |
+| `pageSize` | int  | Items per page. Required with `page`.            |
+
+**When paginated** (both `page` and `pageSize` provided), returns:
+
+```json
+{
+  "items": [...],
+  "totalCount": 100,
+  "page": 1,
+  "pageSize": 20,
+  "totalPages": 5
+}
+```
+
+**When not paginated** (params omitted), returns a flat array for backward compatibility. WebDAV and other internal consumers rely on this.
 
 ## Architecture Overview
 

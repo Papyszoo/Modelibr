@@ -41,6 +41,43 @@ internal sealed class ModelRepository : IModelRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(
+        int page, int pageSize,
+        int? packId = null, int? projectId = null, int? textureSetId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Models.AsNoTracking().AsQueryable();
+
+        if (packId.HasValue)
+            query = query.Where(m => m.Packs.Any(p => p.Id == packId.Value));
+
+        if (projectId.HasValue)
+            query = query.Where(m => m.Projects.Any(p => p.Id == projectId.Value));
+
+        if (textureSetId.HasValue)
+            query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(m => m.UpdatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(m => m.Packs)
+            .Include(m => m.Projects)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.TextureSets)
+            .Include(m => m.Versions)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models
