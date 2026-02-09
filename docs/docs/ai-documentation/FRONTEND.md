@@ -264,7 +264,7 @@ src/frontend/src/
 - Collapsible sections with click-to-toggle headers and count badges
 - Pagination with "Load More" pattern for each asset section (models, textures, sprites, sounds)
 - Drag-and-drop upload works even on collapsed section headers
-- Title displays "Pack: {name}" or "Project: {name}" format
+- Title displays "Pack: \{name\}" or "Project: \{name\}" format
 - Header shows counts for all asset types including sounds
 
 **Effects of changes:**
