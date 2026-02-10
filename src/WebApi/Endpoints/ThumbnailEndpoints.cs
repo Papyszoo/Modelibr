@@ -287,48 +287,6 @@ public static class ThumbnailEndpoints
         .WithName("Get Model PNG Thumbnail File")
         .WithTags("Thumbnails");
 
-        app.MapGet("/models/{id}/classification-views/{viewName}", async (
-            int id,
-            string viewName,
-            IConfiguration configuration) =>
-        {
-            // Get storage path from configuration
-            var storagePath = configuration["THUMBNAIL_STORAGE_PATH"] ?? "/var/lib/modelibr/thumbnails";
-            
-            // Build path to classification view
-            var classificationViewsDir = Path.Combine(storagePath, id.ToString(), "classification-views");
-            var possibleFiles = Directory.Exists(classificationViewsDir)
-                ? Directory.GetFiles(classificationViewsDir, $"{viewName}*.png")
-                : Array.Empty<string>();
-            
-            if (possibleFiles.Length == 0)
-            {
-                return Results.NotFound($"Classification view '{viewName}' not found for model {id}");
-            }
-            
-            var filePath = possibleFiles[0];
-            
-            if (!System.IO.File.Exists(filePath))
-            {
-                return Results.NotFound("Classification view file not found on disk");
-            }
-
-            var fileStream = System.IO.File.OpenRead(filePath);
-            var contentType = "image/png";
-            
-            // Add cache headers for classification view files
-            var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
-            if (httpContext != null)
-            {
-                httpContext.Response.Headers.CacheControl = "public, max-age=86400"; // Cache for 24 hours
-                httpContext.Response.Headers.ETag = $"\"{id}-{viewName}\"";
-            }
-            
-            return Results.File(fileStream, contentType, enableRangeProcessing: true);
-        })
-        .WithName("Get Classification View")
-        .WithTags("Thumbnails");
-
         // Version-specific thumbnail endpoints
         app.MapGet("/model-versions/{versionId}/thumbnail", async (
             int versionId, 

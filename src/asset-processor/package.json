@@ -1,0 +1,53 @@
+{
+  "name": "modelibr-asset-processor",
+  "version": "1.0.0",
+  "description": "Node.js asset processor service for thumbnail rendering, waveform generation, and mesh analysis",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "asset-processor",
+    "thumbnail",
+    "threejs",
+    "worker",
+    "mesh-analysis",
+    "modelibr"
+  ],
+  "author": "Modelibr",
+  "license": "MIT",
+  "dependencies": {
+    "@microsoft/signalr": "^9.0.6",
+    "axios": "^1.6.2",
+    "canvas": "^2.11.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "form-data": "^4.0.4",
+    "node-webpmux": "^3.2.1",
+    "puppeteer": "^23.10.4",
+    "sharp": "^0.34.4",
+    "three": "^0.180.0",
+    "winston": "^3.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "vitest": "^4.0.18"
+  }
+}

@@ -40,12 +40,14 @@ services:
             - "${FRONTEND_PORT:-3000}:80"
         networks:
             - modelibr
-    thumbnail-worker:
-        image: ${DOCKER_REGISTRY-}thumbnail-worker
+    asset-processor:
+        image: ${DOCKER_REGISTRY-}asset-processor
         build:
-            context: ./src/worker-service
+            context: ./src/asset-processor
             dockerfile: Dockerfile
-        container_name: thumbnail-worker
+            args:
+                ENABLE_BLENDER: ${ENABLE_BLENDER:-false}
+        container_name: asset-processor
         environment:
             - WORKER_ID=${WORKER_ID:-worker-1}
             - WORKER_PORT=${WORKER_PORT:-3001}

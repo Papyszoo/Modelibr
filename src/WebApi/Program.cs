@@ -110,7 +110,7 @@ namespace WebApi
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");
-            app.MapHub<ThumbnailJobHub>("/thumbnailJobHub");
+            app.MapHub<ThumbnailJobHub>("/jobProcessingHub");
 
             app.MapHealthChecks("/health");
 
