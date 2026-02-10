@@ -4,14 +4,16 @@ This document explains how the unified CI/CD pipeline works and how to access E2
 
 ## Overview
 
-Modelibr uses a unified GitHub Actions workflow that:
-1. Runs all test suites (backend, frontend, Blender addon, and E2E tests)
-2. Automatically collects the latest 10 test reports
-3. Deploys them alongside the documentation to GitHub Pages
+Modelibr uses GitHub Actions workflows that:
+
+1. Runs all test suites (backend, frontend, asset processor, Blender addon, and E2E tests)
+2. Runs code quality checks (linting, formatting) on frontend and asset processor
+3. Automatically collects the latest 10 test reports
+4. Deploys them alongside the documentation to GitHub Pages
 
 ## Accessing Test Reports
 
-The latest Playwright E2E test reports are always available on the documentation site, updated after every test run (from any branch):
+The latest test reports (Backend, Frontend, Asset Processor, Blender Addon, and E2E) are always available on the documentation site, updated after every test run (from any branch):
 
 **[View Test Reports](/test-reports)**
 
@@ -20,15 +22,15 @@ You can also access them from the navigation bar at the top of this site.
 ### How Reports Are Updated
 
 - **After any CI run completes** (from any branch, whether tests pass or fail):
-  - The workflow fetches the last 10 test reports from all workflow runs
-  - Builds the documentation using the **main branch** content
-  - Deploys to GitHub Pages with the updated reports
+    - The workflow fetches the last 10 test reports from all workflow runs
+    - Builds the documentation using the **main branch** content
+    - Deploys to GitHub Pages with the updated reports
 
 - **Report artifacts** are also available:
-  1. Go to the workflow run in GitHub Actions
-  2. Scroll to the "Artifacts" section at the bottom
-  3. Download the `docs-with-reports` artifact
-  4. Extract the zip file and open `test-reports/index.html` in your browser
+    1. Go to the workflow run in GitHub Actions
+    2. Scroll to the "Artifacts" section at the bottom
+    3. Download the `docs-with-reports` artifact
+    4. Extract the zip file and open `test-reports/index.html` in your browser
 
 ## How It Works
 
@@ -37,21 +39,22 @@ You can also access them from the navigation bar at the top of this site.
 The workflow is defined in `.github/workflows/ci-and-deploy.yml` and consists of:
 
 1. **Test Jobs** (run on all branches and PRs):
-   - `backend-tests`: .NET unit tests
-   - `frontend-tests`: React unit tests
-   - `blender-addon-tests`: Python unit tests
-   - `e2e-tests`: Playwright end-to-end tests
-   - `ci-status`: Aggregates results from all tests
+    - `backend-tests`: .NET unit tests
+    - `frontend-tests`: React unit tests
+    - `asset-processor-tests`: Vitest unit tests for the asset processor (results uploaded as JSON artifact)
+    - `blender-addon-tests`: Python unit tests
+    - `e2e-tests`: Playwright end-to-end tests
+    - `ci-status`: Aggregates results from all tests
 
 2. **Documentation Building and Deployment** (runs after all tests, even if they fail):
-   - Checks out the **current branch** for workflow scripts
-   - Checks out the **main branch** for documentation content
-   - Copies scripts from current branch (ensures latest tooling)
-   - Copies docs from main branch (ensures stable content)
-   - Fetches the last 10 test reports from **all workflow runs** (any branch)
-   - Builds the Docusaurus documentation site
-   - Uploads docs with reports as artifact (`docs-with-reports`) for download
-   - **Always deploys to GitHub Pages** after successful build
+    - Checks out the **current branch** for workflow scripts
+    - Checks out the **main branch** for documentation content
+    - Copies scripts from current branch (ensures latest tooling)
+    - Copies docs from main branch (ensures stable content)
+    - Fetches the last 10 test reports from **all workflow runs** (any branch)
+    - Builds the Docusaurus documentation site
+    - Uploads docs with reports as artifact (`docs-with-reports`) for download
+    - **Always deploys to GitHub Pages** after successful build
 
 This means the documentation site is continuously updated with the latest test reports from any branch, while the documentation content itself comes from the main branch.
 
@@ -76,10 +79,12 @@ The `.github/scripts/fetch-test-reports.sh` script:
 ### Triggering a Documentation Deployment
 
 Documentation is automatically deployed to GitHub Pages when:
+
 - A commit is pushed to the `main` branch
 - All CI tests pass successfully
 
 You can also manually trigger a deployment:
+
 1. Go to the [Actions tab](https://github.com/Papyszoo/Modelibr/actions)
 2. Select the "CI and Deploy Docs" workflow
 3. Click "Run workflow" and select the `main` branch
@@ -97,6 +102,7 @@ To change the number of reports displayed:
 #### No Reports Showing
 
 If no reports appear on the E2E Reports page:
+
 - Check that E2E tests are running successfully in CI
 - Verify the workflow run has the `playwright-report` artifact
 - Check the workflow logs for the "Fetch last 10 test reports" step
@@ -110,6 +116,7 @@ If no reports appear on the E2E Reports page:
 #### Script Errors
 
 The fetch script requires:
+
 - `curl` for API calls
 - `jq` for JSON parsing
 - `unzip` for extracting artifacts
@@ -121,6 +128,7 @@ These are pre-installed on GitHub Actions runners.
 ### Permissions Required
 
 The workflow needs these GitHub permissions:
+
 - `contents: read` - Read repository code
 - `pages: write` - Deploy to GitHub Pages
 - `id-token: write` - OIDC for Pages deployment
@@ -129,6 +137,7 @@ The workflow needs these GitHub permissions:
 ### API Rate Limits
 
 The GitHub API has rate limits:
+
 - 1,000 requests per hour for authenticated requests
 - The fetch script makes ~20 API calls per run
 - This allows for frequent deployments without hitting limits
@@ -139,9 +148,18 @@ The GitHub API has rate limits:
 - After 30 days, older reports may not be available for fetching
 - Reports already on GitHub Pages remain until replaced
 
+## Code Quality Workflow
+
+A separate workflow is defined in `.github/workflows/code-quality.yml` and runs on all branches and PRs:
+
+- `frontend-quality`: Runs ESLint, Prettier checks, and build verification for the frontend
+- `asset-processor-quality`: Runs ESLint, Prettier checks, and unit tests for the asset processor
+- `code-quality-status`: Aggregates results from all quality jobs
+
 ## Removed Workflows
 
 This unified workflow replaces:
+
 - `.github/workflows/ci.yml` (standalone CI)
 - `.github/workflows/deploy-docs.yml` (standalone docs deployment)
 

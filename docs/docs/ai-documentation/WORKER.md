@@ -2,9 +2,9 @@
 sidebar_position: 2
 ---
 
-# Thumbnail Worker Service
+# Asset Processor Service
 
-Node.js microservice for generating 3D model thumbnails and animated previews. Operates independently from the .NET Web API, communicating via REST API and SignalR.
+Node.js microservice for processing 3D model assets — generating thumbnails, animated previews, waveforms, and more. Operates independently from the .NET Web API, communicating via REST API and SignalR.
 
 ## Quick Start
 
@@ -17,7 +17,7 @@ Node.js microservice for generating 3D model thumbnails and animated previews. O
 ### Setup & Run
 
 ```bash
-cd src/worker-service
+cd src/asset-processor
 npm install
 cp .env.example .env
 # Edit .env with your API URL
@@ -102,13 +102,13 @@ CLEANUP_TEMP_FILES=true
 
 ```bash
 # Start worker
-docker compose up -d thumbnail-worker
+docker compose up -d asset-processor
 
 # Scale to 3 workers
-docker compose up -d --scale thumbnail-worker=3
+docker compose up -d --scale asset-processor=3
 
 # View logs
-docker compose logs -f thumbnail-worker
+docker compose logs -f asset-processor
 
 # Check health
 curl http://localhost:3001/health
@@ -117,12 +117,12 @@ curl http://localhost:3001/health
 ### Standalone Docker
 
 ```bash
-docker build -t modelibr-worker src/worker-service
+docker build -t modelibr-asset-processor src/asset-processor
 docker run -d \
   -e API_BASE_URL=http://host.docker.internal:5009 \
   -e WORKER_ID=worker-1 \
   -p 3001:3001 \
-  modelibr-worker
+  modelibr-asset-processor
 ```
 
 ## Development
@@ -133,11 +133,12 @@ docker run -d \
 npm run dev  # Auto-reload on file changes
 ```
 
-### Testing
+### Manual Testing
 
 ```bash
-# Test API connectivity
-node test-api-service.js
+# Test scripts are in the tests/ subdirectory
+node tests/test-puppeteer.js
+node tests/test-scene-cleanup.js
 
 # Test with debug logging
 export LOG_LEVEL=debug
@@ -148,6 +149,29 @@ export CLEANUP_TEMP_FILES=false
 npm start
 ```
 
+### Unit Tests (Vitest)
+
+The asset processor uses [Vitest](https://vitest.dev/) for unit testing with 33 tests across 5 test files:
+
+| Test File                         | Tests | What It Covers                                    |
+| --------------------------------- | ----- | ------------------------------------------------- |
+| `tests/processorRegistry.test.js` | 11    | Processor registration, lookup, strategy dispatch |
+| `tests/baseProcessor.test.js`     | 8     | Base processor contract, lifecycle hooks          |
+| `tests/meshProcessor.test.js`     | 8     | 3D mesh processing pipeline                       |
+| `tests/config.test.js`            | 3     | Configuration loading and validation              |
+| `tests/healthServer.test.js`      | 3     | Health endpoint responses                         |
+
+```bash
+# Run all unit tests
+npm test
+
+# Watch mode (re-runs on file changes)
+npm run test:watch
+
+# Run with coverage report
+npm run test:coverage
+```
+
 ### Code Quality
 
 ```bash
@@ -155,6 +179,10 @@ npm run lint        # Check code style
 npm run lint:fix    # Fix code style issues
 npm run format      # Format with Prettier
 ```
+
+### CI Integration
+
+The `asset-processor-quality` job in GitHub Actions runs linting, and the `asset-processor-tests` job runs the full Vitest suite on every PR.
 
 ## Troubleshooting
 
@@ -170,8 +198,8 @@ This error occurs due to Windows line ending (CRLF) issues. The repository inclu
 **Solution:** Simply rebuild the container:
 
 ```bash
-docker compose build thumbnail-worker
-docker compose up -d thumbnail-worker
+docker compose build asset-processor
+docker compose up -d asset-processor
 ```
 
 For existing checkouts, optionally normalize line endings:
@@ -193,16 +221,16 @@ Verify:
 
 ```bash
 # Check if node is running
-docker compose exec thumbnail-worker sh -c 'pidof node'
+docker compose exec asset-processor sh -c 'pidof node'
 
 # View startup sequence
-docker compose logs thumbnail-worker | head -20
+docker compose logs asset-processor | head -20
 ```
 
 Expected logs:
 
 ```
-info: Starting Modelibr Thumbnail Worker Service
+info: Starting Modelibr Asset Processor Service
 info: Configuration validated successfully
 info: Health server started
 info: Starting SignalR-based job processor
@@ -219,7 +247,7 @@ Check API is accessible:
 curl http://localhost:5009/health
 
 # From Docker container
-docker compose exec thumbnail-worker curl http://webapi:8080/health
+docker compose exec asset-processor curl http://webapi:8080/health
 ```
 
 Common fixes:
@@ -247,7 +275,7 @@ LOG_LEVEL=debug
 Verify SignalR hub endpoint:
 
 ```bash
-curl http://localhost:5009/hubs/thumbnail-jobs
+curl http://localhost:5009/jobProcessingHub
 # Should return connection upgrade message or 404
 ```
 
@@ -263,20 +291,20 @@ Requires two fixes:
 The latest Docker image includes both fixes. Rebuild:
 
 ```bash
-docker compose build thumbnail-worker
+docker compose build asset-processor
 ```
 
 Verify:
 
 ```bash
 # Check Xvfb is running
-docker compose exec thumbnail-worker sh -c 'pidof Xvfb'
+docker compose exec asset-processor sh -c 'pidof Xvfb'
 
 # Verify DISPLAY is set
-docker compose exec thumbnail-worker sh -c 'echo $DISPLAY'  # Should show :99
+docker compose exec asset-processor sh -c 'echo $DISPLAY'  # Should show :99
 
 # Check Mesa libraries
-docker compose exec thumbnail-worker dpkg -l | grep -E 'libgl1|mesa'
+docker compose exec asset-processor dpkg -l | grep -E 'libgl1|mesa'
 ```
 
 **"Failed to load model: Invalid file format"**
@@ -347,7 +375,7 @@ Docker memory limit:
 ```yaml
 # docker-compose.yml
 services:
-    thumbnail-worker:
+    asset-processor:
         deploy:
             resources:
                 limits:
@@ -359,7 +387,7 @@ services:
 Scale workers:
 
 ```bash
-docker compose up -d --scale thumbnail-worker=5
+docker compose up -d --scale asset-processor=5
 ```
 
 Or increase per-worker capacity:
@@ -425,11 +453,11 @@ watch -n 5 'curl -s http://localhost:3001/status | jq ".worker,.system.memory"'
 **Test Components**
 
 ```bash
-# Test API connectivity
-node test-api-service.js
+# Run unit tests
+npm test
 
 # Test SignalR (use browser developer tools)
-# Connect to ws://localhost:5009/hubs/thumbnail-jobs
+# Connect to ws://localhost:5009/jobProcessingHub
 ```
 
 ## Architecture
@@ -449,21 +477,31 @@ node test-api-service.js
 
 **config.js** - Centralized configuration from environment variables with validation
 
-**signalrQueueService.js** - SignalR connection management and job notifications
+**signalrQueueService.js** - SignalR connection management and job notifications (connects to `/jobProcessingHub`)
 
-**thumbnailJobService.js** - Job acquisition, status updates, and result reporting via HTTP
+**jobApiClient.js** - Job acquisition, status updates, and result reporting via HTTP (formerly `thumbnailJobService.js`)
 
-**modelDownloadService.js** - Downloads model files from backend API
+**jobProcessor.js** - Orchestrates job processing; uses `ProcessorRegistry` for strategy-based dispatch
 
-**modelLoaderService.js** - Loads and normalizes 3D models with Three.js loaders
+**processors/** - Strategy pattern processors:
 
-**frameRenderer.js** - Renders orbit animation frames with Three.js scene
+- `processorRegistry.js` - Registers and resolves processors by job type
+- `baseProcessor.js` - Abstract base class defining the processor contract
+- `meshProcessor.js` - 3D mesh thumbnail generation (OBJ, FBX, GLTF, GLB)
+- `soundProcessor.js` - Audio waveform generation
+- `thumbnailProcessor.js` - Generic thumbnail processing
 
-**frameEncoder.js** - Encodes frames to animated WebP and poster with Sharp/node-webpmux
+**modelFileService.js** - Downloads and manages model files from backend API
+
+**puppeteerRenderer.js** - Browser-based 3D rendering with Puppeteer and Three.js
+
+**frameEncoderService.js** - Encodes frames to animated WebP and poster with Sharp/node-webpmux
 
 **thumbnailStorageService.js** - Uploads generated thumbnails to backend API
 
 **healthServer.js** - HTTP server for /health and /status endpoints
+
+**jobEventService.js** - Sends detailed job event logs to the backend for audit trails
 
 ### Job Processing Flow
 
@@ -528,7 +566,7 @@ mkdir -p /tmp/worker-diagnostics
 cd /tmp/worker-diagnostics
 
 # Collect logs
-docker logs thumbnail-worker > worker.log 2>&1
+docker logs asset-processor > worker.log 2>&1
 
 # Configuration
 env | grep -E "(WORKER|API|RENDER)" > config.txt
@@ -568,6 +606,6 @@ Include:
 
 ## Related Documentation
 
-- Worker README: `src/worker-service/README.md` - Quick reference
-- Backend API: `docs/BACKEND_API.md` - API reference
+- Asset Processor README: `src/asset-processor/README.md` - Quick reference
+- Backend API: `docs/docs/ai-documentation/BACKEND_API.md` - API reference
 - Project README: `README.md` - Full application setup

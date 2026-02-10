@@ -39,6 +39,9 @@ if [ -n "${CURRENT_RUN_NUMBER}" ] && [ -d "${REPORTS_DIR}/run-${CURRENT_RUN_NUMB
   if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json" ]; then
     create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json" "pytest"
   fi
+  if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/asset-processor-results.json" ]; then
+    create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/asset-processor-results.json" "Vitest"
+  fi
 else
   # No current run directory, ensure reports directory exists
   mkdir -p "${REPORTS_DIR}"
@@ -159,6 +162,20 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
       rm "${TEMP_ZIP}"
     else
       create_placeholder_json "${REPORT_DIR}/blender-results.json" "pytest"
+    fi
+    
+    # Download asset processor test results
+    ASSET_PROCESSOR_ARTIFACT_URL=$(echo "${ARTIFACTS}" | jq -r '.artifacts[] | select(.name | startswith("asset-processor-test-results")) | .archive_download_url' | head -1)
+    if [ -n "${ASSET_PROCESSOR_ARTIFACT_URL}" ] && [ "${ASSET_PROCESSOR_ARTIFACT_URL}" != "null" ]; then
+      echo "Found asset processor test results for run ${RUN_NUMBER}"
+      TEMP_ZIP="/tmp/asset-processor-results-${RUN_NUMBER}.zip"
+      curl -L -H "Authorization: token ${TOKEN}" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "${ASSET_PROCESSOR_ARTIFACT_URL}" -o "${TEMP_ZIP}"
+      unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
+      rm "${TEMP_ZIP}"
+    else
+      create_placeholder_json "${REPORT_DIR}/asset-processor-results.json" "Vitest"
     fi
     
     REPORT_COUNT=$((REPORT_COUNT + 1))
@@ -504,7 +521,7 @@ cat > "${REPORTS_DIR}/index.html" << 'EOF'
     <div class="info-banner">
       <div class="info-banner-text">
         <div class="info-banner-title">Test Reports Archive</div>
-        <div class="info-banner-desc">E2E, backend, frontend, and Blender addon test results</div>
+        <div class="info-banner-desc">E2E, backend, frontend, asset processor, and Blender addon test results</div>
       </div>
       <a href="#" id="workflow-link" class="info-banner-link" target="_blank">
         View All Workflows
@@ -542,6 +559,7 @@ while IFS='|' read -r _ DIR; do
     BACKEND_RESULTS=$(cat "${DIR}/backend-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
     FRONTEND_RESULTS=$(cat "${DIR}/frontend-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
     BLENDER_RESULTS=$(cat "${DIR}/blender-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
+    ASSET_PROCESSOR_RESULTS=$(cat "${DIR}/asset-processor-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
 
     # Convert timestamp to readable format using JavaScript
     if [ "${FIRST}" = true ]; then
@@ -560,7 +578,8 @@ while IFS='|' read -r _ DIR; do
         path: 'run-${RUN_NUM}/index.html',
         backendTests: ${BACKEND_RESULTS},
         frontendTests: ${FRONTEND_RESULTS},
-        blenderTests: ${BLENDER_RESULTS}
+        blenderTests: ${BLENDER_RESULTS},
+        assetProcessorTests: ${ASSET_PROCESSOR_RESULTS}
       }
 REPORT_EOF
   fi
@@ -693,6 +712,7 @@ cat >> "${REPORTS_DIR}/index.html" << 'EOF'
             ${renderTestSection('backend-' + index, 'Backend', '.NET', report.backendTests)}
             ${renderTestSection('frontend-' + index, 'Frontend', 'Jest', report.frontendTests)}
             ${renderTestSection('blender-' + index, 'Blender Addon', 'pytest', report.blenderTests)}
+            ${renderTestSection('asset-processor-' + index, 'Asset Processor', 'Vitest', report.assetProcessorTests)}
           </div>
           <div class="report-actions">
             <a href="${report.path}" class="view-button">View E2E Report</a>

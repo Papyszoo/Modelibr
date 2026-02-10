@@ -42,12 +42,14 @@ describe('ModelInfo', () => {
     expect(screen.getByText(updatedDate)).toBeInTheDocument()
   })
 
-  it('should display AI Classification section', () => {
+  it('should display Tags & Description section', () => {
     render(<ModelInfo model={mockModel} />)
 
-    expect(screen.getByText('AI Classification')).toBeInTheDocument()
+    expect(screen.getByText('Tags & Description')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Add new tag...')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Enter description...')).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText('Enter description...')
+    ).toBeInTheDocument()
   })
 
   it('should display control instructions', () => {
@@ -96,7 +98,7 @@ describe('ModelInfo', () => {
       screen.getByRole('heading', { name: 'Model Information' })
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: 'AI Classification' })
+      screen.getByRole('heading', { name: 'Tags & Description' })
     ).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: 'Linked Texture Sets' })

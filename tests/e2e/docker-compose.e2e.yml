@@ -38,11 +38,13 @@ services:
             - "3002:80"
         networks:
             - modelibr-e2e
-    thumbnail-worker-e2e:
+    asset-processor-e2e:
         build:
-            context: ../../src/worker-service
+            context: ../../src/asset-processor
             dockerfile: Dockerfile
-        container_name: thumbnail-worker-e2e
+            args:
+                ENABLE_BLENDER: "false"
+        container_name: asset-processor-e2e
         environment:
             - WORKER_ID=worker-e2e
             - WORKER_PORT=3001

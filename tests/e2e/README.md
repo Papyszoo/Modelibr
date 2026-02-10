@@ -24,7 +24,7 @@ npx playwright show-report
 tests/e2e/
 ├── features/                    # Gherkin feature files (organized by feature area)
 │   ├── 00-texture-sets/         # Texture set tests
-│   ├── 01-model-viewer/         # Model viewer tests  
+│   ├── 01-model-viewer/         # Model viewer tests
 │   ├── 02-dock-system/          # Tab and dock management tests
 │   ├── 03-upload-window/        # Upload history tests
 │   └── 04-recycled-files/       # Recycle bin tests
@@ -74,28 +74,28 @@ Feature: My Feature Name
 Step definitions go in `steps/`. Use TypeScript:
 
 ```typescript
-import { Given, When, Then } from './fixtures/test';
+import { Given, When, Then } from "./fixtures/test";
 
 When("I perform some action", async ({ page }) => {
-    await page.click('.some-button');
+    await page.click(".some-button");
     console.log("[Action] Button clicked");
 });
 
 Then("I should see expected result", async ({ page }) => {
-    await expect(page.locator('.result')).toBeVisible();
+    await expect(page.locator(".result")).toBeVisible();
     console.log("[UI] Result visible ✓");
 });
 ```
 
 ### 3. Use Tags for Test Organization
 
-| Tag | Purpose |
-|-----|---------|
-| `@setup` | Setup tests that run first |
+| Tag                 | Purpose                                 |
+| ------------------- | --------------------------------------- |
+| `@setup`            | Setup tests that run first              |
 | `@depends-on:setup` | Tests that need setup to complete first |
-| `@three-js` | Tests that verify Three.js rendering |
-| `@ui` | UI-only tests |
-| `@recycled-files` | Recycle bin tests |
+| `@three-js`         | Tests that verify Three.js rendering    |
+| `@ui`               | UI-only tests                           |
+| `@recycled-files`   | Recycle bin tests                       |
 
 ---
 
@@ -106,27 +106,27 @@ The backend deduplicates files by content hash. To create truly unique models fo
 ### How It Works
 
 ```typescript
-import { UniqueFileGenerator } from '../fixtures/unique-file-generator';
+import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 
 // Generate a unique copy of test-cube.glb
-const uniquePath = await UniqueFileGenerator.generate('test-cube.glb');
+const uniquePath = await UniqueFileGenerator.generate("test-cube.glb");
 // Returns: /path/to/data/abc123/test-cube.glb
 ```
 
 ### ⚠️ CRITICAL: File Format Rules
 
-| File Type | Modification | Why |
-|-----------|-------------|-----|
-| **GLB** | ✅ Safe | JSON chunk modified with unique `extras` field |
-| **FBX** | ❌ DO NOT MODIFY | Binary format - appending data corrupts the file |
-| **OBJ** | ❌ DO NOT MODIFY | May break if comments added incorrectly |
-| **GLTF** | ⚠️ Be careful | JSON file, could work but not tested |
+| File Type | Modification     | Why                                              |
+| --------- | ---------------- | ------------------------------------------------ |
+| **GLB**   | ✅ Safe          | JSON chunk modified with unique `extras` field   |
+| **FBX**   | ❌ DO NOT MODIFY | Binary format - appending data corrupts the file |
+| **OBJ**   | ❌ DO NOT MODIFY | May break if comments added incorrectly          |
+| **GLTF**  | ⚠️ Be careful    | JSON file, could work but not tested             |
 
 ### Current Behavior
 
 ```typescript
 // unique-file-generator.ts
-if (sourceFilename.toLowerCase().endsWith('.glb')) {
+if (sourceFilename.toLowerCase().endsWith(".glb")) {
     // ✅ Safely modifies JSON chunk
     newBuffer = this.modifyGLBJson(originalBuffer, uniqueId);
 } else {
@@ -138,6 +138,7 @@ if (sourceFilename.toLowerCase().endsWith('.glb')) {
 ### Best Practice: Use GLB Files
 
 For tests requiring unique files, prefer `.glb` format:
+
 - `test-cube.glb` - Simple cube model
 - More GLB assets can be added to `assets/`
 
@@ -185,7 +186,7 @@ docker compose -f docker-compose.e2e.yml up -d --build
 
 # View container logs
 docker logs webapi-e2e
-docker logs thumbnail-worker-e2e
+docker logs asset-processor-e2e
 
 # Stop and clean up
 docker compose -f docker-compose.e2e.yml down -v
@@ -227,13 +228,13 @@ await db.query('SELECT * FROM "Models" WHERE "Id" = $1', [modelId]);
 Tests share state via `SharedState`:
 
 ```typescript
-import { sharedState } from '../fixtures/shared-state';
+import { sharedState } from "../fixtures/shared-state";
 
 // Store model reference
-sharedState.saveModel('my-model', { id: 1, name: 'test-cube' });
+sharedState.saveModel("my-model", { id: 1, name: "test-cube" });
 
 // Retrieve model
-const model = sharedState.getModel('my-model');
+const model = sharedState.getModel("my-model");
 ```
 
 ---
@@ -244,9 +245,9 @@ Take screenshots for debugging:
 
 ```typescript
 Then("I take a screenshot named {string}", async ({ page }, name: string) => {
-    await page.screenshot({ 
+    await page.screenshot({
         path: `test-results/screenshots/${name}.png`,
-        fullPage: false 
+        fullPage: false,
     });
 });
 ```
@@ -260,7 +261,7 @@ For model rendering tests, use the exposed Three.js scene:
 ```typescript
 const meshCount = await page.evaluate(() => {
     const scene = window.__THREE_SCENE__;
-    return scene?.children.filter(c => c.type === 'Mesh').length || 0;
+    return scene?.children.filter((c) => c.type === "Mesh").length || 0;
 });
 ```
 
@@ -269,18 +270,22 @@ const meshCount = await page.evaluate(() => {
 ## Common Pitfalls
 
 ### 1. Binary File Corruption
+
 **Problem:** Appending text to binary files (FBX, OBJ) corrupts them.
 **Solution:** Only modify GLB files via JSON chunk. Copy others as-is.
 
 ### 2. Version Dropdown Not Visible
+
 **Problem:** Tests fail waiting for `.version-dropdown-trigger`.
 **Solution:** Ensure model loaded correctly. Check if file is corrupted.
 
 ### 3. Database Connection Errors
+
 **Problem:** Tests fail with pg-pool connection errors.
 **Solution:** Ensure database is running on port 5433, not 5432.
 
 ### 4. Flaky Tests
+
 **Problem:** Tests pass sometimes, fail other times.
 **Solution:** Add `waitForLoadState('networkidle')` and explicit waits.
 
@@ -288,12 +293,12 @@ const meshCount = await page.evaluate(() => {
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `POSTGRES_HOST` | `localhost` | Database host |
-| `POSTGRES_PORT` | `5433` | Database port |
-| `POSTGRES_DB` | `Modelibr` | Database name |
-| `POSTGRES_USER` | `modelibr` | Database user |
+| Variable            | Default         | Description       |
+| ------------------- | --------------- | ----------------- |
+| `POSTGRES_HOST`     | `localhost`     | Database host     |
+| `POSTGRES_PORT`     | `5433`          | Database port     |
+| `POSTGRES_DB`       | `Modelibr`      | Database name     |
+| `POSTGRES_USER`     | `modelibr`      | Database user     |
 | `POSTGRES_PASSWORD` | `ChangeThis...` | Database password |
 
 ---
@@ -301,6 +306,7 @@ const meshCount = await page.evaluate(() => {
 ## Cleanup
 
 The `run-e2e.js` script automatically cleans:
+
 - `data/` directory (temporary test files)
 - Docker containers and volumes
 - Shared state file (`.shared-state.json`)
@@ -331,29 +337,29 @@ These practices ensure reliable, maintainable, and reviewable E2E tests.
 
 #### Selector Priority (Best to Worst)
 
-| Priority | Selector Type | Example | When to Use |
-|:--------:|:--------------|:--------|:------------|
-| **1** | `data-testid` | `[data-testid="category-dialog-save"]` | **Always preferred** - explicit test hook |
-| **2** | Element ID | `#categoryName` | Good for form fields with IDs |
-| **3** | Semantic class | `.version-dropdown-trigger` | OK if class is specific to element |
-| **4** | Generic selector | `.p-dialog input[type='text']` | **AVOID** - breaks easily |
+| Priority | Selector Type    | Example                                | When to Use                               |
+| :------: | :--------------- | :------------------------------------- | :---------------------------------------- |
+|  **1**   | `data-testid`    | `[data-testid="category-dialog-save"]` | **Always preferred** - explicit test hook |
+|  **2**   | Element ID       | `#categoryName`                        | Good for form fields with IDs             |
+|  **3**   | Semantic class   | `.version-dropdown-trigger`            | OK if class is specific to element        |
+|  **4**   | Generic selector | `.p-dialog input[type='text']`         | **AVOID** - breaks easily                 |
 
 #### Available data-testid Attributes
 
 These are already defined in the codebase:
 
-| Component | Attribute | Element |
-|:----------|:----------|:--------|
-| Sprite Category Dialog | `data-testid="category-dialog"` | Dialog container |
-| | `data-testid="category-name-input"` | Name input |
-| | `data-testid="category-description-input"` | Description textarea |
-| | `data-testid="category-dialog-save"` | Save button |
-| | `data-testid="category-dialog-cancel"` | Cancel button |
-| Model Viewer | `data-testid="model-viewer-canvas"` | 3D canvas |
-| Version Strip | `data-testid="version-strip"` | Version strip container |
-| | `data-testid="version-dropdown-trigger"` | Dropdown button |
-| | `data-testid="version-dropdown-menu"` | Dropdown menu |
-| | `data-testid="version-dropdown-item-{n}"` | Version item (n = version number) |
+| Component              | Attribute                                  | Element                           |
+| :--------------------- | :----------------------------------------- | :-------------------------------- |
+| Sprite Category Dialog | `data-testid="category-dialog"`            | Dialog container                  |
+|                        | `data-testid="category-name-input"`        | Name input                        |
+|                        | `data-testid="category-description-input"` | Description textarea              |
+|                        | `data-testid="category-dialog-save"`       | Save button                       |
+|                        | `data-testid="category-dialog-cancel"`     | Cancel button                     |
+| Model Viewer           | `data-testid="model-viewer-canvas"`        | 3D canvas                         |
+| Version Strip          | `data-testid="version-strip"`              | Version strip container           |
+|                        | `data-testid="version-dropdown-trigger"`   | Dropdown button                   |
+|                        | `data-testid="version-dropdown-menu"`      | Dropdown menu                     |
+|                        | `data-testid="version-dropdown-item-{n}"`  | Version item (n = version number) |
 
 #### Examples
 
@@ -362,13 +368,13 @@ These are already defined in the codebase:
 await page.locator('[data-testid="category-dialog-save"]').click();
 
 // ✅ GOOD - ID
-await page.locator('#categoryName').fill('Test Category');
+await page.locator("#categoryName").fill("Test Category");
 
 // ⚠️ OK - Semantic class
-await page.locator('.version-dropdown-trigger').click();
+await page.locator(".version-dropdown-trigger").click();
 
 // ❌ BAD - Generic selector (AVOID)
-await page.locator('.p-dialog input[type="text"]').first().fill('Test');
+await page.locator('.p-dialog input[type="text"]').first().fill("Test");
 ```
 
 #### Adding New data-testid Attributes
@@ -377,15 +383,13 @@ When creating new UI components, add `data-testid` to interactive elements:
 
 ```tsx
 // In React component
-<Button 
-  onClick={handleSave}
-  data-testid="my-feature-save-button"
->
-  Save
+<Button onClick={handleSave} data-testid="my-feature-save-button">
+    Save
 </Button>
 ```
 
 **Naming convention:** `{component}-{element}-{variant?}`
+
 - `category-dialog-save`
 - `version-dropdown-item-1`
 - `model-card-thumbnail`
@@ -412,6 +416,7 @@ ThenBdd("I take a screenshot after recycling", async ({ page }) => {
 ```
 
 **When to capture screenshots:**
+
 - Before/after any destructive or state-changing action
 - After navigation to new pages
 - When verifying UI elements are displayed correctly
@@ -427,20 +432,27 @@ async function waitForThumbnails(page: Page, context: string): Promise<void> {
     const thumbnailSelectors = [
         ".model-card-thumbnail img",
         ".recycled-item-thumbnail img",
-        ".model-card img"
+        ".model-card img",
     ];
-    
+
     for (const selector of thumbnailSelectors) {
         const images = page.locator(selector);
         const count = await images.count();
-        
+
         if (count > 0) {
             for (let i = 0; i < count; i++) {
                 const img = images.nth(i);
-                await expect.poll(async () => {
-                    const naturalWidth = await img.evaluate((el: HTMLImageElement) => el.naturalWidth);
-                    return naturalWidth > 0;
-                }, { timeout: 10000 }).toBe(true);
+                await expect
+                    .poll(
+                        async () => {
+                            const naturalWidth = await img.evaluate(
+                                (el: HTMLImageElement) => el.naturalWidth,
+                            );
+                            return naturalWidth > 0;
+                        },
+                        { timeout: 10000 },
+                    )
+                    .toBe(true);
             }
             console.log(`[Thumbnail] All thumbnails loaded for ${context} ✓`);
             return;
@@ -457,25 +469,32 @@ The frontend uses SignalR for real-time updates. **Don't assume state is immedia
 
 ```typescript
 // Wait for thumbnail to appear via SignalR updates
-await expect.poll(async () => {
-    // Open dropdown to see current state
-    await dropdownTrigger.click();
-    await page.waitForTimeout(500);
-    
-    const imgCount = await thumbnail.count();
-    if (imgCount > 0) {
-        const naturalWidth = await thumbnail.evaluate((el: HTMLImageElement) => el.naturalWidth);
-        if (naturalWidth > 0) return true;
-    }
-    
-    // Toggle dropdown to trigger re-render
-    await dropdownTrigger.click();
-    await page.waitForTimeout(500);
-    return false;
-}, { 
-    message: "Waiting for thumbnail to appear via SignalR",
-    timeout: 30000 
-}).toBe(true);
+await expect
+    .poll(
+        async () => {
+            // Open dropdown to see current state
+            await dropdownTrigger.click();
+            await page.waitForTimeout(500);
+
+            const imgCount = await thumbnail.count();
+            if (imgCount > 0) {
+                const naturalWidth = await thumbnail.evaluate(
+                    (el: HTMLImageElement) => el.naturalWidth,
+                );
+                if (naturalWidth > 0) return true;
+            }
+
+            // Toggle dropdown to trigger re-render
+            await dropdownTrigger.click();
+            await page.waitForTimeout(500);
+            return false;
+        },
+        {
+            message: "Waiting for thumbnail to appear via SignalR",
+            timeout: 30000,
+        },
+    )
+    .toBe(true);
 ```
 
 ### 4. Database Polling for Backend State
@@ -489,14 +508,16 @@ for (let i = 0; i < maxAttempts; i++) {
     const result = await db.query(
         `SELECT t."Status" FROM "Thumbnails" t 
          JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
-         WHERE mv."VersionNumber" = $1`, [versionNumber]
+         WHERE mv."VersionNumber" = $1`,
+        [versionNumber],
     );
-    
-    if (result.rows[0]?.Status === 2) { // 2 = Ready
+
+    if (result.rows[0]?.Status === 2) {
+        // 2 = Ready
         console.log(`[DB] Thumbnail ready ✓`);
         break;
     }
-    
+
     await page.waitForTimeout(3000);
 }
 ```
@@ -505,23 +526,23 @@ for (let i = 0; i < maxAttempts; i++) {
 
 Use consistent log prefixes for easy filtering and debugging:
 
-| Prefix | Use For |
-|--------|---------|
-| `[Setup]` | Test setup and initialization |
-| `[Navigation]` | Page navigation |
-| `[Action]` | User actions (clicks, inputs) |
-| `[UI]` | UI verification |
-| `[DB]` | Database operations |
-| `[Thumbnail]` | Thumbnail loading status |
-| `[Screenshot]` | Screenshot capture |
-| `[Three.js]` | 3D scene verification |
+| Prefix         | Use For                       |
+| -------------- | ----------------------------- |
+| `[Setup]`      | Test setup and initialization |
+| `[Navigation]` | Page navigation               |
+| `[Action]`     | User actions (clicks, inputs) |
+| `[UI]`         | UI verification               |
+| `[DB]`         | Database operations           |
+| `[Thumbnail]`  | Thumbnail loading status      |
+| `[Screenshot]` | Screenshot capture            |
+| `[Three.js]`   | 3D scene verification         |
 
 ### 6. Handle Cache-Busting URLs
 
 The frontend adds cache-busting timestamps to URLs (`?t=123456`). **Strip query params when comparing URLs:**
 
 ```typescript
-const stripQueryParams = (url: string | null) => url?.split('?')[0] || null;
+const stripQueryParams = (url: string | null) => url?.split("?")[0] || null;
 expect(stripQueryParams(currentSrc)).toBe(stripQueryParams(savedSrc));
 ```
 
@@ -530,24 +551,26 @@ expect(stripQueryParams(currentSrc)).toBe(stripQueryParams(savedSrc));
 Wrap potentially flaky operations in retry loops:
 
 ```typescript
-async function getVersionThumbnailSrc(versionNumber: number): Promise<string | null> {
+async function getVersionThumbnailSrc(
+    versionNumber: number,
+): Promise<string | null> {
     const maxAttempts = 15;
     const pollInterval = 2000;
-    
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         // Try to get thumbnail src
         const img = await page.locator("img.version-dropdown-thumb");
-        if (await img.count() > 0 && await img.isVisible()) {
-            const naturalWidth = await img.evaluate(el => el.naturalWidth);
+        if ((await img.count()) > 0 && (await img.isVisible())) {
+            const naturalWidth = await img.evaluate((el) => el.naturalWidth);
             if (naturalWidth > 0) {
                 return await img.getAttribute("src");
             }
         }
-        
+
         console.log(`[Thumbnail] Retrying... (${attempt + 1}/${maxAttempts})`);
         await page.waitForTimeout(pollInterval);
     }
-    
+
     return null;
 }
 ```
@@ -555,6 +578,7 @@ async function getVersionThumbnailSrc(versionNumber: number): Promise<string | n
 ### 8. Test Independence
 
 Each test should be able to run independently:
+
 - Use `UniqueFileGenerator` the create unique test files
 - Don't rely on state from other tests (use `sharedState` explicitly)
 - Clean up resources after tests
@@ -576,10 +600,12 @@ Feature: My New Feature
 
 ```typescript
 // steps/my-steps.ts
-Given("I upload a unique model as {string}", async ({ page }, alias: string) => {
-    const filePath = await UniqueFileGenerator.generate('test-cube.glb');
-    // ... upload logic
-    sharedState.saveModel(alias, { id, name });
-});
+Given(
+    "I upload a unique model as {string}",
+    async ({ page }, alias: string) => {
+        const filePath = await UniqueFileGenerator.generate("test-cube.glb");
+        // ... upload logic
+        sharedState.saveModel(alias, { id, name });
+    },
+);
 ```
-

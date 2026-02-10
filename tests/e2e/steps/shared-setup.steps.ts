@@ -481,7 +481,7 @@ Then(
             throw new Error(
                 `Thumbnail generation timed out after ${(maxAttempts * pollInterval) / 1000}s. ` +
                     `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
-                    `Check if thumbnail-worker-e2e container is healthy and processing jobs.`,
+                    `Check if asset-processor-e2e container is healthy and processing jobs.`,
             );
         }
         // Clear the tracking variables after successful check

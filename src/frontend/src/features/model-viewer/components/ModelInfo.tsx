@@ -96,7 +96,7 @@ function ModelInfo({ model, onModelUpdated }) {
       </div>
 
       <div className="model-info-section">
-        <h3 className="model-info-title">AI Classification</h3>
+        <h3 className="model-info-title">Tags &amp; Description</h3>
 
         <div className="tags-section">
           <label className="field-label">Tags:</label>
