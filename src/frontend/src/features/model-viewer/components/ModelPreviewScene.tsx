@@ -3,12 +3,11 @@ import { Stage, OrbitControls, useHelper } from '@react-three/drei'
 import * as THREE from 'three'
 import Model from './Model'
 import TexturedModel from './TexturedModel'
-import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
-import { Model as ModelType } from '../../../utils/fileUtils'
+import LoadingPlaceholder from '@/components/LoadingPlaceholder'
+import { getFileUrl } from '@/features/models/api/modelApi'
+import { Model as ModelType } from '@/utils/fileUtils'
 import { ViewerSettingsType } from './ViewerSettings'
-import { TextureSetDto } from '../../../types'
+import { TextureSetDto } from '@/types'
 
 // Helper component to show directional light with visual indicator
 function FillLight({
@@ -80,7 +79,7 @@ function Scene({
     .split('.')
     .pop()
     .toLowerCase()
-  const modelUrl = ApiClient.getFileUrl(renderableFile.id)
+  const modelUrl = getFileUrl(renderableFile.id)
 
   // Default settings if not provided
   const orbitSpeed = settings?.orbitSpeed ?? 1

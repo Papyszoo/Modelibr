@@ -4,23 +4,23 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import './TextureSetGrid.css'
-import {
-  TextureSetDto,
-  TextureType,
-  TextureChannel,
-  PackDto,
-} from '../../../types'
+import { TextureSetDto, TextureType, TextureChannel, PackDto } from '@/types'
 import { ProgressBar } from 'primereact/progressbar'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
-import MergeTextureSetDialog from '../dialogs/MergeTextureSetDialog'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import { addTextureSetToPack, getAllPacks } from '@/features/pack/api/packApi'
+import {
+  addTextureToSetEndpoint,
+  hardDeleteTextureSet,
+  softDeleteTextureSet,
+} from '@/features/texture-set/api/textureSetApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
+import MergeTextureSetDialog from '@/features/texture-set/dialogs/MergeTextureSetDialog'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
   openInFileExplorer,
   copyPathToClipboard,
   getCopyPathSuccessMessage,
-} from '../../../utils/webdavUtils'
+} from '@/utils/webdavUtils'
 
 // Interface for channel merge request (must match MergeTextureSetDialog)
 interface ChannelMergeRequest {
@@ -78,7 +78,7 @@ export default function TextureSetGrid({
 
   const loadPacks = async () => {
     try {
-      const data = await ApiClient.getAllPacks()
+      const data = await getAllPacks()
       setPacks(data)
     } catch (error) {
       console.error('Failed to load packs:', error)
@@ -89,7 +89,7 @@ export default function TextureSetGrid({
     if (!selectedTextureSet) return
 
     try {
-      await ApiClient.addTextureSetToPack(packId, selectedTextureSet.id)
+      await addTextureSetToPack(packId, selectedTextureSet.id)
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -112,7 +112,7 @@ export default function TextureSetGrid({
     if (!selectedTextureSet) return
 
     try {
-      await ApiClient.softDeleteTextureSet(selectedTextureSet.id)
+      await softDeleteTextureSet(selectedTextureSet.id)
       toast.current?.show({
         severity: 'success',
         summary: 'Recycled',
@@ -240,7 +240,7 @@ export default function TextureSetGrid({
       // Add each texture mapping to the target set
       for (const request of requests) {
         for (const mapping of request.mappings) {
-          await ApiClient.addTextureToSetEndpoint(dropTargetTextureSet.id, {
+          await addTextureToSetEndpoint(dropTargetTextureSet.id, {
             fileId: request.fileId,
             textureType: mapping.textureType,
             sourceChannel: mapping.channel,
@@ -249,7 +249,7 @@ export default function TextureSetGrid({
       }
 
       // Hard delete the source texture set after successful merge (keeps the files)
-      await ApiClient.hardDeleteTextureSet(draggedTextureSet.id)
+      await hardDeleteTextureSet(draggedTextureSet.id)
 
       const textureCount = requests.reduce(
         (sum, r) => sum + r.mappings.length,
@@ -294,7 +294,7 @@ export default function TextureSetGrid({
 
     const texture = albedo || diffuse
     if (texture) {
-      return ApiClient.getFileUrl(texture.fileId.toString())
+      return getFileUrl(texture.fileId.toString())
     }
     return null
   }

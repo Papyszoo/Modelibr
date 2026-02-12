@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import DraggableTab from '../layout/DraggableTab'
-import { Tab } from '../../types'
+import DraggableTab from '@/components/layout/DraggableTab'
+import { Tab } from '@/types'
 
 // Helper function to find element by data-pr-tooltip attribute
 const getByTooltip = (tooltip: string): HTMLElement => {

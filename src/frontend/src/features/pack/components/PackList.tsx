@@ -6,13 +6,20 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createPack, deletePack } from '../api/packApi'
-import { usePacksQuery } from '../api/queries'
-import { PackDto } from '../../../types'
-import { openTabInPanel } from '../../../utils/tabNavigation'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { createPack, deletePack } from '@/features/pack/api/packApi'
+import { usePacksQuery } from '@/features/pack/api/queries'
+import { PackDto } from '@/types'
+import { openTabInPanel } from '@/utils/tabNavigation'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { packCreateFormSchema } from '@/shared/validation/formSchemas'
 import './PackList.css'
+
+type PackCreateFormInput = z.input<typeof packCreateFormSchema>
+type PackCreateFormOutput = z.output<typeof packCreateFormSchema>
 
 export default function PackList() {
   const queryClient = useQueryClient()
@@ -20,9 +27,20 @@ export default function PackList() {
   const packs = packsQuery.data ?? []
   const loading = packsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [newPackName, setNewPackName] = useState('')
-  const [newPackDescription, setNewPackDescription] = useState('')
   const toast = useRef<Toast>(null)
+
+  const { register, handleSubmit, reset } = useForm<
+    PackCreateFormInput,
+    unknown,
+    PackCreateFormOutput
+  >({
+    resolver: zodResolver(packCreateFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      description: '',
+    },
+  })
 
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.packs
@@ -43,8 +61,7 @@ export default function PackList() {
       })
 
       setShowCreateDialog(false)
-      setNewPackName('')
-      setNewPackDescription('')
+      reset({ name: '', description: '' })
       await invalidatePacks()
     },
     onError: error => {
@@ -93,22 +110,19 @@ export default function PackList() {
     },
   })
 
-  const handleCreatePack = async () => {
-    if (!newPackName.trim()) {
+  const handleCreatePack = handleSubmit(
+    async values => {
+      await createPackMutation.mutateAsync(values)
+    },
+    () => {
       toast.current?.show({
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Pack name is required',
         life: 3000,
       })
-      return
     }
-
-    await createPackMutation.mutateAsync({
-      name: newPackName.trim(),
-      description: newPackDescription.trim() || undefined,
-    })
-  }
+  )
 
   const handleDeletePack = async (packId: number) => {
     await deletePackMutation.mutateAsync(packId)
@@ -231,8 +245,7 @@ export default function PackList() {
         style={{ width: '500px' }}
         onHide={() => {
           setShowCreateDialog(false)
-          setNewPackName('')
-          setNewPackDescription('')
+          reset({ name: '', description: '' })
         }}
         footer={
           <div>
@@ -241,8 +254,7 @@ export default function PackList() {
               icon="pi pi-times"
               onClick={() => {
                 setShowCreateDialog(false)
-                setNewPackName('')
-                setNewPackDescription('')
+                reset({ name: '', description: '' })
               }}
               className="p-button-text"
             />
@@ -260,8 +272,7 @@ export default function PackList() {
             <label htmlFor="pack-name">Name *</label>
             <InputText
               id="pack-name"
-              value={newPackName}
-              onChange={e => setNewPackName(e.target.value)}
+              {...register('name')}
               placeholder="Enter pack name"
             />
           </div>
@@ -269,8 +280,7 @@ export default function PackList() {
             <label htmlFor="pack-description">Description</label>
             <InputTextarea
               id="pack-description"
-              value={newPackDescription}
-              onChange={e => setNewPackDescription(e.target.value)}
+              {...register('description')}
               rows={3}
               placeholder="Enter pack description (optional)"
             />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, JSX } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Stats } from '@react-three/drei'
@@ -13,14 +14,24 @@ import ModelVersionWindow from './ModelVersionWindow'
 import VersionStrip from './VersionStrip'
 import { FileUploadModal } from './FileUploadModal'
 import { ViewerSettingsType } from './ViewerSettings'
-import { ModelProvider } from '../../../contexts/ModelContext'
-import { Model } from '../../../utils/fileUtils'
-import { TextureSetDto, ModelVersionDto } from '../../../types'
-// eslint-disable-next-line no-restricted-imports -- ModelViewer needs direct API access for fetching model data
-import ApiClient from '../../../services/ApiClient'
+import { ModelProvider } from '@/contexts/ModelContext'
+import { Model } from '@/utils/fileUtils'
+import { TextureSetDto, ModelVersionDto } from '@/types'
+import {
+  addFileToVersion,
+  createModelVersion,
+  setActiveVersion,
+  softDeleteModelVersion,
+} from '@/features/model-viewer/api/modelVersionApi'
+import { regenerateThumbnail } from '@/features/thumbnail/api/thumbnailApi'
+import {
+  useModelByIdQuery,
+  useModelVersionsQuery,
+} from '@/features/model-viewer/api/queries'
+import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { useModelThumbnailUpdates } from '../../thumbnail'
+import { useModelThumbnailUpdates } from '@/features/thumbnail'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -34,9 +45,6 @@ function ModelViewer({
   modelId,
   side = 'left',
 }: ModelViewerProps): JSX.Element {
-  const [error, setError] = useState<string>('')
-  const [model, setModel] = useState<Model | null>(propModel || null)
-  const [loading, setLoading] = useState<boolean>(!propModel && !!modelId)
   const [infoWindowVisible, setInfoWindowVisible] = useState<boolean>(false)
   const [thumbnailWindowVisible, setThumbnailWindowVisible] =
     useState<boolean>(false)
@@ -52,8 +60,6 @@ function ModelViewer({
   const [selectedTextureSetId, setSelectedTextureSetId] = useState<
     number | null
   >(null)
-  const [selectedTextureSet, setSelectedTextureSet] =
-    useState<TextureSetDto | null>(null)
   const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
     orbitSpeed: 1,
     zoomSpeed: 1,
@@ -66,13 +72,39 @@ function ModelViewer({
   const [uploadModalVisible, setUploadModalVisible] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] =
     useState<ModelVersionDto | null>(null)
   const [versionModel, setVersionModel] = useState<Model | null>(null)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
+  const modelQuery = useModelByIdQuery({
+    modelId: modelId || '',
+    queryConfig: {
+      enabled: !propModel && !!modelId,
+    },
+  })
+  const model: Model | null = propModel || modelQuery.data || null
+  const modelNumericId = model?.id ? parseInt(model.id) : null
+  const versionsQuery = useModelVersionsQuery({
+    modelId: modelNumericId ?? 0,
+    queryConfig: {
+      enabled: modelNumericId !== null,
+    },
+  })
+  const versions: ModelVersionDto[] = versionsQuery.data ?? []
+  const textureSetQuery = useTextureSetByIdQuery({
+    textureSetId: selectedTextureSetId ?? 0,
+    queryConfig: {
+      enabled: selectedTextureSetId !== null,
+    },
+  })
+  const selectedTextureSet: TextureSetDto | null =
+    selectedTextureSetId !== null ? (textureSetQuery.data ?? null) : null
+  const loading = !propModel && !!modelId && modelQuery.isLoading
+  const error =
+    modelQuery.error instanceof Error ? modelQuery.error.message : ''
 
   // Determine which side for button positioning
   const buttonPosition = side === 'left' ? 'right' : 'left'
@@ -88,83 +120,36 @@ function ModelViewer({
   }, [model])
 
   useEffect(() => {
-    if (!propModel && modelId) {
-      fetchModel(modelId, false) // Use cache for initial load
+    if (!model) return
+
+    if (versions.length === 0) {
+      setSelectedVersion(null)
+      setVersionModel(null)
+      return
     }
-  }, [propModel, modelId])
 
-  // Load versions when model is loaded
-  useEffect(() => {
-    if (model?.id) {
-      loadVersions()
+    if (!selectedVersion) {
+      const activeVersion =
+        versions.find(v => v.id === model.activeVersionId) ||
+        versions[versions.length - 1]
+      handleVersionSelect(activeVersion)
+      return
     }
-  }, [model?.id])
 
-  const loadVersions = async () => {
-    if (!model?.id) return
-    try {
-      const data = await ApiClient.getModelVersions(parseInt(model.id))
-      setVersions(data)
-
-      // Auto-select the active version if no version is currently selected
-      if (data.length > 0 && !selectedVersion) {
-        const activeVersion =
-          data.find(v => v.id === model.activeVersionId) ||
-          data[data.length - 1]
-        handleVersionSelect(activeVersion)
-      } else if (selectedVersion) {
-        // If a version is already selected, refresh its data from the new versions list
-        const updatedVersion = data.find(v => v.id === selectedVersion.id)
-        if (updatedVersion) {
-          handleVersionSelect(updatedVersion)
-        } else {
-          // Selected version no longer exists (was recycled), select the active version
-          const activeVersion =
-            data.find(v => v.id === model.activeVersionId) ||
-            data[data.length - 1]
-          if (activeVersion) {
-            handleVersionSelect(activeVersion)
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load versions:', error)
+    const updatedVersion = versions.find(v => v.id === selectedVersion.id)
+    if (updatedVersion) {
+      handleVersionSelect(updatedVersion)
+      return
     }
-  }
 
-  const loadVersionsWithSkipCache = async () => {
-    if (!model?.id) return
-    try {
-      const data = await ApiClient.getModelVersions(parseInt(model.id), {
-        skipCache: true,
-      })
-      setVersions(data)
-
-      // Auto-select the active version if no version is currently selected
-      if (data.length > 0 && !selectedVersion) {
-        const activeVersion =
-          data.find(v => v.id === model.activeVersionId) ||
-          data[data.length - 1]
-        handleVersionSelect(activeVersion)
-      } else if (selectedVersion) {
-        // If a version is already selected, refresh its data from the new versions list
-        const updatedVersion = data.find(v => v.id === selectedVersion.id)
-        if (updatedVersion) {
-          handleVersionSelect(updatedVersion)
-        } else {
-          // Selected version no longer exists (was recycled), select the active version
-          const activeVersion =
-            data.find(v => v.id === model.activeVersionId) ||
-            data[data.length - 1]
-          if (activeVersion) {
-            handleVersionSelect(activeVersion)
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load versions:', error)
+    const fallbackVersion =
+      versions.find(v => v.id === model.activeVersionId) ||
+      versions[versions.length - 1]
+    if (fallbackVersion) {
+      handleVersionSelect(fallbackVersion)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Keep selected version and derived preview model aligned with server versions
+  }, [versions, model?.activeVersionId])
 
   // Subscribe via hook (keeps components from importing services directly)
   useModelThumbnailUpdates(
@@ -177,7 +162,7 @@ function ModelViewer({
         v => v.id === event.modelVersionId
       )
       if (event.status === 'Ready' && isThisModelsVersion) {
-        loadVersions()
+        void versionsQuery.refetch()
       }
     }
   )
@@ -192,62 +177,22 @@ function ModelViewer({
       // Version has no default, clear selection
       setSelectedTextureSetId(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Effect reacts to selected version identity and default texture fields
   }, [selectedVersion?.id, selectedVersion?.defaultTextureSetId])
 
-  // Load selected texture set data
-  useEffect(() => {
-    if (selectedTextureSetId) {
-      loadTextureSet(selectedTextureSetId)
-    } else {
-      setSelectedTextureSet(null)
-    }
-  }, [selectedTextureSetId])
-
-  const fetchModel = async (
-    id: string,
-    skipCache: boolean = true
-  ): Promise<void> => {
-    try {
-      setLoading(true)
-      setError('')
-      const model = await ApiClient.getModelById(id, { skipCache })
-      setModel(model)
-      // If we're skipping cache for model, also skip cache for versions
-      if (skipCache && model?.id) {
-        await loadVersionsWithSkipCache()
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load model')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadTextureSet = async (textureSetId: number): Promise<void> => {
-    try {
-      const textureSet = await ApiClient.getTextureSetById(textureSetId)
-      setSelectedTextureSet(textureSet)
-    } catch (err) {
-      console.error('Failed to load texture set:', err)
-      setSelectedTextureSet(null)
-    }
-  }
-
   const handleModelUpdated = async () => {
-    if (modelId) {
-      await fetchModel(modelId, true) // Skip cache to get fresh data
-      await loadVersions() // Also reload versions to update UI
+    if (modelId && !propModel) {
+      await modelQuery.refetch()
     }
+    await queryClient.invalidateQueries({ queryKey: ['modelVersions'] })
+    await versionsQuery.refetch()
   }
 
   const handleRegenerateThumbnail = async () => {
     if (!model) return
 
     try {
-      await ApiClient.regenerateThumbnail(
-        model.id.toString(),
-        selectedVersion?.id
-      )
+      await regenerateThumbnail(model.id.toString(), selectedVersion?.id)
       const versionInfo = selectedVersion
         ? ` version #${selectedVersion.id}`
         : ''
@@ -322,10 +267,6 @@ function ModelViewer({
     if (model) {
       localStorage.setItem(`model-${model.id}-default-file`, fileId.toString())
     }
-    // If this file is in the current model or version, trigger a re-render
-    if (model) {
-      setModel({ ...model })
-    }
     if (versionModel) {
       setVersionModel({ ...versionModel })
     }
@@ -334,12 +275,10 @@ function ModelViewer({
   const handleSetActiveVersion = async (versionId: number) => {
     if (!model) return
     try {
-      await ApiClient.setActiveVersion(parseInt(model.id), versionId)
-      // Reload versions to update badges
-      await loadVersions()
-      // Notify parent to refresh model data so UI updates immediately
-      if (modelId) {
-        await fetchModel(modelId, true) // Skip cache to get fresh data
+      await setActiveVersion(parseInt(model.id), versionId)
+      await versionsQuery.refetch()
+      if (modelId && !propModel) {
+        await modelQuery.refetch()
       }
     } catch (error) {
       console.error('Failed to set active version:', error)
@@ -355,19 +294,17 @@ function ModelViewer({
   const handleRecycleVersion = async (versionId: number) => {
     if (!model) return
     try {
-      await ApiClient.softDeleteModelVersion(parseInt(model.id), versionId)
+      await softDeleteModelVersion(parseInt(model.id), versionId)
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
         detail: 'Model version recycled successfully',
         life: 3000,
       })
-      // Refresh model data in case active version changed
-      if (modelId) {
-        await fetchModel(modelId, true) // Skip cache to get fresh data
+      if (modelId && !propModel) {
+        await modelQuery.refetch()
       }
-      // Reload versions to update list - loadVersions will handle selecting appropriate version
-      await loadVersions()
+      await versionsQuery.refetch()
     } catch (error) {
       console.error('Failed to recycle version:', error)
       const errorMessage =
@@ -434,7 +371,7 @@ function ModelViewer({
     try {
       if (action === 'new') {
         // Always create new version when explicitly requested
-        await ApiClient.createModelVersion(
+        await createModelVersion(
           parseInt(model.id),
           file,
           description,
@@ -444,23 +381,16 @@ function ModelViewer({
         // Add to current/selected version
         // If no versions are loaded yet, reload them first to check if version 1 exists
         if (versions.length === 0) {
-          await loadVersions()
-          // After loading, check again
-          const currentVersions = await ApiClient.getModelVersions(
-            parseInt(model.id)
-          )
+          const refreshedVersions = await versionsQuery.refetch()
+          const currentVersions = refreshedVersions.data ?? []
 
           if (currentVersions.length > 0) {
             // Version 1 exists (auto-created), add file to it
             const latestVersion = currentVersions[currentVersions.length - 1]
-            await ApiClient.addFileToVersion(
-              parseInt(model.id),
-              latestVersion.id,
-              file
-            )
+            await addFileToVersion(parseInt(model.id), latestVersion.id, file)
           } else {
             // No versions exist at all, create first version
-            await ApiClient.createModelVersion(
+            await createModelVersion(
               parseInt(model.id),
               file,
               description,
@@ -471,11 +401,7 @@ function ModelViewer({
           // Versions are already loaded, use selected or latest
           const currentVersion =
             selectedVersion || versions[versions.length - 1]
-          await ApiClient.addFileToVersion(
-            parseInt(model.id),
-            currentVersion.id,
-            file
-          )
+          await addFileToVersion(parseInt(model.id), currentVersion.id, file)
         }
       }
 
@@ -487,11 +413,11 @@ function ModelViewer({
       })
 
       // Reload versions and model
-      await loadVersions()
-      if (modelId) {
-        await fetchModel(modelId)
+      await versionsQuery.refetch()
+      if (modelId && !propModel) {
+        await modelQuery.refetch()
       }
-      handleModelUpdated()
+      await handleModelUpdated()
     } catch (error) {
       toast.current?.show({
         severity: 'error',
@@ -675,7 +601,10 @@ function ModelViewer({
             <div className="viewer-error">
               <h3>Failed to load model</h3>
               <p>{error}</p>
-              <button onClick={() => setError('')} className="retry-button">
+              <button
+                onClick={() => void modelQuery.refetch()}
+                className="retry-button"
+              >
                 Retry
               </button>
             </div>

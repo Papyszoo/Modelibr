@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
-import { useUploadProgress } from '../../hooks/useUploadProgress'
-import FloatingWindow from '../../components/FloatingWindow'
-import { openTabInPanel } from '../../utils/tabNavigation'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
+import FloatingWindow from '@/components/FloatingWindow'
+import { openTabInPanel } from '@/utils/tabNavigation'
 import './UploadProgressWindow.css'
 
 // Utility function to get file extension

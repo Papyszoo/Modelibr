@@ -4,7 +4,7 @@ import { Button } from 'primereact/button'
 import { RadioButton } from 'primereact/radiobutton'
 import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
-import { ModelVersionDto } from '../../../types'
+import { ModelVersionDto } from '@/types'
 
 interface FileUploadModalProps {
   visible: boolean

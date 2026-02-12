@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 import ModelHierarchyWindow from './ModelHierarchyWindow'
-import { ModelProvider } from '../../../contexts/ModelContext'
+import { ModelProvider } from '@/contexts/ModelContext'
 import { Button } from 'primereact/button'
 import * as THREE from 'three'
 

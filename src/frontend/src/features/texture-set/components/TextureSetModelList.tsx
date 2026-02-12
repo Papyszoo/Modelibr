@@ -5,14 +5,14 @@ import { InputText } from 'primereact/inputtext'
 import { Dialog } from 'primereact/dialog'
 import { Checkbox } from 'primereact/checkbox'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ThumbnailDisplay } from '../../thumbnail'
-import { Model } from '../../../utils/fileUtils'
-import { getModelsPaginated } from '../../models/api/modelApi'
-import { associateTextureSetWithAllModelVersions } from '../api/textureSetApi'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
-import { useTabContext } from '../../../hooks/useTabContext'
-import '../../models/components/ModelGrid/ModelGrid.css'
+import { ThumbnailDisplay } from '@/features/thumbnail'
+import { Model } from '@/utils/fileUtils'
+import { useModelsQuery } from '@/features/models/api/queries'
+import { associateTextureSetWithAllModelVersions } from '@/features/texture-set/api/textureSetApi'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { useTabContext } from '@/hooks/useTabContext'
+import '@/features/models/components/ModelGrid/ModelGrid.css'
 
 interface TextureSetModelListProps {
   textureSetId: number
@@ -25,31 +25,24 @@ export default function TextureSetModelList({
   const { openModelDetailsTab } = useTabContext()
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.textureSets
+  const queryClient = useQueryClient()
 
-  const [models, setModels] = useState<Model[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showAddDialog, setShowAddDialog] = useState(false)
-
-  const fetchModels = useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await getModelsPaginated({
-        page: 1,
-        pageSize: 200,
-        textureSetId,
-      })
-      setModels(result.items)
-    } catch (err) {
-      console.error('Failed to fetch texture set models:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [textureSetId])
+  const modelsQuery = useModelsQuery({
+    params: { page: 1, pageSize: 200, textureSetId },
+  })
+  const models: Model[] = modelsQuery.data?.items ?? []
+  const loading = modelsQuery.isLoading
 
   useEffect(() => {
-    fetchModels()
-  }, [fetchModels])
+    if (!modelsQuery.error) return
+    console.error('Failed to fetch texture set models:', modelsQuery.error)
+  }, [modelsQuery.error])
+
+  const fetchModels = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['models'] })
+  }, [queryClient])
 
   const getModelName = (model: Model) => {
     if (model.name) return model.name
@@ -188,10 +181,12 @@ function LinkModelDialog({
   onModelsLinked,
 }: LinkModelDialogProps) {
   const queryClient = useQueryClient()
-  const [allModels, setAllModels] = useState<Model[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [loading, setLoading] = useState(false)
+  const allModelsQuery = useModelsQuery({
+    params: { page: 1, pageSize: 200 },
+    queryConfig: { enabled: visible },
+  })
 
   const linkModelsMutation = useMutation({
     mutationFn: async (modelIds: number[]) => {
@@ -217,30 +212,23 @@ function LinkModelDialog({
     return `Model ${model.id}`
   }
 
-  const loadModels = useCallback(async () => {
-    setLoading(true)
-    try {
-      const result = await getModelsPaginated({
-        page: 1,
-        pageSize: 200,
-      })
-      setAllModels(
-        result.items.filter(m => !existingModelIds.includes(String(m.id)))
-      )
-    } catch {
-      console.error('Failed to load models')
-    } finally {
-      setLoading(false)
-    }
-  }, [existingModelIds])
-
   useEffect(() => {
     if (visible) {
-      loadModels()
       setSelectedIds([])
       setSearchQuery('')
     }
-  }, [visible, loadModels])
+  }, [visible])
+
+  useEffect(() => {
+    if (!allModelsQuery.error) return
+    console.error('Failed to load models')
+  }, [allModelsQuery.error])
+
+  const allModels =
+    allModelsQuery.data?.items.filter(
+      m => !existingModelIds.includes(String(m.id))
+    ) ?? []
+  const loading = allModelsQuery.isLoading
 
   const filtered = allModels.filter(m =>
     searchQuery

@@ -1,4 +1,4 @@
-import { Tab } from '../../types'
+import { Tab } from '@/types'
 import DockPanelContent from './DockPanelContent'
 import './DockPanel.css'
 

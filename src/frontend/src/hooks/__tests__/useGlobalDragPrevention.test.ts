@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react'
-import { useGlobalDragPrevention } from '../useGlobalDragPrevention'
+import { useGlobalDragPrevention } from '@/hooks/useGlobalDragPrevention'
 
 // Mock window event listener methods
 const addEventListenerSpy = jest.spyOn(window, 'addEventListener')

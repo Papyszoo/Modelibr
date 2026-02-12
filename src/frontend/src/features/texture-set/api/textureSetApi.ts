@@ -1,5 +1,5 @@
 import { AxiosResponse } from 'axios'
-import { client, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
+import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
 import {
   TextureSetDto,
   GetAllTextureSetsResponse,

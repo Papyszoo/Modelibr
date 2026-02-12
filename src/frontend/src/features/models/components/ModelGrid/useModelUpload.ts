@@ -1,10 +1,7 @@
 import { useCallback, RefObject } from 'react'
-import { addModelToPack } from '../../../pack/api/packApi'
-import { addModelToProject } from '../../../project/api/projectApi'
-import {
-  useFileUpload,
-  useDragAndDrop,
-} from '../../../../shared/hooks/useFileUpload'
+import { addModelToPack } from '@/features/pack/api/packApi'
+import { addModelToProject } from '@/features/project/api/projectApi'
+import { useFileUpload, useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { Toast } from 'primereact/toast'
 
 interface UseModelUploadOptions {

@@ -109,6 +109,54 @@ Given(
             const textureSetName = row.name;
             let textureSet = sharedState.getTextureSet(textureSetName);
 
+            // Validate cached shared-state entry against database to avoid stale IDs
+            if (textureSet) {
+                const { DbHelper } = await import("../fixtures/db-helper");
+                const db = new DbHelper();
+                try {
+                    let isValid = false;
+
+                    if (textureSet.id) {
+                        const byId = await db.query(
+                            `SELECT "Id", "Name"
+                             FROM "TextureSets"
+                             WHERE "Id" = $1 AND "IsDeleted" = false`,
+                            [textureSet.id],
+                        );
+                        isValid = byId.rows.length > 0;
+                    }
+
+                    if (!isValid) {
+                        const byName = await db.query(
+                            `SELECT "Id", "Name"
+                             FROM "TextureSets"
+                             WHERE "Name" = $1 AND "IsDeleted" = false
+                             ORDER BY "Id" DESC
+                             LIMIT 1`,
+                            [textureSetName],
+                        );
+
+                        if (byName.rows.length > 0) {
+                            textureSet = {
+                                id: byName.rows[0].Id,
+                                name: byName.rows[0].Name,
+                            };
+                            sharedState.saveTextureSet(
+                                textureSetName,
+                                textureSet,
+                            );
+                            console.log(
+                                `[AutoHeal] Refreshed stale texture set "${textureSetName}" -> ID ${textureSet.id}`,
+                            );
+                        } else {
+                            textureSet = null;
+                        }
+                    }
+                } finally {
+                    await db.close();
+                }
+            }
+
             if (!textureSet) {
                 // Self-provision: create the texture set via API
                 console.log(

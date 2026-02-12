@@ -17,27 +17,37 @@ import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Checkbox } from 'primereact/checkbox'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
-import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
-import { useUploadProgress } from '../../../hooks/useUploadProgress'
-import { useSpritesQuery, useSpriteCategoriesQuery } from '../api/queries'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
+import {
+  getSpritesQueryOptions,
+  useSpritesQuery,
+  useSpriteCategoriesQuery,
+} from '@/features/sprite/api/queries'
 import {
   createSpriteCategory,
   createSpriteWithFile,
   deleteSpriteCategory,
-  getSpritesPaginated,
   softDeleteSprite,
   updateSprite,
   updateSpriteCategory,
-} from '../api/spriteApi'
-import { getFileUrl } from '../../models/api/modelApi'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
+} from '@/features/sprite/api/spriteApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
   openInFileExplorer,
   copyPathToClipboard,
   getCopyPathSuccessMessage,
-} from '../../../utils/webdavUtils'
-import { PaginationState } from '../../../types'
+} from '@/utils/webdavUtils'
+import {
+  spriteCategoryFormSchema,
+  spriteRenameFormSchema,
+} from '@/shared/validation/formSchemas'
+import { PaginationState } from '@/types'
 import './SpriteList.css'
 
 interface SpriteDto {
@@ -66,6 +76,10 @@ const SPRITE_TYPE_STATIC = 1
 const SPRITE_TYPE_GIF = 3
 
 function SpriteList() {
+  type SpriteCategoryFormInput = z.input<typeof spriteCategoryFormSchema>
+  type SpriteCategoryFormOutput = z.output<typeof spriteCategoryFormSchema>
+  type SpriteRenameFormValues = z.infer<typeof spriteRenameFormSchema>
+
   const [sprites, setSprites] = useState<SpriteDto[]>([])
   const [categories, setCategories] = useState<SpriteCategoryDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,11 +87,8 @@ function SpriteList() {
   const [showSpriteModal, setShowSpriteModal] = useState(false)
   const [editingCategory, setEditingCategory] =
     useState<SpriteCategoryDto | null>(null)
-  const [categoryName, setCategoryName] = useState('')
-  const [categoryDescription, setCategoryDescription] = useState('')
   const [selectedSprite, setSelectedSprite] = useState<SpriteDto | null>(null)
   const [isEditingSpriteName, setIsEditingSpriteName] = useState(false)
-  const [spriteNameDraft, setSpriteNameDraft] = useState('')
   const [isSavingSpriteName, setIsSavingSpriteName] = useState(false)
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
     UNASSIGNED_CATEGORY_ID
@@ -113,6 +124,31 @@ function SpriteList() {
     null
   )
 
+  const {
+    register: registerCategory,
+    handleSubmit: handleCategorySubmit,
+    reset: resetCategoryForm,
+  } = useForm<SpriteCategoryFormInput, unknown, SpriteCategoryFormOutput>({
+    resolver: zodResolver(spriteCategoryFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      description: '',
+    },
+  })
+
+  const {
+    register: registerSpriteRename,
+    handleSubmit: handleSpriteRenameSubmit,
+    reset: resetSpriteRenameForm,
+  } = useForm<SpriteRenameFormValues>({
+    resolver: zodResolver(spriteRenameFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+    },
+  })
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sprites
 
@@ -133,7 +169,7 @@ function SpriteList() {
       })
       setLoading(false)
     }
-  }, [spritesQuery.data])
+  }, [spritesQuery.data, pagination.page])
 
   useEffect(() => {
     if (categoriesQuery.data) {
@@ -152,10 +188,12 @@ function SpriteList() {
       try {
         setIsLoadingMore(true)
         const page = pagination.page + 1
-        const result = await getSpritesPaginated({
-          page,
-          pageSize: 50,
-        })
+        const result = await queryClient.fetchQuery(
+          getSpritesQueryOptions({
+            page,
+            pageSize: 50,
+          })
+        )
         setSprites(prev => [...prev, ...result.sprites])
         setPagination({
           page,
@@ -175,9 +213,8 @@ function SpriteList() {
       } finally {
         setIsLoadingMore(false)
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [pagination.page]
+    [pagination.page, queryClient]
   )
 
   const loadCategories = useCallback(async () => {
@@ -351,7 +388,7 @@ function SpriteList() {
     },
     onError: (error, vars) => {
       console.error('Failed to rename sprite:', error)
-      setSpriteNameDraft(vars.sprite.name)
+      resetSpriteRenameForm({ name: vars.sprite.name })
       setIsEditingSpriteName(false)
       toast.current?.show({
         severity: 'error',
@@ -469,35 +506,36 @@ function SpriteList() {
 
   const openCreateCategoryDialog = () => {
     setEditingCategory(null)
-    setCategoryName('')
-    setCategoryDescription('')
+    resetCategoryForm({ name: '', description: '' })
     setShowCategoryDialog(true)
   }
 
   const openEditCategoryDialog = (category: SpriteCategoryDto) => {
     setEditingCategory(category)
-    setCategoryName(category.name)
-    setCategoryDescription(category.description || '')
+    resetCategoryForm({
+      name: category.name,
+      description: category.description || '',
+    })
     setShowCategoryDialog(true)
   }
 
-  const handleSaveCategory = async () => {
-    if (!categoryName.trim()) {
+  const handleSaveCategory = handleCategorySubmit(
+    async values => {
+      saveCategoryMutation.mutate({
+        editingCategory,
+        name: values.name,
+        description: values.description,
+      })
+    },
+    () => {
       toast.current?.show({
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Category name is required',
         life: 3000,
       })
-      return
     }
-
-    saveCategoryMutation.mutate({
-      editingCategory,
-      name: categoryName.trim(),
-      description: categoryDescription.trim() || undefined,
-    })
-  }
+  )
 
   const handleDeleteCategory = (category: SpriteCategoryDto) => {
     confirmDialog({
@@ -513,17 +551,17 @@ function SpriteList() {
 
   const openSpriteModal = (sprite: SpriteDto) => {
     setSelectedSprite(sprite)
-    setSpriteNameDraft(sprite.name)
+    resetSpriteRenameForm({ name: sprite.name })
     setIsEditingSpriteName(false)
     setShowSpriteModal(true)
   }
 
-  const handleSaveSpriteName = async () => {
+  const handleSaveSpriteName = handleSpriteRenameSubmit(values => {
     if (!selectedSprite) return
-    const trimmedName = spriteNameDraft.trim()
+    const trimmedName = values.name
     if (!trimmedName || trimmedName === selectedSprite.name) {
       setIsEditingSpriteName(false)
-      setSpriteNameDraft(selectedSprite.name)
+      resetSpriteRenameForm({ name: selectedSprite.name })
       return
     }
     setIsSavingSpriteName(true)
@@ -531,7 +569,7 @@ function SpriteList() {
       sprite: selectedSprite,
       newName: trimmedName,
     })
-  }
+  })
 
   const handleDownload = async () => {
     if (!selectedSprite) return
@@ -1065,7 +1103,17 @@ function SpriteList() {
               label="Cancel"
               icon="pi pi-times"
               className="p-button-text"
-              onClick={() => setShowCategoryDialog(false)}
+              onClick={() => {
+                setShowCategoryDialog(false)
+                if (editingCategory) {
+                  resetCategoryForm({
+                    name: editingCategory.name,
+                    description: editingCategory.description || '',
+                  })
+                } else {
+                  resetCategoryForm({ name: '', description: '' })
+                }
+              }}
               data-testid="category-dialog-cancel"
             />
             <Button
@@ -1082,8 +1130,7 @@ function SpriteList() {
             <label htmlFor="categoryName">Name *</label>
             <InputText
               id="categoryName"
-              value={categoryName}
-              onChange={e => setCategoryName(e.target.value)}
+              {...registerCategory('name')}
               autoFocus
               data-testid="category-name-input"
             />
@@ -1092,8 +1139,7 @@ function SpriteList() {
             <label htmlFor="categoryDescription">Description</label>
             <InputTextarea
               id="categoryDescription"
-              value={categoryDescription}
-              onChange={e => setCategoryDescription(e.target.value)}
+              {...registerCategory('description')}
               rows={3}
               data-testid="category-description-input"
             />
@@ -1112,13 +1158,12 @@ function SpriteList() {
               {isEditingSpriteName ? (
                 <div className="sprite-name-edit">
                   <InputText
-                    value={spriteNameDraft}
-                    onChange={e => setSpriteNameDraft(e.target.value)}
+                    {...registerSpriteRename('name')}
                     onKeyDown={e => {
                       if (e.key === 'Enter') handleSaveSpriteName()
                       if (e.key === 'Escape') {
                         setIsEditingSpriteName(false)
-                        setSpriteNameDraft(selectedSprite.name)
+                        resetSpriteRenameForm({ name: selectedSprite.name })
                       }
                     }}
                     autoFocus
@@ -1138,7 +1183,7 @@ function SpriteList() {
                     className="p-button-text p-button-rounded"
                     onClick={() => {
                       setIsEditingSpriteName(false)
-                      setSpriteNameDraft(selectedSprite.name)
+                      resetSpriteRenameForm({ name: selectedSprite.name })
                     }}
                     disabled={isSavingSpriteName}
                     tooltip="Cancel"
@@ -1153,7 +1198,10 @@ function SpriteList() {
                   <Button
                     icon="pi pi-pencil"
                     className="p-button-text p-button-rounded"
-                    onClick={() => setIsEditingSpriteName(true)}
+                    onClick={() => {
+                      setIsEditingSpriteName(true)
+                      resetSpriteRenameForm({ name: selectedSprite.name })
+                    }}
                     tooltip="Edit name"
                     data-testid="sprite-name-edit"
                   />
@@ -1168,6 +1216,9 @@ function SpriteList() {
         onHide={() => {
           setShowSpriteModal(false)
           setIsEditingSpriteName(false)
+          if (selectedSprite) {
+            resetSpriteRenameForm({ name: selectedSprite.name })
+          }
         }}
         style={{ width: '600px' }}
         className="sprite-detail-modal"

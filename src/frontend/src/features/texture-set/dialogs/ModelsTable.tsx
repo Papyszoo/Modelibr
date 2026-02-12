@@ -1,7 +1,7 @@
 import { Button } from 'primereact/button'
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
-import { ModelSummaryDto } from '../../../types'
+import { ModelSummaryDto } from '@/types'
 
 interface ModelsTableProps {
   models: ModelSummaryDto[]

@@ -1,5 +1,5 @@
-import FloatingWindow from '../../../components/FloatingWindow'
-import { Model } from '../../../utils/fileUtils'
+import FloatingWindow from '@/components/FloatingWindow'
+import { Model } from '@/utils/fileUtils'
 import UVMapScene from './UVMapScene'
 
 interface UVMapWindowProps {

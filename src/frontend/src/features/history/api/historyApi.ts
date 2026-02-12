@@ -1,4 +1,4 @@
-import { client } from '../../../lib/apiBase'
+import { client } from '@/lib/apiBase'
 
 export async function getBatchUploadHistory(): Promise<{
   uploads: Array<{

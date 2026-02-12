@@ -1,5 +1,5 @@
-import { client, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { SpriteDto } from '../../../types'
+import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { SpriteDto } from '@/types'
 
 export async function getAllSprites(): Promise<{
   sprites: Array<{

@@ -1,12 +1,12 @@
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
-import { TextureSetDto, TextureDto } from '../../../types'
+import { TextureSetDto, TextureDto } from '@/types'
 import {
   getTextureTypeLabel,
   getTextureTypeColor,
   getTextureTypeIcon,
-} from '../../../utils/textureTypeUtils'
+} from '@/utils/textureTypeUtils'
 
 interface TextureSetTableProps {
   textureSets: TextureSetDto[]

@@ -3,15 +3,15 @@ import WaveSurfer from 'wavesurfer.js'
 import RegionsPlugin, { Region } from 'wavesurfer.js/dist/plugins/regions.js'
 import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
-import { SoundDto } from '../../../types'
-import { updateSound } from '../api/soundApi'
-import { getFileUrl } from '../../models/api/modelApi'
+import { SoundDto } from '@/types'
+import { updateSound } from '@/features/sounds/api/soundApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
 import {
   decodeAudio,
   sliceAudioBuffer,
   audioBufferToWav,
   formatDuration,
-} from '../../../utils/audioUtils'
+} from '@/utils/audioUtils'
 import './SoundEditor.css'
 
 interface SoundEditorProps {
@@ -143,6 +143,7 @@ function SoundEditor({
       }
       ws.destroy()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- WaveSurfer instance should be recreated only for sound identity changes
   }, [sound.fileId, sound.fileName])
 
   // Update slice URL when region changes

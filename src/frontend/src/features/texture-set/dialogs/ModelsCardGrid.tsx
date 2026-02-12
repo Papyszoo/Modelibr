@@ -3,9 +3,9 @@ import { Button } from 'primereact/button'
 import { Badge } from 'primereact/badge'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
-import { ModelSummaryDto } from '../../../types'
-import ThumbnailDisplay from '../../thumbnail/components/ThumbnailDisplay'
-import { openTabInPanel } from '../../../utils/tabNavigation'
+import { ModelSummaryDto } from '@/types'
+import { ThumbnailDisplay } from '@/features/thumbnail'
+import { openTabInPanel } from '@/utils/tabNavigation'
 import './ModelsCardGrid.css'
 
 interface ModelsCardGridProps {

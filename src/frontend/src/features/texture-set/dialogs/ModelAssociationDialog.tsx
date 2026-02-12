@@ -5,10 +5,11 @@ import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
 import { MultiSelect } from 'primereact/multiselect'
-import { TextureSetDto, Model, PackSummaryDto } from '../../../types'
-import { useTextureSets } from '../hooks/useTextureSets'
-import ApiClient from '../../../services/ApiClient'
-import ThumbnailDisplay from '../../thumbnail/components/ThumbnailDisplay'
+import type { Model } from '@/utils/fileUtils'
+import { TextureSetDto, PackSummaryDto } from '@/features/texture-set/types'
+import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { getModelVersions } from '@/features/model-viewer/api/modelVersionApi'
+import { ThumbnailDisplay } from '@/features/thumbnail'
 import './dialogs.css'
 
 interface ModelAssociationDialogProps {
@@ -72,7 +73,7 @@ function ModelAssociationDialog({
 
       // Load versions for each model and build associations
       const associationsPromises = allModels.map(async model => {
-        const versions = await ApiClient.getModelVersions(parseInt(model.id))
+        const versions = await getModelVersions(parseInt(model.id))
 
         // Get currently associated version IDs for this model
         const associatedVersions = textureSet.associatedModels

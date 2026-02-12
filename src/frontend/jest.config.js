@@ -2,6 +2,7 @@ export default {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
   transform: {
@@ -26,7 +27,5 @@ export default {
       statements: 60,
     },
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!(three|@react-three|.*\\.mjs$))',
-  ],
+  transformIgnorePatterns: ['node_modules/(?!(three|@react-three|.*\\.mjs$))'],
 }

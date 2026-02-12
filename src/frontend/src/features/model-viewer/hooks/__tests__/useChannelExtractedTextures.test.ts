@@ -1,5 +1,8 @@
-import { getChannelIndex, TextureConfig } from '../useChannelExtractedTextures'
-import { TextureChannel } from '../../../../types'
+import {
+  getChannelIndex,
+  TextureConfig,
+} from '@/features/model-viewer/hooks/useChannelExtractedTextures'
+import { TextureChannel } from '@/types'
 
 describe('useChannelExtractedTextures', () => {
   describe('getChannelIndex', () => {

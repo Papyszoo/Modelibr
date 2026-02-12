@@ -1,20 +1,83 @@
-import { ModelList } from '../../features/models'
-import { ModelViewer } from '../../features/model-viewer'
-import { TextureSetList, TextureSetViewer } from '../../features/texture-set'
-import { PackList, PackViewer } from '../../features/pack'
-import { ProjectList, ProjectViewer } from '../../features/project'
-import { SpriteList } from '../../features/sprite'
-import { SoundList } from '../../features/sounds'
-import { History } from '../../features/history'
-import { StageEditor, StageList } from '../../features/stage-editor'
-import { RecycledFilesList } from '../../features/recycled-files'
-import Settings from '../tabs/Settings'
-import { Tab } from '../../types'
-import { useTabContext } from '../../hooks/useTabContext'
+import { lazy, Suspense } from 'react'
+import { ModelList } from '@/features/models'
+import { History } from '@/features/history'
+import Settings from '@/components/tabs/Settings'
+import { Tab } from '@/types'
+import { useTabContext } from '@/hooks/useTabContext'
 import './TabContent.css'
+
+const ModelViewer = lazy(() =>
+  import('@/features/model-viewer').then(module => ({
+    default: module.ModelViewer,
+  }))
+)
+const TextureSetList = lazy(() =>
+  import('@/features/texture-set').then(module => ({
+    default: module.TextureSetList,
+  }))
+)
+const TextureSetViewer = lazy(() =>
+  import('@/features/texture-set').then(module => ({
+    default: module.TextureSetViewer,
+  }))
+)
+const PackList = lazy(() =>
+  import('@/features/pack').then(module => ({
+    default: module.PackList,
+  }))
+)
+const PackViewer = lazy(() =>
+  import('@/features/pack').then(module => ({
+    default: module.PackViewer,
+  }))
+)
+const ProjectList = lazy(() =>
+  import('@/features/project').then(module => ({
+    default: module.ProjectList,
+  }))
+)
+const ProjectViewer = lazy(() =>
+  import('@/features/project').then(module => ({
+    default: module.ProjectViewer,
+  }))
+)
+const SpriteList = lazy(() =>
+  import('@/features/sprite').then(module => ({
+    default: module.SpriteList,
+  }))
+)
+const SoundList = lazy(() =>
+  import('@/features/sounds').then(module => ({
+    default: module.SoundList,
+  }))
+)
+const StageList = lazy(() =>
+  import('@/features/stage-editor').then(module => ({
+    default: module.StageList,
+  }))
+)
+const StageEditor = lazy(() =>
+  import('@/features/stage-editor').then(module => ({
+    default: module.StageEditor,
+  }))
+)
+const RecycledFilesList = lazy(() =>
+  import('@/features/recycled-files').then(module => ({
+    default: module.RecycledFilesList,
+  }))
+)
 
 interface TabContentProps {
   tab: Tab
+}
+
+function TabContentLoading(): JSX.Element {
+  return (
+    <div className="tab-loading">
+      <i className="pi pi-spin pi-spinner" aria-hidden="true" />
+      <span>Loading...</span>
+    </div>
+  )
 }
 
 function TabContent({ tab }: TabContentProps): JSX.Element {
@@ -109,7 +172,11 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
     }
   }
 
-  return <div className="tab-content">{renderContent()}</div>
+  return (
+    <div className="tab-content">
+      <Suspense fallback={<TabContentLoading />}>{renderContent()}</Suspense>
+    </div>
+  )
 }
 
 export default TabContent

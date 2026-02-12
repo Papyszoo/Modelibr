@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
 import './StageGrid.css'
 
 interface StageDto {

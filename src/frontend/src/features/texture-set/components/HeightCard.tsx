@@ -3,15 +3,15 @@ import { Card } from 'primereact/card'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
-import { TextureType, TextureDto } from '../../../types'
+import { TextureType, TextureDto } from '@/types'
 import {
   getTextureTypeInfo,
   getHeightModeOptions,
   HEIGHT_RELATED_TYPES,
-} from '../../../utils/textureTypeUtils'
-import { useTextureSets } from '../hooks/useTextureSets'
-import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
-import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
+} from '@/utils/textureTypeUtils'
+import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { useGenericFileUpload } from '@/shared/hooks/useGenericFileUpload'
 import './TextureCard.css'
 
 interface HeightCardProps {

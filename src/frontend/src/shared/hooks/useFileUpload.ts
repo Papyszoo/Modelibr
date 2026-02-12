@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import ApiClient from '../../services/ApiClient'
+import { uploadModel } from '@/features/models/api/modelApi'
 import {
   isSupportedModelFormat,
   isThreeJSRenderable,
 } from '../../utils/fileUtils'
-import { useUploadProgress } from '../../hooks/useUploadProgress'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
 
 /**
  * Custom hook for handling file uploads with validation and progress tracking
@@ -83,7 +83,7 @@ export function useFileUpload(options = {}) {
         uploadProgressContext.updateUploadProgress(uploadId, 50)
       }
 
-      const result = await ApiClient.uploadModel(file, { batchId })
+      const result = await uploadModel(file, { batchId })
 
       // Update global progress if enabled and available
       if (useGlobalProgress && uploadId && uploadProgressContext) {

@@ -10,21 +10,21 @@
  *
  * This facade exists for backward compatibility with existing imports.
  */
-import { baseURL } from '../lib/apiBase'
+import { baseURL } from '@/lib/apiBase'
 
 // Feature API modules
-import * as modelApi from '../features/models/api/modelApi'
-import * as modelVersionApi from '../features/model-viewer/api/modelVersionApi'
-import * as thumbnailApi from '../features/thumbnail/api/thumbnailApi'
-import * as textureSetApi from '../features/texture-set/api/textureSetApi'
-import * as packApi from '../features/pack/api/packApi'
-import * as projectApi from '../features/project/api/projectApi'
-import * as spriteApi from '../features/sprite/api/spriteApi'
-import * as soundApi from '../features/sounds/api/soundApi'
-import * as recycledApi from '../features/recycled-files/api/recycledApi'
-import * as stageApi from '../features/stage-editor/api/stageApi'
-import * as historyApi from '../features/history/api/historyApi'
-import * as settingsApi from '../features/settings/api/settingsApi'
+import * as modelApi from '@/features/models/api/modelApi'
+import * as modelVersionApi from '@/features/model-viewer/api/modelVersionApi'
+import * as thumbnailApi from '@/features/thumbnail/api/thumbnailApi'
+import * as textureSetApi from '@/features/texture-set/api/textureSetApi'
+import * as packApi from '@/features/pack/api/packApi'
+import * as projectApi from '@/features/project/api/projectApi'
+import * as spriteApi from '@/features/sprite/api/spriteApi'
+import * as soundApi from '@/features/sounds/api/soundApi'
+import * as recycledApi from '@/features/recycled-files/api/recycledApi'
+import * as stageApi from '@/features/stage-editor/api/stageApi'
+import * as historyApi from '@/features/history/api/historyApi'
+import * as settingsApi from '@/features/settings/api/settingsApi'
 
 // Re-export types that were previously defined here
 export type { UploadModelResponse } from '../features/models/api/modelApi'

@@ -3,24 +3,24 @@ import { Dialog } from 'primereact/dialog'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
-import { Model } from '../../../../utils/fileUtils'
-import { PackDto, ProjectDto } from '../../../../types'
+import { Model } from '@/utils/fileUtils'
+import { PackDto, ProjectDto } from '@/types'
 import {
   addModelToPack,
   getAllPacks,
   removeModelFromPack,
-} from '../../../pack/api/packApi'
+} from '@/features/pack/api/packApi'
 import {
   addModelToProject,
   getAllProjects,
   removeModelFromProject,
-} from '../../../project/api/projectApi'
-import { softDeleteModel } from '../../api/modelApi'
+} from '@/features/project/api/projectApi'
+import { softDeleteModel } from '@/features/models/api/modelApi'
 import {
   openInFileExplorer,
   copyPathToClipboard,
   getCopyPathSuccessMessage,
-} from '../../../../utils/webdavUtils'
+} from '@/utils/webdavUtils'
 
 export interface ModelContextMenuHandle {
   show: (event: React.MouseEvent, model: Model) => void

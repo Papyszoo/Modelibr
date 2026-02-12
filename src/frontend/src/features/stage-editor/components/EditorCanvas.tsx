@@ -1,7 +1,7 @@
 import { Suspense, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid } from '@react-three/drei'
-import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
+import LoadingPlaceholder from '@/components/LoadingPlaceholder'
 import SceneLights from './SceneLights'
 import SceneMeshes from './SceneMeshes'
 import SceneHelpers from './SceneHelpers'

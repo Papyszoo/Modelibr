@@ -1,4 +1,4 @@
-import { TextureType } from '../types'
+import { TextureType } from '@/types'
 
 export interface TextureTypeInfo {
   label: string

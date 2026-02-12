@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { TextureChannel } from '../../../types'
+import { TextureChannel } from '@/types'
 
 interface TexturePreviewProps {
   src: string

@@ -3,9 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useTexture } from '@react-three/drei'
 import { GeometryType } from './GeometrySelector'
-import { TextureSetDto, TextureType } from '../../../types'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
+import { TextureSetDto, TextureType } from '@/types'
+import { getFileUrl } from '@/features/models/api/modelApi'
 
 interface GeometryParams {
   type: GeometryType
@@ -53,9 +52,9 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Diffuse
     )
     if (albedo) {
-      urls.map = ApiClient.getFileUrl(albedo.fileId.toString())
+      urls.map = getFileUrl(albedo.fileId.toString())
     } else if (diffuse) {
-      urls.map = ApiClient.getFileUrl(diffuse.fileId.toString())
+      urls.map = getFileUrl(diffuse.fileId.toString())
     }
 
     // Normal map
@@ -63,7 +62,7 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Normal
     )
     if (normal) {
-      urls.normalMap = ApiClient.getFileUrl(normal.fileId.toString())
+      urls.normalMap = getFileUrl(normal.fileId.toString())
     }
 
     // Roughness map
@@ -71,7 +70,7 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Roughness
     )
     if (roughness) {
-      urls.roughnessMap = ApiClient.getFileUrl(roughness.fileId.toString())
+      urls.roughnessMap = getFileUrl(roughness.fileId.toString())
     }
 
     // Metallic map
@@ -79,13 +78,13 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Metallic
     )
     if (metallic) {
-      urls.metalnessMap = ApiClient.getFileUrl(metallic.fileId.toString())
+      urls.metalnessMap = getFileUrl(metallic.fileId.toString())
     }
 
     // AO map
     const ao = textureSet.textures.find(t => t.textureType === TextureType.AO)
     if (ao) {
-      urls.aoMap = ApiClient.getFileUrl(ao.fileId.toString())
+      urls.aoMap = getFileUrl(ao.fileId.toString())
     }
 
     // Emissive map
@@ -93,7 +92,7 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Emissive
     )
     if (emissive) {
-      urls.emissiveMap = ApiClient.getFileUrl(emissive.fileId.toString())
+      urls.emissiveMap = getFileUrl(emissive.fileId.toString())
     }
 
     // Bump map
@@ -101,7 +100,7 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Bump
     )
     if (bump) {
-      urls.bumpMap = ApiClient.getFileUrl(bump.fileId.toString())
+      urls.bumpMap = getFileUrl(bump.fileId.toString())
     }
 
     // Alpha map
@@ -109,7 +108,7 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Alpha
     )
     if (alpha) {
-      urls.alphaMap = ApiClient.getFileUrl(alpha.fileId.toString())
+      urls.alphaMap = getFileUrl(alpha.fileId.toString())
     }
 
     // Displacement map (also check Height for backwards compatibility)
@@ -120,11 +119,9 @@ function TexturedGeometry({
       t => t.textureType === TextureType.Height
     )
     if (displacement) {
-      urls.displacementMap = ApiClient.getFileUrl(
-        displacement.fileId.toString()
-      )
+      urls.displacementMap = getFileUrl(displacement.fileId.toString())
     } else if (height) {
-      urls.displacementMap = ApiClient.getFileUrl(height.fileId.toString())
+      urls.displacementMap = getFileUrl(height.fileId.toString())
     }
 
     return urls

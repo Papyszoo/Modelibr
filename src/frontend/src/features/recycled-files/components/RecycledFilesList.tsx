@@ -1,17 +1,22 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
 import { ConfirmDialog } from 'primereact/confirmdialog'
 import { ProgressBar } from 'primereact/progressbar'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
+import {
+  getDeletePreview,
+  permanentlyDeleteEntity,
+  restoreEntity,
+} from '@/features/recycled-files/api/recycledApi'
+import { getVersionThumbnailUrl } from '@/features/thumbnail/api/thumbnailApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRecycledFilesQuery } from '../api/queries'
-import { ThumbnailDisplay } from '../../thumbnail'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
-import { formatDuration } from '../../../utils/audioUtils'
+import { useRecycledFilesQuery } from '@/features/recycled-files/api/queries'
+import { ThumbnailDisplay } from '@/features/thumbnail'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { formatDuration } from '@/utils/audioUtils'
 import './RecycledFilesList.css'
 
 interface RecycledModel {
@@ -71,12 +76,6 @@ interface DeletePreviewInfo {
 }
 
 export default function RecycledFilesList() {
-  const [models, setModels] = useState<RecycledModel[]>([])
-  const [modelVersions, setModelVersions] = useState<RecycledModelVersion[]>([])
-  const [textureSets, setTextureSets] = useState<RecycledTextureSet[]>([])
-  const [sprites, setSprites] = useState<RecycledSprite[]>([])
-  const [sounds, setSounds] = useState<RecycledSound[]>([])
-  const [loading, setLoading] = useState(true)
   const [deletePreview, setDeletePreview] = useState<DeletePreviewInfo | null>(
     null
   )
@@ -88,62 +87,41 @@ export default function RecycledFilesList() {
 
   const queryClient = useQueryClient()
   const recycledQuery = useRecycledFilesQuery()
-
-  // Sync query data into local state
-  useEffect(() => {
-    if (recycledQuery.data) {
-      const data = recycledQuery.data
-      setModels(
-        data.models.map(m => ({
-          id: m.id,
-          name: m.name,
-          deletedAt: m.deletedAt,
-          fileCount: m.fileCount,
-        }))
-      )
-
-      setModelVersions(
-        data.modelVersions.map(v => ({
-          id: v.id,
-          modelId: v.modelId,
-          versionNumber: v.versionNumber,
-          description: v.description,
-          deletedAt: v.deletedAt,
-          fileCount: v.fileCount,
-        }))
-      )
-
-      setTextureSets(
-        data.textureSets.map(ts => ({
-          id: ts.id,
-          name: ts.name,
-          deletedAt: ts.deletedAt,
-          textureCount: ts.textureCount,
-          previewFileId: ts.previewFileId ?? null,
-        }))
-      )
-
-      setSprites(
-        (data.sprites || []).map(s => ({
-          id: s.id,
-          name: s.name,
-          fileId: s.fileId,
-          deletedAt: s.deletedAt,
-        }))
-      )
-
-      setSounds(
-        (data.sounds || []).map(s => ({
-          id: s.id,
-          name: s.name,
-          fileId: s.fileId,
-          duration: s.duration,
-          deletedAt: s.deletedAt,
-        }))
-      )
-      setLoading(false)
-    }
-  }, [recycledQuery.data])
+  const recycledData = recycledQuery.data
+  const models = (recycledData?.models ?? []).map(m => ({
+    id: m.id,
+    name: m.name,
+    deletedAt: m.deletedAt,
+    fileCount: m.fileCount,
+  }))
+  const modelVersions = (recycledData?.modelVersions ?? []).map(v => ({
+    id: v.id,
+    modelId: v.modelId,
+    versionNumber: v.versionNumber,
+    description: v.description,
+    deletedAt: v.deletedAt,
+    fileCount: v.fileCount,
+  }))
+  const textureSets = (recycledData?.textureSets ?? []).map(ts => ({
+    id: ts.id,
+    name: ts.name,
+    deletedAt: ts.deletedAt,
+    textureCount: ts.textureCount,
+    previewFileId: ts.previewFileId ?? null,
+  }))
+  const sprites = (recycledData?.sprites ?? []).map(s => ({
+    id: s.id,
+    name: s.name,
+    fileId: s.fileId,
+    deletedAt: s.deletedAt,
+  }))
+  const sounds = (recycledData?.sounds ?? []).map(s => ({
+    id: s.id,
+    name: s.name,
+    fileId: s.fileId,
+    duration: s.duration,
+    deletedAt: s.deletedAt,
+  }))
 
   const loadRecycledFiles = () => {
     queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
@@ -162,10 +140,9 @@ export default function RecycledFilesList() {
       entityType: RestoreEntityType
       entityId: number
       successDetail: string
-      onRemove: () => void
       errorDetail: string
       invalidateQueryKeys?: InvalidateKey[]
-    }) => ApiClient.restoreEntity(vars.entityType, vars.entityId),
+    }) => restoreEntity(vars.entityType, vars.entityId),
     onSuccess: async (_data, vars) => {
       toast.current?.show({
         severity: 'success',
@@ -173,7 +150,6 @@ export default function RecycledFilesList() {
         detail: vars.successDetail,
         life: 3000,
       })
-      vars.onRemove()
 
       await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
       for (const key of vars.invalidateQueryKeys ?? []) {
@@ -196,7 +172,7 @@ export default function RecycledFilesList() {
       entityType: string
       entityId: number
       item: DeletePreviewItem
-    }) => ApiClient.getDeletePreview(vars.entityType, vars.entityId),
+    }) => getDeletePreview(vars.entityType, vars.entityId),
     onSuccess: (preview, vars) => {
       setDeletePreview({ ...preview, item: vars.item })
       setShowPreviewDialog(true)
@@ -214,7 +190,7 @@ export default function RecycledFilesList() {
 
   const permanentDeleteMutation = useMutation({
     mutationFn: (vars: { item: DeletePreviewItem }) =>
-      ApiClient.permanentlyDeleteEntity(vars.item.type, vars.item.id),
+      permanentlyDeleteEntity(vars.item.type, vars.item.id),
     onSuccess: async (_data, vars) => {
       toast.current?.show({
         severity: 'success',
@@ -225,18 +201,12 @@ export default function RecycledFilesList() {
       setShowPreviewDialog(false)
 
       if (vars.item.type === 'model') {
-        setModels(prevModels => prevModels.filter(m => m.id !== vars.item.id))
         await queryClient.invalidateQueries({ queryKey: ['models'] })
       } else if (vars.item.type === 'modelVersion') {
-        setModelVersions(prev => prev.filter(v => v.id !== vars.item.id))
         await queryClient.invalidateQueries({ queryKey: ['models'] })
-      } else if (vars.item.type === 'textureSet') {
-        setTextureSets(prev => prev.filter(ts => ts.id !== vars.item.id))
       } else if (vars.item.type === 'sprite') {
-        setSprites(prev => prev.filter(s => s.id !== vars.item.id))
         await queryClient.invalidateQueries({ queryKey: ['sprites'] })
       } else if (vars.item.type === 'sound') {
-        setSounds(prev => prev.filter(s => s.id !== vars.item.id))
         await queryClient.invalidateQueries({ queryKey: ['sounds'] })
       }
 
@@ -260,7 +230,6 @@ export default function RecycledFilesList() {
       entityId: model.id,
       successDetail: `${model.name} has been restored`,
       errorDetail: 'Failed to restore model',
-      onRemove: () => setModels(prev => prev.filter(m => m.id !== model.id)),
       invalidateQueryKeys: [['models']],
     })
   }
@@ -271,8 +240,6 @@ export default function RecycledFilesList() {
       entityId: version.id,
       successDetail: `Version ${version.versionNumber} has been restored`,
       errorDetail: 'Failed to restore model version',
-      onRemove: () =>
-        setModelVersions(prev => prev.filter(v => v.id !== version.id)),
       invalidateQueryKeys: [['models']],
     })
   }
@@ -283,8 +250,6 @@ export default function RecycledFilesList() {
       entityId: textureSet.id,
       successDetail: `${textureSet.name} has been restored`,
       errorDetail: 'Failed to restore texture set',
-      onRemove: () =>
-        setTextureSets(prev => prev.filter(ts => ts.id !== textureSet.id)),
     })
   }
 
@@ -326,7 +291,6 @@ export default function RecycledFilesList() {
       entityId: sprite.id,
       successDetail: `${sprite.name} has been restored`,
       errorDetail: 'Failed to restore sprite',
-      onRemove: () => setSprites(prev => prev.filter(s => s.id !== sprite.id)),
       invalidateQueryKeys: [['sprites']],
     })
   }
@@ -345,7 +309,6 @@ export default function RecycledFilesList() {
       entityId: sound.id,
       successDetail: `${sound.name} has been restored`,
       errorDetail: 'Failed to restore sound',
-      onRemove: () => setSounds(prev => prev.filter(s => s.id !== sound.id)),
       invalidateQueryKeys: [['sounds']],
     })
   }
@@ -378,12 +341,12 @@ export default function RecycledFilesList() {
 
   const getTexturePreviewUrl = (textureSet: RecycledTextureSet) => {
     if (textureSet.previewFileId) {
-      return ApiClient.getFileUrl(textureSet.previewFileId.toString())
+      return getFileUrl(textureSet.previewFileId.toString())
     }
     return null
   }
 
-  if (loading) {
+  if (recycledQuery.isLoading || recycledQuery.isFetching) {
     return (
       <div className="recycled-files-list">
         <div className="recycled-files-loading">
@@ -506,7 +469,7 @@ export default function RecycledFilesList() {
                   >
                     <div className="recycled-card-thumbnail">
                       <img
-                        src={ApiClient.getVersionThumbnailUrl(version.id)}
+                        src={getVersionThumbnailUrl(version.id)}
                         alt={`Version ${version.versionNumber}`}
                         className="recycled-card-image"
                         onError={e => {
@@ -657,7 +620,7 @@ export default function RecycledFilesList() {
                   <div key={sprite.id} className="recycled-card">
                     <div className="recycled-card-thumbnail">
                       <img
-                        src={ApiClient.getFileUrl(sprite.fileId.toString())}
+                        src={getFileUrl(sprite.fileId.toString())}
                         alt={sprite.name}
                         className="recycled-card-image"
                       />

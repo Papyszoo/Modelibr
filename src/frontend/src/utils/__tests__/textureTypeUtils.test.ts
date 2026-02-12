@@ -1,4 +1,4 @@
-import { TextureType } from '../../types'
+import { TextureType } from '@/types'
 import {
   TEXTURE_TYPE_INFO,
   getAllTextureTypes,

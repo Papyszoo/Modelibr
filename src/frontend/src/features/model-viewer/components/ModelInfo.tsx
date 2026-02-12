@@ -4,9 +4,9 @@ import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Button } from 'primereact/button'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { getModelFileFormat } from '../../../utils/fileUtils'
-// eslint-disable-next-line no-restricted-imports -- ModelInfo needs direct API access
-import apiClient from '../../../services/ApiClient'
+import { getModelFileFormat } from '@/utils/fileUtils'
+import { updateModelTags } from '@/features/models/api/modelApi'
+import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
 import TextureSetAssociationDialog from './TextureSetAssociationDialog'
 import './ModelInfo.css'
 
@@ -33,7 +33,7 @@ function ModelInfo({ model, onModelUpdated }) {
     }: {
       tagsString: string
       desc: string
-    }) => apiClient.updateModelTags(model.id, tagsString, desc),
+    }) => updateModelTags(model.id, tagsString, desc),
     onSuccess: () => {
       invalidateModelQueries()
       if (onModelUpdated) {
@@ -51,7 +51,7 @@ function ModelInfo({ model, onModelUpdated }) {
       if (!activeVersionId) {
         throw new Error('Model has no active version')
       }
-      await apiClient.disassociateTextureSetFromModelVersion(
+      await disassociateTextureSetFromModelVersion(
         textureSetId,
         activeVersionId
       )

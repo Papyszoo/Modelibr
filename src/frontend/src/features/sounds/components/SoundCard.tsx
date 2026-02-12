@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SoundDto } from '../../../types'
-import { baseURL } from '../../../lib/apiBase'
-import { getFileUrl } from '../../models/api/modelApi'
-import { formatDuration } from '../../../utils/audioUtils'
+import { SoundDto } from '@/types'
+import { baseURL } from '@/lib/apiBase'
+import { getFileUrl } from '@/features/models/api/modelApi'
+import { formatDuration } from '@/utils/audioUtils'
 import './SoundCard.css'
 
 interface SoundCardProps {
@@ -77,7 +77,7 @@ function SoundCard({
     resizeObserver.observe(container)
 
     return () => resizeObserver.disconnect()
-  }, [])
+  }, [drawOverlay])
 
   // Update playback position while playing
   useEffect(() => {

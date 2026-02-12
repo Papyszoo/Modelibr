@@ -7,32 +7,32 @@ import { MenuItem } from 'primereact/menuitem'
 import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
 import { TabView, TabPanel } from 'primereact/tabview'
-import { TextureSetDto, TextureType, SpriteDto, SoundDto } from '../../types'
-import { ContainerAdapter, ContainerDto } from '../types/ContainerTypes'
-import { ModelGrid } from '../../features/models/components/ModelGrid'
-import { UploadableGrid } from '../components'
-import { useTabContext } from '../../hooks/useTabContext'
-import { useUploadProgress } from '../../hooks/useUploadProgress'
+import { TextureSetDto, TextureType, SpriteDto, SoundDto } from '@/types'
+import { ContainerAdapter, ContainerDto } from '@/shared/types/ContainerTypes'
+import { ModelGrid } from '@/features/models/components/ModelGrid'
+import { UploadableGrid } from '@/shared/components'
+import { useTabContext } from '@/hooks/useTabContext'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
 import {
   getAllTextureSets,
   getTextureSetsPaginated,
-} from '../../features/texture-set/api/textureSetApi'
+} from '@/features/texture-set/api/textureSetApi'
 import {
   createSpriteWithFile,
   getAllSprites,
   getSpritesPaginated,
-} from '../../features/sprite/api/spriteApi'
+} from '@/features/sprite/api/spriteApi'
 import {
   createSoundWithFile,
   getAllSounds,
   getSoundsPaginated,
-} from '../../features/sounds/api/soundApi'
-import { getFileUrl } from '../../features/models/api/modelApi'
+} from '@/features/sounds/api/soundApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
 import {
   formatDuration,
   filterAudioFiles,
   processAudioFile,
-} from '../../utils/audioUtils'
+} from '@/utils/audioUtils'
 import './ContainerViewer.css'
 
 interface ContainerViewerProps {
@@ -94,6 +94,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
   useEffect(() => {
     loadContainer()
     loadAllContent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reload content when target container changes
   }, [adapter.containerId])
 
   const loadContainer = async () => {

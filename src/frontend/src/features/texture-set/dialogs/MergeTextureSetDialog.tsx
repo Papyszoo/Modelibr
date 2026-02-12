@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
 import { Message } from 'primereact/message'
-import { TextureSetDto, TextureType, TextureChannel } from '../../../types'
+import { TextureSetDto, TextureType, TextureChannel } from '@/types'
 import {
   getTextureTypeLabel,
   isHeightRelatedType,
@@ -119,7 +119,7 @@ function MergeTextureSetDialog({
   ]
 
   // Get all selected texture types across all files
-  const getAllSelectedTypes = (): TextureType[] => {
+  const getAllSelectedTypes = useCallback((): TextureType[] => {
     const types: TextureType[] = []
     fileMappings.forEach(fm => {
       if (fm.rgbOption === 'albedo') types.push(TextureType.Albedo)
@@ -133,7 +133,7 @@ function MergeTextureSetDialog({
       if (fm.aChannel) types.push(fm.aChannel)
     })
     return types
-  }
+  }, [fileMappings])
 
   // Check for conflicts with target set
   const overrideWarnings = useMemo(() => {
@@ -142,7 +142,7 @@ function MergeTextureSetDialog({
       targetTextureSet.textures?.map(t => t.textureType) || []
     const selectedTypes = getAllSelectedTypes()
     return selectedTypes.filter(t => existingTypes.includes(t))
-  }, [fileMappings, targetTextureSet])
+  }, [targetTextureSet, getAllSelectedTypes])
 
   // Check Height exclusivity
   const heightConflict = useMemo(() => {
@@ -168,7 +168,7 @@ function MergeTextureSetDialog({
     }
 
     return null
-  }, [fileMappings, targetTextureSet])
+  }, [targetTextureSet, getAllSelectedTypes])
 
   const updateFileMapping = (
     fileId: number,

@@ -1,6 +1,6 @@
 import { useContext, ReactNode } from 'react'
-import TabContext, { TabContextValue } from '../contexts/TabContext'
-import { Tab } from '../types'
+import TabContext, { TabContextValue } from '@/contexts/TabContext'
+import { Tab } from '@/types'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useTabContext = (): TabContextValue => {

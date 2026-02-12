@@ -1,5 +1,5 @@
 import { JSX, useEffect, useRef } from 'react'
-import { useModelObject } from '../hooks/useModelObject'
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import * as THREE from 'three'
 
 interface UVMapSceneProps {

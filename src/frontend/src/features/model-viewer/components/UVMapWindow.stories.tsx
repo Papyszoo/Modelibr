@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 import UVMapWindow from './UVMapWindow'
-import { ModelProvider } from '../../../contexts/ModelContext'
+import { ModelProvider } from '@/contexts/ModelContext'
 import { Button } from 'primereact/button'
-import { Model } from '../../../utils/fileUtils'
+import { Model } from '@/utils/fileUtils'
 
 const meta = {
   title: 'Components/UVMapWindow',

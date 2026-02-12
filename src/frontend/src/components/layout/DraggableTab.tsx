@@ -1,5 +1,5 @@
 import { Tooltip } from 'primereact/tooltip'
-import { Tab } from '../../types'
+import { Tab } from '@/types'
 import './DraggableTab.css'
 
 const getTabIcon = (tabType: Tab['type']): string => {

@@ -1,4 +1,4 @@
-import { TextureSetDto } from '../../../types'
+import { TextureSetDto } from '@/types'
 import './PreviewInfo.css'
 
 interface PreviewInfoProps {

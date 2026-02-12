@@ -1,10 +1,7 @@
 import { useMemo } from 'react'
-import { ContainerViewer } from '../../../shared/components/ContainerViewer'
-import {
-  ContainerAdapter,
-  ContainerDto,
-} from '../../../shared/types/ContainerTypes'
-import { PackDto } from '../../../types'
+import { ContainerViewer } from '@/shared/components/ContainerViewer'
+import { ContainerAdapter, ContainerDto } from '@/shared/types/ContainerTypes'
+import { PackDto } from '@/types'
 import {
   getPackById,
   getModelsByPack,
@@ -20,7 +17,7 @@ import {
   addSoundToPack,
   removeSoundFromPack,
   addTextureToPackWithFile,
-} from '../api/packApi'
+} from '@/features/pack/api/packApi'
 
 interface PackViewerProps {
   packId: number

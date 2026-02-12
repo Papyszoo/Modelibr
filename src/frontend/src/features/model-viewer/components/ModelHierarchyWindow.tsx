@@ -1,7 +1,7 @@
-import { useModelObject } from '../hooks/useModelObject'
-import { useModelHierarchy } from '../hooks/useModelHierarchy'
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
+import { useModelHierarchy } from '@/features/model-viewer/hooks/useModelHierarchy'
 import ModelHierarchy from './ModelHierarchy'
-import FloatingWindow from '../../../components/FloatingWindow'
+import FloatingWindow from '@/components/FloatingWindow'
 
 interface ModelHierarchyWindowProps {
   visible: boolean

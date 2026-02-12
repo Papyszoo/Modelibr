@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './ThumbnailDisplay.css'
-import { useThumbnail } from '../hooks/useThumbnail'
+import { useThumbnail } from '@/features/thumbnail/hooks/useThumbnail'
 
 interface ThumbnailDisplayProps {
   modelId: number | string

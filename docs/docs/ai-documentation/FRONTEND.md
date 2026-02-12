@@ -50,10 +50,11 @@ src/frontend/src/
 ## Server State (React Query)
 
 - Query client config: `src/lib/react-query.ts` (app-wide `QueryClient`)
-- App wiring: `src/main.tsx` (`QueryClientProvider` + devtools)
+- App wiring: `src/main.tsx` (`ErrorBoundary` + `QueryClientProvider` + devtools)
 - Feature queries: `features/*/api/queries.ts` exports `queryOptions` + `useQuery` wrappers
 - Mutations: prefer `useMutation` in components and `queryClient.invalidateQueries()` on success/settle
 - API calls: prefer feature-local modules like `features/pack/api/packApi.ts` over importing `services/ApiClient` in components
+- Axios base client: `src/lib/apiBase.ts` centralizes request/response interceptors (default `Accept` header + normalized `ApiClientError` for consistent `error.message` handling)
 - Recent migration examples:
     - `features/texture-set/components/TextureSetList.tsx` now uses React Query `useMutation` for create/delete texture-set actions.
     - `features/thumbnail/hooks/useThumbnail.ts` now invalidates model queries on SignalR thumbnail/version events.
@@ -61,6 +62,34 @@ src/frontend/src/
     - `features/model-viewer/components/ModelInfo.tsx` now uses `useMutation` for tag/description saves and texture-set disassociation with model query invalidation.
     - `features/texture-set/components/TextureSetModelList.tsx` now uses `useMutation` for model linking and invalidates model list/detail queries.
     - `features/sounds/components/SoundCard.tsx` now uses `getFileUrl(...)` consistently and restores the `.sound-card` root class (required by sound card styling and e2e selectors).
+    - `features/texture-set/components/TextureSetList.tsx` now uses `features/texture-set/api/queries.ts` (`queryOptions` + `useTextureSetsQuery`) for server state reads while keeping load-more UX.
+    - `features/stage-editor/components/StageList.tsx` now uses `features/stage-editor/api/queries.ts` (`useStagesQuery`) for reads and invalidation-based refresh after create.
+    - `features/models/components/ModelVersionHistory.tsx` now uses `features/model-viewer/api/queries.ts` (`useModelVersionsQuery`) for version list loading.
+    - `components/tabs/Settings.tsx` now uses `features/settings/api/queries.ts` (`useSettingsQuery`) for initial settings load.
+
+---
+
+## Form Validation
+
+- Preferred stack: `react-hook-form` + `zod` + `@hookform/resolvers`
+- Shared schemas live in `src/shared/validation/formSchemas.ts`
+- Keep form UX behavior unchanged when migrating (same submit/cancel flow, same toasts/messages)
+- Current migrated examples:
+    - `features/texture-set/dialogs/CreateTextureSetDialog.tsx`
+    - `features/texture-set/dialogs/SetHeader.tsx`
+    - `features/sprite/components/SpriteList.tsx` (category create/edit + sprite rename dialog controls)
+    - `components/tabs/Settings.tsx` (settings form fields)
+    - `features/sounds/components/SoundList.tsx` (category create/edit dialog)
+    - `features/pack/components/PackList.tsx` (create pack dialog)
+    - `features/project/components/ProjectList.tsx` (create project dialog)
+
+---
+
+## Code Splitting
+
+- Tab content in `components/layout/TabContent.tsx` uses `React.lazy` + `Suspense` for heavy feature entries so the initial bundle is reduced.
+- Lazy-loaded tab views include: `ModelViewer`, `TextureSetList`, `TextureSetViewer`, `PackList`, `PackViewer`, `ProjectList`, `ProjectViewer`, `SpriteList`, `SoundList`, `StageList`, `StageEditor`, and `RecycledFilesList`.
+- Fallback behavior remains tab-local via a lightweight loading state rendered inside the tab content area.
 
 ---
 

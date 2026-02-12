@@ -1,5 +1,5 @@
 import CodePanel from './CodePanel'
-import FloatingWindow from '../../../components/FloatingWindow'
+import FloatingWindow from '@/components/FloatingWindow'
 import { StageConfig } from './SceneEditor'
 
 interface CodePanelWindowProps {

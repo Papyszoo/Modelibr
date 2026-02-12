@@ -1,5 +1,5 @@
 import PropertyPanel from './PropertyPanel'
-import FloatingWindow from '../../../components/FloatingWindow'
+import FloatingWindow from '@/components/FloatingWindow'
 import { StageObject } from './SceneEditor'
 
 interface PropertyPanelWindowProps {

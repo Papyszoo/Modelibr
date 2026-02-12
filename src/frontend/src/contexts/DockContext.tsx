@@ -9,7 +9,7 @@ import {
   RefObject,
 } from 'react'
 import { ContextMenu } from 'primereact/contextmenu'
-import { Tab } from '../types'
+import { Tab } from '@/types'
 
 interface DockContextValue {
   recentlyClosedTabs: Tab[]

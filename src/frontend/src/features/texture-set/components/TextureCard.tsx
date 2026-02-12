@@ -3,13 +3,12 @@ import { Card } from 'primereact/card'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import { Dialog } from 'primereact/dialog'
-import { TextureType, TextureDto } from '../../../types'
-import { getTextureTypeInfo } from '../../../utils/textureTypeUtils'
-import { useTextureSets } from '../hooks/useTextureSets'
-import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
-import { useGenericFileUpload } from '../../../shared/hooks/useGenericFileUpload'
-// eslint-disable-next-line no-restricted-imports -- ApiClient needed for file operations
-import ApiClient from '../../../services/ApiClient'
+import { TextureType, TextureDto } from '@/types'
+import { getTextureTypeInfo } from '@/utils/textureTypeUtils'
+import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { useGenericFileUpload } from '@/shared/hooks/useGenericFileUpload'
+import { getFileUrl } from '@/features/models/api/modelApi'
 import './TextureCard.css'
 import TexturePreview from './TexturePreview'
 
@@ -319,7 +318,7 @@ function TextureCard({
               onDragEnd={handleTextureDragEnd}
             >
               <TexturePreview
-                src={ApiClient.getFileUrl(texture.fileId.toString())}
+                src={getFileUrl(texture.fileId.toString())}
                 alt={texture.fileName || typeInfo.label}
                 sourceChannel={texture.sourceChannel}
                 className="texture-preview-image"

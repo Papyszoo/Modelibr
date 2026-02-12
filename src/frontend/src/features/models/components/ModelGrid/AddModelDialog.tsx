@@ -3,11 +3,11 @@ import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
-import { ThumbnailDisplay } from '../../../thumbnail'
-import { Model } from '../../../../utils/fileUtils'
-import { getModelsPaginated } from '../../api/modelApi'
-import { addModelToPack } from '../../../pack/api/packApi'
-import { addModelToProject } from '../../../project/api/projectApi'
+import { ThumbnailDisplay } from '@/features/thumbnail'
+import { Model } from '@/utils/fileUtils'
+import { getModelsPaginated } from '@/features/models/api/modelApi'
+import { addModelToPack } from '@/features/pack/api/packApi'
+import { addModelToProject } from '@/features/project/api/projectApi'
 
 interface AddModelDialogProps {
   visible: boolean
@@ -49,6 +49,7 @@ export default function AddModelDialog({
       setSelectedModelIds([])
       setSearchQuery('')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Dialog initialization should rerun only on visibility/preloaded models changes
   }, [visible, preloadedModels])
 
   const loadAvailableModels = async () => {
