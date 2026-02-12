@@ -4,9 +4,11 @@ import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
 import { Dialog } from 'primereact/dialog'
 import { Checkbox } from 'primereact/checkbox'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ThumbnailDisplay } from '../../thumbnail'
 import { Model } from '../../../utils/fileUtils'
-import ApiClient from '../../../services/ApiClient'
+import { getModelsPaginated } from '../../models/api/modelApi'
+import { associateTextureSetWithAllModelVersions } from '../api/textureSetApi'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import { useTabContext } from '../../../hooks/useTabContext'
@@ -32,7 +34,7 @@ export default function TextureSetModelList({
   const fetchModels = useCallback(async () => {
     try {
       setLoading(true)
-      const result = await ApiClient.getModelsPaginated({
+      const result = await getModelsPaginated({
         page: 1,
         pageSize: 200,
         textureSetId,
@@ -185,10 +187,28 @@ function LinkModelDialog({
   existingModelIds,
   onModelsLinked,
 }: LinkModelDialogProps) {
+  const queryClient = useQueryClient()
   const [allModels, setAllModels] = useState<Model[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const linkModelsMutation = useMutation({
+    mutationFn: async (modelIds: number[]) => {
+      for (const modelId of modelIds) {
+        await associateTextureSetWithAllModelVersions(textureSetId, modelId)
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({ queryKey: ['models', 'detail'] })
+      onModelsLinked()
+      onHide()
+    },
+    onError: error => {
+      console.error('Failed to link models to texture set:', error)
+    },
+  })
 
   const getModelName = (model: Model) => {
     if (model.name) return model.name
@@ -197,18 +217,10 @@ function LinkModelDialog({
     return `Model ${model.id}`
   }
 
-  useEffect(() => {
-    if (visible) {
-      loadModels()
-      setSelectedIds([])
-      setSearchQuery('')
-    }
-  }, [visible])
-
-  const loadModels = async () => {
+  const loadModels = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await ApiClient.getModelsPaginated({
+      const result = await getModelsPaginated({
         page: 1,
         pageSize: 200,
       })
@@ -220,7 +232,15 @@ function LinkModelDialog({
     } finally {
       setLoading(false)
     }
-  }
+  }, [existingModelIds])
+
+  useEffect(() => {
+    if (visible) {
+      loadModels()
+      setSelectedIds([])
+      setSearchQuery('')
+    }
+  }, [visible, loadModels])
 
   const filtered = allModels.filter(m =>
     searchQuery
@@ -233,15 +253,8 @@ function LinkModelDialog({
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     )
 
-  const handleLink = async () => {
-    for (const modelId of selectedIds) {
-      await ApiClient.associateTextureSetWithAllModelVersions(
-        textureSetId,
-        modelId
-      )
-    }
-    onModelsLinked()
-    onHide()
+  const handleLink = () => {
+    linkModelsMutation.mutate(selectedIds)
   }
 
   return (
@@ -268,7 +281,8 @@ function LinkModelDialog({
             label={`Link Selected (${selectedIds.length})`}
             icon="pi pi-link"
             onClick={handleLink}
-            disabled={selectedIds.length === 0}
+            loading={linkModelsMutation.isPending}
+            disabled={selectedIds.length === 0 || linkModelsMutation.isPending}
           />
         </div>
       }

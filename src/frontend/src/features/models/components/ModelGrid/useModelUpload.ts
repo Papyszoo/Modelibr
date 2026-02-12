@@ -1,5 +1,6 @@
 import { useCallback, RefObject } from 'react'
-import ApiClient from '../../../../services/ApiClient'
+import { addModelToPack } from '../../../pack/api/packApi'
+import { addModelToProject } from '../../../project/api/projectApi'
 import {
   useFileUpload,
   useDragAndDrop,
@@ -22,10 +23,10 @@ export function useModelUpload({
   const associateModel = useCallback(
     async (modelId: number) => {
       if (packId) {
-        await ApiClient.addModelToPack(packId, modelId)
+        await addModelToPack(packId, modelId)
       }
       if (projectId) {
-        await ApiClient.addModelToProject(projectId, modelId)
+        await addModelToProject(projectId, modelId)
       }
     },
     [packId, projectId]

@@ -1,14 +1,55 @@
 import { client } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 
-export async function getAllRecycledFiles(): Promise<{
-  models: any[]
-  modelVersions: any[]
-  files: any[]
-  textureSets: any[]
-  textures: any[]
-  sprites: any[]
-}> {
+export interface RecycledModelDto {
+  id: number
+  name: string
+  deletedAt: string
+  fileCount: number
+}
+
+export interface RecycledModelVersionDto {
+  id: number
+  modelId: number
+  versionNumber: number
+  description: string | null
+  deletedAt: string
+  fileCount: number
+}
+
+export interface RecycledTextureSetDto {
+  id: number
+  name: string
+  deletedAt: string
+  textureCount: number
+  previewFileId?: number | null
+}
+
+export interface RecycledSpriteDto {
+  id: number
+  name: string
+  fileId: number
+  deletedAt: string
+}
+
+export interface RecycledSoundDto {
+  id: number
+  name: string
+  fileId: number
+  duration: number
+  deletedAt: string
+}
+
+export interface GetAllRecycledFilesResponse {
+  models: RecycledModelDto[]
+  modelVersions: RecycledModelVersionDto[]
+  files: unknown[]
+  textureSets: RecycledTextureSetDto[]
+  textures: unknown[]
+  sprites: RecycledSpriteDto[]
+  sounds: RecycledSoundDto[]
+}
+
+export async function getAllRecycledFiles(): Promise<GetAllRecycledFilesResponse> {
   const response = await client.get('/recycled')
   return response.data
 }
@@ -18,22 +59,6 @@ export async function restoreEntity(
   entityId: number
 ): Promise<void> {
   await client.post(`/recycled/${entityType}/${entityId}/restore`)
-
-  switch (entityType.toLowerCase()) {
-    case 'model':
-      useApiCacheStore.getState().invalidateModels()
-      useApiCacheStore.getState().invalidateModelById(entityId.toString())
-      break
-    case 'modelversion':
-      useApiCacheStore.getState().invalidateModels()
-      break
-    case 'textureset':
-      useApiCacheStore.getState().invalidateTextureSets()
-      useApiCacheStore.getState().invalidateTextureSetById(entityId)
-      break
-    case 'sprite':
-      break
-  }
 }
 
 export async function getDeletePreview(

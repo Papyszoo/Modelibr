@@ -1,5 +1,4 @@
 import { client, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 import { Model } from '../../../utils/fileUtils'
 import {
   ProjectDto,
@@ -18,17 +17,8 @@ import {
 export async function getAllProjects(
   options: { skipCache?: boolean } = {}
 ): Promise<ProjectDto[]> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getProjects()
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response = await client.get<GetAllProjectsResponse>('/projects')
-
-  useApiCacheStore.getState().setProjects(response.data.projects)
-
   return response.data.projects
 }
 
@@ -36,17 +26,8 @@ export async function getProjectById(
   id: number,
   options: { skipCache?: boolean } = {}
 ): Promise<ProjectDto> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getProjectById(id)
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response = await client.get<ProjectDto>(`/projects/${id}`)
-
-  useApiCacheStore.getState().setProjectById(id, response.data)
-
   return response.data
 }
 
@@ -57,9 +38,6 @@ export async function createProject(
     '/projects',
     request
   )
-
-  useApiCacheStore.getState().invalidateProjects()
-
   return response.data
 }
 
@@ -68,16 +46,10 @@ export async function updateProject(
   request: UpdateProjectRequest
 ): Promise<void> {
   await client.put(`/projects/${id}`, request)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(id)
 }
 
 export async function deleteProject(id: number): Promise<void> {
   await client.delete(`/projects/${id}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(id)
 }
 
 export async function addModelToProject(
@@ -85,11 +57,6 @@ export async function addModelToProject(
   modelId: number
 ): Promise<void> {
   await client.post(`/projects/${projectId}/models/${modelId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }
 
 export async function removeModelFromProject(
@@ -97,11 +64,6 @@ export async function removeModelFromProject(
   modelId: number
 ): Promise<void> {
   await client.delete(`/projects/${projectId}/models/${modelId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }
 
 export async function addTextureSetToProject(
@@ -109,11 +71,6 @@ export async function addTextureSetToProject(
   textureSetId: number
 ): Promise<void> {
   await client.post(`/projects/${projectId}/texture-sets/${textureSetId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
 }
 
 export async function addTextureToProjectWithFile(
@@ -144,11 +101,6 @@ export async function addTextureToProjectWithFile(
       timeout: UPLOAD_TIMEOUT,
     }
   )
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
-  useApiCacheStore.getState().invalidateTextureSets()
-
   return response.data
 }
 
@@ -157,11 +109,6 @@ export async function removeTextureSetFromProject(
   textureSetId: number
 ): Promise<void> {
   await client.delete(`/projects/${projectId}/texture-sets/${textureSetId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
 }
 
 export async function getModelsByProject(projectId: number): Promise<Model[]> {
@@ -183,9 +130,6 @@ export async function addSpriteToProject(
   spriteId: number
 ): Promise<void> {
   await client.post(`/projects/${projectId}/sprites/${spriteId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
 }
 
 export async function removeSpriteFromProject(
@@ -193,9 +137,6 @@ export async function removeSpriteFromProject(
   spriteId: number
 ): Promise<void> {
   await client.delete(`/projects/${projectId}/sprites/${spriteId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
 }
 
 export async function getSpritesByProject(
@@ -212,9 +153,6 @@ export async function addSoundToProject(
   soundId: number
 ): Promise<void> {
   await client.post(`/projects/${projectId}/sounds/${soundId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
 }
 
 export async function removeSoundFromProject(
@@ -222,9 +160,6 @@ export async function removeSoundFromProject(
   soundId: number
 ): Promise<void> {
   await client.delete(`/projects/${projectId}/sounds/${soundId}`)
-
-  useApiCacheStore.getState().invalidateProjects()
-  useApiCacheStore.getState().invalidateProjectById(projectId)
 }
 
 export async function getSoundsByProject(

@@ -31,7 +31,10 @@ export function useTextureSets() {
   }, [])
 
   const getTextureSetById = useCallback(
-    async (id: number, options: { skipCache?: boolean } = {}): Promise<TextureSetDto> => {
+    async (
+      id: number,
+      options: { skipCache?: boolean } = {}
+    ): Promise<TextureSetDto> => {
       try {
         setLoading(true)
         setError(null)
@@ -179,7 +182,9 @@ export function useTextureSets() {
         await ApiClient.changeTextureChannel(setId, textureId, sourceChannel)
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : 'Failed to change texture channel'
+          err instanceof Error
+            ? err.message
+            : 'Failed to change texture channel'
         setError(errorMessage)
         throw err
       } finally {
@@ -194,7 +199,10 @@ export function useTextureSets() {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.associateTextureSetWithModelVersion(setId, modelVersionId)
+        await ApiClient.associateTextureSetWithModelVersion(
+          setId,
+          modelVersionId
+        )
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -214,7 +222,10 @@ export function useTextureSets() {
       try {
         setLoading(true)
         setError(null)
-        await ApiClient.disassociateTextureSetFromModelVersion(setId, modelVersionId)
+        await ApiClient.disassociateTextureSetFromModelVersion(
+          setId,
+          modelVersionId
+        )
       } catch (err) {
         const errorMessage =
           err instanceof Error

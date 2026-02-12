@@ -98,7 +98,9 @@ function TextureSetDetailDialog({
   }
 
   const handleDisassociateModel = (model: ModelSummaryDto) => {
-    const versionInfo = model.versionNumber ? ` (Version ${model.versionNumber})` : ''
+    const versionInfo = model.versionNumber
+      ? ` (Version ${model.versionNumber})`
+      : ''
     confirmDialog({
       message: `Are you sure you want to disassociate the model "${model.name}"${versionInfo} from this texture set?`,
       header: 'Disassociate Model',

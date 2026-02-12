@@ -4,7 +4,8 @@ import RegionsPlugin, { Region } from 'wavesurfer.js/dist/plugins/regions.js'
 import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
 import { SoundDto } from '../../../types'
-import ApiClient from '../../../services/ApiClient'
+import { updateSound } from '../api/soundApi'
+import { getFileUrl } from '../../models/api/modelApi'
 import {
   decodeAudio,
   sliceAudioBuffer,
@@ -75,7 +76,7 @@ function SoundEditor({
     wavesurferRef.current = ws
 
     // Load audio file
-    const audioUrl = ApiClient.getFileUrl(sound.fileId.toString())
+    const audioUrl = getFileUrl(sound.fileId.toString())
     setIsLoading(true)
     ws.load(audioUrl)
 
@@ -209,7 +210,7 @@ function SoundEditor({
 
     try {
       setIsSavingName(true)
-      const updated = await ApiClient.updateSound(sound.id, {
+      const updated = await updateSound(sound.id, {
         name: trimmedName,
         categoryId: sound.categoryId,
       })

@@ -140,10 +140,7 @@ describe('uploadProgressStore', () => {
       let uploadId: string
 
       act(() => {
-        uploadId = result.current.addUpload(
-          createMockFile('test.glb'),
-          'model'
-        )
+        uploadId = result.current.addUpload(createMockFile('test.glb'), 'model')
       })
 
       expect(result.current.uploads[0].status).toBe('pending')
@@ -163,10 +160,7 @@ describe('uploadProgressStore', () => {
       let uploadId: string
 
       act(() => {
-        uploadId = result.current.addUpload(
-          createMockFile('test.glb'),
-          'model'
-        )
+        uploadId = result.current.addUpload(createMockFile('test.glb'), 'model')
         result.current.updateUploadProgress(uploadId!, 50)
       })
 
@@ -185,10 +179,7 @@ describe('uploadProgressStore', () => {
       const mockResult = { modelId: 'model-123', name: 'My Model' }
 
       act(() => {
-        uploadId = result.current.addUpload(
-          createMockFile('test.glb'),
-          'model'
-        )
+        uploadId = result.current.addUpload(createMockFile('test.glb'), 'model')
       })
 
       act(() => {
@@ -234,10 +225,7 @@ describe('uploadProgressStore', () => {
       const mockError = new Error('Upload failed: connection timeout')
 
       act(() => {
-        uploadId = result.current.addUpload(
-          createMockFile('test.glb'),
-          'model'
-        )
+        uploadId = result.current.addUpload(createMockFile('test.glb'), 'model')
       })
 
       act(() => {
@@ -300,10 +288,7 @@ describe('uploadProgressStore', () => {
           createMockFile('completed.glb'),
           'model'
         )
-        errorId = result.current.addUpload(
-          createMockFile('error.glb'),
-          'model'
-        )
+        errorId = result.current.addUpload(createMockFile('error.glb'), 'model')
       })
 
       // Set different statuses

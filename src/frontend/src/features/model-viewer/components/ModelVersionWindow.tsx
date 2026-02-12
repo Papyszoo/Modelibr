@@ -79,7 +79,7 @@ function ModelVersionWindow({
     }
   }
 
-  const handleDownloadFile = (fileId: number, fileName: string) => {
+  const handleDownloadFile = (fileId: number, _fileName: string) => {
     if (!selectedVersion || !model) return
     const url = ApiClient.getVersionFileUrl(
       parseInt(model.id),
@@ -89,7 +89,7 @@ function ModelVersionWindow({
     window.open(url, '_blank')
   }
 
-  const handleOpenInBlender = (fileId: number, fileName: string) => {
+  const handleOpenInBlender = (fileId: number, _fileName: string) => {
     if (!selectedVersion || !model) return
     const url = ApiClient.getVersionFileUrl(
       parseInt(model.id),
@@ -218,7 +218,11 @@ function ModelVersionWindow({
                         onRecycleVersion(version.id)
                       }
                     }}
-                    tooltip={versions.length <= 1 ? "Cannot delete the last version" : undefined}
+                    tooltip={
+                      versions.length <= 1
+                        ? 'Cannot delete the last version'
+                        : undefined
+                    }
                   />
                 </div>
               </div>

@@ -94,8 +94,8 @@ When("I open the texture set viewer", async ({ page }) => {
 // ============================================================================
 
 When("I switch to the Files tab", async ({ page }) => {
-    // Wait for network to be idle before interacting
-    await page.waitForLoadState("networkidle");
+    // Wait for tab header to be ready before interacting
+    await page.waitForSelector(".p-tabview-nav", { timeout: 10000 });
 
     // Use PrimeReact TabView nav link selector
     const filesTab = page
@@ -108,7 +108,6 @@ When("I switch to the Files tab", async ({ page }) => {
     await page.waitForSelector(".files-tab, .files-tab-empty", {
         timeout: 10000,
     });
-    await page.waitForLoadState("networkidle");
 
     // Give extra time for React to render the file cards
     await page.waitForTimeout(500);

@@ -35,9 +35,13 @@ interface VersionThumbnailProps {
   versionNumber: number
 }
 
-function VersionThumbnail({ modelId, versionId, versionNumber }: VersionThumbnailProps) {
+function VersionThumbnail({
+  modelId,
+  versionId,
+  versionNumber,
+}: VersionThumbnailProps) {
   const { imgSrc, thumbnailDetails } = useThumbnail(modelId, versionId)
-  
+
   if (thumbnailDetails?.status === 'Ready' && imgSrc) {
     return (
       <img
@@ -50,14 +54,11 @@ function VersionThumbnail({ modelId, versionId, versionNumber }: VersionThumbnai
       />
     )
   }
-  
+
   // Show placeholder when thumbnail is not ready
   return (
     <div className="version-dropdown-thumb version-dropdown-thumb-placeholder">
-      <i
-        className="pi pi-image"
-        style={{ fontSize: '1.5rem', opacity: 0.3 }}
-      />
+      <i className="pi pi-image" style={{ fontSize: '1.5rem', opacity: 0.3 }} />
     </div>
   )
 }
@@ -185,7 +186,10 @@ function VersionStrip({
         </button>
 
         {dropdownOpen && (
-          <div className="version-dropdown-menu" data-testid="version-dropdown-menu">
+          <div
+            className="version-dropdown-menu"
+            data-testid="version-dropdown-menu"
+          >
             {versions.map(version => (
               <div
                 key={version.id}
@@ -193,10 +197,10 @@ function VersionStrip({
                 onClick={() => handleVersionClick(version)}
                 data-testid={`version-dropdown-item-${version.versionNumber}`}
               >
-                <VersionThumbnail 
-                  modelId={model.id} 
-                  versionId={version.id} 
-                  versionNumber={version.versionNumber} 
+                <VersionThumbnail
+                  modelId={model.id}
+                  versionId={version.id}
+                  versionNumber={version.versionNumber}
                 />
                 <div className="version-dropdown-item-info">
                   <span className="version-dropdown-item-number">

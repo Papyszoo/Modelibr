@@ -25,15 +25,52 @@ export class SoundListPage {
         const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
         await this.page.goto(`${baseUrl}/?leftTabs=sounds&activeLeft=sounds`);
         await this.page.waitForLoadState("networkidle").catch(() => {});
-        // Wait for sounds grid or empty state to be visible
+
+        const soundsShell = this.page.locator(
+            ".sound-list, .sound-grid, .sound-list-empty",
+        );
+
+        if ((await soundsShell.count()) === 0) {
+            const soundsTab = this.page
+                .locator(".draggable-tab:has(.pi-volume-up)")
+                .first();
+
+            if (await soundsTab.isVisible().catch(() => false)) {
+                await soundsTab.click().catch(() => {});
+            } else {
+                const addTabButton = this.page
+                    .locator(".dock-add-button")
+                    .first();
+
+                if (await addTabButton.isVisible().catch(() => false)) {
+                    await addTabButton.click().catch(() => {});
+                    const soundsMenuItem = this.page.locator(
+                        ".p-menuitem-link:has-text('Sounds')",
+                    );
+                    if (
+                        await soundsMenuItem
+                            .first()
+                            .isVisible()
+                            .catch(() => false)
+                    ) {
+                        await soundsMenuItem
+                            .first()
+                            .click()
+                            .catch(() => {});
+                    }
+                }
+            }
+        }
+
         await this.page
-            .waitForSelector(`${this.soundGrid}, .sound-list-empty`, {
-                state: "visible",
-                timeout: 10000,
-            })
-            .catch(() => {
-                // Grid might not exist if no sounds, that's ok
-            });
+            .waitForSelector(
+                ".sound-list, .sound-grid, .sound-list-empty, button:has-text('Add Category'), input[type='file']",
+                {
+                    state: "attached",
+                    timeout: 15000,
+                },
+            )
+            .catch(() => {});
     }
 
     /**

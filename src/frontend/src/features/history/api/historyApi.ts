@@ -16,6 +16,8 @@ export async function getBatchUploadHistory(): Promise<{
     modelName: string | null
     textureSetId: number | null
     textureSetName: string | null
+    spriteId: number | null
+    spriteName: string | null
   }>
 }> {
   const response = await client.get('/batch-uploads/history')

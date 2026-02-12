@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Frontend Development Guide
 
-React 18+ application with TypeScript, Three.js for 3D rendering, and PrimeReact UI components.
+React application with TypeScript, Three.js for 3D rendering, PrimeReact UI components, and React Query for server state.
 
 ## Quick Start
 
@@ -14,7 +14,7 @@ npm install
 npm run dev          # Start at http://localhost:5173
 ```
 
-**Environment:** Set `VITE_API_BASE_URL` in root `.env` or `src/frontend/.env`
+**Environment:** Set `VITE_API_BASE_URL` in the root `.env`
 
 ---
 
@@ -40,10 +40,27 @@ src/frontend/src/
 ├── hooks/                 # Shared custom hooks
 ├── contexts/              # React Context providers
 ├── services/              # API clients
-│   └── ApiClient.ts       # Backend API (ALWAYS use this)
+│   └── ApiClient.ts       # Legacy facade (avoid importing from components)
 ├── stores/                # Zustand stores
 └── utils/                 # Helper functions
 ```
+
+---
+
+## Server State (React Query)
+
+- Query client config: `src/lib/react-query.ts` (app-wide `QueryClient`)
+- App wiring: `src/main.tsx` (`QueryClientProvider` + devtools)
+- Feature queries: `features/*/api/queries.ts` exports `queryOptions` + `useQuery` wrappers
+- Mutations: prefer `useMutation` in components and `queryClient.invalidateQueries()` on success/settle
+- API calls: prefer feature-local modules like `features/pack/api/packApi.ts` over importing `services/ApiClient` in components
+- Recent migration examples:
+    - `features/texture-set/components/TextureSetList.tsx` now uses React Query `useMutation` for create/delete texture-set actions.
+    - `features/thumbnail/hooks/useThumbnail.ts` now invalidates model queries on SignalR thumbnail/version events.
+    - `features/stage-editor/components/StageList.tsx` now uses `useMutation` for stage creation instead of inline async try/catch writes.
+    - `features/model-viewer/components/ModelInfo.tsx` now uses `useMutation` for tag/description saves and texture-set disassociation with model query invalidation.
+    - `features/texture-set/components/TextureSetModelList.tsx` now uses `useMutation` for model linking and invalidates model list/detail queries.
+    - `features/sounds/components/SoundCard.tsx` now uses `getFileUrl(...)` consistently and restores the `.sound-card` root class (required by sound card styling and e2e selectors).
 
 ---
 

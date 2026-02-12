@@ -26,7 +26,7 @@ function StageGrid({
   onStageDelete,
 }: StageGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.stages
 
@@ -82,9 +82,11 @@ function StageGrid({
       </div>
 
       {/* Grid of stage cards */}
-      <div 
+      <div
         className="stage-grid"
-        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+        }}
       >
         {filteredStages.map(stage => (
           <div key={stage.id} className="stage-card">

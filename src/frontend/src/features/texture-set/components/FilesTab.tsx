@@ -152,8 +152,7 @@ export default function FilesTab({
       mappings.push({
         fileId,
         fileName: firstTexture.fileName || `File ${fileId}`,
-        rgbOption:
-          (rgbOptionOverrides[fileId] as any) || inferRgbOption(textures),
+        rgbOption: rgbOptionOverrides[fileId] || inferRgbOption(textures),
         rChannel: getChannelType(textures, TextureChannel.R),
         gChannel: getChannelType(textures, TextureChannel.G),
         bChannel: getChannelType(textures, TextureChannel.B),

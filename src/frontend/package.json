@@ -21,6 +21,8 @@
     "@microsoft/signalr": "^8.0.11",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
+    "@tanstack/react-query": "^5.90.20",
+    "@tanstack/react-query-devtools": "^5.91.3",
     "axios": "^1.12.2",
     "nuqs": "^2.6.0",
     "primeicons": "^7.0.0",

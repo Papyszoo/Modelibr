@@ -199,7 +199,11 @@ function HeightCard({ textures, setId, onTextureUpdated }: HeightCardProps) {
   const cardClassName = `texture-card height-card ${isDragging ? 'dragging' : ''} ${existingHeightTexture ? 'has-texture' : 'empty'}`
 
   // Mode dropdown item template
-  const modeOptionTemplate = (option: { label: string; color: string; icon: string }) => {
+  const modeOptionTemplate = (option: {
+    label: string
+    color: string
+    icon: string
+  }) => {
     if (!option) return null
     return (
       <div className="height-mode-option">
@@ -212,7 +216,9 @@ function HeightCard({ textures, setId, onTextureUpdated }: HeightCardProps) {
   return (
     <Card
       className={cardClassName}
-      style={{ '--card-accent': typeInfo?.color || '#8b5cf6' } as React.CSSProperties}
+      style={
+        { '--card-accent': typeInfo?.color || '#8b5cf6' } as React.CSSProperties
+      }
       onClick={handleClick}
       onDragOver={onDragOver}
       onDragEnter={handleDragEnter}
@@ -229,7 +235,10 @@ function HeightCard({ textures, setId, onTextureUpdated }: HeightCardProps) {
       />
 
       <div className="texture-card-header">
-        <div className="height-mode-selector" onClick={e => e.stopPropagation()}>
+        <div
+          className="height-mode-selector"
+          onClick={e => e.stopPropagation()}
+        >
           <Dropdown
             value={selectedMode}
             options={modeOptions}

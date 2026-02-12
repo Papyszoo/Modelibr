@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import ApiClient from '../../../services/ApiClient'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createProject, deleteProject } from '../api/projectApi'
+import { useProjectsQuery } from '../api/queries'
 import { ProjectDto } from '../../../types'
 import { openTabInPanel } from '../../../utils/tabNavigation'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
@@ -13,37 +15,85 @@ import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './ProjectList.css'
 
 export default function ProjectList() {
-  const [projects, setProjects] = useState<ProjectDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const projectsQuery = useProjectsQuery()
+  const projects = projectsQuery.data ?? []
+  const loading = projectsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
   const toast = useRef<Toast>(null)
-  
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.projects
 
-  useEffect(() => {
-    loadProjects()
-  }, [])
+  const invalidateProjects = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['projects'] })
+  }
 
-  const loadProjects = async () => {
-    try {
-      setLoading(true)
-      const data = await ApiClient.getAllProjects()
-      setProjects(data)
-    } catch (error) {
-      console.error('Failed to load projects:', error)
+  const createProjectMutation = useMutation({
+    mutationFn: (payload: { name: string; description?: string }) =>
+      createProject(payload),
+    onSuccess: async () => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Project created successfully',
+        life: 3000,
+      })
+
+      setShowCreateDialog(false)
+      setNewProjectName('')
+      setNewProjectDescription('')
+      await invalidateProjects()
+    },
+    onError: error => {
+      console.error('Failed to create project:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to load projects',
+        detail: 'Failed to create project',
         life: 3000,
       })
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+  })
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: (projectId: number) => deleteProject(projectId),
+    onMutate: async projectId => {
+      await queryClient.cancelQueries({ queryKey: ['projects'] })
+      const previousProjects = queryClient.getQueryData<ProjectDto[]>([
+        'projects',
+      ])
+      queryClient.setQueryData<ProjectDto[]>(['projects'], current =>
+        (current ?? []).filter(p => p.id !== projectId)
+      )
+      return { previousProjects }
+    },
+    onError: (error, _projectId, context) => {
+      console.error('Failed to delete project:', error)
+      if (context?.previousProjects) {
+        queryClient.setQueryData(['projects'], context.previousProjects)
+      }
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete project',
+        life: 3000,
+      })
+    },
+    onSuccess: () => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Project deleted successfully',
+        life: 3000,
+      })
+    },
+    onSettled: async () => {
+      await invalidateProjects()
+    },
+  })
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
@@ -56,56 +106,17 @@ export default function ProjectList() {
       return
     }
 
-    try {
-      await ApiClient.createProject({
-        name: newProjectName.trim(),
-        description: newProjectDescription.trim() || undefined,
-      })
-
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Project created successfully',
-        life: 3000,
-      })
-
-      setShowCreateDialog(false)
-      setNewProjectName('')
-      setNewProjectDescription('')
-      loadProjects()
-    } catch (error) {
-      console.error('Failed to create project:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to create project',
-        life: 3000,
-      })
-    }
+    await createProjectMutation.mutateAsync({
+      name: newProjectName.trim(),
+      description: newProjectDescription.trim() || undefined,
+    })
   }
 
   const handleDeleteProject = async (projectId: number) => {
-    try {
-      await ApiClient.deleteProject(projectId)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Project deleted successfully',
-        life: 3000,
-      })
-      loadProjects()
-    } catch (error) {
-      console.error('Failed to delete project:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to delete project',
-        life: 3000,
-      })
-    }
+    await deleteProjectMutation.mutateAsync(projectId)
   }
 
-  const getProjectThumbnail = (project: ProjectDto) => {
+  const getProjectThumbnail = (_project: ProjectDto) => {
     // TODO: Add project thumbnail support
     // For now, return null - will be implemented when thumbnail upload is added
     return null
@@ -149,9 +160,11 @@ export default function ProjectList() {
           />
         </div>
       ) : (
-        <div 
+        <div
           className="project-grid"
-          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+          }}
         >
           {projects.map(project => {
             const thumbnail = getProjectThumbnail(project)
@@ -160,7 +173,12 @@ export default function ProjectList() {
                 key={project.id}
                 className="project-grid-card"
                 onClick={() => {
-                  openTabInPanel('projectViewer', 'left', project.id.toString(), project.name)
+                  openTabInPanel(
+                    'projectViewer',
+                    'left',
+                    project.id.toString(),
+                    project.name
+                  )
                 }}
               >
                 <div className="project-grid-card-image">
@@ -196,6 +214,7 @@ export default function ProjectList() {
                     icon="pi pi-trash"
                     className="p-button-text p-button-rounded p-button-danger p-button-sm"
                     tooltip="Delete Project"
+                    disabled={deleteProjectMutation.isPending}
                     onClick={e => {
                       e.stopPropagation()
                       handleDeleteProject(project.id)

@@ -7,13 +7,27 @@ import { MenuItem } from 'primereact/menuitem'
 import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
 import { TabView, TabPanel } from 'primereact/tabview'
-import ApiClient from '../../services/ApiClient'
 import { TextureSetDto, TextureType, SpriteDto, SoundDto } from '../../types'
 import { ContainerAdapter, ContainerDto } from '../types/ContainerTypes'
 import { ModelGrid } from '../../features/models/components/ModelGrid'
 import { UploadableGrid } from '../components'
 import { useTabContext } from '../../hooks/useTabContext'
 import { useUploadProgress } from '../../hooks/useUploadProgress'
+import {
+  getAllTextureSets,
+  getTextureSetsPaginated,
+} from '../../features/texture-set/api/textureSetApi'
+import {
+  createSpriteWithFile,
+  getAllSprites,
+  getSpritesPaginated,
+} from '../../features/sprite/api/spriteApi'
+import {
+  createSoundWithFile,
+  getAllSounds,
+  getSoundsPaginated,
+} from '../../features/sounds/api/soundApi'
+import { getFileUrl } from '../../features/models/api/modelApi'
 import {
   formatDuration,
   filterAudioFiles,
@@ -113,7 +127,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       if (adapter.type === 'project')
         filterOptions.projectId = adapter.containerId
 
-      const result = await ApiClient.getTextureSetsPaginated(filterOptions)
+      const result = await getTextureSetsPaginated(filterOptions)
       setTextureSets(prev =>
         loadMore ? [...prev, ...result.textureSets] : result.textureSets
       )
@@ -140,7 +154,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       if (adapter.type === 'project')
         filterOptions.projectId = adapter.containerId
 
-      const result = await ApiClient.getSpritesPaginated(filterOptions)
+      const result = await getSpritesPaginated(filterOptions)
       setSprites(prev =>
         loadMore ? [...prev, ...result.sprites] : result.sprites
       )
@@ -167,7 +181,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       if (adapter.type === 'project')
         filterOptions.projectId = adapter.containerId
 
-      const result = await ApiClient.getSoundsPaginated(filterOptions)
+      const result = await getSoundsPaginated(filterOptions)
       setSounds(prev =>
         loadMore ? [...prev, ...result.sounds] : result.sounds
       )
@@ -189,7 +203,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
 
   const loadAvailableTextureSets = async () => {
     try {
-      const response = await ApiClient.getAllTextureSets()
+      const response = await getAllTextureSets()
       const textureSetIds = textureSets.map(ts => ts.id)
       const available = response.filter(ts => !textureSetIds.includes(ts.id))
       setAllTextureSets(available)
@@ -200,7 +214,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
 
   const loadAvailableSprites = async () => {
     try {
-      const response = await ApiClient.getAllSprites()
+      const response = await getAllSprites()
       const spriteIds = sprites.map(s => s.id)
       const available = (response.sprites || []).filter(
         s => !spriteIds.includes(s.id)
@@ -213,7 +227,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
 
   const loadAvailableSounds = async () => {
     try {
-      const response = await ApiClient.getAllSounds()
+      const response = await getAllSounds()
       const soundIds = sounds.map(s => s.id)
       const available = (response.sounds || []).filter(
         s => !soundIds.includes(s.id)
@@ -479,7 +493,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
           const spriteName = file.name.replace(/\.[^/.]+$/, '')
 
           const spriteOptions = adapter.createSpriteOptions(adapter.containerId)
-          const response = await ApiClient.createSpriteWithFile(file, {
+          const response = await createSpriteWithFile(file, {
             name: spriteName,
             batchId,
             ...spriteOptions,
@@ -575,7 +589,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
 
           const soundName = file.name.replace(/\.[^/.]+$/, '')
 
-          const response = await ApiClient.createSoundWithFile(file, {
+          const response = await createSoundWithFile(file, {
             name: soundName,
             duration,
             peaks,
@@ -649,12 +663,15 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
     const albedo = textureSet.textures?.find(
       t => t.textureType === TextureType.Albedo
     )
-    const diffuse = textureSet.textures?.find(
-      t => t.textureType === (TextureType as any).Diffuse
-    )
+    const diffuseType = (TextureType as unknown as Record<string, number>)
+      .Diffuse
+    const diffuse =
+      typeof diffuseType === 'number'
+        ? textureSet.textures?.find(t => t.textureType === diffuseType)
+        : undefined
     const texture = albedo || diffuse
     if (texture) {
-      return ApiClient.getFileUrl(texture.fileId.toString())
+      return getFileUrl(texture.fileId.toString())
     }
     return null
   }
@@ -691,7 +708,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
     if (!selectedSprite) return
 
     try {
-      const url = ApiClient.getFileUrl(selectedSprite.fileId.toString())
+      const url = getFileUrl(selectedSprite.fileId.toString())
       const response = await fetch(url)
       const blob = await response.blob()
 
@@ -921,9 +938,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
               <div className="container-section">
                 <div className="container-grid">
                   {sprites.map(sprite => {
-                    const spriteUrl = ApiClient.getFileUrl(
-                      sprite.fileId.toString()
-                    )
+                    const spriteUrl = getFileUrl(sprite.fileId.toString())
                     return (
                       <div
                         key={sprite.id}
@@ -1188,7 +1203,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
           </div>
           <div className="container-grid scrollable-grid">
             {filteredAvailableSprites.map(sprite => {
-              const spriteUrl = ApiClient.getFileUrl(sprite.fileId.toString())
+              const spriteUrl = getFileUrl(sprite.fileId.toString())
               const isSelected = selectedSpriteIds.includes(sprite.id)
               return (
                 <div
@@ -1244,7 +1259,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
           <div className="sprite-modal-content">
             <div className="sprite-modal-preview">
               <img
-                src={ApiClient.getFileUrl(selectedSprite.fileId.toString())}
+                src={getFileUrl(selectedSprite.fileId.toString())}
                 alt={selectedSprite.name}
               />
             </div>
@@ -1373,7 +1388,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
             <div className="sound-modal-preview">
               <audio
                 controls
-                src={ApiClient.getFileUrl(selectedSound.fileId.toString())}
+                src={getFileUrl(selectedSound.fileId.toString())}
                 style={{ width: '100%' }}
               />
             </div>

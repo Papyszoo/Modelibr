@@ -4,15 +4,9 @@ import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
 import { Message } from 'primereact/message'
-import {
-  TextureSetDto,
-  TextureType,
-  TextureChannel,
-  TextureDto,
-} from '../../../types'
+import { TextureSetDto, TextureType, TextureChannel } from '../../../types'
 import {
   getTextureTypeLabel,
-  HEIGHT_RELATED_TYPES,
   isHeightRelatedType,
 } from '../../../utils/textureTypeUtils'
 import './dialogs.css'
@@ -87,17 +81,17 @@ function MergeTextureSetDialog({
         }
       })
 
-      const mappings: FileChannelMapping[] = Array.from(uniqueFiles.entries()).map(
-        ([fileId, fileName]) => ({
-          fileId,
-          fileName,
-          rgbOption: 'none',
-          rChannel: null,
-          gChannel: null,
-          bChannel: null,
-          aChannel: null,
-        })
-      )
+      const mappings: FileChannelMapping[] = Array.from(
+        uniqueFiles.entries()
+      ).map(([fileId, fileName]) => ({
+        fileId,
+        fileName,
+        rgbOption: 'none',
+        rChannel: null,
+        gChannel: null,
+        bChannel: null,
+        aChannel: null,
+      }))
       setFileMappings(mappings)
     } else if (!visible) {
       setFileMappings([])
@@ -144,7 +138,8 @@ function MergeTextureSetDialog({
   // Check for conflicts with target set
   const overrideWarnings = useMemo(() => {
     if (!targetTextureSet) return []
-    const existingTypes = targetTextureSet.textures?.map(t => t.textureType) || []
+    const existingTypes =
+      targetTextureSet.textures?.map(t => t.textureType) || []
     const selectedTypes = getAllSelectedTypes()
     return selectedTypes.filter(t => existingTypes.includes(t))
   }, [fileMappings, targetTextureSet])
@@ -157,7 +152,9 @@ function MergeTextureSetDialog({
     )?.textureType
 
     // Check if we're selecting multiple height types
-    const selectedHeightTypes = selectedTypes.filter(t => isHeightRelatedType(t))
+    const selectedHeightTypes = selectedTypes.filter(t =>
+      isHeightRelatedType(t)
+    )
     if (selectedHeightTypes.length > 1) {
       return 'Cannot select multiple Height/Displacement/Bump types'
     }
@@ -199,15 +196,27 @@ function MergeTextureSetDialog({
       const mappings: ChannelMergeRequest['mappings'] = []
 
       if (fm.rgbOption === 'albedo') {
-        mappings.push({ channel: TextureChannel.RGB, textureType: TextureType.Albedo })
+        mappings.push({
+          channel: TextureChannel.RGB,
+          textureType: TextureType.Albedo,
+        })
       } else if (fm.rgbOption === 'normal') {
-        mappings.push({ channel: TextureChannel.RGB, textureType: TextureType.Normal })
+        mappings.push({
+          channel: TextureChannel.RGB,
+          textureType: TextureType.Normal,
+        })
       } else if (fm.rgbOption === 'emissive') {
-        mappings.push({ channel: TextureChannel.RGB, textureType: TextureType.Emissive })
+        mappings.push({
+          channel: TextureChannel.RGB,
+          textureType: TextureType.Emissive,
+        })
       } else if (fm.rgbOption === 'split') {
-        if (fm.rChannel) mappings.push({ channel: TextureChannel.R, textureType: fm.rChannel })
-        if (fm.gChannel) mappings.push({ channel: TextureChannel.G, textureType: fm.gChannel })
-        if (fm.bChannel) mappings.push({ channel: TextureChannel.B, textureType: fm.bChannel })
+        if (fm.rChannel)
+          mappings.push({ channel: TextureChannel.R, textureType: fm.rChannel })
+        if (fm.gChannel)
+          mappings.push({ channel: TextureChannel.G, textureType: fm.gChannel })
+        if (fm.bChannel)
+          mappings.push({ channel: TextureChannel.B, textureType: fm.bChannel })
       }
 
       if (fm.aChannel) {
@@ -320,7 +329,9 @@ function MergeTextureSetDialog({
                         <Dropdown
                           value={fm.rChannel}
                           options={grayscaleOptions}
-                          onChange={e => updateFileMapping(fm.fileId, { rChannel: e.value })}
+                          onChange={e =>
+                            updateFileMapping(fm.fileId, { rChannel: e.value })
+                          }
                           disabled={merging}
                           className="channel-dropdown"
                           placeholder="None"
@@ -331,7 +342,9 @@ function MergeTextureSetDialog({
                         <Dropdown
                           value={fm.gChannel}
                           options={grayscaleOptions}
-                          onChange={e => updateFileMapping(fm.fileId, { gChannel: e.value })}
+                          onChange={e =>
+                            updateFileMapping(fm.fileId, { gChannel: e.value })
+                          }
                           disabled={merging}
                           className="channel-dropdown"
                           placeholder="None"
@@ -342,7 +355,9 @@ function MergeTextureSetDialog({
                         <Dropdown
                           value={fm.bChannel}
                           options={grayscaleOptions}
-                          onChange={e => updateFileMapping(fm.fileId, { bChannel: e.value })}
+                          onChange={e =>
+                            updateFileMapping(fm.fileId, { bChannel: e.value })
+                          }
                           disabled={merging}
                           className="channel-dropdown"
                           placeholder="None"
@@ -356,7 +371,9 @@ function MergeTextureSetDialog({
                     <Dropdown
                       value={fm.aChannel}
                       options={alphaOptions}
-                      onChange={e => updateFileMapping(fm.fileId, { aChannel: e.value })}
+                      onChange={e =>
+                        updateFileMapping(fm.fileId, { aChannel: e.value })
+                      }
                       disabled={merging}
                       className="channel-dropdown"
                       placeholder="None"

@@ -1,5 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import ApiClient, { ThumbnailStatus } from '../../../services/ApiClient'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  ThumbnailStatus,
+  getThumbnailStatus,
+  getVersionThumbnailStatus,
+  getThumbnailUrl,
+  getVersionThumbnailUrl,
+} from '../api/thumbnailApi'
 import thumbnailSignalRService, {
   ThumbnailStatusChangedEvent,
   ActiveVersionChangedEvent,
@@ -14,6 +21,7 @@ const log = (message: string, ...args: unknown[]) => {
 }
 
 export function useThumbnail(modelId: string, versionId?: number) {
+  const queryClient = useQueryClient()
   const [thumbnailDetails, setThumbnailDetails] =
     useState<ThumbnailStatus | null>(null)
   const [imgSrc, setImgSrc] = useState<string | null>(null)
@@ -25,11 +33,13 @@ export function useThumbnail(modelId: string, versionId?: number) {
     try {
       const identifier = versionId ? `version:${versionId}` : `model:${modelId}`
       log(`useThumbnail[${identifier}]: Fetching thumbnail details...`)
-      
+
       const details = versionId
-        ? await ApiClient.getVersionThumbnailStatus(versionId, { skipCache: true })
-        : await ApiClient.getThumbnailStatus(modelId, { skipCache: true })
-      
+        ? await getVersionThumbnailStatus(versionId, {
+            skipCache: true,
+          })
+        : await getThumbnailStatus(modelId, { skipCache: true })
+
       log(`useThumbnail[${identifier}]: Got details:`, details)
       setThumbnailDetails(details)
 
@@ -37,8 +47,8 @@ export function useThumbnail(modelId: string, versionId?: number) {
       // Add a cache-busting parameter only when thumbnail is updated via SignalR
       if (details?.status === 'Ready') {
         const baseUrl = versionId
-          ? ApiClient.getVersionThumbnailUrl(versionId)
-          : ApiClient.getThumbnailUrl(modelId)
+          ? getVersionThumbnailUrl(versionId)
+          : getThumbnailUrl(modelId)
         // Use the stable timestamp that only changes on SignalR events
         const newSrc = `${baseUrl}?t=${cacheBustTimestamp.current}`
         log(`useThumbnail[${identifier}]: Setting imgSrc to:`, newSrc)
@@ -73,11 +83,11 @@ export function useThumbnail(modelId: string, versionId?: number) {
       // The ThumbnailStatusChangedEvent contains modelVersionId, not modelId
       // So we need to refresh to check if this affects our model
       if (event.status === 'Ready' || event.status === 'Failed') {
-        log(
-          `useThumbnail[${modelId}]: Triggering refresh due to status change`
-        )
+        log(`useThumbnail[${modelId}]: Triggering refresh due to status change`)
         // Update cache bust timestamp when we receive a SignalR event
         cacheBustTimestamp.current = Date.now()
+        queryClient.invalidateQueries({ queryKey: ['models'] })
+        queryClient.invalidateQueries({ queryKey: ['models', 'detail'] })
         setRefreshKey(prev => prev + 1)
       }
     }
@@ -94,6 +104,10 @@ export function useThumbnail(modelId: string, versionId?: number) {
         )
         // Update cache bust timestamp when we receive a SignalR event
         cacheBustTimestamp.current = Date.now()
+        queryClient.invalidateQueries({ queryKey: ['models'] })
+        queryClient.invalidateQueries({
+          queryKey: ['models', 'detail', modelId],
+        })
         setRefreshKey(prev => prev + 1)
       }
     }
@@ -110,7 +124,7 @@ export function useThumbnail(modelId: string, versionId?: number) {
       unsubscribeThumbnail()
       unsubscribeActiveVersion()
     }
-  }, [modelId])
+  }, [modelId, queryClient])
 
   return { thumbnailDetails, imgSrc, refreshThumbnail: fetchThumbnailDetails }
 }

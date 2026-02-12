@@ -20,9 +20,7 @@ import { TextureSetDto, ModelVersionDto } from '../../../types'
 import ApiClient from '../../../services/ApiClient'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import thumbnailSignalRService, {
-  ThumbnailStatusChangedEvent,
-} from '../../../services/ThumbnailSignalRService'
+import { useModelThumbnailUpdates } from '../../thumbnail'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -56,7 +54,6 @@ function ModelViewer({
   >(null)
   const [selectedTextureSet, setSelectedTextureSet] =
     useState<TextureSetDto | null>(null)
-  const [hasUserSelectedTexture, setHasUserSelectedTexture] = useState(false)
   const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
     orbitSpeed: 1,
     zoomSpeed: 1,
@@ -138,7 +135,9 @@ function ModelViewer({
   const loadVersionsWithSkipCache = async () => {
     if (!model?.id) return
     try {
-      const data = await ApiClient.getModelVersions(parseInt(model.id), { skipCache: true })
+      const data = await ApiClient.getModelVersions(parseInt(model.id), {
+        skipCache: true,
+      })
       setVersions(data)
 
       // Auto-select the active version if no version is currently selected
@@ -167,32 +166,21 @@ function ModelViewer({
     }
   }
 
-  // Subscribe to thumbnail status changes to refresh versions when thumbnails are ready
-  useEffect(() => {
-    if (!model?.id || versions.length === 0) return
-
-    const handleThumbnailStatusChanged = (
-      event: ThumbnailStatusChangedEvent
-    ) => {
-      // Only reload if the thumbnail is for a version of this model
+  // Subscribe via hook (keeps components from importing services directly)
+  useModelThumbnailUpdates(
+    model?.id ? parseInt(model.id) : null,
+    undefined,
+    undefined,
+    event => {
+      if (versions.length === 0) return
       const isThisModelsVersion = versions.some(
         v => v.id === event.modelVersionId
       )
-
       if (event.status === 'Ready' && isThisModelsVersion) {
         loadVersions()
       }
     }
-
-    const unsubscribe = thumbnailSignalRService.onThumbnailStatusChanged(
-      handleThumbnailStatusChanged
-    )
-
-    return () => {
-      // Cleanup: unsubscribe when component unmounts or model changes
-      unsubscribe()
-    }
-  }, [model?.id, versions])
+  )
 
   // Set initial selected texture set to default if available
   // Only auto-select if user hasn't made a manual selection yet
@@ -200,11 +188,9 @@ function ModelViewer({
   useEffect(() => {
     if (selectedVersion?.defaultTextureSetId) {
       setSelectedTextureSetId(selectedVersion.defaultTextureSetId)
-      setHasUserSelectedTexture(false) // Reset so future version changes can apply their defaults
     } else if (selectedVersion && !selectedVersion.defaultTextureSetId) {
       // Version has no default, clear selection
       setSelectedTextureSetId(null)
-      setHasUserSelectedTexture(false)
     }
   }, [selectedVersion?.id, selectedVersion?.defaultTextureSetId])
 
@@ -283,7 +269,6 @@ function ModelViewer({
 
   const handleTextureSetSelect = (textureSetId: number | null) => {
     setSelectedTextureSetId(textureSetId)
-    setHasUserSelectedTexture(true)
   }
 
   const handleVersionSelect = (version: ModelVersionDto) => {
@@ -292,11 +277,9 @@ function ModelViewer({
     // Apply version's default texture set immediately
     if (version.defaultTextureSetId) {
       setSelectedTextureSetId(version.defaultTextureSetId)
-      setHasUserSelectedTexture(false)
     } else {
       // Version has no default, clear selection
       setSelectedTextureSetId(null)
-      setHasUserSelectedTexture(false)
     }
 
     // Create a temporary model with the version's files for preview
@@ -709,14 +692,22 @@ function ModelViewer({
                   powerPreference: 'high-performance',
                 }}
                 dpr={Math.min(window.devicePixelRatio, 2)}
-                onCreated={(state) => {
+                onCreated={state => {
                   // Expose Three.js scene for E2E testing
                   // This allows Playwright to verify actual 3D content is rendered
                   if (typeof window !== 'undefined') {
-                    (window as Window & { __THREE_SCENE__?: THREE.Scene; __THREE_STATE__?: typeof state }).
-                      __THREE_SCENE__ = state.scene;
-                    (window as Window & { __THREE_SCENE__?: THREE.Scene; __THREE_STATE__?: typeof state }).
-                      __THREE_STATE__ = state;
+                    ;(
+                      window as Window & {
+                        __THREE_SCENE__?: THREE.Scene
+                        __THREE_STATE__?: typeof state
+                      }
+                    ).__THREE_SCENE__ = state.scene
+                    ;(
+                      window as Window & {
+                        __THREE_SCENE__?: THREE.Scene
+                        __THREE_STATE__?: typeof state
+                      }
+                    ).__THREE_STATE__ = state
                   }
                 }}
               >

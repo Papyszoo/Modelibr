@@ -1,5 +1,4 @@
 import { client } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 
 export async function getSettings(): Promise<{
   maxFileSizeBytes: number
@@ -39,14 +38,7 @@ export async function updateSettings(settings: {
 }
 
 export function refreshCache(type?: 'models' | 'textureSets' | 'packs'): void {
-  const store = useApiCacheStore.getState()
-  if (!type) {
-    store.invalidateAll()
-  } else if (type === 'models') {
-    store.refreshModels()
-  } else if (type === 'textureSets') {
-    store.refreshTextureSets()
-  } else if (type === 'packs') {
-    store.refreshPacks()
-  }
+  // Legacy apiCacheStore hook removed. React Query is now responsible for caching.
+  // This function is kept (no-op) to avoid breaking imports if any appear later.
+  void type
 }

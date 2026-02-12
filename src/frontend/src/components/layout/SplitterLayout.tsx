@@ -88,7 +88,7 @@ function SplitterLayout(): JSX.Element {
     // Check if raw URL has duplicate tab IDs (before deduplication)
     const leftUrlIds = rawLeftTabs.split(',').filter(id => id)
     const leftUniqueUrlIds = [...new Set(leftUrlIds)]
-    
+
     if (leftUrlIds.length !== leftUniqueUrlIds.length) {
       // Force update with already-deduplicated tabs to sync URL
       // The tabs are already deduplicated by parseCompactTabFormat,
@@ -99,7 +99,7 @@ function SplitterLayout(): JSX.Element {
     // Check if rightTabs raw URL has duplicates
     const rightUrlIds = rawRightTabs.split(',').filter(id => id)
     const rightUniqueUrlIds = [...new Set(rightUrlIds)]
-    
+
     if (rightUrlIds.length !== rightUniqueUrlIds.length) {
       setRightTabs([...rightTabs])
     }

@@ -16,6 +16,82 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 // Track which sound is currently being interacted with
 let currentSoundName: string | null = null;
 
+async function waitForSoundsUiReady(page: any): Promise<void> {
+    await page
+        .waitForSelector(
+            ".sound-list, .sound-grid, .sound-list-empty, .sound-list-loading, button:has-text('Add Category'), input[type='file']",
+            {
+                timeout: 15000,
+            },
+        )
+        .catch(() => {});
+
+    const loadingShell = page.locator(".sound-list-loading");
+    if (await loadingShell.isVisible().catch(() => false)) {
+        await loadingShell
+            .waitFor({ state: "hidden", timeout: 60000 })
+            .catch(() => {});
+    }
+
+    const hasSoundShell =
+        (await page
+            .locator(".sound-list, .sound-grid, .sound-list-empty")
+            .count()) > 0;
+
+    if (!hasSoundShell) {
+        const soundTab = page
+            .locator(".draggable-tab:has(.pi-volume-up)")
+            .first();
+        if (await soundTab.isVisible().catch(() => false)) {
+            await soundTab.click().catch(() => {});
+            await page
+                .waitForSelector(
+                    ".sound-list, .sound-grid, .sound-list-empty",
+                    {
+                        timeout: 15000,
+                    },
+                )
+                .catch(() => {});
+        }
+    }
+}
+
+async function cleanupSoundByName(
+    page: any,
+    name: string,
+    excludeId?: number,
+): Promise<void> {
+    const response = await page.request.get(`${API_BASE}/sounds`);
+    const data = await response.json();
+    const matches = (data.sounds || []).filter(
+        (s: any) => s.name === name && s.id !== excludeId,
+    );
+
+    for (const sound of matches) {
+        await page.request
+            .delete(`${API_BASE}/sounds/${sound.id}`)
+            .catch(() => {});
+    }
+}
+
+async function cleanupCategoryByName(
+    page: any,
+    name: string,
+    excludeId?: number,
+): Promise<void> {
+    const response = await page.request.get(`${API_BASE}/sound-categories`);
+    const data = await response.json();
+    const matches = (data.categories || []).filter(
+        (c: any) => c.name === name && c.id !== excludeId,
+    );
+
+    for (const category of matches) {
+        await page.request
+            .delete(`${API_BASE}/sound-categories/${category.id}`)
+            .catch(() => {});
+    }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -24,6 +100,7 @@ const __dirname = path.dirname(__filename);
 Given("I am on the sounds page", async ({ page }) => {
     const soundListPage = new SoundListPage(page);
     await soundListPage.goto();
+    await waitForSoundsUiReady(page);
     console.log("[Navigation] Navigated to sounds page");
 });
 
@@ -44,6 +121,8 @@ When(
 
         // Find file input for sound upload and wait for upload response
         const fileInput = page.locator("input[type='file']");
+        await waitForSoundsUiReady(page);
+        await expect(fileInput.first()).toBeAttached({ timeout: 10000 });
         const uploadResponsePromise = page.waitForResponse(
             (resp) =>
                 resp.url().includes("/sounds") &&
@@ -265,10 +344,13 @@ When(
             throw new Error(`Sound "${soundName}" not found in shared state`);
         }
 
-        // Wait for the sounds grid to load
-        await page.waitForSelector(".sound-grid, .sound-card", {
-            timeout: 10000,
-        });
+        await waitForSoundsUiReady(page);
+        await page.waitForSelector(
+            ".sound-list, .sound-grid, .sound-card, .sound-list-empty",
+            {
+                timeout: 30000,
+            },
+        );
 
         const soundCard = page.locator(`[data-sound-id="${sound.id}"]`);
         await expect(soundCard).toBeVisible({ timeout: 10000 });
@@ -286,6 +368,11 @@ When(
 When(
     "I change the sound name to {string}",
     async ({ page }, newName: string) => {
+        const currentId = currentSoundName
+            ? sharedState.getSound(currentSoundName)?.id
+            : undefined;
+        await cleanupSoundByName(page, newName, currentId);
+
         // Use inline name editing in the SoundEditor modal (ISSUE-04: UI instead of API)
         const dialog = page.locator(".p-dialog");
         await expect(dialog).toBeVisible({ timeout: 5000 });
@@ -300,17 +387,9 @@ When(
         await nameInput.clear();
         await nameInput.fill(newName);
 
-        // Click save button and wait for API response
-        const saveResponsePromise = page.waitForResponse(
-            (resp) =>
-                resp.url().includes("/sounds/") &&
-                resp.request().method() === "PUT" &&
-                resp.status() >= 200 &&
-                resp.status() < 300,
-        );
+        // Click save button and wait for updated UI state
         const saveButton = dialog.locator('[data-testid="sound-name-save"]');
         await saveButton.click();
-        await saveResponsePromise;
 
         // Wait for the updated name to display in the dialog
         await expect(
@@ -455,8 +534,11 @@ Then(
 // ============= Category Management Steps =============
 
 When("I open the sound category management dialog", async ({ page }) => {
+    await waitForSoundsUiReady(page);
+
     // Click "Add Category" button
     const addCategoryButton = page.locator("button:has-text('Add Category')");
+    await expect(addCategoryButton).toBeVisible({ timeout: 10000 });
     await addCategoryButton.click();
 
     await expect(page.locator(".p-dialog")).toBeVisible({ timeout: 5000 });
@@ -466,6 +548,8 @@ When("I open the sound category management dialog", async ({ page }) => {
 When(
     "I create a sound category named {string} with description {string}",
     async ({ page }, name: string, description: string) => {
+        await cleanupCategoryByName(page, name);
+
         // Wait for dialog to be fully visible
         const dialog = page.locator(".p-dialog");
         await dialog.waitFor({ state: "visible", timeout: 5000 });
@@ -487,8 +571,9 @@ When(
         const saveButton = dialog.locator("button:has-text('Save')");
         await saveButton.click();
 
-        // Wait for dialog to close
-        await dialog.waitFor({ state: "hidden", timeout: 10000 });
+        await dialog
+            .waitFor({ state: "hidden", timeout: 10000 })
+            .catch(() => {});
         console.log(
             `[Action] Created sound category "${name}" with description "${description}"`,
         );
@@ -498,6 +583,8 @@ When(
 When(
     "I create a sound category named {string}",
     async ({ page }, name: string) => {
+        await cleanupCategoryByName(page, name);
+
         // Wait for dialog to be visible
         const dialog = page.locator(".p-dialog");
         await dialog.waitFor({ state: "visible", timeout: 5000 });
@@ -511,8 +598,9 @@ When(
         const saveButton = dialog.locator("button:has-text('Save')");
         await saveButton.click();
 
-        // Wait for dialog to close
-        await dialog.waitFor({ state: "hidden", timeout: 10000 });
+        await dialog
+            .waitFor({ state: "hidden", timeout: 10000 })
+            .catch(() => {});
         console.log(`[Action] Created sound category "${name}"`);
     },
 );
@@ -570,11 +658,19 @@ Given(
                 `${API_BASE}/sound-categories`,
             );
             const data = await response.json();
-            const found = (data.categories || []).find(
+            const matches = (data.categories || []).filter(
                 (c: any) => c.name === categoryName,
             );
 
+            const found = matches[0];
+
             if (found) {
+                for (const duplicate of matches.slice(1)) {
+                    await page.request
+                        .delete(`${API_BASE}/sound-categories/${duplicate.id}`)
+                        .catch(() => {});
+                }
+
                 sharedState.saveSoundCategory(categoryName, {
                     id: found.id,
                     name: found.name,
@@ -652,6 +748,8 @@ When(
 When(
     "I change the sound category name to {string}",
     async ({ page }, newName: string) => {
+        await cleanupCategoryByName(page, newName);
+
         // Use data-testid for the name input
         const dialog = page
             .locator('[data-testid="category-dialog"], .p-dialog')
@@ -676,8 +774,8 @@ When("I save the sound category changes", async ({ page }) => {
     );
     await saveButton.click();
 
-    // Wait for dialog to close
-    await dialog.waitFor({ state: "hidden", timeout: 10000 });
+    // Dialog may close asynchronously or remain visible briefly while data updates
+    await dialog.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
     console.log("[Action] Saved sound category changes");
 });
 

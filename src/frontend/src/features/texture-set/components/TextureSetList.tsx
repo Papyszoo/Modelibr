@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import { TextureSetDto, TextureType, PaginationState } from '../../../types'
-import { useTextureSets } from '../hooks/useTextureSets'
+import { TextureSetDto, PaginationState } from '../../../types'
 import { useTabContext } from '../../../hooks/useTabContext'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
+import {
+  createTextureSet,
+  createTextureSetWithFile,
+  deleteTextureSet,
+  getTextureSetsPaginated,
+} from '../api/textureSetApi'
 import { Button } from 'primereact/button'
 import CreateTextureSetDialog from '../dialogs/CreateTextureSetDialog'
 import TextureSetListHeader from './TextureSetListHeader'
@@ -28,7 +32,6 @@ function TextureSetList() {
   })
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const toast = useRef<Toast>(null)
-  const textureSetsApi = useTextureSets()
   const { openTextureSetDetailsTab } = useTabContext()
   const uploadProgressContext = useUploadProgress()
 
@@ -40,7 +43,7 @@ function TextureSetList() {
         setLoading(true)
       }
       const page = loadMore ? pagination.page + 1 : 1
-      const result = await ApiClient.getTextureSetsPaginated({
+      const result = await getTextureSetsPaginated({
         page,
         pageSize: 50,
       })
@@ -79,18 +82,21 @@ function TextureSetList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleCreateTextureSet = async (name: string) => {
-    try {
-      await textureSetsApi.createTextureSet({ name })
+  const createTextureSetMutation = useMutation({
+    mutationFn: async (name: string) => {
+      await createTextureSet({ name })
+    },
+    onSuccess: async () => {
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
         detail: 'Texture set created successfully',
         life: 3000,
       })
-      loadTextureSets()
+      await loadTextureSets()
       setShowCreateDialog(false)
-    } catch (error) {
+    },
+    onError: error => {
       console.error('Failed to create texture set:', error)
       toast.current?.show({
         severity: 'error',
@@ -98,7 +104,35 @@ function TextureSetList() {
         detail: 'Failed to create texture set',
         life: 3000,
       })
-    }
+    },
+  })
+
+  const deleteTextureSetMutation = useMutation({
+    mutationFn: async (textureSetId: number) => {
+      await deleteTextureSet(textureSetId)
+    },
+    onSuccess: async () => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Texture set deleted successfully',
+        life: 3000,
+      })
+      await loadTextureSets()
+    },
+    onError: error => {
+      console.error('Failed to delete texture set:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete texture set',
+        life: 3000,
+      })
+    },
+  })
+
+  const handleCreateTextureSet = async (name: string) => {
+    await createTextureSetMutation.mutateAsync(name)
   }
 
   const _handleDeleteTextureSet = (textureSet: TextureSetDto) => {
@@ -107,24 +141,7 @@ function TextureSetList() {
       header: 'Delete Confirmation',
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
-        try {
-          await textureSetsApi.deleteTextureSet(textureSet.id)
-          toast.current?.show({
-            severity: 'success',
-            summary: 'Success',
-            detail: 'Texture set deleted successfully',
-            life: 3000,
-          })
-          loadTextureSets()
-        } catch (error) {
-          console.error('Failed to delete texture set:', error)
-          toast.current?.show({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to delete texture set',
-            life: 3000,
-          })
-        }
+        await deleteTextureSetMutation.mutateAsync(textureSet.id)
       },
     })
   }
@@ -158,10 +175,10 @@ function TextureSetList() {
 
         // 3. Use the new consolidated endpoint that handles file upload + texture set creation + texture addition
         const fileName = file.name.replace(/\.[^/.]+$/, '')
-        const result = await ApiClient.createTextureSetWithFile(file, {
+        const result = await createTextureSetWithFile(file, {
           name: fileName,
           textureType: 'Albedo',
-          batchId: batchId,
+          batchId,
         })
 
         // 4. Complete the upload with texture set ID

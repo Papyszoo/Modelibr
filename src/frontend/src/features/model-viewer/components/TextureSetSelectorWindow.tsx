@@ -72,7 +72,11 @@ function TextureSetSelectorWindow({
     }
     try {
       setSettingDefault(true)
-      await ApiClient.setDefaultTextureSet(parseInt(model.id), textureSetId, modelVersionId)
+      await ApiClient.setDefaultTextureSet(
+        parseInt(model.id),
+        textureSetId,
+        modelVersionId
+      )
       // Refresh the model to show updated default
       onModelUpdated()
     } catch (error) {
@@ -112,7 +116,11 @@ function TextureSetSelectorWindow({
         )
         const newDefaultId =
           remainingTextureSets.length > 0 ? remainingTextureSets[0].id : null
-        await ApiClient.setDefaultTextureSet(parseInt(model.id), newDefaultId, modelVersionId)
+        await ApiClient.setDefaultTextureSet(
+          parseInt(model.id),
+          newDefaultId,
+          modelVersionId
+        )
       }
 
       // If this was the selected texture set, clear selection
@@ -196,7 +204,8 @@ function TextureSetSelectorWindow({
               {textureSets.map(textureSet => {
                 const previewUrl = getPreviewUrl(textureSet)
                 const isSelected = selectedTextureSetId === textureSet.id
-                const isDefault = selectedVersion?.defaultTextureSetId === textureSet.id
+                const isDefault =
+                  selectedVersion?.defaultTextureSetId === textureSet.id
 
                 return (
                   <div

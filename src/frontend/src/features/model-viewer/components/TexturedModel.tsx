@@ -60,7 +60,6 @@ function buildTextureConfigs(
   return configs
 }
 
-
 // OBJ Model with textures
 function OBJModelWithTextures({
   modelUrl,
@@ -92,7 +91,11 @@ function OBJModelWithTextures({
   const hasTextures = Object.keys(textureConfigs).length > 0
 
   // Load textures with channel extraction
-  const loadedTextures = useChannelExtractedTextures(textureConfigs, renderer, true) // OBJ uses flipY=true
+  const loadedTextures = useChannelExtractedTextures(
+    textureConfigs,
+    renderer,
+    true
+  ) // OBJ uses flipY=true
   const texturesReady = Object.keys(loadedTextures).length > 0
 
   useEffect(() => {
@@ -207,7 +210,11 @@ function GLTFModelWithTextures({
   const hasTextures = Object.keys(textureConfigs).length > 0
 
   // Load textures with channel extraction
-  const loadedTextures = useChannelExtractedTextures(textureConfigs, renderer, false) // GLTF uses flipY=false
+  const loadedTextures = useChannelExtractedTextures(
+    textureConfigs,
+    renderer,
+    false
+  ) // GLTF uses flipY=false
   const texturesReady = Object.keys(loadedTextures).length > 0
 
   useEffect(() => {
@@ -321,7 +328,11 @@ function FBXModelWithTextures({
   const hasTextures = Object.keys(textureConfigs).length > 0
 
   // Load textures with channel extraction
-  const loadedTextures = useChannelExtractedTextures(textureConfigs, renderer, true) // FBX uses flipY=true
+  const loadedTextures = useChannelExtractedTextures(
+    textureConfigs,
+    renderer,
+    true
+  ) // FBX uses flipY=true
   const texturesReady = Object.keys(loadedTextures).length > 0
 
   useEffect(() => {

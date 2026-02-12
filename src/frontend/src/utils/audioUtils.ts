@@ -136,8 +136,7 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   for (let i = 0; i < numSamples; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
       const sample = Math.max(-1, Math.min(1, channels[ch][i]))
-      const intSample =
-        sample < 0 ? sample * 0x8000 : sample * 0x7fff
+      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff
       view.setInt16(pos, intSample, true)
       pos += 2
     }

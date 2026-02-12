@@ -9,7 +9,11 @@ interface ThumbnailDisplayProps {
   modelName?: string
 }
 
-function ThumbnailDisplay({ modelId, versionId, modelName }: ThumbnailDisplayProps) {
+function ThumbnailDisplay({
+  modelId,
+  versionId,
+  modelName,
+}: ThumbnailDisplayProps) {
   // Normalize modelId to string for consistency
   const modelIdStr = modelId.toString()
   const { thumbnailDetails, imgSrc } = useThumbnail(modelIdStr, versionId)
