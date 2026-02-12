@@ -5,7 +5,17 @@ import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import { Model } from '../../../../utils/fileUtils'
 import { PackDto, ProjectDto } from '../../../../types'
-import ApiClient from '../../../../services/ApiClient'
+import {
+  addModelToPack,
+  getAllPacks,
+  removeModelFromPack,
+} from '../../../pack/api/packApi'
+import {
+  addModelToProject,
+  getAllProjects,
+  removeModelFromProject,
+} from '../../../project/api/projectApi'
+import { softDeleteModel } from '../../api/modelApi'
 import {
   openInFileExplorer,
   copyPathToClipboard,
@@ -74,7 +84,7 @@ const ModelContextMenu = forwardRef<
 
     const loadPacks = async () => {
       try {
-        const data = await ApiClient.getAllPacks()
+        const data = await getAllPacks()
         setContextMenuPacks(data)
       } catch (error) {
         console.error('Failed to load packs:', error)
@@ -83,7 +93,7 @@ const ModelContextMenu = forwardRef<
 
     const loadProjects = async () => {
       try {
-        const data = await ApiClient.getAllProjects()
+        const data = await getAllProjects()
         setContextMenuProjects(data)
       } catch (error) {
         console.error('Failed to load projects:', error)
@@ -132,7 +142,7 @@ const ModelContextMenu = forwardRef<
     const handleAddToPack = async (packId: number) => {
       if (!selectedModel) return
       try {
-        await ApiClient.addModelToPack(packId, Number(selectedModel.id))
+        await addModelToPack(packId, Number(selectedModel.id))
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
@@ -154,7 +164,7 @@ const ModelContextMenu = forwardRef<
     const handleAddToProject = async (projectId: number) => {
       if (!selectedModel) return
       try {
-        await ApiClient.addModelToProject(projectId, Number(selectedModel.id))
+        await addModelToProject(projectId, Number(selectedModel.id))
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
@@ -176,7 +186,7 @@ const ModelContextMenu = forwardRef<
     const handleSoftDelete = async () => {
       if (!selectedModel) return
       try {
-        await ApiClient.softDeleteModel(Number(selectedModel.id))
+        await softDeleteModel(Number(selectedModel.id))
         toast.current?.show({
           severity: 'success',
           summary: 'Recycled',
@@ -200,7 +210,7 @@ const ModelContextMenu = forwardRef<
     const handleRemoveFromPack = async () => {
       if (!selectedModel || !packId) return
       try {
-        await ApiClient.removeModelFromPack(packId, Number(selectedModel.id))
+        await removeModelFromPack(packId, Number(selectedModel.id))
         toast.current?.show({
           severity: 'success',
           summary: 'Removed',
@@ -222,10 +232,7 @@ const ModelContextMenu = forwardRef<
     const handleRemoveFromProject = async () => {
       if (!selectedModel || !projectId) return
       try {
-        await ApiClient.removeModelFromProject(
-          projectId,
-          Number(selectedModel.id)
-        )
+        await removeModelFromProject(projectId, Number(selectedModel.id))
         toast.current?.show({
           severity: 'success',
           summary: 'Removed',

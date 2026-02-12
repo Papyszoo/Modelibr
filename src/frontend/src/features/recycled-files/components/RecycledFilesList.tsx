@@ -6,6 +6,8 @@ import { ConfirmDialog } from 'primereact/confirmdialog'
 import { ProgressBar } from 'primereact/progressbar'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRecycledFilesQuery } from '../api/queries'
 import { ThumbnailDisplay } from '../../thumbnail'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
@@ -84,15 +86,13 @@ export default function RecycledFilesList() {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.recycledFiles
 
+  const queryClient = useQueryClient()
+  const recycledQuery = useRecycledFilesQuery()
+
+  // Sync query data into local state
   useEffect(() => {
-    loadRecycledFiles()
-  }, [])
-
-  const loadRecycledFiles = async () => {
-    try {
-      setLoading(true)
-      const data = await ApiClient.getAllRecycledFiles()
-
+    if (recycledQuery.data) {
+      const data = recycledQuery.data
       setModels(
         data.models.map(m => ({
           id: m.id,
@@ -141,92 +141,67 @@ export default function RecycledFilesList() {
           deletedAt: s.deletedAt,
         }))
       )
-    } catch (error) {
-      console.error('Failed to load recycled files:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load recycled files',
-        life: 3000,
-      })
-    } finally {
       setLoading(false)
     }
+  }, [recycledQuery.data])
+
+  const loadRecycledFiles = () => {
+    queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
   }
 
-  const handleRestoreModel = async (model: RecycledModel) => {
-    try {
-      await ApiClient.restoreEntity('model', model.id)
+  type RestoreEntityType =
+    | 'model'
+    | 'modelVersion'
+    | 'textureSet'
+    | 'sprite'
+    | 'sound'
+  type InvalidateKey = readonly unknown[]
+
+  const restoreEntityMutation = useMutation({
+    mutationFn: (vars: {
+      entityType: RestoreEntityType
+      entityId: number
+      successDetail: string
+      onRemove: () => void
+      errorDetail: string
+      invalidateQueryKeys?: InvalidateKey[]
+    }) => ApiClient.restoreEntity(vars.entityType, vars.entityId),
+    onSuccess: async (_data, vars) => {
       toast.current?.show({
         severity: 'success',
         summary: 'Restored',
-        detail: `${model.name} has been restored`,
+        detail: vars.successDetail,
         life: 3000,
       })
-      setModels(prevModels => prevModels.filter(m => m.id !== model.id))
-    } catch (error) {
+      vars.onRemove()
+
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+      for (const key of vars.invalidateQueryKeys ?? []) {
+        await queryClient.invalidateQueries({ queryKey: key })
+      }
+    },
+    onError: (error, vars) => {
       console.error('Failed to restore:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to restore model',
+        detail: vars.errorDetail,
         life: 3000,
       })
-    }
-  }
+    },
+  })
 
-  const handleRestoreModelVersion = async (version: RecycledModelVersion) => {
-    try {
-      await ApiClient.restoreEntity('modelVersion', version.id)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Restored',
-        detail: `Version ${version.versionNumber} has been restored`,
-        life: 3000,
-      })
-      setModelVersions(prevVersions =>
-        prevVersions.filter(v => v.id !== version.id)
-      )
-    } catch (error) {
-      console.error('Failed to restore:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to restore model version',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleRestoreTextureSet = async (textureSet: RecycledTextureSet) => {
-    try {
-      await ApiClient.restoreEntity('textureSet', textureSet.id)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Restored',
-        detail: `${textureSet.name} has been restored`,
-        life: 3000,
-      })
-      setTextureSets(prevTextureSets =>
-        prevTextureSets.filter(ts => ts.id !== textureSet.id)
-      )
-    } catch (error) {
-      console.error('Failed to restore:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to restore texture set',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleDeletePreviewModel = async (model: RecycledModel) => {
-    try {
-      const preview = await ApiClient.getDeletePreview('model', model.id)
-      setDeletePreview({ ...preview, item: { ...model, type: 'model' } })
+  const deletePreviewMutation = useMutation({
+    mutationFn: (vars: {
+      entityType: string
+      entityId: number
+      item: DeletePreviewItem
+    }) => ApiClient.getDeletePreview(vars.entityType, vars.entityId),
+    onSuccess: (preview, vars) => {
+      setDeletePreview({ ...preview, item: vars.item })
       setShowPreviewDialog(true)
-    } catch (error) {
+    },
+    onError: error => {
       console.error('Failed to load delete preview:', error)
       toast.current?.show({
         severity: 'error',
@@ -234,177 +209,41 @@ export default function RecycledFilesList() {
         detail: 'Failed to load delete preview',
         life: 3000,
       })
-    }
-  }
+    },
+  })
 
-  const handleDeletePreviewModelVersion = async (
-    version: RecycledModelVersion
-  ) => {
-    try {
-      const preview = await ApiClient.getDeletePreview(
-        'modelVersion',
-        version.id
-      )
-      setDeletePreview({
-        ...preview,
-        item: {
-          id: version.id,
-          name: `Version ${version.versionNumber}`,
-          type: 'modelVersion',
-        },
-      })
-      setShowPreviewDialog(true)
-    } catch (error) {
-      console.error('Failed to load delete preview:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load delete preview',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleDeletePreviewTextureSet = async (
-    textureSet: RecycledTextureSet
-  ) => {
-    try {
-      const preview = await ApiClient.getDeletePreview(
-        'textureSet',
-        textureSet.id
-      )
-      setDeletePreview({
-        ...preview,
-        item: { ...textureSet, type: 'textureSet' },
-      })
-      setShowPreviewDialog(true)
-    } catch (error) {
-      console.error('Failed to load delete preview:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load delete preview',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleRestoreSprite = async (sprite: RecycledSprite) => {
-    try {
-      await ApiClient.restoreEntity('sprite', sprite.id)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Restored',
-        detail: `${sprite.name} has been restored`,
-        life: 3000,
-      })
-      setSprites(prevSprites => prevSprites.filter(s => s.id !== sprite.id))
-    } catch (error) {
-      console.error('Failed to restore:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to restore sprite',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleDeletePreviewSprite = async (sprite: RecycledSprite) => {
-    try {
-      const preview = await ApiClient.getDeletePreview('sprite', sprite.id)
-      setDeletePreview({
-        ...preview,
-        item: { ...sprite, type: 'sprite' },
-      })
-      setShowPreviewDialog(true)
-    } catch (error) {
-      console.error('Failed to load delete preview:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load delete preview',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleRestoreSound = async (sound: RecycledSound) => {
-    try {
-      await ApiClient.restoreEntity('sound', sound.id)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Restored',
-        detail: `${sound.name} has been restored`,
-        life: 3000,
-      })
-      setSounds(prevSounds => prevSounds.filter(s => s.id !== sound.id))
-    } catch (error) {
-      console.error('Failed to restore:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to restore sound',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleDeletePreviewSound = async (sound: RecycledSound) => {
-    try {
-      const preview = await ApiClient.getDeletePreview('sound', sound.id)
-      setDeletePreview({
-        ...preview,
-        item: { ...sound, type: 'sound' },
-      })
-      setShowPreviewDialog(true)
-    } catch (error) {
-      console.error('Failed to load delete preview:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load delete preview',
-        life: 3000,
-      })
-    }
-  }
-
-  const handlePermanentDelete = async () => {
-    if (!deletePreview) return
-
-    try {
-      await ApiClient.permanentlyDeleteEntity(
-        deletePreview.item.type,
-        deletePreview.item.id
-      )
+  const permanentDeleteMutation = useMutation({
+    mutationFn: (vars: { item: DeletePreviewItem }) =>
+      ApiClient.permanentlyDeleteEntity(vars.item.type, vars.item.id),
+    onSuccess: async (_data, vars) => {
       toast.current?.show({
         severity: 'success',
         summary: 'Deleted',
-        detail: `${deletePreview.item.name} has been permanently deleted`,
+        detail: `${vars.item.name} has been permanently deleted`,
         life: 3000,
       })
       setShowPreviewDialog(false)
 
-      const deletedItem = deletePreview.item
-      if (deletedItem.type === 'model') {
-        setModels(prevModels => prevModels.filter(m => m.id !== deletedItem.id))
-      } else if (deletedItem.type === 'modelVersion') {
-        setModelVersions(prevVersions =>
-          prevVersions.filter(v => v.id !== deletedItem.id)
-        )
-      } else if (deletedItem.type === 'textureSet') {
-        setTextureSets(prevTextureSets =>
-          prevTextureSets.filter(ts => ts.id !== deletedItem.id)
-        )
-      } else if (deletedItem.type === 'sprite') {
-        setSprites(prevSprites =>
-          prevSprites.filter(s => s.id !== deletedItem.id)
-        )
-      } else if (deletedItem.type === 'sound') {
-        setSounds(prevSounds => prevSounds.filter(s => s.id !== deletedItem.id))
+      if (vars.item.type === 'model') {
+        setModels(prevModels => prevModels.filter(m => m.id !== vars.item.id))
+        await queryClient.invalidateQueries({ queryKey: ['models'] })
+      } else if (vars.item.type === 'modelVersion') {
+        setModelVersions(prev => prev.filter(v => v.id !== vars.item.id))
+        await queryClient.invalidateQueries({ queryKey: ['models'] })
+      } else if (vars.item.type === 'textureSet') {
+        setTextureSets(prev => prev.filter(ts => ts.id !== vars.item.id))
+      } else if (vars.item.type === 'sprite') {
+        setSprites(prev => prev.filter(s => s.id !== vars.item.id))
+        await queryClient.invalidateQueries({ queryKey: ['sprites'] })
+      } else if (vars.item.type === 'sound') {
+        setSounds(prev => prev.filter(s => s.id !== vars.item.id))
+        await queryClient.invalidateQueries({ queryKey: ['sounds'] })
       }
+
       setDeletePreview(null)
-    } catch (error) {
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+    },
+    onError: error => {
       console.error('Failed to permanently delete:', error)
       toast.current?.show({
         severity: 'error',
@@ -412,7 +251,117 @@ export default function RecycledFilesList() {
         detail: 'Failed to permanently delete item',
         life: 3000,
       })
-    }
+    },
+  })
+
+  const handleRestoreModel = async (model: RecycledModel) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'model',
+      entityId: model.id,
+      successDetail: `${model.name} has been restored`,
+      errorDetail: 'Failed to restore model',
+      onRemove: () => setModels(prev => prev.filter(m => m.id !== model.id)),
+      invalidateQueryKeys: [['models']],
+    })
+  }
+
+  const handleRestoreModelVersion = async (version: RecycledModelVersion) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'modelVersion',
+      entityId: version.id,
+      successDetail: `Version ${version.versionNumber} has been restored`,
+      errorDetail: 'Failed to restore model version',
+      onRemove: () =>
+        setModelVersions(prev => prev.filter(v => v.id !== version.id)),
+      invalidateQueryKeys: [['models']],
+    })
+  }
+
+  const handleRestoreTextureSet = async (textureSet: RecycledTextureSet) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'textureSet',
+      entityId: textureSet.id,
+      successDetail: `${textureSet.name} has been restored`,
+      errorDetail: 'Failed to restore texture set',
+      onRemove: () =>
+        setTextureSets(prev => prev.filter(ts => ts.id !== textureSet.id)),
+    })
+  }
+
+  const handleDeletePreviewModel = async (model: RecycledModel) => {
+    deletePreviewMutation.mutate({
+      entityType: 'model',
+      entityId: model.id,
+      item: { ...model, type: 'model' },
+    })
+  }
+
+  const handleDeletePreviewModelVersion = async (
+    version: RecycledModelVersion
+  ) => {
+    deletePreviewMutation.mutate({
+      entityType: 'modelVersion',
+      entityId: version.id,
+      item: {
+        id: version.id,
+        name: `Version ${version.versionNumber}`,
+        type: 'modelVersion',
+      },
+    })
+  }
+
+  const handleDeletePreviewTextureSet = async (
+    textureSet: RecycledTextureSet
+  ) => {
+    deletePreviewMutation.mutate({
+      entityType: 'textureSet',
+      entityId: textureSet.id,
+      item: { ...textureSet, type: 'textureSet' },
+    })
+  }
+
+  const handleRestoreSprite = async (sprite: RecycledSprite) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'sprite',
+      entityId: sprite.id,
+      successDetail: `${sprite.name} has been restored`,
+      errorDetail: 'Failed to restore sprite',
+      onRemove: () => setSprites(prev => prev.filter(s => s.id !== sprite.id)),
+      invalidateQueryKeys: [['sprites']],
+    })
+  }
+
+  const handleDeletePreviewSprite = async (sprite: RecycledSprite) => {
+    deletePreviewMutation.mutate({
+      entityType: 'sprite',
+      entityId: sprite.id,
+      item: { ...sprite, type: 'sprite' },
+    })
+  }
+
+  const handleRestoreSound = async (sound: RecycledSound) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'sound',
+      entityId: sound.id,
+      successDetail: `${sound.name} has been restored`,
+      errorDetail: 'Failed to restore sound',
+      onRemove: () => setSounds(prev => prev.filter(s => s.id !== sound.id)),
+      invalidateQueryKeys: [['sounds']],
+    })
+  }
+
+  const handleDeletePreviewSound = async (sound: RecycledSound) => {
+    deletePreviewMutation.mutate({
+      entityType: 'sound',
+      entityId: sound.id,
+      item: { ...sound, type: 'sound' },
+    })
+  }
+
+  const handlePermanentDelete = async () => {
+    if (!deletePreview) return
+
+    await permanentDeleteMutation.mutateAsync({ item: deletePreview.item })
   }
 
   const formatFileSize = (bytes: number) => {

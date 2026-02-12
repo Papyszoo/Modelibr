@@ -4,8 +4,23 @@ import {
   ContainerAdapter,
   ContainerDto,
 } from '../../../shared/types/ContainerTypes'
-import ApiClient from '../../../services/ApiClient'
 import { ProjectDto } from '../../../types'
+import {
+  getProjectById,
+  getModelsByProject,
+  getTextureSetsByProject,
+  getSpritesByProject,
+  getSoundsByProject,
+  addModelToProject,
+  removeModelFromProject,
+  addTextureSetToProject,
+  removeTextureSetFromProject,
+  addSpriteToProject,
+  removeSpriteFromProject,
+  addSoundToProject,
+  removeSoundFromProject,
+  addTextureToProjectWithFile,
+} from '../api/projectApi'
 
 interface ProjectViewerProps {
   projectId: number
@@ -37,22 +52,21 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
       label: 'Project',
       cssPrefix: 'container',
       loadContainer: async id => {
-        const project = await ApiClient.getProjectById(id)
+        const project = await getProjectById(id)
         return toContainerDto(project)
       },
-      loadModels: id => ApiClient.getModelsByProject(id),
-      loadTextureSets: id => ApiClient.getTextureSetsByProject(id),
-      loadSprites: id => ApiClient.getSpritesByProject(id),
-      loadSounds: id => ApiClient.getSoundsByProject(id),
-      addModel: (cId, mId) => ApiClient.addModelToProject(cId, mId),
-      removeModel: (cId, mId) => ApiClient.removeModelFromProject(cId, mId),
-      addTextureSet: (cId, tsId) => ApiClient.addTextureSetToProject(cId, tsId),
-      removeTextureSet: (cId, tsId) =>
-        ApiClient.removeTextureSetFromProject(cId, tsId),
-      addSprite: (cId, sId) => ApiClient.addSpriteToProject(cId, sId),
-      removeSprite: (cId, sId) => ApiClient.removeSpriteFromProject(cId, sId),
-      addSound: (cId, sId) => ApiClient.addSoundToProject(cId, sId),
-      removeSound: (cId, sId) => ApiClient.removeSoundFromProject(cId, sId),
+      loadModels: id => getModelsByProject(id),
+      loadTextureSets: id => getTextureSetsByProject(id),
+      loadSprites: id => getSpritesByProject(id),
+      loadSounds: id => getSoundsByProject(id),
+      addModel: (cId, mId) => addModelToProject(cId, mId),
+      removeModel: (cId, mId) => removeModelFromProject(cId, mId),
+      addTextureSet: (cId, tsId) => addTextureSetToProject(cId, tsId),
+      removeTextureSet: (cId, tsId) => removeTextureSetFromProject(cId, tsId),
+      addSprite: (cId, sId) => addSpriteToProject(cId, sId),
+      removeSprite: (cId, sId) => removeSpriteFromProject(cId, sId),
+      addSound: (cId, sId) => addSoundToProject(cId, sId),
+      removeSound: (cId, sId) => removeSoundFromProject(cId, sId),
       uploadTextureWithFile: (
         cId,
         file,
@@ -60,14 +74,7 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
         textureType,
         batchId,
         _uploadType
-      ) =>
-        ApiClient.addTextureToProjectWithFile(
-          cId,
-          file,
-          name,
-          textureType,
-          batchId
-        ),
+      ) => addTextureToProjectWithFile(cId, file, name, textureType, batchId),
       createSpriteOptions: cId => ({ projectId: cId }),
       createSoundOptions: cId => ({ projectId: cId }),
     }),

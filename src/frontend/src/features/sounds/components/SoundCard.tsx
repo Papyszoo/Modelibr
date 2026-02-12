@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SoundDto } from '../../../types'
-import ApiClient from '../../../services/ApiClient'
+import { baseURL } from '../../../lib/apiBase'
+import { getFileUrl } from '../../models/api/modelApi'
 import { formatDuration } from '../../../utils/audioUtils'
 import './SoundCard.css'
 
@@ -18,7 +19,7 @@ interface SoundCardProps {
 function SoundCard({
   sound,
   isSelected,
-  isDragging,
+  isDragging: _isDragging,
   onSelect,
   onClick,
   onContextMenu,
@@ -141,13 +142,14 @@ function SoundCard({
 
   // Use waveform URL from backend response (only if waveform exists)
   const waveformUrl = sound.waveformUrl
-    ? `${ApiClient.getBaseURL()}${sound.waveformUrl}`
+    ? `${baseURL}${sound.waveformUrl}`
     : null
 
   return (
     <div
+      className={`sound-card ${isSelected ? 'selected' : ''}`}
       data-sound-id={sound.id}
-      className={`sound-card ${isDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+      src={getFileUrl(sound.fileId.toString())}
       onClick={onClick}
       onContextMenu={onContextMenu}
       draggable
@@ -156,7 +158,7 @@ function SoundCard({
     >
       <audio
         ref={audioRef}
-        src={ApiClient.getFileUrl(sound.fileId.toString())}
+        src={getFileUrl(sound.fileId.toString())}
         onLoadedMetadata={handleAudioLoad}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}

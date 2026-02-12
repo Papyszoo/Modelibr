@@ -1,6 +1,5 @@
 import { useRef, useCallback } from 'react'
 import { PackDto, ProjectDto } from '../../../../types'
-import { useApiCache } from '../../../../hooks/useApiCache'
 import { useThumbnailSignalR } from '../../../thumbnail/hooks/useThumbnailSignalR'
 import { Toast } from 'primereact/toast'
 import { useModelData } from './useModelData'
@@ -19,7 +18,6 @@ export function useModelGrid({
   textureSetId,
 }: UseModelGridOptions) {
   const toast = useRef<Toast>(null)
-  const { refreshModels } = useApiCache()
 
   // Filters (search, pack/project selection, card width)
   const filters = useModelFilters({ packId, projectId })
@@ -60,7 +58,6 @@ export function useModelGrid({
   }, [projectId, packId, data.projects, data.packs])
 
   const handleRefresh = useCallback(async () => {
-    refreshModels()
     await data.fetchModels()
     toast.current?.show({
       severity: 'success',
@@ -68,7 +65,7 @@ export function useModelGrid({
       detail: 'Models list has been refreshed',
       life: 2000,
     })
-  }, [refreshModels, data.fetchModels])
+  }, [data.fetchModels])
 
   return {
     // Data

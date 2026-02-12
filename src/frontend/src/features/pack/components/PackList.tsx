@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import ApiClient from '../../../services/ApiClient'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createPack, deletePack } from '../api/packApi'
+import { usePacksQuery } from '../api/queries'
 import { PackDto } from '../../../types'
 import { openTabInPanel } from '../../../utils/tabNavigation'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
@@ -14,38 +15,83 @@ import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import './PackList.css'
 
 export default function PackList() {
-  const [packs, setPacks] = useState<PackDto[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const queryClient = useQueryClient()
+  const packsQuery = usePacksQuery()
+  const packs = packsQuery.data ?? []
+  const loading = packsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newPackName, setNewPackName] = useState('')
   const [newPackDescription, setNewPackDescription] = useState('')
   const toast = useRef<Toast>(null)
-  
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.packs
 
-  useEffect(() => {
-    loadPacks()
-  }, [])
+  const invalidatePacks = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['packs'] })
+  }
 
-  const loadPacks = async () => {
-    try {
-      setLoading(true)
-      const data = await ApiClient.getAllPacks()
-      setPacks(data)
-    } catch (error) {
-      console.error('Failed to load packs:', error)
+  const createPackMutation = useMutation({
+    mutationFn: (payload: { name: string; description?: string }) =>
+      createPack(payload),
+    onSuccess: async () => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Pack created successfully',
+        life: 3000,
+      })
+
+      setShowCreateDialog(false)
+      setNewPackName('')
+      setNewPackDescription('')
+      await invalidatePacks()
+    },
+    onError: error => {
+      console.error('Failed to create pack:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to load packs',
+        detail: 'Failed to create pack',
         life: 3000,
       })
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+  })
+
+  const deletePackMutation = useMutation({
+    mutationFn: (packId: number) => deletePack(packId),
+    onMutate: async packId => {
+      await queryClient.cancelQueries({ queryKey: ['packs'] })
+      const previousPacks = queryClient.getQueryData<PackDto[]>(['packs'])
+      queryClient.setQueryData<PackDto[]>(['packs'], current =>
+        (current ?? []).filter(p => p.id !== packId)
+      )
+      return { previousPacks }
+    },
+    onError: (error, _packId, context) => {
+      console.error('Failed to delete pack:', error)
+      if (context?.previousPacks) {
+        queryClient.setQueryData(['packs'], context.previousPacks)
+      }
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete pack',
+        life: 3000,
+      })
+    },
+    onSuccess: () => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Pack deleted successfully',
+        life: 3000,
+      })
+    },
+    onSettled: async () => {
+      await invalidatePacks()
+    },
+  })
 
   const handleCreatePack = async () => {
     if (!newPackName.trim()) {
@@ -58,56 +104,17 @@ export default function PackList() {
       return
     }
 
-    try {
-      await ApiClient.createPack({
-        name: newPackName.trim(),
-        description: newPackDescription.trim() || undefined,
-      })
-
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Pack created successfully',
-        life: 3000,
-      })
-
-      setShowCreateDialog(false)
-      setNewPackName('')
-      setNewPackDescription('')
-      loadPacks()
-    } catch (error) {
-      console.error('Failed to create pack:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to create pack',
-        life: 3000,
-      })
-    }
+    await createPackMutation.mutateAsync({
+      name: newPackName.trim(),
+      description: newPackDescription.trim() || undefined,
+    })
   }
 
   const handleDeletePack = async (packId: number) => {
-    try {
-      await ApiClient.deletePack(packId)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Pack deleted successfully',
-        life: 3000,
-      })
-      loadPacks()
-    } catch (error) {
-      console.error('Failed to delete pack:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to delete pack',
-        life: 3000,
-      })
-    }
+    await deletePackMutation.mutateAsync(packId)
   }
 
-  const getPackThumbnail = (pack: PackDto) => {
+  const getPackThumbnail = (_pack: PackDto) => {
     // TODO: Add pack thumbnail support
     // For now, return null - will be implemented when thumbnail upload is added
     return null
@@ -151,9 +158,11 @@ export default function PackList() {
           />
         </div>
       ) : (
-        <div 
+        <div
           className="pack-grid"
-          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+          }}
         >
           {packs.map(pack => {
             const thumbnail = getPackThumbnail(pack)
@@ -162,7 +171,12 @@ export default function PackList() {
                 key={pack.id}
                 className="pack-grid-card"
                 onClick={() => {
-                  openTabInPanel('packViewer', 'left', pack.id.toString(), pack.name)
+                  openTabInPanel(
+                    'packViewer',
+                    'left',
+                    pack.id.toString(),
+                    pack.name
+                  )
                 }}
               >
                 <div className="pack-grid-card-image">
@@ -198,6 +212,7 @@ export default function PackList() {
                     icon="pi pi-trash"
                     className="p-button-text p-button-rounded p-button-danger p-button-sm"
                     tooltip="Delete Pack"
+                    disabled={deletePackMutation.isPending}
                     onClick={e => {
                       e.stopPropagation()
                       handleDeletePack(pack.id)

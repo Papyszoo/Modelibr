@@ -1,5 +1,4 @@
 import { client, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 import { Model } from '../../../utils/fileUtils'
 import {
   PackDto,
@@ -18,17 +17,8 @@ import {
 export async function getAllPacks(
   options: { skipCache?: boolean } = {}
 ): Promise<PackDto[]> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getPacks()
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response = await client.get<GetAllPacksResponse>('/packs')
-
-  useApiCacheStore.getState().setPacks(response.data.packs)
-
   return response.data.packs
 }
 
@@ -36,17 +26,8 @@ export async function getPackById(
   id: number,
   options: { skipCache?: boolean } = {}
 ): Promise<PackDto> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getPackById(id)
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response = await client.get<PackDto>(`/packs/${id}`)
-
-  useApiCacheStore.getState().setPackById(id, response.data)
-
   return response.data
 }
 
@@ -54,9 +35,6 @@ export async function createPack(
   request: CreatePackRequest
 ): Promise<CreatePackResponse> {
   const response = await client.post<CreatePackResponse>('/packs', request)
-
-  useApiCacheStore.getState().invalidatePacks()
-
   return response.data
 }
 
@@ -65,16 +43,10 @@ export async function updatePack(
   request: UpdatePackRequest
 ): Promise<void> {
   await client.put(`/packs/${id}`, request)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(id)
 }
 
 export async function deletePack(id: number): Promise<void> {
   await client.delete(`/packs/${id}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(id)
 }
 
 export async function addModelToPack(
@@ -82,11 +54,6 @@ export async function addModelToPack(
   modelId: number
 ): Promise<void> {
   await client.post(`/packs/${packId}/models/${modelId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }
 
 export async function removeModelFromPack(
@@ -94,11 +61,6 @@ export async function removeModelFromPack(
   modelId: number
 ): Promise<void> {
   await client.delete(`/packs/${packId}/models/${modelId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }
 
 export async function addTextureSetToPack(
@@ -106,11 +68,6 @@ export async function addTextureSetToPack(
   textureSetId: number
 ): Promise<void> {
   await client.post(`/packs/${packId}/texture-sets/${textureSetId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
 }
 
 export async function addTextureToPackWithFile(
@@ -141,11 +98,6 @@ export async function addTextureToPackWithFile(
       timeout: UPLOAD_TIMEOUT,
     }
   )
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
-  useApiCacheStore.getState().invalidateTextureSets()
-
   return response.data
 }
 
@@ -154,11 +106,6 @@ export async function removeTextureSetFromPack(
   textureSetId: number
 ): Promise<void> {
   await client.delete(`/packs/${packId}/texture-sets/${textureSetId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
 }
 
 export async function getModelsByPack(packId: number): Promise<Model[]> {
@@ -180,9 +127,6 @@ export async function addSpriteToPack(
   spriteId: number
 ): Promise<void> {
   await client.post(`/packs/${packId}/sprites/${spriteId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
 }
 
 export async function removeSpriteFromPack(
@@ -190,9 +134,6 @@ export async function removeSpriteFromPack(
   spriteId: number
 ): Promise<void> {
   await client.delete(`/packs/${packId}/sprites/${spriteId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
 }
 
 export async function getSpritesByPack(packId: number): Promise<SpriteDto[]> {
@@ -207,9 +148,6 @@ export async function addSoundToPack(
   soundId: number
 ): Promise<void> {
   await client.post(`/packs/${packId}/sounds/${soundId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
 }
 
 export async function removeSoundFromPack(
@@ -217,9 +155,6 @@ export async function removeSoundFromPack(
   soundId: number
 ): Promise<void> {
   await client.delete(`/packs/${packId}/sounds/${soundId}`)
-
-  useApiCacheStore.getState().invalidatePacks()
-  useApiCacheStore.getState().invalidatePackById(packId)
 }
 
 export async function getSoundsByPack(packId: number): Promise<SoundDto[]> {

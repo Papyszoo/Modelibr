@@ -3,6 +3,7 @@ import { Chip } from 'primereact/chip'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Button } from 'primereact/button'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { getModelFileFormat } from '../../../utils/fileUtils'
 // eslint-disable-next-line no-restricted-imports -- ModelInfo needs direct API access
 import apiClient from '../../../services/ApiClient'
@@ -15,8 +16,56 @@ function ModelInfo({ model, onModelUpdated }) {
   )
   const [description, setDescription] = useState(model.description || '')
   const [newTag, setNewTag] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
   const [showTextureSetDialog, setShowTextureSetDialog] = useState(false)
+  const queryClient = useQueryClient()
+
+  const invalidateModelQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['models'] })
+    queryClient.invalidateQueries({
+      queryKey: ['models', 'detail', String(model.id)],
+    })
+  }
+
+  const saveModelInfoMutation = useMutation({
+    mutationFn: async ({
+      tagsString,
+      desc,
+    }: {
+      tagsString: string
+      desc: string
+    }) => apiClient.updateModelTags(model.id, tagsString, desc),
+    onSuccess: () => {
+      invalidateModelQueries()
+      if (onModelUpdated) {
+        onModelUpdated()
+      }
+    },
+    onError: error => {
+      console.error('Failed to save tags:', error)
+    },
+  })
+
+  const removeTextureSetMutation = useMutation({
+    mutationFn: async (textureSetId: number) => {
+      const activeVersionId = model.activeVersionId
+      if (!activeVersionId) {
+        throw new Error('Model has no active version')
+      }
+      await apiClient.disassociateTextureSetFromModelVersion(
+        textureSetId,
+        activeVersionId
+      )
+    },
+    onSuccess: () => {
+      invalidateModelQueries()
+      if (onModelUpdated) {
+        onModelUpdated()
+      }
+    },
+    onError: error => {
+      console.error('Failed to remove texture set:', error)
+    },
+  })
 
   const handleAddTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
@@ -35,40 +84,13 @@ function ModelInfo({ model, onModelUpdated }) {
     }
   }
 
-  const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      const tagsString = tags.join(', ')
-      await apiClient.updateModelTags(model.id, tagsString, description)
-      // Success - could show a toast notification here
-      if (onModelUpdated) {
-        onModelUpdated()
-      }
-    } catch (error) {
-      console.error('Failed to save tags:', error)
-      // Could show error toast here
-    } finally {
-      setIsSaving(false)
-    }
+  const handleSave = () => {
+    const tagsString = tags.join(', ')
+    saveModelInfoMutation.mutate({ tagsString, desc: description })
   }
 
-  const handleRemoveTextureSet = async (textureSetId: number) => {
-    try {
-      const activeVersionId = model.activeVersionId
-      if (!activeVersionId) {
-        console.error('Model has no active version')
-        return
-      }
-      await apiClient.disassociateTextureSetFromModelVersion(
-        textureSetId,
-        activeVersionId
-      )
-      if (onModelUpdated) {
-        onModelUpdated()
-      }
-    } catch (error) {
-      console.error('Failed to remove texture set:', error)
-    }
+  const handleRemoveTextureSet = (textureSetId: number) => {
+    removeTextureSetMutation.mutate(textureSetId)
   }
 
   return (
@@ -145,10 +167,10 @@ function ModelInfo({ model, onModelUpdated }) {
         </div>
 
         <Button
-          label={isSaving ? 'Saving...' : 'Save Changes'}
+          label={saveModelInfoMutation.isPending ? 'Saving...' : 'Save Changes'}
           icon="pi pi-save"
           onClick={handleSave}
-          disabled={isSaving}
+          disabled={saveModelInfoMutation.isPending}
           className="save-button"
         />
       </div>

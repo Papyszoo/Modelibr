@@ -11,16 +11,21 @@ import { ViewerSettingsType } from './ViewerSettings'
 import { TextureSetDto } from '../../../types'
 
 // Helper component to show directional light with visual indicator
-function FillLight({ position, intensity, color, helperColor }: { 
+function FillLight({
+  position,
+  intensity,
+  color,
+  helperColor,
+}: {
   position: [number, number, number]
   intensity: number
   color: string
-  helperColor: string  // Separate color for helper visibility
+  helperColor: string // Separate color for helper visibility
 }) {
   const lightRef = useRef<THREE.DirectionalLight>(null)
   // Show helper arrow to visualize light direction (comment out to hide)
   useHelper(lightRef, THREE.DirectionalLightHelper, 1, helperColor)
-  
+
   return (
     <directionalLight
       ref={lightRef}
@@ -120,32 +125,32 @@ function Scene({
         Models are normalized to fit in ~2x2x2 bounds (see TexturedModel.tsx)
         Lights positioned at 3x model radius for consistent illumination
       */}
-      
+
       {/* Ambient fill - base illumination */}
       <ambientLight intensity={0.3} />
-      
+
       {/* KEY LIGHT: Main light, warm, from front-right-above (45° azimuth, 45° elevation) */}
-      <FillLight 
-        position={[4, 4, 4]} 
-        intensity={1.2} 
+      <FillLight
+        position={[4, 4, 4]}
+        intensity={1.2}
         color="#fff5e6"
-        helperColor="#ff8800"  // Bright orange - visible in light mode
+        helperColor="#ff8800" // Bright orange - visible in light mode
       />
-      
+
       {/* FILL LIGHT: Softer, cool, from front-left (opposite key) */}
-      <FillLight 
-        position={[-4, 2, 4]} 
-        intensity={0.6} 
+      <FillLight
+        position={[-4, 2, 4]}
+        intensity={0.6}
         color="#e6f0ff"
-        helperColor="#00ccff"  // Bright cyan - visible in light mode
+        helperColor="#00ccff" // Bright cyan - visible in light mode
       />
-      
+
       {/* RIM/BACK LIGHT: Edge separation, from behind */}
-      <FillLight 
-        position={[0, 3, -5]} 
-        intensity={0.8} 
+      <FillLight
+        position={[0, 3, -5]}
+        intensity={0.8}
         color="#ffffff"
-        helperColor="#ff00ff"  // Bright magenta - visible in light mode
+        helperColor="#ff00ff" // Bright magenta - visible in light mode
       />
 
       {/* Orbit controls for interaction */}

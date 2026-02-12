@@ -70,7 +70,9 @@ function TextureSetAssociationDialog({
       // Get currently associated texture set IDs for this specific model version
       const associatedTextureSetIds = new Set(
         allTextureSets
-          .filter(ts => ts.associatedModels.some(m => m.modelVersionId === modelVersionId))
+          .filter(ts =>
+            ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
+          )
           .map(ts => ts.id)
       )
 

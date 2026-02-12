@@ -6,7 +6,7 @@ import { ProgressBar } from 'primereact/progressbar'
 import { ThumbnailDisplay } from '../../../thumbnail'
 import { useTabContext } from '../../../../hooks/useTabContext'
 import { Model } from '../../../../utils/fileUtils'
-import ApiClient from '../../../../services/ApiClient'
+import { getModelsPaginated } from '../../api/modelApi'
 import { ModelGridProps } from './types'
 import { useModelGrid } from './useModelGrid'
 import ModelsFilters from './ModelsFilters'
@@ -28,7 +28,7 @@ export default function ModelGrid({
 
   const openAddModelDialog = useCallback(async () => {
     try {
-      const response = await ApiClient.getModelsPaginated({
+      const response = await getModelsPaginated({
         page: 1,
         pageSize: 200,
       })

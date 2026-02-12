@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
+import { useMutation } from '@tanstack/react-query'
 import { openTabInPanel } from '../../../utils/tabNavigation'
 // eslint-disable-next-line no-restricted-imports
 import ApiClient from '../../../services/ApiClient'
@@ -47,14 +48,15 @@ function StageList() {
     loadStages()
   }, [loadStages])
 
-  const handleCreateStage = async (name: string) => {
-    try {
-      // Create with minimal config
+  const createStageMutation = useMutation({
+    mutationFn: async (name: string) => {
       const defaultConfig = JSON.stringify({
         lights: [],
         components: [],
       })
       await ApiClient.createStage(name, defaultConfig)
+    },
+    onSuccess: () => {
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -63,7 +65,8 @@ function StageList() {
       })
       loadStages()
       setShowCreateDialog(false)
-    } catch (error) {
+    },
+    onError: error => {
       console.error('Failed to create stage:', error)
       toast.current?.show({
         severity: 'error',
@@ -71,7 +74,11 @@ function StageList() {
         detail: 'Failed to create stage',
         life: 3000,
       })
-    }
+    },
+  })
+
+  const handleCreateStage = (name: string) => {
+    createStageMutation.mutate(name)
   }
 
   const handleDeleteStage = (stage: StageDto) => {

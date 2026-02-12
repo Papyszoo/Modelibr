@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { ModelVersionDto } from '../../../types'
-import ApiClient from '../../../services/ApiClient'
+import {
+  createModelVersion,
+  getModelVersions,
+  getVersionFileUrl,
+} from '../../model-viewer/api/modelVersionApi'
 import './ModelVersionHistory.css'
 
 interface ModelVersionHistoryProps {
@@ -26,7 +30,7 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
   const loadVersions = async () => {
     try {
       setLoading(true)
-      const data = await ApiClient.getModelVersions(modelId)
+      const data = await getModelVersions(modelId)
       setVersions(data)
       setError(null)
     } catch (err) {
@@ -47,11 +51,7 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
 
     try {
       setUploading(true)
-      await ApiClient.createModelVersion(
-        modelId,
-        file,
-        description || undefined
-      )
+      await createModelVersion(modelId, file, description || undefined)
       await loadVersions()
     } catch (err) {
       alert('Failed to create new version')
@@ -61,13 +61,16 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
     }
   }
 
-  const handleDownload = (version: ModelVersionDto, file: any) => {
-    const url = ApiClient.getVersionFileUrl(modelId, version.id, file.id)
+  const handleDownload = (version: ModelVersionDto, file: { id: number }) => {
+    const url = getVersionFileUrl(modelId, version.id, file.id)
     window.open(url, '_blank')
   }
 
-  const handleOpenInBlender = (version: ModelVersionDto, file: any) => {
-    const url = ApiClient.getVersionFileUrl(modelId, version.id, file.id)
+  const handleOpenInBlender = (
+    version: ModelVersionDto,
+    file: { id: number }
+  ) => {
+    const url = getVersionFileUrl(modelId, version.id, file.id)
     // Try to open with blender:// protocol, fallback to download
     const blenderUrl = `blender://${url}`
     window.location.href = blenderUrl

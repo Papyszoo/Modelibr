@@ -26,7 +26,7 @@ export function FileUploadModal({
   visible,
   onHide,
   file,
-  modelId,
+  modelId: _modelId,
   versions,
   selectedVersion,
   onUpload,
@@ -35,7 +35,7 @@ export function FileUploadModal({
   const [description, setDescription] = useState('')
   const [uploading, setUploading] = useState(false)
   const [setAsActive, setSetAsActive] = useState(true)
-  const [targetVersionNumber, setTargetVersionNumber] = useState<number>(
+  const [targetVersionNumber, _setTargetVersionNumber] = useState<number>(
     versions.length > 0 ? versions[versions.length - 1].versionNumber : 1
   )
 

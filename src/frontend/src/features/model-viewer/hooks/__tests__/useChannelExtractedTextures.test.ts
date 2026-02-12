@@ -62,5 +62,5 @@ describe('useChannelExtractedTextures', () => {
 })
 
 // Note: Full hook testing with WebGL requires @react-three/test-renderer
-// Those tests should be in a separate integration test file that can 
+// Those tests should be in a separate integration test file that can
 // properly set up the Three.js rendering context

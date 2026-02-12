@@ -163,7 +163,11 @@
   align-items: center;
   justify-content: center;
   color: var(--text-color-secondary);
-  background: linear-gradient(135deg, var(--surface-ground), var(--surface-hover));
+  background: linear-gradient(
+    135deg,
+    var(--surface-ground),
+    var(--surface-hover)
+  );
 }
 
 .texture-set-placeholder .pi {

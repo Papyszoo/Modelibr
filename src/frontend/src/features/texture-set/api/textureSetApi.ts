@@ -1,6 +1,5 @@
 import { AxiosResponse } from 'axios'
 import { client, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 import {
   TextureSetDto,
   GetAllTextureSetsResponse,
@@ -15,18 +14,9 @@ import {
 export async function getAllTextureSets(
   options: { skipCache?: boolean } = {}
 ): Promise<TextureSetDto[]> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getTextureSets()
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response: AxiosResponse<GetAllTextureSetsResponse> =
     await client.get('/texture-sets')
-
-  useApiCacheStore.getState().setTextureSets(response.data.textureSets)
-
   return response.data.textureSets
 }
 
@@ -57,19 +47,10 @@ export async function getTextureSetById(
   id: number,
   options: { skipCache?: boolean } = {}
 ): Promise<TextureSetDto> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getTextureSetById(id)
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response: AxiosResponse<TextureSetDto> = await client.get(
     `/texture-sets/${id}`
   )
-
-  useApiCacheStore.getState().setTextureSetById(id, response.data)
-
   return response.data
 }
 
@@ -88,9 +69,6 @@ export async function createTextureSet(
     '/texture-sets',
     request
   )
-
-  useApiCacheStore.getState().invalidateTextureSets()
-
   return response.data
 }
 
@@ -122,9 +100,6 @@ export async function createTextureSetWithFile(
       timeout: UPLOAD_TIMEOUT,
     }
   )
-
-  useApiCacheStore.getState().invalidateTextureSets()
-
   return response.data
 }
 
@@ -137,24 +112,15 @@ export async function updateTextureSet(
     request
   )
 
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(id)
-
   return response.data
 }
 
 export async function deleteTextureSet(id: number): Promise<void> {
   await client.delete(`/texture-sets/${id}`)
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(id)
 }
 
 export async function hardDeleteTextureSet(id: number): Promise<void> {
   await client.delete(`/texture-sets/${id}/hard`)
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(id)
 }
 
 export async function addTextureToSetEndpoint(
@@ -166,9 +132,6 @@ export async function addTextureToSetEndpoint(
     request
   )
 
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(setId)
-
   return response.data
 }
 
@@ -177,9 +140,6 @@ export async function removeTextureFromSet(
   textureId: number
 ): Promise<void> {
   await client.delete(`/texture-sets/${setId}/textures/${textureId}`)
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(setId)
 }
 
 export async function changeTextureType(
@@ -190,9 +150,6 @@ export async function changeTextureType(
   await client.put(`/texture-sets/${setId}/textures/${textureId}/type`, {
     textureType: newTextureType,
   })
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(setId)
 }
 
 export async function changeTextureChannel(
@@ -203,9 +160,6 @@ export async function changeTextureChannel(
   await client.put(`/texture-sets/${setId}/textures/${textureId}/channel`, {
     sourceChannel,
   })
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(setId)
 }
 
 export async function associateTextureSetWithModelVersion(
@@ -213,10 +167,6 @@ export async function associateTextureSetWithModelVersion(
   modelVersionId: number
 ): Promise<void> {
   await client.post(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(setId)
-  useApiCacheStore.getState().invalidateModels()
 }
 
 export async function disassociateTextureSetFromModelVersion(
@@ -224,10 +174,6 @@ export async function disassociateTextureSetFromModelVersion(
   modelVersionId: number
 ): Promise<void> {
   await client.delete(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(setId)
-  useApiCacheStore.getState().invalidateModels()
 }
 
 export async function associateTextureSetWithAllModelVersions(
@@ -235,18 +181,10 @@ export async function associateTextureSetWithAllModelVersions(
   modelId: number
 ): Promise<void> {
   await client.post(`/texture-sets/${setId}/models/${modelId}/all-versions`)
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(setId)
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }
 
 export async function softDeleteTextureSet(
   textureSetId: number
 ): Promise<void> {
   await client.delete(`/texture-sets/${textureSetId}`)
-
-  useApiCacheStore.getState().invalidateTextureSets()
-  useApiCacheStore.getState().invalidateTextureSetById(textureSetId)
 }

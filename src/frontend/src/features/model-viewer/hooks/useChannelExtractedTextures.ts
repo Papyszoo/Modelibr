@@ -123,7 +123,7 @@ export interface ChannelExtractedTextures {
 /**
  * Hook that loads textures and extracts individual channels as needed.
  * For RGB textures, returns the original. For R/G/B/A, extracts that channel as grayscale.
- * 
+ *
  * @param textureConfigs - Map of texture slot names to their config (url + sourceChannel)
  * @param renderer - Three.js renderer for GPU-based extraction
  * @param flipY - Whether to flip textures on Y axis (false for GLTF/GLB, true for OBJ/FBX)
@@ -138,9 +138,11 @@ export function useChannelExtractedTextures(
 
   // Create a stable key for the configs to track changes
   const configKey = useMemo(() => {
-    return Object.entries(textureConfigs)
-      .map(([key, config]) => `${key}:${config.url}:${config.sourceChannel}`)
-      .join('|') + `:flipY=${flipY}`
+    return (
+      Object.entries(textureConfigs)
+        .map(([key, config]) => `${key}:${config.url}:${config.sourceChannel}`)
+        .join('|') + `:flipY=${flipY}`
+    )
   }, [textureConfigs, flipY])
 
   useEffect(() => {

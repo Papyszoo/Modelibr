@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
+import { useQueryClient } from '@tanstack/react-query'
 import ApiClient from '../../services/ApiClient'
+import { useUploadHistoryQuery } from './api/queries'
 import { openTabInPanel } from '../../utils/tabNavigation'
 import './History.css'
 
@@ -81,16 +83,16 @@ const getFileTypeIcon = (fileType: string): string => {
 }
 
 export default function History() {
-  const [history, setHistory] = useState<BatchUploadHistory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [batchGroups, setBatchGroups] = useState<BatchGroup[]>([])
+  const queryClient = useQueryClient()
+  const historyQuery = useUploadHistoryQuery()
+  const history = historyQuery.data?.uploads ?? []
+  const loading = historyQuery.isLoading
+  const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(
+    new Set()
+  )
 
-  useEffect(() => {
-    loadHistory()
-  }, [])
-
-  useEffect(() => {
-    // Group uploads by batchId
+  // Derive batch groups from query data
+  const batchGroups = useMemo(() => {
     const grouped = new Map<string, BatchUploadHistory[]>()
 
     history.forEach(upload => {
@@ -100,45 +102,37 @@ export default function History() {
       grouped.get(upload.batchId)!.push(upload)
     })
 
-    // Create batch groups
     const groups: BatchGroup[] = Array.from(grouped.entries()).map(
       ([batchId, files]) => ({
         batchId,
         files: files.sort((a, b) => a.fileName.localeCompare(b.fileName)),
         timestamp: files[0].uploadedAt,
-        collapsed: false,
+        collapsed: collapsedBatches.has(batchId),
       })
     )
 
-    // Sort groups by timestamp descending
     groups.sort(
       (a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     )
 
-    setBatchGroups(groups)
-  }, [history])
+    return groups
+  }, [history, collapsedBatches])
 
-  const loadHistory = async () => {
-    try {
-      setLoading(true)
-      const response = await ApiClient.getBatchUploadHistory()
-      setHistory(response.uploads || [])
-    } catch (error) {
-      console.error('Failed to load upload history:', error)
-    } finally {
-      setLoading(false)
-    }
+  const refreshHistory = () => {
+    queryClient.invalidateQueries({ queryKey: ['uploadHistory'] })
   }
 
   const toggleBatchCollapse = (batchId: string) => {
-    setBatchGroups(prev =>
-      prev.map(group =>
-        group.batchId === batchId
-          ? { ...group, collapsed: !group.collapsed }
-          : group
-      )
-    )
+    setCollapsedBatches(prev => {
+      const next = new Set(prev)
+      if (next.has(batchId)) {
+        next.delete(batchId)
+      } else {
+        next.add(batchId)
+      }
+      return next
+    })
   }
 
   const getUploadedToText = (upload: BatchUploadHistory): string => {
@@ -213,7 +207,12 @@ export default function History() {
                   const model = await ApiClient.getModelById(
                     upload.modelId!.toString()
                   )
-                  openTabInPanel('modelViewer', 'left', model.id.toString(), model.name)
+                  openTabInPanel(
+                    'modelViewer',
+                    'left',
+                    model.id.toString(),
+                    model.name
+                  )
                 } catch (error) {
                   console.error('Failed to open model:', error)
                 }
@@ -232,7 +231,12 @@ export default function History() {
                   const textureSet = await ApiClient.getTextureSetById(
                     upload.textureSetId!
                   )
-                  openTabInPanel('textureSetViewer', 'left', textureSet.id.toString(), textureSet.name)
+                  openTabInPanel(
+                    'textureSetViewer',
+                    'left',
+                    textureSet.id.toString(),
+                    textureSet.name
+                  )
                 } catch (error) {
                   console.error('Failed to open texture set:', error)
                 }
@@ -246,7 +250,9 @@ export default function History() {
               text
               rounded
               title="Open Pack"
-              onClick={() => openTabInPanel('packViewer', 'left', upload.packId!.toString())}
+              onClick={() =>
+                openTabInPanel('packViewer', 'left', upload.packId!.toString())
+              }
             />
           )}
           {upload.projectId && (
@@ -257,7 +263,11 @@ export default function History() {
               rounded
               title="Open Project"
               onClick={() =>
-                openTabInPanel('projectViewer', 'left', upload.projectId!.toString())
+                openTabInPanel(
+                  'projectViewer',
+                  'left',
+                  upload.projectId!.toString()
+                )
               }
             />
           )}
@@ -318,8 +328,7 @@ export default function History() {
         <Button
           icon="pi pi-refresh"
           className="p-button-text"
-          onClick={loadHistory}
-          loading={loading}
+          onClick={refreshHistory}
           tooltip="Refresh history"
         />
       </div>

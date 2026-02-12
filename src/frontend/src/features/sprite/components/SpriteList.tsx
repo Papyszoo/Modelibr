@@ -6,6 +6,7 @@ import {
   DragEvent,
   MouseEvent,
 } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Toast } from 'primereact/toast'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Button } from 'primereact/button'
@@ -18,7 +19,17 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
-import ApiClient from '../../../services/ApiClient'
+import { useSpritesQuery, useSpriteCategoriesQuery } from '../api/queries'
+import {
+  createSpriteCategory,
+  createSpriteWithFile,
+  deleteSpriteCategory,
+  getSpritesPaginated,
+  softDeleteSprite,
+  updateSprite,
+  updateSpriteCategory,
+} from '../api/spriteApi'
+import { getFileUrl } from '../../models/api/modelApi'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import {
@@ -105,62 +116,254 @@ function SpriteList() {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sprites
 
-  const loadSprites = useCallback(async (loadMore = false) => {
-    try {
-      if (loadMore) {
-        setIsLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      const page = loadMore ? pagination.page + 1 : 1
-      const result = await ApiClient.getSpritesPaginated({
-        page,
-        pageSize: 50,
-      })
+  const queryClient = useQueryClient()
+  const spritesQuery = useSpritesQuery({ params: { page: 1, pageSize: 50 } })
+  const categoriesQuery = useSpriteCategoriesQuery()
 
-      if (loadMore) {
-        setSprites(prev => [...prev, ...result.sprites])
-      } else {
-        setSprites(result.sprites || [])
-      }
-
+  // Sync initial query data into local state (for load-more accumulation)
+  useEffect(() => {
+    if (spritesQuery.data && pagination.page === 1) {
+      setSprites(spritesQuery.data.sprites || [])
       setPagination({
-        page,
-        pageSize: result.pageSize,
-        totalCount: result.totalCount,
-        totalPages: result.totalPages,
-        hasMore: page < result.totalPages,
+        page: 1,
+        pageSize: spritesQuery.data.pageSize,
+        totalCount: spritesQuery.data.totalCount,
+        totalPages: spritesQuery.data.totalPages,
+        hasMore: 1 < spritesQuery.data.totalPages,
       })
-    } catch (error) {
-      console.error('Failed to load sprites:', error)
-      setSprites([])
+      setLoading(false)
+    }
+  }, [spritesQuery.data])
+
+  useEffect(() => {
+    if (categoriesQuery.data) {
+      setCategories(categoriesQuery.data.categories || [])
+    }
+  }, [categoriesQuery.data])
+
+  const loadSprites = useCallback(
+    async (loadMore = false) => {
+      if (!loadMore) {
+        // For full refresh, invalidate React Query and let it refetch
+        queryClient.invalidateQueries({ queryKey: ['sprites'] })
+        return
+      }
+      // Load more: fetch next page manually and append
+      try {
+        setIsLoadingMore(true)
+        const page = pagination.page + 1
+        const result = await getSpritesPaginated({
+          page,
+          pageSize: 50,
+        })
+        setSprites(prev => [...prev, ...result.sprites])
+        setPagination({
+          page,
+          pageSize: result.pageSize,
+          totalCount: result.totalCount,
+          totalPages: result.totalPages,
+          hasMore: page < result.totalPages,
+        })
+      } catch (error) {
+        console.error('Failed to load more sprites:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to load more sprites',
+          life: 3000,
+        })
+      } finally {
+        setIsLoadingMore(false)
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [pagination.page]
+  )
+
+  const loadCategories = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['spriteCategories'] })
+  }, [queryClient])
+
+  const saveCategoryMutation = useMutation({
+    mutationFn: async (vars: {
+      editingCategory: SpriteCategoryDto | null
+      name: string
+      description?: string
+    }): Promise<{ type: 'create' | 'update'; createdId?: number }> => {
+      if (vars.editingCategory) {
+        await updateSpriteCategory(
+          vars.editingCategory.id,
+          vars.name,
+          vars.description
+        )
+        return { type: 'update' }
+      }
+
+      const created = await createSpriteCategory(vars.name, vars.description)
+      return { type: 'create', createdId: created.id }
+    },
+    onSuccess: async (result, vars) => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: vars.editingCategory
+          ? 'Category updated successfully'
+          : 'Category created successfully',
+        life: 3000,
+      })
+
+      if (result.type === 'create' && typeof result.createdId === 'number') {
+        setActiveCategoryId(result.createdId)
+      }
+
+      setShowCategoryDialog(false)
+      await loadCategories()
+      await loadSprites()
+    },
+    onError: error => {
+      console.error('Failed to save category:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to load sprites',
+        detail: 'Failed to save category',
         life: 3000,
       })
-    } finally {
-      setLoading(false)
-      setIsLoadingMore(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    },
+  })
 
-  const loadCategories = useCallback(async () => {
-    try {
-      const response = await ApiClient.getAllSpriteCategories()
-      setCategories(response.categories || [])
-    } catch (error) {
-      console.error('Failed to load categories:', error)
-      setCategories([])
-    }
-  }, [])
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId: number) => {
+      await deleteSpriteCategory(categoryId)
+    },
+    onSuccess: async (_data, categoryId) => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Category deleted successfully',
+        life: 3000,
+      })
+      if (activeCategoryId === categoryId) {
+        setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
+      }
+      await loadCategories()
+      await loadSprites()
+    },
+    onError: error => {
+      console.error('Failed to delete category:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete category',
+        life: 3000,
+      })
+    },
+  })
 
-  useEffect(() => {
-    loadSprites()
-    loadCategories()
-  }, [loadSprites, loadCategories])
+  const moveSpritesToCategoryMutation = useMutation({
+    mutationFn: async (vars: {
+      spriteIds: number[]
+      categoryId: number | null
+    }) => {
+      await Promise.all(
+        vars.spriteIds.map(id =>
+          updateSprite(id, { categoryId: vars.categoryId })
+        )
+      )
+    },
+    onSuccess: async (_data, vars) => {
+      const targetCategoryName =
+        vars.categoryId === null
+          ? 'Unassigned'
+          : categories.find(c => c.id === vars.categoryId)?.name ||
+            'Unknown Category'
+      const message =
+        vars.spriteIds.length === 1
+          ? `Sprite moved to ${targetCategoryName}`
+          : `${vars.spriteIds.length} sprites moved to ${targetCategoryName}`
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: message,
+        life: 3000,
+      })
+      setSelectedSpriteIds(new Set())
+      await loadSprites()
+    },
+    onError: error => {
+      console.error('Failed to update sprite category:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to update sprite category',
+        life: 3000,
+      })
+    },
+  })
+
+  const recycleSpritesMutation = useMutation({
+    mutationFn: async (spriteIds: number[]) => {
+      await Promise.all(spriteIds.map(id => softDeleteSprite(id)))
+    },
+    onSuccess: async (_data, spriteIds) => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Recycled',
+        detail:
+          spriteIds.length > 1
+            ? `${spriteIds.length} sprites moved to recycle bin`
+            : 'Sprite moved to recycle bin',
+        life: 3000,
+      })
+      setSelectedSpriteIds(new Set())
+      setContextMenuTarget(null)
+      await loadSprites()
+    },
+    onError: error => {
+      console.error('Failed to recycle sprites:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to recycle sprites',
+        life: 3000,
+      })
+    },
+  })
+
+  const renameSpriteMutation = useMutation({
+    mutationFn: async (vars: { sprite: SpriteDto; newName: string }) => {
+      await updateSprite(vars.sprite.id, { name: vars.newName })
+    },
+    onSuccess: (_data, vars) => {
+      setSelectedSprite({ ...vars.sprite, name: vars.newName })
+      setSprites(prev =>
+        prev.map(s =>
+          s.id === vars.sprite.id ? { ...s, name: vars.newName } : s
+        )
+      )
+      setIsEditingSpriteName(false)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Updated',
+        detail: `Sprite renamed to "${vars.newName}"`,
+        life: 3000,
+      })
+    },
+    onError: (error, vars) => {
+      console.error('Failed to rename sprite:', error)
+      setSpriteNameDraft(vars.sprite.name)
+      setIsEditingSpriteName(false)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to rename sprite',
+        life: 3000,
+      })
+    },
+    onSettled: () => {
+      setIsSavingSpriteName(false)
+    },
+  })
 
   const handleFileDrop = async (files: File[] | FileList) => {
     const fileArray = Array.from(files)
@@ -198,12 +401,12 @@ function SpriteList() {
         }
 
         const fileName = file.name.replace(/\.[^/.]+$/, '')
-        const result = await ApiClient.createSpriteWithFile(file, {
+        const result = await createSpriteWithFile(file, {
           name: fileName,
           spriteType:
             file.type === 'image/gif' ? SPRITE_TYPE_GIF : SPRITE_TYPE_STATIC,
           categoryId: categoryIdToAssign,
-          batchId: batchId,
+          batchId,
         })
 
         if (uploadId && uploadProgressContext) {
@@ -289,44 +492,11 @@ function SpriteList() {
       return
     }
 
-    try {
-      if (editingCategory) {
-        await ApiClient.updateSpriteCategory(
-          editingCategory.id,
-          categoryName.trim(),
-          categoryDescription.trim() || undefined
-        )
-        toast.current?.show({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Category updated successfully',
-          life: 3000,
-        })
-      } else {
-        const result = await ApiClient.createSpriteCategory(
-          categoryName.trim(),
-          categoryDescription.trim() || undefined
-        )
-        toast.current?.show({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Category created successfully',
-          life: 3000,
-        })
-        setActiveCategoryId(result.id)
-      }
-      setShowCategoryDialog(false)
-      loadCategories()
-      loadSprites()
-    } catch (error) {
-      console.error('Failed to save category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to save category',
-        life: 3000,
-      })
-    }
+    saveCategoryMutation.mutate({
+      editingCategory,
+      name: categoryName.trim(),
+      description: categoryDescription.trim() || undefined,
+    })
   }
 
   const handleDeleteCategory = (category: SpriteCategoryDto) => {
@@ -336,28 +506,7 @@ function SpriteList() {
       icon: 'pi pi-exclamation-triangle',
       acceptClassName: 'p-button-danger',
       accept: async () => {
-        try {
-          await ApiClient.deleteSpriteCategory(category.id)
-          toast.current?.show({
-            severity: 'success',
-            summary: 'Success',
-            detail: 'Category deleted successfully',
-            life: 3000,
-          })
-          if (activeCategoryId === category.id) {
-            setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
-          }
-          loadCategories()
-          loadSprites()
-        } catch (error) {
-          console.error('Failed to delete category:', error)
-          toast.current?.show({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to delete category',
-            life: 3000,
-          })
-        }
+        await deleteCategoryMutation.mutateAsync(category.id)
       },
     })
   }
@@ -377,42 +526,18 @@ function SpriteList() {
       setSpriteNameDraft(selectedSprite.name)
       return
     }
-    try {
-      setIsSavingSpriteName(true)
-      await ApiClient.updateSprite(selectedSprite.id, { name: trimmedName })
-      setSelectedSprite({ ...selectedSprite, name: trimmedName })
-      setSprites(prev =>
-        prev.map(s =>
-          s.id === selectedSprite.id ? { ...s, name: trimmedName } : s
-        )
-      )
-      setIsEditingSpriteName(false)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Updated',
-        detail: `Sprite renamed to "${trimmedName}"`,
-        life: 3000,
-      })
-    } catch (error) {
-      console.error('Failed to rename sprite:', error)
-      setSpriteNameDraft(selectedSprite.name)
-      setIsEditingSpriteName(false)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to rename sprite',
-        life: 3000,
-      })
-    } finally {
-      setIsSavingSpriteName(false)
-    }
+    setIsSavingSpriteName(true)
+    renameSpriteMutation.mutate({
+      sprite: selectedSprite,
+      newName: trimmedName,
+    })
   }
 
   const handleDownload = async () => {
     if (!selectedSprite) return
 
     try {
-      const url = ApiClient.getFileUrl(selectedSprite.fileId.toString())
+      const url = getFileUrl(selectedSprite.fileId.toString())
       const response = await fetch(url)
       const blob = await response.blob()
 
@@ -594,38 +719,10 @@ function SpriteList() {
       return
     }
 
-    try {
-      await Promise.all(
-        spritesToMove.map(sprite =>
-          ApiClient.updateSprite(sprite.id, { categoryId: newCategoryId })
-        )
-      )
-      const targetCategoryName =
-        newCategoryId === null
-          ? 'Unassigned'
-          : categories.find(c => c.id === newCategoryId)?.name ||
-            'Unknown Category'
-      const message =
-        spritesToMove.length === 1
-          ? `Sprite moved to ${targetCategoryName}`
-          : `${spritesToMove.length} sprites moved to ${targetCategoryName}`
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: message,
-        life: 3000,
-      })
-      setSelectedSpriteIds(new Set())
-      loadSprites()
-    } catch (error) {
-      console.error('Failed to update sprite category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to update sprite category',
-        life: 3000,
-      })
-    }
+    moveSpritesToCategoryMutation.mutate({
+      spriteIds: spritesToMove.map(s => s.id),
+      categoryId: newCategoryId,
+    })
 
     setDraggedSpriteId(null)
   }
@@ -699,31 +796,7 @@ function SpriteList() {
 
     if (spriteIdsToRecycle.length === 0) return
 
-    try {
-      await Promise.all(
-        spriteIdsToRecycle.map(id => ApiClient.softDeleteSprite(id))
-      )
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Recycled',
-        detail:
-          spriteIdsToRecycle.length > 1
-            ? `${spriteIdsToRecycle.length} sprites moved to recycle bin`
-            : 'Sprite moved to recycle bin',
-        life: 3000,
-      })
-      setSelectedSpriteIds(new Set())
-      setContextMenuTarget(null)
-      loadSprites()
-    } catch (error) {
-      console.error('Failed to recycle sprites:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to recycle sprites',
-        life: 3000,
-      })
-    }
+    recycleSpritesMutation.mutate(spriteIdsToRecycle)
   }
 
   // Get context menu items (dynamic label based on selection)
@@ -918,7 +991,7 @@ function SpriteList() {
                 </div>
                 <div className="sprite-preview">
                   <img
-                    src={ApiClient.getFileUrl(sprite.fileId.toString())}
+                    src={getFileUrl(sprite.fileId.toString())}
                     alt={sprite.name}
                     onError={e => {
                       const target = e.target as HTMLImageElement
@@ -1104,7 +1177,7 @@ function SpriteList() {
           <div className="sprite-modal-content">
             <div className="sprite-modal-preview">
               <img
-                src={ApiClient.getFileUrl(selectedSprite.fileId.toString())}
+                src={getFileUrl(selectedSprite.fileId.toString())}
                 alt={selectedSprite.name}
               />
             </div>

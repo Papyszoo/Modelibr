@@ -1,6 +1,5 @@
 import { AxiosResponse } from 'axios'
 import { client, baseURL, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 import { Model } from '../../../utils/fileUtils'
 import { PaginatedResponse } from '../../../types'
 
@@ -35,9 +34,6 @@ export async function uploadModel(
       timeout: UPLOAD_TIMEOUT,
     }
   )
-
-  useApiCacheStore.getState().invalidateModels()
-
   return response.data
 }
 
@@ -89,14 +85,7 @@ export async function uploadFile(
 export async function getModels(
   options: { skipCache?: boolean; packId?: number; projectId?: number } = {}
 ): Promise<Model[]> {
-  const hasFilters =
-    options.packId !== undefined || options.projectId !== undefined
-  if (!options.skipCache && !hasFilters) {
-    const cached = useApiCacheStore.getState().getModels()
-    if (cached) {
-      return cached
-    }
-  }
+  void options
 
   let url = '/models'
   const params = new URLSearchParams()
@@ -111,11 +100,6 @@ export async function getModels(
   }
 
   const response: AxiosResponse<Model[]> = await client.get(url)
-
-  if (!hasFilters) {
-    useApiCacheStore.getState().setModels(response.data)
-  }
-
   return response.data
 }
 
@@ -145,17 +129,8 @@ export async function getModelById(
   modelId: string,
   options: { skipCache?: boolean } = {}
 ): Promise<Model> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getModelById(modelId)
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response: AxiosResponse<Model> = await client.get(`/models/${modelId}`)
-
-  useApiCacheStore.getState().setModelById(modelId, response.data)
-
   return response.data
 }
 
@@ -185,9 +160,6 @@ export async function updateModelTags(
 
 export async function softDeleteModel(modelId: number): Promise<void> {
   await client.delete(`/models/${modelId}`)
-
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }
 
 export async function setDefaultTextureSet(
@@ -199,9 +171,5 @@ export async function setDefaultTextureSet(
     TextureSetId: textureSetId,
     ModelVersionId: modelVersionId,
   })
-
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
-
   return response.data
 }

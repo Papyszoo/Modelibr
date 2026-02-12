@@ -49,26 +49,30 @@ export function openTabInPanel(
       ? {
           id: newTabId,
           type: tabType,
-          label: name || getTabLabel(tabType, { 
-            modelId: tabType === 'modelViewer' ? id : undefined,
-            setId: tabType === 'textureSetViewer' ? id : undefined,
-            packId: tabType === 'packViewer' ? id : undefined,
-            projectId: tabType === 'projectViewer' ? id : undefined,
-            stageId: tabType === 'stageEditor' ? id : undefined,
-            modelName: tabType === 'modelViewer' && name ? name : undefined,
-            setName: tabType === 'textureSetViewer' && name ? name : undefined,
-            packName: tabType === 'packViewer' && name ? name : undefined,
-            projectName: tabType === 'projectViewer' && name ? name : undefined,
-            stageName: tabType === 'stageEditor' && name ? name : undefined,
-          }),
+          label:
+            name ||
+            getTabLabel(tabType, {
+              modelId: tabType === 'modelViewer' ? id : undefined,
+              setId: tabType === 'textureSetViewer' ? id : undefined,
+              packId: tabType === 'packViewer' ? id : undefined,
+              projectId: tabType === 'projectViewer' ? id : undefined,
+              stageId: tabType === 'stageEditor' ? id : undefined,
+              modelName: tabType === 'modelViewer' && name ? name : undefined,
+              setName:
+                tabType === 'textureSetViewer' && name ? name : undefined,
+              packName: tabType === 'packViewer' && name ? name : undefined,
+              projectName:
+                tabType === 'projectViewer' && name ? name : undefined,
+              stageName: tabType === 'stageEditor' && name ? name : undefined,
+            }),
           ...(tabType === 'modelViewer' && { modelId: id }),
           ...(tabType === 'textureSetViewer' && { setId: id }),
           ...(tabType === 'packViewer' && { packId: id }),
           ...(tabType === 'projectViewer' && { projectId: id }),
           ...(tabType === 'stageEditor' && { stageId: id }),
         }
-      : { 
-          id: tabType, 
+      : {
+          id: tabType,
           type: tabType,
           label: name || getTabLabel(tabType),
         }

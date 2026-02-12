@@ -1,6 +1,5 @@
 import { AxiosResponse } from 'axios'
 import { client, baseURL } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 
 export interface ThumbnailStatus {
   status: 'Pending' | 'Processing' | 'Ready' | 'Failed'
@@ -17,19 +16,10 @@ export async function getThumbnailStatus(
   modelId: string,
   options: { skipCache?: boolean } = {}
 ): Promise<ThumbnailStatus> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getThumbnailStatus(modelId)
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response: AxiosResponse<ThumbnailStatus> = await client.get(
     `/models/${modelId}/thumbnail`
   )
-
-  useApiCacheStore.getState().setThumbnailStatus(modelId, response.data)
-
   return response.data
 }
 
@@ -59,20 +49,11 @@ export async function getThumbnailFile(
   modelId: string,
   options: { skipCache?: boolean } = {}
 ): Promise<Blob> {
-  if (!options.skipCache) {
-    const cached = useApiCacheStore.getState().getThumbnailBlob(modelId)
-    if (cached) {
-      return cached
-    }
-  }
-
+  void options
   const response: AxiosResponse<Blob> = await client.get(
     `/models/${modelId}/thumbnail/file`,
     { responseType: 'blob' }
   )
-
-  useApiCacheStore.getState().setThumbnailBlob(modelId, response.data)
-
   return response.data
 }
 
@@ -85,8 +66,5 @@ export async function regenerateThumbnail(
     : `/models/${modelId}/thumbnail/regenerate`
 
   const response: AxiosResponse<void> = await client.post(url)
-
-  useApiCacheStore.getState().invalidateThumbnailById(modelId)
-
   return response.data
 }

@@ -21,9 +21,7 @@ jest.mock('../../../../services/ApiClient', () => ({
 jest.mock('@react-three/fiber', () => ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   Canvas: ({ children, ...props }: any) => (
-    <div data-testid="canvas">
-      {children}
-    </div>
+    <div data-testid="canvas">{children}</div>
   ),
 }))
 

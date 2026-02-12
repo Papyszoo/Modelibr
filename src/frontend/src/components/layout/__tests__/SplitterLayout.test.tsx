@@ -12,14 +12,18 @@ describe('SplitterLayout URL Serialization', () => {
       expect(getTabLabel('textureSets')).toBe('Texture Sets')
       expect(getTabLabel('modelViewer')).toBe('Model Viewer')
       expect(getTabLabel('modelViewer', { modelId: '123' })).toBe('Model 123')
-      expect(getTabLabel('modelViewer', { modelName: 'My Model' })).toBe('My Model')
+      expect(getTabLabel('modelViewer', { modelName: 'My Model' })).toBe(
+        'My Model'
+      )
     })
 
     it('should return correct labels for pack and project types', () => {
       expect(getTabLabel('packs')).toBe('Packs')
       expect(getTabLabel('packViewer', { packId: '5' })).toBe('Pack 5')
       expect(getTabLabel('projects')).toBe('Projects')
-      expect(getTabLabel('projectViewer', { projectId: '10' })).toBe('Project 10')
+      expect(getTabLabel('projectViewer', { projectId: '10' })).toBe(
+        'Project 10'
+      )
     })
 
     it('should return Unknown for invalid types', () => {

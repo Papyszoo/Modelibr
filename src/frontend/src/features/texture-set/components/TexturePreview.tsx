@@ -39,7 +39,7 @@ export default function TexturePreview({
 
     const img = new Image()
     img.crossOrigin = 'anonymous'
-    
+
     img.onload = () => {
       // Set canvas size to match image
       canvas.width = img.width
@@ -54,11 +54,11 @@ export default function TexturePreview({
 
       // Extract the specified channel and convert to grayscale
       const channelIndex = getChannelIndex(sourceChannel)
-      
+
       for (let i = 0; i < data.length; i += 4) {
         const channelValue = data[i + channelIndex]
         // Set R, G, B to the channel value (grayscale)
-        data[i] = channelValue     // R
+        data[i] = channelValue // R
         data[i + 1] = channelValue // G
         data[i + 2] = channelValue // B
         // Keep alpha as is (data[i + 3])
@@ -93,11 +93,11 @@ export default function TexturePreview({
       <canvas
         ref={canvasRef}
         className={className}
-        style={{ 
+        style={{
           display: imageLoaded && !error ? 'block' : 'none',
           width: '100%',
           height: '100%',
-          objectFit: 'cover'
+          objectFit: 'cover',
         }}
       />
       {!imageLoaded && !error && (

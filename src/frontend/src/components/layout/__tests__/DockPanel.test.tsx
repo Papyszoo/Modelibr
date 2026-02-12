@@ -17,7 +17,9 @@ jest.mock('primereact/button', () => {
       children,
       onClick,
       ...props
-    }: React.PropsWithChildren<{ onClick?: (e: React.MouseEvent) => void }>) => (
+    }: React.PropsWithChildren<{
+      onClick?: (e: React.MouseEvent) => void
+    }>) => (
       <button onClick={onClick} {...props}>
         {children}
       </button>

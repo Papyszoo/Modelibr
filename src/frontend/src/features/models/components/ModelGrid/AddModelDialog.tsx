@@ -5,7 +5,9 @@ import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
 import { ThumbnailDisplay } from '../../../thumbnail'
 import { Model } from '../../../../utils/fileUtils'
-import ApiClient from '../../../../services/ApiClient'
+import { getModelsPaginated } from '../../api/modelApi'
+import { addModelToPack } from '../../../pack/api/packApi'
+import { addModelToProject } from '../../../project/api/projectApi'
 
 interface AddModelDialogProps {
   visible: boolean
@@ -52,7 +54,7 @@ export default function AddModelDialog({
   const loadAvailableModels = async () => {
     setLoading(true)
     try {
-      const response = await ApiClient.getModelsPaginated({
+      const response = await getModelsPaginated({
         page: 1,
         pageSize: 200,
       })
@@ -92,9 +94,9 @@ export default function AddModelDialog({
     try {
       for (const modelId of selectedModelIds) {
         if (packId) {
-          await ApiClient.addModelToPack(packId, modelId)
+          await addModelToPack(packId, modelId)
         } else if (projectId) {
-          await ApiClient.addModelToProject(projectId, modelId)
+          await addModelToProject(projectId, modelId)
         }
       }
       onModelsAdded()

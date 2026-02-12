@@ -1,5 +1,4 @@
 import { client, baseURL, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
 import { ModelVersionDto, CreateModelVersionResponse } from '../../../types'
 
 export async function getModelVersions(
@@ -51,10 +50,6 @@ export async function createModelVersion(
       timeout: UPLOAD_TIMEOUT,
     }
   )
-
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
-
   return response.data
 }
 
@@ -78,10 +73,6 @@ export async function addFileToVersion(
       timeout: UPLOAD_TIMEOUT,
     }
   )
-
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
-
   return response.data
 }
 
@@ -98,9 +89,6 @@ export async function setActiveVersion(
   versionId: number
 ): Promise<void> {
   await client.post(`/models/${modelId}/active-version/${versionId}`)
-
-  useApiCacheStore.getState().invalidateModels()
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }
 
 export async function softDeleteModelVersion(
@@ -108,6 +96,4 @@ export async function softDeleteModelVersion(
   versionId: number
 ): Promise<void> {
   await client.delete(`/models/${modelId}/versions/${versionId}`)
-
-  useApiCacheStore.getState().invalidateModelById(modelId.toString())
 }

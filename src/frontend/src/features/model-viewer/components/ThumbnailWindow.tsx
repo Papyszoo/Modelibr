@@ -31,8 +31,8 @@ function ThumbnailWindow({
     >
       {model ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <ThumbnailDisplay 
-            modelId={model.id.toString()} 
+          <ThumbnailDisplay
+            modelId={model.id.toString()}
             versionId={selectedVersion?.id}
           />
           {onRegenerate && (

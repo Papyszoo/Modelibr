@@ -5,7 +5,7 @@ import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
 import { MultiSelect } from 'primereact/multiselect'
-import { TextureSetDto, Model, PackSummaryDto, ModelVersionDto } from '../../../types'
+import { TextureSetDto, Model, PackSummaryDto } from '../../../types'
 import { useTextureSets } from '../hooks/useTextureSets'
 import ApiClient from '../../../services/ApiClient'
 import ThumbnailDisplay from '../../thumbnail/components/ThumbnailDisplay'
@@ -47,9 +47,6 @@ function ModelAssociationDialog({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>([])
   const [availablePacks, setAvailablePacks] = useState<PackSummaryDto[]>([])
-  const [recentlyUnlinkedIds, setRecentlyUnlinkedIds] = useState<Set<string>>(
-    new Set()
-  )
   const toast = useRef<Toast>(null)
   const textureSetsApi = useTextureSets()
 
@@ -74,24 +71,26 @@ function ModelAssociationDialog({
       const allModels = await textureSetsApi.getModels()
 
       // Load versions for each model and build associations
-      const associationsPromises = allModels.map(async (model) => {
+      const associationsPromises = allModels.map(async model => {
         const versions = await ApiClient.getModelVersions(parseInt(model.id))
-        
+
         // Get currently associated version IDs for this model
         const associatedVersions = textureSet.associatedModels
           .filter(m => m.id === parseInt(model.id))
           .map(m => m.modelVersionId)
-        
-        const versionAssociations: ModelVersionAssociation[] = versions.map(v => ({
-          modelVersionId: v.id,
-          versionNumber: v.versionNumber,
-          isAssociated: associatedVersions.includes(v.id),
-          originallyAssociated: associatedVersions.includes(v.id),
-        }))
-        
+
+        const versionAssociations: ModelVersionAssociation[] = versions.map(
+          v => ({
+            modelVersionId: v.id,
+            versionNumber: v.versionNumber,
+            isAssociated: associatedVersions.includes(v.id),
+            originallyAssociated: associatedVersions.includes(v.id),
+          })
+        )
+
         // Get IDs of currently associated versions
         const selectedVersionIds = associatedVersions
-        
+
         return {
           model,
           versions: versionAssociations,
@@ -116,15 +115,18 @@ function ModelAssociationDialog({
     }
   }, [textureSetsApi, textureSet.associatedModels])
 
-  const handleVersionSelectionChange = (modelId: string, selectedIds: number[]) => {
+  const handleVersionSelectionChange = (
+    modelId: string,
+    selectedIds: number[]
+  ) => {
     setModelAssociations(prev =>
       prev.map(assoc => {
         if (assoc.model.id === modelId) {
           // Check if the selection has changed from original
-          const hasChanges = 
+          const hasChanges =
             selectedIds.length !== assoc.originalVersionIds.length ||
             !selectedIds.every(id => assoc.originalVersionIds.includes(id))
-          
+
           return {
             ...assoc,
             selectedVersionIds: selectedIds,
@@ -208,7 +210,6 @@ function ModelAssociationDialog({
         recentlyUnlinked: false,
       }))
     )
-    setRecentlyUnlinkedIds(new Set())
     setSearchQuery('')
     setSelectedPackIds([])
     onHide()
@@ -345,10 +346,15 @@ interface ModelCardProps {
   onVersionSelectionChange: (modelId: string, selectedIds: number[]) => void
 }
 
-function ModelCard({ model, versions, selectedVersionIds, onVersionSelectionChange }: ModelCardProps) {
+function ModelCard({
+  model,
+  versions,
+  selectedVersionIds,
+  onVersionSelectionChange,
+}: ModelCardProps) {
   const versionOptions = versions.map(v => ({
     label: `Version ${v.versionNumber}`,
-    value: v.modelVersionId
+    value: v.modelVersionId,
   }))
 
   return (
@@ -359,11 +365,14 @@ function ModelCard({ model, versions, selectedVersionIds, onVersionSelectionChan
           <span className="model-card-name">{model.name}</span>
         </div>
       </div>
-      <div className="model-card-version-selector" style={{ padding: '0.5rem' }}>
+      <div
+        className="model-card-version-selector"
+        style={{ padding: '0.5rem' }}
+      >
         <MultiSelect
           value={selectedVersionIds}
           options={versionOptions}
-          onChange={(e) => onVersionSelectionChange(model.id, e.value)}
+          onChange={e => onVersionSelectionChange(model.id, e.value)}
           placeholder="Select versions"
           display="chip"
           style={{ width: '100%' }}

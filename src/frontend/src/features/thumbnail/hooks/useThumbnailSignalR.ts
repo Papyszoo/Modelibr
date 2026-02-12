@@ -3,7 +3,7 @@ import thumbnailSignalRService, {
   ThumbnailStatusChangedEvent,
   ActiveVersionChangedEvent,
 } from '../../../services/ThumbnailSignalRService'
-import { useApiCacheStore } from '../../../stores/apiCacheStore'
+import { useQueryClient } from '@tanstack/react-query'
 
 /**
  * Hook to subscribe to thumbnail status changes for displayed models.
@@ -13,11 +13,7 @@ import { useApiCacheStore } from '../../../stores/apiCacheStore'
  */
 export function useThumbnailSignalR(_modelIds: number[]) {
   const [isConnected, setIsConnected] = useState(false)
-  const invalidateThumbnails = useApiCacheStore(s => s.invalidateThumbnails)
-  const invalidateThumbnailById = useApiCacheStore(
-    s => s.invalidateThumbnailById
-  )
-  const invalidateModelById = useApiCacheStore(s => s.invalidateModelById)
+  const queryClient = useQueryClient()
   const hasConnected = useRef(false)
 
   // Connect and join the all-models group for broadcast notifications
@@ -55,21 +51,24 @@ export function useThumbnailSignalR(_modelIds: number[]) {
   // Handle thumbnail status changes
   const handleThumbnailStatusChanged = useCallback(
     (_event: ThumbnailStatusChangedEvent) => {
-      // Invalidate thumbnail cache for the affected model version
-      invalidateThumbnails()
+      // Thumbnail status affects model lists and model detail views.
+      // We don't have modelId here, so invalidate broadly.
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({ queryKey: ['models', 'detail'] })
     },
-    [invalidateThumbnails]
+    [queryClient]
   )
 
   // Handle active version changes
   const handleActiveVersionChanged = useCallback(
     (event: ActiveVersionChangedEvent) => {
-      // Invalidate thumbnail cache for the affected model
-      invalidateThumbnailById(event.modelId.toString())
-      // Also invalidate model cache since active version changed
-      invalidateModelById(event.modelId.toString())
+      // Active version affects both model detail and model list rendering.
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({
+        queryKey: ['models', 'detail', event.modelId.toString()],
+      })
     },
-    [invalidateThumbnailById, invalidateModelById]
+    [queryClient]
   )
 
   // Subscribe to events
@@ -95,27 +94,36 @@ export function useThumbnailSignalR(_modelIds: number[]) {
  * Returns callbacks that can be used to trigger re-renders when thumbnails change.
  */
 export function useModelThumbnailUpdates(
-  modelId: number,
+  modelId: number | null,
   onThumbnailReady?: (thumbnailUrl: string) => void,
-  onActiveVersionChanged?: (event: ActiveVersionChangedEvent) => void
+  onActiveVersionChanged?: (event: ActiveVersionChangedEvent) => void,
+  onThumbnailStatusChanged?: (event: ThumbnailStatusChangedEvent) => void
 ) {
-  const store = useApiCacheStore()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
+    if (modelId == null) return
+
     const handleThumbnailStatusChanged = (
       event: ThumbnailStatusChangedEvent
     ) => {
+      onThumbnailStatusChanged?.(event)
       if (event.status === 'Ready' && event.thumbnailUrl && onThumbnailReady) {
         onThumbnailReady(event.thumbnailUrl)
       }
-      // Invalidate cache to trigger re-fetch
-      store.invalidateThumbnailById(modelId.toString())
+      // Invalidate queries to trigger re-fetch
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({
+        queryKey: ['models', 'detail', modelId.toString()],
+      })
     }
 
     const handleActiveVersionChanged = (event: ActiveVersionChangedEvent) => {
       if (event.modelId === modelId) {
-        // Invalidate thumbnail cache for this model
-        store.invalidateThumbnailById(modelId.toString())
+        queryClient.invalidateQueries({ queryKey: ['models'] })
+        queryClient.invalidateQueries({
+          queryKey: ['models', 'detail', modelId.toString()],
+        })
         // Call the callback if provided
         if (onActiveVersionChanged) {
           onActiveVersionChanged(event)
@@ -134,5 +142,11 @@ export function useModelThumbnailUpdates(
       unsubscribeThumbnail()
       unsubscribeActiveVersion()
     }
-  }, [modelId, onThumbnailReady, onActiveVersionChanged, store])
+  }, [
+    modelId,
+    onThumbnailReady,
+    onActiveVersionChanged,
+    onThumbnailStatusChanged,
+    queryClient,
+  ])
 }

@@ -53,12 +53,14 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
-  const openTextureSetDetailsTab = (textureSetId: number, name?: string): void => {
+  const openTextureSetDetailsTab = (
+    textureSetId: number,
+    name?: string
+  ): void => {
     // Check if tab already exists
     const existingTab = tabs.find(
       tab =>
-        tab.type === 'textureSetViewer' &&
-        tab.setId === textureSetId.toString()
+        tab.type === 'textureSetViewer' && tab.setId === textureSetId.toString()
     )
 
     if (existingTab) {

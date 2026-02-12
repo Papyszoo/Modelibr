@@ -6,6 +6,7 @@ import {
   DragEvent,
   MouseEvent,
 } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Toast } from 'primereact/toast'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Button } from 'primereact/button'
@@ -17,15 +18,21 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
 import { useUploadProgress } from '../../../hooks/useUploadProgress'
-import ApiClient from '../../../services/ApiClient'
+import { useSoundsQuery, useSoundCategoriesQuery } from '../api/queries'
+import {
+  createSoundCategory,
+  createSoundWithFile,
+  deleteSoundCategory,
+  getSoundsPaginated,
+  softDeleteSound,
+  updateSound,
+  updateSoundCategory,
+} from '../api/soundApi'
+import { getFileUrl } from '../../models/api/modelApi'
 import CardWidthSlider from '../../../shared/components/CardWidthSlider'
 import { useCardWidthStore } from '../../../stores/cardWidthStore'
 import { SoundDto, SoundCategoryDto, PaginationState } from '../../../types'
-import {
-  decodeAudio,
-  extractPeaks,
-  formatDuration,
-} from '../../../utils/audioUtils'
+import { decodeAudio, extractPeaks } from '../../../utils/audioUtils'
 import {
   openInFileExplorer,
   copyPathToClipboard,
@@ -85,62 +92,232 @@ function SoundList() {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sounds
 
-  const loadSounds = useCallback(async (loadMore = false) => {
-    try {
-      if (loadMore) {
-        setIsLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      const page = loadMore ? pagination.page + 1 : 1
-      const result = await ApiClient.getSoundsPaginated({
-        page,
-        pageSize: 50,
-      })
+  const queryClient = useQueryClient()
+  const soundsQuery = useSoundsQuery({ params: { page: 1, pageSize: 50 } })
+  const categoriesQuery = useSoundCategoriesQuery()
 
-      if (loadMore) {
-        setSounds(prev => [...prev, ...result.sounds])
-      } else {
-        setSounds(result.sounds || [])
-      }
-
+  // Sync initial query data into local state (for load-more accumulation)
+  useEffect(() => {
+    if (soundsQuery.data && pagination.page === 1) {
+      setSounds(soundsQuery.data.sounds || [])
       setPagination({
-        page,
-        pageSize: result.pageSize,
-        totalCount: result.totalCount,
-        totalPages: result.totalPages,
-        hasMore: page < result.totalPages,
+        page: 1,
+        pageSize: soundsQuery.data.pageSize,
+        totalCount: soundsQuery.data.totalCount,
+        totalPages: soundsQuery.data.totalPages,
+        hasMore: 1 < soundsQuery.data.totalPages,
       })
-    } catch (error) {
-      console.error('Failed to load sounds:', error)
+      setLoading(false)
+    }
+  }, [soundsQuery.data])
+
+  useEffect(() => {
+    if (soundsQuery.isFetched && !soundsQuery.data) {
+      setLoading(false)
       setSounds([])
+      setPagination(prev => ({
+        ...prev,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      }))
+    }
+  }, [soundsQuery.isFetched, soundsQuery.data])
+
+  useEffect(() => {
+    if (categoriesQuery.data) {
+      setCategories(categoriesQuery.data.categories || [])
+    }
+  }, [categoriesQuery.data])
+
+  const loadSounds = useCallback(
+    async (loadMore = false) => {
+      if (!loadMore) {
+        // For full refresh, invalidate React Query and let it refetch
+        queryClient.invalidateQueries({ queryKey: ['sounds'] })
+        return
+      }
+      // Load more: fetch next page manually and append
+      try {
+        setIsLoadingMore(true)
+        const page = pagination.page + 1
+        const result = await getSoundsPaginated({
+          page,
+          pageSize: 50,
+        })
+        setSounds(prev => [...prev, ...result.sounds])
+        setPagination({
+          page,
+          pageSize: result.pageSize,
+          totalCount: result.totalCount,
+          totalPages: result.totalPages,
+          hasMore: page < result.totalPages,
+        })
+      } catch (error) {
+        console.error('Failed to load more sounds:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to load more sounds',
+          life: 3000,
+        })
+      } finally {
+        setIsLoadingMore(false)
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [pagination.page]
+  )
+
+  const loadCategories = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['soundCategories'] })
+  }, [queryClient])
+
+  const saveCategoryMutation = useMutation({
+    mutationFn: async (vars: {
+      editingCategory: SoundCategoryDto | null
+      name: string
+      description?: string
+    }): Promise<{ type: 'create' | 'update'; createdId?: number }> => {
+      if (vars.editingCategory) {
+        await updateSoundCategory(
+          vars.editingCategory.id,
+          vars.name,
+          vars.description
+        )
+        return { type: 'update' }
+      }
+
+      const created = await createSoundCategory(vars.name, vars.description)
+      return { type: 'create', createdId: created.id }
+    },
+    onSuccess: async (result, vars) => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: vars.editingCategory
+          ? 'Category updated successfully'
+          : 'Category created successfully',
+        life: 3000,
+      })
+
+      if (result.type === 'create' && typeof result.createdId === 'number') {
+        setActiveCategoryId(result.createdId)
+      }
+
+      setShowCategoryDialog(false)
+      await loadCategories()
+      await loadSounds()
+    },
+    onError: error => {
+      console.error('Failed to save category:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to load sounds',
+        detail: 'Failed to save category',
         life: 3000,
       })
-    } finally {
-      setLoading(false)
-      setIsLoadingMore(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    },
+  })
 
-  const loadCategories = useCallback(async () => {
-    try {
-      const response = await ApiClient.getAllSoundCategories()
-      setCategories(response.categories || [])
-    } catch (error) {
-      console.error('Failed to load categories:', error)
-      setCategories([])
-    }
-  }, [])
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId: number) => {
+      await deleteSoundCategory(categoryId)
+    },
+    onSuccess: async (_data, categoryId) => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Category deleted successfully',
+        life: 3000,
+      })
+      if (activeCategoryId === categoryId) {
+        setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
+      }
+      await loadCategories()
+      await loadSounds()
+    },
+    onError: error => {
+      console.error('Failed to delete category:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete category',
+        life: 3000,
+      })
+    },
+  })
 
-  useEffect(() => {
-    loadSounds()
-    loadCategories()
-  }, [loadSounds, loadCategories])
+  const moveSoundsToCategoryMutation = useMutation({
+    mutationFn: async (vars: {
+      soundIds: number[]
+      categoryId: number | null
+    }) => {
+      await Promise.all(
+        vars.soundIds.map(id =>
+          updateSound(id, { categoryId: vars.categoryId })
+        )
+      )
+    },
+    onSuccess: async (_data, vars) => {
+      const targetCategoryName =
+        vars.categoryId === null
+          ? 'Unassigned'
+          : categories.find(c => c.id === vars.categoryId)?.name ||
+            'Unknown Category'
+      const message =
+        vars.soundIds.length === 1
+          ? `Sound moved to ${targetCategoryName}`
+          : `${vars.soundIds.length} sounds moved to ${targetCategoryName}`
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: message,
+        life: 3000,
+      })
+      setSelectedSoundIds(new Set())
+      await loadSounds()
+    },
+    onError: error => {
+      console.error('Failed to update sound category:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to update sound category',
+        life: 3000,
+      })
+    },
+  })
+
+  const recycleSoundsMutation = useMutation({
+    mutationFn: async (soundIds: number[]) => {
+      await Promise.all(soundIds.map(id => softDeleteSound(id)))
+    },
+    onSuccess: async (_data, soundIds) => {
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Recycled',
+        detail:
+          soundIds.length > 1
+            ? `${soundIds.length} sounds moved to recycle bin`
+            : 'Sound moved to recycle bin',
+        life: 3000,
+      })
+      setSelectedSoundIds(new Set())
+      setContextMenuTarget(null)
+      await loadSounds()
+    },
+    onError: error => {
+      console.error('Failed to recycle sounds:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to recycle sounds',
+        life: 3000,
+      })
+    },
+  })
 
   const handleFileDrop = async (files: File[] | FileList) => {
     const fileArray = Array.from(files)
@@ -201,12 +378,12 @@ function SoundList() {
         }
 
         const fileName = file.name.replace(/\.[^/.]+$/, '')
-        const result = await ApiClient.createSoundWithFile(file, {
+        const result = await createSoundWithFile(file, {
           name: fileName,
-          duration: duration,
-          peaks: peaks,
+          duration,
+          peaks,
           categoryId: categoryIdToAssign,
-          batchId: batchId,
+          batchId,
         })
 
         if (uploadId && uploadProgressContext) {
@@ -244,12 +421,6 @@ function SoundList() {
   const { onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDragAndDrop(handleFileDrop)
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-
   const openCreateCategoryDialog = () => {
     setEditingCategory(null)
     setCategoryName('')
@@ -275,44 +446,11 @@ function SoundList() {
       return
     }
 
-    try {
-      if (editingCategory) {
-        await ApiClient.updateSoundCategory(
-          editingCategory.id,
-          categoryName.trim(),
-          categoryDescription.trim() || undefined
-        )
-        toast.current?.show({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Category updated successfully',
-          life: 3000,
-        })
-      } else {
-        const result = await ApiClient.createSoundCategory(
-          categoryName.trim(),
-          categoryDescription.trim() || undefined
-        )
-        toast.current?.show({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Category created successfully',
-          life: 3000,
-        })
-        setActiveCategoryId(result.id)
-      }
-      setShowCategoryDialog(false)
-      loadCategories()
-      loadSounds()
-    } catch (error) {
-      console.error('Failed to save category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to save category',
-        life: 3000,
-      })
-    }
+    saveCategoryMutation.mutate({
+      editingCategory,
+      name: categoryName.trim(),
+      description: categoryDescription.trim() || undefined,
+    })
   }
 
   const handleDeleteCategory = (category: SoundCategoryDto) => {
@@ -322,28 +460,7 @@ function SoundList() {
       icon: 'pi pi-exclamation-triangle',
       acceptClassName: 'p-button-danger',
       accept: async () => {
-        try {
-          await ApiClient.deleteSoundCategory(category.id)
-          toast.current?.show({
-            severity: 'success',
-            summary: 'Success',
-            detail: 'Category deleted successfully',
-            life: 3000,
-          })
-          if (activeCategoryId === category.id) {
-            setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
-          }
-          loadCategories()
-          loadSounds()
-        } catch (error) {
-          console.error('Failed to delete category:', error)
-          toast.current?.show({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to delete category',
-            life: 3000,
-          })
-        }
+        await deleteCategoryMutation.mutateAsync(category.id)
       },
     })
   }
@@ -357,7 +474,7 @@ function SoundList() {
     if (!selectedSound) return
 
     try {
-      const url = ApiClient.getFileUrl(selectedSound.fileId.toString())
+      const url = getFileUrl(selectedSound.fileId.toString())
       const response = await fetch(url)
       const blob = await response.blob()
 
@@ -539,38 +656,10 @@ function SoundList() {
       return
     }
 
-    try {
-      await Promise.all(
-        soundsToMove.map(sound =>
-          ApiClient.updateSound(sound.id, { categoryId: newCategoryId })
-        )
-      )
-      const targetCategoryName =
-        newCategoryId === null
-          ? 'Unassigned'
-          : categories.find(c => c.id === newCategoryId)?.name ||
-            'Unknown Category'
-      const message =
-        soundsToMove.length === 1
-          ? `Sound moved to ${targetCategoryName}`
-          : `${soundsToMove.length} sounds moved to ${targetCategoryName}`
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: message,
-        life: 3000,
-      })
-      setSelectedSoundIds(new Set())
-      loadSounds()
-    } catch (error) {
-      console.error('Failed to update sound category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to update sound category',
-        life: 3000,
-      })
-    }
+    moveSoundsToCategoryMutation.mutate({
+      soundIds: soundsToMove.map(s => s.id),
+      categoryId: newCategoryId,
+    })
 
     setDraggedSoundId(null)
   }
@@ -593,31 +682,7 @@ function SoundList() {
 
     if (soundIdsToRecycle.length === 0) return
 
-    try {
-      await Promise.all(
-        soundIdsToRecycle.map(id => ApiClient.softDeleteSound(id))
-      )
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Recycled',
-        detail:
-          soundIdsToRecycle.length > 1
-            ? `${soundIdsToRecycle.length} sounds moved to recycle bin`
-            : 'Sound moved to recycle bin',
-        life: 3000,
-      })
-      setSelectedSoundIds(new Set())
-      setContextMenuTarget(null)
-      loadSounds()
-    } catch (error) {
-      console.error('Failed to recycle sounds:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to recycle sounds',
-        life: 3000,
-      })
-    }
+    recycleSoundsMutation.mutate(soundIdsToRecycle)
   }
 
   // Handle "Show in Folder" from context menu
