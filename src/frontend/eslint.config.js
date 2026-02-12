@@ -6,7 +6,50 @@ import tseslint from '@typescript-eslint/eslint-plugin'
 import tsParser from '@typescript-eslint/parser'
 import prettier from 'eslint-plugin-prettier'
 import prettierConfig from 'eslint-config-prettier'
+import fs from 'node:fs'
+import path from 'node:path'
 import { defineConfig, globalIgnores } from 'eslint/config'
+
+const featuresRoot = path.join(import.meta.dirname, 'src', 'features')
+const featureNames = fs.existsSync(featuresRoot)
+  ? fs
+      .readdirSync(featuresRoot, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+  : []
+
+const featureBoundaryConfigs = featureNames.map(featureName => {
+  const otherFeatures = featureNames.filter(name => name !== featureName)
+  const restrictedGroups = otherFeatures.flatMap(otherFeature => [
+    `../${otherFeature}`,
+    `../${otherFeature}/*`,
+    `../../${otherFeature}`,
+    `../../${otherFeature}/*`,
+  ])
+
+  return {
+    files: [`src/features/${featureName}/**/*.{js,jsx,ts,tsx}`],
+    ignores: [
+      '**/*.test.{js,jsx,ts,tsx}',
+      '**/__tests__/**/*.{js,jsx,ts,tsx}',
+      '**/*.stories.{js,jsx,ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: restrictedGroups,
+              message:
+                'Direct imports across feature boundaries are not allowed. Use shared modules or feature APIs.',
+            },
+          ],
+        },
+      ],
+    },
+  }
+})
 
 export default defineConfig([
   globalIgnores(['dist', 'coverage']),
@@ -146,6 +189,7 @@ export default defineConfig([
       ],
     },
   },
+  ...featureBoundaryConfigs,
   // Configuration for test files and Storybook (must come after architectural rules)
   {
     files: [

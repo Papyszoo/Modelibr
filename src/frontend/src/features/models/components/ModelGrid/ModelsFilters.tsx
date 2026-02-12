@@ -1,6 +1,6 @@
 import { MultiSelect } from 'primereact/multiselect'
 import { Button } from 'primereact/button'
-import { PackDto, ProjectDto } from '../../../../types'
+import { PackDto, ProjectDto } from '@/types'
 import CardWidthButton from './CardWidthButton'
 
 interface ModelsFiltersProps {

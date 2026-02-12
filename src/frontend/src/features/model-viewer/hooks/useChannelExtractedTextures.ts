@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import * as THREE from 'three'
-import { TextureChannel } from '../../../types'
+import { TextureChannel } from '@/types'
 
 /**
  * Vertex shader - simple passthrough

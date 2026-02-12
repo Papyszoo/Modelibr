@@ -1,6 +1,6 @@
-﻿import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import ModelGrid from '../ModelGrid'
+import ModelGrid from '@/features/models/components/ModelGrid/ModelGrid'
 
 // Mock useTabContext
 const mockOpenModelDetailsTab = jest.fn()

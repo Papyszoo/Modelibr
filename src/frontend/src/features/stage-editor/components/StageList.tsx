@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
-import { useMutation } from '@tanstack/react-query'
-import { openTabInPanel } from '../../../utils/tabNavigation'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { openTabInPanel } from '@/utils/tabNavigation'
+import { createStage } from '@/features/stage-editor/api/stageApi'
+import { useStagesQuery } from '@/features/stage-editor/api/queries'
 import StageGrid from './StageGrid'
 import StageListHeader from './StageListHeader'
 import CreateStageDialog from './CreateStageDialog'
@@ -18,35 +18,24 @@ interface StageDto {
 }
 
 function StageList() {
-  const [stages, setStages] = useState<StageDto[]>([])
-  const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const toast = useRef<Toast>(null)
-
-  const loadStages = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await ApiClient.getAllStages()
-      // Handle both response formats
-      const stagesList = Array.isArray(response.stages) ? response.stages : []
-      setStages(stagesList)
-    } catch (error) {
-      console.error('Failed to load stages:', error)
-      setStages([])
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load stages',
-        life: 3000,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const queryClient = useQueryClient()
+  const stagesQuery = useStagesQuery()
+  const stages: StageDto[] = stagesQuery.data?.stages ?? []
+  const loading = stagesQuery.isLoading
 
   useEffect(() => {
-    loadStages()
-  }, [loadStages])
+    if (!stagesQuery.error) return
+
+    console.error('Failed to load stages:', stagesQuery.error)
+    toast.current?.show({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to load stages',
+      life: 3000,
+    })
+  }, [stagesQuery.error])
 
   const createStageMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -54,16 +43,16 @@ function StageList() {
         lights: [],
         components: [],
       })
-      await ApiClient.createStage(name, defaultConfig)
+      await createStage(name, defaultConfig)
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
         detail: 'Stage created successfully',
         life: 3000,
       })
-      loadStages()
+      await queryClient.invalidateQueries({ queryKey: ['stages'] })
       setShowCreateDialog(false)
     },
     onError: error => {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import TexturePreviewPanel from '../features/texture-set/components/TexturePreviewPanel'
-import { TextureSetDto, TextureType } from '../types'
+import TexturePreviewPanel from '@/features/texture-set/components/TexturePreviewPanel'
+import { TextureSetDto, TextureType } from '@/types'
 
 const mockTextureSet: TextureSetDto = {
   id: 1,

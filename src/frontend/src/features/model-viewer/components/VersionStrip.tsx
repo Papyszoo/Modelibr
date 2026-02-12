@@ -1,21 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from 'primereact/button'
-import { Model } from '../../../utils/fileUtils'
-import { ModelVersionDto, VersionFileDto } from '../../../types'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
-import { useThumbnail } from '../../thumbnail/hooks/useThumbnail'
+import { Model } from '@/utils/fileUtils'
+import { ModelVersionDto, VersionFileDto } from '@/types'
+import { getVersionFileUrl } from '@/features/model-viewer/api/modelVersionApi'
+import { useThumbnail } from '@/features/thumbnail'
 import './VersionStrip.css'
 
 // Import file format icons
-import fbxIcon from '../../../assets/icons/fbx.svg'
-import objIcon from '../../../assets/icons/obj.svg'
-import gltfIcon from '../../../assets/icons/gltf.svg'
-import glbIcon from '../../../assets/icons/glb.svg'
-import blendIcon from '../../../assets/icons/blend.png'
-import stlIcon from '../../../assets/icons/stl.svg'
-import daeIcon from '../../../assets/icons/dae.svg'
-import defaultIcon from '../../../assets/icons/default.svg'
+import fbxIcon from '@/assets/icons/fbx.svg'
+import objIcon from '@/assets/icons/obj.svg'
+import gltfIcon from '@/assets/icons/gltf.svg'
+import glbIcon from '@/assets/icons/glb.svg'
+import blendIcon from '@/assets/icons/blend.png'
+import stlIcon from '@/assets/icons/stl.svg'
+import daeIcon from '@/assets/icons/dae.svg'
+import defaultIcon from '@/assets/icons/default.svg'
 
 interface VersionStripProps {
   model: Model
@@ -92,7 +91,7 @@ function VersionStrip({
 
   const handleDownloadFile = (file: VersionFileDto) => {
     if (!selectedVersion || !model) return
-    const url = ApiClient.getVersionFileUrl(
+    const url = getVersionFileUrl(
       parseInt(model.id),
       selectedVersion.id,
       file.id

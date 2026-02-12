@@ -5,8 +5,8 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import * as THREE from 'three'
-import LoadingPlaceholder from '../../../components/LoadingPlaceholder'
-import { useModelObject } from '../hooks/useModelObject'
+import LoadingPlaceholder from '@/components/LoadingPlaceholder'
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 
 // Separate components for each model type to avoid conditional hooks
 function OBJModel({

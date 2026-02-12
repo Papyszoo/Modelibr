@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, ReactNode } from 'react'
-import { usePanelStore } from '../stores/panelStore'
+import { usePanelStore } from '@/stores/panelStore'
 import './FloatingWindow.css'
 
 interface FloatingWindowProps {

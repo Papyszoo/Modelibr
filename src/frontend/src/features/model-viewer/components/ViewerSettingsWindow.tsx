@@ -1,5 +1,5 @@
 import ViewerSettings, { ViewerSettingsType } from './ViewerSettings'
-import FloatingWindow from '../../../components/FloatingWindow'
+import FloatingWindow from '@/components/FloatingWindow'
 
 interface ViewerSettingsWindowProps {
   visible: boolean

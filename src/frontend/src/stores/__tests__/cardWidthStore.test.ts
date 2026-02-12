@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react'
-import { useCardWidthStore } from '../cardWidthStore'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
 
 describe('cardWidthStore', () => {
   beforeEach(() => {

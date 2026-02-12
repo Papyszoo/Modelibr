@@ -1,8 +1,8 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
-import DockPanel from '../DockPanel'
-import { DockProvider } from '../../../contexts/DockContext'
-import { Tab } from '../../../types'
+import DockPanel from '@/components/layout/DockPanel'
+import { DockProvider } from '@/contexts/DockContext'
+import { Tab } from '@/types'
 
 // Test wrapper with DockProvider
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (

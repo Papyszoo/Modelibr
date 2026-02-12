@@ -7,9 +7,12 @@ import ComponentLibraryWindow from './ComponentLibraryWindow'
 import PropertyPanelWindow from './PropertyPanelWindow'
 import CodePanelWindow from './CodePanelWindow'
 import StageHierarchyWindow from './StageHierarchyWindow'
-import { useTabContext } from '../../../hooks/useTabContext'
-// eslint-disable-next-line no-restricted-imports -- Stage editor needs API access for saving/loading stages
-import apiClient from '../../../services/ApiClient'
+import { useTabContext } from '@/hooks/useTabContext'
+import {
+  createStage,
+  getStageById,
+  updateStage,
+} from '@/features/stage-editor/api/stageApi'
 import './SceneEditor.css'
 
 export interface StageLight {
@@ -119,7 +122,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   const loadStageById = async (id: number) => {
     try {
       setIsLoading(true)
-      const stage = await apiClient.getStageById(id)
+      const stage = await getStageById(id)
       setStageName(stage.name)
       setCurrentStageId(stage.id)
 
@@ -164,7 +167,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
 
       if (currentStageId) {
         // Update existing stage
-        await apiClient.updateStage(currentStageId, configJson)
+        await updateStage(currentStageId, configJson)
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
@@ -173,7 +176,7 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
         })
       } else {
         // Create new stage
-        const response = await apiClient.createStage(stageName, configJson)
+        const response = await createStage(stageName, configJson)
         setCurrentStageId(response.id)
         toast.current?.show({
           severity: 'success',

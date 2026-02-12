@@ -1,5 +1,9 @@
-import { Tab } from '../types'
-import ApiClient from '../services/ApiClient'
+import { Tab } from '@/types'
+import { getModelById } from '@/features/models/api/modelApi'
+import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
+import { getPackById } from '@/features/pack/api/packApi'
+import { getProjectById } from '@/features/project/api/projectApi'
+import { getStageById } from '@/features/stage-editor/api/stageApi'
 
 interface TabLabelOptions {
   modelId?: string
@@ -234,7 +238,7 @@ export async function parseCompactTabFormatAsync(
         const modelId = tabId.substring(6)
         let modelName: string | undefined
         try {
-          const model = await ApiClient.getModelById(modelId)
+          const model = await getModelById(modelId)
           modelName = model.name
         } catch {
           // If API call fails, fall back to ID-based label
@@ -253,7 +257,7 @@ export async function parseCompactTabFormatAsync(
         const setId = tabId.substring(4)
         let setName: string | undefined
         try {
-          const textureSet = await ApiClient.getTextureSetById(Number(setId))
+          const textureSet = await getTextureSetById(Number(setId))
           setName = textureSet.name
         } catch {
           // If API call fails, fall back to ID-based label
@@ -272,7 +276,7 @@ export async function parseCompactTabFormatAsync(
         const packId = tabId.substring(5)
         let packName: string | undefined
         try {
-          const pack = await ApiClient.getPackById(Number(packId))
+          const pack = await getPackById(Number(packId))
           packName = pack.name
         } catch {
           // If API call fails, fall back to ID-based label
@@ -291,7 +295,7 @@ export async function parseCompactTabFormatAsync(
         const projectId = tabId.substring(8)
         let projectName: string | undefined
         try {
-          const project = await ApiClient.getProjectById(Number(projectId))
+          const project = await getProjectById(Number(projectId))
           projectName = project.name
         } catch {
           // If API call fails, fall back to ID-based label
@@ -310,7 +314,7 @@ export async function parseCompactTabFormatAsync(
         const stageId = tabId.substring(6)
         let stageName: string | undefined
         try {
-          const stage = await ApiClient.getStageById(Number(stageId))
+          const stage = await getStageById(Number(stageId))
           stageName = stage.name
         } catch {
           // If API call fails, fall back to ID-based label

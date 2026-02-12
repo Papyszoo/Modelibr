@@ -6,13 +6,20 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createProject, deleteProject } from '../api/projectApi'
-import { useProjectsQuery } from '../api/queries'
-import { ProjectDto } from '../../../types'
-import { openTabInPanel } from '../../../utils/tabNavigation'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { createProject, deleteProject } from '@/features/project/api/projectApi'
+import { useProjectsQuery } from '@/features/project/api/queries'
+import { ProjectDto } from '@/types'
+import { openTabInPanel } from '@/utils/tabNavigation'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { projectCreateFormSchema } from '@/shared/validation/formSchemas'
 import './ProjectList.css'
+
+type ProjectCreateFormInput = z.input<typeof projectCreateFormSchema>
+type ProjectCreateFormOutput = z.output<typeof projectCreateFormSchema>
 
 export default function ProjectList() {
   const queryClient = useQueryClient()
@@ -20,9 +27,20 @@ export default function ProjectList() {
   const projects = projectsQuery.data ?? []
   const loading = projectsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [newProjectDescription, setNewProjectDescription] = useState('')
   const toast = useRef<Toast>(null)
+
+  const { register, handleSubmit, reset } = useForm<
+    ProjectCreateFormInput,
+    unknown,
+    ProjectCreateFormOutput
+  >({
+    resolver: zodResolver(projectCreateFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      description: '',
+    },
+  })
 
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.projects
@@ -43,8 +61,7 @@ export default function ProjectList() {
       })
 
       setShowCreateDialog(false)
-      setNewProjectName('')
-      setNewProjectDescription('')
+      reset({ name: '', description: '' })
       await invalidateProjects()
     },
     onError: error => {
@@ -95,22 +112,19 @@ export default function ProjectList() {
     },
   })
 
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim()) {
+  const handleCreateProject = handleSubmit(
+    async values => {
+      await createProjectMutation.mutateAsync(values)
+    },
+    () => {
       toast.current?.show({
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Project name is required',
         life: 3000,
       })
-      return
     }
-
-    await createProjectMutation.mutateAsync({
-      name: newProjectName.trim(),
-      description: newProjectDescription.trim() || undefined,
-    })
-  }
+  )
 
   const handleDeleteProject = async (projectId: number) => {
     await deleteProjectMutation.mutateAsync(projectId)
@@ -233,8 +247,7 @@ export default function ProjectList() {
         style={{ width: '500px' }}
         onHide={() => {
           setShowCreateDialog(false)
-          setNewProjectName('')
-          setNewProjectDescription('')
+          reset({ name: '', description: '' })
         }}
         footer={
           <div>
@@ -243,8 +256,7 @@ export default function ProjectList() {
               icon="pi pi-times"
               onClick={() => {
                 setShowCreateDialog(false)
-                setNewProjectName('')
-                setNewProjectDescription('')
+                reset({ name: '', description: '' })
               }}
               className="p-button-text"
             />
@@ -262,8 +274,7 @@ export default function ProjectList() {
             <label htmlFor="project-name">Name *</label>
             <InputText
               id="project-name"
-              value={newProjectName}
-              onChange={e => setNewProjectName(e.target.value)}
+              {...register('name')}
               placeholder="Enter project name"
             />
           </div>
@@ -271,8 +282,7 @@ export default function ProjectList() {
             <label htmlFor="project-description">Description</label>
             <InputTextarea
               id="project-description"
-              value={newProjectDescription}
-              onChange={e => setNewProjectDescription(e.target.value)}
+              {...register('description')}
               rows={3}
               placeholder="Enter project description (optional)"
             />

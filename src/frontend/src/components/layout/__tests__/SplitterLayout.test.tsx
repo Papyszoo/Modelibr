@@ -1,9 +1,9 @@
-import { Tab } from '../../../types'
+import { Tab } from '@/types'
 import {
   getTabLabel,
   parseCompactTabFormat,
   serializeToCompactFormat,
-} from '../../../utils/tabSerialization'
+} from '@/utils/tabSerialization'
 
 describe('SplitterLayout URL Serialization', () => {
   describe('getTabLabel', () => {

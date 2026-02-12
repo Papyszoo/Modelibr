@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { classNames } from 'primereact/utils'
-import { TextureSetDto } from '../../../types'
+import { TextureSetDto } from '@/types'
+import { textureSetNameFormSchema } from '@/shared/validation/formSchemas'
+
+type TextureSetNameFormValues = {
+  name: string
+}
 
 interface SetHeaderProps {
   textureSet: TextureSetDto
@@ -16,31 +23,31 @@ export default function SetHeader({
   updating,
 }: SetHeaderProps) {
   const [editing, setEditing] = useState(false)
-  const [editedName, setEditedName] = useState(textureSet.name)
-  const [errors, setErrors] = useState<{ name?: string }>({})
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<TextureSetNameFormValues>({
+    resolver: zodResolver(textureSetNameFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: textureSet.name,
+    },
+  })
 
-  const validateName = (name: string) => {
-    const newErrors: { name?: string } = {}
+  const editedName = watch('name') || ''
 
-    if (!name.trim()) {
-      newErrors.name = 'Name is required'
-    } else if (name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters long'
-    } else if (name.trim().length > 200) {
-      newErrors.name = 'Name cannot exceed 200 characters'
+  useEffect(() => {
+    if (!editing) {
+      reset({ name: textureSet.name })
     }
+  }, [editing, textureSet.name, reset])
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleUpdateName = async () => {
-    if (!validateName(editedName)) {
-      return
-    }
-
+  const handleUpdateName = async (values: TextureSetNameFormValues) => {
     try {
-      await onNameUpdate(editedName.trim())
+      await onNameUpdate(values.name)
       setEditing(false)
     } catch {
       // Error handling is done in parent component
@@ -48,9 +55,8 @@ export default function SetHeader({
   }
 
   const handleCancelEdit = () => {
-    setEditedName(textureSet.name)
+    reset({ name: textureSet.name })
     setEditing(false)
-    setErrors({})
   }
 
   return (
@@ -58,8 +64,7 @@ export default function SetHeader({
       {editing ? (
         <div className="p-inputgroup">
           <InputText
-            value={editedName}
-            onChange={e => setEditedName(e.target.value)}
+            {...register('name')}
             className={classNames({ 'p-invalid': errors.name })}
             placeholder="Texture set name"
             maxLength={200}
@@ -68,7 +73,7 @@ export default function SetHeader({
           <Button
             icon="pi pi-check"
             className="p-button-success"
-            onClick={handleUpdateName}
+            onClick={handleSubmit(handleUpdateName)}
             loading={updating}
             disabled={!editedName.trim() || updating}
           />
@@ -90,7 +95,7 @@ export default function SetHeader({
           />
         </div>
       )}
-      {errors.name && <small className="p-error">{errors.name}</small>}
+      {errors.name && <small className="p-error">{errors.name.message}</small>}
     </div>
   )
 }

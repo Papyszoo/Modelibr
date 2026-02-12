@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
-import TexturePreviewPanel from '../TexturePreviewPanel'
-import { TextureSetDto, TextureType } from '../../../../types'
+import TexturePreviewPanel from '@/features/texture-set/components/TexturePreviewPanel'
+import { TextureSetDto, TextureType } from '@/types'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({

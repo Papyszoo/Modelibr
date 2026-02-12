@@ -1,14 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
-import {
-  TextureSetDto,
-  TextureDto,
-  TextureType,
-  TextureChannel,
-} from '../../../types'
-import { getTextureTypeLabel } from '../../../utils/textureTypeUtils'
-import { useTextureSets } from '../hooks/useTextureSets'
+import { TextureSetDto, TextureDto, TextureType, TextureChannel } from '@/types'
+import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
+import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import './FilesTab.css'
 
 interface FilesTabProps {

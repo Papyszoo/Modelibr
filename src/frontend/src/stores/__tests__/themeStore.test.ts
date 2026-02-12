@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react'
-import { useThemeStore } from '../themeStore'
+import { useThemeStore } from '@/stores/themeStore'
 
 describe('themeStore', () => {
   beforeEach(() => {

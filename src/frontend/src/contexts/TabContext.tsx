@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import { Tab } from '../types'
+import { Tab } from '@/types'
 
 export interface TabContextValue {
   side: 'left' | 'right'

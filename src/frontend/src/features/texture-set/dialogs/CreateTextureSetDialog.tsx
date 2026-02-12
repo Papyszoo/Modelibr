@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { classNames } from 'primereact/utils'
+import { textureSetNameFormSchema } from '@/shared/validation/formSchemas'
+
+type TextureSetNameFormValues = {
+  name: string
+}
 
 interface CreateTextureSetDialogProps {
   visible: boolean
@@ -15,36 +22,35 @@ function CreateTextureSetDialog({
   onHide,
   onSubmit,
 }: CreateTextureSetDialogProps) {
-  const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [errors, setErrors] = useState<{ name?: string }>({})
 
-  const validateForm = () => {
-    const newErrors: { name?: string } = {}
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<TextureSetNameFormValues>({
+    resolver: zodResolver(textureSetNameFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+    },
+  })
 
-    if (!name.trim()) {
-      newErrors.name = 'Name is required'
-    } else if (name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters long'
-    } else if (name.trim().length > 200) {
-      newErrors.name = 'Name cannot exceed 200 characters'
+  const nameValue = watch('name') || ''
+
+  useEffect(() => {
+    if (!visible) {
+      reset({ name: '' })
     }
+  }, [visible, reset])
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      return
-    }
-
+  const handleValidSubmit = async (values: TextureSetNameFormValues) => {
     try {
       setSubmitting(true)
-      await onSubmit(name.trim())
-      // Reset form on success
-      setName('')
-      setErrors({})
+      await onSubmit(values.name)
+      reset({ name: '' })
     } catch (error) {
       console.error('Failed to create texture set:', error)
     } finally {
@@ -53,8 +59,7 @@ function CreateTextureSetDialog({
   }
 
   const handleCancel = () => {
-    setName('')
-    setErrors({})
+    reset({ name: '' })
     onHide()
   }
 
@@ -70,9 +75,9 @@ function CreateTextureSetDialog({
       <Button
         label="Create"
         icon="pi pi-check"
-        onClick={handleSubmit}
+        onClick={handleSubmit(handleValidSubmit)}
         loading={submitting}
-        disabled={!name.trim() || submitting}
+        disabled={!nameValue.trim() || submitting}
       />
     </div>
   )
@@ -94,19 +99,20 @@ function CreateTextureSetDialog({
         </label>
         <InputText
           id="set-name"
-          value={name}
-          onChange={e => setName(e.target.value)}
+          {...register('name')}
           className={classNames({ 'p-invalid': errors.name })}
           placeholder="Enter texture set name"
           maxLength={200}
           autoFocus
           onKeyDown={e => {
-            if (e.key === 'Enter' && name.trim() && !submitting) {
-              handleSubmit()
+            if (e.key === 'Enter' && nameValue.trim() && !submitting) {
+              void handleSubmit(handleValidSubmit)()
             }
           }}
         />
-        {errors.name && <small className="p-error">{errors.name}</small>}
+        {errors.name && (
+          <small className="p-error">{errors.name.message}</small>
+        )}
         <small className="p-text-secondary">
           Choose a descriptive name for your texture set (2-200 characters)
         </small>

@@ -1,4 +1,4 @@
-import FloatingWindow from '../../../components/FloatingWindow'
+import FloatingWindow from '@/components/FloatingWindow'
 import StageHierarchy from './StageHierarchy'
 import { StageConfig, StageGroup } from './SceneEditor'
 

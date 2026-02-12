@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 import { Canvas } from '@react-three/fiber'
-import TexturedGeometry from '../TexturedGeometry'
-import { TextureSetDto, TextureType } from '../../../../types'
+import TexturedGeometry from '@/features/texture-set/components/TexturedGeometry'
+import { TextureSetDto, TextureType } from '@/types'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({

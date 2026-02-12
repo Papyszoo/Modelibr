@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import ModelInfo from '../ModelInfo'
+import ModelInfo from '@/features/model-viewer/components/ModelInfo'
 
 // Mock the ApiClient
 jest.mock('../../../../services/ApiClient', () => ({

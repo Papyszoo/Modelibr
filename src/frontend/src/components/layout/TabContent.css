@@ -27,3 +27,11 @@
   margin: 0;
   color: #9ca3af;
 }
+
+.tab-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}

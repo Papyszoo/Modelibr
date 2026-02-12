@@ -1,27 +1,29 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import { TextureSetDto, PaginationState } from '../../../types'
-import { useTabContext } from '../../../hooks/useTabContext'
-import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
-import { useUploadProgress } from '../../../hooks/useUploadProgress'
+import { TextureSetDto, PaginationState } from '@/types'
+import { useTabContext } from '@/hooks/useTabContext'
+import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
 import {
   createTextureSet,
   createTextureSetWithFile,
   deleteTextureSet,
-  getTextureSetsPaginated,
-} from '../api/textureSetApi'
+} from '@/features/texture-set/api/textureSetApi'
+import {
+  getTextureSetsQueryOptions,
+  useTextureSetsQuery,
+} from '@/features/texture-set/api/queries'
 import { Button } from 'primereact/button'
-import CreateTextureSetDialog from '../dialogs/CreateTextureSetDialog'
+import CreateTextureSetDialog from '@/features/texture-set/dialogs/CreateTextureSetDialog'
 import TextureSetListHeader from './TextureSetListHeader'
 import TextureSetGrid from './TextureSetGrid'
 import './TextureSetList.css'
 
 function TextureSetList() {
   const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
-  const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
@@ -34,53 +36,75 @@ function TextureSetList() {
   const toast = useRef<Toast>(null)
   const { openTextureSetDetailsTab } = useTabContext()
   const uploadProgressContext = useUploadProgress()
+  const queryClient = useQueryClient()
+  const textureSetsQuery = useTextureSetsQuery({
+    params: { page: 1, pageSize: 50 },
+  })
 
-  const loadTextureSets = useCallback(async (loadMore = false) => {
-    try {
-      if (loadMore) {
-        setIsLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      const page = loadMore ? pagination.page + 1 : 1
-      const result = await getTextureSetsPaginated({
-        page,
-        pageSize: 50,
-      })
-
-      if (loadMore) {
-        setTextureSets(prev => [...prev, ...result.textureSets])
-      } else {
-        setTextureSets(result.textureSets || [])
-      }
-
-      setPagination({
-        page,
-        pageSize: result.pageSize,
-        totalCount: result.totalCount,
-        totalPages: result.totalPages,
-        hasMore: page < result.totalPages,
-      })
-    } catch (error) {
-      console.error('Failed to load texture sets:', error)
-      setTextureSets([])
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load texture sets',
-        life: 3000,
-      })
-    } finally {
-      setLoading(false)
-      setIsLoadingMore(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const loading = textureSetsQuery.isLoading && textureSets.length === 0
 
   useEffect(() => {
-    loadTextureSets()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!textureSetsQuery.data) return
+
+    setTextureSets(textureSetsQuery.data.textureSets || [])
+    setPagination({
+      page: 1,
+      pageSize: textureSetsQuery.data.pageSize,
+      totalCount: textureSetsQuery.data.totalCount,
+      totalPages: textureSetsQuery.data.totalPages,
+      hasMore: 1 < textureSetsQuery.data.totalPages,
+    })
+  }, [textureSetsQuery.data])
+
+  useEffect(() => {
+    if (!textureSetsQuery.error) return
+
+    console.error('Failed to load texture sets:', textureSetsQuery.error)
+    setTextureSets([])
+    toast.current?.show({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to load texture sets',
+      life: 3000,
+    })
+  }, [textureSetsQuery.error])
+
+  const loadTextureSets = useCallback(
+    async (loadMore = false) => {
+      if (!loadMore) {
+        await queryClient.invalidateQueries({ queryKey: ['textureSets'] })
+        return
+      }
+
+      try {
+        setIsLoadingMore(true)
+        const page = pagination.page + 1
+        const result = await queryClient.fetchQuery(
+          getTextureSetsQueryOptions({ page, pageSize: 50 })
+        )
+
+        setTextureSets(prev => [...prev, ...(result.textureSets || [])])
+        setPagination({
+          page,
+          pageSize: result.pageSize,
+          totalCount: result.totalCount,
+          totalPages: result.totalPages,
+          hasMore: page < result.totalPages,
+        })
+      } catch (error) {
+        console.error('Failed to load texture sets:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to load texture sets',
+          life: 3000,
+        })
+      } finally {
+        setIsLoadingMore(false)
+      }
+    },
+    [pagination.page, queryClient]
+  )
 
   const createTextureSetMutation = useMutation({
     mutationFn: async (name: string) => {

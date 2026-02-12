@@ -1,5 +1,8 @@
-import { client, baseURL, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { ModelVersionDto, CreateModelVersionResponse } from '../../../types'
+import { client, baseURL, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import {
+  ModelVersionDto,
+  CreateModelVersionResponse,
+} from '@/features/model-viewer/types'
 
 export async function getModelVersions(
   modelId: number,

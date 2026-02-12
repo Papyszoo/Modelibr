@@ -1,9 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import ThumbnailDisplay from './ThumbnailDisplay'
-import ApiClient from '../../../services/ApiClient'
-
-// Mock ApiClient for Storybook
-const mockApiClient = ApiClient as any
+import * as thumbnailApi from '@/features/thumbnail/api/thumbnailApi'
 
 const meta = {
   title: 'Components/ThumbnailDisplay',
@@ -23,7 +20,7 @@ const meta = {
       // Mock different thumbnail states for different modelIds
       const modelId = context.args.modelId || '1'
 
-      mockApiClient.getThumbnailStatus = jest.fn().mockResolvedValue({
+      jest.spyOn(thumbnailApi, 'getThumbnailStatus').mockResolvedValue({
         status:
           modelId === 'processing'
             ? 'Processing'
@@ -34,7 +31,7 @@ const meta = {
                 : 'Ready',
       })
 
-      mockApiClient.getThumbnailFile = jest.fn().mockImplementation(() => {
+      jest.spyOn(thumbnailApi, 'getThumbnailFile').mockImplementation(() => {
         if (modelId === 'failed') {
           return Promise.reject(new Error('Failed to fetch'))
         }

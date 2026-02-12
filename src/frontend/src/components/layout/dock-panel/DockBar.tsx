@@ -1,10 +1,10 @@
 import { useRef, useEffect } from 'react'
 import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
-import DraggableTab from '../DraggableTab'
-import { Tab } from '../../../types'
-import { useDockContext } from '../../../contexts/DockContext'
-import { useTabMenuItems } from '../../../hooks/useTabMenuItems'
+import DraggableTab from '@/components/layout/DraggableTab'
+import { Tab } from '@/types'
+import { useDockContext } from '@/contexts/DockContext'
+import { useTabMenuItems } from '@/hooks/useTabMenuItems'
 
 interface DockBarProps {
   side: 'left' | 'right'
@@ -52,11 +52,14 @@ export default function DockBar({
   })
 
   useEffect(() => {
-    if (menuRef.current) {
+    const menu = menuRef.current
+
+    if (menu) {
       registerContextMenu(menuRef)
     }
+
     return () => {
-      if (menuRef.current) {
+      if (menu) {
         unregisterContextMenu(menuRef)
       }
     }

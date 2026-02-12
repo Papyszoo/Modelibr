@@ -4,14 +4,13 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import * as THREE from 'three'
-import { useModelObject } from '../hooks/useModelObject'
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import {
   useChannelExtractedTextures,
   TextureConfig,
-} from '../hooks/useChannelExtractedTextures'
-import { TextureSetDto, TextureType, TextureChannel } from '../../../types'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
+} from '@/features/model-viewer/hooks/useChannelExtractedTextures'
+import { TextureSetDto, TextureType, TextureChannel } from '@/types'
+import { getFileUrl } from '@/features/models/api/modelApi'
 
 interface TexturedModelProps {
   modelUrl: string
@@ -40,7 +39,7 @@ function buildTextureConfigs(
     }
     if (texture) {
       configs[slotName] = {
-        url: ApiClient.getFileUrl(texture.fileId.toString()),
+        url: getFileUrl(texture.fileId.toString()),
         sourceChannel: texture.sourceChannel ?? TextureChannel.RGB,
       }
     }

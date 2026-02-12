@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { Canvas } from '@react-three/fiber'
-import Model from '../Model'
+import Model from '@/features/model-viewer/components/Model'
 
 // Mock the loaders to avoid actual file loading
 jest.mock('three/examples/jsm/loaders/OBJLoader', () => ({

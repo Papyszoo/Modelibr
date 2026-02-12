@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useQueryState } from 'nuqs'
-import { DockProvider } from '../../contexts/DockContext'
+import { DockProvider } from '@/contexts/DockContext'
 import DockPanel from './DockPanel'
-import { Tab, SplitterEvent } from '../../types'
+import { Tab, SplitterEvent } from '@/types'
 import {
   parseCompactTabFormat,
   parseCompactTabFormatAsync,
   serializeToCompactFormat,
-} from '../../utils/tabSerialization'
-import { usePanelStore } from '../../stores/panelStore'
+} from '@/utils/tabSerialization'
+import { usePanelStore } from '@/stores/panelStore'
 import './SplitterLayout.css'
 
 function SplitterLayout(): JSX.Element {

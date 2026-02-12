@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
-import { ModelVersionDto } from '../../../types'
+import React, { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ModelVersionDto } from '@/types'
 import {
   createModelVersion,
-  getModelVersions,
   getVersionFileUrl,
-} from '../../model-viewer/api/modelVersionApi'
+} from '@/features/model-viewer/api/modelVersionApi'
+import { useModelVersionsQuery } from '@/features/model-viewer/api/queries'
 import './ModelVersionHistory.css'
 
 interface ModelVersionHistoryProps {
@@ -18,28 +19,15 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
   onClose,
   onVersionSelect,
 }) => {
-  const [versions, setVersions] = useState<ModelVersionDto[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-
-  useEffect(() => {
-    loadVersions()
-  }, [modelId])
-
-  const loadVersions = async () => {
-    try {
-      setLoading(true)
-      const data = await getModelVersions(modelId)
-      setVersions(data)
-      setError(null)
-    } catch (err) {
-      setError('Failed to load model versions')
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const queryClient = useQueryClient()
+  const versionsQuery = useModelVersionsQuery({
+    modelId,
+    queryConfig: { enabled: modelId > 0 },
+  })
+  const versions: ModelVersionDto[] = versionsQuery.data ?? []
+  const loading = versionsQuery.isLoading
+  const error = versionsQuery.error ? 'Failed to load model versions' : null
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -52,7 +40,9 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
     try {
       setUploading(true)
       await createModelVersion(modelId, file, description || undefined)
-      await loadVersions()
+      await queryClient.invalidateQueries({
+        queryKey: ['modelVersions', modelId],
+      })
     } catch (err) {
       alert('Failed to create new version')
       console.error(err)

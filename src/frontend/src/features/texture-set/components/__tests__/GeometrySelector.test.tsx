@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import GeometrySelector from '../GeometrySelector'
+import GeometrySelector from '@/features/texture-set/components/GeometrySelector'
 
 describe('GeometrySelector', () => {
   it('should render all geometry options', () => {

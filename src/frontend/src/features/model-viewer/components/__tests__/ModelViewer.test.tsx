@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import ModelViewer from '../ModelViewer'
-import { ModelProvider } from '../../../../contexts/ModelContext'
+import ModelViewer from '@/features/model-viewer/components/ModelViewer'
+import { ModelProvider } from '@/contexts/ModelContext'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
@@ -19,10 +19,7 @@ jest.mock('../../../../services/ApiClient', () => ({
 
 // Mock @react-three/fiber
 jest.mock('@react-three/fiber', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  Canvas: ({ children, ...props }: any) => (
-    <div data-testid="canvas">{children}</div>
-  ),
+  Canvas: ({ children }: any) => <div data-testid="canvas">{children}</div>,
 }))
 
 // Mock child components

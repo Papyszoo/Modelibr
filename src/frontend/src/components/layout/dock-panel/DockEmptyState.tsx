@@ -1,8 +1,8 @@
 import { useRef, useEffect } from 'react'
 import { ContextMenu } from 'primereact/contextmenu'
-import { Tab } from '../../../types'
-import { useDockContext } from '../../../contexts/DockContext'
-import { useTabMenuItems } from '../../../hooks/useTabMenuItems'
+import { Tab } from '@/types'
+import { useDockContext } from '@/contexts/DockContext'
+import { useTabMenuItems } from '@/hooks/useTabMenuItems'
 
 interface DockEmptyStateProps {
   onAddTab: (type: Tab['type'], title: string) => void
@@ -36,11 +36,14 @@ export default function DockEmptyState({
   })
 
   useEffect(() => {
-    if (contextMenuRef.current) {
+    const menu = contextMenuRef.current
+
+    if (menu) {
       registerContextMenu(contextMenuRef)
     }
+
     return () => {
-      if (contextMenuRef.current) {
+      if (menu) {
         unregisterContextMenu(contextMenuRef)
       }
     }

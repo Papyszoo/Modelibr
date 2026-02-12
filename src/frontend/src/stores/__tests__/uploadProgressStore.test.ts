@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { useUploadProgressStore } from '../uploadProgressStore'
+import { useUploadProgressStore } from '@/stores/uploadProgressStore'
 
 // Helper to create a mock File
 const createMockFile = (name: string): File => {

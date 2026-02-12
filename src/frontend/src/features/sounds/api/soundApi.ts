@@ -1,4 +1,4 @@
-import { client, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
+import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
 import {
   SoundDto,
   GetAllSoundsResponse,

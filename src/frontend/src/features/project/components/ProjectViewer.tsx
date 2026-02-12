@@ -1,10 +1,7 @@
 import { useMemo } from 'react'
-import { ContainerViewer } from '../../../shared/components/ContainerViewer'
-import {
-  ContainerAdapter,
-  ContainerDto,
-} from '../../../shared/types/ContainerTypes'
-import { ProjectDto } from '../../../types'
+import { ContainerViewer } from '@/shared/components/ContainerViewer'
+import { ContainerAdapter, ContainerDto } from '@/shared/types/ContainerTypes'
+import { ProjectDto } from '@/types'
 import {
   getProjectById,
   getModelsByProject,
@@ -20,7 +17,7 @@ import {
   addSoundToProject,
   removeSoundFromProject,
   addTextureToProjectWithFile,
-} from '../api/projectApi'
+} from '@/features/project/api/projectApi'
 
 interface ProjectViewerProps {
   projectId: number

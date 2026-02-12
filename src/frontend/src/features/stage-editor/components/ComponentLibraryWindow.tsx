@@ -1,5 +1,5 @@
 import ComponentLibrary, { ComponentType } from './ComponentLibrary'
-import FloatingWindow from '../../../components/FloatingWindow'
+import FloatingWindow from '@/components/FloatingWindow'
 
 interface ComponentLibraryWindowProps {
   visible: boolean

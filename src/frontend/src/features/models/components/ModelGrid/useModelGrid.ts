@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react'
-import { PackDto, ProjectDto } from '../../../../types'
-import { useThumbnailSignalR } from '../../../thumbnail/hooks/useThumbnailSignalR'
+import { PackDto, ProjectDto } from '@/types'
+import { useThumbnailSignalR } from '@/features/thumbnail/hooks/useThumbnailSignalR'
 import { Toast } from 'primereact/toast'
 import { useModelData } from './useModelData'
 import { useModelFilters } from './useModelFilters'
@@ -65,7 +65,7 @@ export function useModelGrid({
       detail: 'Models list has been refreshed',
       life: 2000,
     })
-  }, [data.fetchModels])
+  }, [data])
 
   return {
     // Data

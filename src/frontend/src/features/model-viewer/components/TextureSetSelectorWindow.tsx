@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from 'primereact/button'
-import { Model } from '../../../utils/fileUtils'
-import { TextureSetDto } from '../../../types'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
-import FloatingWindow from '../../../components/FloatingWindow'
+import { Model } from '@/utils/fileUtils'
+import { TextureSetDto } from '@/types'
+import {
+  getFileUrl,
+  setDefaultTextureSet,
+} from '@/features/models/api/modelApi'
+import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
+import FloatingWindow from '@/components/FloatingWindow'
+import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import TextureSetAssociationDialog from './TextureSetAssociationDialog'
 import './TextureSetSelectorWindow.css'
 
@@ -31,39 +35,17 @@ function TextureSetSelectorWindow({
   onTextureSetSelect,
   onModelUpdated,
 }: TextureSetSelectorWindowProps) {
-  const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
-  const [loading, setLoading] = useState(false)
   const [settingDefault, setSettingDefault] = useState(false)
   const [linkDialogVisible, setLinkDialogVisible] = useState(false)
   const [unlinking, setUnlinking] = useState<number | null>(null)
-
-  const loadTextureSets = async () => {
-    if (!modelVersionId) {
-      setTextureSets([])
-      return
-    }
-
-    try {
-      setLoading(true)
-      // Get all texture sets and filter to those associated with this model version
-      const allTextureSets = await ApiClient.getAllTextureSets()
-      const filteredTextureSets = allTextureSets.filter(ts =>
-        ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
-      )
-      setTextureSets(filteredTextureSets)
-    } catch (error) {
-      console.error('Failed to load texture sets:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (visible && modelVersionId) {
-      loadTextureSets()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, modelVersionId])
+  const textureSetsQuery = useTextureSetsByModelVersionQuery({
+    modelVersionId: modelVersionId ?? 0,
+    queryConfig: {
+      enabled: visible && modelVersionId !== null,
+    },
+  })
+  const textureSets: TextureSetDto[] = textureSetsQuery.data ?? []
+  const loading = textureSetsQuery.isLoading || textureSetsQuery.isFetching
 
   const handleSetDefault = async (textureSetId: number | null) => {
     if (!modelVersionId) {
@@ -72,7 +54,7 @@ function TextureSetSelectorWindow({
     }
     try {
       setSettingDefault(true)
-      await ApiClient.setDefaultTextureSet(
+      await setDefaultTextureSet(
         parseInt(model.id),
         textureSetId,
         modelVersionId
@@ -88,7 +70,7 @@ function TextureSetSelectorWindow({
 
   const handleLinkDialogClose = () => {
     setLinkDialogVisible(false)
-    // Refresh model data - texture sets will reload via useEffect when model updates
+    void textureSetsQuery.refetch()
     onModelUpdated()
   }
 
@@ -103,10 +85,7 @@ function TextureSetSelectorWindow({
     }
     try {
       setUnlinking(textureSetId)
-      await ApiClient.disassociateTextureSetFromModelVersion(
-        textureSetId,
-        modelVersionId
-      )
+      await disassociateTextureSetFromModelVersion(textureSetId, modelVersionId)
 
       // If this was the default texture set, clear or update the default
       if (selectedVersion?.defaultTextureSetId === textureSetId) {
@@ -116,7 +95,7 @@ function TextureSetSelectorWindow({
         )
         const newDefaultId =
           remainingTextureSets.length > 0 ? remainingTextureSets[0].id : null
-        await ApiClient.setDefaultTextureSet(
+        await setDefaultTextureSet(
           parseInt(model.id),
           newDefaultId,
           modelVersionId
@@ -129,6 +108,7 @@ function TextureSetSelectorWindow({
       }
 
       // Refresh model data - texture sets will reload via useEffect when model updates
+      await textureSetsQuery.refetch()
       onModelUpdated()
     } catch (error) {
       console.error('Failed to unlink texture set:', error)
@@ -141,7 +121,7 @@ function TextureSetSelectorWindow({
     const albedo = textureSet.textures?.find(t => t.textureType === 1) // Albedo
     const diffuse = textureSet.textures?.find(t => t.textureType === 7) // Diffuse
     const texture = albedo || diffuse
-    return texture ? ApiClient.getFileUrl(texture.fileId.toString()) : null
+    return texture ? getFileUrl(texture.fileId.toString()) : null
   }
 
   return (

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import CodePanel from '../CodePanel'
-import { StageConfig } from '../SceneEditor'
+import CodePanel from '@/features/stage-editor/components/CodePanel'
+import { StageConfig } from '@/features/stage-editor/components/SceneEditor'
 
 // Mock clipboard API
 const writeTextMock = jest.fn()

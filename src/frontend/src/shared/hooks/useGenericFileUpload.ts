@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
-import ApiClient from '../../services/ApiClient'
-import { useUploadProgress } from '../../hooks/useUploadProgress'
+import { uploadFile as uploadModelFile } from '@/features/models/api/modelApi'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
 
 /**
  * Custom hook for uploading files (non-model files like textures)
@@ -37,7 +37,7 @@ export function useGenericFileUpload(options = {}) {
           uploadProgressContext.updateUploadProgress(uploadId, 50)
         }
 
-        const result = await ApiClient.uploadFile(file, {
+        const result = await uploadModelFile(file, {
           batchId: options.batchId,
           uploadType: options.uploadType || fileType,
           packId: options.packId,
@@ -93,7 +93,7 @@ export function useGenericFileUpload(options = {}) {
             uploadProgressContext.updateUploadProgress(uploadId, 50)
           }
 
-          const result = await ApiClient.uploadFile(file, {
+          const result = await uploadModelFile(file, {
             batchId,
             uploadType: fileType,
           })

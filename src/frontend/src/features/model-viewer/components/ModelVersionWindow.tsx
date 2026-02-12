@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
-import FloatingWindow from '../../../components/FloatingWindow'
-import { Model } from '../../../utils/fileUtils'
-import { ModelVersionDto } from '../../../types'
-// eslint-disable-next-line no-restricted-imports
-import ApiClient from '../../../services/ApiClient'
+import { useState, useEffect, useMemo } from 'react'
+import FloatingWindow from '@/components/FloatingWindow'
+import { Model } from '@/utils/fileUtils'
+import { ModelVersionDto } from '@/types'
+import {
+  getVersionFileUrl,
+  setActiveVersion,
+} from '@/features/model-viewer/api/modelVersionApi'
+import { useModelVersionsQuery } from '@/features/model-viewer/api/queries'
 import { Button } from 'primereact/button'
 import './ModelVersionWindow.css'
 
@@ -28,11 +31,18 @@ function ModelVersionWindow({
   onModelUpdate,
   onRecycleVersion,
 }: ModelVersionWindowProps) {
-  const [versions, setVersions] = useState<ModelVersionDto[]>([])
   const [selectedVersion, setSelectedVersion] =
     useState<ModelVersionDto | null>(null)
-  const [loading, setLoading] = useState(false)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
+  const numericModelId = model ? parseInt(model.id) : null
+  const versionsQuery = useModelVersionsQuery({
+    modelId: numericModelId ?? 0,
+    queryConfig: {
+      enabled: visible && numericModelId !== null,
+    },
+  })
+  const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data])
+  const loading = versionsQuery.isLoading || versionsQuery.isFetching
 
   // Load default file preference from localStorage
   useEffect(() => {
@@ -45,32 +55,41 @@ function ModelVersionWindow({
   }, [model])
 
   useEffect(() => {
-    if (visible && model) {
-      loadVersions()
+    if (!visible) return
+
+    if (versions.length === 0) {
+      setSelectedVersion(null)
+      return
     }
-  }, [visible, model])
 
-  const loadVersions = async () => {
-    if (!model) return
-
-    try {
-      setLoading(true)
-      const data = await ApiClient.getModelVersions(parseInt(model.id))
-      setVersions(data)
-      // Select the latest version by default
-      if (data.length > 0) {
-        const latestVersion = data[data.length - 1]
-        setSelectedVersion(latestVersion)
-        if (onVersionSelect) {
-          onVersionSelect(latestVersion)
-        }
+    if (!selectedVersion) {
+      const latestVersion = versions[versions.length - 1]
+      setSelectedVersion(latestVersion)
+      if (onVersionSelect) {
+        onVersionSelect(latestVersion)
       }
-    } catch (error) {
-      console.error('Failed to load versions:', error)
-    } finally {
-      setLoading(false)
+      return
     }
-  }
+
+    const updatedSelectedVersion = versions.find(
+      v => v.id === selectedVersion.id
+    )
+    if (updatedSelectedVersion && updatedSelectedVersion !== selectedVersion) {
+      setSelectedVersion(updatedSelectedVersion)
+      if (onVersionSelect) {
+        onVersionSelect(updatedSelectedVersion)
+      }
+      return
+    }
+
+    if (!updatedSelectedVersion) {
+      const latestVersion = versions[versions.length - 1]
+      setSelectedVersion(latestVersion)
+      if (onVersionSelect) {
+        onVersionSelect(latestVersion)
+      }
+    }
+  }, [versions, selectedVersion, visible, onVersionSelect])
 
   const handleVersionSelect = (version: ModelVersionDto) => {
     setSelectedVersion(version)
@@ -81,7 +100,7 @@ function ModelVersionWindow({
 
   const handleDownloadFile = (fileId: number, _fileName: string) => {
     if (!selectedVersion || !model) return
-    const url = ApiClient.getVersionFileUrl(
+    const url = getVersionFileUrl(
       parseInt(model.id),
       selectedVersion.id,
       fileId
@@ -91,7 +110,7 @@ function ModelVersionWindow({
 
   const handleOpenInBlender = (fileId: number, _fileName: string) => {
     if (!selectedVersion || !model) return
-    const url = ApiClient.getVersionFileUrl(
+    const url = getVersionFileUrl(
       parseInt(model.id),
       selectedVersion.id,
       fileId
@@ -113,9 +132,8 @@ function ModelVersionWindow({
   const handleSetActiveVersion = async (versionId: number) => {
     if (!model) return
     try {
-      await ApiClient.setActiveVersion(parseInt(model.id), versionId)
-      // Reload versions to update badges
-      await loadVersions()
+      await setActiveVersion(parseInt(model.id), versionId)
+      await versionsQuery.refetch()
       // Notify parent to refresh model data so UI updates immediately
       if (onModelUpdate) {
         onModelUpdate()

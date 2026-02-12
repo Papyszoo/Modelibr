@@ -1,5 +1,7 @@
-import { Model } from '../../utils/fileUtils'
-import { TextureSetDto, SpriteDto, SoundDto } from '../../types'
+import { Model } from '@/utils/fileUtils'
+import { TextureSetDto } from '@/features/texture-set/types'
+import { SpriteDto } from '@/features/sprite/types'
+import { SoundDto } from '@/features/sounds/types'
 
 // Unified container DTO - structurally identical to PackDto and ProjectDto
 export interface ContainerDto {

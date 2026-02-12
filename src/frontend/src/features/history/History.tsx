@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react'
 import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
 import { useQueryClient } from '@tanstack/react-query'
-import ApiClient from '../../services/ApiClient'
+import { getModelById } from '@/features/models/api/modelApi'
+import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
 import { useUploadHistoryQuery } from './api/queries'
-import { openTabInPanel } from '../../utils/tabNavigation'
+import { openTabInPanel } from '@/utils/tabNavigation'
 import './History.css'
 
 interface BatchUploadHistory {
@@ -85,7 +86,10 @@ const getFileTypeIcon = (fileType: string): string => {
 export default function History() {
   const queryClient = useQueryClient()
   const historyQuery = useUploadHistoryQuery()
-  const history = historyQuery.data?.uploads ?? []
+  const history = useMemo(
+    () => historyQuery.data?.uploads ?? [],
+    [historyQuery.data?.uploads]
+  )
   const loading = historyQuery.isLoading
   const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(
     new Set()
@@ -204,9 +208,7 @@ export default function History() {
               title="Open Model"
               onClick={async () => {
                 try {
-                  const model = await ApiClient.getModelById(
-                    upload.modelId!.toString()
-                  )
+                  const model = await getModelById(upload.modelId!.toString())
                   openTabInPanel(
                     'modelViewer',
                     'left',
@@ -228,7 +230,7 @@ export default function History() {
               title="Open Texture Set"
               onClick={async () => {
                 try {
-                  const textureSet = await ApiClient.getTextureSetById(
+                  const textureSet = await getTextureSetById(
                     upload.textureSetId!
                   )
                   openTabInPanel(

@@ -1,5 +1,5 @@
-import { client, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { Model } from '../../../utils/fileUtils'
+import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { Model } from '@/utils/fileUtils'
 import {
   PackDto,
   GetAllPacksResponse,

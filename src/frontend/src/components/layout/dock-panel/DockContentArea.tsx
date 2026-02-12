@@ -1,6 +1,6 @@
-import TabContent from '../TabContent'
-import { TabProvider } from '../../../hooks/useTabContext'
-import { Tab } from '../../../types'
+import TabContent from '@/components/layout/TabContent'
+import { TabProvider } from '@/hooks/useTabContext'
+import { Tab } from '@/types'
 
 interface DockContentAreaProps {
   side: 'left' | 'right'

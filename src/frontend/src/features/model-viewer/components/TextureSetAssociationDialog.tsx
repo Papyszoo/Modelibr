@@ -1,17 +1,22 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
 import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
+import type { Model } from '@/utils/fileUtils'
 import {
-  Model,
   TextureSetDto,
   PackSummaryDto,
   TextureType,
-} from '../../../types'
-// eslint-disable-next-line no-restricted-imports -- Dialog needs direct API access
-import ApiClient from '../../../services/ApiClient'
+} from '@/features/texture-set/types'
+import {
+  associateTextureSetWithModelVersion,
+  disassociateTextureSetFromModelVersion,
+} from '@/features/texture-set/api/textureSetApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
+import { useAllTextureSetsQuery } from '@/features/texture-set/api/queries'
+import { usePacksQuery } from '@/features/pack/api/queries'
 import './TextureSetAssociationDialog.css'
 
 interface TextureSetAssociationDialogProps {
@@ -38,66 +43,65 @@ function TextureSetAssociationDialog({
   const [textureSetAssociations, setTextureSetAssociations] = useState<
     TextureSetAssociation[]
   >([])
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>([])
-  const [availablePacks, setAvailablePacks] = useState<PackSummaryDto[]>([])
   const toast = useRef<Toast>(null)
+  const allTextureSetsQuery = useAllTextureSetsQuery({
+    queryConfig: {
+      enabled: visible,
+    },
+  })
+  const packsQuery = usePacksQuery({
+    queryConfig: {
+      enabled: visible,
+    },
+  })
+  const availablePacks: PackSummaryDto[] = packsQuery.data ?? []
+  const loading =
+    allTextureSetsQuery.isLoading ||
+    allTextureSetsQuery.isFetching ||
+    packsQuery.isLoading ||
+    packsQuery.isFetching
 
   useEffect(() => {
-    if (visible) {
-      loadTextureSets()
-      loadPacks()
+    if (!visible || !allTextureSetsQuery.data) {
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when dialog becomes visible
-  }, [visible])
 
-  const loadPacks = async () => {
-    try {
-      const packs = await ApiClient.getAllPacks()
-      setAvailablePacks(packs)
-    } catch (error) {
-      console.error('Failed to load packs:', error)
+    const associatedTextureSetIds = new Set(
+      allTextureSetsQuery.data
+        .filter(ts =>
+          ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
+        )
+        .map(ts => ts.id)
+    )
+
+    const associations: TextureSetAssociation[] = allTextureSetsQuery.data.map(
+      textureSet => ({
+        textureSet,
+        isAssociated: associatedTextureSetIds.has(textureSet.id),
+        originallyAssociated: associatedTextureSetIds.has(textureSet.id),
+      })
+    )
+
+    setTextureSetAssociations(associations)
+  }, [visible, allTextureSetsQuery.data, modelVersionId])
+
+  useEffect(() => {
+    if (!visible) {
+      return
     }
-  }
 
-  const loadTextureSets = useCallback(async () => {
-    try {
-      setLoading(true)
-      const allTextureSets = await ApiClient.getAllTextureSets()
-
-      // Get currently associated texture set IDs for this specific model version
-      const associatedTextureSetIds = new Set(
-        allTextureSets
-          .filter(ts =>
-            ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
-          )
-          .map(ts => ts.id)
-      )
-
-      // Create association objects
-      const associations: TextureSetAssociation[] = allTextureSets.map(
-        textureSet => ({
-          textureSet,
-          isAssociated: associatedTextureSetIds.has(textureSet.id),
-          originallyAssociated: associatedTextureSetIds.has(textureSet.id),
-        })
-      )
-
-      setTextureSetAssociations(associations)
-    } catch (error) {
-      console.error('Failed to load texture sets:', error)
+    if (allTextureSetsQuery.error || packsQuery.error) {
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load texture sets',
         life: 3000,
       })
-    } finally {
-      setLoading(false)
     }
-  }, [modelVersionId])
+  }, [visible, allTextureSetsQuery.error, packsQuery.error])
 
   const handleToggleAssociation = (
     textureSetId: number,
@@ -149,15 +153,12 @@ function TextureSetAssociationDialog({
 
       // Process associations for the selected model version
       for (const textureSet of toAssociate) {
-        await ApiClient.associateTextureSetWithModelVersion(
-          textureSet.id,
-          modelVersionId
-        )
+        await associateTextureSetWithModelVersion(textureSet.id, modelVersionId)
       }
 
       // Process disassociations
       for (const textureSet of toDisassociate) {
-        await ApiClient.disassociateTextureSetFromModelVersion(
+        await disassociateTextureSetFromModelVersion(
           textureSet.id,
           modelVersionId
         )
@@ -344,7 +345,7 @@ function TextureSetCard({
 
   const previewTexture = getPreviewTexture()
   const previewUrl = previewTexture
-    ? ApiClient.getFileUrl(previewTexture.fileId.toString())
+    ? getFileUrl(previewTexture.fileId.toString())
     : null
 
   return (

@@ -1,17 +1,22 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { TabView, TabPanel } from 'primereact/tabview'
-import { TextureSetDto, TextureType } from '../../../types'
-import { useTextureSets } from '../hooks/useTextureSets'
-import { getNonHeightTypes } from '../../../utils/textureTypeUtils'
-import SetHeader from '../dialogs/SetHeader'
-import SetStats from '../dialogs/SetStats'
+import { TextureType } from '@/types'
+import {
+  useTextureSetByIdQuery,
+  getTextureSetByIdQueryOptions,
+} from '@/features/texture-set/api/queries'
+import { updateTextureSet } from '@/features/texture-set/api/textureSetApi'
+import { getNonHeightTypes } from '@/utils/textureTypeUtils'
+import SetHeader from '@/features/texture-set/dialogs/SetHeader'
+import SetStats from '@/features/texture-set/dialogs/SetStats'
 import TextureSetModelList from './TextureSetModelList'
 import TextureCard from './TextureCard'
 import HeightCard from './HeightCard'
 import FilesTab from './FilesTab'
 import TexturePreviewPanel from './TexturePreviewPanel'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
 import './TextureSetViewer.css'
 
 interface TextureSetViewerProps {
@@ -20,53 +25,47 @@ interface TextureSetViewerProps {
 }
 
 function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
-  const [textureSet, setTextureSet] = useState<TextureSetDto | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string>('')
   const [updating, setUpdating] = useState(false)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
-  const textureSetsApi = useTextureSets()
+  const queryClient = useQueryClient()
+  const textureSetId = parseInt(setId)
+  const textureSetQuery = useTextureSetByIdQuery({
+    textureSetId,
+    queryConfig: {
+      enabled: !Number.isNaN(textureSetId),
+    },
+  })
+  const textureSet = textureSetQuery.data ?? null
+  const loading = textureSetQuery.isLoading
+  const error =
+    textureSetQuery.error instanceof Error ? textureSetQuery.error.message : ''
 
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.textureSetViewer
 
-  const loadTextureSet = useCallback(
-    async (forceRefresh = false) => {
-      try {
-        if (!textureSet) {
-          setLoading(true)
-        }
-        setError('')
-        const set = await textureSetsApi.getTextureSetById(parseInt(setId), {
-          skipCache: forceRefresh,
-        })
-        setTextureSet(set)
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to load texture set'
-        )
-      } finally {
-        if (!textureSet) {
-          setLoading(false)
-        }
-      }
-    },
-    [setId, textureSetsApi, textureSet]
-  )
+  const refreshTextureSet = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: getTextureSetByIdQueryOptions(textureSetId).queryKey,
+    })
+    await textureSetQuery.refetch()
+  }, [queryClient, textureSetId, textureSetQuery])
 
-  useEffect(() => {
-    loadTextureSet()
-  }, [loadTextureSet])
+  const updateTextureSetMutation = useMutation({
+    mutationFn: (newName: string) => {
+      if (!textureSet) {
+        throw new Error('Texture set not found')
+      }
+      return updateTextureSet(textureSet.id, { name: newName })
+    },
+  })
 
   const handleUpdateName = async (newName: string) => {
     if (!textureSet) return
 
     try {
       setUpdating(true)
-      await textureSetsApi.updateTextureSet(textureSet.id, {
-        name: newName,
-      })
-      await loadTextureSet()
+      await updateTextureSetMutation.mutateAsync(newName)
+      await refreshTextureSet()
     } catch (error) {
       console.error('Failed to update texture set:', error)
       throw error
@@ -145,7 +144,7 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
                   textureType={textureType}
                   texture={texture}
                   setId={textureSet.id}
-                  onTextureUpdated={loadTextureSet}
+                  onTextureUpdated={refreshTextureSet}
                 />
               )
             })}
@@ -154,14 +153,17 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
             <HeightCard
               textures={textureSet.textures}
               setId={textureSet.id}
-              onTextureUpdated={loadTextureSet}
+              onTextureUpdated={refreshTextureSet}
             />
           </div>
         </TabPanel>
 
         {/* Files Tab - channel mapping for source files */}
         <TabPanel header="Files" leftIcon="pi pi-file">
-          <FilesTab textureSet={textureSet} onMappingChanged={loadTextureSet} />
+          <FilesTab
+            textureSet={textureSet}
+            onMappingChanged={refreshTextureSet}
+          />
         </TabPanel>
 
         <TabPanel header="Models" leftIcon="pi pi-box">

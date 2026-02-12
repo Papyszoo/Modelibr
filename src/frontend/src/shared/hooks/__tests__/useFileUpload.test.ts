@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react'
-import { useFileUpload, useDragAndDrop } from '../useFileUpload'
+import { useFileUpload, useDragAndDrop } from '@/shared/hooks/useFileUpload'
 
 // Mock ApiClient
 jest.mock('../../../services/ApiClient', () => ({
@@ -34,7 +34,7 @@ jest.mock('../../../stores/uploadProgressStore', () => ({
   }),
 }))
 
-import ApiClient from '../../../services/ApiClient'
+import ApiClient from '@/services/ApiClient'
 import {
   isSupportedModelFormat,
   isThreeJSRenderable,

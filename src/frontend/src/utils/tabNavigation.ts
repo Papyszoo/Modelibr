@@ -3,7 +3,7 @@ import {
   parseCompactTabFormat,
   getTabLabel,
 } from './tabSerialization'
-import { Tab } from '../types'
+import { Tab } from '@/types'
 
 /**
  * Generic utility to open a tab using URL manipulation

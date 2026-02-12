@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Tree } from 'primereact/tree'
 import { TreeNode } from 'primereact/treenode'
-import { HierarchyNode } from '../hooks/useModelHierarchy'
+import { HierarchyNode } from '@/features/model-viewer/hooks/useModelHierarchy'
 import './ModelHierarchy.css'
 
 interface ModelHierarchyProps {

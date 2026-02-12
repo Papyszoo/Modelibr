@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { MenuItem } from 'primereact/menuitem'
-import { Tab } from '../types'
+import { Tab } from '@/types'
 
 interface UseTabMenuItemsProps {
   onAddTab: (type: Tab['type'], title: string) => void

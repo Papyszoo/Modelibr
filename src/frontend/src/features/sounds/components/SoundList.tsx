@@ -16,33 +16,43 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
-import { useDragAndDrop } from '../../../shared/hooks/useFileUpload'
-import { useUploadProgress } from '../../../hooks/useUploadProgress'
-import { useSoundsQuery, useSoundCategoriesQuery } from '../api/queries'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
+import {
+  getSoundsQueryOptions,
+  useSoundsQuery,
+  useSoundCategoriesQuery,
+} from '@/features/sounds/api/queries'
 import {
   createSoundCategory,
   createSoundWithFile,
   deleteSoundCategory,
-  getSoundsPaginated,
   softDeleteSound,
   updateSound,
   updateSoundCategory,
-} from '../api/soundApi'
-import { getFileUrl } from '../../models/api/modelApi'
-import CardWidthSlider from '../../../shared/components/CardWidthSlider'
-import { useCardWidthStore } from '../../../stores/cardWidthStore'
-import { SoundDto, SoundCategoryDto, PaginationState } from '../../../types'
-import { decodeAudio, extractPeaks } from '../../../utils/audioUtils'
+} from '@/features/sounds/api/soundApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
+import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { SoundDto, SoundCategoryDto, PaginationState } from '@/types'
+import { decodeAudio, extractPeaks } from '@/utils/audioUtils'
 import {
   openInFileExplorer,
   copyPathToClipboard,
   getCopyPathSuccessMessage,
-} from '../../../utils/webdavUtils'
+} from '@/utils/webdavUtils'
+import { soundCategoryFormSchema } from '@/shared/validation/formSchemas'
 import SoundCard from './SoundCard'
 import SoundEditor from './SoundEditor'
 import './SoundList.css'
 
 const UNASSIGNED_CATEGORY_ID = -1
+
+type SoundCategoryFormInput = z.input<typeof soundCategoryFormSchema>
+type SoundCategoryFormOutput = z.output<typeof soundCategoryFormSchema>
 
 function SoundList() {
   const [sounds, setSounds] = useState<SoundDto[]>([])
@@ -52,8 +62,6 @@ function SoundList() {
   const [showSoundModal, setShowSoundModal] = useState(false)
   const [editingCategory, setEditingCategory] =
     useState<SoundCategoryDto | null>(null)
-  const [categoryName, setCategoryName] = useState('')
-  const [categoryDescription, setCategoryDescription] = useState('')
   const [selectedSound, setSelectedSound] = useState<SoundDto | null>(null)
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
     UNASSIGNED_CATEGORY_ID
@@ -89,6 +97,19 @@ function SoundList() {
     null
   )
 
+  const {
+    register: registerCategory,
+    handleSubmit: handleCategorySubmit,
+    reset: resetCategoryForm,
+  } = useForm<SoundCategoryFormInput, unknown, SoundCategoryFormOutput>({
+    resolver: zodResolver(soundCategoryFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      description: '',
+    },
+  })
+
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sounds
 
@@ -109,7 +130,7 @@ function SoundList() {
       })
       setLoading(false)
     }
-  }, [soundsQuery.data])
+  }, [soundsQuery.data, pagination.page])
 
   useEffect(() => {
     if (soundsQuery.isFetched && !soundsQuery.data) {
@@ -141,10 +162,12 @@ function SoundList() {
       try {
         setIsLoadingMore(true)
         const page = pagination.page + 1
-        const result = await getSoundsPaginated({
-          page,
-          pageSize: 50,
-        })
+        const result = await queryClient.fetchQuery(
+          getSoundsQueryOptions({
+            page,
+            pageSize: 50,
+          })
+        )
         setSounds(prev => [...prev, ...result.sounds])
         setPagination({
           page,
@@ -164,9 +187,8 @@ function SoundList() {
       } finally {
         setIsLoadingMore(false)
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [pagination.page]
+    [pagination.page, queryClient]
   )
 
   const loadCategories = useCallback(async () => {
@@ -423,35 +445,36 @@ function SoundList() {
 
   const openCreateCategoryDialog = () => {
     setEditingCategory(null)
-    setCategoryName('')
-    setCategoryDescription('')
+    resetCategoryForm({ name: '', description: '' })
     setShowCategoryDialog(true)
   }
 
   const openEditCategoryDialog = (category: SoundCategoryDto) => {
     setEditingCategory(category)
-    setCategoryName(category.name)
-    setCategoryDescription(category.description || '')
+    resetCategoryForm({
+      name: category.name,
+      description: category.description || '',
+    })
     setShowCategoryDialog(true)
   }
 
-  const handleSaveCategory = async () => {
-    if (!categoryName.trim()) {
+  const handleSaveCategory = handleCategorySubmit(
+    values => {
+      saveCategoryMutation.mutate({
+        editingCategory,
+        name: values.name,
+        description: values.description,
+      })
+    },
+    () => {
       toast.current?.show({
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Category name is required',
         life: 3000,
       })
-      return
     }
-
-    saveCategoryMutation.mutate({
-      editingCategory,
-      name: categoryName.trim(),
-      description: categoryDescription.trim() || undefined,
-    })
-  }
+  )
 
   const handleDeleteCategory = (category: SoundCategoryDto) => {
     confirmDialog({
@@ -989,8 +1012,7 @@ function SoundList() {
             <label htmlFor="categoryName">Name *</label>
             <InputText
               id="categoryName"
-              value={categoryName}
-              onChange={e => setCategoryName(e.target.value)}
+              {...registerCategory('name')}
               autoFocus
               data-testid="sound-category-name-input"
             />
@@ -999,8 +1021,7 @@ function SoundList() {
             <label htmlFor="categoryDescription">Description</label>
             <InputTextarea
               id="categoryDescription"
-              value={categoryDescription}
-              onChange={e => setCategoryDescription(e.target.value)}
+              {...registerCategory('description')}
               rows={3}
               data-testid="sound-category-description-input"
             />

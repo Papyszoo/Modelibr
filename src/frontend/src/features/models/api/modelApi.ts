@@ -1,7 +1,7 @@
 import { AxiosResponse } from 'axios'
-import { client, baseURL, UPLOAD_TIMEOUT } from '../../../lib/apiBase'
-import { Model } from '../../../utils/fileUtils'
-import { PaginatedResponse } from '../../../types'
+import { client, baseURL, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { Model } from '@/utils/fileUtils'
+import { PaginatedResponse } from '@/types'
 
 export interface UploadModelResponse {
   id: number

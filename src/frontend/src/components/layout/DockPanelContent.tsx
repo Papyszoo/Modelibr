@@ -1,5 +1,5 @@
-import { Tab } from '../../types'
-import { useDockContext } from '../../contexts/DockContext'
+import { Tab } from '@/types'
+import { useDockContext } from '@/contexts/DockContext'
 import DockBar from './dock-panel/DockBar'
 import DockEmptyState from './dock-panel/DockEmptyState'
 import DockContentArea from './dock-panel/DockContentArea'

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useThemeStore, Theme } from '../stores/themeStore'
+import { useThemeStore, Theme } from '@/stores/themeStore'
 
 const THEME_LINK_ID = 'primereact-theme-link'
 
