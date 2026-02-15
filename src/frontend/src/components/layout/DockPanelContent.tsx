@@ -1,5 +1,10 @@
 import { Tab } from '@/types'
 import { useDockContext } from '@/contexts/DockContext'
+import {
+  getWindowId,
+  broadcastNavigation,
+  createTab,
+} from '@/stores/navigationStore'
 import DockBar from './dock-panel/DockBar'
 import DockEmptyState from './dock-panel/DockEmptyState'
 import DockContentArea from './dock-panel/DockContentArea'
@@ -45,11 +50,7 @@ function DockPanelContent({
       return
     }
 
-    const newTab: Tab = {
-      id: type,
-      type,
-      label: title,
-    }
+    const newTab = createTab(type, undefined, title)
 
     const newTabs = [...tabs, newTab]
     setTabs(newTabs)
@@ -111,13 +112,43 @@ function DockPanelContent({
 
   const handleDropOnOtherPanel = (e: React.DragEvent): void => {
     e.preventDefault()
-    // Only process drop if there's a dragged tab and it's not from this panel
+
+    // Check for cross-window drop via application/json
+    const jsonData = e.dataTransfer.getData('application/json')
+    if (jsonData) {
+      try {
+        const { tab: droppedTab, sourceWindowId } = JSON.parse(jsonData) as {
+          tab: Tab
+          sourceWindowId: string
+        }
+        const currentWindowId = getWindowId()
+
+        if (sourceWindowId !== currentWindowId) {
+          // Cross-window transfer: add tab here, broadcast removal to source
+          const newTabs = [...tabs, droppedTab]
+          setTabs(newTabs)
+          setActiveTab(droppedTab.id)
+
+          broadcastNavigation({
+            type: 'TAB_MOVED',
+            sourceWindowId,
+            targetWindowId: currentWindowId,
+            tab: droppedTab,
+          })
+
+          e.currentTarget.classList.remove('drag-over')
+          return
+        }
+      } catch {
+        // Fall through to intra-window handling
+      }
+    }
+
+    // Intra-window: only process drop if there's a dragged tab not from this panel
     if (draggedTab && !tabs.some(tab => tab.id === draggedTab.id)) {
-      // Determine which panel the dragged tab came from
       const fromSide = side === 'left' ? 'right' : 'left'
       moveTabBetweenPanels(draggedTab, fromSide)
     }
-    // Always remove drag visual feedback after drop attempt
     e.currentTarget.classList.remove('drag-over')
   }
 

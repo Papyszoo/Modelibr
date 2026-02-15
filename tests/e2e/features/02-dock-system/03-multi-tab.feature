@@ -1,5 +1,5 @@
 @depends-on:setup
-Feature: Multi-Tab URL State
+Feature: Multi-Tab Persistence
 
   Background:
     Given the following models exist in shared state:
@@ -7,9 +7,11 @@ Feature: Multi-Tab URL State
       | single-version-model |
       | multi-version-model  |
 
-  Scenario: URL state persists after page refresh
-    Given I navigate directly to URL with tabs "leftTabs=modelList,textureSets&rightTabs=settings&activeLeft=textureSets"
-    When I refresh the page
-    Then the URL should contain "leftTabs=modelList,textureSets"
-    And the URL should contain "rightTabs=settings"
+  Scenario: Tab state persists after page refresh
+    Given I am on the model list page
+    When I open the Texture Sets tab in the left panel
+    And I open Settings in the right panel
+    And I refresh the page
+    Then the Texture Sets content should be visible
+    And a Settings tab should be visible in the dock bar
     And I take a screenshot of the persisted tabs

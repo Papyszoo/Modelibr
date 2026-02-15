@@ -2,8 +2,11 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { sharedState } from "../fixtures/shared-state";
 import { ProjectsPage } from "../pages/ProjectsPage";
+import { navigateToTab } from "../helpers/navigation-helper";
 
 const { Given, When, Then } = createBdd();
+
+const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
 // Navigation steps
 Given("I am on the project list page", async ({ page }) => {
@@ -29,13 +32,20 @@ Given(
             );
         }
 
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await page.goto(
-            `${baseUrl}/?leftTabs=project-${project.id}&activeLeft=project-${project.id}`,
-        );
-        await page.waitForLoadState("networkidle");
+        // Navigate to projects tab, then open the specific project by clicking
+        await navigateToTab(page, "projects");
+        await page.waitForLoadState("domcontentloaded");
 
-        // Wait for project viewer content to fully load (not just "Loading...")
+        // Find and double-click the project card to open viewer
+        const projectCard = page
+            .locator(
+                `.project-grid-card:has-text("${projectName}"), .container-card:has-text("${projectName}")`,
+            )
+            .first();
+        await projectCard.waitFor({ state: "visible", timeout: 10000 });
+        await projectCard.dblclick();
+
+        // Wait for project viewer content to fully load
         await page
             .locator(".container-viewer")
             .first()
@@ -129,10 +139,8 @@ When(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        await page.waitForTimeout(300);
 
         const addModelCard = page.locator(".model-card-add").first();
-
         await addModelCard.waitFor({ state: "visible", timeout: 10000 });
         await addModelCard.click();
         console.log("[Action] Clicked Add Model card");
@@ -143,9 +151,6 @@ When(
             timeout: 5000,
         });
         console.log("[Action] Add Models dialog opened");
-
-        // Wait for content to load
-        await page.waitForTimeout(500);
 
         const modelName = model.name;
 
@@ -167,13 +172,11 @@ When(
             console.log(`[Action] Clicked model text: ${modelName}`);
         }
 
-        // Wait for selection to register
-        await page.waitForTimeout(500);
-
+        // Wait for selection to register in the Add button
         const addButton = page
             .locator('.p-dialog-footer button:has-text("Add Selected")')
             .first();
-        await addButton.waitFor({ state: "visible", timeout: 5000 });
+        await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
 
         const buttonText = await addButton.textContent();
         console.log(`[Action] Add button text: ${buttonText}`);
@@ -187,7 +190,10 @@ When(
         });
         console.log("[Action] Dialog closed");
 
-        await page.waitForTimeout(500);
+        // Wait for model card to appear in project after adding
+        await expect(
+            page.locator(`.model-card:has-text("${modelName}")`).first(),
+        ).toBeVisible({ timeout: 10000 });
         console.log(`[Action] Added model "${model.name}" to project`);
     },
 );
@@ -209,11 +215,11 @@ When(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        await page.waitForTimeout(300);
 
         const modelCard = page
             .locator(`.model-card:has-text("${model.name}")`)
             .first();
+        await modelCard.waitFor({ state: "visible", timeout: 5000 });
         await modelCard.click({ button: "right" });
         console.log("[Action] Right-clicked on model card");
 
@@ -227,7 +233,8 @@ When(
         await removeOption.click();
         console.log("[Action] Clicked Remove from project");
 
-        await page.waitForTimeout(500);
+        // Wait for model card to disappear after removal
+        await expect(modelCard).not.toBeVisible({ timeout: 5000 });
         console.log(`[Action] Removed model "${model.name}" from project`);
     },
 );
@@ -297,7 +304,6 @@ Then(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        await page.waitForTimeout(300);
 
         const modelCard = page
             .locator(`.model-card:has-text("${model.name}")`)
@@ -323,7 +329,6 @@ Then(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        await page.waitForTimeout(300);
 
         const modelCard = page
             .locator(`.model-card:has-text("${model.name}")`)
@@ -350,12 +355,15 @@ Given(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        await page.waitForTimeout(300);
 
         const modelCard = page
             .locator(`.model-card:has-text("${model.name}")`)
             .first();
-        const isPresent = await modelCard.isVisible().catch(() => false);
+        // Wait for tab content to render, then check presence
+        const isPresent = await modelCard
+            .waitFor({ state: "visible", timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
 
         if (!isPresent) {
             throw new Error(
@@ -379,12 +387,43 @@ When(
             );
         }
 
+        // Clean up: remove this texture set from the project if already present
+        const project = sharedState.getProject("Test Project");
+        if (project) {
+            const projRes = await page.request.get(
+                `${API_BASE}/projects/${project.id}`,
+            );
+            if (projRes.ok()) {
+                const projData = await projRes.json();
+                const existing = (projData.textureSets || []).filter(
+                    (ts: any) => ts.name === textureSet.name,
+                );
+                for (const ts of existing) {
+                    await page.request
+                        .delete(
+                            `${API_BASE}/projects/${project.id}/texture-sets/${ts.id}`,
+                        )
+                        .catch(() => {});
+                    console.log(
+                        `[Cleanup] Removed stale texture set "${ts.name}" (ID: ${ts.id}) from project`,
+                    );
+                }
+                if (existing.length > 0) {
+                    // Reload the project viewer to reflect changes
+                    await page.reload({ waitUntil: "domcontentloaded" });
+                    await page
+                        .locator(".container-viewer")
+                        .first()
+                        .waitFor({ state: "visible", timeout: 15000 });
+                }
+            }
+        }
+
         // Click Texture Sets tab first, then find Add card
         await page
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Texture Sets" })
             .click();
-        await page.waitForTimeout(300);
 
         const addCard = page.locator(".container-card-add").first();
         await addCard.waitFor({ state: "visible", timeout: 10000 });
@@ -398,19 +437,17 @@ When(
         });
         console.log("[Action] Add Texture Sets dialog opened");
 
-        // Find and click texture set item
-        const textureItems = page
-            .locator('.p-dialog div[data-pc-section="content"] > div')
-            .filter({
-                hasText: textureSet.name,
-            });
+        // Find and click texture set item in the dialog grid
+        const textureItems = page.locator(".p-dialog .container-card").filter({
+            hasText: textureSet.name,
+        });
 
         const firstItem = textureItems.first();
         await firstItem.waitFor({ state: "visible", timeout: 5000 });
         await firstItem.click();
         console.log(`[Action] Clicked texture set item: ${textureSet.name}`);
 
-        await page.waitForTimeout(300);
+        // Wait for selection to register in the Add button
         const addButton = page
             .locator('.p-dialog-footer button:has-text("Add Selected")')
             .first();
@@ -425,11 +462,33 @@ When(
                 .first();
             await checkbox.click({ force: true });
             console.log("[Action] Clicked checkbox directly");
-            await page.waitForTimeout(300);
+            // Wait for selection count to update
+            await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
         }
+
+        // Set up response interceptor before clicking Add
+        const responsePromise = page.waitForResponse(
+            (resp) =>
+                resp.url().includes("/projects/") &&
+                resp.url().includes("/texture-sets/") &&
+                resp.request().method() === "POST",
+            { timeout: 15000 },
+        );
 
         await addButton.click();
         console.log("[Action] Clicked Add button");
+
+        // Wait for the API response from the add operation
+        try {
+            const response = await responsePromise;
+            console.log(
+                `[API] Add texture set response: ${response.status()} ${response.url()}`,
+            );
+        } catch {
+            console.log(
+                "[API] No POST /projects/*/texture-sets/* response detected — add may have failed silently",
+            );
+        }
 
         await page.waitForSelector('.p-dialog:has-text("Add Texture Sets")', {
             state: "hidden",
@@ -437,9 +496,17 @@ When(
         });
         console.log("[Action] Dialog closed");
 
-        // Reload page to ensure cards reflect the new association
-        await page.reload({ waitUntil: "networkidle" });
-        await page.waitForTimeout(500);
+        // Wait for React Query to invalidate and refetch project data
+        await page.waitForTimeout(2000);
+
+        // Wait for the texture set card to appear in the project viewer
+        const textureSetCard = page
+            .locator(".container-card")
+            .filter({ hasText: textureSet.name })
+            .first();
+        await expect(textureSetCard).toBeVisible({
+            timeout: 10000,
+        });
         console.log(
             `[Action] Added texture set "${textureSet.name}" to project`,
         );
@@ -462,13 +529,13 @@ When(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Texture Sets" })
             .click();
-        await page.waitForTimeout(300);
 
         const textureCard = page
             .locator(
                 `.container-section .container-card:has-text("${textureSet.name}")`,
             )
             .first();
+        await textureCard.waitFor({ state: "visible", timeout: 5000 });
         await textureCard.click({ button: "right" });
         console.log("[Action] Right-clicked on texture set card");
 
@@ -482,7 +549,8 @@ When(
         await removeOption.click();
         console.log("[Action] Clicked Remove from project");
 
-        await page.waitForTimeout(500);
+        // Wait for texture set card to disappear after removal
+        await expect(textureCard).not.toBeVisible({ timeout: 5000 });
         console.log(
             `[Action] Removed texture set "${textureSet.name}" from project`,
         );
@@ -506,7 +574,6 @@ Then(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Texture Sets" })
             .click();
-        await page.waitForTimeout(300);
 
         await expect
             .poll(
@@ -545,7 +612,6 @@ Then(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Texture Sets" })
             .click();
-        await page.waitForTimeout(300);
 
         const textureCard = page
             .locator(
@@ -576,14 +642,17 @@ Given(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Texture Sets" })
             .click();
-        await page.waitForTimeout(300);
 
         const textureCard = page
             .locator(
                 `.container-section .container-card:has-text("${textureSet.name}")`,
             )
             .first();
-        const isPresent = await textureCard.isVisible().catch(() => false);
+        // Wait for tab content to render, then check presence
+        const isPresent = await textureCard
+            .waitFor({ state: "visible", timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
 
         if (!isPresent) {
             // Self-provision: add texture set to project via API
@@ -603,8 +672,12 @@ Given(
                 );
                 if (response.ok()) {
                     console.log(`[AutoProvision] Added texture set via API ✓`);
-                    await page.reload({ waitUntil: "networkidle" });
-                    await page.waitForTimeout(500);
+                    await page.reload({ waitUntil: "domcontentloaded" });
+                    // Wait for page content to render after reload
+                    await page
+                        .locator(".container-viewer")
+                        .first()
+                        .waitFor({ state: "visible", timeout: 10000 });
                 } else {
                     throw new Error(
                         `Failed to auto-provision texture set association: ${response.status()}`,
@@ -682,12 +755,12 @@ Then(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Details" })
             .click();
-        await page.waitForTimeout(300);
 
-        // Check sprite count in container detail assets
+        // Wait for Details tab content to render
         const statSpan = page.locator(
             '.container-detail-assets span:has-text("sprite")',
         );
+        await statSpan.waitFor({ state: "visible", timeout: 5000 });
         const text = (await statSpan.textContent()) || "0";
         const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
         expect(count).toBe(expectedCount);
@@ -703,11 +776,12 @@ Given(
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Details" })
             .click();
-        await page.waitForTimeout(300);
 
+        // Wait for Details tab content to render
         const statSpan = page.locator(
             '.container-detail-assets span:has-text("sprite")',
         );
+        await statSpan.waitFor({ state: "visible", timeout: 5000 });
         const text = (await statSpan.textContent()) || "0";
         const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
         if (count < minCount) {
@@ -725,19 +799,21 @@ When("I remove the first sprite from the project", async ({ page }) => {
         .locator(".p-tabview-nav li")
         .filter({ hasText: "Sprites" })
         .click();
-    await page.waitForTimeout(300);
 
     const spriteCard = page
         .locator(".container-section .container-card:not(.container-card-add)")
         .first();
+    await spriteCard.waitFor({ state: "visible", timeout: 5000 });
     await spriteCard.click({ button: "right" });
-    await page.waitForTimeout(300);
 
     // Click Remove from project option
     const removeOption = page.locator(
         '.p-contextmenu .p-menuitem:has-text("Remove")',
     );
+    await removeOption.waitFor({ state: "visible", timeout: 3000 });
     await removeOption.click();
-    await page.waitForTimeout(500);
+
+    // Wait for sprite card to disappear after removal
+    await expect(spriteCard).not.toBeVisible({ timeout: 5000 });
     console.log("[Action] Removed first sprite from project");
 });

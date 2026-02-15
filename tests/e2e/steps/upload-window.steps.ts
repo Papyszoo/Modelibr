@@ -34,10 +34,13 @@ When("I upload model file {string}", async ({ page }, fileName: string) => {
 
 Then("the upload progress window should be visible", async ({ page }) => {
     // Use the correct selector - the window ID
-    await page.waitForSelector("#upload-progress-window, .upload-progress-window", {
-        state: "visible",
-        timeout: 10000,
-    });
+    await page.waitForSelector(
+        "#upload-progress-window, .upload-progress-window",
+        {
+            state: "visible",
+            timeout: 10000,
+        },
+    );
     console.log("[UI] Upload progress window is visible ✓");
 });
 
@@ -48,7 +51,7 @@ Then(
         const isDisplayed = await uploadProgress.isFileDisplayed(filename);
         expect(isDisplayed).toBe(true);
         console.log(`[UI] Filename "${filename}" displayed in upload window ✓`);
-    }
+    },
 );
 
 Then(
@@ -58,42 +61,56 @@ Then(
         // Get first upload item's extension
         const count = await uploadProgress.getTotalUploadCount();
         expect(count).toBeGreaterThan(0);
-        
+
         // Check each item for the extension
         const items = page.locator(".upload-item .upload-item-ext-name");
         const textContents = await items.allTextContents();
-        const hasExtension = textContents.some(text => 
-            text.toLowerCase().includes(extension.toLowerCase())
+        const hasExtension = textContents.some((text) =>
+            text.toLowerCase().includes(extension.toLowerCase()),
         );
         expect(hasExtension).toBe(true);
         console.log(`[UI] Extension "${extension}" displayed ✓`);
-    }
+    },
 );
 
 Then("the upload should complete successfully", async ({ page }) => {
     // Wait for any upload to complete
-    await expect.poll(async () => {
-        const completedItems = page.locator(".upload-item.upload-item-completed, .upload-item-completed");
-        return await completedItems.count();
-    }, {
-        message: "Waiting for upload to complete",
-        timeout: 60000,
-        intervals: [1000, 2000]
-    }).toBeGreaterThan(0);
-    
+    await expect
+        .poll(
+            async () => {
+                const completedItems = page.locator(
+                    ".upload-item.upload-item-completed, .upload-item-completed",
+                );
+                return await completedItems.count();
+            },
+            {
+                message: "Waiting for upload to complete",
+                timeout: 60000,
+                intervals: [1000, 2000],
+            },
+        )
+        .toBeGreaterThan(0);
+
     console.log("[Upload] Upload completed successfully ✓");
 });
 
 When("the upload completes successfully", async ({ page }) => {
-    await expect.poll(async () => {
-        const completedItems = page.locator(".upload-item.upload-item-completed, .upload-item-completed");
-        return await completedItems.count();
-    }, {
-        message: "Waiting for upload to complete",
-        timeout: 60000,
-        intervals: [1000, 2000]
-    }).toBeGreaterThan(0);
-    
+    await expect
+        .poll(
+            async () => {
+                const completedItems = page.locator(
+                    ".upload-item.upload-item-completed, .upload-item-completed",
+                );
+                return await completedItems.count();
+            },
+            {
+                message: "Waiting for upload to complete",
+                timeout: 60000,
+                intervals: [1000, 2000],
+            },
+        )
+        .toBeGreaterThan(0);
+
     console.log("[Upload] Upload completed successfully ✓");
 });
 
@@ -101,10 +118,11 @@ Then(
     'the "Open in Tab" button should be visible for {string}',
     async ({ page }, filename: string) => {
         const uploadProgress = new UploadProgressPage(page);
-        const isVisible = await uploadProgress.isOpenInTabButtonVisible(filename);
+        const isVisible =
+            await uploadProgress.isOpenInTabButtonVisible(filename);
         expect(isVisible).toBe(true);
         console.log(`[UI] "Open in Tab" button visible for "${filename}" ✓`);
-    }
+    },
 );
 
 When(
@@ -113,36 +131,34 @@ When(
         const uploadProgress = new UploadProgressPage(page);
         await uploadProgress.clickOpenInTab(filename);
         console.log(`[UI] Clicked "Open in Tab" for "${filename}"`);
-    }
+    },
 );
 
 Then("a model viewer tab should be opened in the URL", async ({ page }) => {
-    const url = page.url();
-    expect(url).toMatch(/model-\d+/);
-    console.log(`[URL] Model viewer tab found in URL ✓`);
+    // Check that a model viewer tab exists in the dock bar
+    const { countTabsByType } = await import("../helpers/navigation-helper");
+    const count = await countTabsByType(page, "modelViewer");
+    expect(count).toBeGreaterThanOrEqual(1);
+    console.log(`[UI] Model viewer tab found in dock bar ✓`);
 });
 
 Then("the model viewer should be visible", async ({ page }) => {
     // Use .first() to avoid strict mode violation when both elements match
-    await expect(page.locator(".viewer-canvas, .version-dropdown-trigger").first()).toBeVisible({
-        timeout: 15000
+    await expect(
+        page.locator(".viewer-canvas, .version-dropdown-trigger").first(),
+    ).toBeVisible({
+        timeout: 15000,
     });
     console.log("[UI] Model viewer is visible ✓");
 });
 
 Then("there should be only one model tab in the URL", async ({ page }) => {
-    const url = page.url();
-    console.log(`[DEBUG] URL: ${url}`);
-    const matches = url.match(/model-(\d+)/g);
-    console.log(`[DEBUG] Model tabs found: ${JSON.stringify(matches)}`);
-    
-    // Get unique model tabs
-    const uniqueTabs = [...new Set(matches || [])];
-    console.log(`[DEBUG] Unique model tabs: ${JSON.stringify(uniqueTabs)}`);
-    
-    // Should only have 1 unique model tab (the one we uploaded)
-    expect(uniqueTabs.length).toBe(1);
-    console.log(`[URL] Only one unique model tab in URL ✓`);
+    // Check that exactly one model viewer tab exists (no duplicates)
+    const { countTabsByType } = await import("../helpers/navigation-helper");
+    const count = await countTabsByType(page, "modelViewer");
+    console.log(`[DEBUG] Model viewer tabs found: ${count}`);
+    expect(count).toBe(1);
+    console.log(`[UI] Only one model viewer tab in dock bar ✓`);
 });
 
 Then('the "Clear Completed" button should be visible', async ({ page }) => {
@@ -159,18 +175,23 @@ When('I click the "Clear Completed" button', async ({ page }) => {
 
 Then("the upload window should be hidden or empty", async ({ page }) => {
     // Either window is hidden or has no items
-    await expect.poll(async () => {
-        const window = page.locator(".upload-progress-window");
-        const isVisible = await window.isVisible();
-        if (!isVisible) return true;
-        
-        const items = await page.locator(".upload-item").count();
-        return items === 0;
-    }, {
-        message: "Waiting for upload window to be hidden or empty",
-        timeout: 5000
-    }).toBe(true);
-    
+    await expect
+        .poll(
+            async () => {
+                const window = page.locator(".upload-progress-window");
+                const isVisible = await window.isVisible();
+                if (!isVisible) return true;
+
+                const items = await page.locator(".upload-item").count();
+                return items === 0;
+            },
+            {
+                message: "Waiting for upload window to be hidden or empty",
+                timeout: 5000,
+            },
+        )
+        .toBe(true);
+
     console.log("[UI] Upload window is hidden or empty ✓");
 });
 
@@ -181,15 +202,15 @@ Then("the upload window should be hidden or empty", async ({ page }) => {
 When("I upload multiple 3D models:", async ({ page }, dataTable: DataTable) => {
     const modelList = new ModelListPage(page);
     const files = dataTable.hashes();
-    
+
     // Create array of unique file paths using UniqueFileGenerator
     const filePaths = await Promise.all(
-        files.map(row => UniqueFileGenerator.generate(row.filename))
+        files.map((row) => UniqueFileGenerator.generate(row.filename)),
     );
-    
+
     // Upload multiple files at once
     await modelList.uploadMultipleModels(filePaths);
-    
+
     console.log(`[Upload] Started batch upload of ${files.length} files`);
 });
 
@@ -200,27 +221,37 @@ Then("I should see a batch group in the upload window", async ({ page }) => {
     console.log(`[UI] Found ${batchCount} batch group(s) ✓`);
 });
 
-Then("the batch header should show {string}", async ({ page }, expectedText: string) => {
-    const uploadProgress = new UploadProgressPage(page);
-    
-    // Wait for batch to fully populate (files are added asynchronously)
-    await expect.poll(async () => {
-        const title = await uploadProgress.getBatchTitle(0);
-        console.log(`[DEBUG] Batch title: "${title}", expecting: "${expectedText}"`);
-        return title?.includes(expectedText);
-    }, {
-        message: `Waiting for batch header to show "${expectedText}"`,
-        timeout: 10000,
-        intervals: [500, 1000]
-    }).toBe(true);
-    
-    const batchTitle = await uploadProgress.getBatchTitle(0);
-    console.log(`[UI] Batch header shows "${expectedText}" ✓`);
-});
+Then(
+    "the batch header should show {string}",
+    async ({ page }, expectedText: string) => {
+        const uploadProgress = new UploadProgressPage(page);
+
+        // Wait for batch to fully populate (files are added asynchronously)
+        await expect
+            .poll(
+                async () => {
+                    const title = await uploadProgress.getBatchTitle(0);
+                    console.log(
+                        `[DEBUG] Batch title: "${title}", expecting: "${expectedText}"`,
+                    );
+                    return title?.includes(expectedText);
+                },
+                {
+                    message: `Waiting for batch header to show "${expectedText}"`,
+                    timeout: 10000,
+                    intervals: [500, 1000],
+                },
+            )
+            .toBe(true);
+
+        const batchTitle = await uploadProgress.getBatchTitle(0);
+        console.log(`[UI] Batch header shows "${expectedText}" ✓`);
+    },
+);
 
 Then("all files should be listed in the batch", async ({ page }) => {
     const uploadProgress = new UploadProgressPage(page);
-    
+
     // First batch should have files
     const fileCount = await uploadProgress.getBatchFileCount(0);
     expect(fileCount).toBeGreaterThan(0);
@@ -236,24 +267,34 @@ Then("the batch should show uploading status", async ({ page }) => {
 
 When("all uploads complete", async ({ page }) => {
     // Wait for all uploads to complete
-    await expect.poll(async () => {
-        const uploadingItems = page.locator(".upload-item:not(.upload-item-completed):not(.upload-item-error)");
-        return await uploadingItems.count();
-    }, {
-        message: "Waiting for all uploads to complete",
-        timeout: 120000,
-        intervals: [2000, 3000]
-    }).toBe(0);
-    
+    await expect
+        .poll(
+            async () => {
+                const uploadingItems = page.locator(
+                    ".upload-item:not(.upload-item-completed):not(.upload-item-error)",
+                );
+                return await uploadingItems.count();
+            },
+            {
+                message: "Waiting for all uploads to complete",
+                timeout: 120000,
+                intervals: [2000, 3000],
+            },
+        )
+        .toBe(0);
+
     console.log("[Upload] All uploads completed ✓");
 });
 
-Then("the batch status should show {string}", async ({ page }, expectedStatus: string) => {
-    const uploadProgress = new UploadProgressPage(page);
-    const status = await uploadProgress.getBatchStatus(0);
-    expect(status).toContain(expectedStatus);
-    console.log(`[UI] Batch status shows "${expectedStatus}" ✓`);
-});
+Then(
+    "the batch status should show {string}",
+    async ({ page }, expectedStatus: string) => {
+        const uploadProgress = new UploadProgressPage(page);
+        const status = await uploadProgress.getBatchStatus(0);
+        expect(status).toContain(expectedStatus);
+        console.log(`[UI] Batch status shows "${expectedStatus}" ✓`);
+    },
+);
 
 Then("the batch items should be visible by default", async ({ page }) => {
     const uploadProgress = new UploadProgressPage(page);
@@ -269,13 +310,17 @@ When("I collapse the batch", async ({ page }) => {
 });
 
 Then("the batch items should be hidden", async ({ page }) => {
-    await page.waitForTimeout(300); // Animation
     const uploadProgress = new UploadProgressPage(page);
-    const isVisible = await uploadProgress.areBatchItemsVisible(0);
-    expect(isVisible).toBe(false);
-    
+    // Wait for collapse animation to complete
+    await expect
+        .poll(async () => await uploadProgress.areBatchItemsVisible(0), {
+            message: "Waiting for batch items to be hidden after collapse",
+            timeout: 5000,
+        })
+        .toBe(false);
+
     // Take screenshot showing collapsed state
-    await page.screenshot({ path: 'test-results/batch-collapsed-state.png' });
+    await page.screenshot({ path: "test-results/batch-collapsed-state.png" });
     console.log("[UI] Batch items are hidden ✓");
     console.log("[Screenshot] Captured collapsed batch state");
 });
@@ -287,13 +332,17 @@ When("I expand the batch", async ({ page }) => {
 });
 
 Then("the batch items should be visible", async ({ page }) => {
-    await page.waitForTimeout(300); // Animation
     const uploadProgress = new UploadProgressPage(page);
-    const isVisible = await uploadProgress.areBatchItemsVisible(0);
-    expect(isVisible).toBe(true);
-    
+    // Wait for expand animation to complete
+    await expect
+        .poll(async () => await uploadProgress.areBatchItemsVisible(0), {
+            message: "Waiting for batch items to be visible after expand",
+            timeout: 5000,
+        })
+        .toBe(true);
+
     // Take screenshot showing expanded state
-    await page.screenshot({ path: 'test-results/batch-expanded-state.png' });
+    await page.screenshot({ path: "test-results/batch-expanded-state.png" });
     console.log("[UI] Batch items are visible ✓");
     console.log("[Screenshot] Captured expanded batch state");
 });
@@ -302,21 +351,26 @@ When(
     'I click the "Open in Tab" button for {string} in the batch',
     async ({ page }, filename: string) => {
         const uploadProgress = new UploadProgressPage(page);
-        
+
         // Create regex to match filename with potential hash (e.g. test-cube.glb -> test-cube.*.glb)
         // Helper to escape regex special characters except the dot we want to replace
-        const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
+        const escapeRegExp = (string: string) =>
+            string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
         const baseName = path.basename(filename, path.extname(filename));
         const ext = path.extname(filename);
-        
-        // Better approach: Find the actual filename visible on screen that matches the pattern
-        const namePattern = new RegExp(`^${escapeRegExp(baseName)}.*${escapeRegExp(ext)}$`);
-        
-         await uploadProgress.clickOpenInTab(namePattern);
 
-        console.log(`[UI] Clicked "Open in Tab" for "${filename}" (pattern match) in batch`);
-    }
+        // Better approach: Find the actual filename visible on screen that matches the pattern
+        const namePattern = new RegExp(
+            `^${escapeRegExp(baseName)}.*${escapeRegExp(ext)}$`,
+        );
+
+        await uploadProgress.clickOpenInTab(namePattern);
+
+        console.log(
+            `[UI] Clicked "Open in Tab" for "${filename}" (pattern match) in batch`,
+        );
+    },
 );
 
 // ============================================
@@ -328,13 +382,13 @@ Given("I have at least one uploaded model in history", async ({ page }) => {
     // Note: uploadModel() waits for completion and closes the window
     const modelList = new ModelListPage(page);
     await modelList.goto();
-    
+
     const filePath = path.join(__dirname, "..", "assets", "test-cube.glb");
     await modelList.uploadModel(filePath, false); // Allow window to close
-    
-    // Give a moment for the upload to be recorded
-    await page.waitForTimeout(1000);
-    
+
+    // Wait for upload to be recorded
+    await page.waitForLoadState("domcontentloaded");
+
     console.log("[Setup] Uploaded model for history ✓");
 });
 
@@ -415,11 +469,15 @@ When('I click the "Open Model" button for that item', async ({ page }) => {
 });
 
 Then("a model viewer tab should be opened", async ({ page }) => {
-    // Check URL contains model tab
-    await page.waitForTimeout(1000);
-    const url = page.url();
-    expect(url).toMatch(/model-\d+/);
-    console.log("[URL] Model viewer tab opened ✓");
+    // Wait for model viewer to load before checking tabs
+    await page
+        .locator(".viewer-canvas, .version-dropdown-trigger")
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 });
+    const { countTabsByType } = await import("../helpers/navigation-helper");
+    const count = await countTabsByType(page, "modelViewer");
+    expect(count).toBeGreaterThanOrEqual(1);
+    console.log("[UI] Model viewer tab opened ✓");
 });
 
 When("I note the current history state", async ({ page }) => {
@@ -478,42 +536,68 @@ Then("I should see the empty state message", async ({ page }) => {
 // ============================================
 
 Then("I take a screenshot of the upload completed state", async ({ page }) => {
-    const screenshot = await page.screenshot({ path: "test-results/upload-completed.png" });
+    const screenshot = await page.screenshot({
+        path: "test-results/upload-completed.png",
+    });
     const testInfo = test.info();
     if (testInfo) {
-        await testInfo.attach("Upload Completed", { body: screenshot, contentType: "image/png" });
+        await testInfo.attach("Upload Completed", {
+            body: screenshot,
+            contentType: "image/png",
+        });
     }
     console.log("[Screenshot] Captured: Upload Completed");
 });
 
-Then("I take a screenshot of the model viewer from upload", async ({ page }) => {
-    // Wait for model viewer to fully load
-    await expect(page.locator(".viewer-canvas, .version-dropdown-trigger").first()).toBeVisible({
-        timeout: 10000,
-    });
-    await page.waitForTimeout(1000); // Allow 3D scene to render
-    const screenshot = await page.screenshot({ path: "test-results/model-viewer-from-upload.png" });
-    const testInfo = test.info();
-    if (testInfo) {
-        await testInfo.attach("Model Viewer From Upload", { body: screenshot, contentType: "image/png" });
-    }
-    console.log("[Screenshot] Captured: Model Viewer From Upload");
-});
+Then(
+    "I take a screenshot of the model viewer from upload",
+    async ({ page }) => {
+        // Wait for model viewer to fully load
+        await expect(
+            page.locator(".viewer-canvas, .version-dropdown-trigger").first(),
+        ).toBeVisible({
+            timeout: 10000,
+        });
+        // Wait for 3D scene assets to finish loading
+        await page.waitForLoadState("domcontentloaded");
+        const screenshot = await page.screenshot({
+            path: "test-results/model-viewer-from-upload.png",
+        });
+        const testInfo = test.info();
+        if (testInfo) {
+            await testInfo.attach("Model Viewer From Upload", {
+                body: screenshot,
+                contentType: "image/png",
+            });
+        }
+        console.log("[Screenshot] Captured: Model Viewer From Upload");
+    },
+);
 
 Then("I take a screenshot of the batch upload", async ({ page }) => {
-    const screenshot = await page.screenshot({ path: "test-results/batch-upload.png" });
+    const screenshot = await page.screenshot({
+        path: "test-results/batch-upload.png",
+    });
     const testInfo = test.info();
     if (testInfo) {
-        await testInfo.attach("Batch Upload", { body: screenshot, contentType: "image/png" });
+        await testInfo.attach("Batch Upload", {
+            body: screenshot,
+            contentType: "image/png",
+        });
     }
     console.log("[Screenshot] Captured: Batch Upload");
 });
 
 Then("I take a screenshot of the upload history page", async ({ page }) => {
-    const screenshot = await page.screenshot({ path: "test-results/upload-history.png" });
+    const screenshot = await page.screenshot({
+        path: "test-results/upload-history.png",
+    });
     const testInfo = test.info();
     if (testInfo) {
-        await testInfo.attach("Upload History", { body: screenshot, contentType: "image/png" });
+        await testInfo.attach("Upload History", {
+            body: screenshot,
+            contentType: "image/png",
+        });
     }
     console.log("[Screenshot] Captured: Upload History");
 });

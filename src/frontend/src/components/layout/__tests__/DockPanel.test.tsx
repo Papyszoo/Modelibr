@@ -4,6 +4,30 @@ import DockPanel from '@/components/layout/DockPanel'
 import { DockProvider } from '@/contexts/DockContext'
 import { Tab } from '@/types'
 
+// Mock navigationStore to avoid import.meta.env chain
+jest.mock('@/stores/navigationStore', () => ({
+  getWindowId: () => 'test-window-id',
+  useNavigationStore: Object.assign(
+    jest.fn((selector?: (state: Record<string, unknown>) => unknown) => {
+      const state = {
+        recentlyClosedTabs: [],
+        addRecentlyClosedTab: jest.fn(),
+        removeRecentlyClosedTab: jest.fn(),
+      }
+      return selector ? selector(state) : state
+    }),
+    { getState: () => ({}) }
+  ),
+  createTab: (type: string) => ({
+    id: type,
+    type,
+    label: type,
+    params: {},
+    internalUiState: {},
+  }),
+  broadcastNavigation: jest.fn(),
+}))
+
 // Test wrapper with DockProvider
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <DockProvider>{children}</DockProvider>
@@ -117,7 +141,13 @@ describe('DockPanel', () => {
 
   it('should render active tab content when tabs are present', () => {
     const tabs: Tab[] = [
-      { id: 'test-tab', type: 'modelList', label: 'Test Tab' },
+      {
+        id: 'test-tab',
+        type: 'modelList',
+        label: 'Test Tab',
+        params: {},
+        internalUiState: {},
+      },
     ]
     const propsWithTabs = {
       ...mockProps,
@@ -133,7 +163,13 @@ describe('DockPanel', () => {
 
   it('should have drag handlers on dock-bar but not on active tab content', () => {
     const tabs: Tab[] = [
-      { id: 'test-tab', type: 'modelList', label: 'Test Tab' },
+      {
+        id: 'test-tab',
+        type: 'modelList',
+        label: 'Test Tab',
+        params: {},
+        internalUiState: {},
+      },
     ]
     const propsWithTabs = {
       ...mockProps,
@@ -171,9 +207,27 @@ describe('DockPanel', () => {
   describe('Tab Closing Behavior', () => {
     it('should activate previous tab when closing the middle active tab', () => {
       const tabs: Tab[] = [
-        { id: 'tab-1', type: 'modelList', label: 'Tab 1' },
-        { id: 'tab-2', type: 'texture', label: 'Tab 2' },
-        { id: 'tab-3', type: 'animation', label: 'Tab 3' },
+        {
+          id: 'tab-1',
+          type: 'modelList',
+          label: 'Tab 1',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-2',
+          type: 'textureSets',
+          label: 'Tab 2',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-3',
+          type: 'sprites',
+          label: 'Tab 3',
+          params: {},
+          internalUiState: {},
+        },
       ]
       const setActiveTab = jest.fn()
       const setTabs = jest.fn()
@@ -196,16 +250,46 @@ describe('DockPanel', () => {
       // Should activate the previous tab (tab-1)
       expect(setActiveTab).toHaveBeenCalledWith('tab-1')
       expect(setTabs).toHaveBeenCalledWith([
-        { id: 'tab-1', type: 'modelList', label: 'Tab 1' },
-        { id: 'tab-3', type: 'animation', label: 'Tab 3' },
+        {
+          id: 'tab-1',
+          type: 'modelList',
+          label: 'Tab 1',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-3',
+          type: 'sprites',
+          label: 'Tab 3',
+          params: {},
+          internalUiState: {},
+        },
       ])
     })
 
     it('should activate next tab when closing the first active tab', () => {
       const tabs: Tab[] = [
-        { id: 'tab-1', type: 'modelList', label: 'Tab 1' },
-        { id: 'tab-2', type: 'texture', label: 'Tab 2' },
-        { id: 'tab-3', type: 'animation', label: 'Tab 3' },
+        {
+          id: 'tab-1',
+          type: 'modelList',
+          label: 'Tab 1',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-2',
+          type: 'textureSets',
+          label: 'Tab 2',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-3',
+          type: 'sprites',
+          label: 'Tab 3',
+          params: {},
+          internalUiState: {},
+        },
       ]
       const setActiveTab = jest.fn()
       const setTabs = jest.fn()
@@ -228,16 +312,46 @@ describe('DockPanel', () => {
       // Should activate the next tab (tab-2)
       expect(setActiveTab).toHaveBeenCalledWith('tab-2')
       expect(setTabs).toHaveBeenCalledWith([
-        { id: 'tab-2', type: 'texture', label: 'Tab 2' },
-        { id: 'tab-3', type: 'animation', label: 'Tab 3' },
+        {
+          id: 'tab-2',
+          type: 'textureSets',
+          label: 'Tab 2',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-3',
+          type: 'sprites',
+          label: 'Tab 3',
+          params: {},
+          internalUiState: {},
+        },
       ])
     })
 
     it('should activate previous tab when closing the last active tab', () => {
       const tabs: Tab[] = [
-        { id: 'tab-1', type: 'modelList', label: 'Tab 1' },
-        { id: 'tab-2', type: 'texture', label: 'Tab 2' },
-        { id: 'tab-3', type: 'animation', label: 'Tab 3' },
+        {
+          id: 'tab-1',
+          type: 'modelList',
+          label: 'Tab 1',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-2',
+          type: 'textureSets',
+          label: 'Tab 2',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-3',
+          type: 'sprites',
+          label: 'Tab 3',
+          params: {},
+          internalUiState: {},
+        },
       ]
       const setActiveTab = jest.fn()
       const setTabs = jest.fn()
@@ -260,13 +374,33 @@ describe('DockPanel', () => {
       // Should activate the previous tab (tab-2)
       expect(setActiveTab).toHaveBeenCalledWith('tab-2')
       expect(setTabs).toHaveBeenCalledWith([
-        { id: 'tab-1', type: 'modelList', label: 'Tab 1' },
-        { id: 'tab-2', type: 'texture', label: 'Tab 2' },
+        {
+          id: 'tab-1',
+          type: 'modelList',
+          label: 'Tab 1',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-2',
+          type: 'textureSets',
+          label: 'Tab 2',
+          params: {},
+          internalUiState: {},
+        },
       ])
     })
 
     it('should set empty active tab when closing the only tab', () => {
-      const tabs: Tab[] = [{ id: 'tab-1', type: 'modelList', label: 'Tab 1' }]
+      const tabs: Tab[] = [
+        {
+          id: 'tab-1',
+          type: 'modelList',
+          label: 'Tab 1',
+          params: {},
+          internalUiState: {},
+        },
+      ]
       const setActiveTab = jest.fn()
       const setTabs = jest.fn()
 
@@ -292,9 +426,27 @@ describe('DockPanel', () => {
 
     it('should not change active tab when closing a non-active tab', () => {
       const tabs: Tab[] = [
-        { id: 'tab-1', type: 'modelList', label: 'Tab 1' },
-        { id: 'tab-2', type: 'texture', label: 'Tab 2' },
-        { id: 'tab-3', type: 'animation', label: 'Tab 3' },
+        {
+          id: 'tab-1',
+          type: 'modelList',
+          label: 'Tab 1',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-2',
+          type: 'textureSets',
+          label: 'Tab 2',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-3',
+          type: 'sprites',
+          label: 'Tab 3',
+          params: {},
+          internalUiState: {},
+        },
       ]
       const setActiveTab = jest.fn()
       const setTabs = jest.fn()
@@ -317,8 +469,20 @@ describe('DockPanel', () => {
       // Should not change active tab
       expect(setActiveTab).not.toHaveBeenCalled()
       expect(setTabs).toHaveBeenCalledWith([
-        { id: 'tab-2', type: 'texture', label: 'Tab 2' },
-        { id: 'tab-3', type: 'animation', label: 'Tab 3' },
+        {
+          id: 'tab-2',
+          type: 'textureSets',
+          label: 'Tab 2',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'tab-3',
+          type: 'sprites',
+          label: 'Tab 3',
+          params: {},
+          internalUiState: {},
+        },
       ])
     })
   })

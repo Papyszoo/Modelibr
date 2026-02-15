@@ -10,6 +10,7 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
+import { ApiHelper } from "../helpers/api-helper";
 import { sharedState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import path from "path";
@@ -19,6 +20,80 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const { Given, When, Then } = createBdd();
+const apiHelper = new ApiHelper();
+
+// Generate unique suffix for each test run to avoid name conflicts
+const runId = Date.now().toString(36).slice(-4);
+
+// Store the last created texture set name for the viewer to use
+let lastCreatedTextureSetName: string | null = null;
+
+// Track whether cleanup has been done this run
+let cleanupDone = false;
+
+/**
+ * Clean up stale texture sets from previous test runs.
+ * Keeps only the first 'blue_color' and removes old test artifacts.
+ */
+async function cleanupStaleTextureSets(): Promise<void> {
+    if (cleanupDone) return;
+    cleanupDone = true;
+
+    try {
+        const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+        const response = await fetch(`${API_BASE}/texture-sets`);
+        if (!response.ok) return;
+
+        const data = (await response.json()) as {
+            textureSets: Array<{ id: number; name: string }>;
+        };
+        const textureSets = data.textureSets;
+
+        // Find stale duplicates: keep first blue_color, delete rest
+        let firstBlueKept = false;
+        const toDelete: number[] = [];
+
+        for (const ts of textureSets) {
+            if (ts.name === "blue_color") {
+                if (firstBlueKept) {
+                    toDelete.push(ts.id);
+                } else {
+                    firstBlueKept = true;
+                }
+            }
+            // Delete old test artifacts from previous runs
+            if (
+                ts.name.startsWith("channel-test_") ||
+                ts.name.startsWith("orm-test_") ||
+                ts.name.startsWith("height-test_") ||
+                ts.name.startsWith("complete-texture-set-") ||
+                ts.name.startsWith("Source ORM_") ||
+                ts.name.startsWith("ORM Target_")
+            ) {
+                // Only delete ones from previous runs (not current)
+                if (!ts.name.endsWith(`_${runId}`)) {
+                    toDelete.push(ts.id);
+                }
+            }
+        }
+
+        if (toDelete.length > 0) {
+            console.log(
+                `[Cleanup] Removing ${toDelete.length} stale texture sets`,
+            );
+            for (const id of toDelete) {
+                await fetch(`${API_BASE}/texture-sets/${id}`, {
+                    method: "DELETE",
+                });
+            }
+            console.log(
+                `[Cleanup] Removed ${toDelete.length} stale texture sets ✓`,
+            );
+        }
+    } catch (e) {
+        console.log(`[Cleanup] Warning: cleanup failed: ${e}`);
+    }
+}
 
 // ============================================================================
 // SETUP STEPS
@@ -47,43 +122,130 @@ When("I open the texture set viewer for any set", async ({ page }) => {
 });
 
 Given("I have a texture set with uploaded textures", async ({ page }) => {
+    await cleanupStaleTextureSets();
     const textureSetsPage = new TextureSetsPage(page);
     await textureSetsPage.goto();
 
-    // Use UniqueFileGenerator to avoid hash-based deduplication
+    // Create texture set with file via API using unique name (avoids data accumulation issues)
+    const uniqueName = `channel-test_${runId}`;
     const testFile = await UniqueFileGenerator.generate("blue_color.png");
-    await textureSetsPage.uploadTexturesViaInput([testFile]);
+    const result = await apiHelper.createTextureSetWithFile(
+        uniqueName,
+        testFile,
+        1, // Albedo
+    );
+    lastCreatedTextureSetName = uniqueName;
+    console.log(
+        `[API] Created texture set "${uniqueName}" with file, ID ${result.textureSetId}`,
+    );
 
-    // Wait for texture set to be created and worker to settle
-    await page.waitForTimeout(5000);
+    // Hard reload to bust React Query cache, then navigate
+    await page.reload();
+    await page.waitForLoadState("domcontentloaded");
+    await textureSetsPage.goto();
+
+    // Use search to find the specific card (grid may have many items off-screen)
+    const searchInput = page.locator(".search-input");
+    if (await searchInput.isVisible({ timeout: 3000 })) {
+        await searchInput.fill(uniqueName);
+        await page.waitForTimeout(500);
+    }
+
+    // Verify the card is visible
+    const card = page
+        .locator(`.texture-set-card:has-text("${uniqueName}")`)
+        .first();
+    await expect(card).toBeVisible({ timeout: 15000 });
 });
 
 Given("I have a texture set with ORM packed texture", async ({ page }) => {
+    await cleanupStaleTextureSets();
     const textureSetsPage = new TextureSetsPage(page);
     await textureSetsPage.goto();
 
-    // Use UniqueFileGenerator to avoid hash-based deduplication
+    // Create texture set with file via API using unique name
+    const uniqueName = `orm-test_${runId}`;
     const testFile = await UniqueFileGenerator.generate("blue_color.png");
-    await textureSetsPage.uploadTexturesViaInput([testFile]);
+    const result = await apiHelper.createTextureSetWithFile(
+        uniqueName,
+        testFile,
+        1, // Albedo
+    );
+    lastCreatedTextureSetName = uniqueName;
+    console.log(
+        `[API] Created texture set "${uniqueName}" with ORM file, ID ${result.textureSetId}`,
+    );
 
-    await page.waitForTimeout(2000);
+    // Navigate to see the new card (cleanup ensures <50 items in grid)
+    await page.reload();
+    await page.waitForLoadState("domcontentloaded");
+    await textureSetsPage.goto();
+
+    // Verify the card is visible
+    const card = page
+        .locator(`.texture-set-card:has-text("${uniqueName}")`)
+        .first();
+    await expect(card).toBeVisible({ timeout: 15000 });
 });
 
 Given("I have a texture set with a height texture", async ({ page }) => {
+    await cleanupStaleTextureSets();
     const textureSetsPage = new TextureSetsPage(page);
     await textureSetsPage.goto();
 
+    // Create texture set with height texture via API using unique name
+    const uniqueName = `height-test_${runId}`;
     const testFile = await UniqueFileGenerator.generate("blue_color.png");
-    await textureSetsPage.uploadTexturesViaInput([testFile]);
+    const result = await apiHelper.createTextureSetWithFile(
+        uniqueName,
+        testFile,
+        3, // Height
+    );
+    lastCreatedTextureSetName = uniqueName;
+    console.log(
+        `[API] Created texture set "${uniqueName}" with Height texture, ID ${result.textureSetId}`,
+    );
 
-    await page.waitForTimeout(2000);
+    // Hard reload to bust React Query cache, then navigate
+    await page.reload();
+    await page.waitForLoadState("domcontentloaded");
+    await textureSetsPage.goto();
+
+    // Use search to find the specific card (grid may have many items off-screen)
+    const searchInput3 = page.locator(".search-input");
+    if (await searchInput3.isVisible({ timeout: 3000 })) {
+        await searchInput3.fill(uniqueName);
+        await page.waitForTimeout(500);
+    }
+
+    // Verify the card is visible
+    const card = page
+        .locator(`.texture-set-card:has-text("${uniqueName}")`)
+        .first();
+    await expect(card).toBeVisible({ timeout: 10000 });
 });
 
 When("I open the texture set viewer", async ({ page }) => {
-    // Click on first texture set card to open viewer
-    const firstCard = page.locator(".texture-set-card").first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
-    await firstCard.dblclick();
+    // Open the specific texture set that was just created, not a random .first()
+    let card;
+    if (lastCreatedTextureSetName) {
+        card = page
+            .locator(
+                `.texture-set-card:has-text("${lastCreatedTextureSetName}")`,
+            )
+            .first();
+        console.log(
+            `[Navigation] Opening texture set "${lastCreatedTextureSetName}"`,
+        );
+    } else {
+        card = page.locator(".texture-set-card").first();
+        console.log(
+            "[Navigation] Opening first texture set card (no name stored)",
+        );
+    }
+
+    await expect(card).toBeVisible({ timeout: 10000 });
+    await card.dblclick();
 
     // Wait for viewer to open
     await page.waitForSelector(".texture-set-viewer", { timeout: 10000 });
@@ -109,8 +271,11 @@ When("I switch to the Files tab", async ({ page }) => {
         timeout: 10000,
     });
 
-    // Give extra time for React to render the file cards
-    await page.waitForTimeout(500);
+    // Wait for file content to finish rendering (file cards or confirmed empty state)
+    await page
+        .locator(".file-mapping-card, .files-tab-empty")
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 });
 });
 
 When("I switch to the Texture Types tab", async ({ page }) => {
@@ -228,7 +393,7 @@ Then("each file should show its texture type usage", async ({ page }) => {
 
 Then("the file should show split channels mode", async ({ page }) => {
     // Wait for page to be fully loaded
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     const fileCard = page
         .locator('[data-testid^="file-mapping-card-"]')
@@ -289,7 +454,11 @@ Then(
 
         const dropdown = heightCard.locator(".height-mode-dropdown").first();
         await dropdown.click();
-        await page.waitForTimeout(300);
+
+        // Wait for dropdown panel to open
+        await page
+            .locator(".p-dropdown-panel")
+            .waitFor({ state: "visible", timeout: 5000 });
 
         // Check dropdown options
         const options = page.locator(".p-dropdown-panel .p-dropdown-item");
@@ -311,7 +480,7 @@ Then(
 
 When("I enable split channel mode for the file", async ({ page }) => {
     // Wait for page to be fully loaded
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     const fileCard = page
         .locator('[data-testid^="file-mapping-card-"]')
@@ -326,7 +495,11 @@ When("I enable split channel mode for the file", async ({ page }) => {
         .first();
     await expect(rgbDropdown).toBeVisible({ timeout: 10000 });
     await rgbDropdown.click();
-    await page.waitForTimeout(500); // Wait for dropdown animation
+
+    // Wait for dropdown panel to open
+    await page
+        .locator(".p-dropdown-panel")
+        .waitFor({ state: "visible", timeout: 5000 });
 
     // Select "Split Channels" option
     // Note: We no longer remove the RGB texture immediately, so no DELETE request is expected.
@@ -339,8 +512,6 @@ When("I enable split channel mode for the file", async ({ page }) => {
     // Wait for split channels UI to appear using data-testid
     const splitChannels = fileCard.locator('[data-testid^="split-channels-"]');
     await expect(splitChannels).toBeVisible({ timeout: 10000 });
-
-    await page.waitForTimeout(500); // Extra time for UI state settlement
 
     console.log("[Action] Enabled split channel mode ✓");
 });
@@ -365,11 +536,15 @@ When(
 
         await expect(channelDropdown).toBeVisible({ timeout: 10000 });
         await channelDropdown.click();
-        await page.waitForTimeout(300);
+
+        // Wait for dropdown panel to open — use .last() because PrimeReact may leave
+        // previous dropdown panels in DOM with exit animations
+        const dropdownPanel = page.locator(".p-dropdown-panel").last();
+        await dropdownPanel.waitFor({ state: "visible", timeout: 5000 });
 
         // Select the texture type from dropdown and wait for POST request
-        const typeOption = page
-            .locator(".p-dropdown-panel .p-dropdown-item")
+        const typeOption = dropdownPanel
+            .locator(".p-dropdown-item")
             .filter({ hasText: textureType });
         await expect(typeOption).toBeVisible({ timeout: 10000 });
         await typeOption.click();
@@ -380,8 +555,6 @@ When(
         );
         await expect(dropdownLabel).toHaveText(textureType, { timeout: 10000 });
 
-        await page.waitForTimeout(300);
-
         console.log(`[Action] Set channel ${channel} to ${textureType} ✓`);
     },
 );
@@ -391,7 +564,11 @@ When("I save the texture set changes", async ({ page }) => {
     const saveButton = page.getByRole("button", { name: /save/i });
     if (await saveButton.isVisible({ timeout: 2000 })) {
         await saveButton.click();
-        await page.waitForTimeout(1000);
+        // Wait for save confirmation toast
+        await page
+            .locator(".p-toast-message")
+            .first()
+            .waitFor({ state: "visible", timeout: 10000 });
         console.log("[Action] Saved texture set changes ✓");
     } else {
         // Changes might be auto-saved

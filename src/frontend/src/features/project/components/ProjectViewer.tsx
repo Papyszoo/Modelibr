@@ -21,6 +21,7 @@ import {
 
 interface ProjectViewerProps {
   projectId: number
+  tabId?: string
 }
 
 function toContainerDto(project: ProjectDto): ContainerDto {
@@ -41,7 +42,10 @@ function toContainerDto(project: ProjectDto): ContainerDto {
   }
 }
 
-export default function ProjectViewer({ projectId }: ProjectViewerProps) {
+export default function ProjectViewer({
+  projectId,
+  tabId,
+}: ProjectViewerProps) {
   const adapter = useMemo<ContainerAdapter>(
     () => ({
       type: 'project',
@@ -78,5 +82,5 @@ export default function ProjectViewer({ projectId }: ProjectViewerProps) {
     [projectId]
   )
 
-  return <ContainerViewer adapter={adapter} />
+  return <ContainerViewer adapter={adapter} tabId={tabId} />
 }

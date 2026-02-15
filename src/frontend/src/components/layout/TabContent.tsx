@@ -125,7 +125,7 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return <PackViewer packId={parseInt(tab.packId)} />
+        return <PackViewer packId={parseInt(tab.packId)} tabId={tab.id} />
 
       case 'projects':
         return <ProjectList />
@@ -139,7 +139,9 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return <ProjectViewer projectId={parseInt(tab.projectId)} />
+        return (
+          <ProjectViewer projectId={parseInt(tab.projectId)} tabId={tab.id} />
+        )
 
       case 'sprites':
         return <SpriteList />

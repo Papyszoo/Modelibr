@@ -384,12 +384,36 @@ List components use `PaginationState` from `types/index.ts` to track `page`, `to
 
 ## State Management
 
-| Type            | When to use                  | Example                   |
-| --------------- | ---------------------------- | ------------------------- |
-| **URL state**   | Tabs, navigation, shareable  | `useQueryState` from nuqs |
-| **Context**     | Cross-component global state | TabContext                |
-| **Local state** | Component-specific           | `useState`                |
-| **Zustand**     | Cached API data              | `useApiCacheStore`        |
+| Type            | When to use                   | Example                           |
+| --------------- | ----------------------------- | --------------------------------- |
+| **Zustand**     | Navigation, tabs, persistence | `useNavigationStore`              |
+| **Zustand**     | Cached API data               | `useApiCacheStore`                |
+| **Zustand**     | Panel sizes, card widths      | `usePanelStore`, `cardWidthStore` |
+| **Context**     | Cross-component (dock layout) | `DockContext`                     |
+| **React Query** | Server state, entity data     | `useQuery`, `useMutation`         |
+| **Local state** | Component-specific            | `useState`                        |
+
+### Navigation Store (`stores/navigationStore.ts`)
+
+The primary store for tab and window management. Replaces the former URL-based state (`useQueryState`/nuqs) and `TabContext`.
+
+- **Multi-window aware**: Each browser tab gets a UUID in `sessionStorage`, stored as a key in `activeWindows: Record<windowId, WindowState>`
+- **WindowState**: `{ tabs: Tab[], activeTabId, splitterSize, lastActiveAt }`
+- **Persisted to localStorage** via Zustand `persist` middleware (survives F5)
+- **Cross-window sync**: `BroadcastChannel('modelibr_navigation')` for tab moves, window close events
+- **Session recovery**: `recentlyClosedTabs` (max 10) and `recentlyClosedWindows` (max 5) stored in the global store
+- **Stale window GC**: Windows inactive >24h are automatically pruned on init
+- **Tab creation**: Always use `createTab(type, id?, name?)` factory — populates `params`, `internalUiState`, and legacy accessors
+- **Per-tab UI state**: `tab.internalUiState` persists sub-tab indices, scroll positions, etc. via `useTabUiState(tabId, key, default)` hook
+
+#### Key hooks
+
+| Hook                 | File                          | Purpose                                                                                              |
+| -------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `useWindowInit`      | `hooks/useWindowInit.ts`      | Initialize window in store, setup BroadcastChannel, pagehide broadcast (no store mutation on unload) |
+| `useDeepLinkHandler` | `hooks/useDeepLinkHandler.ts` | Parse URL deep links (`/view/model/123`), open tab, clean URL                                        |
+| `useTabUiState`      | `hooks/useTabUiState.ts`      | Generic `[value, setter]` for persistent per-tab UI state                                            |
+| `useSessionRecovery` | `hooks/useSessionRecovery.ts` | Access recently closed windows and restore them                                                      |
 
 ---
 
@@ -407,7 +431,8 @@ List components use `PaginationState` from `types/index.ts` to track `page`, `to
 - **React 18+**, TypeScript, Vite
 - **Three.js** + React Three Fiber + Drei
 - **PrimeReact** UI components
-- **nuqs** for URL state
+- **Zustand** for navigation/tab state (persisted to localStorage)
+- **React Query** for server state
 
 ---
 

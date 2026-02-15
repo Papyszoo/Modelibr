@@ -1,4 +1,5 @@
 import { Tab } from '@/types'
+import { createTab } from '@/stores/navigationStore'
 import { getModelById } from '@/features/models/api/modelApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
 import { getPackById } from '@/features/pack/api/packApi'
@@ -87,7 +88,13 @@ export function parseCompactTabFormat(
   if (value.startsWith('[')) {
     try {
       const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : defaultValue
+      if (!Array.isArray(parsed)) return defaultValue
+      // Ensure legacy tabs have the new required fields
+      return parsed.map((t: Partial<Tab>) => ({
+        ...t,
+        params: t.params ?? {},
+        internalUiState: t.internalUiState ?? {},
+      })) as Tab[]
     } catch {
       return defaultValue
     }
@@ -99,76 +106,31 @@ export function parseCompactTabFormat(
     const tabs: Tab[] = []
 
     for (const tabId of value.split(',')) {
-      // Skip if already seen (deduplicate)
-      if (seen.has(tabId)) {
-        continue
-      }
+      if (seen.has(tabId)) continue
       seen.add(tabId)
 
-      // Handle model viewer tabs (e.g., "model-123")
       if (tabId.startsWith('model-')) {
-        const modelId = tabId.substring(6)
-        tabs.push({
-          id: tabId,
-          type: 'modelViewer',
-          label: getTabLabel('modelViewer', { modelId }),
-          modelId,
-        })
+        tabs.push(createTab('modelViewer', tabId.substring(6)))
         continue
       }
-
-      // Handle texture set viewer tabs (e.g., "set-123")
       if (tabId.startsWith('set-')) {
-        const setId = tabId.substring(4)
-        tabs.push({
-          id: tabId,
-          type: 'textureSetViewer',
-          label: getTabLabel('textureSetViewer', { setId }),
-          setId,
-        })
+        tabs.push(createTab('textureSetViewer', tabId.substring(4)))
         continue
       }
-
-      // Handle pack viewer tabs (e.g., "pack-123")
       if (tabId.startsWith('pack-')) {
-        const packId = tabId.substring(5)
-        tabs.push({
-          id: tabId,
-          type: 'packViewer',
-          label: getTabLabel('packViewer', { packId }),
-          packId,
-        })
+        tabs.push(createTab('packViewer', tabId.substring(5)))
         continue
       }
-
-      // Handle project viewer tabs (e.g., "project-123")
       if (tabId.startsWith('project-')) {
-        const projectId = tabId.substring(8)
-        tabs.push({
-          id: tabId,
-          type: 'projectViewer',
-          label: getTabLabel('projectViewer', { projectId }),
-          projectId,
-        })
+        tabs.push(createTab('projectViewer', tabId.substring(8)))
         continue
       }
-
-      // Handle stage editor tabs (e.g., "stage-123")
       if (tabId.startsWith('stage-')) {
-        const stageId = tabId.substring(6)
-        tabs.push({
-          id: tabId,
-          type: 'stageEditor',
-          label: getTabLabel('stageEditor', { stageId }),
-          stageId,
-        })
+        tabs.push(createTab('stageEditor', tabId.substring(6)))
         continue
       }
 
-      // Handle simple tabs (use tabId as type)
       const tabType = tabId as Tab['type']
-
-      // Validate tab type
       if (
         ![
           'modelList',
@@ -191,11 +153,7 @@ export function parseCompactTabFormat(
         throw new Error(`Invalid tab type: ${tabId}`)
       }
 
-      tabs.push({
-        id: tabId,
-        type: tabType,
-        label: getTabLabel(tabType),
-      })
+      tabs.push(createTab(tabType))
     }
 
     return tabs
@@ -215,7 +173,12 @@ export async function parseCompactTabFormatAsync(
   if (value.startsWith('[')) {
     try {
       const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : defaultValue
+      if (!Array.isArray(parsed)) return defaultValue
+      return parsed.map((t: Partial<Tab>) => ({
+        ...t,
+        params: t.params ?? {},
+        internalUiState: t.internalUiState ?? {},
+      })) as Tab[]
     } catch {
       return defaultValue
     }
@@ -227,13 +190,9 @@ export async function parseCompactTabFormatAsync(
     const tabs: Tab[] = []
 
     for (const tabId of value.split(',')) {
-      // Skip if already seen (deduplicate)
-      if (seen.has(tabId)) {
-        continue
-      }
+      if (seen.has(tabId)) continue
       seen.add(tabId)
 
-      // Handle model viewer tabs (e.g., "model-123")
       if (tabId.startsWith('model-')) {
         const modelId = tabId.substring(6)
         let modelName: string | undefined
@@ -241,18 +200,12 @@ export async function parseCompactTabFormatAsync(
           const model = await getModelById(modelId)
           modelName = model.name
         } catch {
-          // If API call fails, fall back to ID-based label
+          /* fall back to ID-based label */
         }
-        tabs.push({
-          id: tabId,
-          type: 'modelViewer',
-          label: getTabLabel('modelViewer', { modelId, modelName }),
-          modelId,
-        })
+        tabs.push(createTab('modelViewer', modelId, modelName))
         continue
       }
 
-      // Handle texture set viewer tabs (e.g., "set-123")
       if (tabId.startsWith('set-')) {
         const setId = tabId.substring(4)
         let setName: string | undefined
@@ -260,18 +213,12 @@ export async function parseCompactTabFormatAsync(
           const textureSet = await getTextureSetById(Number(setId))
           setName = textureSet.name
         } catch {
-          // If API call fails, fall back to ID-based label
+          /* fall back to ID-based label */
         }
-        tabs.push({
-          id: tabId,
-          type: 'textureSetViewer',
-          label: getTabLabel('textureSetViewer', { setId, setName }),
-          setId,
-        })
+        tabs.push(createTab('textureSetViewer', setId, setName))
         continue
       }
 
-      // Handle pack viewer tabs (e.g., "pack-123")
       if (tabId.startsWith('pack-')) {
         const packId = tabId.substring(5)
         let packName: string | undefined
@@ -279,18 +226,12 @@ export async function parseCompactTabFormatAsync(
           const pack = await getPackById(Number(packId))
           packName = pack.name
         } catch {
-          // If API call fails, fall back to ID-based label
+          /* fall back to ID-based label */
         }
-        tabs.push({
-          id: tabId,
-          type: 'packViewer',
-          label: getTabLabel('packViewer', { packId, packName }),
-          packId,
-        })
+        tabs.push(createTab('packViewer', packId, packName))
         continue
       }
 
-      // Handle project viewer tabs (e.g., "project-123")
       if (tabId.startsWith('project-')) {
         const projectId = tabId.substring(8)
         let projectName: string | undefined
@@ -298,18 +239,12 @@ export async function parseCompactTabFormatAsync(
           const project = await getProjectById(Number(projectId))
           projectName = project.name
         } catch {
-          // If API call fails, fall back to ID-based label
+          /* fall back to ID-based label */
         }
-        tabs.push({
-          id: tabId,
-          type: 'projectViewer',
-          label: getTabLabel('projectViewer', { projectId, projectName }),
-          projectId,
-        })
+        tabs.push(createTab('projectViewer', projectId, projectName))
         continue
       }
 
-      // Handle stage editor tabs (e.g., "stage-123")
       if (tabId.startsWith('stage-')) {
         const stageId = tabId.substring(6)
         let stageName: string | undefined
@@ -317,21 +252,13 @@ export async function parseCompactTabFormatAsync(
           const stage = await getStageById(Number(stageId))
           stageName = stage.name
         } catch {
-          // If API call fails, fall back to ID-based label
+          /* fall back to ID-based label */
         }
-        tabs.push({
-          id: tabId,
-          type: 'stageEditor',
-          label: getTabLabel('stageEditor', { stageId, stageName }),
-          stageId,
-        })
+        tabs.push(createTab('stageEditor', stageId, stageName))
         continue
       }
 
-      // Handle simple tabs (use tabId as type)
       const tabType = tabId as Tab['type']
-
-      // Validate tab type
       if (
         ![
           'modelList',
@@ -354,11 +281,7 @@ export async function parseCompactTabFormatAsync(
         throw new Error(`Invalid tab type: ${tabId}`)
       }
 
-      tabs.push({
-        id: tabId,
-        type: tabType,
-        label: getTabLabel(tabType),
-      })
+      tabs.push(createTab(tabType))
     }
 
     return tabs

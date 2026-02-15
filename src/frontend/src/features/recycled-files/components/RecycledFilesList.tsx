@@ -204,6 +204,8 @@ export default function RecycledFilesList() {
         await queryClient.invalidateQueries({ queryKey: ['models'] })
       } else if (vars.item.type === 'modelVersion') {
         await queryClient.invalidateQueries({ queryKey: ['models'] })
+      } else if (vars.item.type === 'textureSet') {
+        await queryClient.invalidateQueries({ queryKey: ['textureSets'] })
       } else if (vars.item.type === 'sprite') {
         await queryClient.invalidateQueries({ queryKey: ['sprites'] })
       } else if (vars.item.type === 'sound') {

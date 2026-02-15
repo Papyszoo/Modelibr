@@ -74,11 +74,20 @@ Given("a model with at least 2 versions exists", async ({ page }) => {
 
     console.log(`[Setup] Added second version to model ${multiVersionModelId}`);
 
-    // Save to shared state for later use (trust 200 OK response from both uploads)
-    const uploadData2 = await uploadResponse.json();
+    // Fetch the actual model name from the API (POST response only returns {id, alreadyExists})
+    const modelDetailResponse = await page.request.get(
+        `${API_BASE}/models/${multiVersionModelId}`,
+    );
+    const modelDetail = modelDetailResponse.ok()
+        ? await modelDetailResponse.json()
+        : null;
+    const actualModelName =
+        modelDetail?.name || path.basename(modelFile, path.extname(modelFile));
+
+    // Save to shared state for later use
     sharedState.saveModel("multi-version-test-model", {
         id: multiVersionModelId!, // Non-null after successful upload
-        name: uploadData2.name || "Test Model",
+        name: actualModelName,
     });
 
     expect(multiVersionModelId).not.toBeNull();
@@ -101,6 +110,19 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
                 `[Setup] Model "${modelName}" (ID: ${model.id}) no longer exists in backend (${checkResponse.status()}), recreating...`,
             );
             model = undefined; // Force recreation
+        } else {
+            // Model exists in backend — update shared state with actual name from API
+            const checkData = await checkResponse.json();
+            if (checkData.name && checkData.name !== model.name) {
+                console.log(
+                    `[Setup] Updating shared state name from "${model.name}" to "${checkData.name}"`,
+                );
+                sharedState.saveModel(modelName, {
+                    ...model,
+                    name: checkData.name,
+                });
+                model = sharedState.getModel(modelName);
+            }
         }
     }
 
@@ -141,10 +163,22 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
             );
         }
 
-        // Store in shared state
+        // Fetch the actual model name from the API (POST response only returns {id, alreadyExists})
+        const detailResponse = await page.request.get(
+            `${API_BASE}/models/${modelId}`,
+        );
+        const detailData = detailResponse.ok()
+            ? await detailResponse.json()
+            : null;
+        const actualName =
+            detailData?.name ||
+            path.basename(modelFile, path.extname(modelFile));
+
+        // Store in shared state — use actual name from API (based on filename),
+        // not the parameterized modelName, so UI card matching works
         sharedState.saveModel(modelName, {
             id: modelId,
-            name: modelName,
+            name: actualName,
             versions: versionId
                 ? [
                       {
@@ -174,17 +208,17 @@ When(
         if (!multiVersionModelId)
             throw new Error("Multi-version model ID not set");
 
-        // Use correct tab-based URL format
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await page.goto(
-            `${baseUrl}/?leftTabs=modelList,model-${multiVersionModelId}&activeLeft=model-${multiVersionModelId}`,
-        );
+        // Find the model name from shared state — check this test's own key first
+        const multiModel =
+            sharedState.getModel("multi-version-test-model") ||
+            sharedState.getModel("multi-version-model");
+        const modelName = multiModel?.name || "multi-version-model";
 
-        // Wait for the viewer to load using data-testid or fallback selectors
-        await page.waitForSelector(
-            '[data-testid="version-dropdown-trigger"], .version-dropdown-trigger, [data-testid="model-viewer-canvas"]',
-            { timeout: 15000 },
-        );
+        const { navigateToAppClean, openModelViewer } =
+            await import("../helpers/navigation-helper");
+        await navigateToAppClean(page);
+        await openModelViewer(page, modelName);
+
         console.log(
             `[Navigation] Opened model viewer for multi-version model (ID: ${multiVersionModelId})`,
         );
@@ -198,15 +232,11 @@ When(
         if (!model)
             throw new Error(`Model "${modelName}" not found in shared state`);
 
-        // Use correct tab-based URL format
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await page.goto(
-            `${baseUrl}/?leftTabs=modelList,model-${model.id}&activeLeft=model-${model.id}`,
-        );
-        await page.waitForSelector(
-            '[data-testid="version-dropdown-trigger"], .version-dropdown-trigger, [data-testid="model-viewer-canvas"]',
-            { timeout: 15000 },
-        );
+        const { navigateToAppClean, openModelViewer } =
+            await import("../helpers/navigation-helper");
+        await navigateToAppClean(page);
+        await openModelViewer(page, model.name);
+
         console.log(
             `[Navigation] Opened model viewer for "${modelName}" (ID: ${model.id})`,
         );
@@ -241,9 +271,6 @@ When("I delete version {int}", async ({ page }, versionIndex: number) => {
 Then(
     "the model should have {int} version remaining",
     async ({ page }, expectedCount: number) => {
-        // Wait for update
-        await page.waitForTimeout(1000);
-
         // Re-open dropdown to check count if needed, or check header
         // Actually, checking the dropdown items count is better
         const dropdown = page.locator(".version-dropdown-trigger");
@@ -289,7 +316,6 @@ When("I click the regenerate thumbnail button", async ({ page }) => {
                     .filter({ has: page.locator(".pi-image") }),
             );
         await toggleBtn.first().click();
-        await page.waitForTimeout(500);
         await expect(thumbnailTitle).toBeVisible({ timeout: 5000 });
         console.log("[Action] Opened Thumbnail Details window");
     }
@@ -299,7 +325,11 @@ When("I click the regenerate thumbnail button", async ({ page }) => {
         ".floating-window button:has-text('Regenerate Thumbnail')",
     );
     await regenButton.click();
-    await page.waitForTimeout(2000); // Wait for signalR/Toast
+    // Wait for server processing confirmation (toast or SignalR response)
+    await page
+        .locator(".p-toast-message")
+        .first()
+        .waitFor({ state: "visible", timeout: 15000 });
     console.log("[Action] Clicked regenerate thumbnail button");
 });
 

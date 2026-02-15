@@ -21,6 +21,7 @@ import {
 
 interface PackViewerProps {
   packId: number
+  tabId?: string
 }
 
 function toContainerDto(pack: PackDto): ContainerDto {
@@ -41,7 +42,7 @@ function toContainerDto(pack: PackDto): ContainerDto {
   }
 }
 
-export default function PackViewer({ packId }: PackViewerProps) {
+export default function PackViewer({ packId, tabId }: PackViewerProps) {
   const adapter = useMemo<ContainerAdapter>(
     () => ({
       type: 'pack',
@@ -78,5 +79,5 @@ export default function PackViewer({ packId }: PackViewerProps) {
     [packId]
   )
 
-  return <ContainerViewer adapter={adapter} />
+  return <ContainerViewer adapter={adapter} tabId={tabId} />
 }

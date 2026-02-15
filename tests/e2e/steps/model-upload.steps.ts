@@ -3,6 +3,10 @@ import { expect } from "@playwright/test";
 import { ModelListPage } from "../pages/ModelListPage";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import {
+    cleanupStaleModels,
+    cleanupStaleRecycledModels,
+} from "../helpers/cleanup-helper";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -12,6 +16,10 @@ const __dirname = path.dirname(__filename);
 const { Given, When, Then } = createBdd();
 
 Given("I am on the model list page", async ({ page }) => {
+    // Clean up accumulated models from previous test runs
+    await cleanupStaleModels();
+    await cleanupStaleRecycledModels();
+
     const modelList = new ModelListPage(page);
     await modelList.goto();
 });
@@ -28,7 +36,7 @@ Then(
     async ({ page }, modelName: string) => {
         const modelList = new ModelListPage(page);
         await modelList.expectModelVisible(modelName);
-    }
+    },
 );
 
 Then(
@@ -37,7 +45,7 @@ Then(
         const signalR = new SignalRHelper(page);
         // We wait for the ThumbnailStatusChanged message on the thumbnailHub
         await signalR.waitForMessage("/thumbnailHub", target);
-    }
+    },
 );
 
 Then(
@@ -50,20 +58,20 @@ Then(
             // Wait for a thumbnail image to appear in any model card
             await expect(
                 page
-                    .locator(".model-card .thumbnail-image, .model-card .thumbnail-image-container img")
-                    .first()
+                    .locator(
+                        ".model-card .thumbnail-image, .model-card .thumbnail-image-container img",
+                    )
+                    .first(),
             ).toBeVisible({
                 timeout: 90000, // Give worker time to process
             });
         } else {
             // For other statuses, look for the thumbnail placeholder
             await expect(
-                page
-                    .locator(".model-card .thumbnail-placeholder")
-                    .first()
+                page.locator(".model-card .thumbnail-placeholder").first(),
             ).toBeVisible({
                 timeout: 30000,
             });
         }
-    }
+    },
 );

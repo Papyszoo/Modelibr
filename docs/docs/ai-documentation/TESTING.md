@@ -14,15 +14,16 @@ Testing philosophy: Tests should be readable documentation, not just coverage me
 
 **Purpose:** Verify entire application flows work correctly across frontend, backend, and worker.
 
-| Directory | What it tests |
-|-----------|---------------|
-| `features/00-texture-sets/` | Texture set creation, linking, defaults |
-| `features/01-model-viewer/` | 3D rendering, version switching |
-| `features/02-dock-system/` | Tab URL sync, deduplication |
-| `features/03-upload-window/` | Progress tracking, batch uploads |
-| `features/04-recycled-files/` | Soft delete, restore, permanent delete |
+| Directory                     | What it tests                                    |
+| ----------------------------- | ------------------------------------------------ |
+| `features/00-texture-sets/`   | Texture set creation, linking, defaults          |
+| `features/01-model-viewer/`   | 3D rendering, version switching                  |
+| `features/02-dock-system/`    | Tab state management, deduplication, persistence |
+| `features/03-upload-window/`  | Progress tracking, batch uploads                 |
+| `features/04-recycled-files/` | Soft delete, restore, permanent delete           |
 
 **Running E2E tests:**
+
 ```bash
 cd tests/e2e
 node run-e2e.js          # Full run with cleanup
@@ -30,10 +31,14 @@ npm run test:quick       # Quick run (existing containers)
 ```
 
 **E2E conventions:**
+
 - Uses Playwright + Cucumber (BDD)
 - Feature files describe expected behavior
 - Page objects abstract UI interactions
 - SharedState passes data between scenarios
+- **UI-based navigation only** — never use URL query params to set tab state. Use helpers from `tests/e2e/helpers/navigation-helper.ts` (`navigateToAppClean`, `navigateToTab`, `openTabViaMenu`, `openModelViewer`, etc.)
+- Tab state is managed by a Zustand store persisted to localStorage (key: `modelibr_navigation`), not URL params
+- Tabs render as icons only (no text labels). Identify tabs via `.draggable-tab:has(.pi-{icon})` selectors or `[data-pr-tooltip]` attributes
 - See `tests/e2e/README.md` for full details
 
 ---
@@ -45,6 +50,7 @@ npm run test:quick       # Quick run (existing containers)
 **Purpose:** Test business logic in isolation.
 
 **Running:**
+
 ```bash
 dotnet test --no-build  # Avoids Azure.Core timeout issue
 ```
@@ -58,6 +64,7 @@ dotnet test --no-build  # Avoids Azure.Core timeout issue
 **Purpose:** Test component behavior and utilities.
 
 **Running:**
+
 ```bash
 cd src/frontend
 npm test
@@ -71,12 +78,13 @@ npm test
 
 **Purpose:** Test addon API client, utilities, and flows.
 
-| Type | Location |
-|------|----------|
+| Type       | Location                    |
+| ---------- | --------------------------- |
 | Unit tests | `blender-addon/tests/unit/` |
-| E2E tests | `blender-addon/tests/e2e/` |
+| E2E tests  | `blender-addon/tests/e2e/`  |
 
 **Running:**
+
 ```bash
 cd blender-addon/tests
 python run_tests.py

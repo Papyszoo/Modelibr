@@ -91,12 +91,19 @@ When(
         });
 
         // Navigate to model list to establish SignalR connection
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await page.goto(`${baseUrl}/?leftTabs=modelList&activeLeft=modelList`);
-        await page.waitForLoadState("networkidle").catch(() => {});
+        const { navigateToAppClean } =
+            await import("../helpers/navigation-helper");
 
-        // Small delay to ensure WebSocket connection is established
-        await page.waitForTimeout(2000);
+        // Set up a promise to wait for the SignalR WebSocket connection
+        const wsConnected = page.waitForEvent("websocket", {
+            predicate: (ws) => ws.url().includes("thumbnailHub"),
+            timeout: 15000,
+        });
+
+        await navigateToAppClean(page);
+
+        // Wait for SignalR WebSocket connection to thumbnailHub
+        await wsConnected;
 
         // Upload a model to trigger thumbnail generation
         const filePath = await UniqueFileGenerator.generate("test-cube.glb");

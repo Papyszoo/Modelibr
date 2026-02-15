@@ -5,6 +5,35 @@ import {
   serializeToCompactFormat,
 } from '@/utils/tabSerialization'
 
+// Mock apiBase to prevent import.meta.env error in Jest
+jest.mock('@/lib/apiBase', () => ({
+  client: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn(),
+  },
+  baseURL: 'http://localhost:8080',
+  UPLOAD_TIMEOUT: 300000,
+}))
+
+// Mock individual API modules to prevent import.meta.env chain
+jest.mock('@/features/models/api/modelApi', () => ({
+  getModelById: jest.fn(),
+}))
+jest.mock('@/features/texture-set/api/textureSetApi', () => ({
+  getTextureSetById: jest.fn(),
+}))
+jest.mock('@/features/pack/api/packApi', () => ({
+  getPackById: jest.fn(),
+}))
+jest.mock('@/features/project/api/projectApi', () => ({
+  getProjectById: jest.fn(),
+}))
+jest.mock('@/features/stage-editor/api/stageApi', () => ({
+  getStageById: jest.fn(),
+}))
+
 describe('SplitterLayout URL Serialization', () => {
   describe('getTabLabel', () => {
     it('should return correct labels for different tab types', () => {
@@ -78,7 +107,13 @@ describe('SplitterLayout URL Serialization', () => {
 
     it('should return default value for invalid formats', () => {
       const customDefault = [
-        { id: 'default', type: 'modelList', label: 'Default' },
+        {
+          id: 'default',
+          type: 'modelList',
+          label: 'Default',
+          params: {},
+          internalUiState: {},
+        },
       ] as Tab[]
       expect(parseCompactTabFormat('invalidType', customDefault)).toEqual(
         customDefault
@@ -100,20 +135,40 @@ describe('SplitterLayout URL Serialization', () => {
   describe('serializeToCompactFormat', () => {
     it('should serialize basic tabs using their IDs', () => {
       const tabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
-        { id: 'textureSets', type: 'textureSets', label: 'Texture Sets' },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'textureSets',
+          type: 'textureSets',
+          label: 'Texture Sets',
+          params: {},
+          internalUiState: {},
+        },
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList,textureSets')
     })
 
     it('should serialize viewer tabs with IDs', () => {
       const tabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
         {
           id: 'model-123',
           type: 'modelViewer',
           label: 'Model 123',
           modelId: '123',
+          params: { modelId: '123' },
+          internalUiState: {},
         },
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123')
@@ -125,8 +180,20 @@ describe('SplitterLayout URL Serialization', () => {
 
     it('should deduplicate tabs during serialization', () => {
       const tabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
-        { id: 'modelList', type: 'modelList', label: 'Models' },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList')
     })

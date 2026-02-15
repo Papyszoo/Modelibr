@@ -2,6 +2,25 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import DraggableTab from '@/components/layout/DraggableTab'
 import { Tab } from '@/types'
 
+// Mock navigationStore to avoid import.meta.env chain
+jest.mock('@/stores/navigationStore', () => ({
+  getWindowId: () => 'test-window-id',
+  useNavigationStore: Object.assign(
+    jest.fn(() => ({})),
+    {
+      getState: () => ({}),
+    }
+  ),
+  createTab: (type: string) => ({
+    id: type,
+    type,
+    label: type,
+    params: {},
+    internalUiState: {},
+  }),
+  broadcastNavigation: jest.fn(),
+}))
+
 // Helper function to find element by data-pr-tooltip attribute
 const getByTooltip = (tooltip: string): HTMLElement => {
   const element = document.querySelector(`[data-pr-tooltip="${tooltip}"]`)
@@ -18,6 +37,8 @@ describe('DraggableTab', () => {
     id: 'test-tab-1',
     type: 'modelList',
     label: 'Test Tab',
+    params: {},
+    internalUiState: {},
   }
 
   const defaultProps = {
@@ -111,6 +132,8 @@ describe('DraggableTab', () => {
       id: 'test-tab-2',
       type: 'modelViewer',
       modelId: 'model-123',
+      params: { modelId: 'model-123' },
+      internalUiState: {},
     }
 
     render(<DraggableTab {...defaultProps} tab={modelViewerTab} />)
@@ -166,6 +189,8 @@ describe('DraggableTab', () => {
       id: 'test-tab-3',
       type: 'textureSets',
       label: 'Texture Sets',
+      params: {},
+      internalUiState: {},
     }
 
     render(<DraggableTab {...defaultProps} tab={textureSetsTab} />)
@@ -182,6 +207,8 @@ describe('DraggableTab', () => {
       id: 'test-tab-4',
       type: 'textureSetViewer',
       setId: 'set-123',
+      params: { setId: 'set-123' },
+      internalUiState: {},
     }
 
     render(<DraggableTab {...defaultProps} tab={textureSetViewerTab} />)
