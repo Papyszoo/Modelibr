@@ -59,7 +59,7 @@ jobs:
             - name: Build and push modelibr-webapi
               uses: docker/build-push-action@v6
               with:
-                  context: ./src/WebApi
+                  context: .
                   file: ./src/WebApi/Dockerfile
                   push: true
                   tags: |
