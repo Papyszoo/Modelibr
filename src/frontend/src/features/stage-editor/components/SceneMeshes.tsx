@@ -6,7 +6,7 @@ interface SceneMeshesProps {
   onSelectMesh: (id: string) => void
 }
 
-function SceneMeshes({
+export function SceneMeshes({
   meshes,
   selectedId,
   onSelectMesh,
@@ -66,4 +66,3 @@ function SceneMeshes({
   )
 }
 
-export default SceneMeshes

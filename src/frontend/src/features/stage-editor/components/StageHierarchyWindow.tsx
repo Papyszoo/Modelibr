@@ -1,5 +1,5 @@
-import FloatingWindow from '@/components/FloatingWindow'
-import StageHierarchy from './StageHierarchy'
+import { FloatingWindow } from '@/components/FloatingWindow'
+import { StageHierarchy } from './StageHierarchy'
 import { StageConfig, StageGroup } from './SceneEditor'
 
 interface StageHierarchyWindowProps {
@@ -13,7 +13,7 @@ interface StageHierarchyWindowProps {
   onUpdateGroup: (groupId: string, updates: Partial<StageGroup>) => void
 }
 
-function StageHierarchyWindow({
+export function StageHierarchyWindow({
   visible,
   onClose,
   side = 'left',
@@ -42,4 +42,3 @@ function StageHierarchyWindow({
   )
 }
 
-export default StageHierarchyWindow

@@ -7,7 +7,7 @@ interface UVMapSceneProps {
   height: number
 }
 
-function UVMapScene({ width, height }: UVMapSceneProps): JSX.Element {
+export function UVMapScene({ width, height }: UVMapSceneProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { modelObject } = useModelObject()
 
@@ -180,4 +180,3 @@ function UVMapScene({ width, height }: UVMapSceneProps): JSX.Element {
   )
 }
 
-export default UVMapScene

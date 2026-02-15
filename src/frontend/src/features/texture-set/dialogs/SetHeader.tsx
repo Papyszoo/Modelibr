@@ -17,7 +17,7 @@ interface SetHeaderProps {
   updating: boolean
 }
 
-export default function SetHeader({
+export function SetHeader({
   textureSet,
   onNameUpdate,
   updating,

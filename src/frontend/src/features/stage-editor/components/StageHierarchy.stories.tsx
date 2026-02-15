@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import StageHierarchy from './StageHierarchy'
+import { StageHierarchy } from './StageHierarchy'
 import { StageConfig } from './SceneEditor'
 
 const meta: Meta<typeof StageHierarchy> = {

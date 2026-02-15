@@ -42,7 +42,7 @@ function toContainerDto(project: ProjectDto): ContainerDto {
   }
 }
 
-export default function ProjectViewer({
+export function ProjectViewer({
   projectId,
   tabId,
 }: ProjectViewerProps) {

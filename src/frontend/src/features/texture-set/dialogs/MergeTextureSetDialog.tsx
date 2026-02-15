@@ -59,7 +59,7 @@ const ALPHA_TYPES = [
   TextureType.Bump,
 ]
 
-function MergeTextureSetDialog({
+export function MergeTextureSetDialog({
   visible,
   sourceTextureSet,
   targetTextureSet,
@@ -405,4 +405,3 @@ function MergeTextureSetDialog({
   )
 }
 
-export default MergeTextureSetDialog

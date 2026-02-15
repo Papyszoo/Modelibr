@@ -1,5 +1,5 @@
-export { default as StageEditor } from './components/SceneEditor'
-export { default as StageList } from './components/StageList'
+export { StageEditor } from './components/SceneEditor'
+export { StageList } from './components/StageList'
 export type {
   StageConfig,
   StageLight,

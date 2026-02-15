@@ -23,7 +23,7 @@ interface GroupedModel {
   }>
 }
 
-export default function ModelsCardGrid({
+export function ModelsCardGrid({
   models,
   onDisassociateModel,
   onManageAssociations,

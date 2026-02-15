@@ -1,5 +1,5 @@
 import { useContext, ReactNode } from 'react'
-import TabContext, { TabContextValue } from '@/contexts/TabContext'
+import { TabContext, TabContextValue } from '@/contexts/TabContext'
 import { Tab } from '@/types'
 import { createTab } from '@/stores/navigationStore'
 
@@ -143,4 +143,3 @@ export const TabProvider = ({
   return <TabContext.Provider value={value}>{children}</TabContext.Provider>
 }
 
-export default TabContext

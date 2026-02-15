@@ -11,7 +11,7 @@ interface CardWidthButtonProps {
   onChange: (value: number) => void
 }
 
-export default function CardWidthButton({
+export function CardWidthButton({
   value,
   min,
   max,

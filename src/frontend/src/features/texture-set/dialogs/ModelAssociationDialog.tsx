@@ -34,7 +34,7 @@ interface ModelAssociation {
   hasChanges: boolean
 }
 
-function ModelAssociationDialog({
+export function ModelAssociationDialog({
   visible,
   textureSet,
   onHide,
@@ -385,4 +385,3 @@ function ModelCard({
   )
 }
 
-export default ModelAssociationDialog

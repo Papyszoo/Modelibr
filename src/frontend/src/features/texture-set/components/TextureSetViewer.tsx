@@ -8,14 +8,14 @@ import {
 } from '@/features/texture-set/api/queries'
 import { updateTextureSet } from '@/features/texture-set/api/textureSetApi'
 import { getNonHeightTypes } from '@/utils/textureTypeUtils'
-import SetHeader from '@/features/texture-set/dialogs/SetHeader'
-import SetStats from '@/features/texture-set/dialogs/SetStats'
-import TextureSetModelList from './TextureSetModelList'
-import TextureCard from './TextureCard'
-import HeightCard from './HeightCard'
-import FilesTab from './FilesTab'
-import TexturePreviewPanel from './TexturePreviewPanel'
-import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { SetHeader } from '@/features/texture-set/dialogs/SetHeader'
+import { SetStats } from '@/features/texture-set/dialogs/SetStats'
+import { TextureSetModelList } from './TextureSetModelList'
+import { TextureCard } from './TextureCard'
+import { HeightCard } from './HeightCard'
+import { FilesTab } from './FilesTab'
+import { TexturePreviewPanel } from './TexturePreviewPanel'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import './TextureSetViewer.css'
 
@@ -24,7 +24,7 @@ interface TextureSetViewerProps {
   side?: 'left' | 'right'
 }
 
-function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
+export function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
   const [updating, setUpdating] = useState(false)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const queryClient = useQueryClient()
@@ -183,4 +183,3 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
   )
 }
 
-export default TextureSetViewer

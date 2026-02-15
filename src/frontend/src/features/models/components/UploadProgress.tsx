@@ -5,7 +5,7 @@ interface UploadProgressProps {
   progress: number
 }
 
-export default function UploadProgress({
+export function UploadProgress({
   visible,
   progress,
 }: UploadProgressProps) {

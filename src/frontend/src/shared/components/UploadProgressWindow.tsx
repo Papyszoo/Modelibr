@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { ProgressBar } from 'primereact/progressbar'
 import { Button } from 'primereact/button'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
-import FloatingWindow from '@/components/FloatingWindow'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { openTabInPanel } from '@/utils/tabNavigation'
 import './UploadProgressWindow.css'
 
@@ -72,7 +72,7 @@ const getFileTypeIcon = (
   return typeIconMap[fileType]
 }
 
-export default function UploadProgressWindow() {
+export function UploadProgressWindow() {
   const {
     uploads,
     batches,

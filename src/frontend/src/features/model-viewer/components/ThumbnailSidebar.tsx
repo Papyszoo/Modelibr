@@ -7,7 +7,7 @@ interface ThumbnailSidebarProps {
   onRegenerate: () => void
 }
 
-function ThumbnailSidebar({
+export function ThumbnailSidebar({
   model,
   onRegenerate,
 }: ThumbnailSidebarProps): JSX.Element {
@@ -31,4 +31,3 @@ function ThumbnailSidebar({
   )
 }
 
-export default ThumbnailSidebar

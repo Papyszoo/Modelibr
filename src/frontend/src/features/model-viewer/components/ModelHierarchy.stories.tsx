@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import ModelHierarchy from './ModelHierarchy'
+import { ModelHierarchy } from './ModelHierarchy'
 import * as THREE from 'three'
 
 /**

@@ -9,7 +9,7 @@ import { ThumbnailDisplay } from '@/features/thumbnail'
 import { Model } from '@/utils/fileUtils'
 import { useModelsQuery } from '@/features/models/api/queries'
 import { associateTextureSetWithAllModelVersions } from '@/features/texture-set/api/textureSetApi'
-import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { useTabContext } from '@/hooks/useTabContext'
 import '@/features/models/components/ModelGrid/ModelGrid.css'
@@ -18,7 +18,7 @@ interface TextureSetModelListProps {
   textureSetId: number
 }
 
-export default function TextureSetModelList({
+export function TextureSetModelList({
   textureSetId,
 }: TextureSetModelListProps) {
   const toast = useRef<Toast>(null)

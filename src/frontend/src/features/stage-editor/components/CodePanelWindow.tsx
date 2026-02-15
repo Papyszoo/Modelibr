@@ -1,5 +1,5 @@
-import CodePanel from './CodePanel'
-import FloatingWindow from '@/components/FloatingWindow'
+import { CodePanel } from './CodePanel'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { StageConfig } from './SceneEditor'
 
 interface CodePanelWindowProps {
@@ -9,7 +9,7 @@ interface CodePanelWindowProps {
   stageConfig: StageConfig
 }
 
-function CodePanelWindow({
+export function CodePanelWindow({
   visible,
   onClose,
   side = 'none',
@@ -28,4 +28,3 @@ function CodePanelWindow({
   )
 }
 
-export default CodePanelWindow

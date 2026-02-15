@@ -1,5 +1,5 @@
 import { ThumbnailDisplay } from '@/features/thumbnail'
-import FloatingWindow from '@/components/FloatingWindow'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { Model } from '@/utils/fileUtils'
 import { ModelVersionDto } from '@/types'
 import { Button } from 'primereact/button'
@@ -13,7 +13,7 @@ interface ThumbnailWindowProps {
   onRegenerate?: () => void
 }
 
-function ThumbnailWindow({
+export function ThumbnailWindow({
   visible,
   onClose,
   side = 'left',
@@ -52,4 +52,3 @@ function ThumbnailWindow({
   )
 }
 
-export default ThumbnailWindow

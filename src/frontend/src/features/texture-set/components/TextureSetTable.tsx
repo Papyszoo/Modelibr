@@ -15,7 +15,7 @@ interface TextureSetTableProps {
   onDeleteSet: (set: TextureSetDto) => void
 }
 
-export default function TextureSetTable({
+export function TextureSetTable({
   textureSets,
   loading,
   onViewDetails,

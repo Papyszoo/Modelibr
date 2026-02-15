@@ -14,7 +14,7 @@ interface TextureTypeDropdownProps {
   onChange: (value: TextureType) => void
 }
 
-export default function TextureTypeDropdown({
+export function TextureTypeDropdown({
   options,
   value,
   onChange,

@@ -33,7 +33,7 @@ interface TextureSetAssociation {
   originallyAssociated: boolean
 }
 
-function TextureSetAssociationDialog({
+export function TextureSetAssociationDialog({
   visible,
   model,
   modelVersionId,
@@ -380,4 +380,3 @@ function TextureSetCard({
   )
 }
 
-export default TextureSetAssociationDialog

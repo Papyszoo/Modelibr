@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
-import DockPanel from '@/components/layout/DockPanel'
+import { DockPanel } from '@/components/layout/DockPanel'
 import { DockProvider } from '@/contexts/DockContext'
 import { Tab } from '@/types'
 
@@ -70,14 +70,14 @@ jest.mock('primereact/contextmenu', () => {
 })
 
 // Mock TabContent and DraggableTab components
-jest.mock('../TabContent', () => {
-  return function MockTabContent({ tab }: { tab: { label?: string } }) {
+jest.mock('../TabContent', () => ({
+  TabContent: function MockTabContent({ tab }: { tab: { label?: string } }) {
     return <div data-testid="tab-content">{tab.label} Content</div>
-  }
-})
+  },
+}))
 
-jest.mock('../DraggableTab', () => {
-  return function MockDraggableTab({
+jest.mock('../DraggableTab', () => ({
+  DraggableTab: function MockDraggableTab({
     tab,
     isActive,
     onClose,
@@ -98,8 +98,8 @@ jest.mock('../DraggableTab', () => {
         </button>
       </div>
     )
-  }
-})
+  },
+}))
 
 jest.mock('../../../hooks/useTabContext', () => {
   const React = require('react')

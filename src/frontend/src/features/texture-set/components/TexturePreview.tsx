@@ -13,7 +13,7 @@ interface TexturePreviewProps {
  * For single-channel textures (R, G, B, A), extracts that channel and displays as grayscale.
  * Uses Canvas for actual pixel manipulation instead of SVG filters.
  */
-export default function TexturePreview({
+export function TexturePreview({
   src,
   alt,
   sourceChannel = TextureChannel.RGB,

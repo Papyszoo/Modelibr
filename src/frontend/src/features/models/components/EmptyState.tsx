@@ -7,7 +7,7 @@ interface EmptyStateProps {
   customMessage?: string
 }
 
-export default function EmptyState({
+export function EmptyState({
   visible,
   onDrop,
   onDragOver,

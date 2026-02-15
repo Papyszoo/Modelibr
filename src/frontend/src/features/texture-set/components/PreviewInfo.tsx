@@ -6,7 +6,7 @@ interface PreviewInfoProps {
   geometryType: string
 }
 
-function PreviewInfo({ textureSet, geometryType }: PreviewInfoProps) {
+export function PreviewInfo({ textureSet, geometryType }: PreviewInfoProps) {
   const geometryNames: Record<string, string> = {
     box: 'Cube',
     sphere: 'Sphere',
@@ -66,4 +66,3 @@ function PreviewInfo({ textureSet, geometryType }: PreviewInfoProps) {
   )
 }
 
-export default PreviewInfo

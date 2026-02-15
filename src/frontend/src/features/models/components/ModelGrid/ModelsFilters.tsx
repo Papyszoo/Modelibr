@@ -1,7 +1,7 @@
 import { MultiSelect } from 'primereact/multiselect'
 import { Button } from 'primereact/button'
 import { PackDto, ProjectDto } from '@/types'
-import CardWidthButton from './CardWidthButton'
+import { CardWidthButton } from './CardWidthButton'
 
 interface ModelsFiltersProps {
   searchQuery: string
@@ -18,7 +18,7 @@ interface ModelsFiltersProps {
   onCardWidthChange: (width: number) => void
 }
 
-export default function ModelsFilters({
+export function ModelsFilters({
   searchQuery,
   onSearchChange,
   packs,

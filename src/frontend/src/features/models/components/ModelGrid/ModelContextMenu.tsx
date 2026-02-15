@@ -41,7 +41,7 @@ interface ModelContextMenuComponentProps {
   projects: ProjectDto[]
 }
 
-const ModelContextMenu = forwardRef<
+export const ModelContextMenu = forwardRef<
   ModelContextMenuHandle,
   ModelContextMenuComponentProps
 >(
@@ -401,4 +401,3 @@ const ModelContextMenu = forwardRef<
 
 ModelContextMenu.displayName = 'ModelContextMenu'
 
-export default ModelContextMenu

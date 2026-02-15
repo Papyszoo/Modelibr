@@ -2,7 +2,7 @@ import { JSX } from 'react'
 import './ModelList.css'
 import { useTabContext } from '@/hooks/useTabContext'
 import { TabContextValue } from '@/contexts/TabContext'
-import ModelListHeader from './ModelListHeader'
+import { ModelListHeader } from './ModelListHeader'
 import { ModelGrid } from './ModelGrid'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
@@ -13,7 +13,7 @@ interface ModelListProps {
   isTabContent?: boolean
 }
 
-function ModelList({
+export function ModelList({
   onBackToUpload,
   isTabContent = false,
 }: ModelListProps): JSX.Element {
@@ -66,4 +66,3 @@ function ModelListContent({
   )
 }
 
-export default ModelList

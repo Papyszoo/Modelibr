@@ -13,7 +13,7 @@ import { createPack, deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { PackDto } from '@/types'
 import { openTabInPanel } from '@/utils/tabNavigation'
-import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { packCreateFormSchema } from '@/shared/validation/formSchemas'
 import './PackList.css'
@@ -21,7 +21,7 @@ import './PackList.css'
 type PackCreateFormInput = z.input<typeof packCreateFormSchema>
 type PackCreateFormOutput = z.output<typeof packCreateFormSchema>
 
-export default function PackList() {
+export function PackList() {
   const queryClient = useQueryClient()
   const packsQuery = usePacksQuery()
   const packs = packsQuery.data ?? []

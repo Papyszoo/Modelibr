@@ -1,7 +1,7 @@
 import { Text } from '@react-three/drei'
 import { JSX } from 'react'
 
-function LoadingPlaceholder(): JSX.Element {
+export function LoadingPlaceholder(): JSX.Element {
   return (
     <Text
       position={[0, 0, 0]}
@@ -15,4 +15,3 @@ function LoadingPlaceholder(): JSX.Element {
   )
 }
 
-export default LoadingPlaceholder

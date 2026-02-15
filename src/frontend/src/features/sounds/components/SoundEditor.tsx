@@ -21,7 +21,7 @@ interface SoundEditorProps {
   onSoundUpdated?: (soundId: number, name: string) => void
 }
 
-function SoundEditor({
+export function SoundEditor({
   sound,
   onClose,
   onDownload,
@@ -396,4 +396,3 @@ function SoundEditor({
   )
 }
 
-export default SoundEditor

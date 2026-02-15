@@ -4,7 +4,7 @@ interface LoadingStateProps {
   visible: boolean
 }
 
-export default function LoadingState({ visible }: LoadingStateProps) {
+export function LoadingState({ visible }: LoadingStateProps) {
   if (!visible) return null
 
   return (

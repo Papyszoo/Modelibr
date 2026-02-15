@@ -89,7 +89,7 @@ interface DraggableTabProps {
   side: 'left' | 'right'
 }
 
-function DraggableTab({
+export function DraggableTab({
   tab,
   isActive,
   onSelect,
@@ -176,4 +176,3 @@ function DraggableTab({
   )
 }
 
-export default DraggableTab

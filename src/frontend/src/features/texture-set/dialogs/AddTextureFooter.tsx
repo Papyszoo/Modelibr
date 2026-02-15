@@ -7,7 +7,7 @@ interface AddTextureFooterProps {
   canSubmit: boolean
 }
 
-export default function AddTextureFooter({
+export function AddTextureFooter({
   onCancel,
   onSubmit,
   submitting,

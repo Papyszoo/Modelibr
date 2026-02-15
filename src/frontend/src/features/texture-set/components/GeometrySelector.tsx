@@ -14,7 +14,7 @@ const geometries: { type: GeometryType; icon: string; label: string }[] = [
   { type: 'torus', icon: 'pi pi-circle-off', label: 'Torus' },
 ]
 
-function GeometrySelector({ onGeometrySelect }: GeometrySelectorProps) {
+export function GeometrySelector({ onGeometrySelect }: GeometrySelectorProps) {
   return (
     <div className="geometry-selector">
       <h3 className="geometry-selector-title">
@@ -38,4 +38,3 @@ function GeometrySelector({ onGeometrySelect }: GeometrySelectorProps) {
   )
 }
 
-export default GeometrySelector

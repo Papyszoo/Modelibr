@@ -1,5 +1,5 @@
-import PropertyPanel from './PropertyPanel'
-import FloatingWindow from '@/components/FloatingWindow'
+import { PropertyPanel } from './PropertyPanel'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { StageObject } from './SceneEditor'
 
 interface PropertyPanelWindowProps {
@@ -11,7 +11,7 @@ interface PropertyPanelWindowProps {
   onDeleteObject: (id: string) => void
 }
 
-function PropertyPanelWindow({
+export function PropertyPanelWindow({
   visible,
   onClose,
   side = 'right',
@@ -36,4 +36,3 @@ function PropertyPanelWindow({
   )
 }
 
-export default PropertyPanelWindow

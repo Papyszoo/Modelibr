@@ -6,6 +6,7 @@ import tseslint from '@typescript-eslint/eslint-plugin'
 import tsParser from '@typescript-eslint/parser'
 import prettier from 'eslint-plugin-prettier'
 import prettierConfig from 'eslint-config-prettier'
+import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig, globalIgnores } from 'eslint/config'
@@ -81,6 +82,7 @@ export default defineConfig([
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
       prettier: prettier,
+      'simple-import-sort': simpleImportSort,
     },
     languageOptions: {
       parser: tsParser,
@@ -103,8 +105,18 @@ export default defineConfig([
         'error',
         { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
       ],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/consistent-type-imports': [
+        'warn',
+        {
+          prefer: 'type-imports',
+          fixStyle: 'inline-type-imports',
+        },
+      ],
       'no-unused-vars': 'off', // Disable base rule as it can report incorrect errors
       'prettier/prettier': 'error',
+      'simple-import-sort/imports': 'warn',
+      'simple-import-sort/exports': 'warn',
 
       // Architectural boundary rules - will be overridden for specific directories
       'no-restricted-imports': 'off',

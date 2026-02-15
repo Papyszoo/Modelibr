@@ -6,7 +6,7 @@ interface SceneLightsProps {
   onSelectLight: (id: string) => void
 }
 
-function SceneLights({
+export function SceneLights({
   lights,
   selectedId,
   onSelectLight,
@@ -132,4 +132,3 @@ function SceneLights({
   )
 }
 
-export default SceneLights

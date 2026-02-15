@@ -2,7 +2,7 @@ interface NoTextureTypesWarningProps {
   visible: boolean
 }
 
-export default function NoTextureTypesWarning({
+export function NoTextureTypesWarning({
   visible,
 }: NoTextureTypesWarningProps) {
   if (!visible) return null

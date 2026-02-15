@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import ModelInfo from './ModelInfo'
+import { ModelInfo } from './ModelInfo'
 import { Model } from '@/utils/fileUtils'
 
 const meta = {

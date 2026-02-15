@@ -13,7 +13,7 @@ import { createProject, deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { ProjectDto } from '@/types'
 import { openTabInPanel } from '@/utils/tabNavigation'
-import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { projectCreateFormSchema } from '@/shared/validation/formSchemas'
 import './ProjectList.css'
@@ -21,7 +21,7 @@ import './ProjectList.css'
 type ProjectCreateFormInput = z.input<typeof projectCreateFormSchema>
 type ProjectCreateFormOutput = z.output<typeof projectCreateFormSchema>
 
-export default function ProjectList() {
+export function ProjectList() {
   const queryClient = useQueryClient()
   const projectsQuery = useProjectsQuery()
   const projects = projectsQuery.data ?? []

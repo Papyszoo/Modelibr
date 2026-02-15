@@ -1,4 +1,4 @@
-export default function AssociationInstructions() {
+export function AssociationInstructions() {
   return (
     <div className="association-instructions">
       <p>

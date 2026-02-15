@@ -1,11 +1,11 @@
 import { render } from '@testing-library/react'
 import { Canvas } from '@react-three/fiber'
-import TexturedGeometry from '@/features/texture-set/components/TexturedGeometry'
+import { TexturedGeometry } from '@/features/texture-set/components/TexturedGeometry'
 import { TextureSetDto, TextureType } from '@/types'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
-  default: {
+  apiClient: {
     getFileUrl: jest.fn(id => `http://localhost/files/${id}`),
   },
 }))

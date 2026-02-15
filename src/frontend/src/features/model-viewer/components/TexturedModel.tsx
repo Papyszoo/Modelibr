@@ -414,7 +414,7 @@ function FBXModelWithTextures({
   return <group ref={meshRef} />
 }
 
-function TexturedModel({
+export function TexturedModel({
   modelUrl,
   fileExtension,
   rotationSpeed,
@@ -451,4 +451,3 @@ function TexturedModel({
   return null
 }
 
-export default TexturedModel

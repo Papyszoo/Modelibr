@@ -26,7 +26,7 @@ interface TexturedGeometryProps {
   geometryParams?: GeometryParams
 }
 
-function TexturedGeometry({
+export function TexturedGeometry({
   geometryType,
   textureSet,
   geometryParams = {},
@@ -234,4 +234,3 @@ function TexturedGeometry({
   )
 }
 
-export default TexturedGeometry

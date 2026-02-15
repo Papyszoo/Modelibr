@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import ModelGrid from '@/features/models/components/ModelGrid/ModelGrid'
+import { ModelGrid } from '@/features/models/components/ModelGrid/ModelGrid'
 
 // Mock useTabContext
 const mockOpenModelDetailsTab = jest.fn()
@@ -75,14 +75,14 @@ jest.mock('../ModelContextMenu', () => {
   const React = require('react')
   return {
     __esModule: true,
-    default: React.forwardRef(() => null),
+    ModelContextMenu: React.forwardRef(() => null),
   }
 })
 
 // Mock ModelsFilters
 jest.mock('../ModelsFilters', () => ({
   __esModule: true,
-  default: ({
+  ModelsFilters: ({
     searchQuery,
     onSearchChange,
   }: {

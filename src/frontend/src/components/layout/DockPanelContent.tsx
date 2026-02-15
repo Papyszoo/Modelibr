@@ -5,9 +5,9 @@ import {
   broadcastNavigation,
   createTab,
 } from '@/stores/navigationStore'
-import DockBar from './dock-panel/DockBar'
-import DockEmptyState from './dock-panel/DockEmptyState'
-import DockContentArea from './dock-panel/DockContentArea'
+import { DockBar } from './dock-panel/DockBar'
+import { DockEmptyState } from './dock-panel/DockEmptyState'
+import { DockContentArea } from './dock-panel/DockContentArea'
 
 interface DockPanelContentProps {
   side: 'left' | 'right'
@@ -24,7 +24,7 @@ interface DockPanelContentProps {
   moveTabBetweenPanels: (tab: Tab, fromSide: 'left' | 'right') => void
 }
 
-function DockPanelContent({
+export function DockPanelContent({
   side,
   tabs,
   setTabs,
@@ -223,4 +223,3 @@ function DockPanelContent({
   )
 }
 
-export default DockPanelContent

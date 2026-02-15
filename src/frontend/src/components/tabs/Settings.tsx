@@ -22,7 +22,7 @@ interface SettingsData {
 type SettingsFormValues = z.input<typeof settingsFormSchema>
 type SettingsFormOutput = z.output<typeof settingsFormSchema>
 
-function Settings(): JSX.Element {
+export function Settings(): JSX.Element {
   const [_settings, setSettings] = useState<SettingsData | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -563,4 +563,3 @@ function Settings(): JSX.Element {
   )
 }
 
-export default Settings

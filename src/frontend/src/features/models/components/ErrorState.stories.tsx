@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import ErrorState from './ErrorState'
+import { ErrorState } from './ErrorState'
 
 const meta = {
   title: 'Components/Model List/ErrorState',

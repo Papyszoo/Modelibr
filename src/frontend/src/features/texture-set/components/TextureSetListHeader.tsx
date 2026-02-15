@@ -7,7 +7,7 @@ interface TextureSetListHeaderProps {
   onFilesSelected?: (files: FileList) => void
 }
 
-export default function TextureSetListHeader({
+export function TextureSetListHeader({
   setCount,
   onCreateSet,
   onFilesSelected,

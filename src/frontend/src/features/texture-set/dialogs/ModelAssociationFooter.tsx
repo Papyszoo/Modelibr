@@ -7,7 +7,7 @@ interface ModelAssociationFooterProps {
   hasChanges: boolean
 }
 
-export default function ModelAssociationFooter({
+export function ModelAssociationFooter({
   onCancel,
   onSave,
   saving,

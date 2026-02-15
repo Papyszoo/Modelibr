@@ -83,7 +83,7 @@ const getFileTypeIcon = (fileType: string): string => {
   return typeIconMap[fileType] || 'pi-file'
 }
 
-export default function History() {
+export function History() {
   const queryClient = useQueryClient()
   const historyQuery = useUploadHistoryQuery()
   const history = useMemo(

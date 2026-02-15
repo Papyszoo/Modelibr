@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { memo, useState, useRef, useEffect } from 'react'
 import { Card } from 'primereact/card'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
@@ -26,7 +26,11 @@ interface HeightCardProps {
  * Only ONE of these can be assigned at a time (mutually exclusive).
  * Shows a mode dropdown to switch between the three types.
  */
-function HeightCard({ textures, setId, onTextureUpdated }: HeightCardProps) {
+export const HeightCard = memo(function HeightCard({
+  textures,
+  setId,
+  onTextureUpdated,
+}: HeightCardProps) {
   // Find which height-related texture exists (if any)
   const existingHeightTexture = textures.find(t =>
     HEIGHT_RELATED_TYPES.includes(t.textureType)
@@ -290,6 +294,4 @@ function HeightCard({ textures, setId, onTextureUpdated }: HeightCardProps) {
       )}
     </Card>
   )
-}
-
-export default HeightCard
+})

@@ -8,7 +8,7 @@ interface ModelListHeaderProps {
   modelCount?: number
 }
 
-export default function ModelListHeader({
+export function ModelListHeader({
   isTabContent,
   onBackToUpload,
   onUpload,

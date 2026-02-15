@@ -62,7 +62,7 @@ function VersionThumbnail({
   )
 }
 
-function VersionStrip({
+export function VersionStrip({
   model,
   versions,
   selectedVersion,
@@ -310,4 +310,3 @@ function VersionStrip({
   )
 }
 
-export default VersionStrip

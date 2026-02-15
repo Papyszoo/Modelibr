@@ -14,7 +14,7 @@ interface TexturesTableProps {
   onAddTexture: () => void
 }
 
-export default function TexturesTable({
+export function TexturesTable({
   textures,
   onRemoveTexture,
   onAddTexture,

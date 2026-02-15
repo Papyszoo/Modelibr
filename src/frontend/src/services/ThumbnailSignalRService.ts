@@ -40,8 +40,7 @@ class ThumbnailSignalRService {
   private maxReconnectAttempts: number = 5
 
   private getHubUrl(): string {
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
     return `${baseUrl}/thumbnailHub`
   }
 
@@ -231,4 +230,3 @@ class ThumbnailSignalRService {
 
 // Export singleton instance
 export const thumbnailSignalRService = new ThumbnailSignalRService()
-export default thumbnailSignalRService

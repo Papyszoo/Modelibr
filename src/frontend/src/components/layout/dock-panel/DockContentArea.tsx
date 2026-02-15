@@ -1,4 +1,4 @@
-import TabContent from '@/components/layout/TabContent'
+import { TabContent } from '@/components/layout/TabContent'
 import { TabProvider } from '@/hooks/useTabContext'
 import { Tab } from '@/types'
 
@@ -11,7 +11,7 @@ interface DockContentAreaProps {
   activeTabData: Tab | undefined
 }
 
-export default function DockContentArea({
+export function DockContentArea({
   side,
   tabs,
   setTabs,

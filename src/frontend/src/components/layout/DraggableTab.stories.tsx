@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import DraggableTab from './DraggableTab'
+import { DraggableTab } from './DraggableTab'
 import { Tab } from '@/types'
 
 const meta = {

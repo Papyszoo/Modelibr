@@ -15,7 +15,7 @@ interface FileSelectionTableProps {
   onFileSelect: (fileId: number | null) => void
 }
 
-export default function FileSelectionTable({
+export function FileSelectionTable({
   files,
   loading,
   selectedFileId,

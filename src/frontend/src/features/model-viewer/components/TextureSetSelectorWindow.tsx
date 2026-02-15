@@ -7,9 +7,9 @@ import {
   setDefaultTextureSet,
 } from '@/features/models/api/modelApi'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
-import FloatingWindow from '@/components/FloatingWindow'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
-import TextureSetAssociationDialog from './TextureSetAssociationDialog'
+import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
 import './TextureSetSelectorWindow.css'
 
 interface TextureSetSelectorWindowProps {
@@ -24,7 +24,7 @@ interface TextureSetSelectorWindowProps {
   onModelUpdated: () => void
 }
 
-function TextureSetSelectorWindow({
+export function TextureSetSelectorWindow({
   visible,
   onClose,
   side,
@@ -259,4 +259,3 @@ function TextureSetSelectorWindow({
   )
 }
 
-export default TextureSetSelectorWindow

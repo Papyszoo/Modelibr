@@ -23,7 +23,7 @@ interface DockContextValue {
   ) => void
 }
 
-const DockContext = createContext<DockContextValue | null>(null)
+export const DockContext = createContext<DockContextValue | null>(null)
 
 export const useDockContext = (): DockContextValue => {
   const context = useContext(DockContext)
@@ -113,5 +113,3 @@ export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
 
   return <DockContext.Provider value={value}>{children}</DockContext.Provider>
 }
-
-export default DockContext

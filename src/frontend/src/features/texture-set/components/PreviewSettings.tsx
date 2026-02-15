@@ -27,7 +27,7 @@ interface PreviewSettingsProps {
   onSettingsChange: (settings: PreviewSettingsType) => void
 }
 
-function PreviewSettings({ settings, onSettingsChange }: PreviewSettingsProps) {
+export function PreviewSettings({ settings, onSettingsChange }: PreviewSettingsProps) {
   const handleChange = (
     key: keyof PreviewSettingsType,
     value: number | boolean | GeometryType
@@ -248,4 +248,3 @@ function PreviewSettings({ settings, onSettingsChange }: PreviewSettingsProps) {
   )
 }
 
-export default PreviewSettings

@@ -113,7 +113,7 @@ function buildHierarchyTree(stageConfig: StageConfig): TreeNode[] {
   return nodes
 }
 
-function StageHierarchy({
+export function StageHierarchy({
   stageConfig,
   selectedObjectId,
   onSelectObject,
@@ -233,4 +233,3 @@ function StageHierarchy({
   )
 }
 
-export default StageHierarchy

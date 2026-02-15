@@ -19,7 +19,7 @@ interface AddModelDialogProps {
   preloadedModels?: Model[]
 }
 
-export default function AddModelDialog({
+export function AddModelDialog({
   visible,
   onHide,
   packId,

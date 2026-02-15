@@ -3,15 +3,15 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Stats } from '@react-three/drei'
-import ModelPreviewScene from './ModelPreviewScene'
-import ModelInfoWindow from './ModelInfoWindow'
-import ThumbnailWindow from './ThumbnailWindow'
-import ModelHierarchyWindow from './ModelHierarchyWindow'
-import ViewerSettingsWindow from './ViewerSettingsWindow'
-import UVMapWindow from './UVMapWindow'
-import TextureSetSelectorWindow from './TextureSetSelectorWindow'
-import ModelVersionWindow from './ModelVersionWindow'
-import VersionStrip from './VersionStrip'
+import { Scene as ModelPreviewScene } from './ModelPreviewScene'
+import { ModelInfoWindow } from './ModelInfoWindow'
+import { ThumbnailWindow } from './ThumbnailWindow'
+import { ModelHierarchyWindow } from './ModelHierarchyWindow'
+import { ViewerSettingsWindow } from './ViewerSettingsWindow'
+import { UVMapWindow } from './UVMapWindow'
+import { TextureSetSelectorWindow } from './TextureSetSelectorWindow'
+import { ModelVersionWindow } from './ModelVersionWindow'
+import { VersionStrip } from './VersionStrip'
 import { FileUploadModal } from './FileUploadModal'
 import { ViewerSettingsType } from './ViewerSettings'
 import { ModelProvider } from '@/contexts/ModelContext'
@@ -40,7 +40,7 @@ interface ModelViewerProps {
   side?: 'left' | 'right'
 }
 
-function ModelViewer({
+export function ModelViewer({
   model: propModel,
   modelId,
   side = 'left',
@@ -731,4 +731,3 @@ function ModelViewer({
   )
 }
 
-export default ModelViewer

@@ -6,7 +6,7 @@ interface ErrorStateProps {
   onRetry: () => void
 }
 
-export default function ErrorState({
+export function ErrorState({
   visible,
   error,
   onRetry,

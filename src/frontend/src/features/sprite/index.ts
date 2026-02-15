@@ -1,2 +1,2 @@
 // Sprite feature exports
-export { default as SpriteList } from './components/SpriteList'
+export { SpriteList } from './components/SpriteList'
