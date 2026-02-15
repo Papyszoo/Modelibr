@@ -36,7 +36,7 @@ import {
   updateSpriteCategory,
 } from '@/features/sprite/api/spriteApi'
 import { getFileUrl } from '@/features/models/api/modelApi'
-import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
   openInFileExplorer,
@@ -75,7 +75,7 @@ const UNASSIGNED_CATEGORY_ID = -1
 const SPRITE_TYPE_STATIC = 1
 const SPRITE_TYPE_GIF = 3
 
-function SpriteList() {
+export function SpriteList() {
   type SpriteCategoryFormInput = z.input<typeof spriteCategoryFormSchema>
   type SpriteCategoryFormOutput = z.output<typeof spriteCategoryFormSchema>
   type SpriteRenameFormValues = z.infer<typeof spriteRenameFormSchema>
@@ -1278,4 +1278,3 @@ function SpriteList() {
   )
 }
 
-export default SpriteList

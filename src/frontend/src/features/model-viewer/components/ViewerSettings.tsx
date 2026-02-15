@@ -16,7 +16,7 @@ interface ViewerSettingsProps {
   onSettingsChange: (settings: ViewerSettingsType) => void
 }
 
-function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
+export function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
   const handleChange = (
     key: keyof ViewerSettingsType,
     value: number | boolean
@@ -128,4 +128,3 @@ function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
   )
 }
 
-export default ViewerSettings

@@ -1,5 +1,5 @@
-import ViewerSettings, { ViewerSettingsType } from './ViewerSettings'
-import FloatingWindow from '@/components/FloatingWindow'
+import { ViewerSettings, ViewerSettingsType } from './ViewerSettings'
+import { FloatingWindow } from '@/components/FloatingWindow'
 
 interface ViewerSettingsWindowProps {
   visible: boolean
@@ -9,7 +9,7 @@ interface ViewerSettingsWindowProps {
   onSettingsChange: (settings: ViewerSettingsType) => void
 }
 
-function ViewerSettingsWindow({
+export function ViewerSettingsWindow({
   visible,
   onClose,
   side = 'left',
@@ -29,4 +29,3 @@ function ViewerSettingsWindow({
   )
 }
 
-export default ViewerSettingsWindow

@@ -2,7 +2,7 @@ interface ChangesSummaryProps {
   hasChanges: boolean
 }
 
-export default function ChangesSummary({ hasChanges }: ChangesSummaryProps) {
+export function ChangesSummary({ hasChanges }: ChangesSummaryProps) {
   if (!hasChanges) return null
 
   return (

@@ -1,4 +1,4 @@
-export default {
+export const apiClient = {
   uploadModel: jest.fn(),
   uploadFile: jest.fn(),
   getModels: jest.fn(),

@@ -1,2 +1,2 @@
-export { default as ModelGrid } from './ModelGrid'
+export { ModelGrid } from './ModelGrid'
 export type { ModelGridProps } from './types'

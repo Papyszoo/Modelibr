@@ -9,7 +9,7 @@ interface ModelsTableProps {
   onManageAssociations: () => void
 }
 
-export default function ModelsTable({
+export function ModelsTable({
   models,
   onDisassociateModel,
   onManageAssociations,

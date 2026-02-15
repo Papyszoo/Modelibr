@@ -1,6 +1,6 @@
-import FloatingWindow from '@/components/FloatingWindow'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { Model } from '@/utils/fileUtils'
-import UVMapScene from './UVMapScene'
+import { UVMapScene } from './UVMapScene'
 
 interface UVMapWindowProps {
   visible: boolean
@@ -9,7 +9,7 @@ interface UVMapWindowProps {
   model: Model | null
 }
 
-function UVMapWindow({
+export function UVMapWindow({
   visible,
   onClose,
   side = 'left',
@@ -45,4 +45,3 @@ function UVMapWindow({
   )
 }
 
-export default UVMapWindow

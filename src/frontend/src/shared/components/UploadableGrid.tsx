@@ -9,7 +9,7 @@ interface UploadableGridProps {
   className?: string
 }
 
-export default function UploadableGrid({
+export function UploadableGrid({
   children,
   onFilesDropped,
   isUploading = false,

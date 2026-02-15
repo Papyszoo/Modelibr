@@ -1,2 +1,2 @@
-export { default as UploadableGrid } from './UploadableGrid'
-export { default as UploadProgressWindow } from './UploadProgressWindow'
+export { UploadableGrid } from './UploadableGrid'
+export { UploadProgressWindow } from './UploadProgressWindow'

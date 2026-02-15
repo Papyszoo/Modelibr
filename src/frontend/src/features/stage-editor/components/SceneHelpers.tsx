@@ -16,7 +16,7 @@ interface SceneHelpersProps {
   helpers: StageHelper[]
 }
 
-function SceneHelpers({ helpers }: SceneHelpersProps): JSX.Element {
+export function SceneHelpers({ helpers }: SceneHelpersProps): JSX.Element {
   return (
     <>
       {helpers.map(helper => {
@@ -141,4 +141,3 @@ function SceneHelpers({ helpers }: SceneHelpersProps): JSX.Element {
   )
 }
 
-export default SceneHelpers

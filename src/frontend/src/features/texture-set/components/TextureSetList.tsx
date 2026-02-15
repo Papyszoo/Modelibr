@@ -17,12 +17,12 @@ import {
   useTextureSetsQuery,
 } from '@/features/texture-set/api/queries'
 import { Button } from 'primereact/button'
-import CreateTextureSetDialog from '@/features/texture-set/dialogs/CreateTextureSetDialog'
-import TextureSetListHeader from './TextureSetListHeader'
-import TextureSetGrid from './TextureSetGrid'
+import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
+import { TextureSetListHeader } from './TextureSetListHeader'
+import { TextureSetGrid } from './TextureSetGrid'
 import './TextureSetList.css'
 
-function TextureSetList() {
+export function TextureSetList() {
   const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [pagination, setPagination] = useState<PaginationState>({
@@ -298,4 +298,3 @@ function TextureSetList() {
   )
 }
 
-export default TextureSetList

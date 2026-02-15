@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import FloatingWindow from '@/components/FloatingWindow'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { Model } from '@/utils/fileUtils'
 import { ModelVersionDto } from '@/types'
 import {
@@ -21,7 +21,7 @@ interface ModelVersionWindowProps {
   onRecycleVersion?: (versionId: number) => void
 }
 
-function ModelVersionWindow({
+export function ModelVersionWindow({
   visible,
   onClose,
   side = 'left',
@@ -312,4 +312,3 @@ function ModelVersionWindow({
   )
 }
 
-export default ModelVersionWindow

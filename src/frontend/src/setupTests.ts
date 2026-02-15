@@ -46,7 +46,7 @@ jest.mock('@/lib/apiBase', () => {
 
 jest.mock('./services/ApiClient', () => ({
   __esModule: true,
-  default: {
+  apiClient: {
     getBaseURL: jest.fn(() => 'http://localhost:8080'),
     uploadModel: jest.fn(),
     uploadFile: jest.fn(),
@@ -108,19 +108,6 @@ jest.mock('./services/ApiClient', () => ({
 
 jest.mock('./services/ThumbnailSignalRService', () => ({
   __esModule: true,
-  default: {
-    connect: jest.fn(),
-    disconnect: jest.fn(),
-    joinAllModelsGroup: jest.fn(),
-    leaveAllModelsGroup: jest.fn(),
-    joinModelVersionGroup: jest.fn(),
-    leaveModelVersionGroup: jest.fn(),
-    joinModelActiveVersionGroup: jest.fn(),
-    leaveModelActiveVersionGroup: jest.fn(),
-    onThumbnailStatusChanged: jest.fn(() => jest.fn()),
-    onActiveVersionChanged: jest.fn(() => jest.fn()),
-    isConnected: jest.fn(() => false),
-  },
   thumbnailSignalRService: {
     connect: jest.fn(),
     disconnect: jest.fn(),
@@ -152,11 +139,11 @@ jest.mock('@/features/thumbnail/hooks/useThumbnail', () => ({
 jest.mock('./utils/webdavUtils', () => ({
   __esModule: true,
   detectOS: jest.fn(() => 'windows'),
-  getWebDavBaseUrl: jest.fn(() => 'https://localhost:8081/modelibr'),
+  getWebDavBaseUrl: jest.fn(() => 'http://localhost:8080/modelibr'),
   getWebDavPath: jest.fn((virtualPath: string) => ({
-    nativePath: `\\\\localhost@8081\\modelibr\\${virtualPath}`,
-    displayPath: `\\\\localhost@8081\\modelibr\\${virtualPath}`,
-    webDavUrl: `https://localhost:8081/modelibr/${virtualPath}`,
+    nativePath: `\\\\localhost@8080\\modelibr\\${virtualPath}`,
+    displayPath: `\\\\localhost@8080\\modelibr\\${virtualPath}`,
+    webDavUrl: `http://localhost:8080/modelibr/${virtualPath}`,
   })),
   getProjectAssetPath: jest.fn(),
   getSoundCategoryPath: jest.fn(),

@@ -51,7 +51,7 @@ interface ComponentLibraryProps {
   onAddComponent: (category: ComponentType, type: string) => void
 }
 
-function ComponentLibrary({
+export function ComponentLibrary({
   onAddComponent,
 }: ComponentLibraryProps): JSX.Element {
   const lightTypes: ComponentDefinition[] = [
@@ -288,4 +288,3 @@ function ComponentLibrary({
   )
 }
 
-export default ComponentLibrary

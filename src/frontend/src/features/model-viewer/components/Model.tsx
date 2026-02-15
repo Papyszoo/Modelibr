@@ -5,7 +5,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import * as THREE from 'three'
-import LoadingPlaceholder from '@/components/LoadingPlaceholder'
+import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 
 // Separate components for each model type to avoid conditional hooks
@@ -296,7 +296,7 @@ function PlaceholderModel({ rotationSpeed }: { rotationSpeed: number }) {
   )
 }
 
-function Model({ modelUrl, fileExtension, rotationSpeed = 0.002 }) {
+export function Model({ modelUrl, fileExtension, rotationSpeed = 0.002 }) {
   return (
     <Suspense fallback={<LoadingPlaceholder />}>
       {fileExtension === 'obj' && (
@@ -315,4 +315,3 @@ function Model({ modelUrl, fileExtension, rotationSpeed = 0.002 }) {
   )
 }
 
-export default Model

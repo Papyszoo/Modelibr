@@ -174,4 +174,4 @@ class ApiClient {
   refreshCache = settingsApi.refreshCache
 }
 
-export default new ApiClient()
+export const apiClient = new ApiClient()

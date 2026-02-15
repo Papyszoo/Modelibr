@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import CodePanel from '@/features/stage-editor/components/CodePanel'
+import { CodePanel } from '@/features/stage-editor/components/CodePanel'
 import { StageConfig } from '@/features/stage-editor/components/SceneEditor'
 
 // Mock clipboard API

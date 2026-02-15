@@ -5,7 +5,7 @@ interface StageListHeaderProps {
   onCreateClick: () => void
 }
 
-function StageListHeader({ onCreateClick }: StageListHeaderProps) {
+export function StageListHeader({ onCreateClick }: StageListHeaderProps) {
   return (
     <div className="stage-list-header">
       <div className="header-content">
@@ -28,4 +28,3 @@ function StageListHeader({ onCreateClick }: StageListHeaderProps) {
   )
 }
 
-export default StageListHeader

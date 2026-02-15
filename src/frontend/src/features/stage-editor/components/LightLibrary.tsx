@@ -6,7 +6,7 @@ interface LightLibraryProps {
   onAddLight: (type: SceneLight['type']) => void
 }
 
-function LightLibrary({ onAddLight }: LightLibraryProps): JSX.Element {
+export function LightLibrary({ onAddLight }: LightLibraryProps): JSX.Element {
   const lightTypes: Array<{
     type: SceneLight['type']
     label: string
@@ -69,4 +69,3 @@ function LightLibrary({ onAddLight }: LightLibraryProps): JSX.Element {
   )
 }
 
-export default LightLibrary

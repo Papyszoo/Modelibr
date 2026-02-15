@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import EditorCanvas from './EditorCanvas'
+import { EditorCanvas } from './EditorCanvas'
 import { ComponentType } from './ComponentLibrary'
-import ComponentLibraryWindow from './ComponentLibraryWindow'
-import PropertyPanelWindow from './PropertyPanelWindow'
-import CodePanelWindow from './CodePanelWindow'
-import StageHierarchyWindow from './StageHierarchyWindow'
+import { ComponentLibraryWindow } from './ComponentLibraryWindow'
+import { PropertyPanelWindow } from './PropertyPanelWindow'
+import { CodePanelWindow } from './CodePanelWindow'
+import { StageHierarchyWindow } from './StageHierarchyWindow'
 import { useTabContext } from '@/hooks/useTabContext'
 import {
   createStage,
@@ -89,7 +89,7 @@ interface StageEditorProps {
   stageId?: string
 }
 
-function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
+export function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   const { side } = useTabContext()
   const [stageConfig, setStageConfig] = useState<StageConfig>({
     lights: [],
@@ -443,4 +443,3 @@ function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
   )
 }
 
-export default StageEditor

@@ -15,7 +15,7 @@ interface ModelAssociationTableProps {
   onToggleAssociation: (modelId: string, isAssociated: boolean) => void
 }
 
-export default function ModelAssociationTable({
+export function ModelAssociationTable({
   modelAssociations,
   loading,
   onToggleAssociation,

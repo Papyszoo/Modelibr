@@ -7,7 +7,7 @@ interface CodePanelProps {
   stageConfig: StageConfig
 }
 
-function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
+export function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
   const [copied, setCopied] = useState(false)
 
   const generateCode = (): string => {
@@ -168,4 +168,3 @@ ${allElements}${footer}`
   )
 }
 
-export default CodePanel

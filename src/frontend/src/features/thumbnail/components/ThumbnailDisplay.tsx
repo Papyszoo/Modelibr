@@ -9,7 +9,7 @@ interface ThumbnailDisplayProps {
   modelName?: string
 }
 
-function ThumbnailDisplay({
+export function ThumbnailDisplay({
   modelId,
   versionId,
   modelName,
@@ -46,4 +46,3 @@ function ThumbnailDisplay({
   )
 }
 
-export default ThumbnailDisplay

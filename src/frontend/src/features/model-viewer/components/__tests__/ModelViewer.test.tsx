@@ -1,13 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
-import ModelViewer from '@/features/model-viewer/components/ModelViewer'
+import { ModelViewer } from '@/features/model-viewer/components/ModelViewer'
 import { ModelProvider } from '@/contexts/ModelContext'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
   __esModule: true,
-  default: {
+  apiClient: {
     getModelById: jest.fn(),
     regenerateThumbnail: jest.fn(),
     getFileUrl: jest.fn((id: string) => `http://api.test/files/${id}`),
@@ -25,65 +25,65 @@ jest.mock('@react-three/fiber', () => ({
 }))
 
 // Mock child components
-jest.mock('../ModelPreviewScene', () => {
-  return function MockModelPreviewScene(props: any) {
+jest.mock('../ModelPreviewScene', () => ({
+  Scene: function MockModelPreviewScene(props: any) {
     return (
       <div data-testid="model-preview-scene" data-model-id={props.model?.id} />
     )
-  }
-})
+  },
+}))
 
-jest.mock('../ModelInfoWindow', () => {
-  return function MockModelInfoWindow() {
+jest.mock('../ModelInfoWindow', () => ({
+  ModelInfoWindow: function MockModelInfoWindow() {
     return <div data-testid="model-info-window" />
-  }
-})
+  },
+}))
 
-jest.mock('../ThumbnailWindow', () => {
-  return function MockThumbnailWindow() {
+jest.mock('../ThumbnailWindow', () => ({
+  ThumbnailWindow: function MockThumbnailWindow() {
     return <div data-testid="thumbnail-window" />
-  }
-})
+  },
+}))
 
-jest.mock('../ModelHierarchyWindow', () => {
-  return function MockModelHierarchyWindow() {
+jest.mock('../ModelHierarchyWindow', () => ({
+  ModelHierarchyWindow: function MockModelHierarchyWindow() {
     return <div data-testid="model-hierarchy-window" />
-  }
-})
+  },
+}))
 
-jest.mock('../ViewerSettingsWindow', () => {
-  return function MockViewerSettingsWindow() {
+jest.mock('../ViewerSettingsWindow', () => ({
+  ViewerSettingsWindow: function MockViewerSettingsWindow() {
     return <div data-testid="viewer-settings-window" />
-  }
-})
+  },
+}))
 
-jest.mock('../UVMapWindow', () => {
-  return function MockUVMapWindow() {
+jest.mock('../UVMapWindow', () => ({
+  UVMapWindow: function MockUVMapWindow() {
     return <div data-testid="uv-map-window" />
-  }
-})
+  },
+}))
 
-jest.mock('../TextureSetSelectorWindow', () => {
-  return function MockTextureSetSelectorWindow() {
+jest.mock('../TextureSetSelectorWindow', () => ({
+  TextureSetSelectorWindow: function MockTextureSetSelectorWindow() {
     return <div data-testid="texture-set-selector-window" />
-  }
-})
+  },
+}))
 
-jest.mock('../ModelVersionWindow', () => {
-  return function MockModelVersionWindow() {
+jest.mock('../ModelVersionWindow', () => ({
+  ModelVersionWindow: function MockModelVersionWindow() {
     return <div data-testid="model-version-window" />
-  }
-})
+  },
+}))
 
 jest.mock('../FileUploadModal', () => ({
   FileUploadModal: () => <div data-testid="file-upload-modal" />,
 }))
 
-jest.mock('../VersionStrip', () => {
-  return function MockVersionStrip() {
+jest.mock('../VersionStrip', () => ({
+  VersionStrip: function MockVersionStrip() {
     return <div data-testid="version-strip" />
-  }
-})
+  },
+}))
 
 // Mock Toast
 jest.mock('primereact/toast', () => ({

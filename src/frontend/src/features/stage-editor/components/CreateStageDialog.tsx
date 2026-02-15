@@ -9,7 +9,7 @@ interface CreateStageDialogProps {
   onCreate: (name: string) => void
 }
 
-function CreateStageDialog({
+export function CreateStageDialog({
   visible,
   onHide,
   onCreate,
@@ -69,4 +69,3 @@ function CreateStageDialog({
   )
 }
 
-export default CreateStageDialog

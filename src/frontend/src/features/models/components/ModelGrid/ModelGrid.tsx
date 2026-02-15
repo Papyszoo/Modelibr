@@ -9,11 +9,11 @@ import { Model } from '@/utils/fileUtils'
 import { getModelsPaginated } from '@/features/models/api/modelApi'
 import { ModelGridProps } from './types'
 import { useModelGrid } from './useModelGrid'
-import ModelsFilters from './ModelsFilters'
-import ModelContextMenu, { ModelContextMenuHandle } from './ModelContextMenu'
-import AddModelDialog from './AddModelDialog'
+import { ModelsFilters } from './ModelsFilters'
+import { ModelContextMenu, ModelContextMenuHandle } from './ModelContextMenu'
+import { AddModelDialog } from './AddModelDialog'
 
-export default function ModelGrid({
+export function ModelGrid({
   projectId,
   packId,
   textureSetId,

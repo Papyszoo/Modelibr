@@ -2,11 +2,11 @@ import { Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Stage, OrbitControls } from '@react-three/drei'
 import { TextureSetDto } from '@/types'
-import TexturedGeometry from './TexturedGeometry'
-import LoadingPlaceholder from '@/components/LoadingPlaceholder'
-import FloatingWindow from '@/components/FloatingWindow'
-import PreviewInfo from './PreviewInfo'
-import PreviewSettings, { PreviewSettingsType } from './PreviewSettings'
+import { TexturedGeometry } from './TexturedGeometry'
+import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
+import { FloatingWindow } from '@/components/FloatingWindow'
+import { PreviewInfo } from './PreviewInfo'
+import { PreviewSettings, PreviewSettingsType } from './PreviewSettings'
 import { Button } from 'primereact/button'
 import './TexturePreviewPanel.css'
 
@@ -15,7 +15,7 @@ interface TexturePreviewPanelProps {
   side?: 'left' | 'right'
 }
 
-function TexturePreviewPanel({
+export function TexturePreviewPanel({
   textureSet,
   side = 'left',
 }: TexturePreviewPanelProps) {
@@ -133,4 +133,3 @@ function TexturePreviewPanel({
   )
 }
 
-export default TexturePreviewPanel

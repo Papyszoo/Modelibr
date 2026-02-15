@@ -27,7 +27,7 @@ const mockGetStageById = jest.fn()
 
 jest.mock('../../services/ApiClient', () => ({
   __esModule: true,
-  default: {
+  apiClient: {
     getModelById: (...args: unknown[]) => mockGetModelById(...args),
     getTextureSetById: (...args: unknown[]) => mockGetTextureSetById(...args),
     getPackById: (...args: unknown[]) => mockGetPackById(...args),

@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
-import ModelInfo from '@/features/model-viewer/components/ModelInfo'
+import { ModelInfo } from '@/features/model-viewer/components/ModelInfo'
 
 // Mock the ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
   __esModule: true,
-  default: {
+  apiClient: {
     updateModelTags: jest.fn(),
     disassociateTextureSetFromModelVersion: jest.fn(),
     getAllTextureSets: jest.fn().mockResolvedValue([]),

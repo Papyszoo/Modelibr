@@ -1,5 +1,5 @@
-import ModelInfo from './ModelInfo'
-import FloatingWindow from '@/components/FloatingWindow'
+import { ModelInfo } from './ModelInfo'
+import { FloatingWindow } from '@/components/FloatingWindow'
 import { Model } from '@/utils/fileUtils'
 
 interface ModelInfoWindowProps {
@@ -10,7 +10,7 @@ interface ModelInfoWindowProps {
   onModelUpdated?: () => void
 }
 
-function ModelInfoWindow({
+export function ModelInfoWindow({
   visible,
   onClose,
   side = 'left',
@@ -34,4 +34,3 @@ function ModelInfoWindow({
   )
 }
 
-export default ModelInfoWindow

@@ -8,7 +8,7 @@ interface CardWidthSliderProps {
   onChange: (value: number) => void
 }
 
-export default function CardWidthSlider({
+export function CardWidthSlider({
   value,
   min,
   max,

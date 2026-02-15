@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { ModelList } from '@/features/models'
 import { History } from '@/features/history'
-import Settings from '@/components/tabs/Settings'
+import { Settings } from '@/components/tabs/Settings'
 import { Tab } from '@/types'
 import { useTabContext } from '@/hooks/useTabContext'
 import './TabContent.css'
@@ -71,7 +71,7 @@ interface TabContentProps {
   tab: Tab
 }
 
-function TabContentLoading(): JSX.Element {
+export function TabContentLoading(): JSX.Element {
   return (
     <div className="tab-loading">
       <i className="pi pi-spin pi-spinner" aria-hidden="true" />
@@ -80,7 +80,7 @@ function TabContentLoading(): JSX.Element {
   )
 }
 
-function TabContent({ tab }: TabContentProps): JSX.Element {
+export function TabContent({ tab }: TabContentProps): JSX.Element {
   const { side } = useTabContext()
 
   const renderContent = (): JSX.Element => {
@@ -180,5 +180,3 @@ function TabContent({ tab }: TabContentProps): JSX.Element {
     </div>
   )
 }
-
-export default TabContent

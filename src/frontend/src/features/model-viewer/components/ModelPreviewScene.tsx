@@ -1,9 +1,9 @@
 import { JSX, Suspense, useRef } from 'react'
 import { Stage, OrbitControls, useHelper } from '@react-three/drei'
 import * as THREE from 'three'
-import Model from './Model'
-import TexturedModel from './TexturedModel'
-import LoadingPlaceholder from '@/components/LoadingPlaceholder'
+import { Model } from './Model'
+import { TexturedModel } from './TexturedModel'
+import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { Model as ModelType } from '@/utils/fileUtils'
 import { ViewerSettingsType } from './ViewerSettings'
@@ -42,7 +42,7 @@ interface SceneProps {
   defaultFileId?: number | null
 }
 
-function Scene({
+export function Scene({
   model,
   settings,
   textureSet,
@@ -168,4 +168,3 @@ function Scene({
   )
 }
 
-export default Scene

@@ -6,12 +6,12 @@ import { Toast } from 'primereact/toast'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { TextureSetDto, TextureDto, ModelSummaryDto } from '@/types'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
-import AddTextureToSetDialog from './AddTextureToSetDialog'
-import ModelAssociationDialog from './ModelAssociationDialog'
-import SetHeader from './SetHeader'
-import SetStats from './SetStats'
-import TexturesTable from './TexturesTable'
-import ModelsCardGrid from './ModelsCardGrid'
+import { AddTextureToSetDialog } from './AddTextureToSetDialog'
+import { ModelAssociationDialog } from './ModelAssociationDialog'
+import { SetHeader } from './SetHeader'
+import { SetStats } from './SetStats'
+import { TexturesTable } from './TexturesTable'
+import { ModelsCardGrid } from './ModelsCardGrid'
 import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
 import './dialogs.css'
 
@@ -22,7 +22,7 @@ interface TextureSetDetailDialogProps {
   onSetUpdated: () => void
 }
 
-function TextureSetDetailDialog({
+export function TextureSetDetailDialog({
   visible,
   textureSet,
   onHide,
@@ -218,4 +218,3 @@ function TextureSetDetailDialog({
   )
 }
 
-export default TextureSetDetailDialog

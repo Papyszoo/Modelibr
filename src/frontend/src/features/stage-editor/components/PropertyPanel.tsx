@@ -18,7 +18,7 @@ interface PropertyPanelProps {
   onDeleteObject: (id: string) => void
 }
 
-function PropertyPanel({
+export function PropertyPanel({
   selectedObject,
   onUpdateObject,
   onDeleteObject,
@@ -337,4 +337,3 @@ function PropertyPanel({
   )
 }
 
-export default PropertyPanel

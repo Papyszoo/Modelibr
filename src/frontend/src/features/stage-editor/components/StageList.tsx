@@ -5,9 +5,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { openTabInPanel } from '@/utils/tabNavigation'
 import { createStage } from '@/features/stage-editor/api/stageApi'
 import { useStagesQuery } from '@/features/stage-editor/api/queries'
-import StageGrid from './StageGrid'
-import StageListHeader from './StageListHeader'
-import CreateStageDialog from './CreateStageDialog'
+import { StageGrid } from './StageGrid'
+import { StageListHeader } from './StageListHeader'
+import { CreateStageDialog } from './CreateStageDialog'
 import './StageList.css'
 
 interface StageDto {
@@ -17,7 +17,7 @@ interface StageDto {
   updatedAt: string
 }
 
-function StageList() {
+export function StageList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const toast = useRef<Toast>(null)
   const queryClient = useQueryClient()
@@ -125,4 +125,3 @@ function StageList() {
   )
 }
 
-export default StageList

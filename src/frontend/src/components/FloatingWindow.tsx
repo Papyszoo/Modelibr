@@ -11,7 +11,7 @@ interface FloatingWindowProps {
   windowId: string
 }
 
-function FloatingWindow({
+export function FloatingWindow({
   visible,
   onClose,
   title,
@@ -225,4 +225,3 @@ function FloatingWindow({
   )
 }
 
-export default FloatingWindow

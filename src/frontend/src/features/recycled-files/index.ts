@@ -1,1 +1,1 @@
-export { default as RecycledFilesList } from './components/RecycledFilesList'
+export { RecycledFilesList } from './components/RecycledFilesList'

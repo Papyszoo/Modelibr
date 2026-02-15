@@ -14,6 +14,5 @@ export interface TabContextValue {
   openTab: (type: Tab['type'], title: string, data?: unknown) => void
 }
 
-const TabContext = createContext<TabContextValue | null>(null)
+export const TabContext = createContext<TabContextValue | null>(null)
 
-export default TabContext

@@ -27,7 +27,7 @@ export function detectOS(): OperatingSystem {
  */
 export function getWebDavBaseUrl(): string {
   const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+    import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
   const url = new URL(apiBaseUrl)
   return `${url.protocol}//${url.host}/modelibr`
 }
@@ -37,7 +37,7 @@ export function getWebDavBaseUrl(): string {
  */
 function getWebDavHostInfo(): { host: string; port: string; isHttps: boolean } {
   const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081'
+    import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
   const url = new URL(apiBaseUrl)
   const isHttps = url.protocol === 'https:'
   const defaultPort = isHttps ? '443' : '80'

@@ -1,5 +1,5 @@
-import ComponentLibrary, { ComponentType } from './ComponentLibrary'
-import FloatingWindow from '@/components/FloatingWindow'
+import { ComponentLibrary, ComponentType } from './ComponentLibrary'
+import { FloatingWindow } from '@/components/FloatingWindow'
 
 interface ComponentLibraryWindowProps {
   visible: boolean
@@ -8,7 +8,7 @@ interface ComponentLibraryWindowProps {
   onAddComponent: (category: ComponentType, type: string) => void
 }
 
-function ComponentLibraryWindow({
+export function ComponentLibraryWindow({
   visible,
   onClose,
   side = 'left',
@@ -27,4 +27,3 @@ function ComponentLibraryWindow({
   )
 }
 
-export default ComponentLibraryWindow

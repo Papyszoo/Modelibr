@@ -35,7 +35,7 @@ import {
   updateSoundCategory,
 } from '@/features/sounds/api/soundApi'
 import { getFileUrl } from '@/features/models/api/modelApi'
-import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { SoundDto, SoundCategoryDto, PaginationState } from '@/types'
 import { decodeAudio, extractPeaks } from '@/utils/audioUtils'
@@ -45,8 +45,8 @@ import {
   getCopyPathSuccessMessage,
 } from '@/utils/webdavUtils'
 import { soundCategoryFormSchema } from '@/shared/validation/formSchemas'
-import SoundCard from './SoundCard'
-import SoundEditor from './SoundEditor'
+import { SoundCard } from './SoundCard'
+import { SoundEditor } from './SoundEditor'
 import './SoundList.css'
 
 const UNASSIGNED_CATEGORY_ID = -1
@@ -54,7 +54,7 @@ const UNASSIGNED_CATEGORY_ID = -1
 type SoundCategoryFormInput = z.input<typeof soundCategoryFormSchema>
 type SoundCategoryFormOutput = z.output<typeof soundCategoryFormSchema>
 
-function SoundList() {
+export function SoundList() {
   const [sounds, setSounds] = useState<SoundDto[]>([])
   const [categories, setCategories] = useState<SoundCategoryDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -1073,4 +1073,3 @@ function SoundList() {
   )
 }
 
-export default SoundList

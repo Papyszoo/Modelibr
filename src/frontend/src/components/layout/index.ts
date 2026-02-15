@@ -1,0 +1,6 @@
+export { DockPanel } from './DockPanel'
+export { DockPanelContent } from './DockPanelContent'
+export { DraggableTab } from './DraggableTab'
+export { SplitterLayout } from './SplitterLayout'
+export { TabContent } from './TabContent'
+export { DockBar, DockContentArea, DockEmptyState } from './dock-panel'

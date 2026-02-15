@@ -419,6 +419,7 @@ The primary store for tab and window management. Replaces the former URL-based s
 
 ## Design Philosophy
 
+- **Named exports only**: All components use named exports (`export function ComponentName` / `export const ComponentName`). No `export default` except `App.tsx` and `main.tsx`. Barrel files (`index.ts`) re-export with `export { Name } from './File'`.
 - **Single responsibility**: One component, one job
 - **Direct API calls**: No unnecessary abstractions
 - **Local state default**: Lift only when needed

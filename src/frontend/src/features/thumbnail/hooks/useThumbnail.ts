@@ -7,10 +7,8 @@ import {
   getThumbnailUrl,
   getVersionThumbnailUrl,
 } from '../api/thumbnailApi'
-import thumbnailSignalRService, {
-  ThumbnailStatusChangedEvent,
-  ActiveVersionChangedEvent,
-} from '../../../services/ThumbnailSignalRService'
+import { thumbnailSignalRService, ThumbnailStatusChangedEvent,
+  ActiveVersionChangedEvent, } from '../../../services/ThumbnailSignalRService'
 
 // Only log in development mode
 const isDev = import.meta.env.DEV

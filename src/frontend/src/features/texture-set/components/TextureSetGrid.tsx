@@ -13,8 +13,8 @@ import {
   softDeleteTextureSet,
 } from '@/features/texture-set/api/textureSetApi'
 import { getFileUrl } from '@/features/models/api/modelApi'
-import MergeTextureSetDialog from '@/features/texture-set/dialogs/MergeTextureSetDialog'
-import CardWidthSlider from '@/shared/components/CardWidthSlider'
+import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextureSetDialog'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
   openInFileExplorer,
@@ -43,7 +43,7 @@ interface TextureSetGridProps {
   onTextureSetUpdated?: () => void
 }
 
-export default function TextureSetGrid({
+export function TextureSetGrid({
   textureSets,
   loading = false,
   onTextureSetSelect,

@@ -7,10 +7,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { getModelFileFormat } from '@/utils/fileUtils'
 import { updateModelTags } from '@/features/models/api/modelApi'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
-import TextureSetAssociationDialog from './TextureSetAssociationDialog'
+import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
 import './ModelInfo.css'
 
-function ModelInfo({ model, onModelUpdated }) {
+export function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(
     model.tags ? model.tags.split(', ').filter(t => t.trim()) : []
   )
@@ -236,4 +236,3 @@ function ModelInfo({ model, onModelUpdated }) {
   )
 }
 
-export default ModelInfo

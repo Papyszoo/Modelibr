@@ -1,5 +1,5 @@
 import { Tab } from '@/types'
-import DockPanelContent from './DockPanelContent'
+import { DockPanelContent } from './DockPanelContent'
 import './DockPanel.css'
 
 interface DockPanelProps {
@@ -17,8 +17,7 @@ interface DockPanelProps {
   moveTabBetweenPanels: (tab: Tab, fromSide: 'left' | 'right') => void
 }
 
-function DockPanel(props: DockPanelProps): JSX.Element {
+export function DockPanel(props: DockPanelProps): JSX.Element {
   return <DockPanelContent {...props} />
 }
 
-export default DockPanel

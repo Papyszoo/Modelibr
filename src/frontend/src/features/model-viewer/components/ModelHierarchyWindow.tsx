@@ -1,7 +1,7 @@
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { useModelHierarchy } from '@/features/model-viewer/hooks/useModelHierarchy'
-import ModelHierarchy from './ModelHierarchy'
-import FloatingWindow from '@/components/FloatingWindow'
+import { ModelHierarchy } from './ModelHierarchy'
+import { FloatingWindow } from '@/components/FloatingWindow'
 
 interface ModelHierarchyWindowProps {
   visible: boolean
@@ -9,7 +9,7 @@ interface ModelHierarchyWindowProps {
   side?: 'left' | 'right'
 }
 
-function ModelHierarchyWindow({
+export function ModelHierarchyWindow({
   visible,
   onClose,
   side = 'left',
@@ -30,4 +30,3 @@ function ModelHierarchyWindow({
   )
 }
 
-export default ModelHierarchyWindow

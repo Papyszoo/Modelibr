@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import DraggableTab from '@/components/layout/DraggableTab'
+import { DraggableTab } from '@/components/layout/DraggableTab'
 import { Tab } from '@/types'
 
 // Mock navigationStore to avoid import.meta.env chain

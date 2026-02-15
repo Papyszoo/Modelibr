@@ -13,7 +13,7 @@ interface DockEmptyStateProps {
   onDragLeave: (e: React.DragEvent) => void
 }
 
-export default function DockEmptyState({
+export function DockEmptyState({
   onAddTab,
   onReopenTab,
   onDrop,

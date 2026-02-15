@@ -1,8 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
-import thumbnailSignalRService, {
-  ThumbnailStatusChangedEvent,
-  ActiveVersionChangedEvent,
-} from '../../../services/ThumbnailSignalRService'
+import { thumbnailSignalRService, ThumbnailStatusChangedEvent,
+  ActiveVersionChangedEvent, } from '../../../services/ThumbnailSignalRService'
 import { useQueryClient } from '@tanstack/react-query'
 
 /**

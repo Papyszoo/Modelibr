@@ -42,7 +42,7 @@ function toContainerDto(pack: PackDto): ContainerDto {
   }
 }
 
-export default function PackViewer({ packId, tabId }: PackViewerProps) {
+export function PackViewer({ packId, tabId }: PackViewerProps) {
   const adapter = useMemo<ContainerAdapter>(
     () => ({
       type: 'pack',

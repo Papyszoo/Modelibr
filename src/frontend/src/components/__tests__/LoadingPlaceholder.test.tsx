@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { Canvas } from '@react-three/fiber'
-import LoadingPlaceholder from '@/components/LoadingPlaceholder'
+import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 
 // Mock @react-three/drei Text component
 jest.mock('@react-three/drei', () => ({

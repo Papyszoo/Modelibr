@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { memo, useState, useRef } from 'react'
 import { Card } from 'primereact/card'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
@@ -10,7 +10,7 @@ import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { useGenericFileUpload } from '@/shared/hooks/useGenericFileUpload'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import './TextureCard.css'
-import TexturePreview from './TexturePreview'
+import { TexturePreview } from './TexturePreview'
 
 interface TextureCardProps {
   textureType: TextureType
@@ -19,7 +19,7 @@ interface TextureCardProps {
   onTextureUpdated: () => void
 }
 
-function TextureCard({
+export const TextureCard = memo(function TextureCard({
   textureType,
   texture,
   setId,
@@ -399,6 +399,4 @@ function TextureCard({
       )}
     </>
   )
-}
-
-export default TextureCard
+})

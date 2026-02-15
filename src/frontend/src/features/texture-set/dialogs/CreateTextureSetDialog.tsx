@@ -17,7 +17,7 @@ interface CreateTextureSetDialogProps {
   onSubmit: (name: string) => Promise<void>
 }
 
-function CreateTextureSetDialog({
+export function CreateTextureSetDialog({
   visible,
   onHide,
   onSubmit,
@@ -121,4 +121,3 @@ function CreateTextureSetDialog({
   )
 }
 
-export default CreateTextureSetDialog

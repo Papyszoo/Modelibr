@@ -7,6 +7,13 @@ import axios, {
 export const baseURL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
+if (import.meta.env.DEV && !import.meta.env.VITE_API_BASE_URL) {
+  console.warn(
+    '[Modelibr] VITE_API_BASE_URL is not set. Falling back to http://localhost:8080. ' +
+      'Set this variable in your .env file for proper configuration.'
+  )
+}
+
 export const UPLOAD_TIMEOUT = 120000 // 2 minutes per file upload
 
 type ApiErrorBody = {

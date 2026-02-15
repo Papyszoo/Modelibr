@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { SoundDto } from '@/types'
 import { baseURL } from '@/lib/apiBase'
 import { getFileUrl } from '@/features/models/api/modelApi'
@@ -16,7 +16,7 @@ interface SoundCardProps {
   onDragEnd: () => void
 }
 
-function SoundCard({
+export const SoundCard = memo(function SoundCard({
   sound,
   isSelected,
   isDragging: _isDragging,
@@ -229,6 +229,4 @@ function SoundCard({
       </div>
     </div>
   )
-}
-
-export default SoundCard
+})

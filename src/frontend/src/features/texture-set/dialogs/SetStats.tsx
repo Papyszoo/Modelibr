@@ -4,7 +4,7 @@ interface SetStatsProps {
   textureSet: TextureSetDto
 }
 
-export default function SetStats({ textureSet }: SetStatsProps) {
+export function SetStats({ textureSet }: SetStatsProps) {
   return (
     <div className="set-stats">
       <span className="stat-item">

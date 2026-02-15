@@ -5,10 +5,10 @@ import type { Model } from '@/utils/fileUtils'
 import { TextureSetDto, TextureType } from '@/features/texture-set/types'
 import { getTextureTypeOptions } from '@/utils/textureTypeUtils'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
-import TextureTypeDropdown from './TextureTypeDropdown'
-import FileSelectionTable, { FileOption } from './FileSelectionTable'
-import NoTextureTypesWarning from './NoTextureTypesWarning'
-import AddTextureFooter from './AddTextureFooter'
+import { TextureTypeDropdown } from './TextureTypeDropdown'
+import { FileSelectionTable, FileOption } from './FileSelectionTable'
+import { NoTextureTypesWarning } from './NoTextureTypesWarning'
+import { AddTextureFooter } from './AddTextureFooter'
 import './dialogs.css'
 
 interface AddTextureToSetDialogProps {
@@ -18,7 +18,7 @@ interface AddTextureToSetDialogProps {
   onTextureAdded: () => void
 }
 
-function AddTextureToSetDialog({
+export function AddTextureToSetDialog({
   visible,
   textureSet,
   onHide,
@@ -166,4 +166,3 @@ function AddTextureToSetDialog({
   )
 }
 
-export default AddTextureToSetDialog

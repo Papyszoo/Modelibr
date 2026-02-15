@@ -120,7 +120,7 @@ function getTextureByChannel(
   return textures.find(t => t.sourceChannel === channel)
 }
 
-export default function FilesTab({
+export function FilesTab({
   textureSet,
   onMappingChanged,
 }: FilesTabProps) {

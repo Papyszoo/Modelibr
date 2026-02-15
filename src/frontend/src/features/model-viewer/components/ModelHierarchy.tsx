@@ -29,7 +29,7 @@ function convertToTreeNode(node: HierarchyNode): TreeNode {
   return treeNode
 }
 
-function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
+export function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
   const [selectedKeys, setSelectedKeys] = useState<{ [key: string]: boolean }>(
     {}
   )
@@ -165,4 +165,3 @@ function findNodeById(node: HierarchyNode, id: string): HierarchyNode | null {
   return null
 }
 
-export default ModelHierarchy

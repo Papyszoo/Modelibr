@@ -1,5 +1,5 @@
 import { NuqsAdapter } from 'nuqs/adapters/react'
-import SplitterLayout from './components/layout/SplitterLayout'
+import { SplitterLayout } from './components/layout/SplitterLayout'
 import { useGlobalDragPrevention } from './hooks/useGlobalDragPrevention'
 import { useTheme } from './hooks/useTheme'
 import { useThumbnailSignalR } from './features/thumbnail/hooks/useThumbnailSignalR'

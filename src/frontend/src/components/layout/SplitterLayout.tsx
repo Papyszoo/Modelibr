@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { DockProvider } from '@/contexts/DockContext'
-import DockPanel from './DockPanel'
+import { DockPanel } from './DockPanel'
 import { Tab, SplitterEvent } from '@/types'
 import { useNavigationStore, createTab } from '@/stores/navigationStore'
 import { useWindowInit } from '@/hooks/useWindowInit'
@@ -13,7 +13,7 @@ import {
 } from '@/utils/tabSerialization'
 import './SplitterLayout.css'
 
-function SplitterLayout(): JSX.Element {
+export function SplitterLayout(): JSX.Element {
   // ── Window identity & lifecycle ─────────────────────────────────────
   const windowId = useWindowInit()
   useDeepLinkHandler(windowId)
@@ -294,4 +294,3 @@ function SplitterLayout(): JSX.Element {
   )
 }
 
-export default SplitterLayout
