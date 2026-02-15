@@ -1,5 +1,5 @@
 import { Button } from 'primereact/button'
-import { ThumbnailDisplay } from '@/features/thumbnail'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { Model } from '@/utils/fileUtils'
 
 interface ThumbnailSidebarProps {
@@ -30,4 +30,3 @@ export function ThumbnailSidebar({
     </div>
   )
 }
-

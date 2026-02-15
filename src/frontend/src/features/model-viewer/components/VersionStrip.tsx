@@ -3,7 +3,7 @@ import { Button } from 'primereact/button'
 import { Model } from '@/utils/fileUtils'
 import { ModelVersionDto, VersionFileDto } from '@/types'
 import { getVersionFileUrl } from '@/features/model-viewer/api/modelVersionApi'
-import { useThumbnail } from '@/features/thumbnail'
+import { useThumbnail } from '@/shared/thumbnail'
 import './VersionStrip.css'
 
 // Import file format icons
@@ -96,7 +96,7 @@ export function VersionStrip({
       selectedVersion.id,
       file.id
     )
-    window.open(url, '_blank')
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleFileSelect = (file: VersionFileDto) => {
@@ -309,4 +309,3 @@ export function VersionStrip({
     </div>
   )
 }
-

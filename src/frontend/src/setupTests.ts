@@ -125,7 +125,7 @@ jest.mock('./services/ThumbnailSignalRService', () => ({
   ActiveVersionChangedEvent: {},
 }))
 
-jest.mock('@/features/thumbnail/hooks/useThumbnail', () => ({
+jest.mock('@/shared/thumbnail/hooks/useThumbnail', () => ({
   useThumbnail: () => ({
     status: 'ready',
     thumbnailUrl: 'http://localhost:8080/mock-thumbnail',

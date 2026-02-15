@@ -9,11 +9,11 @@ import {
   permanentlyDeleteEntity,
   restoreEntity,
 } from '@/features/recycled-files/api/recycledApi'
-import { getVersionThumbnailUrl } from '@/features/thumbnail/api/thumbnailApi'
+import { getVersionThumbnailUrl } from '@/shared/thumbnail/api/thumbnailApi'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRecycledFilesQuery } from '@/features/recycled-files/api/queries'
-import { ThumbnailDisplay } from '@/features/thumbnail'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { formatDuration } from '@/utils/audioUtils'

@@ -1,9 +1,9 @@
 import { NuqsAdapter } from 'nuqs/adapters/react'
-import { SplitterLayout } from './components/layout/SplitterLayout'
-import { useGlobalDragPrevention } from './hooks/useGlobalDragPrevention'
-import { useTheme } from './hooks/useTheme'
-import { useThumbnailSignalR } from './features/thumbnail/hooks/useThumbnailSignalR'
-import { UploadProgressWindow } from './shared/components'
+import { SplitterLayout } from '@/components/layout/SplitterLayout'
+import { useGlobalDragPrevention } from '@/hooks/useGlobalDragPrevention'
+import { useTheme } from '@/hooks/useTheme'
+import { useThumbnailSignalR } from '@/shared/thumbnail/hooks/useThumbnailSignalR'
+import { UploadProgressWindow } from '@/shared/components'
 import './App.css'
 
 function App(): JSX.Element {

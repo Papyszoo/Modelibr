@@ -23,7 +23,7 @@ import {
   setActiveVersion,
   softDeleteModelVersion,
 } from '@/features/model-viewer/api/modelVersionApi'
-import { regenerateThumbnail } from '@/features/thumbnail/api/thumbnailApi'
+import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import {
   useModelByIdQuery,
   useModelVersionsQuery,
@@ -31,7 +31,7 @@ import {
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { useModelThumbnailUpdates } from '@/features/thumbnail'
+import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import './ModelViewer.css'
 
 interface ModelViewerProps {
@@ -730,4 +730,3 @@ export function ModelViewer({
     </div>
   )
 }
-

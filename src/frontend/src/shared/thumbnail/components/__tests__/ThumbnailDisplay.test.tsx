@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { ThumbnailDisplay } from '@/features/thumbnail/components/ThumbnailDisplay'
+import { ThumbnailDisplay } from '@/shared/thumbnail/components/ThumbnailDisplay'
 
 // Mock the useThumbnail hook directly
 const mockUseThumbnail = jest.fn()

@@ -98,7 +98,7 @@ jest.mock('../ModelsFilters', () => ({
 }))
 
 // Mock ThumbnailDisplay
-jest.mock('../../../../thumbnail', () => ({
+jest.mock('@/shared/thumbnail', () => ({
   ThumbnailDisplay: () => <div data-testid="thumbnail" />,
 }))
 

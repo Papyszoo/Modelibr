@@ -4,7 +4,7 @@ import { Badge } from 'primereact/badge'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { ModelSummaryDto } from '@/types'
-import { ThumbnailDisplay } from '@/features/thumbnail'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { openTabInPanel } from '@/utils/tabNavigation'
 import './ModelsCardGrid.css'
 

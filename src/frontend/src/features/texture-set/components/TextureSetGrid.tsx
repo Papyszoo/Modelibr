@@ -224,10 +224,6 @@ export function TextureSetGrid({
       isShowingMergeDialog.current = true
       setDropTargetTextureSet(targetTextureSet)
       setShowMergeDialog(true)
-      console.log('Opening merge dialog', {
-        source: draggedTextureSet?.name,
-        target: targetTextureSet?.name,
-      })
     }
 
     setDragOverCardId(null)
