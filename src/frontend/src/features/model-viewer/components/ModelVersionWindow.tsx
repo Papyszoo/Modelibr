@@ -105,7 +105,7 @@ export function ModelVersionWindow({
       selectedVersion.id,
       fileId
     )
-    window.open(url, '_blank')
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleOpenInBlender = (fileId: number, _fileName: string) => {
@@ -311,4 +311,3 @@ export function ModelVersionWindow({
     </FloatingWindow>
   )
 }
-

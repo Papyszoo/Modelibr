@@ -157,7 +157,8 @@ export async function openInFileExplorer(
       // This typically works if the WebDAV share is already mapped
       window.open(
         `file:///${pathInfo.nativePath.replace(/\\/g, '/')}`,
-        '_blank'
+        '_blank',
+        'noopener,noreferrer'
       )
       return {
         success: true,
@@ -176,7 +177,7 @@ export async function openInFileExplorer(
     } else if (os === 'linux') {
       // Linux: Try xdg-open via a custom protocol handler
       // This requires the user to have set up a handler
-      window.open(pathInfo.nativePath, '_blank')
+      window.open(pathInfo.nativePath, '_blank', 'noopener,noreferrer')
       return {
         success: true,
         message:

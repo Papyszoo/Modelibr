@@ -1,4 +1,4 @@
-import { ThumbnailDisplay } from '@/features/thumbnail'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { Model } from '@/utils/fileUtils'
 import { ModelVersionDto } from '@/types'
@@ -51,4 +51,3 @@ export function ThumbnailWindow({
     </FloatingWindow>
   )
 }
-

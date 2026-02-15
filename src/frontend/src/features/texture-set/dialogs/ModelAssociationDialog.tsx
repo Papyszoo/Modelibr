@@ -9,7 +9,7 @@ import type { Model } from '@/utils/fileUtils'
 import { TextureSetDto, PackSummaryDto } from '@/features/texture-set/types'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import { getModelVersions } from '@/features/model-viewer/api/modelVersionApi'
-import { ThumbnailDisplay } from '@/features/thumbnail'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
 import './dialogs.css'
 
 interface ModelAssociationDialogProps {
@@ -384,4 +384,3 @@ function ModelCard({
     </div>
   )
 }
-

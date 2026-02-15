@@ -15,7 +15,7 @@ import { baseURL } from '@/lib/apiBase'
 // Feature API modules
 import * as modelApi from '@/features/models/api/modelApi'
 import * as modelVersionApi from '@/features/model-viewer/api/modelVersionApi'
-import * as thumbnailApi from '@/features/thumbnail/api/thumbnailApi'
+import * as thumbnailApi from '@/shared/thumbnail/api/thumbnailApi'
 import * as textureSetApi from '@/features/texture-set/api/textureSetApi'
 import * as packApi from '@/features/pack/api/packApi'
 import * as projectApi from '@/features/project/api/projectApi'
@@ -28,7 +28,7 @@ import * as settingsApi from '@/features/settings/api/settingsApi'
 
 // Re-export types that were previously defined here
 export type { UploadModelResponse } from '../features/models/api/modelApi'
-export type { ThumbnailStatus } from '../features/thumbnail/api/thumbnailApi'
+export type { ThumbnailStatus } from '../shared/thumbnail/api/thumbnailApi'
 
 class ApiClient {
   // Base

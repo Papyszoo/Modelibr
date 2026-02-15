@@ -53,7 +53,7 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
 
   const handleDownload = (version: ModelVersionDto, file: { id: number }) => {
     const url = getVersionFileUrl(modelId, version.id, file.id)
-    window.open(url, '_blank')
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleOpenInBlender = (
@@ -67,7 +67,7 @@ export const ModelVersionHistory: React.FC<ModelVersionHistoryProps> = ({
 
     // Also open download as fallback after a short delay
     setTimeout(() => {
-      window.open(url, '_blank')
+      window.open(url, '_blank', 'noopener,noreferrer')
     }, 500)
   }
 
