@@ -1,4 +1,5 @@
 import { Page, expect } from "@playwright/test";
+import { navigateToTab } from "../helpers/navigation-helper";
 
 /**
  * Page Object for the Upload History Page
@@ -12,16 +13,16 @@ export class UploadHistoryPage {
     private readonly historyToolbar = ".history-toolbar";
     private readonly historyHeader = ".history-toolbar h2";
     private readonly refreshButton = ".history-toolbar button";
-    
+
     // Loading state
     private readonly loadingIndicator = ".history-loading";
-    
+
     // Empty state
     private readonly emptyState = ".history-empty";
-    
+
     // History list
     private readonly historyList = ".history-list";
-    
+
     // Batch selectors
     private readonly historyBatch = ".history-batch";
     private readonly historyBatchHeader = ".history-batch-header";
@@ -29,7 +30,7 @@ export class UploadHistoryPage {
     private readonly historyBatchTimestamp = ".history-batch-timestamp";
     private readonly historyBatchToggle = ".history-batch-toggle";
     private readonly historyBatchItems = ".history-batch-items";
-    
+
     // Item selectors
     private readonly historyItem = ".history-item";
     private readonly historyItemName = ".history-item-name";
@@ -38,7 +39,7 @@ export class UploadHistoryPage {
     private readonly historyItemExtIcon = ".history-item-ext-icon";
     private readonly historyItemExtName = ".history-item-ext-name";
     private readonly historyItemTypeIcon = ".history-item-type-icon";
-    
+
     // Action buttons
     private readonly openModelButton = 'button[title="Open Model"]';
     private readonly openTextureSetButton = 'button[title="Open Texture Set"]';
@@ -46,12 +47,10 @@ export class UploadHistoryPage {
     private readonly openProjectButton = 'button[title="Open Project"]';
 
     /**
-     * Navigate to the Upload History page
+     * Navigate to the Upload History page via UI interaction
      */
     async goto(): Promise<void> {
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        // History is typically accessed via URL params
-        await this.page.goto(`${baseUrl}/?leftTabs=history&activeLeft=history`);
+        await navigateToTab(this.page, "history");
         await this.waitForHistoryLoaded();
     }
 
@@ -62,7 +61,7 @@ export class UploadHistoryPage {
         // Wait for loading to disappear or list/empty to appear
         await this.page.waitForSelector(
             `${this.historyList}, ${this.emptyState}`,
-            { state: "visible", timeout: 15000 }
+            { state: "visible", timeout: 15000 },
         );
     }
 
@@ -87,7 +86,7 @@ export class UploadHistoryPage {
         const button = this.page.locator(this.refreshButton);
         await button.click();
         // Wait for refresh to complete
-        await this.page.waitForTimeout(1000);
+        await this.waitForHistoryLoaded();
     }
 
     /**
@@ -231,7 +230,7 @@ export class UploadHistoryPage {
         await expect(button).toBeVisible();
         await button.click();
         // Wait for tab navigation
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**
@@ -250,7 +249,7 @@ export class UploadHistoryPage {
         const button = item.locator(this.openTextureSetButton);
         await expect(button).toBeVisible();
         await button.click();
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**
@@ -269,7 +268,7 @@ export class UploadHistoryPage {
         const button = item.locator(this.openPackButton);
         await expect(button).toBeVisible();
         await button.click();
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**

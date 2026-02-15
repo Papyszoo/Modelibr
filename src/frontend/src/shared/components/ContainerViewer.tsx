@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
 import { Dialog } from 'primereact/dialog'
@@ -12,6 +13,7 @@ import { ContainerAdapter, ContainerDto } from '@/shared/types/ContainerTypes'
 import { ModelGrid } from '@/features/models/components/ModelGrid'
 import { UploadableGrid } from '@/shared/components'
 import { useTabContext } from '@/hooks/useTabContext'
+import { useTabUiState } from '@/hooks/useTabUiState'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import {
   getAllTextureSets,
@@ -37,9 +39,12 @@ import './ContainerViewer.css'
 
 interface ContainerViewerProps {
   adapter: ContainerAdapter
+  tabId?: string
 }
 
-export function ContainerViewer({ adapter }: ContainerViewerProps) {
+export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
+  const queryClient = useQueryClient()
+  const containerQueryKey = adapter.type === 'pack' ? 'packs' : 'projects'
   const [container, setContainer] = useState<ContainerDto | null>(null)
   const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
   const [sprites, setSprites] = useState<SpriteDto[]>([])
@@ -85,8 +90,14 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
   const [soundPage, setSoundPage] = useState(1)
   const [soundTotalCount, setSoundTotalCount] = useState(0)
 
-  // Active tab
-  const [activeTabIndex, setActiveTabIndex] = useState(0)
+  // Active tab — persisted in Zustand if tabId is provided
+  const [persistedTabIndex, setPersistedTabIndex] = useTabUiState<number>(
+    tabId ?? `${adapter.type}-${adapter.containerId}`,
+    'activeTabIndex',
+    0
+  )
+  const activeTabIndex = persistedTabIndex
+  const setActiveTabIndex = setPersistedTabIndex
 
   const label = adapter.label
   const labelLower = label.toLowerCase()
@@ -250,6 +261,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       })
       loadTextureSets()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to remove texture set:', error)
       toast.current?.show({
@@ -272,6 +284,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       })
       loadSprites()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to remove sprite:', error)
       toast.current?.show({
@@ -294,6 +307,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       })
       loadSounds()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to remove sound:', error)
       toast.current?.show({
@@ -324,6 +338,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       setSelectedTextureSetIds([])
       loadTextureSets()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to add texture sets:', error)
       toast.current?.show({
@@ -354,6 +369,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       setSelectedSpriteIds([])
       loadSprites()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to add sprites:', error)
       toast.current?.show({
@@ -384,6 +400,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       setSelectedSoundIds([])
       loadSounds()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to add sounds:', error)
       toast.current?.show({
@@ -452,6 +469,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       })
       loadTextureSets()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to upload textures:', error)
       toast.current?.show({
@@ -531,6 +549,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       })
       loadSprites()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to upload sprites:', error)
       toast.current?.show({
@@ -627,6 +646,7 @@ export function ContainerViewer({ adapter }: ContainerViewerProps) {
       })
       loadSounds()
       loadContainer()
+      await queryClient.invalidateQueries({ queryKey: [containerQueryKey] })
     } catch (error) {
       console.error('Failed to upload sounds:', error)
       toast.current?.show({

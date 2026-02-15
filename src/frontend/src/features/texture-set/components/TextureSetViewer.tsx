@@ -57,6 +57,9 @@ function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
       }
       return updateTextureSet(textureSet.id, { name: newName })
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['textureSets'] })
+    },
   })
 
   const handleUpdateName = async (newName: string) => {

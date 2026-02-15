@@ -19,8 +19,9 @@ export class UploadProgressPage {
     private readonly uploadItemError = ".upload-item-error";
     private readonly openInTabButton = 'button[title="Open in new tab"]';
     private readonly removeButton = 'button[title="Remove"]';
-    private readonly clearCompletedButton = 'button:has-text("Clear Completed")';
-    
+    private readonly clearCompletedButton =
+        'button:has-text("Clear Completed")';
+
     // Batch selectors
     private readonly batchGroup = ".upload-batch";
     private readonly batchHeader = ".upload-batch-header";
@@ -56,11 +57,14 @@ export class UploadProgressPage {
     /**
      * Wait for an upload to complete by filename
      */
-    async waitForUploadComplete(filename: string, timeout: number = 30000): Promise<void> {
+    async waitForUploadComplete(
+        filename: string,
+        timeout: number = 30000,
+    ): Promise<void> {
         const item = this.page.locator(this.uploadItem).filter({
             has: this.page.locator(this.uploadItemName, { hasText: filename }),
         });
-        
+
         // Wait for the item to have "completed" status class
         await expect(item).toHaveClass(/upload-item-completed/, { timeout });
     }
@@ -119,8 +123,8 @@ export class UploadProgressPage {
         await item.hover();
         await expect(button).toBeVisible();
         await button.click();
-        // Wait for navigation/URL change
-        await this.page.waitForTimeout(500);
+        // Wait for navigation to complete
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**

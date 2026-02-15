@@ -1,27 +1,14 @@
 import { Page, expect } from "@playwright/test";
+import { navigateToAppClean } from "../helpers/navigation-helper";
 
 export class ModelListPage {
     constructor(private page: Page) {}
 
     async goto() {
-        // Clear local storage and force clean state
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await this.page.goto(baseUrl);
-        await this.page.evaluate(() => {
-            try {
-                localStorage.clear();
-                sessionStorage.clear();
-            } catch (e) {
-                // Ignore errors if storage not accessible
-            }
-        });
+        // Navigate with clean state — default tab is modelList
+        await navigateToAppClean(this.page);
 
-        // Now navigate to the desired state
-        await this.page.goto(
-            `${baseUrl}/?leftTabs=modelList&activeLeft=modelList`,
-        );
-
-        // Wait for the page to be fully loaded and check for model list specific elements
+        // Wait for the model list content to be visible
         await this.page.waitForSelector(
             ".model-card, .no-results, .empty-state",
             {
@@ -40,12 +27,8 @@ export class ModelListPage {
             timeout: 10000,
         });
 
-        // 2. Wait for network to settle
-        await this.page
-            .waitForLoadState("networkidle", { timeout: 15000 })
-            .catch(() => {
-                console.log("[Upload] Network idle timeout, proceeding anyway");
-            });
+        // 2. Wait for load state
+        await this.page.waitForLoadState("load", { timeout: 15000 });
 
         // 3. Ensure model grid is fully rendered
         await this.page

@@ -264,12 +264,14 @@ Given(
             await modelListPage.goto();
             await modelListPage.openModel(modelName);
 
-            // Store in shared state for future lookups
-            const url = page.url();
-            const match = url.match(/model-(\d+)/);
-            if (match) {
+            // Store in shared state for future lookups using navigation store
+            const { ModelViewerPage } =
+                await import("../pages/ModelViewerPage");
+            const modelViewer = new ModelViewerPage(page);
+            const modelId = await modelViewer.getCurrentModelId();
+            if (modelId) {
                 sharedState.saveModel(stateName, {
-                    id: parseInt(match[1], 10),
+                    id: modelId,
                     name: modelName,
                 });
             }
@@ -332,36 +334,20 @@ Given(
                 `[AutoProvision] Created model "${stateName}" (ID: ${model.id})`,
             );
 
-            // Wait for thumbnail processing
-            await page.waitForTimeout(3000);
+            // Thumbnail processing happens asynchronously;
+            // navigation below waits for UI elements independently
         }
 
         if (model?.id) {
             console.log(`[Navigation] Using ID ${model.id} for ${stateName}`);
-            const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
 
-            await page.goto(baseUrl);
-            await page.evaluate(() => {
-                try {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                } catch (e) {
-                    // Ignore
-                }
-            });
+            const { navigateToAppClean, openModelViewer } =
+                await import("../helpers/navigation-helper");
+            await navigateToAppClean(page);
+            await openModelViewer(page, model.name);
 
-            await page.goto(
-                `${baseUrl}/?leftTabs=modelList,model-${model.id}&activeLeft=model-${model.id}`,
-            );
-            await page.waitForSelector(
-                ".viewer-canvas canvas, .version-dropdown-trigger",
-                {
-                    state: "visible",
-                    timeout: 30000,
-                },
-            );
             console.log(
-                `[Navigation] Opened model ${model.id} (${model.name}) via direct URL`,
+                `[Navigation] Opened model ${model.id} (${model.name}) via UI click`,
             );
             return;
         }
@@ -375,26 +361,9 @@ Given(
         await modelListPage.goto();
         await modelListPage.openModel(model.name);
 
-        // Extract model ID from URL
-        const url = page.url();
-        const match = url.match(/model-(\d+)/);
-        if (match) {
-            const modelId = parseInt(match[1], 10);
-            console.log(`[Navigation] Captured ID ${modelId} for ${stateName}`);
-
-            // Update model with actual ID
-            model = { ...model, id: modelId };
-            sharedState.saveModel(stateName, model);
-
-            // Also save by original filename for backward compatibility
-            if (model.name && stateName !== model.name) {
-                sharedState.saveModel(model.name, model);
-            }
-        } else {
-            console.warn(
-                `[Navigation] Could not capture ID for ${stateName} after click`,
-            );
-        }
+        console.log(
+            `[Navigation] Opened model "${model.name}" via model list fallback`,
+        );
     },
 );
 
@@ -421,9 +390,6 @@ Then(
         const db = new DbHelper();
 
         // Poll database for thumbnail status (max 55 seconds to stay within 60s test timeout)
-        const maxAttempts = 11;
-        const pollInterval = 5000;
-        let thumbnailReady = false;
         let lastStatus: number | null = null;
         let lastModelName = "";
         let lastVersionId = 0;
@@ -446,92 +412,94 @@ Then(
             );
         }
 
-        for (let i = 0; i < maxAttempts && !thumbnailReady; i++) {
-            // Query for the specific version's thumbnail, or fall back to name-based or global query
-            let query: string;
-            let params: any[];
+        // Build the query once based on strategy
+        let query: string;
+        let params: any[];
 
-            if (hasVersionId) {
-                // Best case: we have the exact version ID
-                query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
-                         FROM "ModelVersions" mv
-                         JOIN "Models" m ON m."Id" = mv."ModelId"
-                         LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                         WHERE mv."Id" = $1`;
-                params = [uploadTracker.versionId];
-            } else if (hasModelName) {
-                // Fall back to finding most recent version with this name
-                query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
-                         FROM "ModelVersions" mv
-                         JOIN "Models" m ON m."Id" = mv."ModelId"
-                         LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                         WHERE m."DeletedAt" IS NULL AND m."Name" = $1
-                         ORDER BY mv."CreatedAt" DESC 
-                         LIMIT 1`;
-                params = [uploadTracker.modelName];
-            } else {
-                // Last resort: find the globally most recent version
-                query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
-                         FROM "ModelVersions" mv
-                         JOIN "Models" m ON m."Id" = mv."ModelId"
-                         LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                         WHERE m."DeletedAt" IS NULL
-                         ORDER BY mv."CreatedAt" DESC 
-                         LIMIT 1`;
-                params = [];
-            }
-
-            const result = await db.query(query, params);
-
-            if (result.rows.length > 0) {
-                const row = result.rows[0];
-                lastStatus = row.Status;
-                lastModelName = row.ModelName;
-                lastVersionId = row.VersionId;
-
-                if (row.Status === 2) {
-                    thumbnailReady = true;
-                    console.log(
-                        `[Thumbnail] Ready for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=2)`,
-                    );
-                } else if (row.Status === 3) {
-                    // Thumbnail generation failed - fail fast
-                    throw new Error(
-                        `Thumbnail generation FAILED for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId}. Check worker logs.`,
-                    );
-                } else {
-                    console.log(
-                        `[Thumbnail] Waiting for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=${row.Status ?? "null"})... attempt ${i + 1}/${maxAttempts}`,
-                    );
-                    await page.waitForTimeout(pollInterval);
-                }
-            } else {
-                console.log(
-                    `[Thumbnail] No model versions found, waiting... attempt ${i + 1}/${maxAttempts}`,
-                );
-                await page.waitForTimeout(pollInterval);
-            }
+        if (hasVersionId) {
+            query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
+                     FROM "ModelVersions" mv
+                     JOIN "Models" m ON m."Id" = mv."ModelId"
+                     LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                     WHERE mv."Id" = $1`;
+            params = [uploadTracker.versionId];
+        } else if (hasModelName) {
+            query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
+                     FROM "ModelVersions" mv
+                     JOIN "Models" m ON m."Id" = mv."ModelId"
+                     LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                     WHERE m."DeletedAt" IS NULL AND m."Name" = $1
+                     ORDER BY mv."CreatedAt" DESC
+                     LIMIT 1`;
+            params = [uploadTracker.modelName];
+        } else {
+            query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
+                     FROM "ModelVersions" mv
+                     JOIN "Models" m ON m."Id" = mv."ModelId"
+                     LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                     WHERE m."DeletedAt" IS NULL
+                     ORDER BY mv."CreatedAt" DESC
+                     LIMIT 1`;
+            params = [];
         }
 
-        if (!thumbnailReady) {
-            // Provide detailed error about what went wrong
-            const statusName =
-                lastStatus === null
-                    ? "null (no thumbnail)"
-                    : lastStatus === 0
-                      ? "Pending"
-                      : lastStatus === 1
-                        ? "Processing"
-                        : `Unknown (${lastStatus})`;
-            // Clear the tracking variables before throwing
-            uploadTracker.modelName = null;
-            uploadTracker.versionId = 0;
-            throw new Error(
-                `Thumbnail generation timed out after ${(maxAttempts * pollInterval) / 1000}s. ` +
-                    `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
-                    `Check if asset-processor-e2e container is healthy and processing jobs.`,
-            );
-        }
+        // Use expect.poll for idiomatic Playwright polling instead of manual loop with waitForTimeout
+        await expect
+            .poll(
+                async () => {
+                    const result = await db.query(query, params);
+
+                    if (result.rows.length > 0) {
+                        const row = result.rows[0];
+                        lastStatus = row.Status;
+                        lastModelName = row.ModelName;
+                        lastVersionId = row.VersionId;
+
+                        if (row.Status === 2) {
+                            console.log(
+                                `[Thumbnail] Ready for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=2)`,
+                            );
+                            return 2;
+                        } else if (row.Status === 3) {
+                            // Thumbnail generation failed - fail fast
+                            throw new Error(
+                                `Thumbnail generation FAILED for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId}. Check worker logs.`,
+                            );
+                        } else {
+                            console.log(
+                                `[Thumbnail] Waiting for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=${row.Status ?? "null"})...`,
+                            );
+                            return row.Status;
+                        }
+                    } else {
+                        console.log(
+                            `[Thumbnail] No model versions found, waiting...`,
+                        );
+                        return -1;
+                    }
+                },
+                {
+                    message: () => {
+                        const statusName =
+                            lastStatus === null
+                                ? "null (no thumbnail)"
+                                : lastStatus === 0
+                                  ? "Pending"
+                                  : lastStatus === 1
+                                    ? "Processing"
+                                    : `Unknown (${lastStatus})`;
+                        return (
+                            `Thumbnail generation timed out. ` +
+                            `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
+                            `Check if asset-processor-e2e container is healthy and processing jobs.`
+                        );
+                    },
+                    timeout: 55000,
+                    intervals: [5000],
+                },
+            )
+            .toBe(2);
+
         // Clear the tracking variables after successful check
         uploadTracker.modelName = null;
         uploadTracker.versionId = 0;
@@ -545,20 +513,28 @@ Then(
 Then(
     "the model should have {int} versions in shared state",
     async ({ page }, expectedCount: number) => {
-        const url = page.url();
-        const match = url.match(/model-(\d+)/);
+        const { ModelViewerPage } = await import("../pages/ModelViewerPage");
+        const modelViewer = new ModelViewerPage(page);
+        const modelId = await modelViewer.getCurrentModelId();
 
-        if (!match) {
-            throw new Error("Could not extract model ID from URL");
+        if (!modelId) {
+            throw new Error("Could not extract model ID from navigation store");
         }
 
-        const modelId = parseInt(match[1], 10);
-
-        // Query database for actual version count
+        // Query database for actual version count with polling (version creation may be async)
         const { DbHelper } = await import("../fixtures/db-helper");
         const db = new DbHelper();
         try {
-            const actualCount = await db.getModelVersionCount(modelId);
+            let actualCount = 0;
+            const maxAttempts = 15;
+            for (let i = 0; i < maxAttempts; i++) {
+                actualCount = await db.getModelVersionCount(modelId);
+                if (actualCount >= expectedCount) break;
+                console.log(
+                    `[DB] Model ${modelId} has ${actualCount} version(s), waiting for ${expectedCount}... (attempt ${i + 1}/${maxAttempts})`,
+                );
+                await page.waitForTimeout(2000);
+            }
             expect(actualCount).toBe(expectedCount);
             console.log(
                 `[DB] Model ${modelId} has ${actualCount} version(s) (expected: ${expectedCount}) ✓`,
@@ -617,32 +593,32 @@ Then("the version dropdown should be open", async ({ page }) => {
         const btn = closeButtons.nth(i);
         if (await btn.isVisible({ timeout: 500 })) {
             await btn.click();
-            await page.waitForTimeout(300);
+            await btn
+                .waitFor({ state: "hidden", timeout: 2000 })
+                .catch(() => {});
         }
     }
 
     // Also press Escape to close any dialogs
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(500);
-
-    // Wait for page to be stable (no loading spinners)
     await page
-        .waitForLoadState("networkidle", { timeout: 10000 })
+        .locator('.p-dialog, [role="dialog"]')
+        .waitFor({ state: "hidden", timeout: 2000 })
         .catch(() => {});
+
+    // Wait for page to be stable
+    await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
 
     // Wait for dropdown trigger to be visible with longer timeout
     const dropdownTrigger = page.locator(".version-dropdown-trigger");
     await dropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
 
-    // Small delay to ensure UI is stable
-    await page.waitForTimeout(300);
-
     // Click with retry logic
     try {
         await dropdownTrigger.click();
     } catch (e) {
-        console.log("[Screenshot] First click failed, retrying after delay...");
-        await page.waitForTimeout(500);
+        console.log("[Screenshot] First click failed, retrying...");
+        await dropdownTrigger.waitFor({ state: "visible", timeout: 2000 });
         await dropdownTrigger.click({ force: true });
     }
 
@@ -683,7 +659,7 @@ Then("the thumbnail should be visible in the model card", async ({ page }) => {
 
     // Navigate to model list to see the card
     await modelListPage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for any thumbnail image in a model card to be visible
     const thumbnailImg = page

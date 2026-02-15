@@ -1,4 +1,5 @@
 import { Page, expect } from "@playwright/test";
+import { navigateToTab } from "../helpers/navigation-helper";
 
 /**
  * Page Object for the Recycled Files Page (Recycle Bin)
@@ -37,13 +38,10 @@ export class RecycledFilesPage {
     private readonly cancelButton = ".p-dialog-footer .p-button-text";
 
     /**
-     * Navigate to the Recycled Files page
+     * Navigate to the Recycled Files page via UI interaction
      */
     async goto(): Promise<void> {
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await this.page.goto(
-            `${baseUrl}/?leftTabs=recycledFiles&activeLeft=recycledFiles`,
-        );
+        await navigateToTab(this.page, "recycledFiles");
         await this.waitForLoaded();
     }
 
@@ -56,8 +54,6 @@ export class RecycledFilesPage {
             `${this.recycledFilesList}:not(:has(${this.loading}))`,
             { state: "visible", timeout: 15000 },
         );
-        // Give UI time to settle
-        await this.page.waitForTimeout(500);
     }
 
     /**
@@ -125,8 +121,8 @@ export class RecycledFilesPage {
         const card = this.getModelCard(index);
         await card.hover();
         await card.locator(this.restoreButton).click();
-        // Wait for the action to complete
-        await this.page.waitForTimeout(1000);
+        // Wait for the card to disappear after restore
+        await card.waitFor({ state: "hidden", timeout: 10000 });
     }
 
     /**
@@ -170,7 +166,7 @@ export class RecycledFilesPage {
         const card = this.getModelVersionCard(index);
         await card.hover();
         await card.locator(this.restoreButton).click();
-        await this.page.waitForTimeout(1000);
+        await card.waitFor({ state: "hidden", timeout: 10000 });
     }
 
     /**
@@ -258,7 +254,7 @@ export class RecycledFilesPage {
         const card = this.getTextureSetCard(index);
         await card.hover();
         await card.locator(this.restoreButton).click();
-        await this.page.waitForTimeout(1000);
+        await card.waitFor({ state: "hidden", timeout: 10000 });
     }
 
     /**
@@ -309,8 +305,8 @@ export class RecycledFilesPage {
         const card = this.getSpriteCard(index);
         await card.hover();
         await card.locator(this.restoreButton).click();
-        // Wait for the action to complete
-        await this.page.waitForTimeout(1000);
+        // Wait for the card to disappear after restore
+        await card.waitFor({ state: "hidden", timeout: 10000 });
     }
 
     /**
@@ -343,7 +339,13 @@ export class RecycledFilesPage {
             state: "visible",
             timeout: 5000,
         });
-        await this.page.waitForTimeout(500); // Wait for content to populate
+        // Wait for file list items to populate
+        // Optional: file items may not have populated yet
+        await this.page
+            .locator(this.filesToDelete)
+            .first()
+            .waitFor({ state: "visible", timeout: 5000 })
+            .catch(() => {});
 
         const fileItems = this.page.locator(this.filesToDelete);
         const count = await fileItems.count();
@@ -437,7 +439,8 @@ export class RecycledFilesPage {
         }
 
         console.log("[Delete] Permanent delete confirmed successfully");
-        await this.page.waitForTimeout(1000);
+        // Wait for the page to reflect the deletion
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**

@@ -1,4 +1,4 @@
-export type { Tab, SplitterEvent } from '@/shared/types/ui'
+export type { Tab, TabType, SplitterEvent } from '@/shared/types/ui'
 export type {
   ApiError,
   PaginatedResponse,

@@ -2,7 +2,6 @@
 import {
   createContext,
   ReactNode,
-  useState,
   useContext,
   useRef,
   useEffect,
@@ -10,6 +9,7 @@ import {
 } from 'react'
 import { ContextMenu } from 'primereact/contextmenu'
 import { Tab } from '@/types'
+import { useNavigationStore } from '@/stores/navigationStore'
 
 interface DockContextValue {
   recentlyClosedTabs: Tab[]
@@ -38,18 +38,23 @@ interface DockProviderProps {
 }
 
 export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
-  const [recentlyClosedTabs, setRecentlyClosedTabs] = useState<Tab[]>([])
+  // Recently closed tabs are now in the Zustand navigation store
+  const recentlyClosedTabs = useNavigationStore(s => s.recentlyClosedTabs)
+  const addRecentlyClosedTabAction = useNavigationStore(
+    s => s.addRecentlyClosedTab
+  )
+  const removeRecentlyClosedTabAction = useNavigationStore(
+    s => s.removeRecentlyClosedTab
+  )
+
   const contextMenuRefs = useRef<Set<RefObject<ContextMenu>>>(new Set())
 
   const addRecentlyClosedTab = (tab: Tab): void => {
-    setRecentlyClosedTabs(prev => {
-      const updated = [tab, ...prev.filter(t => t.id !== tab.id)]
-      return updated.slice(0, 5) // Keep only last 5
-    })
+    addRecentlyClosedTabAction(tab)
   }
 
   const removeRecentlyClosedTab = (tabId: string): void => {
-    setRecentlyClosedTabs(prev => prev.filter(t => t.id !== tabId))
+    removeRecentlyClosedTabAction(tabId)
   }
 
   const registerContextMenu = (ref: RefObject<ContextMenu>): void => {

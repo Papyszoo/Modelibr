@@ -38,6 +38,8 @@ export const ModelList: Story = {
       id: 'model-list-1',
       type: 'modelList',
       label: 'Models',
+      params: {},
+      internalUiState: {},
     },
     isActive: false,
     side: 'left',
@@ -51,6 +53,8 @@ export const ModelViewer: Story = {
       id: 'model-viewer-1',
       type: 'modelViewer',
       modelId: 'model-123',
+      params: { modelId: 'model-123' },
+      internalUiState: {},
     },
     isActive: true,
     side: 'left',
@@ -64,6 +68,8 @@ export const TextureSets: Story = {
       id: 'texture-sets-1',
       type: 'textureSets',
       label: 'Texture Sets',
+      params: {},
+      internalUiState: {},
     },
     isActive: false,
     side: 'left',
@@ -78,6 +84,8 @@ export const TextureSetViewer: Story = {
       type: 'textureSetViewer',
       setId: 'set-123',
       label: 'Wood Texture Set',
+      params: { setId: 'set-123' },
+      internalUiState: {},
     },
     isActive: true,
     side: 'right',
@@ -91,6 +99,8 @@ export const Settings: Story = {
       id: 'settings-1',
       type: 'settings',
       label: 'Settings',
+      params: {},
+      internalUiState: {},
     },
     isActive: false,
     side: 'right',
@@ -99,29 +109,65 @@ export const Settings: Story = {
 }
 
 export const AllTabTypes: Story = {
+  args: {
+    tab: {
+      id: '1',
+      type: 'modelList',
+      label: 'Models',
+      params: {},
+      internalUiState: {},
+    },
+    isActive: false,
+    side: 'left',
+    ...defaultHandlers,
+  },
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <DraggableTab
-          tab={{ id: '1', type: 'modelList', label: 'Models' }}
+          tab={{
+            id: '1',
+            type: 'modelList',
+            label: 'Models',
+            params: {},
+            internalUiState: {},
+          }}
           isActive={false}
           side="left"
           {...defaultHandlers}
         />
         <DraggableTab
-          tab={{ id: '2', type: 'modelViewer', modelId: 'model-123' }}
+          tab={{
+            id: '2',
+            type: 'modelViewer',
+            modelId: 'model-123',
+            params: { modelId: 'model-123' },
+            internalUiState: {},
+          }}
           isActive={false}
           side="left"
           {...defaultHandlers}
         />
         <DraggableTab
-          tab={{ id: '3', type: 'texture', label: 'Textures' }}
+          tab={{
+            id: '3',
+            type: 'textureSets',
+            label: 'Textures',
+            params: {},
+            internalUiState: {},
+          }}
           isActive={false}
           side="left"
           {...defaultHandlers}
         />
         <DraggableTab
-          tab={{ id: '4', type: 'textureSets', label: 'Texture Sets' }}
+          tab={{
+            id: '4',
+            type: 'textureSets',
+            label: 'Texture Sets',
+            params: {},
+            internalUiState: {},
+          }}
           isActive={true}
           side="left"
           {...defaultHandlers}
@@ -132,19 +178,33 @@ export const AllTabTypes: Story = {
             type: 'textureSetViewer',
             setId: 'set-123',
             label: 'Wood Texture',
+            params: { setId: 'set-123' },
+            internalUiState: {},
           }}
           isActive={false}
           side="left"
           {...defaultHandlers}
         />
         <DraggableTab
-          tab={{ id: '6', type: 'animation', label: 'Animations' }}
+          tab={{
+            id: '6',
+            type: 'sprites',
+            label: 'Sprites',
+            params: {},
+            internalUiState: {},
+          }}
           isActive={false}
           side="left"
           {...defaultHandlers}
         />
         <DraggableTab
-          tab={{ id: '7', type: 'settings', label: 'Settings' }}
+          tab={{
+            id: '7',
+            type: 'settings',
+            label: 'Settings',
+            params: {},
+            internalUiState: {},
+          }}
           isActive={false}
           side="left"
           {...defaultHandlers}
@@ -162,7 +222,7 @@ export const AllTabTypes: Story = {
           <li>
             <strong>Texture Set Viewer: pi-images (NEW)</strong>
           </li>
-          <li>Animation: pi-play</li>
+          <li>Sprites: pi-play</li>
           <li>Settings: pi-cog</li>
         </ul>
       </div>

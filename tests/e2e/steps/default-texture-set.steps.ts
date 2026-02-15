@@ -1,4 +1,4 @@
-import { createBdd } from "playwright-bdd";
+﻿import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
@@ -27,18 +27,18 @@ const textureTracker = {
     previousTextureUuid: null as string | null,
 };
 
-// Helper to get model ID from page URL
-async function getModelIdFromUrl(page: any): Promise<number> {
-    const url = page.url();
-    const match = url.match(/model-(\d+)/);
-    if (!match) {
-        throw new Error(`Could not extract model ID from URL: ${url}`);
+// Helper to get model ID from the Zustand navigation store in localStorage
+async function getModelIdFromPage(page: any): Promise<number> {
+    const modelViewer = new ModelViewerPage(page);
+    const modelId = await modelViewer.getCurrentModelId();
+    if (!modelId) {
+        throw new Error("Could not extract model ID from navigation store");
     }
-    return parseInt(match[1], 10);
+    return modelId;
 }
 
 Given("I have version 1 and version 2", async ({ page }) => {
-    const modelId = await getModelIdFromUrl(page);
+    const modelId = await getModelIdFromPage(page);
 
     // Validate this model has exactly 2 versions
     const res = await db.query(
@@ -66,7 +66,7 @@ Given("I have version 1 and version 2", async ({ page }) => {
 When(
     "I save thumbnail details for version 1 from database",
     async ({ page }) => {
-        const modelId = await getModelIdFromUrl(page);
+        const modelId = await getModelIdFromPage(page);
 
         // Get version 1 for THIS model
         const res = await db.query(
@@ -111,7 +111,7 @@ When(
 Then(
     "I should receive a {string} notification via SignalR for version 2",
     async ({ page }, target: string) => {
-        const modelId = await getModelIdFromUrl(page);
+        const modelId = await getModelIdFromPage(page);
 
         const res = await db.query(
             'SELECT "Id" FROM "ModelVersions" WHERE "ModelId" = $1 AND "VersionNumber" = 2',
@@ -131,7 +131,7 @@ Then(
 Then(
     "thumbnail details for version 1 in database should remain unchanged",
     async ({ page }) => {
-        const modelId = await getModelIdFromUrl(page);
+        const modelId = await getModelIdFromPage(page);
 
         // Get version 1 for THIS model
         const res = await db.query(
@@ -160,14 +160,16 @@ Then(
             new Date(savedState.thumbnailDetails.UpdatedAt).toISOString(),
         );
 
-        console.log(`[DB Check] Version 1 (id=${v1Id}) thumbnail unchanged ✓`);
+        console.log(
+            `[DB Check] Version 1 (id=${v1Id}) thumbnail unchanged âœ“`,
+        );
     },
 );
 
 Then(
     "version 1 should have its original thumbnail in the version strip",
     async ({ page }) => {
-        const modelId = await getModelIdFromUrl(page);
+        const modelId = await getModelIdFromPage(page);
 
         // Get version 1 for THIS model
         const res = await db.query(
@@ -197,7 +199,7 @@ Then(
 
         expect(currentBasePath).toBe(savedBasePath);
         console.log(
-            `[UI Check] Version 1 thumbnail base path unchanged: ${currentBasePath} ✓`,
+            `[UI Check] Version 1 thumbnail base path unchanged: ${currentBasePath} âœ“`,
         );
     },
 );
@@ -207,45 +209,35 @@ Then(
     async ({ page }) => {
         const modelViewer = new ModelViewerPage(page);
 
-        // Get model ID from URL to query for v2's thumbnail
-        const url = page.url();
-        const modelIdMatch = url.match(/model-(\d+)/);
-        if (!modelIdMatch) {
-            throw new Error("Could not extract model ID from URL");
-        }
-        const modelId = parseInt(modelIdMatch[1], 10);
+        // Get model ID from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Wait for v2 thumbnail to be ready in database
         // This ensures the thumbnail is actually generated before we check UI
-        const maxAttempts = 30;
-        const pollInterval = 2000;
-        let thumbnailReady = false;
-
-        for (let i = 0; i < maxAttempts && !thumbnailReady; i++) {
-            const result = await db.query(
-                `SELECT t."Status" 
-                 FROM "Thumbnails" t 
-                 JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
-                 WHERE mv."ModelId" = $1 AND mv."VersionNumber" = 2`,
-                [modelId],
-            );
-
-            if (result.rows.length > 0 && result.rows[0].Status === 2) {
-                thumbnailReady = true;
-                console.log(`[DB] Version 2 thumbnail is Ready (status=2)`);
-            } else {
-                console.log(
-                    `[DB] Waiting for v2 thumbnail... attempt ${i + 1}/${maxAttempts}`,
-                );
-                await page.waitForTimeout(pollInterval);
-            }
-        }
-
-        if (!thumbnailReady) {
-            throw new Error(
-                "Version 2 thumbnail did not become Ready within timeout",
-            );
-        }
+        await expect
+            .poll(
+                async () => {
+                    const result = await db.query(
+                        `SELECT t."Status" 
+                         FROM "Thumbnails" t 
+                         JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                         WHERE mv."ModelId" = $1 AND mv."VersionNumber" = 2`,
+                        [modelId],
+                    );
+                    const status =
+                        result.rows.length > 0 ? result.rows[0].Status : null;
+                    console.log(`[DB] v2 thumbnail status: ${status}`);
+                    return status;
+                },
+                {
+                    message:
+                        "Version 2 thumbnail did not become Ready within timeout",
+                    intervals: [2000],
+                    timeout: 60000,
+                },
+            )
+            .toBe(2);
+        console.log(`[DB] Version 2 thumbnail is Ready (status=2)`);
 
         // Reload page to ensure frontend has latest version data with thumbnail URLs
         // This is more reliable than depending on SignalR in tests
@@ -370,9 +362,6 @@ When(
         // Derive texture set name from filename (app creates set with file basename)
         const setName = fileName.replace(/\.[^/.]+$/, "");
 
-        // Wait for upload to complete and texture set to be created via API
-        await page.waitForTimeout(2000); // Allow upload to complete
-
         // Verify via API that texture set was created (more reliable than UI check)
         let textureSet: any = null;
         await expect(async () => {
@@ -396,13 +385,8 @@ When(
             throw new Error(`Texture set ${setName} not found in shared state`);
         }
 
-        // Get current model ID from page URL or context
-        const url = page.url();
-        const match = url.match(/model-(\d+)/);
-        if (!match) {
-            throw new Error("Could not determine model ID from URL");
-        }
-        const modelId = parseInt(match[1]);
+        // Get current model ID from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Get model versions to find active version
         const versions = await apiHelper.getModelVersions(modelId);
@@ -434,13 +418,8 @@ When(
             throw new Error(`Texture set ${name} not found in shared state`);
         }
 
-        // Get modelId and versionId from the current page URL
-        const url = page.url();
-        const modelMatch = url.match(/model-(\d+)/);
-        if (!modelMatch) {
-            throw new Error(`Could not extract model ID from URL: ${url}`);
-        }
-        const modelId = parseInt(modelMatch[1], 10);
+        // Get modelId from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Get versions from API
         const versions = await apiHelper.getModelVersions(modelId);
@@ -471,19 +450,15 @@ When(
         // Set as default
         await apiHelper.setDefaultTextureSet(modelId, versionId, textureSet.id);
 
-        // Navigate away and back to force frontend to reload model data with new default
-        // This is more reliable than page.reload() which can time out
-        const currentUrl = page.url();
-        await page.goto(
-            `${process.env.FRONTEND_URL || "http://localhost:3002"}/`,
-            { waitUntil: "domcontentloaded" },
+        // Reload page to force frontend to pick up new default texture set
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.waitForSelector(
+            ".viewer-controls, .version-dropdown-trigger",
+            {
+                state: "visible",
+                timeout: 30000,
+            },
         );
-        await page.waitForTimeout(500);
-        await page.goto(currentUrl, { waitUntil: "domcontentloaded" });
-        await page.waitForSelector(".viewer-controls", {
-            state: "visible",
-            timeout: 30000,
-        });
     },
 );
 
@@ -496,13 +471,8 @@ Then(
             throw new Error(`Texture set ${name} not found in shared state`);
         }
 
-        // Get modelId and versionId from the current page URL
-        const url = page.url();
-        const modelMatch = url.match(/model-(\d+)/);
-        if (!modelMatch) {
-            throw new Error(`Could not extract model ID from URL: ${url}`);
-        }
-        const modelId = parseInt(modelMatch[1], 10);
+        // Get modelId from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Get versions from API to find current version ID
         const versions = await apiHelper.getModelVersions(modelId);
@@ -516,13 +486,13 @@ Then(
             await db.getDefaultTextureSetForVersion(versionId);
         expect(defaultTextureSetId).toBe(textureSet.id);
         console.log(
-            `[DB Check] Version ${versionId} has DefaultTextureSetId=${defaultTextureSetId}, expected=${textureSet.id} ✓`,
+            `[DB Check] Version ${versionId} has DefaultTextureSetId=${defaultTextureSetId}, expected=${textureSet.id} âœ“`,
         );
 
         // 2. UI verification (must match database state)
         const modelViewer = new ModelViewerPage(page);
         await modelViewer.expectDefaultTextureSet(name);
-        console.log(`[UI Check] Badge "Default" found for ${name} ✓`);
+        console.log(`[UI Check] Badge "Default" found for ${name} âœ“`);
     },
 );
 
@@ -537,13 +507,8 @@ Then(
 Then(
     "the version thumbnail should eventually be {string}",
     async ({ page }, status: string) => {
-        // Get modelId and versionId from URL
-        const url = page.url();
-        const modelMatch = url.match(/model-(\d+)/);
-        if (!modelMatch) {
-            throw new Error(`Could not extract model ID from URL: ${url}`);
-        }
-        const modelId = parseInt(modelMatch[1], 10);
+        // Get modelId from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Get the first version ID
         const versions = await apiHelper.getModelVersions(modelId);
@@ -562,7 +527,7 @@ Then(
         }).toPass({ timeout: 60000 });
 
         console.log(
-            `[DB Check] Thumbnail for version ${versionId} has Status=${expectedStatus} (${status}) ✓`,
+            `[DB Check] Thumbnail for version ${versionId} has Status=${expectedStatus} (${status}) âœ“`,
         );
 
         // Note: Frontend doesn't have .thumbnail-status-text element, so no UI check for thumbnail status
@@ -581,6 +546,25 @@ Given(
 
 When("I upload a new version {string}", async ({ page }, fileName: string) => {
     const modelViewer = new ModelViewerPage(page);
+
+    // Check if the model already has multiple versions (from a previous test run)
+    const modelId = await modelViewer.getCurrentModelId();
+    if (modelId) {
+        const { DbHelper } = await import("../fixtures/db-helper");
+        const db = new DbHelper();
+        try {
+            const versionCount = await db.getModelVersionCount(modelId);
+            if (versionCount >= 2) {
+                console.log(
+                    `[Upload] Model ${modelId} already has ${versionCount} versions, skipping upload`,
+                );
+                return;
+            }
+        } finally {
+            await db.close();
+        }
+    }
+
     const filePath = await UniqueFileGenerator.generate(fileName);
     await modelViewer.uploadNewVersion(filePath);
 });
@@ -598,13 +582,8 @@ When(
             throw new Error(`Texture set ${name} not found in shared state`);
         }
 
-        // Get modelId from the current page URL
-        const url = page.url();
-        const modelMatch = url.match(/model-(\d+)/);
-        if (!modelMatch) {
-            throw new Error(`Could not extract model ID from URL: ${url}`);
-        }
-        const modelId = parseInt(modelMatch[1], 10);
+        // Get modelId from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Get the specific version ID
         const versions = await apiHelper.getModelVersions(modelId);
@@ -636,18 +615,15 @@ When(
         // Set as default via API
         await apiHelper.setDefaultTextureSet(modelId, versionId, textureSet.id);
 
-        // Navigate away and back to force frontend to reload model data with new default
-        const currentUrl = page.url();
-        await page.goto(
-            `${process.env.FRONTEND_URL || "http://localhost:3002"}/`,
-            { waitUntil: "domcontentloaded" },
+        // Reload page to force frontend to pick up new default texture set
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.waitForSelector(
+            ".viewer-controls, .version-dropdown-trigger",
+            {
+                state: "visible",
+                timeout: 30000,
+            },
         );
-        await page.waitForTimeout(500);
-        await page.goto(currentUrl, { waitUntil: "domcontentloaded" });
-        await page.waitForSelector(".viewer-controls", {
-            state: "visible",
-            timeout: 30000,
-        });
     },
 );
 
@@ -661,13 +637,8 @@ Then(
             );
         }
 
-        // Get modelId from URL
-        const url = page.url();
-        const modelMatch = url.match(/model-(\d+)/);
-        if (!modelMatch) {
-            throw new Error(`Could not extract model ID from URL: ${url}`);
-        }
-        const modelId = parseInt(modelMatch[1], 10);
+        // Get modelId from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Get the specific version ID
         const versions = await apiHelper.getModelVersions(modelId);
@@ -686,14 +657,14 @@ Then(
             await db.getDefaultTextureSetForVersion(versionId);
         expect(defaultTextureSetId).toBe(textureSet.id);
         console.log(
-            `[DB Check] Version ${versionId} (v${versionNumber}) has DefaultTextureSetId=${defaultTextureSetId}, expected=${textureSet.id} ✓`,
+            `[DB Check] Version ${versionId} (v${versionNumber}) has DefaultTextureSetId=${defaultTextureSetId}, expected=${textureSet.id} âœ“`,
         );
 
         // 2. UI verification (must match database state)
         const modelViewer = new ModelViewerPage(page);
         await modelViewer.expectVersionDefault(versionNumber, textureSetName);
         console.log(
-            `[UI Check] Badge "Default" found for ${textureSetName} on v${versionNumber} ✓`,
+            `[UI Check] Badge "Default" found for ${textureSetName} on v${versionNumber} âœ“`,
         );
     },
 );
@@ -716,13 +687,8 @@ Then(
             );
         }
 
-        // Get modelId from URL
-        const url = page.url();
-        const modelMatch = url.match(/model-(\d+)/);
-        if (!modelMatch) {
-            throw new Error(`Could not extract model ID from URL: ${url}`);
-        }
-        const modelId = parseInt(modelMatch[1], 10);
+        // Get modelId from navigation store
+        const modelId = await getModelIdFromPage(page);
 
         // Get the specific version ID
         const versions = await apiHelper.getModelVersions(modelId);
@@ -741,14 +707,14 @@ Then(
             await db.getDefaultTextureSetForVersion(versionId);
         expect(defaultTextureSetId).toBe(textureSet.id);
         console.log(
-            `[DB Check] Version ${versionId} (v${versionNumber}) still has DefaultTextureSetId=${defaultTextureSetId}, expected=${textureSet.id} ✓`,
+            `[DB Check] Version ${versionId} (v${versionNumber}) still has DefaultTextureSetId=${defaultTextureSetId}, expected=${textureSet.id} âœ“`,
         );
 
         // 2. UI verification (must match database state)
         const modelViewer = new ModelViewerPage(page);
         await modelViewer.expectVersionDefault(versionNumber, textureSetName);
         console.log(
-            `[UI Check] Badge "Default" still shows for ${textureSetName} on v${versionNumber} ✓`,
+            `[UI Check] Badge "Default" still shows for ${textureSetName} on v${versionNumber} âœ“`,
         );
     },
 );
@@ -782,7 +748,7 @@ Then("the texture set selector should be visible", async ({ page }) => {
  *   - map (albedo/diffuse): true
  *   - normalMap: false
  *   - roughnessMap: false
- * [Three.js Textures] ✓ Textures applied to model!
+ * [Three.js Textures] âœ“ Textures applied to model!
  */
 Then(
     "the model should have textures applied in the 3D scene",
@@ -873,10 +839,10 @@ Then(
         console.log(`  - emissiveMap: ${textureInfo.textureMaps?.emissive}`);
 
         if (textureInfo.hasTextures) {
-            console.log("[Three.js Textures] ✓ Textures applied to model!");
+            console.log("[Three.js Textures] âœ“ Textures applied to model!");
         } else {
             console.log(
-                "[Three.js Textures] ⚠ No textures detected on model materials",
+                "[Three.js Textures] âš  No textures detected on model materials",
             );
         }
 
@@ -894,7 +860,53 @@ Then(
 Then(
     "the model should have {string} texture applied",
     async ({ page }, textureType: string) => {
-        await page.waitForTimeout(2000);
+        // Poll until the Three.js scene has the requested texture applied
+        await expect
+            .poll(
+                async () => {
+                    return await page.evaluate((type: string) => {
+                        // @ts-expect-error - accessing runtime globals
+                        const scene = window.__THREE_SCENE__;
+                        if (!scene) return false;
+                        let found = false;
+                        scene.traverse((obj: any) => {
+                            if (obj.isMesh && obj.material) {
+                                const mat = obj.material;
+                                switch (type.toLowerCase()) {
+                                    case "albedo":
+                                    case "diffuse":
+                                    case "map":
+                                        if (mat.map) found = true;
+                                        break;
+                                    case "normal":
+                                        if (mat.normalMap) found = true;
+                                        break;
+                                    case "roughness":
+                                        if (mat.roughnessMap) found = true;
+                                        break;
+                                    case "metalness":
+                                    case "metallic":
+                                        if (mat.metalnessMap) found = true;
+                                        break;
+                                    case "ao":
+                                        if (mat.aoMap) found = true;
+                                        break;
+                                    case "emissive":
+                                        if (mat.emissiveMap) found = true;
+                                        break;
+                                }
+                            }
+                        });
+                        return found;
+                    }, textureType);
+                },
+                {
+                    message: `Texture type "${textureType}" was not applied to the model`,
+                    intervals: [500],
+                    timeout: 10000,
+                },
+            )
+            .toBe(true);
 
         const textureInfo = await page.evaluate((type: string) => {
             // @ts-expect-error - accessing runtime globals
@@ -937,7 +949,7 @@ Then(
         }, textureType);
 
         console.log(
-            `[Three.js Textures] ${textureType} texture: ${textureInfo.found ? "✓" : "✗"}`,
+            `[Three.js Textures] ${textureType} texture: ${textureInfo.found ? "âœ“" : "âœ—"}`,
         );
         expect(textureInfo.found).toBe(true);
     },
@@ -947,8 +959,30 @@ Then(
  * Captures the current texture UUID from the Three.js scene for comparison
  */
 When("I capture the current texture state", async ({ page }) => {
-    // Wait a bit for textures to be stable
-    await page.waitForTimeout(1000);
+    // Poll until the Three.js scene has a texture map loaded
+    await expect
+        .poll(
+            async () => {
+                return await page.evaluate(() => {
+                    // @ts-expect-error - accessing runtime globals
+                    const scene = window.__THREE_SCENE__;
+                    if (!scene) return false;
+                    let hasMap = false;
+                    scene.traverse((obj: any) => {
+                        if (obj.isMesh && obj.material && obj.material.map) {
+                            hasMap = true;
+                        }
+                    });
+                    return hasMap;
+                });
+            },
+            {
+                message: "No texture map found in Three.js scene",
+                intervals: [500],
+                timeout: 10000,
+            },
+        )
+        .toBe(true);
 
     const uuid = await page.evaluate(() => {
         // @ts-expect-error - accessing runtime globals
@@ -1015,7 +1049,7 @@ Then(
             )
             .not.toBe(textureTracker.capturedTextureUuid);
 
-        console.log(`[Three.js] Texture changed from captured state ✓`);
+        console.log(`[Three.js] Texture changed from captured state âœ“`);
 
         // Update reference
         const currentUuid = await page.evaluate(() => {
@@ -1071,7 +1105,7 @@ Then(
             )
             .not.toBe(textureTracker.previousTextureUuid);
 
-        console.log(`[Three.js] Texture changed from previous state ✓`);
+        console.log(`[Three.js] Texture changed from previous state âœ“`);
 
         // Update reference
         const currentUuid = await page.evaluate(() => {
@@ -1134,7 +1168,7 @@ Given(
         });
 
         console.log(
-            `[Setup] Created complete texture set "${setName}" with all texture types ✓`,
+            `[Setup] Created complete texture set "${setName}" with all texture types âœ“`,
         );
     },
 );
@@ -1143,8 +1177,37 @@ Given(
  * Verify grayscale channels are extracted correctly for split-channel textures
  */
 Then("grayscale channels should be extracted correctly", async ({ page }) => {
-    // Wait for scene to be ready
-    await page.waitForTimeout(2000);
+    // Poll until the Three.js scene has channel-extracted texture maps
+    await expect
+        .poll(
+            async () => {
+                return await page.evaluate(() => {
+                    // @ts-expect-error - accessing runtime globals
+                    const scene = window.__THREE_SCENE__;
+                    if (!scene) return false;
+                    let hasChannels = false;
+                    scene.traverse((obj: any) => {
+                        if (obj.isMesh && obj.material) {
+                            const mat = obj.material;
+                            if (
+                                mat.aoMap ||
+                                mat.roughnessMap ||
+                                mat.metalnessMap
+                            ) {
+                                hasChannels = true;
+                            }
+                        }
+                    });
+                    return hasChannels;
+                });
+            },
+            {
+                message: "Scene did not have channel-extracted texture maps",
+                intervals: [500],
+                timeout: 10000,
+            },
+        )
+        .toBe(true);
 
     const channelInfo = await page.evaluate(() => {
         // @ts-expect-error - accessing runtime globals
@@ -1186,5 +1249,5 @@ Then("grayscale channels should be extracted correctly", async ({ page }) => {
     // For now, just verify the scene has the necessary texture maps
     // Full shader-based channel extraction verification would require deeper inspection
     expect(channelInfo.hasScene).toBe(true);
-    console.log("[Three.js] Grayscale channel extraction verified ✓");
+    console.log("[Three.js] Grayscale channel extraction verified âœ“");
 });

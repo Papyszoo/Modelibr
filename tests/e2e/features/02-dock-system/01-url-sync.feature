@@ -1,5 +1,5 @@
 @depends-on:setup
-Feature: Tab URL Synchronization
+Feature: Tab State Management
 
   Background:
     Given the following models exist in shared state:
@@ -7,13 +7,15 @@ Feature: Tab URL Synchronization
       | single-version-model |
       | multi-version-model  |
 
-  Scenario: Model tabs are added to URL when opening
+  Scenario: Model viewer tab appears when opening a model
     Given I am on the model list page
     When I click on the model "single-version-model" to open it
-    Then the URL should contain "model-"
-    And the URL should contain "activeLeft=model-"
+    Then a model viewer tab should be visible in the dock bar
+    And the model viewer should be visible
     And I take a screenshot of the dock with model tab
 
-  Scenario: URL with duplicate tabs gets deduplicated on load
-    Given I navigate directly to URL with duplicate tabs "leftTabs=modelList,textureSets,textureSets,textureSets&activeLeft=textureSets"
-    Then the URL should not contain duplicate tab IDs
+  Scenario: Opening a tab via the add-tab menu shows the tab content
+    Given I am on the model list page
+    When I open the Texture Sets tab in the left panel
+    Then the Texture Sets content should be visible
+    And a Texture Sets tab should be visible in the dock bar

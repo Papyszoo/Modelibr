@@ -1,11 +1,11 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { sharedState } from "../fixtures/shared-state";
+import { navigateToAppClean } from "../helpers/navigation-helper";
 
 const { Given, When, Then } = createBdd();
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3002";
 
 // ============= Filter Steps =============
 
@@ -22,7 +22,9 @@ When(
             .locator(".filter-bar .p-multiselect")
             .first();
         await packsMultiselect.click();
-        await page.waitForTimeout(300);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "visible", timeout: 5000 });
 
         // Select the pack option in the dropdown panel
         const packOption = page.locator(
@@ -32,12 +34,18 @@ When(
 
         // Close the dropdown by pressing Escape
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(500);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "hidden", timeout: 5000 });
 
         // Wait for filtered results to load
-        await page.waitForLoadState("networkidle");
-        await page.waitForTimeout(500);
+        await page.waitForLoadState("domcontentloaded");
 
+        // Assert filter was applied - check for filter token/chip
+        const packFilterToken = page.locator(
+            ".filter-bar .p-multiselect-token",
+        );
+        await expect(packFilterToken.first()).toBeVisible({ timeout: 5000 });
         console.log(`[Action] Filtered model list by pack "${packName}"`);
     },
 );
@@ -58,7 +66,9 @@ When(
             '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
         );
         await projectsMultiselect.click();
-        await page.waitForTimeout(300);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "visible", timeout: 5000 });
 
         // Select the project option in the dropdown panel
         const projectOption = page.locator(
@@ -68,7 +78,15 @@ When(
 
         // Close the dropdown by pressing Escape
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(500);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "hidden", timeout: 5000 });
+
+        // Assert filter was applied - check for filter token/chip
+        const projectFilterToken = page.locator(
+            ".filter-bar .p-multiselect-token",
+        );
+        await expect(projectFilterToken.first()).toBeVisible({ timeout: 5000 });
         console.log(`[Action] Filtered model list by project "${projectName}"`);
     },
 );
@@ -78,7 +96,11 @@ When("I clear the model list filter", async ({ page }) => {
     const clearButton = page.locator(".clear-filters-btn");
     if (await clearButton.isVisible()) {
         await clearButton.click();
-        await page.waitForLoadState("networkidle");
+        await page.waitForLoadState("domcontentloaded");
+        const remainingTokens1 = page.locator(
+            ".filter-bar .p-multiselect-token",
+        );
+        expect(await remainingTokens1.count()).toBe(0);
         console.log("[Action] Cleared model list filter via clear button");
     } else {
         // If no clear button, clear individual multiselects
@@ -96,7 +118,11 @@ When("I clear the model list filter", async ({ page }) => {
         if (await projectsClear.isVisible()) {
             await projectsClear.click();
         }
-        await page.waitForLoadState("networkidle");
+        await page.waitForLoadState("domcontentloaded");
+        const remainingTokens2 = page.locator(
+            ".filter-bar .p-multiselect-token",
+        );
+        expect(await remainingTokens2.count()).toBe(0);
         console.log("[Action] Cleared model list filter");
     }
 });
@@ -123,6 +149,8 @@ Given(
             `${API_BASE}/packs/${pack.id}/models/${model.id}`,
         );
 
+        // Assert response is either success or "already in pack" (400)
+        expect(response.ok() || response.status() === 400).toBeTruthy();
         if (response.ok()) {
             console.log(
                 `[Precondition] Model "${model.name}" (ID: ${model.id}) added to pack "${packName}" (ID: ${pack.id})`,
@@ -134,11 +162,8 @@ Given(
         }
 
         // Navigate to model list page to ensure UI shows updated data
-        await page.goto(
-            `${FRONTEND_URL}/?leftTabs=modelList&activeLeft=modelList`,
-        );
-        await page.waitForLoadState("networkidle");
-        await page.waitForTimeout(500);
+        await navigateToAppClean(page);
+        await page.waitForLoadState("domcontentloaded");
     },
 );
 
@@ -164,6 +189,8 @@ Given(
             `${API_BASE}/projects/${project.id}/models/${model.id}`,
         );
 
+        // Assert response is either success or "already in project" (400)
+        expect(response.ok() || response.status() === 400).toBeTruthy();
         if (response.ok()) {
             console.log(
                 `[Precondition] Model "${model.name}" (ID: ${model.id}) added to project "${projectName}" (ID: ${project.id})`,
@@ -175,11 +202,8 @@ Given(
         }
 
         // Navigate to model list page to ensure UI shows updated data
-        await page.goto(
-            `${FRONTEND_URL}/?leftTabs=modelList&activeLeft=modelList`,
-        );
-        await page.waitForLoadState("networkidle");
-        await page.waitForTimeout(500);
+        await navigateToAppClean(page);
+        await page.waitForLoadState("domcontentloaded");
     },
 );
 
@@ -196,7 +220,9 @@ Given(
             .locator(".filter-bar .p-multiselect")
             .first();
         await packsMultiselect.click();
-        await page.waitForTimeout(300);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "visible", timeout: 5000 });
 
         const packOption = page.locator(
             `.p-multiselect-panel .p-multiselect-item:has-text("${packName}")`,
@@ -204,7 +230,13 @@ Given(
         await packOption.click();
 
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(500);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "hidden", timeout: 5000 });
+
+        // Assert filter chip is visible
+        const packChip = page.locator(".filter-bar .p-multiselect-token");
+        await expect(packChip.first()).toBeVisible({ timeout: 5000 });
         console.log(`[Precondition] Model list filtered by pack "${packName}"`);
     },
 );
@@ -224,7 +256,9 @@ Given(
             '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
         );
         await projectsMultiselect.click();
-        await page.waitForTimeout(300);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "visible", timeout: 5000 });
 
         const projectOption = page.locator(
             `.p-multiselect-panel .p-multiselect-item:has-text("${projectName}")`,
@@ -232,7 +266,13 @@ Given(
         await projectOption.click();
 
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(500);
+        await page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "hidden", timeout: 5000 });
+
+        // Assert filter chip is visible
+        const projectChip = page.locator(".filter-bar .p-multiselect-token");
+        await expect(projectChip.first()).toBeVisible({ timeout: 5000 });
         console.log(
             `[Precondition] Model list filtered by project "${projectName}"`,
         );
@@ -267,7 +307,7 @@ Then(
 
 Then("the model list should show all models", async ({ page }) => {
     // Wait for the model list to load
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Verify no filter chips are visible (filters are cleared)
     const filterChips = page.locator(".filter-bar .p-multiselect-token");
@@ -296,6 +336,44 @@ const __dirname_local = path.dirname(__filename_local);
 Given(
     "I create a test pack named {string} via API",
     async ({ page }, packName: string) => {
+        // Check if pack already exists (idempotent)
+        const listResponse = await page.request.get(`${API_BASE}/packs`);
+        if (listResponse.ok()) {
+            const listData = await listResponse.json();
+            const existing = (listData.packs || []).find(
+                (p: any) => p.name === packName,
+            );
+            if (existing) {
+                // Clean up stale sprites from previous runs
+                const detailRes = await page.request.get(
+                    `${API_BASE}/packs/${existing.id}`,
+                );
+                if (detailRes.ok()) {
+                    const detail = await detailRes.json();
+                    for (const sprite of detail.sprites || []) {
+                        await page.request
+                            .delete(
+                                `${API_BASE}/packs/${existing.id}/sprites/${sprite.id}`,
+                            )
+                            .catch(() => {});
+                    }
+                    if ((detail.sprites || []).length > 0) {
+                        console.log(
+                            `[API] Cleaned ${detail.sprites.length} stale sprite(s) from pack "${packName}"`,
+                        );
+                    }
+                }
+                sharedState.savePack(packName, {
+                    id: existing.id,
+                    name: packName,
+                });
+                console.log(
+                    `[API] Pack "${packName}" already exists (ID: ${existing.id}), reusing`,
+                );
+                return;
+            }
+        }
+
         const response = await page.request.post(`${API_BASE}/packs`, {
             data: {
                 name: packName,
@@ -303,13 +381,9 @@ Given(
             },
         });
 
-        if (!response.ok()) {
-            throw new Error(
-                `Failed to create pack "${packName}": ${response.status()}`,
-            );
-        }
-
+        expect(response.ok()).toBeTruthy();
         const data = await response.json();
+        expect(data.id).toBeTruthy();
         sharedState.savePack(packName, { id: data.id, name: packName });
         console.log(`[API] Created pack "${packName}" (ID: ${data.id})`);
     },
@@ -340,7 +414,9 @@ Given(
             );
         }
 
+        expect(response.ok()).toBeTruthy();
         const data = await response.json();
+        expect(data.id).toBeTruthy();
         const actualName = path
             .basename(uniqueFilePath)
             .replace(/\.[^/.]+$/, "");
@@ -372,8 +448,9 @@ Given(
             `${API_BASE}/packs/${pack.id}/models/${model.id}`,
         );
 
+        // Assert response is success or "already in pack" (400)
+        expect(response.ok() || response.status() === 400).toBeTruthy();
         if (!response.ok() && response.status() !== 400) {
-            // 400 means already in pack, which is fine
             throw new Error(
                 `Failed to add model to pack: ${response.status()}`,
             );
@@ -388,6 +465,25 @@ Given(
 Given(
     "I create a test project named {string} via API",
     async ({ page }, projectName: string) => {
+        // Check if project already exists (idempotent)
+        const listResponse = await page.request.get(`${API_BASE}/projects`);
+        if (listResponse.ok()) {
+            const listData = await listResponse.json();
+            const existing = (listData.projects || []).find(
+                (p: any) => p.name === projectName,
+            );
+            if (existing) {
+                sharedState.saveProject(projectName, {
+                    id: existing.id,
+                    name: projectName,
+                });
+                console.log(
+                    `[API] Project "${projectName}" already exists (ID: ${existing.id}), reusing`,
+                );
+                return;
+            }
+        }
+
         const response = await page.request.post(`${API_BASE}/projects`, {
             data: {
                 name: projectName,
@@ -395,13 +491,9 @@ Given(
             },
         });
 
-        if (!response.ok()) {
-            throw new Error(
-                `Failed to create project "${projectName}": ${response.status()}`,
-            );
-        }
-
+        expect(response.ok()).toBeTruthy();
         const data = await response.json();
+        expect(data.id).toBeTruthy();
         sharedState.saveProject(projectName, {
             id: data.id,
             name: projectName,
@@ -429,8 +521,9 @@ Given(
             `${API_BASE}/projects/${project.id}/models/${model.id}`,
         );
 
+        // Assert response is success or "already in project" (400)
+        expect(response.ok() || response.status() === 400).toBeTruthy();
         if (!response.ok() && response.status() !== 400) {
-            // 400 means already in project, which is fine
             throw new Error(
                 `Failed to add model to project: ${response.status()}`,
             );
@@ -471,8 +564,10 @@ Given(
             );
         }
 
+        expect(response.ok()).toBeTruthy();
         const data = await response.json();
         const spriteId = data.spriteId || data.id;
+        expect(spriteId).toBeTruthy();
         const fileId = data.fileId || spriteId; // Fallback to spriteId if fileId not returned
         sharedState.saveSprite(spriteName, {
             id: spriteId,
@@ -501,6 +596,8 @@ Given(
             `${API_BASE}/packs/${pack.id}/sprites/${sprite.id}`,
         );
 
+        // Assert response is success or "already in pack" (400)
+        expect(response.ok() || response.status() === 400).toBeTruthy();
         if (!response.ok() && response.status() !== 400) {
             throw new Error(
                 `Failed to add sprite to pack: ${response.status()}`,
@@ -532,6 +629,8 @@ Given(
             `${API_BASE}/projects/${project.id}/sprites/${sprite.id}`,
         );
 
+        // Assert response is success or "already in project" (400)
+        expect(response.ok() || response.status() === 400).toBeTruthy();
         if (!response.ok() && response.status() !== 400) {
             throw new Error(
                 `Failed to add sprite to project: ${response.status()}`,
@@ -578,6 +677,7 @@ Given(
                             : categories.categories || []
                     ).find((c: any) => c.name === categoryName);
                     if (existing) {
+                        expect(existing.id).toBeTruthy();
                         sharedState.saveSpriteCategory(categoryName, {
                             id: existing.id,
                             name: categoryName,
@@ -595,7 +695,9 @@ Given(
             );
         }
 
+        expect(response.ok()).toBeTruthy();
         const data = await response.json();
+        expect(data.id).toBeTruthy();
         sharedState.saveSpriteCategory(categoryName, {
             id: data.id,
             name: categoryName,
@@ -629,6 +731,7 @@ Given(
             },
         );
 
+        expect(response.ok()).toBeTruthy();
         if (!response.ok()) {
             throw new Error(
                 `Failed to assign sprite to category: ${response.status()}`,

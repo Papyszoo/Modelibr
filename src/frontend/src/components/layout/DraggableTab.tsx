@@ -1,5 +1,6 @@
 import { Tooltip } from 'primereact/tooltip'
 import { Tab } from '@/types'
+import { getWindowId } from '@/stores/navigationStore'
 import './DraggableTab.css'
 
 const getTabIcon = (tabType: Tab['type']): string => {
@@ -99,7 +100,16 @@ function DraggableTab({
 }: DraggableTabProps): JSX.Element {
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
+    // Legacy plain text for intra-window drags
     e.dataTransfer.setData('text/plain', tab.id)
+    // Full tab config for cross-window drags
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        tab,
+        sourceWindowId: getWindowId(),
+      })
+    )
     onDragStart(tab)
   }
 

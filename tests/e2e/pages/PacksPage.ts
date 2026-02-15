@@ -1,4 +1,5 @@
 import { Page, Locator } from "@playwright/test";
+import { navigateToTab } from "../helpers/navigation-helper";
 
 const API_BASE = "http://localhost:8090";
 
@@ -32,16 +33,33 @@ export class PacksPage {
     }
 
     async navigateToPackList(): Promise<void> {
-        // Click on Packs tab in sidebar or navigate directly
-        // Tab type is 'packs' (not 'packList') per TabContent.tsx
-        await this.page.goto(
-            "http://localhost:3002/?leftTabs=packs&activeLeft=packs",
+        await navigateToTab(this.page, "packs");
+        await this.page.waitForSelector(
+            ".pack-list-header, .pack-list-empty, .pack-grid",
+            {
+                state: "visible",
+                timeout: 15000,
+            },
         );
-        await this.page.waitForLoadState("networkidle");
         console.log("[Navigation] Navigated to Pack List");
     }
 
     async createPack(name: string, description?: string): Promise<PackInfo> {
+        // Check if pack already exists via API (idempotent)
+        const checkResponse = await this.page.request.get(`${API_BASE}/packs`);
+        if (checkResponse.ok()) {
+            const checkData = await checkResponse.json();
+            const existing = (checkData.packs || []).find(
+                (p: any) => p.name === name,
+            );
+            if (existing) {
+                console.log(
+                    `[Pack] Pack "${name}" already exists (ID: ${existing.id}), skipping creation`,
+                );
+                return { id: existing.id, name, description };
+            }
+        }
+
         // Wait for the page to be fully loaded
         await this.page.waitForSelector(".pack-list-header, .pack-list-empty", {
             timeout: 10000,
@@ -109,7 +127,7 @@ export class PacksPage {
             `.pack-grid-card:has-text("${packName}")`,
         );
         await packCard.click();
-        await this.page.waitForTimeout(500);
+        await this.page.waitForLoadState("domcontentloaded");
         console.log(`[Navigation] Opened pack: ${packName}`);
     }
 
@@ -121,7 +139,7 @@ export class PacksPage {
             'button[aria-label="Delete Pack"], button.p-button-danger',
         );
         await deleteButton.click();
-        await this.page.waitForTimeout(500);
+        await packCard.waitFor({ state: "hidden", timeout: 10000 });
         console.log(`[Action] Deleted pack: ${packName}`);
     }
 
@@ -143,10 +161,12 @@ export class PacksPage {
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        await this.page.waitForTimeout(300);
         const addCard = this.page.locator(".model-card-add").first();
+        await addCard.waitFor({ state: "visible", timeout: 10000 });
         await addCard.click();
-        await this.page.waitForTimeout(500);
+        await this.page
+            .locator(".p-dialog")
+            .waitFor({ state: "visible", timeout: 10000 });
         console.log("[Action] Opened Add Model dialog");
     }
 
@@ -163,7 +183,9 @@ export class PacksPage {
             '.p-dialog-footer button:has-text("Add")',
         );
         await addButton.click();
-        await this.page.waitForTimeout(500);
+        await this.page
+            .locator(".p-dialog")
+            .waitFor({ state: "hidden", timeout: 10000 });
         console.log("[Action] Confirmed adding items to pack");
     }
 
@@ -173,19 +195,21 @@ export class PacksPage {
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        await this.page.waitForTimeout(300);
         const modelCard = this.page
             .locator(`.model-card:has-text("${modelName}")`)
             .first();
+        await modelCard.waitFor({ state: "visible", timeout: 10000 });
         await modelCard.click({ button: "right" });
-        await this.page.waitForTimeout(300);
+        await this.page
+            .locator(".p-contextmenu")
+            .waitFor({ state: "visible", timeout: 5000 });
         const removeOption = this.page
             .locator(
                 '.p-contextmenu .p-menuitem:has-text("Remove from pack"), .p-contextmenu .p-menuitem:has-text("Remove")',
             )
             .first();
         await removeOption.click();
-        await this.page.waitForTimeout(500);
+        await modelCard.waitFor({ state: "hidden", timeout: 10000 });
         console.log(`[Action] Removed model "${modelName}" from pack`);
     }
 

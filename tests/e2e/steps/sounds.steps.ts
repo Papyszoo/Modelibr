@@ -43,7 +43,7 @@ async function waitForSoundsUiReady(page: any): Promise<void> {
             .locator(".draggable-tab:has(.pi-volume-up)")
             .first();
         if (await soundTab.isVisible().catch(() => false)) {
-            await soundTab.click().catch(() => {});
+            await soundTab.click();
             await page
                 .waitForSelector(
                     ".sound-list, .sound-grid, .sound-list-empty",
@@ -138,7 +138,7 @@ When(
                 "[Upload] Upload response wait timed out, continuing...",
             );
         });
-        await page.waitForLoadState("networkidle").catch(() => {});
+        await page.waitForLoadState("domcontentloaded");
 
         // Get sounds AFTER upload and find the new one
         const afterResponse = await page.request.get(`${API_BASE}/sounds`);
@@ -444,7 +444,7 @@ When("I save the sound changes", async ({ page }) => {
     }
 
     // Wait for UI to reactively update instead of page.reload()
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded");
     console.log("[Action] UI updated to reflect sound changes");
 });
 
@@ -510,7 +510,7 @@ When(
             .filter({ hasText: categoryName });
         await categoryTab.click();
         // Wait for the sound grid to update reactively
-        await page.waitForLoadState("networkidle").catch(() => {});
+        await page.waitForLoadState("domcontentloaded");
         console.log(`[Action] Filtered sounds by category "${categoryName}"`);
     },
 );
@@ -812,7 +812,7 @@ When(
 
         // Wait for dialog to close reactively
         await confirmDialog.waitFor({ state: "hidden", timeout: 10000 });
-        await page.waitForLoadState("networkidle").catch(() => {});
+        await page.waitForLoadState("domcontentloaded");
 
         console.log(`[Action] Deleted sound category "${categoryName}"`);
     },

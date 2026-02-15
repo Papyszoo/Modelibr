@@ -6,6 +6,18 @@ import {
   serializeToCompactFormat,
 } from '../tabSerialization'
 
+// Mock apiBase to prevent import.meta.env error in Jest
+jest.mock('@/lib/apiBase', () => ({
+  client: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn(),
+  },
+  baseURL: 'http://localhost:8080',
+  UPLOAD_TIMEOUT: 300000,
+}))
+
 // Mock ApiClient with properly typed mock functions
 const mockGetModelById = jest.fn()
 const mockGetTextureSetById = jest.fn()
@@ -22,6 +34,23 @@ jest.mock('../../services/ApiClient', () => ({
     getProjectById: (...args: unknown[]) => mockGetProjectById(...args),
     getStageById: (...args: unknown[]) => mockGetStageById(...args),
   },
+}))
+
+// Mock individual API modules to prevent import.meta.env chain
+jest.mock('@/features/models/api/modelApi', () => ({
+  getModelById: (...args: unknown[]) => mockGetModelById(...args),
+}))
+jest.mock('@/features/texture-set/api/textureSetApi', () => ({
+  getTextureSetById: (...args: unknown[]) => mockGetTextureSetById(...args),
+}))
+jest.mock('@/features/pack/api/packApi', () => ({
+  getPackById: (...args: unknown[]) => mockGetPackById(...args),
+}))
+jest.mock('@/features/project/api/projectApi', () => ({
+  getProjectById: (...args: unknown[]) => mockGetProjectById(...args),
+}))
+jest.mock('@/features/stage-editor/api/stageApi', () => ({
+  getStageById: (...args: unknown[]) => mockGetStageById(...args),
 }))
 
 describe('Tab Serialization (Browser Refresh Compatibility)', () => {
@@ -152,20 +181,40 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
   describe('serializeToCompactFormat', () => {
     it('should serialize basic tabs without modelId', () => {
       const tabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
-        { id: 'textureSets', type: 'textureSets', label: 'Texture Sets' },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'textureSets',
+          type: 'textureSets',
+          label: 'Texture Sets',
+          params: {},
+          internalUiState: {},
+        },
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList,textureSets')
     })
 
     it('should serialize tabs with modelId', () => {
       const tabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
         {
           id: 'model-123',
           type: 'modelViewer',
           label: 'Model 123',
           modelId: '123',
+          params: { modelId: '123' },
+          internalUiState: {},
         },
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123')
@@ -177,20 +226,36 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
     it('should deduplicate tabs with same id', () => {
       const tabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
         {
-          id: 'model-123',
-          type: 'modelViewer',
-          label: 'Model 123',
-          modelId: '123',
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
         },
         {
           id: 'model-123',
           type: 'modelViewer',
           label: 'Model 123',
           modelId: '123',
+          params: { modelId: '123' },
+          internalUiState: {},
+        },
+        {
+          id: 'model-123',
+          type: 'modelViewer',
+          label: 'Model 123',
+          modelId: '123',
+          params: { modelId: '123' },
+          internalUiState: {},
         }, // duplicate
-        { id: 'textureSets', type: 'textureSets', label: 'Texture Sets' },
+        {
+          id: 'textureSets',
+          type: 'textureSets',
+          label: 'Texture Sets',
+          params: {},
+          internalUiState: {},
+        },
       ]
       expect(serializeToCompactFormat(tabs)).toBe(
         'modelList,model-123,textureSets'
@@ -199,18 +264,28 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
     it('should keep first occurrence when deduplicating', () => {
       const tabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
         {
           id: 'model-123',
           type: 'modelViewer',
           label: 'First',
           modelId: '123',
+          params: { modelId: '123' },
+          internalUiState: {},
         },
         {
           id: 'model-123',
           type: 'modelViewer',
           label: 'Second',
           modelId: '123',
+          params: { modelId: '123' },
+          internalUiState: {},
         }, // duplicate with different label
       ]
       expect(serializeToCompactFormat(tabs)).toBe('modelList,model-123')
@@ -220,13 +295,27 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
   describe('roundtrip compatibility (critical for browser refresh)', () => {
     it('should preserve tab functionality after serialization and parsing', () => {
       const originalTabs: Tab[] = [
-        { id: 'modelList', type: 'modelList', label: 'Models' },
-        { id: 'textureSets', type: 'textureSets', label: 'Texture Sets' },
+        {
+          id: 'modelList',
+          type: 'modelList',
+          label: 'Models',
+          params: {},
+          internalUiState: {},
+        },
+        {
+          id: 'textureSets',
+          type: 'textureSets',
+          label: 'Texture Sets',
+          params: {},
+          internalUiState: {},
+        },
         {
           id: 'model-123',
           type: 'modelViewer',
           label: 'Model 123',
           modelId: '123',
+          params: { modelId: '123' },
+          internalUiState: {},
         },
       ]
 

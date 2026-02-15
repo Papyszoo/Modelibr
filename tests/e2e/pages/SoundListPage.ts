@@ -1,4 +1,5 @@
 import { Page, expect } from "@playwright/test";
+import { navigateToTab } from "../helpers/navigation-helper";
 
 /**
  * Page Object Model for interacting with the Sound List page.
@@ -19,48 +20,10 @@ export class SoundListPage {
     private readonly dialog = ".p-dialog";
 
     /**
-     * Navigate to the sounds page
+     * Navigate to the sounds page via UI interaction
      */
     async goto(): Promise<void> {
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-        await this.page.goto(`${baseUrl}/?leftTabs=sounds&activeLeft=sounds`);
-        await this.page.waitForLoadState("networkidle").catch(() => {});
-
-        const soundsShell = this.page.locator(
-            ".sound-list, .sound-grid, .sound-list-empty",
-        );
-
-        if ((await soundsShell.count()) === 0) {
-            const soundsTab = this.page
-                .locator(".draggable-tab:has(.pi-volume-up)")
-                .first();
-
-            if (await soundsTab.isVisible().catch(() => false)) {
-                await soundsTab.click().catch(() => {});
-            } else {
-                const addTabButton = this.page
-                    .locator(".dock-add-button")
-                    .first();
-
-                if (await addTabButton.isVisible().catch(() => false)) {
-                    await addTabButton.click().catch(() => {});
-                    const soundsMenuItem = this.page.locator(
-                        ".p-menuitem-link:has-text('Sounds')",
-                    );
-                    if (
-                        await soundsMenuItem
-                            .first()
-                            .isVisible()
-                            .catch(() => false)
-                    ) {
-                        await soundsMenuItem
-                            .first()
-                            .click()
-                            .catch(() => {});
-                    }
-                }
-            }
-        }
+        await navigateToTab(this.page, "sounds");
 
         await this.page
             .waitForSelector(
@@ -153,7 +116,7 @@ export class SoundListPage {
             .locator(this.recycleMenuItem)
             .filter({ hasText: /Recycle/ })
             .click();
-        await this.page.waitForLoadState("networkidle").catch(() => {});
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**
@@ -170,7 +133,7 @@ export class SoundListPage {
     async uploadSound(filePath: string): Promise<void> {
         const fileInput = this.page.locator("input[type='file']").first();
         await fileInput.setInputFiles(filePath);
-        await this.page.waitForLoadState("networkidle").catch(() => {});
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**
@@ -291,7 +254,7 @@ export class SoundListPage {
     async filterByCategory(name: string): Promise<void> {
         const tab = this.getCategoryTab(name);
         await tab.click();
-        await this.page.waitForLoadState("networkidle").catch(() => {});
+        await this.page.waitForLoadState("domcontentloaded");
     }
 
     /**
