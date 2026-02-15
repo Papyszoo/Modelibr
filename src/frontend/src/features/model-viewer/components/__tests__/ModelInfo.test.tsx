@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import ModelInfo from '@/features/model-viewer/components/ModelInfo'
 
 // Mock the ApiClient
@@ -12,6 +14,18 @@ jest.mock('../../../../services/ApiClient', () => ({
 }))
 
 describe('ModelInfo', () => {
+  const renderWithQueryClient = (ui: ReactElement) => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    })
+
+    return render(
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    )
+  }
+
   const mockModel = {
     id: 'test-model-123',
     createdAt: '2024-01-15T10:30:00Z',
@@ -23,7 +37,7 @@ describe('ModelInfo', () => {
   }
 
   it('should render model information correctly', () => {
-    render(<ModelInfo model={mockModel} />)
+    renderWithQueryClient(<ModelInfo model={mockModel} />)
 
     // Check if model information is displayed
     expect(screen.getByText('Model Information')).toBeInTheDocument()
@@ -32,7 +46,7 @@ describe('ModelInfo', () => {
   })
 
   it('should format dates correctly', () => {
-    render(<ModelInfo model={mockModel} />)
+    renderWithQueryClient(<ModelInfo model={mockModel} />)
 
     // Check if dates are formatted (will depend on locale)
     const createdDate = new Date(mockModel.createdAt).toLocaleString()
@@ -43,7 +57,7 @@ describe('ModelInfo', () => {
   })
 
   it('should display Tags & Description section', () => {
-    render(<ModelInfo model={mockModel} />)
+    renderWithQueryClient(<ModelInfo model={mockModel} />)
 
     expect(screen.getByText('Tags & Description')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Add new tag...')).toBeInTheDocument()
@@ -53,7 +67,7 @@ describe('ModelInfo', () => {
   })
 
   it('should display control instructions', () => {
-    render(<ModelInfo model={mockModel} />)
+    renderWithQueryClient(<ModelInfo model={mockModel} />)
 
     expect(screen.getByText('Controls')).toBeInTheDocument()
     expect(screen.getByText(/Mouse:/)).toBeInTheDocument()
@@ -68,7 +82,7 @@ describe('ModelInfo', () => {
       files: [],
     }
 
-    render(<ModelInfo model={modelWithoutFiles} />)
+    renderWithQueryClient(<ModelInfo model={modelWithoutFiles} />)
 
     expect(screen.getByText('test-model-456')).toBeInTheDocument()
     expect(screen.getByText('UNKNOWN')).toBeInTheDocument()
@@ -84,14 +98,14 @@ describe('ModelInfo', () => {
       ],
     }
 
-    render(<ModelInfo model={modelWithMultipleFiles} />)
+    renderWithQueryClient(<ModelInfo model={modelWithMultipleFiles} />)
 
     // Should show format of first file
     expect(screen.getByText('GLTF')).toBeInTheDocument()
   })
 
   it('should render all required sections', () => {
-    render(<ModelInfo model={mockModel} />)
+    renderWithQueryClient(<ModelInfo model={mockModel} />)
 
     // Check that all four main sections are present
     expect(
@@ -109,7 +123,7 @@ describe('ModelInfo', () => {
   })
 
   it('should display Linked Texture Sets section', () => {
-    render(<ModelInfo model={mockModel} />)
+    renderWithQueryClient(<ModelInfo model={mockModel} />)
 
     expect(screen.getByText('Linked Texture Sets')).toBeInTheDocument()
     expect(screen.getByText('No texture sets linked')).toBeInTheDocument()
@@ -122,7 +136,7 @@ describe('ModelInfo', () => {
       tags: 'character, sci-fi, robot',
     }
 
-    render(<ModelInfo model={modelWithTags} />)
+    renderWithQueryClient(<ModelInfo model={modelWithTags} />)
 
     expect(screen.getByText('character')).toBeInTheDocument()
     expect(screen.getByText('sci-fi')).toBeInTheDocument()
@@ -138,7 +152,7 @@ describe('ModelInfo', () => {
       ],
     }
 
-    render(<ModelInfo model={modelWithTextureSets} />)
+    renderWithQueryClient(<ModelInfo model={modelWithTextureSets} />)
 
     expect(screen.getByText('Metal Texture')).toBeInTheDocument()
     expect(screen.getByText('Wood Texture')).toBeInTheDocument()

@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import ModelViewer from '@/features/model-viewer/components/ModelViewer'
 import { ModelProvider } from '@/contexts/ModelContext'
 
@@ -96,6 +98,20 @@ jest.mock('primereact/button', () => ({
 }))
 
 describe('ModelViewer', () => {
+  const renderWithProviders = (ui: ReactElement) => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    })
+
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <ModelProvider>{ui}</ModelProvider>
+      </QueryClientProvider>
+    )
+  }
+
   const mockModel = {
     id: 1,
     name: 'Test Model',
@@ -109,32 +125,20 @@ describe('ModelViewer', () => {
   }
 
   it('should render Canvas and scene when model is provided', () => {
-    render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="left" />
-      </ModelProvider>
-    )
+    renderWithProviders(<ModelViewer model={mockModel} side="left" />)
 
     expect(screen.getByTestId('canvas')).toBeInTheDocument()
     expect(screen.getByTestId('model-preview-scene')).toBeInTheDocument()
   })
 
   it('should display model name in header', () => {
-    render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="left" />
-      </ModelProvider>
-    )
+    renderWithProviders(<ModelViewer model={mockModel} side="left" />)
 
     expect(screen.getByText('Test Model')).toBeInTheDocument()
   })
 
   it('should render viewer control buttons', () => {
-    render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="left" />
-      </ModelProvider>
-    )
+    renderWithProviders(<ModelViewer model={mockModel} side="left" />)
 
     const buttons = screen.getAllByTestId('button')
     // There should be multiple control buttons (settings, info, texture, hierarchy, thumbnail, uv)
@@ -143,21 +147,15 @@ describe('ModelViewer', () => {
   })
 
   it('should pass model to ModelPreviewScene', () => {
-    render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="left" />
-      </ModelProvider>
-    )
+    renderWithProviders(<ModelViewer model={mockModel} side="left" />)
 
     const scene = screen.getByTestId('model-preview-scene')
     expect(scene).toHaveAttribute('data-model-id', '1')
   })
 
   it('should render correctly when model prop changes', () => {
-    const { rerender, getByTestId } = render(
-      <ModelProvider>
-        <ModelViewer model={mockModel} side="left" />
-      </ModelProvider>
+    const { rerender, getByTestId } = renderWithProviders(
+      <ModelViewer model={mockModel} side="left" />
     )
 
     // Initial render should show the canvas and scene
@@ -165,10 +163,18 @@ describe('ModelViewer', () => {
     expect(getByTestId('model-preview-scene')).toBeInTheDocument()
 
     const mockModel2 = { ...mockModel, id: 2, name: 'Another Model' }
+    const nextQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    })
+
     rerender(
-      <ModelProvider>
-        <ModelViewer model={mockModel2} side="left" />
-      </ModelProvider>
+      <QueryClientProvider client={nextQueryClient}>
+        <ModelProvider>
+          <ModelViewer model={mockModel2} side="left" />
+        </ModelProvider>
+      </QueryClientProvider>
     )
 
     // After rerender, the component should still be functional
@@ -177,11 +183,7 @@ describe('ModelViewer', () => {
   })
 
   it('should show error message when no model data is available', () => {
-    render(
-      <ModelProvider>
-        <ModelViewer model={undefined} side="left" />
-      </ModelProvider>
-    )
+    renderWithProviders(<ModelViewer model={undefined} side="left" />)
 
     expect(screen.getByText('No model data available')).toBeInTheDocument()
   })

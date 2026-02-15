@@ -566,7 +566,10 @@ When("I upload a new version {string}", async ({ page }, fileName: string) => {
     }
 
     const filePath = await UniqueFileGenerator.generate(fileName);
-    await modelViewer.uploadNewVersion(filePath);
+    // Use direct API upload for reliability — the UI dialog's PrimeReact RadioButton
+    // has a timing issue where the "Create new version" selection doesn't always
+    // propagate to React state before the Upload button is clicked.
+    await modelViewer.uploadNewVersionViaApi(filePath);
 });
 
 When("I select version {int}", async ({ page }, versionNumber: number) => {
