@@ -7,6 +7,43 @@ process.env.PROD = 'false'
 process.env.MODE = 'test'
 
 // Mock services that use import.meta.env at module level
+jest.mock('@/lib/apiBase', () => {
+  const mockClient = {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn(),
+    interceptors: {
+      request: { use: jest.fn() },
+      response: { use: jest.fn() },
+    },
+  }
+
+  class MockApiClientError extends Error {
+    status?: number
+    code?: string
+    details?: unknown
+    requestId?: string
+    isNetworkError = false
+    isTimeout = false
+    isOffline = false
+
+    constructor(message: string) {
+      super(message)
+      this.name = 'ApiClientError'
+    }
+  }
+
+  return {
+    __esModule: true,
+    client: mockClient,
+    baseURL: 'http://localhost:8080',
+    UPLOAD_TIMEOUT: 120000,
+    ApiClientError: MockApiClientError,
+  }
+})
+
 jest.mock('./services/ApiClient', () => ({
   __esModule: true,
   default: {
@@ -99,6 +136,16 @@ jest.mock('./services/ThumbnailSignalRService', () => ({
   },
   ThumbnailStatusChangedEvent: {},
   ActiveVersionChangedEvent: {},
+}))
+
+jest.mock('@/features/thumbnail/hooks/useThumbnail', () => ({
+  useThumbnail: () => ({
+    status: 'ready',
+    thumbnailUrl: 'http://localhost:8080/mock-thumbnail',
+    loading: false,
+    error: null,
+    refresh: jest.fn(),
+  }),
 }))
 
 // Mock webdavUtils (uses import.meta.env which Jest/Babel cannot transform)

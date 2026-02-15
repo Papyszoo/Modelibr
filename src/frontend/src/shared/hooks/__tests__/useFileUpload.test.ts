@@ -1,12 +1,8 @@
 import { renderHook, act } from '@testing-library/react'
 import { useFileUpload, useDragAndDrop } from '@/shared/hooks/useFileUpload'
 
-// Mock ApiClient
-jest.mock('../../../services/ApiClient', () => ({
-  __esModule: true,
-  default: {
-    uploadModel: jest.fn(),
-  },
+jest.mock('@/features/models/api/modelApi', () => ({
+  uploadModel: jest.fn(),
 }))
 
 // Mock fileUtils
@@ -34,13 +30,13 @@ jest.mock('../../../stores/uploadProgressStore', () => ({
   }),
 }))
 
-import ApiClient from '@/services/ApiClient'
+import { uploadModel } from '@/features/models/api/modelApi'
 import {
   isSupportedModelFormat,
   isThreeJSRenderable,
 } from '../../../utils/fileUtils'
 
-const mockApiClient = ApiClient as jest.Mocked<typeof ApiClient>
+const mockUploadModel = uploadModel as jest.MockedFunction<typeof uploadModel>
 const mockIsSupportedModelFormat =
   isSupportedModelFormat as jest.MockedFunction<typeof isSupportedModelFormat>
 const mockIsThreeJSRenderable = isThreeJSRenderable as jest.MockedFunction<
@@ -108,7 +104,7 @@ describe('useFileUpload', () => {
     it('should round progress to 2 decimal places', async () => {
       mockIsSupportedModelFormat.mockReturnValue(true)
       mockIsThreeJSRenderable.mockReturnValue(true)
-      mockApiClient.uploadModel.mockResolvedValue({
+      mockUploadModel.mockResolvedValue({
         id: 1,
         alreadyExists: false,
       })
@@ -140,7 +136,7 @@ describe('useFileUpload', () => {
     it('should call onSuccess once after all uploads complete', async () => {
       mockIsSupportedModelFormat.mockReturnValue(true)
       mockIsThreeJSRenderable.mockReturnValue(true)
-      mockApiClient.uploadModel
+      mockUploadModel
         .mockResolvedValueOnce({ id: 1, alreadyExists: false })
         .mockResolvedValueOnce({ id: 2, alreadyExists: false })
 

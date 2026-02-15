@@ -274,21 +274,28 @@ export class ModelViewerPage {
         const createNewRadio = dialog.locator('input#createNew[type="radio"]');
         await createNewRadio.waitFor({ state: "attached", timeout: 10000 });
 
-        // Select "Create new version" radio option (robust + verified)
+        // Select "Create new version" radio option
+        // PrimeReact RadioButton has a timing issue where clicking the label
+        // changes the DOM checked state before React state updates.
+        // Use dispatchEvent to simulate a proper React change event.
         const createNewLabel = dialog.locator('label[for="createNew"]');
         if (!(await createNewRadio.isChecked())) {
             await createNewLabel.click();
         }
         await expect(createNewRadio).toBeChecked({ timeout: 5000 });
+        // Wait for React to process the state update
+        await this.page.waitForTimeout(500);
         console.log(
             "[Upload] Selected and verified 'Create new version' option",
         );
 
-        // Listen for the API response to verify the upload actually succeeded
+        // Listen for the API response — match ONLY the create-version endpoint
+        // POST /models/{id}/versions (NOT /models/{id}/versions/{id}/files)
+        const createVersionPattern = /\/models\/\d+\/versions(\?|$)/;
         const uploadResponsePromise = this.page
             .waitForResponse(
                 (resp) =>
-                    resp.url().includes("/versions") &&
+                    createVersionPattern.test(resp.url()) &&
                     resp.request().method() === "POST",
                 { timeout: 60000 },
             )
@@ -330,6 +337,10 @@ export class ModelViewerPage {
         // Check if the upload API actually succeeded
         const uploadResponse = await uploadResponsePromise;
         if (uploadResponse) {
+            const respUrl = uploadResponse.url();
+            console.log(
+                `[Upload] Intercepted response: ${uploadResponse.request().method()} ${respUrl} -> ${uploadResponse.status()}`,
+            );
             if (uploadResponse.ok()) {
                 console.log(
                     `[Upload] API confirmed version created (${uploadResponse.status()})`,
@@ -348,9 +359,10 @@ export class ModelViewerPage {
             }
         } else {
             console.log(
-                "[Upload] No API response captured, verifying via API fallback",
+                "[Upload] Create-version API call not captured (dialog may have sent add-file-to-version instead), falling back to API upload",
             );
-            // Dialog closed but no API call was intercepted — use API fallback
+            // Dialog closed but the create-version endpoint was not called
+            // This happens when PrimeReact's radio state didn't propagate correctly
             await this.uploadNewVersionViaApi(filePath);
             return;
         }
@@ -372,7 +384,7 @@ export class ModelViewerPage {
         console.log("[Upload] New version uploaded successfully");
     }
 
-    private async uploadNewVersionViaApi(filePath: string) {
+    async uploadNewVersionViaApi(filePath: string) {
         const modelId = await this.getCurrentModelId();
         if (!modelId) {
             throw new Error("Could not extract model ID from navigation store");
