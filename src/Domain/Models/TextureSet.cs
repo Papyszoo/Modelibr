@@ -16,10 +16,39 @@ public class TextureSet : AggregateRoot
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
+    public TextureSetKind Kind { get; private set; } = TextureSetKind.ModelSpecific;
+    public float TilingScaleX { get; private set; } = 1.0f;
+    public float TilingScaleY { get; private set; } = 1.0f;
+    
+    /// <summary>
+    /// UV mapping mode controlling how textures are projected onto geometry.
+    /// Only relevant for Universal (Global Material) sets.
+    /// Standard = direct repeat values; Physical = auto-computed from geometry dimensions.
+    /// </summary>
+    public UvMappingMode UvMappingMode { get; private set; } = UvMappingMode.Standard;
+    
+    /// <summary>
+    /// Physical UV scale — the world-space size of one texture tile.
+    /// Used in Physical UV mapping mode to maintain consistent texel density.
+    /// Larger values = bigger tiles (fewer repeats), smaller values = smaller tiles (more repeats).
+    /// Only relevant for Universal sets in Physical mode.
+    /// </summary>
+    public float UvScale { get; private set; } = 1.0f;
+    
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTime? DeletedAt { get; private set; }
+    
+    /// <summary>
+    /// File path for the WebP thumbnail (for Universal texture sets rendered on a sphere).
+    /// </summary>
+    public string? ThumbnailPath { get; private set; }
+    
+    /// <summary>
+    /// File path for the PNG thumbnail variant.
+    /// </summary>
+    public string? PngThumbnailPath { get; private set; }
 
     // Navigation property for the collection of textures - EF Core requires this to be settable
     public ICollection<Texture> Textures
@@ -83,19 +112,25 @@ public class TextureSet : AggregateRoot
     }
 
     /// <summary>
-    /// Creates a new TextureSet with the specified name.
+    /// Creates a new TextureSet with the specified name and kind.
     /// </summary>
     /// <param name="name">The name of the texture set</param>
     /// <param name="createdAt">When the texture set was created</param>
+    /// <param name="kind">The kind of texture set (ModelSpecific or Universal). Defaults to ModelSpecific.</param>
     /// <returns>A new TextureSet instance</returns>
     /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
-    public static TextureSet Create(string name, DateTime createdAt)
+    public static TextureSet Create(string name, DateTime createdAt, TextureSetKind kind = TextureSetKind.ModelSpecific)
     {
         ValidateName(name);
 
         return new TextureSet
         {
             Name = name.Trim(),
+            Kind = kind,
+            TilingScaleX = kind == TextureSetKind.Universal ? 1.0f : 1.0f,
+            TilingScaleY = kind == TextureSetKind.Universal ? 1.0f : 1.0f,
+            UvMappingMode = kind == TextureSetKind.Universal ? UvMappingMode.Physical : UvMappingMode.Standard,
+            UvScale = 1.0f,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -112,6 +147,86 @@ public class TextureSet : AggregateRoot
         ValidateName(name);
 
         Name = name.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Updates the kind of the texture set.
+    /// </summary>
+    /// <param name="kind">The new kind</param>
+    /// <param name="updatedAt">When the update occurred</param>
+    public void UpdateKind(TextureSetKind kind, DateTime updatedAt)
+    {
+        Kind = kind;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Updates the tiling scale for universal (tileable) texture sets.
+    /// </summary>
+    /// <param name="tilingScaleX">Horizontal tiling scale factor</param>
+    /// <param name="tilingScaleY">Vertical tiling scale factor</param>
+    /// <param name="updatedAt">When the update occurred</param>
+    /// <exception cref="InvalidOperationException">Thrown when called on a ModelSpecific texture set</exception>
+    /// <exception cref="ArgumentException">Thrown when scale values are not positive</exception>
+    public void UpdateTilingScale(float tilingScaleX, float tilingScaleY, DateTime updatedAt)
+    {
+        if (Kind != TextureSetKind.Universal)
+            throw new InvalidOperationException("Tiling scale can only be set on Universal texture sets.");
+
+        if (tilingScaleX <= 0)
+            throw new ArgumentException("Tiling scale X must be a positive value.", nameof(tilingScaleX));
+
+        if (tilingScaleY <= 0)
+            throw new ArgumentException("Tiling scale Y must be a positive value.", nameof(tilingScaleY));
+
+        TilingScaleX = tilingScaleX;
+        TilingScaleY = tilingScaleY;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Updates the UV mapping mode and scale for universal (tileable) texture sets.
+    /// </summary>
+    /// <param name="uvMappingMode">The UV mapping mode (Standard or Physical)</param>
+    /// <param name="uvScale">Physical UV scale — world-space size of one texture tile</param>
+    /// <param name="updatedAt">When the update occurred</param>
+    /// <exception cref="InvalidOperationException">Thrown when called on a ModelSpecific texture set</exception>
+    /// <exception cref="ArgumentException">Thrown when uvScale is not positive</exception>
+    public void UpdateUvMapping(UvMappingMode uvMappingMode, float uvScale, DateTime updatedAt)
+    {
+        if (Kind != TextureSetKind.Universal)
+            throw new InvalidOperationException("UV mapping settings can only be changed on Universal texture sets.");
+
+        if (uvScale <= 0)
+            throw new ArgumentException("UV scale must be a positive value.", nameof(uvScale));
+
+        UvMappingMode = uvMappingMode;
+        UvScale = uvScale;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Sets the WebP thumbnail path for this texture set.
+    /// </summary>
+    public void SetThumbnailPath(string thumbnailPath, DateTime updatedAt)
+    {
+        if (string.IsNullOrWhiteSpace(thumbnailPath))
+            throw new ArgumentException("Thumbnail path cannot be null or empty.", nameof(thumbnailPath));
+
+        ThumbnailPath = thumbnailPath.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Sets the PNG thumbnail path for this texture set.
+    /// </summary>
+    public void SetPngThumbnailPath(string pngThumbnailPath, DateTime updatedAt)
+    {
+        if (string.IsNullOrWhiteSpace(pngThumbnailPath))
+            throw new ArgumentException("PNG thumbnail path cannot be null or empty.", nameof(pngThumbnailPath));
+
+        PngThumbnailPath = pngThumbnailPath.Trim();
         UpdatedAt = updatedAt;
     }
 

@@ -44,39 +44,54 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `GET`  | `/models/{modelId}/versions/{versionId}/file`           | Download renderable file |
 | `GET`  | `/models/{modelId}/versions/{versionId}/files/{fileId}` | Download specific file   |
 
-### Files (1 endpoint)
+### Files (4 endpoints)
 
-| Method | Endpoint      | Description             |
-| ------ | ------------- | ----------------------- |
-| `GET`  | `/files/{id}` | Download any file by ID |
+| Method | Endpoint                     | Description                                       | Auth        |
+| ------ | ---------------------------- | ------------------------------------------------- | ----------- |
+| `POST` | `/files`                     | Upload a file (auto-generates thumbnail previews) | None        |
+| `GET`  | `/files/{id}`                | Download any file by ID                           | None        |
+| `GET`  | `/files/{id}/preview`        | Download PNG preview (?channel=rgb\|r\|g\|b)      | None        |
+| `POST` | `/files/{id}/preview/upload` | Upload PNG preview for a file (used by worker)    | `X-Api-Key` |
 
-### Thumbnails (4 endpoints)
+### Thumbnails - Models (4 endpoints)
 
-| Method | Endpoint                            | Description                  |
-| ------ | ----------------------------------- | ---------------------------- |
-| `GET`  | `/models/{id}/thumbnail`            | Get thumbnail status         |
-| `POST` | `/models/{id}/thumbnail/regenerate` | Queue thumbnail regeneration |
-| `POST` | `/models/{id}/thumbnail/upload`     | Upload custom thumbnail      |
-| `GET`  | `/models/{id}/thumbnail/file`       | Download thumbnail image     |
+| Method | Endpoint                            | Description                  | Auth        |
+| ------ | ----------------------------------- | ---------------------------- | ----------- |
+| `GET`  | `/models/{id}/thumbnail`            | Get thumbnail status         | None        |
+| `POST` | `/models/{id}/thumbnail/regenerate` | Queue thumbnail regeneration | None        |
+| `POST` | `/models/{id}/thumbnail/upload`     | Upload custom thumbnail      | `X-Api-Key` |
+| `GET`  | `/models/{id}/thumbnail/file`       | Download thumbnail image     | None        |
 
-### Texture Sets (14 endpoints)
+### Thumbnails - Texture Sets (5 endpoints)
 
-| Method   | Endpoint                                                 | Description                                                   |
-| -------- | -------------------------------------------------------- | ------------------------------------------------------------- |
-| `GET`    | `/texture-sets`                                          | List all texture sets (?packId, ?projectId, ?page, ?pageSize) |
-| `GET`    | `/texture-sets/{id}`                                     | Get texture set details                                       |
-| `GET`    | `/texture-sets/by-file/{fileId}`                         | Get texture set containing a file                             |
-| `POST`   | `/texture-sets`                                          | Create new texture set (JSON)                                 |
-| `POST`   | `/texture-sets/with-file`                                | Create texture set with file upload                           |
-| `PUT`    | `/texture-sets/{id}`                                     | Update texture set                                            |
-| `DELETE` | `/texture-sets/{id}`                                     | Soft delete texture set                                       |
-| `DELETE` | `/texture-sets/{id}/hard`                                | Hard delete (keeps files)                                     |
-| `POST`   | `/texture-sets/{id}/textures`                            | Add texture to set                                            |
-| `DELETE` | `/texture-sets/{packId}/textures/{textureId}`            | Remove texture from set                                       |
-| `PUT`    | `/texture-sets/{setId}/textures/{textureId}/type`        | Change texture type                                           |
-| `POST`   | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Associate with model version                                  |
-| `DELETE` | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Disassociate from model version                               |
-| `POST`   | `/texture-sets/{packId}/models/{modelId}/all-versions`   | Associate with all model versions                             |
+| Method | Endpoint                                  | Description                              | Auth        |
+| ------ | ----------------------------------------- | ---------------------------------------- | ----------- |
+| `POST` | `/texture-sets/{id}/thumbnail/upload`     | Upload WebP thumbnail for texture set    | `X-Api-Key` |
+| `POST` | `/texture-sets/{id}/thumbnail/png-upload` | Upload PNG thumbnail for texture set     | `X-Api-Key` |
+| `GET`  | `/texture-sets/{id}/thumbnail/file`       | Download WebP thumbnail image            | None        |
+| `GET`  | `/texture-sets/{id}/thumbnail/png-file`   | Download PNG thumbnail image             | None        |
+| `POST` | `/texture-sets/{id}/thumbnail/regenerate` | Queue texture set thumbnail regeneration | None        |
+
+### Texture Sets (16 endpoints)
+
+| Method   | Endpoint                                                 | Description                                                                                                          |
+| -------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/texture-sets`                                          | List all texture sets (?packId, ?projectId, ?kind, ?page, ?pageSize)                                                 |
+| `GET`    | `/texture-sets/{id}`                                     | Get texture set details (includes kind, tilingScaleX/Y, uvMappingMode, uvScale)                                      |
+| `GET`    | `/texture-sets/by-file/{fileId}`                         | Get texture set containing a file                                                                                    |
+| `POST`   | `/texture-sets`                                          | Create new texture set (JSON, optional kind: 0=ModelSpecific, 1=Universal)                                           |
+| `POST`   | `/texture-sets/with-file`                                | Create texture set with file upload (?kind query param)                                                              |
+| `PUT`    | `/texture-sets/{id}`                                     | Update texture set                                                                                                   |
+| `PUT`    | `/texture-sets/{id}/kind`                                | Change texture set kind (0=ModelSpecific, 1=Universal); auto-enqueues thumbnail generation when changed to Universal |
+| `PUT`    | `/texture-sets/{id}/tiling-scale`                        | Update tiling scale + UV mapping (Universal only; optional uvMappingMode, uvScale)                                   |
+| `DELETE` | `/texture-sets/{id}`                                     | Soft delete texture set                                                                                              |
+| `DELETE` | `/texture-sets/{id}/hard`                                | Hard delete (keeps files)                                                                                            |
+| `POST`   | `/texture-sets/{id}/textures`                            | Add texture to set                                                                                                   |
+| `DELETE` | `/texture-sets/{packId}/textures/{textureId}`            | Remove texture from set                                                                                              |
+| `PUT`    | `/texture-sets/{setId}/textures/{textureId}/type`        | Change texture type                                                                                                  |
+| `POST`   | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Associate with model version                                                                                         |
+| `DELETE` | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Disassociate from model version                                                                                      |
+| `POST`   | `/texture-sets/{packId}/models/{modelId}/all-versions`   | Associate with all model versions                                                                                    |
 
 ### Recycled Files (4 endpoints)
 
@@ -87,15 +102,16 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `GET`    | `/recycled/{entityType}/{entityId}/preview`   | Preview delete impact   |
 | `DELETE` | `/recycled/{entityType}/{entityId}/permanent` | Permanently delete      |
 
-### Worker API - Thumbnail Jobs (3 endpoints)
+### Worker API - Thumbnail Jobs (4 endpoints)
 
-| Method | Endpoint                             | Description                        |
-| ------ | ------------------------------------ | ---------------------------------- |
-| `POST` | `/thumbnail-jobs/dequeue`            | Dequeue next job (workers only)    |
-| `POST` | `/thumbnail-jobs/{jobId}/complete`   | Mark job complete (workers only)   |
-| `POST` | `/test/thumbnail-complete/{modelId}` | Test completion notification (dev) |
+| Method | Endpoint                                      | Description                            |
+| ------ | --------------------------------------------- | -------------------------------------- |
+| `POST` | `/thumbnail-jobs/dequeue`                     | Dequeue next job (workers only)        |
+| `POST` | `/thumbnail-jobs/{jobId}/complete`            | Mark model job complete (workers only) |
+| `POST` | `/thumbnail-jobs/texture-sets/{jobId}/finish` | Mark texture set job complete/failed   |
+| `POST` | `/test/thumbnail-complete/{modelId}`          | Test completion notification (dev)     |
 
-**Total:** 42 endpoints
+**Total:** 49 endpoints
 
 ## Pagination
 
@@ -146,6 +162,15 @@ WebApi → Application → Domain ← Infrastructure
 ```
 Albedo, Normal, Metallic, Roughness, AmbientOcclusion, Emissive, Height, Opacity
 ```
+
+## File Upload Limits
+
+- **Kestrel MaxRequestBodySize**: 1 GB (configured in `Program.cs`)
+- **FormOptions MultipartBodyLengthLimit**: 1 GB (configured in `Program.cs`)
+- **nginx client_max_body_size**: 1024 MB (configured in `nginx/nginx.conf`)
+- **Application-level validation**: Configured via Settings page, stored in database (`maxFileSizeBytes`)
+
+Files are stored using hash-based deduplication (`HashBasedFileStorage`). When permanently deleting entities, orphaned `File` records and physical files are cleaned up if no other entity references the same hash.
 
 ## Error Handling
 

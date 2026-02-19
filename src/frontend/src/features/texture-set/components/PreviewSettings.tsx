@@ -1,7 +1,9 @@
 import { Slider } from 'primereact/slider'
 import { InputSwitch } from 'primereact/inputswitch'
 import { Dropdown } from 'primereact/dropdown'
+import { SelectButton } from 'primereact/selectbutton'
 import { GeometryType } from './GeometrySelector'
+import { UvMappingMode } from '@/types'
 import './PreviewSettings.css'
 
 export interface PreviewSettingsType {
@@ -20,14 +22,26 @@ export interface PreviewSettingsType {
   // Torus parameters
   torusRadius: number
   torusTube: number
+  // Tiling parameters (for Universal texture sets)
+  tilingScaleX: number
+  tilingScaleY: number
+  // UV mapping mode (Standard = manual repeat, Physical = auto from geometry)
+  uvMappingMode: UvMappingMode
+  // Physical UV scale — world-space size of one texture tile
+  uvScale: number
 }
 
 interface PreviewSettingsProps {
   settings: PreviewSettingsType
   onSettingsChange: (settings: PreviewSettingsType) => void
+  showTilingControls?: boolean
 }
 
-export function PreviewSettings({ settings, onSettingsChange }: PreviewSettingsProps) {
+export function PreviewSettings({
+  settings,
+  onSettingsChange,
+  showTilingControls = false,
+}: PreviewSettingsProps) {
   const handleChange = (
     key: keyof PreviewSettingsType,
     value: number | boolean | GeometryType
@@ -244,7 +258,87 @@ export function PreviewSettings({ settings, onSettingsChange }: PreviewSettingsP
           </div>
         </div>
       )}
+
+      {showTilingControls && (
+        <div className="settings-group">
+          <h4 className="settings-group-title">Tiling / UV Mapping</h4>
+
+          <div className="setting-item">
+            <label>UV Mode</label>
+            <div className="setting-control">
+              <SelectButton
+                value={settings.uvMappingMode}
+                onChange={e => {
+                  if (e.value !== null && e.value !== undefined) {
+                    handleChange('uvMappingMode', e.value as number)
+                  }
+                }}
+                options={[
+                  { label: 'Standard', value: UvMappingMode.Standard },
+                  { label: 'Physical', value: UvMappingMode.Physical },
+                ]}
+                className="uv-mode-select"
+              />
+            </div>
+          </div>
+
+          {settings.uvMappingMode === UvMappingMode.Physical ? (
+            <div className="setting-item">
+              <label>Tile Size</label>
+              <div className="setting-control">
+                <Slider
+                  value={settings.uvScale}
+                  onChange={e => handleChange('uvScale', e.value as number)}
+                  min={0.1}
+                  max={5}
+                  step={0.05}
+                />
+                <span className="setting-value">
+                  {settings.uvScale.toFixed(2)}m
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="setting-item">
+                <label>Tile X</label>
+                <div className="setting-control">
+                  <Slider
+                    value={settings.tilingScaleX}
+                    onChange={e =>
+                      handleChange('tilingScaleX', e.value as number)
+                    }
+                    min={0.1}
+                    max={10}
+                    step={0.1}
+                  />
+                  <span className="setting-value">
+                    {settings.tilingScaleX.toFixed(1)}x
+                  </span>
+                </div>
+              </div>
+
+              <div className="setting-item">
+                <label>Tile Y</label>
+                <div className="setting-control">
+                  <Slider
+                    value={settings.tilingScaleY}
+                    onChange={e =>
+                      handleChange('tilingScaleY', e.value as number)
+                    }
+                    min={0.1}
+                    max={10}
+                    step={0.1}
+                  />
+                  <span className="setting-value">
+                    {settings.tilingScaleY.toFixed(1)}x
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
-

@@ -1431,6 +1431,19 @@ ThenBdd(
                 );
             });
 
+        // Switch to Model-Specific tab (default tab is now Global Materials)
+        const msTab = page
+            .locator(".kind-filter-select .p-button")
+            .filter({ hasText: "Model-Specific" });
+        await msTab.waitFor({ state: "visible", timeout: 10000 });
+        const isActive = await msTab.evaluate((el: Element) =>
+            el.classList.contains("p-highlight"),
+        );
+        if (!isActive) {
+            await msTab.click();
+            await page.waitForTimeout(500);
+        }
+
         // Look for the texture set by name in any card element
         const textureSetCard = page.locator(
             `.texture-set-card-name:has-text("${name}")`,

@@ -34,6 +34,17 @@ public interface IThumbnailQueue
     Task<ThumbnailJob> EnqueueSoundWaveformAsync(int soundId, string soundHash, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Enqueues a new thumbnail generation job for a texture set.
+    /// Renders textures on a sphere to produce a material preview.
+    /// </summary>
+    /// <param name="textureSetId">The texture set ID</param>
+    /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
+    /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The created job or existing job if already exists</returns>
+    Task<ThumbnailJob> EnqueueTextureSetThumbnailAsync(int textureSetId, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Attempts to dequeue and claim the next pending job for processing.
     /// Includes automatic retry of jobs with expired locks.
     /// </summary>

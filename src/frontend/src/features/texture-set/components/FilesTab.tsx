@@ -4,6 +4,8 @@ import { Toast } from 'primereact/toast'
 import { TextureSetDto, TextureDto, TextureType, TextureChannel } from '@/types'
 import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
+import { TexturePreview } from './TexturePreview'
 import './FilesTab.css'
 
 interface FilesTabProps {
@@ -120,10 +122,7 @@ function getTextureByChannel(
   return textures.find(t => t.sourceChannel === channel)
 }
 
-export function FilesTab({
-  textureSet,
-  onMappingChanged,
-}: FilesTabProps) {
+export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
   const [fileMappings, setFileMappings] = useState<FileMapping[]>([])
   const [rgbOptionOverrides, setRgbOptionOverrides] = useState<
     Record<number, string>
@@ -352,12 +351,11 @@ export function FilesTab({
             data-testid={`file-mapping-card-${fm.fileId}`}
           >
             <div className="file-preview">
-              <img
-                src={`/api/files/${fm.fileId}/data`}
+              <TexturePreview
+                src={getFilePreviewUrl(fm.fileId.toString())}
                 alt={fm.fileName}
-                onError={e => {
-                  ;(e.target as HTMLImageElement).style.display = 'none'
-                }}
+                fileName={fm.fileName}
+                className="file-preview-image"
               />
             </div>
 

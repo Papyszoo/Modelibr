@@ -21,4 +21,15 @@ public interface IFileRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if other versions use a file with the same hash</returns>
     Task<bool> IsFileSharedAsync(int fileId, int excludeVersionId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Checks if any other entity (Texture, ModelVersion, Sprite, Sound) references a file with the same hash,
+    /// excluding the specified file ID.
+    /// </summary>
+    Task<bool> IsFileHashReferencedByOthersAsync(int fileId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Hard-deletes a File entity from the database regardless of soft-delete status.
+    /// </summary>
+    Task HardDeleteAsync(int id, CancellationToken cancellationToken = default);
 }

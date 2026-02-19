@@ -6,6 +6,26 @@
   background: var(--surface-ground);
 }
 
+.kind-filter-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 0.5rem;
+}
+
+.kind-filter-bar .kind-filter-select .p-button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+}
+
+.kind-filter-bar .kind-filter-select .p-button.kind-drop-target {
+  outline: 2px dashed var(--primary-color);
+  outline-offset: -2px;
+  background: var(--primary-color);
+  color: var(--primary-color-text);
+  opacity: 0.85;
+}
+
 .texture-set-list-header {
   display: flex;
   justify-content: space-between;

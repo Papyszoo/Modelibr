@@ -8,7 +8,7 @@ import { getTextureTypeInfo } from '@/utils/textureTypeUtils'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { useGenericFileUpload } from '@/shared/hooks/useGenericFileUpload'
-import { getFileUrl } from '@/features/models/api/modelApi'
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import './TextureCard.css'
 import { TexturePreview } from './TexturePreview'
 
@@ -40,8 +40,12 @@ export const TextureCard = memo(function TextureCard({
 
     const file = files[0]
 
-    // Validate it's an image
-    if (!file.type.startsWith('image/')) {
+    // Validate it's an image (allow EXR/TGA which may have empty MIME type)
+    const ext = file.name.toLowerCase().split('.').pop()
+    const isImage =
+      file.type.startsWith('image/') ||
+      ['exr', 'tga', 'bmp'].includes(ext || '')
+    if (!isImage) {
       toast.current?.show({
         severity: 'error',
         summary: 'Invalid File',
@@ -296,7 +300,7 @@ export const TextureCard = memo(function TextureCard({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.exr,.tga,.bmp"
           style={{ display: 'none' }}
           onChange={handleFileInputChange}
         />
@@ -318,9 +322,10 @@ export const TextureCard = memo(function TextureCard({
               onDragEnd={handleTextureDragEnd}
             >
               <TexturePreview
-                src={getFileUrl(texture.fileId.toString())}
+                src={getFilePreviewUrl(texture.fileId.toString())}
                 alt={texture.fileName || typeInfo.label}
                 sourceChannel={texture.sourceChannel}
+                fileName={texture.fileName}
                 className="texture-preview-image"
               />
               <div className="texture-card-overlay">

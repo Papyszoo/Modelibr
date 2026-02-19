@@ -1,5 +1,6 @@
 using Application.Abstractions.Repositories;
 using Domain.Models;
+using Domain.ValueObjects;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,6 +44,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
         int? packId = null, int? projectId = null,
+        TextureSetKind? kind = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.TextureSets.AsNoTracking().AsQueryable();
@@ -52,6 +54,9 @@ internal sealed class TextureSetRepository : ITextureSetRepository
 
         if (projectId.HasValue)
             query = query.Where(ts => ts.Projects.Any(p => p.Id == projectId.Value));
+
+        if (kind.HasValue)
+            query = query.Where(ts => ts.Kind == kind.Value);
 
         var totalCount = await query.CountAsync(cancellationToken);
 

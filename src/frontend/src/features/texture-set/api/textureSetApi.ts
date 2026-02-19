@@ -9,6 +9,8 @@ import {
   UpdateTextureSetResponse,
   AddTextureToSetRequest,
   AddTextureToSetResponse,
+  UpdateTilingScaleRequest,
+  UpdateTilingScaleResponse,
 } from '../../../types'
 
 export async function getAllTextureSets(
@@ -25,6 +27,7 @@ export async function getTextureSetsPaginated(options: {
   pageSize: number
   packId?: number
   projectId?: number
+  kind?: number
 }): Promise<{
   textureSets: TextureSetDto[]
   totalCount: number
@@ -38,6 +41,7 @@ export async function getTextureSetsPaginated(options: {
   if (options.packId) params.append('packId', options.packId.toString())
   if (options.projectId)
     params.append('projectId', options.projectId.toString())
+  if (options.kind !== undefined) params.append('kind', options.kind.toString())
 
   const response = await client.get(`/texture-sets?${params.toString()}`)
   return response.data
@@ -74,7 +78,12 @@ export async function createTextureSet(
 
 export async function createTextureSetWithFile(
   file: File,
-  options?: { name?: string; textureType?: string; batchId?: string }
+  options?: {
+    name?: string
+    textureType?: string
+    batchId?: string
+    kind?: number
+  }
 ): Promise<{
   textureSetId: number
   name: string
@@ -89,6 +98,8 @@ export async function createTextureSetWithFile(
   if (options?.name) params.append('name', options.name)
   if (options?.textureType) params.append('textureType', options.textureType)
   if (options?.batchId) params.append('batchId', options.batchId)
+  if (options?.kind !== undefined)
+    params.append('kind', options.kind.toString())
 
   const response = await client.post(
     `/texture-sets/with-file?${params.toString()}`,
@@ -187,4 +198,28 @@ export async function softDeleteTextureSet(
   textureSetId: number
 ): Promise<void> {
   await client.delete(`/texture-sets/${textureSetId}`)
+}
+
+export async function updateTilingScale(
+  textureSetId: number,
+  request: UpdateTilingScaleRequest
+): Promise<UpdateTilingScaleResponse> {
+  const response: AxiosResponse<UpdateTilingScaleResponse> = await client.put(
+    `/texture-sets/${textureSetId}/tiling-scale`,
+    request
+  )
+  return response.data
+}
+
+export async function regenerateTextureSetThumbnail(
+  textureSetId: number
+): Promise<void> {
+  await client.post(`/texture-sets/${textureSetId}/thumbnail/regenerate`)
+}
+
+export async function updateTextureSetKind(
+  textureSetId: number,
+  kind: number
+): Promise<void> {
+  await client.put(`/texture-sets/${textureSetId}/kind`, { kind })
 }

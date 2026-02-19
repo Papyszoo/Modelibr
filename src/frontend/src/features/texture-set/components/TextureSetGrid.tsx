@@ -4,15 +4,23 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import './TextureSetGrid.css'
-import { TextureSetDto, TextureType, TextureChannel, PackDto } from '@/types'
+import {
+  TextureSetDto,
+  TextureType,
+  TextureChannel,
+  PackDto,
+  TextureSetKind,
+} from '@/types'
 import { ProgressBar } from 'primereact/progressbar'
 import { addTextureSetToPack, getAllPacks } from '@/features/pack/api/packApi'
 import {
   addTextureToSetEndpoint,
   hardDeleteTextureSet,
   softDeleteTextureSet,
+  regenerateTextureSetThumbnail,
 } from '@/features/texture-set/api/textureSetApi'
-import { getFileUrl } from '@/features/models/api/modelApi'
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
+import { baseURL } from '@/lib/apiBase'
 import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextureSetDialog'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
@@ -280,6 +288,14 @@ export function TextureSetGrid({
   }
 
   const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
+    // For Universal (Global Materials) texture sets, prefer the generated sphere thumbnail
+    if (
+      textureSet.kind === TextureSetKind.Universal &&
+      textureSet.thumbnailPath
+    ) {
+      return `${baseURL}/texture-sets/${textureSet.id}/thumbnail/file`
+    }
+
     // Find albedo texture first, then fallback to diffuse
     const albedo = textureSet.textures?.find(
       t => t.textureType === TextureType.Albedo
@@ -290,7 +306,7 @@ export function TextureSetGrid({
 
     const texture = albedo || diffuse
     if (texture) {
-      return getFileUrl(texture.fileId.toString())
+      return getFilePreviewUrl(texture.fileId.toString())
     }
     return null
   }
@@ -329,6 +345,32 @@ export function TextureSetGrid({
     })
   }
 
+  // Handle "Regenerate Thumbnail" from context menu
+  const handleRegenerateThumbnail = async () => {
+    if (!selectedTextureSet) return
+
+    try {
+      await regenerateTextureSetThumbnail(selectedTextureSet.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Thumbnail',
+        detail: 'Thumbnail regeneration started',
+        life: 3000,
+      })
+      if (onTextureSetUpdated) {
+        onTextureSetUpdated()
+      }
+    } catch (error) {
+      console.error('Failed to regenerate thumbnail:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to regenerate thumbnail',
+        life: 3000,
+      })
+    }
+  }
+
   const contextMenuItems: MenuItem[] = [
     {
       label: 'Show in Folder',
@@ -342,6 +384,12 @@ export function TextureSetGrid({
     },
     {
       separator: true,
+    },
+    {
+      label: 'Regenerate Thumbnail',
+      icon: 'pi pi-refresh',
+      command: handleRegenerateThumbnail,
+      visible: selectedTextureSet?.kind === TextureSetKind.Universal,
     },
     {
       label: 'Add to pack',

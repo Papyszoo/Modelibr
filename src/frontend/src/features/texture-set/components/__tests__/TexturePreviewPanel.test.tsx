@@ -1,6 +1,12 @@
 import { render } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TexturePreviewPanel } from '@/features/texture-set/components/TexturePreviewPanel'
-import { TextureSetDto, TextureType } from '@/types'
+import {
+  TextureSetDto,
+  TextureSetKind,
+  TextureType,
+  UvMappingMode,
+} from '@/types'
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
@@ -28,6 +34,11 @@ jest.mock('primereact/button', () => ({
 const mockTextureSet: TextureSetDto = {
   id: 1,
   name: 'Test Pack',
+  kind: TextureSetKind.Universal,
+  tilingScaleX: 1,
+  tilingScaleY: 1,
+  uvMappingMode: UvMappingMode.Physical,
+  uvScale: 1,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   textureCount: 1,
@@ -44,10 +55,18 @@ const mockTextureSet: TextureSetDto = {
   associatedModels: [],
 }
 
+const createQueryClient = () =>
+  new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+const renderWithProviders = (ui: React.ReactElement) =>
+  render(
+    <QueryClientProvider client={createQueryClient()}>{ui}</QueryClientProvider>
+  )
+
 describe('TexturePreviewPanel', () => {
   it('should render without errors', () => {
     expect(() => {
-      render(<TexturePreviewPanel textureSet={mockTextureSet} />)
+      renderWithProviders(<TexturePreviewPanel textureSet={mockTextureSet} />)
     }).not.toThrow()
   })
 
@@ -67,7 +86,7 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      render(<TexturePreviewPanel textureSet={setWithAlbedo} />)
+      renderWithProviders(<TexturePreviewPanel textureSet={setWithAlbedo} />)
     }).not.toThrow()
   })
 
@@ -101,7 +120,9 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      render(<TexturePreviewPanel textureSet={setWithMultipleTextures} />)
+      renderWithProviders(
+        <TexturePreviewPanel textureSet={setWithMultipleTextures} />
+      )
     }).not.toThrow()
   })
 })

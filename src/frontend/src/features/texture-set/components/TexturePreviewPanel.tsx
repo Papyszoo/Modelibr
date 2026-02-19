@@ -1,12 +1,14 @@
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useCallback, useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Stage, OrbitControls } from '@react-three/drei'
-import { TextureSetDto } from '@/types'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { TextureSetDto, TextureSetKind, UvMappingMode } from '@/types'
 import { TexturedGeometry } from './TexturedGeometry'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { PreviewInfo } from './PreviewInfo'
 import { PreviewSettings, PreviewSettingsType } from './PreviewSettings'
+import { updateTilingScale } from '@/features/texture-set/api/textureSetApi'
 import { Button } from 'primereact/button'
 import './TexturePreviewPanel.css'
 
@@ -19,11 +21,13 @@ export function TexturePreviewPanel({
   textureSet,
   side = 'left',
 }: TexturePreviewPanelProps) {
+  const isUniversal = textureSet.kind === TextureSetKind.Universal
+
   const [infoWindowVisible, setInfoWindowVisible] = useState<boolean>(false)
   const [settingsWindowVisible, setSettingsWindowVisible] =
     useState<boolean>(false)
   const [previewSettings, setPreviewSettings] = useState<PreviewSettingsType>({
-    type: 'box',
+    type: isUniversal ? 'sphere' : 'box',
     scale: 1,
     rotationSpeed: 0.01,
     wireframe: false,
@@ -34,7 +38,74 @@ export function TexturePreviewPanel({
     cylinderHeight: 2,
     torusRadius: 1,
     torusTube: 0.4,
+    tilingScaleX: textureSet.tilingScaleX ?? 1,
+    tilingScaleY: textureSet.tilingScaleY ?? 1,
+    uvMappingMode:
+      textureSet.uvMappingMode ??
+      (isUniversal ? UvMappingMode.Physical : UvMappingMode.Standard),
+    uvScale: textureSet.uvScale ?? 1,
   })
+
+  // Auto-save tiling scale for Universal sets (debounced)
+  const queryClient = useQueryClient()
+  const tilingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const saveTilingMutation = useMutation({
+    mutationFn: ({
+      x,
+      y,
+      uvMappingMode,
+      uvScale,
+    }: {
+      x: number
+      y: number
+      uvMappingMode?: UvMappingMode
+      uvScale?: number
+    }) =>
+      updateTilingScale(textureSet.id, {
+        tilingScaleX: x,
+        tilingScaleY: y,
+        uvMappingMode,
+        uvScale,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['textureSets'] })
+    },
+  })
+
+  const handleSettingsChange = useCallback(
+    (newSettings: PreviewSettingsType) => {
+      setPreviewSettings(newSettings)
+
+      // Auto-save tiling/UV mapping changes for Universal sets (debounced 1s)
+      if (isUniversal) {
+        const tilingChanged =
+          newSettings.tilingScaleX !== previewSettings.tilingScaleX ||
+          newSettings.tilingScaleY !== previewSettings.tilingScaleY ||
+          newSettings.uvMappingMode !== previewSettings.uvMappingMode ||
+          newSettings.uvScale !== previewSettings.uvScale
+        if (tilingChanged) {
+          if (tilingDebounceRef.current) clearTimeout(tilingDebounceRef.current)
+          tilingDebounceRef.current = setTimeout(() => {
+            saveTilingMutation.mutate({
+              x: newSettings.tilingScaleX,
+              y: newSettings.tilingScaleY,
+              uvMappingMode: newSettings.uvMappingMode,
+              uvScale: newSettings.uvScale,
+            })
+          }, 1000)
+        }
+      }
+    },
+    [isUniversal, previewSettings, saveTilingMutation]
+  )
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (tilingDebounceRef.current) clearTimeout(tilingDebounceRef.current)
+    }
+  }, [])
 
   // Combine settings for geometry params
   const geometryParams = {
@@ -49,6 +120,10 @@ export function TexturePreviewPanel({
     cylinderHeight: previewSettings.cylinderHeight,
     torusRadius: previewSettings.torusRadius,
     torusTube: previewSettings.torusTube,
+    tilingScaleX: previewSettings.tilingScaleX,
+    tilingScaleY: previewSettings.tilingScaleY,
+    uvMappingMode: previewSettings.uvMappingMode,
+    uvScale: previewSettings.uvScale,
   }
 
   return (
@@ -114,7 +189,8 @@ export function TexturePreviewPanel({
       >
         <PreviewSettings
           settings={previewSettings}
-          onSettingsChange={setPreviewSettings}
+          onSettingsChange={handleSettingsChange}
+          showTilingControls={isUniversal}
         />
       </FloatingWindow>
       <FloatingWindow
@@ -132,4 +208,3 @@ export function TexturePreviewPanel({
     </div>
   )
 }
-

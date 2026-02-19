@@ -8,6 +8,8 @@ export type {
 export {
   TextureType,
   TextureChannel,
+  TextureSetKind,
+  UvMappingMode,
   type TextureDto,
   type ModelSummaryDto,
   type PackSummaryDto,
@@ -21,6 +23,8 @@ export {
   type AddTextureToSetRequest,
   type AddTextureToSetResponse,
   type GetAllTextureSetsResponsePaginated,
+  type UpdateTilingScaleRequest,
+  type UpdateTilingScaleResponse,
 } from '@/features/texture-set/types'
 
 export {

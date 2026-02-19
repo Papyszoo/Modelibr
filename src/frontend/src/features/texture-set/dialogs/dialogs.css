@@ -54,6 +54,19 @@
   color: var(--text-color-secondary);
 }
 
+.stat-item.kind-universal {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.stat-item.kind-universal i {
+  color: var(--primary-color);
+}
+
+.stat-item.kind-model-specific {
+  color: var(--text-color-secondary);
+}
+
 .set-detail-tabs {
   height: calc(100% - 120px);
 }

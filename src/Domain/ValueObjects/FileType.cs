@@ -66,6 +66,7 @@ public sealed class FileType : IEquatable<FileType>
         { ".png", Texture },
         { ".tga", Texture },
         { ".bmp", Texture },
+        { ".exr", Texture },
         { ".mtl", Material },
         { ".gif", Gif },
         { ".webp", WebP },

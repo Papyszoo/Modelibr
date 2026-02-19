@@ -1,10 +1,12 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useTexture } from '@react-three/drei'
 import { GeometryType } from './GeometrySelector'
-import { TextureSetDto, TextureType } from '@/types'
+import { TextureSetDto, TextureType, UvMappingMode } from '@/types'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { isExrFile } from '@/utils/fileUtils'
+import { getPhysicalTiling } from '../utils/physicalUvTiling'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 
 interface GeometryParams {
   type: GeometryType
@@ -18,6 +20,10 @@ interface GeometryParams {
   cylinderHeight?: number
   torusRadius?: number
   torusTube?: number
+  tilingScaleX?: number
+  tilingScaleY?: number
+  uvMappingMode?: UvMappingMode
+  uvScale?: number
 }
 
 interface TexturedGeometryProps {
@@ -26,129 +32,92 @@ interface TexturedGeometryProps {
   geometryParams?: GeometryParams
 }
 
-export function TexturedGeometry({
-  geometryType,
-  textureSet,
-  geometryParams = {},
-}: TexturedGeometryProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+interface TextureUrlInfo {
+  url: string
+  isExrFormat: boolean
+}
 
-  // Rotate the geometry with configurable speed
-  useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += geometryParams.rotationSpeed
-    }
+/** Build texture URLs for all textures including EXR */
+function buildTextureUrls(
+  textureSet: TextureSetDto
+): Record<string, TextureUrlInfo> {
+  const urls: Record<string, TextureUrlInfo> = {}
+
+  const makeInfo = (t: {
+    fileId: number
+    fileName?: string
+  }): TextureUrlInfo => ({
+    url: getFileUrl(t.fileId.toString()),
+    isExrFormat: isExrFile(t.fileName),
   })
 
-  // Build texture URLs object (create URLs for textures that exist)
-  const textureUrlsObject = useMemo(() => {
-    const urls: Record<string, string> = {}
-
-    // Albedo or Diffuse for base color
-    const albedo = textureSet.textures.find(
-      t => t.textureType === TextureType.Albedo
-    )
-    const diffuse = textureSet.textures.find(
-      t => t.textureType === TextureType.Diffuse
-    )
-    if (albedo) {
-      urls.map = getFileUrl(albedo.fileId.toString())
-    } else if (diffuse) {
-      urls.map = getFileUrl(diffuse.fileId.toString())
-    }
-
-    // Normal map
-    const normal = textureSet.textures.find(
-      t => t.textureType === TextureType.Normal
-    )
-    if (normal) {
-      urls.normalMap = getFileUrl(normal.fileId.toString())
-    }
-
-    // Roughness map
-    const roughness = textureSet.textures.find(
-      t => t.textureType === TextureType.Roughness
-    )
-    if (roughness) {
-      urls.roughnessMap = getFileUrl(roughness.fileId.toString())
-    }
-
-    // Metallic map
-    const metallic = textureSet.textures.find(
-      t => t.textureType === TextureType.Metallic
-    )
-    if (metallic) {
-      urls.metalnessMap = getFileUrl(metallic.fileId.toString())
-    }
-
-    // AO map
-    const ao = textureSet.textures.find(t => t.textureType === TextureType.AO)
-    if (ao) {
-      urls.aoMap = getFileUrl(ao.fileId.toString())
-    }
-
-    // Emissive map
-    const emissive = textureSet.textures.find(
-      t => t.textureType === TextureType.Emissive
-    )
-    if (emissive) {
-      urls.emissiveMap = getFileUrl(emissive.fileId.toString())
-    }
-
-    // Bump map
-    const bump = textureSet.textures.find(
-      t => t.textureType === TextureType.Bump
-    )
-    if (bump) {
-      urls.bumpMap = getFileUrl(bump.fileId.toString())
-    }
-
-    // Alpha map
-    const alpha = textureSet.textures.find(
-      t => t.textureType === TextureType.Alpha
-    )
-    if (alpha) {
-      urls.alphaMap = getFileUrl(alpha.fileId.toString())
-    }
-
-    // Displacement map (also check Height for backwards compatibility)
-    const displacement = textureSet.textures.find(
-      t => t.textureType === TextureType.Displacement
-    )
-    const height = textureSet.textures.find(
-      t => t.textureType === TextureType.Height
-    )
-    if (displacement) {
-      urls.displacementMap = getFileUrl(displacement.fileId.toString())
-    } else if (height) {
-      urls.displacementMap = getFileUrl(height.fileId.toString())
-    }
-
-    return urls
-  }, [textureSet])
-
-  // Always call useTexture (even with empty object) to satisfy React Hooks rules
-  const loadedTextures = useTexture(
-    Object.keys(textureUrlsObject).length > 0
-      ? textureUrlsObject
-      : { dummy: '' }
+  const albedo = textureSet.textures.find(
+    t => t.textureType === TextureType.Albedo
   )
+  const diffuse = textureSet.textures.find(
+    t => t.textureType === TextureType.Diffuse
+  )
+  if (albedo) urls.map = makeInfo(albedo)
+  else if (diffuse) urls.map = makeInfo(diffuse)
 
-  // Configure texture properties
-  Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
-    if (texture && texture.wrapS !== undefined) {
-      texture.wrapS = THREE.RepeatWrapping
-      texture.wrapT = THREE.RepeatWrapping
-    }
-  })
+  const normal = textureSet.textures.find(
+    t => t.textureType === TextureType.Normal
+  )
+  if (normal) urls.normalMap = makeInfo(normal)
 
-  // Create geometry based on type with configurable parameters
-  const geometry = useMemo(() => {
+  const roughness = textureSet.textures.find(
+    t => t.textureType === TextureType.Roughness
+  )
+  if (roughness) urls.roughnessMap = makeInfo(roughness)
+
+  const metallic = textureSet.textures.find(
+    t => t.textureType === TextureType.Metallic
+  )
+  if (metallic) urls.metalnessMap = makeInfo(metallic)
+
+  const ao = textureSet.textures.find(t => t.textureType === TextureType.AO)
+  if (ao) urls.aoMap = makeInfo(ao)
+
+  const emissive = textureSet.textures.find(
+    t => t.textureType === TextureType.Emissive
+  )
+  if (emissive) urls.emissiveMap = makeInfo(emissive)
+
+  const bump = textureSet.textures.find(t => t.textureType === TextureType.Bump)
+  if (bump) urls.bumpMap = makeInfo(bump)
+
+  const alpha = textureSet.textures.find(
+    t => t.textureType === TextureType.Alpha
+  )
+  if (alpha) urls.alphaMap = makeInfo(alpha)
+
+  const displacement = textureSet.textures.find(
+    t => t.textureType === TextureType.Displacement
+  )
+  const height = textureSet.textures.find(
+    t => t.textureType === TextureType.Height
+  )
+  if (displacement) urls.displacementMap = makeInfo(displacement)
+  else if (height) urls.displacementMap = makeInfo(height)
+
+  return urls
+}
+
+/** Create the geometry JSX based on type and params */
+function useGeometry(
+  geometryType: GeometryType,
+  geometryParams: GeometryParams
+) {
+  return useMemo(() => {
     const scale = geometryParams.scale || 1
     switch (geometryType) {
       case 'box': {
         const size = geometryParams.cubeSize || 2
-        return <boxGeometry args={[size * scale, size * scale, size * scale]} />
+        return (
+          <boxGeometry
+            args={[size * scale, size * scale, size * scale, 64, 64, 64]}
+          />
+        )
       }
       case 'sphere': {
         const radius = geometryParams.sphereRadius || 1.2
@@ -160,7 +129,14 @@ export function TexturedGeometry({
         const height = geometryParams.cylinderHeight || 2
         return (
           <cylinderGeometry
-            args={[radius * scale, radius * scale, height * scale, 64]}
+            args={[
+              radius * scale,
+              radius * scale,
+              height * scale,
+              64,
+              1,
+              false,
+            ]}
           />
         )
       }
@@ -173,64 +149,178 @@ export function TexturedGeometry({
         return <boxGeometry args={[2, 2, 2]} />
     }
   }, [geometryType, geometryParams])
+}
 
-  // Extract loaded textures, handling the dummy case
-  const hasTextures = Object.keys(textureUrlsObject).length > 0
-  const textures = hasTextures
-    ? {
-        map: (loadedTextures as Record<string, THREE.Texture>).map || null,
-        normalMap:
-          (loadedTextures as Record<string, THREE.Texture>).normalMap || null,
-        roughnessMap:
-          (loadedTextures as Record<string, THREE.Texture>).roughnessMap ||
-          null,
-        metalnessMap:
-          (loadedTextures as Record<string, THREE.Texture>).metalnessMap ||
-          null,
-        aoMap: (loadedTextures as Record<string, THREE.Texture>).aoMap || null,
-        emissiveMap:
-          (loadedTextures as Record<string, THREE.Texture>).emissiveMap || null,
-        bumpMap:
-          (loadedTextures as Record<string, THREE.Texture>).bumpMap || null,
-        alphaMap:
-          (loadedTextures as Record<string, THREE.Texture>).alphaMap || null,
-        displacementMap:
-          (loadedTextures as Record<string, THREE.Texture>).displacementMap ||
-          null,
+/** Texture properties that carry color data (need sRGB encoding) */
+const COLOR_TEXTURE_PROPS = new Set(['map', 'emissiveMap'])
+
+/** Sub-component that loads textures (standard + EXR) and renders the mesh */
+function TexturedMesh({
+  geometryType,
+  geometryParams,
+  textureUrls,
+}: {
+  geometryType: GeometryType
+  geometryParams: GeometryParams
+  textureUrls: Record<string, TextureUrlInfo>
+}) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const [loadedTextures, setLoadedTextures] = useState<
+    Record<string, THREE.Texture>
+  >({})
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += geometryParams.rotationSpeed
+    }
+  })
+
+  const geometry = useGeometry(geometryType, geometryParams)
+
+  const hasNormalMap = !!loadedTextures.normalMap
+
+  // Compute tangents for correct normal-map rendering
+  useEffect(() => {
+    const geo = meshRef.current?.geometry
+    if (
+      geo &&
+      hasNormalMap &&
+      geo.index &&
+      geo.getAttribute('position') &&
+      geo.getAttribute('normal') &&
+      geo.getAttribute('uv')
+    ) {
+      try {
+        geo.computeTangents()
+      } catch {
+        // computeTangents can fail on degenerate geometry — safe to ignore
       }
-    : {
-        map: null,
-        normalMap: null,
-        roughnessMap: null,
-        metalnessMap: null,
-        aoMap: null,
-        emissiveMap: null,
-        bumpMap: null,
-        alphaMap: null,
-        displacementMap: null,
+    }
+  }, [hasNormalMap, geometryType, geometryParams])
+
+  // Compute tiling
+  const uvMode = geometryParams.uvMappingMode ?? UvMappingMode.Standard
+  let tilingX: number
+  let tilingY: number
+
+  if (uvMode === UvMappingMode.Physical) {
+    const physicalTiling = getPhysicalTiling(
+      geometryType,
+      {
+        scale: geometryParams.scale,
+        cubeSize: geometryParams.cubeSize,
+        sphereRadius: geometryParams.sphereRadius,
+        cylinderRadius: geometryParams.cylinderRadius,
+        cylinderHeight: geometryParams.cylinderHeight,
+        torusRadius: geometryParams.torusRadius,
+        torusTube: geometryParams.torusTube,
+      },
+      geometryParams.uvScale ?? 1
+    )
+    tilingX = physicalTiling.x
+    tilingY = physicalTiling.y
+  } else {
+    tilingX = geometryParams.tilingScaleX ?? 1
+    tilingY = geometryParams.tilingScaleY ?? 1
+  }
+
+  // Stable URL key for dependency tracking
+  const urlsKey = useMemo(() => JSON.stringify(textureUrls), [textureUrls])
+
+  // Load all textures (standard via TextureLoader, EXR via EXRLoader)
+  useEffect(() => {
+    let cancelled = false
+    const textureLoader = new THREE.TextureLoader()
+    const exrLoader = new EXRLoader()
+
+    async function loadAll() {
+      const result: Record<string, THREE.Texture> = {}
+
+      await Promise.all(
+        Object.entries(textureUrls).map(async ([prop, info]) => {
+          try {
+            let texture: THREE.Texture
+            if (info.isExrFormat) {
+              texture = await exrLoader.loadAsync(info.url)
+            } else {
+              texture = await textureLoader.loadAsync(info.url)
+            }
+            if (!cancelled) {
+              // Set color space based on texture property
+              if (COLOR_TEXTURE_PROPS.has(prop)) {
+                texture.colorSpace = THREE.SRGBColorSpace
+              } else {
+                texture.colorSpace = THREE.LinearSRGBColorSpace
+              }
+              texture.wrapS = THREE.RepeatWrapping
+              texture.wrapT = THREE.RepeatWrapping
+              result[prop] = texture
+            }
+          } catch (err) {
+            console.warn(`Failed to load ${prop} texture:`, err)
+          }
+        })
+      )
+
+      if (!cancelled) {
+        setLoadedTextures(result)
       }
+    }
+
+    loadAll()
+    return () => {
+      cancelled = true
+    }
+  }, [urlsKey])
+
+  // Apply tiling whenever textures or tiling params change
+  useEffect(() => {
+    Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
+      if (texture && texture.wrapS !== undefined) {
+        texture.repeat.set(tilingX, tilingY)
+      }
+    })
+  }, [loadedTextures, tilingX, tilingY])
+
+  const t = loadedTextures
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
       {geometry}
       <meshStandardMaterial
-        map={textures.map}
-        normalMap={textures.normalMap}
-        roughnessMap={textures.roughnessMap}
-        metalnessMap={textures.metalnessMap}
-        aoMap={textures.aoMap}
-        emissiveMap={textures.emissiveMap}
-        bumpMap={textures.bumpMap}
-        alphaMap={textures.alphaMap}
-        displacementMap={textures.displacementMap}
-        roughness={textures.roughnessMap ? 1 : 0.5}
-        metalness={textures.metalnessMap ? 1 : 0.3}
-        emissive={textures.emissiveMap ? '#ffffff' : '#000000'}
-        transparent={textures.alphaMap ? true : false}
-        color={textures.map ? undefined : '#ffffff'}
+        map={t.map || null}
+        normalMap={t.normalMap || null}
+        roughnessMap={t.roughnessMap || null}
+        metalnessMap={t.metalnessMap || null}
+        aoMap={t.aoMap || null}
+        emissiveMap={t.emissiveMap || null}
+        bumpMap={t.bumpMap || null}
+        alphaMap={t.alphaMap || null}
+        displacementMap={t.displacementMap || null}
+        displacementScale={t.displacementMap ? 0.1 : 0}
+        roughness={t.roughnessMap ? 1 : 0.5}
+        metalness={t.metalnessMap ? 1 : 0.3}
+        emissive={t.emissiveMap ? '#ffffff' : '#000000'}
+        transparent={!!t.alphaMap}
+        color={t.map ? undefined : '#ffffff'}
         wireframe={geometryParams.wireframe || false}
       />
     </mesh>
   )
 }
 
+export function TexturedGeometry({
+  geometryType,
+  textureSet,
+  geometryParams = {} as GeometryParams,
+}: TexturedGeometryProps) {
+  const textureUrls = useMemo(() => buildTextureUrls(textureSet), [textureSet])
+
+  return (
+    <TexturedMesh
+      geometryType={geometryType}
+      geometryParams={geometryParams}
+      textureUrls={textureUrls}
+    />
+  )
+}

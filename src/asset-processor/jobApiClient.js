@@ -139,6 +139,53 @@ export class JobApiClient {
   }
 
   /**
+   * Finish a texture set thumbnail job (mark as completed or failed)
+   * @param {number} jobId - The job ID
+   * @param {boolean} success - Whether the job succeeded
+   * @param {Object} metadata - Thumbnail metadata (required when success=true)
+   * @param {string} metadata.thumbnailPath - Path to the stored thumbnail
+   * @param {number} metadata.sizeBytes - Size of the thumbnail in bytes
+   * @param {string} errorMessage - Error message (required when success=false)
+   */
+  async finishTextureSetJob(
+    jobId,
+    success,
+    metadata = {},
+    errorMessage = null
+  ) {
+    try {
+      const requestData = {
+        success,
+        thumbnailPath: metadata?.thumbnailPath || null,
+        sizeBytes: metadata?.sizeBytes || null,
+        errorMessage,
+      }
+
+      await this.apiClient.post(
+        `/thumbnail-jobs/texture-sets/${jobId}/finish`,
+        requestData
+      )
+      logger.info(
+        success
+          ? 'Marked texture set thumbnail job as completed'
+          : 'Marked texture set thumbnail job as failed',
+        {
+          jobId,
+          success,
+          ...(success ? { thumbnailMetadata: metadata } : { errorMessage }),
+        }
+      )
+    } catch (error) {
+      logger.error('Failed to finish texture set thumbnail job', {
+        jobId,
+        success,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
    * Mark a job as completed (convenience wrapper)
    * @deprecated Use finishJob with success=true instead
    */

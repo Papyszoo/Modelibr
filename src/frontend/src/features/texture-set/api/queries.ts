@@ -9,6 +9,7 @@ import {
 export function getTextureSetsQueryOptions(params: {
   page: number
   pageSize: number
+  kind?: number
 }) {
   return queryOptions({
     queryKey: ['textureSets', params] as const,

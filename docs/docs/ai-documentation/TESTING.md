@@ -14,13 +14,14 @@ Testing philosophy: Tests should be readable documentation, not just coverage me
 
 **Purpose:** Verify entire application flows work correctly across frontend, backend, and worker.
 
-| Directory                     | What it tests                                    |
-| ----------------------------- | ------------------------------------------------ |
-| `features/00-texture-sets/`   | Texture set creation, linking, defaults          |
-| `features/01-model-viewer/`   | 3D rendering, version switching                  |
-| `features/02-dock-system/`    | Tab state management, deduplication, persistence |
-| `features/03-upload-window/`  | Progress tracking, batch uploads                 |
-| `features/04-recycled-files/` | Soft delete, restore, permanent delete           |
+| Directory                              | What it tests                                                                                                                                                                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `features/00-texture-sets/`            | Texture set creation, linking, defaults, EXR preview (2 scenarios), auto-generated thumbnail previews — API (RGB, per-channel for PNG & EXR, sprite) and UI (grid, texture types tab, files tab, sprites page) (9 scenarios)     |
+| `features/01-model-viewer/`            | 3D rendering, version switching                                                                                                                                                                                                  |
+| `features/02-dock-system/`             | Tab state management, deduplication, persistence, cross-panel tab independence (2 scenarios)                                                                                                                                     |
+| `features/03-upload-window/`           | Progress tracking, batch uploads                                                                                                                                                                                                 |
+| `features/04-recycled-files/`          | Soft delete, restore, permanent delete                                                                                                                                                                                           |
+| `features/10-texture-set-kind.feature` | Kind tabs, creating with kind, changing kind via API, drag-drop between tabs, default tab, thumbnail auto-generation, context menu, regenerate action, tab persistence, API filtering, global texture file upload (14 scenarios) |
 
 **Running E2E tests:**
 

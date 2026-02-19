@@ -1,7 +1,11 @@
 using Application.Abstractions.Messaging;
 using Application.TextureSets;
+using Application.Thumbnails;
 using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Files;
+using WebApi.Infrastructure;
+using WebApi.Services;
 
 namespace WebApi.Endpoints;
 
@@ -89,6 +93,43 @@ public static class TextureSetEndpoints
             .WithName("Associate Texture Set with All Model Versions")
             .WithSummary("Associates a texture set with all versions of a model")
             .WithOpenApi();
+
+        // Kind update
+        app.MapPut("/texture-sets/{id}/kind", UpdateTextureSetKind)
+            .WithName("Update Texture Set Kind")
+            .WithSummary("Updates the kind of a texture set (ModelSpecific or Universal)")
+            .WithOpenApi();
+
+        // Tiling scale (Universal texture sets only)
+        app.MapPut("/texture-sets/{id}/tiling-scale", UpdateTilingScale)
+            .WithName("Update Texture Set Tiling Scale")
+            .WithSummary("Updates the tiling scale for a universal texture set")
+            .WithOpenApi();
+
+        // Thumbnail endpoints
+        app.MapPost("/texture-sets/{id}/thumbnail/upload", UploadTextureSetThumbnail)
+            .WithName("Upload Texture Set Thumbnail")
+            .WithTags("Thumbnails")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
+            .DisableAntiforgery();
+
+        app.MapPost("/texture-sets/{id}/thumbnail/png-upload", UploadTextureSetPngThumbnail)
+            .WithName("Upload Texture Set PNG Thumbnail")
+            .WithTags("Thumbnails")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
+            .DisableAntiforgery();
+
+        app.MapGet("/texture-sets/{id}/thumbnail/file", ServeTextureSetThumbnail)
+            .WithName("Serve Texture Set Thumbnail")
+            .WithTags("Thumbnails");
+
+        app.MapGet("/texture-sets/{id}/thumbnail/png-file", ServeTextureSetPngThumbnail)
+            .WithName("Serve Texture Set PNG Thumbnail")
+            .WithTags("Thumbnails");
+
+        app.MapPost("/texture-sets/{id}/thumbnail/regenerate", RegenerateTextureSetThumbnail)
+            .WithName("Regenerate Texture Set Thumbnail")
+            .WithTags("Thumbnails");
     }
 
     private static async Task<IResult> GetAllTextureSets(
@@ -96,10 +137,12 @@ public static class TextureSetEndpoints
         int? projectId,
         int? page,
         int? pageSize,
+        int? kind,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId, page, pageSize), cancellationToken);
+        TextureSetKind? textureSetKind = kind.HasValue ? (TextureSetKind)kind.Value : null;
+        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId, page, pageSize, textureSetKind), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -162,7 +205,7 @@ public static class TextureSetEndpoints
             return Results.BadRequest(new { error = "InvalidInput", message = "Texture set name is required." });
         }
 
-        var result = await commandHandler.Handle(new CreateTextureSetCommand(request.Name), cancellationToken);
+        var result = await commandHandler.Handle(new CreateTextureSetCommand(request.Name, request.Kind ?? TextureSetKind.ModelSpecific), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -177,6 +220,7 @@ public static class TextureSetEndpoints
         string? name,
         TextureType? textureType,
         string? batchId,
+        int? kind,
         ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse> commandHandler,
         CancellationToken cancellationToken)
     {
@@ -188,13 +232,15 @@ public static class TextureSetEndpoints
         // Use file name without extension as default texture set name
         var textureSetName = name ?? Path.GetFileNameWithoutExtension(file.FileName);   
         var texType = textureType ?? TextureType.Albedo;
+        var textureSetKind = kind.HasValue ? (TextureSetKind)kind.Value : TextureSetKind.ModelSpecific;
 
         var result = await commandHandler.Handle(
             new CreateTextureSetWithFileCommand(
                 new WebApi.Files.FormFileUpload(file),
                 textureSetName,
                 texType,
-                batchId),
+                batchId,
+                textureSetKind),
             cancellationToken);
 
         if (result.IsFailure)
@@ -384,11 +430,125 @@ public static class TextureSetEndpoints
 
         return Results.NoContent();
     }
+
+    private static async Task<IResult> UpdateTextureSetKind(
+        int id,
+        [FromBody] UpdateTextureSetKindRequest request,
+        ICommandHandler<UpdateTextureSetKindCommand, UpdateTextureSetKindResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UpdateTextureSetKindCommand(id, request.Kind),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> UpdateTilingScale(
+        int id,
+        [FromBody] UpdateTilingScaleRequest request,
+        ICommandHandler<UpdateTextureSetTilingScaleCommand, UpdateTextureSetTilingScaleResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UpdateTextureSetTilingScaleCommand(id, request.TilingScaleX, request.TilingScaleY, request.UvMappingMode, request.UvScale),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> UploadTextureSetThumbnail(
+        int id,
+        IFormFile file,
+        ICommandHandler<UploadTextureSetThumbnailCommand, UploadTextureSetThumbnailCommandResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new UploadTextureSetThumbnailCommand(id, new FormFileUpload(file), false);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (result.IsFailure)
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Results.Ok(new { Message = "Texture set thumbnail uploaded", TextureSetId = id, result.Value.ThumbnailPath });
+    }
+
+    private static async Task<IResult> UploadTextureSetPngThumbnail(
+        int id,
+        IFormFile file,
+        ICommandHandler<UploadTextureSetThumbnailCommand, UploadTextureSetThumbnailCommandResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new UploadTextureSetThumbnailCommand(id, new FormFileUpload(file), true);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (result.IsFailure)
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Results.Ok(new { Message = "Texture set PNG thumbnail uploaded", TextureSetId = id, result.Value.ThumbnailPath });
+    }
+
+    private static async Task<IResult> ServeTextureSetThumbnail(
+        int id,
+        IQueryHandler<GetTextureSetByIdQuery, GetTextureSetByIdResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetTextureSetByIdQuery(id), cancellationToken);
+        if (result.IsFailure)
+            return Results.NotFound();
+
+        var thumbnailPath = result.Value.TextureSet.ThumbnailPath;
+        if (string.IsNullOrEmpty(thumbnailPath) || !System.IO.File.Exists(thumbnailPath))
+            return Results.NotFound();
+
+        var contentType = ContentTypeProvider.GetContentType(thumbnailPath);
+        return Results.File(thumbnailPath, contentType);
+    }
+
+    private static async Task<IResult> ServeTextureSetPngThumbnail(
+        int id,
+        IQueryHandler<GetTextureSetByIdQuery, GetTextureSetByIdResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetTextureSetByIdQuery(id), cancellationToken);
+        if (result.IsFailure)
+            return Results.NotFound();
+
+        var pngPath = result.Value.TextureSet.PngThumbnailPath;
+        if (string.IsNullOrEmpty(pngPath) || !System.IO.File.Exists(pngPath))
+            return Results.NotFound();
+
+        return Results.File(pngPath, "image/png");
+    }
+
+    private static async Task<IResult> RegenerateTextureSetThumbnail(
+        int id,
+        ICommandHandler<RegenerateTextureSetThumbnailCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RegenerateTextureSetThumbnailCommand(id), cancellationToken);
+
+        if (result.IsFailure)
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Results.Ok(new { Message = "Texture set thumbnail regeneration queued", TextureSetId = id });
+    }
 }
 
 // Request DTOs
-public record CreateTextureSetRequest(string Name);
+public record CreateTextureSetRequest(string Name, TextureSetKind? Kind = null);
 public record UpdateTextureSetRequest(string Name);
+public record UpdateTextureSetKindRequest(TextureSetKind Kind);
+public record UpdateTilingScaleRequest(float TilingScaleX, float TilingScaleY, UvMappingMode? UvMappingMode = null, float? UvScale = null);
 public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);
 public record ChangeTextureTypeRequest(TextureType TextureType);
 public record ChangeTextureChannelRequest(TextureChannel SourceChannel);

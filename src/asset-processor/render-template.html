@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,15 +12,18 @@
             overflow: hidden;
             background-color: transparent;
         }
+
         #canvas-container {
             width: 100vw;
             height: 100vh;
         }
+
         canvas {
             display: block;
         }
     </style>
 </head>
+
 <body>
     <div id="canvas-container"></div>
     <script type="importmap">
@@ -35,6 +39,9 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
         import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+        import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
         // Global state for external control
         window.modelRenderer = {
@@ -51,7 +58,7 @@
         // Initialize scene with WebGPU or WebGL
         async function initScene(width, height, backgroundColor) {
             const container = document.getElementById('canvas-container');
-            
+
             // Create scene
             const scene = new THREE.Scene();
             // Set background to null for transparency
@@ -72,15 +79,15 @@
                 if (navigator.gpu) {
                     try {
                         console.log('WebGPU available, attempting to use WebGPU renderer');
-                        
+
                         // Import WebGPU renderer dynamically
                         const { WebGPURenderer } = await import('three/addons/renderers/webgpu/WebGPURenderer.js');
-                        
+
                         renderer = new WebGPURenderer({
                             antialias: true,
                             alpha: true
                         });
-                        
+
                         await renderer.init();
                         window.modelRenderer.useWebGPU = true;
                         console.log('WebGPU renderer initialized successfully');
@@ -89,7 +96,7 @@
                         renderer = null;
                     }
                 }
-                
+
                 // Fallback to WebGL if WebGPU not available or failed
                 if (!renderer) {
                     console.log('Using WebGL renderer');
@@ -111,13 +118,13 @@
             renderer.setClearColor(0x000000, 0);
             // Keep autoClear enabled and let Three.js handle it properly
             renderer.autoClear = true;
-            
+
             // Shadow mapping (WebGL specific)
             if (!window.modelRenderer.useWebGPU && renderer.shadowMap) {
                 renderer.shadowMap.enabled = true;
                 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             }
-            
+
             container.appendChild(renderer.domElement);
 
             // Setup lighting with increased ambient light and distant directional lights
@@ -146,6 +153,15 @@
             spotLight.castShadow = true;
             scene.add(spotLight);
 
+            // IBL via PMREMGenerator + neutral studio environment
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            pmremGenerator.compileEquirectangularShader();
+            const roomEnv = new RoomEnvironment(renderer);
+            const envMap = pmremGenerator.fromScene(roomEnv).texture;
+            scene.environment = envMap;
+            roomEnv.dispose();
+            pmremGenerator.dispose();
+
             window.modelRenderer.scene = scene;
             window.modelRenderer.camera = camera;
             window.modelRenderer.renderer = renderer;
@@ -157,7 +173,7 @@
         async function loadModel(modelData, fileType) {
             return new Promise((resolve, reject) => {
                 let loader;
-                
+
                 if (fileType === 'gltf' || fileType === 'glb') {
                     loader = new GLTFLoader();
                 } else if (fileType === 'obj') {
@@ -178,7 +194,7 @@
                         } else {
                             model = result;
                         }
-                        
+
                         // Apply standard material to ALL models for consistent appearance
                         // This overrides embedded GLTF textures - texture set will be applied later if configured
                         model.traverse((child) => {
@@ -193,7 +209,7 @@
                                 child.receiveShadow = true;
                             }
                         });
-                        
+
                         resolve(model);
                     },
                     undefined,
@@ -210,7 +226,7 @@
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
-            
+
             // Scale to fit
             const maxDimension = Math.max(size.x, size.y, size.z);
             if (maxDimension > 0) {
@@ -228,22 +244,22 @@
             model.position.x = -scaledCenter.x;
             model.position.y = -scaledCenter.y;
             model.position.z = -scaledCenter.z;
-            
+
             // Create a container group for rotation around the true center
             const container = new THREE.Group();
             container.position.set(0, 0, 0);
-            
+
             // Add model to container
             container.add(model);
-            
+
             // Store reference to container for rotation
             window.modelRenderer.modelContainer = container;
-            
+
             // Calculate the diagonal radius of the bounding box
             // This ensures the entire model is visible when rotated in any direction
             const diagonalRadius = Math.sqrt(
-                scaledSize.x * scaledSize.x + 
-                scaledSize.y * scaledSize.y + 
+                scaledSize.x * scaledSize.x +
+                scaledSize.y * scaledSize.y +
                 scaledSize.z * scaledSize.z
             ) / 2;
 
@@ -261,20 +277,20 @@
             // Camera is positioned in front of the model along the Z-axis
             window.modelRenderer.camera.position.set(0, 0, distance);
             window.modelRenderer.camera.lookAt(0, 0, 0);
-            
+
             // Rotate the model container instead of moving the camera
             if (window.modelRenderer.modelContainer) {
                 // Convert angles to radians
                 const azimuthRad = (azimuthAngle * Math.PI) / 180;
                 const elevationRad = (elevationAngle * Math.PI) / 180;
-                
+
                 // Reset rotation first to avoid accumulation
                 window.modelRenderer.modelContainer.rotation.set(0, 0, 0);
-                
+
                 // Apply rotations
                 // Azimuth rotates around Y-axis (horizontal rotation)
                 window.modelRenderer.modelContainer.rotation.y = azimuthRad;
-                
+
                 // Elevation rotates around X-axis (vertical tilt)
                 // Note: We use negative elevation to maintain the same viewing angle
                 // as the old camera-orbit approach
@@ -287,7 +303,7 @@
             if (!window.modelRenderer.renderer || !window.modelRenderer.scene || !window.modelRenderer.camera) {
                 return false;
             }
-            
+
             // WebGPU renderer uses async render
             if (window.modelRenderer.useWebGPU) {
                 await window.modelRenderer.renderer.render(window.modelRenderer.scene, window.modelRenderer.camera);
@@ -326,7 +342,7 @@
                 try {
                     // Remove the container (which includes the model) from the scene
                     window.modelRenderer.scene.remove(window.modelRenderer.modelContainer);
-                    
+
                     // Dispose of geometries and materials to free memory
                     if (window.modelRenderer.model) {
                         window.modelRenderer.model.traverse((child) => {
@@ -338,7 +354,7 @@
                                 } catch (e) {
                                     console.warn('Failed to dispose geometry:', e);
                                 }
-                                
+
                                 try {
                                     if (child.material) {
                                         if (Array.isArray(child.material)) {
@@ -359,12 +375,12 @@
                             }
                         });
                     }
-                    
+
                     // Clear the references
                     window.modelRenderer.model = null;
                     window.modelRenderer.modelContainer = null;
                     window.modelRenderer.isReady = false;
-                    
+
                     console.log('Scene cleared successfully');
                     return true;
                 } catch (error) {
@@ -389,8 +405,11 @@
         window.getCanvasDataURL = getCanvasDataURL;
         window.countPolygons = countPolygons;
         window.clearScene = clearScene;
+        window.EXRLoader = EXRLoader;
+        window.BufferGeometryUtils = BufferGeometryUtils;
 
         console.log('3D Renderer initialized and ready');
     </script>
 </body>
+
 </html>

@@ -185,12 +185,31 @@ export class ModelDataService {
       textureCount: textureSet.textures.length,
     })
 
+    // Deduplicate downloads: multiple texture types may reference the same fileId
+    // (e.g., ARM packed texture used for AO, Roughness, Metallic channels)
+    const downloadedFiles = new Map() // fileId -> filePath
+
     for (const texture of textureSet.textures) {
       try {
-        const filePath = await this.downloadTextureFile(
-          texture.fileId,
-          texture.fileName || `texture_${texture.id}`
-        )
+        let filePath
+
+        // Reuse already-downloaded file if same fileId was fetched before
+        if (downloadedFiles.has(texture.fileId)) {
+          filePath = downloadedFiles.get(texture.fileId)
+          logger.debug('Reusing already-downloaded texture file', {
+            textureType: texture.textureType,
+            fileId: texture.fileId,
+            filePath,
+          })
+        } else {
+          filePath = await this.downloadTextureFile(
+            texture.fileId,
+            texture.fileName || `texture_${texture.id}`
+          )
+          if (filePath) {
+            downloadedFiles.set(texture.fileId, filePath)
+          }
+        }
 
         if (filePath) {
           // Include sourceChannel for split channel extraction
@@ -218,6 +237,8 @@ export class ModelDataService {
     logger.info('Texture set files downloaded', {
       textureSetId: textureSet.id,
       downloadedCount: Object.keys(texturePaths).length,
+      downloadedFiles: downloadedFiles.size,
+      deduplicatedCount: textureSet.textures.length - downloadedFiles.size,
       types: Object.keys(texturePaths),
     })
 
@@ -275,10 +296,16 @@ export class ModelDataService {
   async cleanupTextureFiles(texturePaths) {
     if (!texturePaths) return
 
+    // Deduplicate file paths — multiple texture types may share the same file (e.g., ARM channels)
+    const uniquePaths = new Set()
     for (const textureInfo of Object.values(texturePaths)) {
       // Handle both new {filePath, sourceChannel} objects and legacy plain strings
       const filePath =
         typeof textureInfo === 'string' ? textureInfo : textureInfo.filePath
+      uniquePaths.add(filePath)
+    }
+
+    for (const filePath of uniquePaths) {
       await this.cleanupTextureFile(filePath)
     }
   }

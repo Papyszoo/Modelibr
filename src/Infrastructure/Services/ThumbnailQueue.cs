@@ -105,6 +105,40 @@ public class ThumbnailQueue : IThumbnailQueue
         return createdJob;
     }
 
+    public async Task<ThumbnailJob> EnqueueTextureSetThumbnailAsync(
+        int textureSetId,
+        int maxAttempts = 3,
+        int lockTimeoutMinutes = 10,
+        CancellationToken cancellationToken = default)
+    {
+        // Check for existing job for this texture set
+        var existingJob = await _thumbnailJobRepository.GetByTextureSetIdAsync(textureSetId, cancellationToken);
+
+        if (existingJob != null)
+        {
+            var currentTime = DateTime.UtcNow;
+            existingJob.Reset(currentTime);
+            await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+
+            _logger.LogInformation("Reset existing texture set thumbnail job {JobId} for texture set {TextureSetId} for regeneration",
+                existingJob.Id, textureSetId);
+
+            await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+
+            return existingJob;
+        }
+
+        var job = ThumbnailJob.CreateForTextureSet(textureSetId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+
+        _logger.LogInformation("Enqueued texture set thumbnail job {JobId} for texture set {TextureSetId}",
+            createdJob.Id, textureSetId);
+
+        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
+
+        return createdJob;
+    }
+
     public async Task<ThumbnailJob?> DequeueAsync(string workerId, CancellationToken cancellationToken = default)
     {
         var job = await _thumbnailJobRepository.GetNextPendingJobAsync(cancellationToken);

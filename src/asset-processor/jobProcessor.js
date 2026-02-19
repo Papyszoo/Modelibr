@@ -130,7 +130,7 @@ export class JobProcessor {
         job = await this.jobService.pollForJob()
         if (job) {
           jobsProcessed++
-          logger.info('Found existing pending job on startup', {
+          logger.info('Found pending job during polling', {
             jobId: job.id,
             assetType: job.assetType,
             modelId: job.modelId,
@@ -154,16 +154,16 @@ export class JobProcessor {
       } while (job !== null && jobsProcessed < 100) // Safety limit
 
       if (jobsProcessed > 0) {
-        logger.info('Startup job polling complete', {
+        logger.info('Job polling complete', {
           jobsFound: jobsProcessed,
         })
         // Start processing the queue
         this.processQueue()
       } else {
-        logger.info('No pending jobs found on startup')
+        logger.debug('No pending jobs found during polling')
       }
     } catch (error) {
-      logger.error('Error during startup job polling', {
+      logger.error('Error during job polling', {
         error: error.message,
         stack: error.stack,
       })
