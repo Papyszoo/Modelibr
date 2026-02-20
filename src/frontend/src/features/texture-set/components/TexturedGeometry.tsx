@@ -1,11 +1,11 @@
 import { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { GeometryType } from './GeometrySelector'
-import { TextureSetDto, TextureType, UvMappingMode } from '@/types'
+import { TextureSetDto, TextureType } from '@/types'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { isExrFile } from '@/utils/fileUtils'
-import { getPhysicalTiling } from '../utils/physicalUvTiling'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 
 interface GeometryParams {
@@ -20,9 +20,6 @@ interface GeometryParams {
   cylinderHeight?: number
   torusRadius?: number
   torusTube?: number
-  tilingScaleX?: number
-  tilingScaleY?: number
-  uvMappingMode?: UvMappingMode
   uvScale?: number
 }
 
@@ -103,52 +100,54 @@ function buildTextureUrls(
   return urls
 }
 
-/** Create the geometry JSX based on type and params */
-function useGeometry(
+/**
+ * Create a welded BufferGeometry for the given primitive type.
+ * mergeVertices welds shared vertices so displacement mapping
+ * doesn't tear the mesh apart at edges.
+ */
+function createWeldedGeometry(
   geometryType: GeometryType,
   geometryParams: GeometryParams
-) {
-  return useMemo(() => {
-    const scale = geometryParams.scale || 1
-    switch (geometryType) {
-      case 'box': {
-        const size = geometryParams.cubeSize || 2
-        return (
-          <boxGeometry
-            args={[size * scale, size * scale, size * scale, 64, 64, 64]}
-          />
-        )
-      }
-      case 'sphere': {
-        const radius = geometryParams.sphereRadius || 1.2
-        const segments = geometryParams.sphereSegments || 64
-        return <sphereGeometry args={[radius * scale, segments, segments]} />
-      }
-      case 'cylinder': {
-        const radius = geometryParams.cylinderRadius || 1
-        const height = geometryParams.cylinderHeight || 2
-        return (
-          <cylinderGeometry
-            args={[
-              radius * scale,
-              radius * scale,
-              height * scale,
-              64,
-              1,
-              false,
-            ]}
-          />
-        )
-      }
-      case 'torus': {
-        const radius = geometryParams.torusRadius || 1
-        const tube = geometryParams.torusTube || 0.4
-        return <torusGeometry args={[radius * scale, tube * scale, 32, 64]} />
-      }
-      default:
-        return <boxGeometry args={[2, 2, 2]} />
+): THREE.BufferGeometry {
+  const scale = geometryParams.scale || 1
+  let geo: THREE.BufferGeometry
+
+  switch (geometryType) {
+    case 'box': {
+      const size = geometryParams.cubeSize || 2
+      geo = new THREE.BoxGeometry(
+        size * scale, size * scale, size * scale, 64, 64, 64
+      )
+      break
     }
-  }, [geometryType, geometryParams])
+    case 'sphere': {
+      const radius = geometryParams.sphereRadius || 1.2
+      const detail = 5 // IcosahedronGeometry detail level — uniform vertex distribution, no pole pinching
+      geo = new THREE.IcosahedronGeometry(radius * scale, detail)
+      break
+    }
+    case 'cylinder': {
+      const radius = geometryParams.cylinderRadius || 1
+      const height = geometryParams.cylinderHeight || 2
+      geo = new THREE.CylinderGeometry(
+        radius * scale, radius * scale, height * scale, 64, 64, false
+      )
+      break
+    }
+    case 'torus': {
+      const radius = geometryParams.torusRadius || 1
+      const tube = geometryParams.torusTube || 0.4
+      geo = new THREE.TorusGeometry(radius * scale, tube * scale, 32, 64)
+      break
+    }
+    default:
+      geo = new THREE.BoxGeometry(2, 2, 2, 64, 64, 64)
+  }
+
+  // Weld shared vertices — mandatory to prevent displacement cracks
+  geo = mergeVertices(geo)
+  geo.computeVertexNormals()
+  return geo
 }
 
 /** Texture properties that carry color data (need sRGB encoding) */
@@ -175,7 +174,11 @@ function TexturedMesh({
     }
   })
 
-  const geometry = useGeometry(geometryType, geometryParams)
+  // Build welded geometry (memoised)
+  const geometry = useMemo(
+    () => createWeldedGeometry(geometryType, geometryParams),
+    [geometryType, geometryParams]
+  )
 
   const hasNormalMap = !!loadedTextures.normalMap
 
@@ -198,31 +201,8 @@ function TexturedMesh({
     }
   }, [hasNormalMap, geometryType, geometryParams])
 
-  // Compute tiling
-  const uvMode = geometryParams.uvMappingMode ?? UvMappingMode.Standard
-  let tilingX: number
-  let tilingY: number
-
-  if (uvMode === UvMappingMode.Physical) {
-    const physicalTiling = getPhysicalTiling(
-      geometryType,
-      {
-        scale: geometryParams.scale,
-        cubeSize: geometryParams.cubeSize,
-        sphereRadius: geometryParams.sphereRadius,
-        cylinderRadius: geometryParams.cylinderRadius,
-        cylinderHeight: geometryParams.cylinderHeight,
-        torusRadius: geometryParams.torusRadius,
-        torusTube: geometryParams.torusTube,
-      },
-      geometryParams.uvScale ?? 1
-    )
-    tilingX = physicalTiling.x
-    tilingY = physicalTiling.y
-  } else {
-    tilingX = geometryParams.tilingScaleX ?? 1
-    tilingY = geometryParams.tilingScaleY ?? 1
-  }
+  // Simple UV scale — direct multiplier from database value
+  const uvScale = geometryParams.uvScale ?? 1
 
   // Stable URL key for dependency tracking
   const urlsKey = useMemo(() => JSON.stringify(textureUrls), [textureUrls])
@@ -273,20 +253,19 @@ function TexturedMesh({
     }
   }, [urlsKey])
 
-  // Apply tiling whenever textures or tiling params change
+  // Apply tiling whenever textures or scale changes
   useEffect(() => {
     Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
       if (texture && texture.wrapS !== undefined) {
-        texture.repeat.set(tilingX, tilingY)
+        texture.repeat.set(uvScale, uvScale)
       }
     })
-  }, [loadedTextures, tilingX, tilingY])
+  }, [loadedTextures, uvScale])
 
   const t = loadedTextures
 
   return (
-    <mesh ref={meshRef} castShadow receiveShadow>
-      {geometry}
+    <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
       <meshStandardMaterial
         map={t.map || null}
         normalMap={t.normalMap || null}

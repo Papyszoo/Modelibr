@@ -2,7 +2,7 @@ import { Suspense, useState, useCallback, useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Stage, OrbitControls } from '@react-three/drei'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { TextureSetDto, TextureSetKind, UvMappingMode } from '@/types'
+import { TextureSetDto, TextureSetKind } from '@/types'
 import { TexturedGeometry } from './TexturedGeometry'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { FloatingWindow } from '@/components/FloatingWindow'
@@ -38,11 +38,6 @@ export function TexturePreviewPanel({
     cylinderHeight: 2,
     torusRadius: 1,
     torusTube: 0.4,
-    tilingScaleX: textureSet.tilingScaleX ?? 1,
-    tilingScaleY: textureSet.tilingScaleY ?? 1,
-    uvMappingMode:
-      textureSet.uvMappingMode ??
-      (isUniversal ? UvMappingMode.Physical : UvMappingMode.Standard),
     uvScale: textureSet.uvScale ?? 1,
   })
 
@@ -52,20 +47,13 @@ export function TexturePreviewPanel({
 
   const saveTilingMutation = useMutation({
     mutationFn: ({
-      x,
-      y,
-      uvMappingMode,
       uvScale,
     }: {
-      x: number
-      y: number
-      uvMappingMode?: UvMappingMode
-      uvScale?: number
+      uvScale: number
     }) =>
       updateTilingScale(textureSet.id, {
-        tilingScaleX: x,
-        tilingScaleY: y,
-        uvMappingMode,
+        tilingScaleX: uvScale,
+        tilingScaleY: uvScale,
         uvScale,
       }),
     onSuccess: () => {
@@ -77,20 +65,14 @@ export function TexturePreviewPanel({
     (newSettings: PreviewSettingsType) => {
       setPreviewSettings(newSettings)
 
-      // Auto-save tiling/UV mapping changes for Universal sets (debounced 1s)
+      // Auto-save UV scale changes for Universal sets (debounced 1s)
       if (isUniversal) {
         const tilingChanged =
-          newSettings.tilingScaleX !== previewSettings.tilingScaleX ||
-          newSettings.tilingScaleY !== previewSettings.tilingScaleY ||
-          newSettings.uvMappingMode !== previewSettings.uvMappingMode ||
           newSettings.uvScale !== previewSettings.uvScale
         if (tilingChanged) {
           if (tilingDebounceRef.current) clearTimeout(tilingDebounceRef.current)
           tilingDebounceRef.current = setTimeout(() => {
             saveTilingMutation.mutate({
-              x: newSettings.tilingScaleX,
-              y: newSettings.tilingScaleY,
-              uvMappingMode: newSettings.uvMappingMode,
               uvScale: newSettings.uvScale,
             })
           }, 1000)
@@ -120,9 +102,6 @@ export function TexturePreviewPanel({
     cylinderHeight: previewSettings.cylinderHeight,
     torusRadius: previewSettings.torusRadius,
     torusTube: previewSettings.torusTube,
-    tilingScaleX: previewSettings.tilingScaleX,
-    tilingScaleY: previewSettings.tilingScaleY,
-    uvMappingMode: previewSettings.uvMappingMode,
     uvScale: previewSettings.uvScale,
   }
 

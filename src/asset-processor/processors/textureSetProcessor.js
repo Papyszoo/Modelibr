@@ -89,32 +89,11 @@ export class TextureSetProcessor extends BaseProcessor {
 
       // Step 4: Apply textures to the sphere
       // Use 'obj' fileType so flipY is true (sphere is not glTF)
-      // Compute tiling based on UV mapping mode
-      const uvMappingMode = textureSet.uvMappingMode ?? 0 // 0=Standard, 1=Physical
+      // Use uvScale directly as texture repeat multiplier
       const uvScale = textureSet.uvScale ?? 1
-      let tilingScale
+      const tilingScale = { x: uvScale, y: uvScale }
 
-      if (uvMappingMode === 1) {
-        // Physical mode: compute repeat from sphere dimensions / uvScale
-        // loadSphere creates a unit sphere (radius=1) with 64 segments
-        const sphereRadius = 1.2
-        const safeScale = Math.max(uvScale, 0.01)
-        const circumference = 2 * Math.PI * sphereRadius
-        const halfCircumference = Math.PI * sphereRadius
-        tilingScale = {
-          x: circumference / safeScale,
-          y: halfCircumference / safeScale,
-        }
-        jobLogger.info('Physical UV tiling computed for sphere', {
-          tilingScale,
-        })
-      } else {
-        // Standard mode: use raw tiling values
-        tilingScale = {
-          x: textureSet.tilingScaleX ?? 1,
-          y: textureSet.tilingScaleY ?? 1,
-        }
-      }
+      jobLogger.info('UV scale applied', { uvScale, tilingScale })
 
       const applied = await this.puppeteerRenderer.applyTextures(
         texturePaths,

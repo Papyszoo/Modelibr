@@ -158,28 +158,15 @@ Generation is handled by `FileThumbnailGenerator` (Infrastructure layer, registe
 
 **3D texture preview shapes (`TexturedGeometry.tsx`):**
 
-The texture-set viewer renders a 3D preview of applied textures on selectable geometry shapes: box, sphere, cylinder, or torus. The cylinder uses `openEnded: false` (caps visible). Sphere polar pinching at the poles is inherent to standard spherical UV mapping and is expected.
+The texture-set viewer renders a 3D preview of applied textures on selectable geometry shapes: box, sphere, cylinder, or torus. The cylinder uses `openEnded: false` (caps visible).
 
-The component is split into three sub-components to safely handle EXR textures:
+Key rendering features:
+- **Vertex welding**: All primitives are passed through `mergeVertices()` (from `BufferGeometryUtils`) before rendering. This welds shared vertices so displacement mapping doesn't tear the mesh at edges/seams.
+- **Icosahedron for sphere**: The sphere uses `IcosahedronGeometry(radius, 5)` instead of `SphereGeometry` to provide uniform vertex distribution and eliminate pole-pinching artifacts.
+- **Simple UV scaling**: The `uvScale` value from the database is used directly as `texture.repeat.set(scale, scale)`. No complex physical tiling calculations.
+- **IBL lighting**: The preview uses `<Stage environment="city">` from `@react-three/drei` for Image-Based Lighting, providing realistic reflections and depth.
 
-- `TexturedMesh` — renders geometry with `useTexture` (drei) for standard image formats. Supports two UV mapping modes:
-    - **Standard** — applies raw `tilingScaleX/Y` values directly via `texture.repeat.set()`.
-    - **Physical** — computes `texture.repeat` from geometry dimensions and `uvScale` using `getPhysicalTiling()`, ensuring consistent texel density across all shapes.
-- `UntexturedMesh` — renders plain geometry with a basic white material. Used when all textures are EXR (since `useTexture`/`THREE.TextureLoader` cannot load EXR files).
-- `TexturedGeometry` (exported wrapper) — builds texture URLs via `buildTextureUrls()`, filters out EXR files using `isExr()` helper, and conditionally renders `TexturedMesh` or `UntexturedMesh`.
-
-Shared utilities: `buildTextureUrls(textureSet)` extracts non-EXR texture URLs into a `Record<string, string>`, and `useGeometry(type, params)` returns geometry JSX for the selected shape.
-
-**Physical UV Tiling (`physicalUvTiling.ts`):**
-
-The `getPhysicalTiling(geometryType, dimensions, uvScale)` utility computes texture repeat values from geometry dimensions so that one tile covers `uvScale` world units regardless of shape. This ensures consistent texel density across different preview geometries. Formulas:
-
-- **Box**: `repeat = size / uvScale` (both axes)
-- **Sphere**: `x = 2πr / uvScale`, `y = πr / uvScale`
-- **Cylinder**: `x = 2πr / uvScale`, `y = height / uvScale`
-- **Torus**: `x = 2πR / uvScale`, `y = 2πr / uvScale` (R = major radius, r = tube radius)
-
-Default `uvScale` is 1.0 (one tile = 1 meter). Guard: `Math.max(uvScale, 0.01)` prevents division by zero.
+The component loads textures (standard + EXR) asynchronously, sets correct color spaces (sRGB for color textures, linear for data textures), and applies `RepeatWrapping`.
 
 **Thumbnail generation for Universal sets:**
 
