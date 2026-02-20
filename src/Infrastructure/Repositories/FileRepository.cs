@@ -28,6 +28,15 @@ internal sealed class FileRepository : IFileRepository
             .FirstOrDefaultAsync(f => f.Sha256Hash == sha256Hash, cancellationToken);
     }
 
+    public async Task<Domain.Models.File?> GetDeletedBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        return await _context.Files
+            .IgnoreQueryFilters()
+            .Where(f => f.IsDeleted)
+            .Include(f => f.Models)
+            .FirstOrDefaultAsync(f => f.Sha256Hash == sha256Hash, cancellationToken);
+    }
+
     public async Task<IEnumerable<Domain.Models.File>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Files
@@ -98,5 +107,44 @@ internal sealed class FileRepository : IFileRepository
             .Where(f => f.Id != fileId)
             .Where(f => f.ModelVersionId != excludeVersionId || f.ModelVersionId == null)
             .AnyAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsFileHashReferencedByOthersAsync(int fileId, CancellationToken cancellationToken = default)
+    {
+        var file = await _context.Files
+            .IgnoreQueryFilters()
+            .Where(f => f.Id == fileId)
+            .Select(f => new { f.Sha256Hash })
+            .FirstOrDefaultAsync(cancellationToken);
+        
+        if (file == null || string.IsNullOrEmpty(file.Sha256Hash))
+            return false;
+        
+        // Check if any other File entity (non-deleted) references the same hash
+        var otherFileExists = await _context.Files
+            .Where(f => f.Sha256Hash == file.Sha256Hash)
+            .Where(f => f.Id != fileId)
+            .AnyAsync(cancellationToken);
+        
+        if (otherFileExists) return true;
+        
+        // Check if any non-deleted Texture references this file
+        var textureExists = await _context.Textures
+            .Where(t => t.FileId == fileId)
+            .AnyAsync(cancellationToken);
+        
+        return textureExists;
+    }
+
+    public async Task HardDeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var file = await _context.Files
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+        if (file != null)
+        {
+            _context.Files.Remove(file);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

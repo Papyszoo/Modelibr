@@ -36,9 +36,9 @@ RUN dotnet publish "./WebApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:
 
 # Final stage
 FROM base AS final
-# Install curl for healthchecks
+# Install curl for healthchecks and libgomp1 for Magick.NET (ImageMagick OpenMP)
 USER root
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl libgomp1 && rm -rf /var/lib/apt/lists/*
 # Allow customizing UID/GID to match host for bind-mounted uploads directory
 ARG APP_UID=1000
 ARG APP_GID=1000

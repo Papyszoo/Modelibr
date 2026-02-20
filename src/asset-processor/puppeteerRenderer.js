@@ -6,6 +6,7 @@ import logger from './logger.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+import http from 'http'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -41,6 +42,9 @@ export class PuppeteerRenderer {
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
+          // Memory flags - give Chromium enough heap for full 4K textures
+          '--js-flags=--max-old-space-size=4096',
+          '--disable-gpu',
           // WebGL/GPU flags - enable WebGL with software rendering for headless mode
           '--use-gl=angle', // Use ANGLE for WebGL compatibility
           '--use-angle=swiftshader', // Use SwiftShader for software rendering
@@ -136,38 +140,119 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Check if the current page is actually usable (not detached/crashed).
+   * `page.isClosed()` alone is insufficient — the page object can exist while
+   * the underlying Chromium renderer process has crashed and the frame is detached.
+   * @returns {Promise<boolean>} true if page.evaluate() works
+   */
+  async _isPageUsable() {
+    try {
+      await this.page.evaluate(() => true)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Close the existing browser (if any) and reinitialize from scratch.
+   * Used when the page/frame becomes detached or the renderer process crashes.
+   */
+  async _reinitialize() {
+    if (this.browser) {
+      try {
+        await this.browser.close()
+      } catch (e) {
+        logger.debug('Error closing browser during reinit', {
+          error: e.message,
+        })
+      }
+      this.browser = null
+    }
+    this.page = null
+    await this.initialize()
+    logger.info('Renderer reinitialized successfully')
+  }
+
+  /**
+   * Start a local HTTP file server for serving texture files to the browser.
+   * This avoids encoding all textures as base64 and sending them through CDP,
+   * which causes Chromium OOM crashes with large (4K) textures.
+   * The browser fetches each texture on-demand via HTTP instead.
+   * @param {string} textureDir - Directory containing the texture temp files
+   * @returns {Promise<{server: http.Server, port: number}>}
+   */
+  async _startTextureServer(textureDir) {
+    return new Promise((resolve, reject) => {
+      const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.exr': 'application/octet-stream',
+        '.webp': 'image/webp',
+        '.tga': 'image/x-tga',
+        '.bmp': 'image/bmp',
+        '.tiff': 'image/tiff',
+        '.tif': 'image/tiff',
+      }
+
+      const server = http.createServer((req, res) => {
+        // Decode the requested filename from the URL path
+        const requestedName = decodeURIComponent(req.url.split('/').pop() || '')
+        // The texture temp files sit in the provided directory
+        const filePath = path.join(textureDir, requestedName)
+
+        if (!fs.existsSync(filePath)) {
+          res.writeHead(404)
+          res.end('Not found')
+          return
+        }
+
+        const ext = path.extname(filePath).toLowerCase()
+        res.writeHead(200, {
+          'Content-Type': mimeTypes[ext] || 'application/octet-stream',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache',
+        })
+        fs.createReadStream(filePath).pipe(res)
+      })
+
+      server.listen(0, '127.0.0.1', () => {
+        const port = server.address().port
+        logger.info('Texture file server started', { port })
+        resolve({ server, port })
+      })
+      server.on('error', reject)
+    })
+  }
+
+  /**
+   * Stop the local texture file server.
+   * @param {http.Server} server
+   */
+  async _stopTextureServer(server) {
+    if (!server) return
+    return new Promise(resolve => {
+      server.close(() => {
+        logger.debug('Texture file server stopped')
+        resolve()
+      })
+    })
+  }
+
+  /**
    * Load a model from file path
    * @param {string} filePath - Path to the model file
    * @param {string} fileType - Type of the file (obj, fbx, gltf, glb)
    * @returns {Promise<number>} Polygon count
    */
   async loadModel(filePath, fileType) {
-    // Check if page exists and is still connected
-    if (!this.page || this.page.isClosed()) {
-      logger.warn('Renderer page is not available, reinitializing')
-      // Close existing browser if it exists
-      if (this.browser) {
-        try {
-          await this.browser.close()
-        } catch (e) {
-          logger.debug('Error closing browser during reinit', {
-            error: e.message,
-          })
-        }
-        this.browser = null
-      }
-      this.page = null
-
-      // Reinitialize
-      try {
-        await this.initialize()
-        logger.info('Renderer reinitialized successfully')
-      } catch (initError) {
-        logger.error('Failed to reinitialize renderer', {
-          error: initError.message,
-        })
-        throw new Error('Renderer not initialized and reinitialize failed')
-      }
+    // Check if page exists, is not closed, AND the frame is still usable
+    if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
+      logger.warn(
+        'Renderer page is not available or frame is detached, reinitializing'
+      )
+      await this._reinitialize()
     }
 
     logger.debug('Loading model in browser', { filePath, fileType })
@@ -186,10 +271,22 @@ export class PuppeteerRenderer {
           logger.debug('Previous model cleared from scene')
         }
       } catch (clearError) {
-        logger.warn('Failed to clear previous scene, continuing anyway', {
+        logger.warn('Failed to clear previous scene', {
           error: clearError.message,
         })
-        // Continue even if clearing fails - the new model will still load
+        // If the frame is detached/crashed, reinitialize before continuing
+        if (
+          clearError.message.includes('detached') ||
+          clearError.message.includes('Target closed') ||
+          clearError.message.includes('Session closed') ||
+          clearError.message.includes('Execution context was destroyed')
+        ) {
+          logger.warn(
+            'Page frame is detached during clearScene, reinitializing renderer'
+          )
+          await this._reinitialize()
+        }
+        // Otherwise continue — the new model load will overwrite the scene
       }
 
       // Read the file and convert to data URL
@@ -255,12 +352,111 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Load a textured sphere into the scene (used for texture set previews).
+   * Creates a SphereGeometry with MeshStandardMaterial, normalizes and adds to scene
+   * exactly like loadModel so the orbit renderer can work unchanged.
+   * @param {number} [segments=64] - Number of width/height segments for the sphere
+   * @returns {Promise<number>} Polygon count
+   */
+  async loadSphere(segments = 5) {
+    // Check if page exists, is not closed, AND the frame is still usable
+    if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
+      logger.warn(
+        'Renderer page is not available or frame is detached, reinitializing'
+      )
+      await this._reinitialize()
+    }
+
+    // Clear any previous model
+    try {
+      await this.page.evaluate(() => {
+        if (typeof window.clearScene === 'function') {
+          window.clearScene()
+        }
+      })
+    } catch (e) {
+      logger.warn('Failed to clear scene before loading sphere', {
+        error: e.message,
+      })
+      // If the frame is detached/crashed, reinitialize before continuing
+      if (
+        e.message.includes('detached') ||
+        e.message.includes('Target closed') ||
+        e.message.includes('Session closed') ||
+        e.message.includes('Execution context was destroyed')
+      ) {
+        logger.warn(
+          'Page frame is detached during clearScene, reinitializing renderer'
+        )
+        await this._reinitialize()
+      }
+    }
+
+    const result = await this.page.evaluate(segs => {
+      try {
+        const THREE = window.THREE
+        // IcosahedronGeometry avoids pole artifacts and gives even vertex distribution
+        let geometry = new THREE.IcosahedronGeometry(1.2, segs)
+        // Weld shared vertices for smooth displacement mapping
+        if (window.BufferGeometryUtils) {
+          geometry = window.BufferGeometryUtils.mergeVertices(geometry)
+        }
+        geometry.computeVertexNormals()
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          metalness: 0.0,
+          roughness: 0.5,
+        })
+
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.castShadow = true
+        mesh.receiveShadow = true
+
+        // Wrap in a Group so normalizeModel works the same way
+        const model = new THREE.Group()
+        model.add(mesh)
+
+        const normInfo = window.normalizeModel(model, 2.0)
+        window.modelRenderer.model = model
+        window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
+        window.modelRenderer.isReady = true
+
+        const polygonCount = window.countPolygons(model)
+
+        return {
+          success: true,
+          polygonCount,
+          boundingSphereRadius: normInfo.boundingSphereRadius,
+        }
+      } catch (error) {
+        console.error('Sphere creation error:', error)
+        return { success: false, error: error.message }
+      }
+    }, segments)
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create sphere')
+    }
+
+    logger.info('Sphere loaded in browser', {
+      polygonCount: result.polygonCount,
+      segments,
+    })
+
+    return result.polygonCount
+  }
+
+  /**
    * Apply textures to the loaded model
    * @param {Object} texturePaths - Map of texture types to texture info {filePath, sourceChannel}
    * @param {string} fileType - Model file type (gltf, glb, obj, fbx) for flipY setting
    * @returns {Promise<boolean>} Success status
    */
-  async applyTextures(texturePaths, fileType = 'gltf') {
+  async applyTextures(
+    texturePaths,
+    fileType = 'gltf',
+    tilingScale = { x: 1, y: 1 }
+  ) {
     if (!texturePaths || Object.keys(texturePaths).length === 0) {
       logger.info('No textures to apply')
       return true
@@ -274,14 +470,27 @@ export class PuppeteerRenderer {
       textureTypes: Object.keys(texturePaths),
       fileType,
       flipY,
+      tilingScale,
     })
 
+    // Start a local HTTP server to serve texture files — avoids base64 encoding and
+    // massive CDP JSON payloads that crash Chromium's renderer process on large textures.
+    // Derive the texture directory from the actual file paths.
+    const firstEntry = Object.values(texturePaths)[0]
+    const firstFilePath =
+      typeof firstEntry === 'string' ? firstEntry : firstEntry.filePath
+    const textureDir = path.dirname(firstFilePath)
+
+    const { server: textureServer, port: texturePort } =
+      await this._startTextureServer(textureDir)
+
     try {
-      // Read texture files and convert to base64 data URLs with channel info
+      // Build lightweight texture metadata with HTTP URLs instead of base64 data.
+      // Only URLs (a few bytes each) are sent through CDP — the browser fetches
+      // full texture data directly from the local server, one at a time.
       const textureData = {}
       for (const [textureType, textureInfo] of Object.entries(texturePaths)) {
         try {
-          // Handle both new {filePath, sourceChannel} objects and legacy plain strings
           const filePath =
             typeof textureInfo === 'string' ? textureInfo : textureInfo.filePath
           const sourceChannel =
@@ -289,32 +498,37 @@ export class PuppeteerRenderer {
               ? 0
               : (textureInfo.sourceChannel ?? 0)
 
-          const fileBuffer = fs.readFileSync(filePath)
-          const base64Data = fileBuffer.toString('base64')
-          // Detect image format from file extension
           const ext = path.extname(filePath).toLowerCase()
-          const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg'
+          const isExr = ext === '.exr'
+          const fileName = path.basename(filePath)
+          const url = `http://127.0.0.1:${texturePort}/${encodeURIComponent(fileName)}`
+
           textureData[textureType] = {
-            dataUrl: `data:${mimeType};base64,${base64Data}`,
-            sourceChannel, // 0=RGB, 1=R, 2=G, 3=B, 4=A
+            url,
+            isExr,
+            sourceChannel,
           }
-          logger.debug('Prepared texture data', {
+
+          const stat = fs.statSync(filePath)
+          logger.debug('Prepared texture URL', {
             textureType,
             filePath,
             sourceChannel,
-            dataUrlLength: textureData[textureType].dataUrl.length,
+            sizeBytes: stat.size,
+            url,
           })
         } catch (error) {
-          logger.warn('Failed to read texture file, skipping', {
+          logger.warn('Failed to prepare texture file, skipping', {
             textureType,
             error: error.message,
           })
         }
       }
 
-      // Apply textures in the browser with channel extraction
+      // Apply textures in the browser with channel extraction.
+      // The browser fetches each texture via HTTP from the local server.
       const result = await this.page.evaluate(
-        async (textures, shouldFlipY) => {
+        async (textures, shouldFlipY, tiling) => {
           try {
             if (!window.modelRenderer.model) {
               return { success: false, error: 'No model loaded' }
@@ -329,13 +543,16 @@ export class PuppeteerRenderer {
             const textureTypeMap = {
               1: 'map', // Albedo
               2: 'normalMap',
-              3: 'displacementMap',
+              3: 'displacementMap', // Height
               4: 'aoMap',
               5: 'roughnessMap',
               6: 'metalnessMap',
               7: 'map', // Diffuse (legacy)
               8: 'specularMap',
               9: 'emissiveMap', // Emissive
+              10: 'bumpMap', // Bump
+              11: 'alphaMap', // Alpha
+              12: 'displacementMap', // Displacement
               Albedo: 'map',
               Normal: 'normalMap',
               Height: 'displacementMap',
@@ -347,6 +564,9 @@ export class PuppeteerRenderer {
               BaseColor: 'map',
               AmbientOcclusion: 'aoMap',
               Emissive: 'emissiveMap',
+              Bump: 'bumpMap',
+              Alpha: 'alphaMap',
+              Displacement: 'displacementMap',
             }
 
             // Channel extraction shader
@@ -418,14 +638,16 @@ export class PuppeteerRenderer {
               return extractedTexture
             }
 
-            // Load texture with proper flipY
+            // Load standard texture via TextureLoader from HTTP URL
             const loadTexture = (url, flip) => {
               return new Promise((resolve, reject) => {
                 textureLoader.load(
                   url,
                   texture => {
                     texture.flipY = flip
-                    texture.colorSpace = THREE.SRGBColorSpace
+                    texture.wrapS = THREE.RepeatWrapping
+                    texture.wrapT = THREE.RepeatWrapping
+                    texture.repeat.set(tiling.x, tiling.y)
                     resolve(texture)
                   },
                   undefined,
@@ -434,10 +656,44 @@ export class PuppeteerRenderer {
               })
             }
 
+            // Load EXR texture via fetch + EXRLoader.parse() — preserves full HDR precision
+            const loadExrTexture = async (url, flip) => {
+              const response = await fetch(url)
+              const arrayBuffer = await response.arrayBuffer()
+
+              const exrLoader = new window.EXRLoader()
+              const exrData = exrLoader.parse(arrayBuffer)
+
+              const texture = new THREE.DataTexture(
+                exrData.data,
+                exrData.width,
+                exrData.height,
+                exrData.format || THREE.RGBAFormat,
+                exrData.type || THREE.FloatType
+              )
+              texture.minFilter = THREE.LinearFilter
+              texture.magFilter = THREE.LinearFilter
+              texture.generateMipmaps = false
+              texture.flipY = flip
+              texture.wrapS = THREE.RepeatWrapping
+              texture.wrapT = THREE.RepeatWrapping
+              texture.repeat.set(tiling.x, tiling.y)
+              texture.needsUpdate = true
+              return texture
+            }
+
+            // Texture types that carry color data (need sRGB color space)
+            const colorTextureProps = new Set(['map', 'emissiveMap'])
+
             const loadedTextures = {}
             for (const [type, data] of Object.entries(textures)) {
               try {
-                let texture = await loadTexture(data.dataUrl, shouldFlipY)
+                let texture
+                if (data.isExr) {
+                  texture = await loadExrTexture(data.url, shouldFlipY)
+                } else {
+                  texture = await loadTexture(data.url, shouldFlipY)
+                }
                 const sourceChannel = data.sourceChannel
 
                 // Extract channel if not RGB (0)
@@ -449,9 +705,19 @@ export class PuppeteerRenderer {
                 }
 
                 const materialProperty = textureTypeMap[type] || type
+
+                // Set correct color space: sRGB for color textures, linear for data textures
+                if (sourceChannel > 0 && sourceChannel <= 4) {
+                  texture.colorSpace = THREE.LinearSRGBColorSpace
+                } else if (colorTextureProps.has(materialProperty)) {
+                  texture.colorSpace = THREE.SRGBColorSpace
+                } else {
+                  texture.colorSpace = THREE.LinearSRGBColorSpace
+                }
+
                 loadedTextures[materialProperty] = texture
                 console.log(
-                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel})`
+                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, exr: ${!!data.isExr})`
                 )
               } catch (error) {
                 console.warn(`Failed to load ${type} texture:`, error)
@@ -487,6 +753,10 @@ export class PuppeteerRenderer {
                     if (property === 'emissiveMap') {
                       child.material.emissive = new THREE.Color(0xffffff)
                     }
+                    // Match frontend displacementScale
+                    if (property === 'displacementMap') {
+                      child.material.displacementScale = 0.1
+                    }
                   }
                 }
               }
@@ -506,7 +776,8 @@ export class PuppeteerRenderer {
           }
         },
         textureData,
-        flipY
+        flipY,
+        tilingScale
       )
 
       if (!result.success) {
@@ -529,6 +800,8 @@ export class PuppeteerRenderer {
         stack: error.stack,
       })
       return false
+    } finally {
+      await this._stopTextureServer(textureServer)
     }
   }
 

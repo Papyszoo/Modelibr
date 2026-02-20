@@ -46,6 +46,7 @@ class ApiClient {
   getFileUrl = modelApi.getFileUrl
   updateModelTags = modelApi.updateModelTags
   softDeleteModel = modelApi.softDeleteModel
+  softDeleteFile = modelApi.softDeleteFile
   setDefaultTextureSet = modelApi.setDefaultTextureSet
 
   // Model Version methods

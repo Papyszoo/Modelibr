@@ -1,4 +1,18 @@
 services:
+    nginx:
+        image: ${DOCKER_REGISTRY-}nginx-proxy
+        build:
+            context: ./nginx
+            dockerfile: Dockerfile
+        container_name: nginx-proxy
+        ports:
+            - "${FRONTEND_PORT:-3000}:443"
+        depends_on:
+            - frontend
+            - webapi
+        networks:
+            - modelibr
+        restart: unless-stopped
     webapi:
         image: ${DOCKER_REGISTRY-}webapi
         build:
@@ -11,12 +25,10 @@ services:
         environment:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
             - ASPNETCORE_HTTP_PORTS=${WEBAPI_HTTP_PORT}
+            - WORKER_API_KEY=${WORKER_API_KEY:-}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
             - ConnectionStrings__Default=Host=postgres;Port=5432;Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
             - DisableHttpsRedirection=true
-        ports:
-            - "${WEBAPI_HTTP_PORT}:8080"
-
         volumes:
             # Use platform-appropriate secret/cert paths; on macOS $HOME works (APPDATA is Windows-specific)
             - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro
@@ -36,8 +48,6 @@ services:
             args:
                 VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         container_name: frontend
-        ports:
-            - "${FRONTEND_PORT:-3000}:80"
         networks:
             - modelibr
     asset-processor:
@@ -52,6 +62,7 @@ services:
             - WORKER_ID=${WORKER_ID:-worker-1}
             - WORKER_PORT=${WORKER_PORT:-3001}
             - API_BASE_URL=http://webapi:${WEBAPI_HTTP_PORT}
+            - WORKER_API_KEY=${WORKER_API_KEY:-}
             - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-3}
             - RENDER_WIDTH=${RENDER_WIDTH:-256}
             - RENDER_HEIGHT=${RENDER_HEIGHT:-256}
@@ -68,6 +79,10 @@ services:
         networks:
             - modelibr
         restart: unless-stopped
+        deploy:
+            resources:
+                limits:
+                    memory: 4G
     postgres:
         image: postgres:16-alpine
         container_name: postgres

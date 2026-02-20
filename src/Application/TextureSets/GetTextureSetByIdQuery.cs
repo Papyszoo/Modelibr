@@ -28,10 +28,17 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
         {
             Id = textureSet.Id,
             Name = textureSet.Name,
+            Kind = textureSet.Kind,
+            TilingScaleX = textureSet.TilingScaleX,
+            TilingScaleY = textureSet.TilingScaleY,
+            UvMappingMode = textureSet.UvMappingMode,
+            UvScale = textureSet.UvScale,
             CreatedAt = textureSet.CreatedAt,
             UpdatedAt = textureSet.UpdatedAt,
             TextureCount = textureSet.TextureCount,
             IsEmpty = textureSet.IsEmpty,
+            ThumbnailPath = textureSet.ThumbnailPath,
+            PngThumbnailPath = textureSet.PngThumbnailPath,
             Textures = textureSet.Textures.Select(t => new TextureDto
             {
                 Id = t.Id,
@@ -74,10 +81,17 @@ public record TextureSetDetailDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public TextureSetKind Kind { get; init; }
+    public float TilingScaleX { get; init; } = 1.0f;
+    public float TilingScaleY { get; init; } = 1.0f;
+    public UvMappingMode UvMappingMode { get; init; } = UvMappingMode.Standard;
+    public float UvScale { get; init; } = 1.0f;
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int TextureCount { get; init; }
     public bool IsEmpty { get; init; }
+    public string? ThumbnailPath { get; init; }
+    public string? PngThumbnailPath { get; init; }
     public ICollection<TextureDto> Textures { get; init; } = new List<TextureDto>();
     public ICollection<ModelSummaryDto> AssociatedModels { get; init; } = new List<ModelSummaryDto>();
     public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();

@@ -96,6 +96,20 @@ When(
         await page.reload();
         await page.waitForLoadState("domcontentloaded");
 
+        // Wait for the texture set page to render, then switch to Model-Specific tab
+        await page.waitForSelector(".kind-filter-select", { timeout: 10000 });
+        const msTab = page
+            .locator(".kind-filter-select .p-button")
+            .filter({ hasText: "Model-Specific" });
+        await msTab.waitFor({ state: "visible", timeout: 5000 });
+        const isActive = await msTab.evaluate((el: Element) =>
+            el.classList.contains("p-highlight"),
+        );
+        if (!isActive) {
+            await msTab.click();
+            await page.waitForTimeout(500);
+        }
+
         const sourceCard = page
             .locator(`.texture-set-card:has-text("${sourceDisplayName}")`)
             .first();

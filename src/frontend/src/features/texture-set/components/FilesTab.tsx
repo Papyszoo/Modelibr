@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
+import { Button } from 'primereact/button'
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { TextureSetDto, TextureDto, TextureType, TextureChannel } from '@/types'
 import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
+import { softDeleteFile } from '@/features/models/api/modelApi'
+import { TexturePreview } from './TexturePreview'
 import './FilesTab.css'
 
 interface FilesTabProps {
@@ -120,16 +126,44 @@ function getTextureByChannel(
   return textures.find(t => t.sourceChannel === channel)
 }
 
-export function FilesTab({
-  textureSet,
-  onMappingChanged,
-}: FilesTabProps) {
+export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
+  const queryClient = useQueryClient()
   const [fileMappings, setFileMappings] = useState<FileMapping[]>([])
   const [rgbOptionOverrides, setRgbOptionOverrides] = useState<
     Record<number, string>
   >({})
   const toast = useRef<Toast>(null)
   const { changeTextureType, addTextureToSetEndpoint } = useTextureSets()
+
+  const handleDeleteFile = (fileMapping: FileMapping) => {
+    confirmDialog({
+      message: `Are you sure you want to delete "${fileMapping.fileName}"? It will be moved to Recycled Files.`,
+      header: 'Delete File',
+      icon: 'pi pi-trash',
+      acceptClassName: 'p-button-danger',
+      accept: async () => {
+        try {
+          await softDeleteFile(fileMapping.fileId)
+          await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Deleted',
+            detail: `${fileMapping.fileName} moved to Recycled Files`,
+            life: 3000,
+          })
+          onMappingChanged(true)
+        } catch (error) {
+          console.error('Failed to delete file:', error)
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to delete file',
+            life: 3000,
+          })
+        }
+      },
+    })
+  }
 
   // Group textures by fileId and create mappings
   useEffect(() => {
@@ -340,6 +374,7 @@ export function FilesTab({
   return (
     <div className="files-tab">
       <Toast ref={toast} />
+      <ConfirmDialog />
       <div className="files-tab-header">
         <h3>Source Files</h3>
       </div>
@@ -351,13 +386,23 @@ export function FilesTab({
             className="file-mapping-card"
             data-testid={`file-mapping-card-${fm.fileId}`}
           >
-            <div className="file-preview">
-              <img
-                src={`/api/files/${fm.fileId}/data`}
-                alt={fm.fileName}
-                onError={e => {
-                  ;(e.target as HTMLImageElement).style.display = 'none'
-                }}
+            <div className="file-preview-column">
+              <div className="file-preview">
+                <TexturePreview
+                  src={getFilePreviewUrl(fm.fileId.toString())}
+                  alt={fm.fileName}
+                  fileName={fm.fileName}
+                  className="file-preview-image"
+                />
+              </div>
+
+              <Button
+                icon="pi pi-trash"
+                label="Delete"
+                className="p-button-outlined p-button-danger p-button-sm file-delete-btn"
+                onClick={() => handleDeleteFile(fm)}
+                aria-label="Delete file"
+                title="Delete file (move to Recycled Files)"
               />
             </div>
 

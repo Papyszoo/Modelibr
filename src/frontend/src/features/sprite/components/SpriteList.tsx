@@ -35,7 +35,7 @@ import {
   updateSprite,
   updateSpriteCategory,
 } from '@/features/sprite/api/spriteApi'
-import { getFileUrl } from '@/features/models/api/modelApi'
+import { getFileUrl, getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
@@ -1029,7 +1029,7 @@ export function SpriteList() {
                 </div>
                 <div className="sprite-preview">
                   <img
-                    src={getFileUrl(sprite.fileId.toString())}
+                    src={getFilePreviewUrl(sprite.fileId.toString())}
                     alt={sprite.name}
                     onError={e => {
                       const target = e.target as HTMLImageElement
@@ -1228,7 +1228,7 @@ export function SpriteList() {
           <div className="sprite-modal-content">
             <div className="sprite-modal-preview">
               <img
-                src={getFileUrl(selectedSprite.fileId.toString())}
+                src={getFilePreviewUrl(selectedSprite.fileId.toString())}
                 alt={selectedSprite.name}
               />
             </div>
@@ -1277,4 +1277,3 @@ export function SpriteList() {
     </div>
   )
 }
-

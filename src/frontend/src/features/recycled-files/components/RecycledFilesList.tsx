@@ -2,7 +2,6 @@ import { useState, useRef } from 'react'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
-import { ConfirmDialog } from 'primereact/confirmdialog'
 import { ProgressBar } from 'primereact/progressbar'
 import {
   getDeletePreview,
@@ -10,7 +9,7 @@ import {
   restoreEntity,
 } from '@/features/recycled-files/api/recycledApi'
 import { getVersionThumbnailUrl } from '@/shared/thumbnail/api/thumbnailApi'
-import { getFileUrl } from '@/features/models/api/modelApi'
+import { getFileUrl, getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRecycledFilesQuery } from '@/features/recycled-files/api/queries'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
@@ -58,10 +57,18 @@ interface RecycledSound {
   deletedAt: string
 }
 
+interface RecycledFile {
+  id: number
+  originalFileName: string
+  filePath: string
+  sizeBytes: number
+  deletedAt: string
+}
+
 interface DeletePreviewItem {
   id: number
   name: string
-  type: 'model' | 'modelVersion' | 'textureSet' | 'sprite' | 'sound'
+  type: 'model' | 'modelVersion' | 'textureSet' | 'sprite' | 'sound' | 'file'
 }
 
 interface DeletePreviewInfo {
@@ -122,10 +129,13 @@ export function RecycledFilesList() {
     duration: s.duration,
     deletedAt: s.deletedAt,
   }))
-
-  const loadRecycledFiles = () => {
-    queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
-  }
+  const files = (recycledData?.files ?? []).map(f => ({
+    id: f.id,
+    originalFileName: f.originalFileName,
+    filePath: f.filePath,
+    sizeBytes: f.sizeBytes,
+    deletedAt: f.deletedAt,
+  })) as RecycledFile[]
 
   type RestoreEntityType =
     | 'model'
@@ -133,6 +143,7 @@ export function RecycledFilesList() {
     | 'textureSet'
     | 'sprite'
     | 'sound'
+    | 'file'
   type InvalidateKey = readonly unknown[]
 
   const restoreEntityMutation = useMutation({
@@ -210,6 +221,8 @@ export function RecycledFilesList() {
         await queryClient.invalidateQueries({ queryKey: ['sprites'] })
       } else if (vars.item.type === 'sound') {
         await queryClient.invalidateQueries({ queryKey: ['sounds'] })
+      } else if (vars.item.type === 'file') {
+        await queryClient.invalidateQueries({ queryKey: ['textureSets'] })
       }
 
       setDeletePreview(null)
@@ -323,6 +336,24 @@ export function RecycledFilesList() {
     })
   }
 
+  const handleRestoreFile = async (file: RecycledFile) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'file',
+      entityId: file.id,
+      successDetail: `${file.originalFileName} has been restored`,
+      errorDetail: 'Failed to restore file',
+      invalidateQueryKeys: [['textureSets']],
+    })
+  }
+
+  const handleDeletePreviewFile = async (file: RecycledFile) => {
+    deletePreviewMutation.mutate({
+      entityType: 'file',
+      entityId: file.id,
+      item: { id: file.id, name: file.originalFileName, type: 'file' },
+    })
+  }
+
   const handlePermanentDelete = async () => {
     if (!deletePreview) return
 
@@ -348,7 +379,7 @@ export function RecycledFilesList() {
     return null
   }
 
-  if (recycledQuery.isLoading || recycledQuery.isFetching) {
+  if (recycledQuery.isLoading) {
     return (
       <div className="recycled-files-list">
         <div className="recycled-files-loading">
@@ -364,32 +395,24 @@ export function RecycledFilesList() {
     modelVersions.length === 0 &&
     textureSets.length === 0 &&
     sprites.length === 0 &&
-    sounds.length === 0
+    sounds.length === 0 &&
+    files.length === 0
 
   return (
     <div className="recycled-files-list">
       <Toast ref={toast} />
-      <ConfirmDialog />
 
       <div className="recycled-files-header">
         <h2>
           <i className="pi pi-trash" />
           Recycled Files
         </h2>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <CardWidthSlider
-            value={cardWidth}
-            min={120}
-            max={400}
-            onChange={width => setCardWidth('recycledFiles', width)}
-          />
-          <Button
-            icon="pi pi-refresh"
-            label="Refresh"
-            onClick={loadRecycledFiles}
-            className="p-button-outlined"
-          />
-        </div>
+        <CardWidthSlider
+          value={cardWidth}
+          min={120}
+          max={400}
+          onChange={width => setCardWidth('recycledFiles', width)}
+        />
       </div>
 
       {isEmpty ? (
@@ -601,6 +624,77 @@ export function RecycledFilesList() {
                     </div>
                   )
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Files Section */}
+          {files.length > 0 && (
+            <div className="recycled-section" data-section="files">
+              <h3 className="recycled-section-title">
+                <i className="pi pi-file" />
+                Files ({files.length})
+              </h3>
+              <div
+                className="recycled-cards-grid"
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
+              >
+                {files.map(file => (
+                  <div key={file.id} className="recycled-card">
+                    <div className="recycled-card-thumbnail">
+                      <img
+                        src={getFilePreviewUrl(file.id.toString())}
+                        alt={file.originalFileName}
+                        className="recycled-card-image"
+                        onError={e => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const placeholder =
+                            target.nextElementSibling as HTMLElement
+                          if (placeholder) {
+                            placeholder.style.display = 'flex'
+                          }
+                        }}
+                      />
+                      <div
+                        className="file-placeholder"
+                        style={{ display: 'none' }}
+                      >
+                        <i className="pi pi-file" />
+                      </div>
+                      <div className="recycled-card-actions">
+                        <Button
+                          icon="pi pi-replay"
+                          className="p-button-success p-button-rounded"
+                          onClick={() => handleRestoreFile(file)}
+                          tooltip="Restore"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-danger p-button-rounded"
+                          onClick={() => handleDeletePreviewFile(file)}
+                          tooltip="Delete Forever"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                      </div>
+                      <div className="recycled-card-overlay">
+                        <span
+                          className="recycled-card-name"
+                          title={file.originalFileName}
+                        >
+                          {file.originalFileName}
+                        </span>
+                        <span className="recycled-card-meta">
+                          {formatFileSize(file.sizeBytes)} • Deleted{' '}
+                          {formatDate(file.deletedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

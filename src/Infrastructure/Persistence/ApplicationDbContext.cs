@@ -229,10 +229,22 @@ namespace Infrastructure.Persistence
             {
                 entity.HasKey(tp => tp.Id);
                 entity.Property(tp => tp.Name).IsRequired().HasMaxLength(200);
+                entity.Property(tp => tp.Kind).IsRequired()
+                    .HasDefaultValue(TextureSetKind.ModelSpecific);
+                entity.Property(tp => tp.TilingScaleX).IsRequired()
+                    .HasDefaultValue(1.0f);
+                entity.Property(tp => tp.TilingScaleY).IsRequired()
+                    .HasDefaultValue(1.0f);
+                entity.Property(tp => tp.UvMappingMode).IsRequired()
+                    .HasDefaultValue(UvMappingMode.Standard);
+                entity.Property(tp => tp.UvScale).IsRequired()
+                    .HasDefaultValue(1.0f);
                 entity.Property(tp => tp.CreatedAt).IsRequired();
                 entity.Property(tp => tp.UpdatedAt).IsRequired();
                 entity.Property(tp => tp.IsDeleted).IsRequired();
                 entity.Property(tp => tp.DeletedAt);
+                entity.Property(tp => tp.ThumbnailPath).HasMaxLength(500);
+                entity.Property(tp => tp.PngThumbnailPath).HasMaxLength(500);
 
                 // Configure one-to-many relationship with Textures
                 entity.HasMany(tp => tp.Textures)
@@ -242,6 +254,9 @@ namespace Infrastructure.Persistence
 
                 // Create index for efficient querying by name
                 entity.HasIndex(tp => tp.Name);
+
+                // Add index for efficient querying by kind
+                entity.HasIndex(tp => tp.Kind);
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(tp => tp.IsDeleted);
@@ -318,6 +333,7 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.ModelHash).IsRequired(false).HasMaxLength(64);
                 entity.Property(tj => tj.SoundId).IsRequired(false);
                 entity.Property(tj => tj.SoundHash).IsRequired(false).HasMaxLength(64);
+                entity.Property(tj => tj.TextureSetId).IsRequired(false);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -359,6 +375,13 @@ namespace Infrastructure.Persistence
                 entity.HasOne(tj => tj.Sound)
                     .WithMany()
                     .HasForeignKey(tj => tj.SoundId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Configure relationship with TextureSet
+                entity.HasOne(tj => tj.TextureSet)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.TextureSetId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired(false);
             });

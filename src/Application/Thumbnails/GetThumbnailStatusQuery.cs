@@ -16,7 +16,8 @@ public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQu
 
     public async Task<Result<GetThumbnailStatusQueryResponse>> Handle(GetThumbnailStatusQuery query, CancellationToken cancellationToken)
     {
-        var model = await _modelRepository.GetByIdAsync(query.ModelId, cancellationToken);
+        var model = await _modelRepository.GetByIdAsync(query.ModelId, cancellationToken)
+                    ?? await _modelRepository.GetDeletedByIdAsync(query.ModelId, cancellationToken);
         
         if (model == null)
         {

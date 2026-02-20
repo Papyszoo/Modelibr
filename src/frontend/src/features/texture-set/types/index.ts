@@ -20,6 +20,16 @@ export enum TextureChannel {
   RGB = 5,
 }
 
+export enum TextureSetKind {
+  ModelSpecific = 0,
+  Universal = 1,
+}
+
+export enum UvMappingMode {
+  Standard = 0,
+  Physical = 1,
+}
+
 export interface TextureDto {
   id: number
   textureType: TextureType
@@ -44,10 +54,17 @@ export interface PackSummaryDto {
 export interface TextureSetDto {
   id: number
   name: string
+  kind: TextureSetKind
+  tilingScaleX: number
+  tilingScaleY: number
+  uvMappingMode: UvMappingMode
+  uvScale: number
   createdAt: string
   updatedAt: string
   textureCount: number
   isEmpty: boolean
+  thumbnailPath?: string
+  pngThumbnailPath?: string
   textures: TextureDto[]
   associatedModels: ModelSummaryDto[]
   packs?: PackSummaryDto[]
@@ -63,11 +80,13 @@ export interface GetTextureSetByIdResponse {
 
 export interface CreateTextureSetRequest {
   name: string
+  kind?: TextureSetKind
 }
 
 export interface CreateTextureSetResponse {
   id: number
   name: string
+  kind: TextureSetKind
 }
 
 export interface UpdateTextureSetRequest {
@@ -97,4 +116,19 @@ export interface GetAllTextureSetsResponsePaginated {
   page: number
   pageSize: number
   totalPages: number
+}
+
+export interface UpdateTilingScaleRequest {
+  tilingScaleX: number
+  tilingScaleY: number
+  uvMappingMode?: UvMappingMode
+  uvScale?: number
+}
+
+export interface UpdateTilingScaleResponse {
+  id: number
+  tilingScaleX: number
+  tilingScaleY: number
+  uvMappingMode: UvMappingMode
+  uvScale: number
 }

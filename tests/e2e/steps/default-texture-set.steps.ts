@@ -369,6 +369,19 @@ When(
             expect(textureSet).not.toBeNull();
         }).toPass({ timeout: 10000 });
 
+        // UI upload creates Model-Specific sets; switch to that tab so the card is visible
+        const msTab = page.locator(".kind-filter-select button", {
+            hasText: "Model-Specific",
+        });
+        await msTab.waitFor({ state: "visible", timeout: 10000 });
+        const isActive = await msTab.evaluate((el) =>
+            el.classList.contains("p-highlight"),
+        );
+        if (!isActive) {
+            await msTab.click();
+            await page.waitForTimeout(500);
+        }
+
         // Store in shared state for subsequent steps
         sharedState.saveTextureSet(setName, {
             id: textureSet.id,

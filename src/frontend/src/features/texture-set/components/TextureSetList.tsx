@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef } from 'react'
-import { TextureSetDto, PaginationState } from '@/types'
+import { TextureSetDto, PaginationState, TextureSetKind } from '@/types'
 import { useTabContext } from '@/hooks/useTabContext'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
@@ -11,6 +11,7 @@ import {
   createTextureSet,
   createTextureSetWithFile,
   deleteTextureSet,
+  updateTextureSetKind,
 } from '@/features/texture-set/api/textureSetApi'
 import {
   getTextureSetsQueryOptions,
@@ -22,9 +23,36 @@ import { TextureSetListHeader } from './TextureSetListHeader'
 import { TextureSetGrid } from './TextureSetGrid'
 import './TextureSetList.css'
 
+type KindFilter = 'model-specific' | 'universal'
+
+const kindFilterOptions: { label: string; value: KindFilter; kind: number }[] =
+  [
+    {
+      label: 'Model-Specific',
+      value: 'model-specific',
+      kind: TextureSetKind.ModelSpecific,
+    },
+    {
+      label: 'Global Materials',
+      value: 'universal',
+      kind: TextureSetKind.Universal,
+    },
+  ]
+
+function kindFilterToApiKind(filter: KindFilter): number {
+  switch (filter) {
+    case 'model-specific':
+      return TextureSetKind.ModelSpecific
+    case 'universal':
+      return TextureSetKind.Universal
+  }
+}
+
 export function TextureSetList() {
   const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [kindFilter, setKindFilter] = useState<KindFilter>('universal')
+  const [dragOverTab, setDragOverTab] = useState<KindFilter | null>(null)
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
     pageSize: 50,
@@ -38,7 +66,7 @@ export function TextureSetList() {
   const uploadProgressContext = useUploadProgress()
   const queryClient = useQueryClient()
   const textureSetsQuery = useTextureSetsQuery({
-    params: { page: 1, pageSize: 50 },
+    params: { page: 1, pageSize: 50, kind: kindFilterToApiKind(kindFilter) },
   })
 
   const loading = textureSetsQuery.isLoading && textureSets.length === 0
@@ -80,7 +108,11 @@ export function TextureSetList() {
         setIsLoadingMore(true)
         const page = pagination.page + 1
         const result = await queryClient.fetchQuery(
-          getTextureSetsQueryOptions({ page, pageSize: 50 })
+          getTextureSetsQueryOptions({
+            page,
+            pageSize: 50,
+            kind: kindFilterToApiKind(kindFilter),
+          })
         )
 
         setTextureSets(prev => [...prev, ...(result.textureSets || [])])
@@ -103,12 +135,12 @@ export function TextureSetList() {
         setIsLoadingMore(false)
       }
     },
-    [pagination.page, queryClient]
+    [pagination.page, queryClient, kindFilter]
   )
 
   const createTextureSetMutation = useMutation({
-    mutationFn: async (name: string) => {
-      await createTextureSet({ name })
+    mutationFn: async ({ name, kind }: { name: string; kind: number }) => {
+      await createTextureSet({ name, kind })
     },
     onSuccess: async () => {
       toast.current?.show({
@@ -155,8 +187,8 @@ export function TextureSetList() {
     },
   })
 
-  const handleCreateTextureSet = async (name: string) => {
-    await createTextureSetMutation.mutateAsync(name)
+  const handleCreateTextureSet = async (name: string, kind: number = 0) => {
+    await createTextureSetMutation.mutateAsync({ name, kind })
   }
 
   const _handleDeleteTextureSet = (textureSet: TextureSetDto) => {
@@ -199,10 +231,13 @@ export function TextureSetList() {
 
         // 3. Use the new consolidated endpoint that handles file upload + texture set creation + texture addition
         const fileName = file.name.replace(/\.[^/.]+$/, '')
+        // Inherit the kind from the current filter tab (Global Materials → Universal, Model-Specific → ModelSpecific)
+        const dropKind = kindFilterToApiKind(kindFilter)
         const result = await createTextureSetWithFile(file, {
           name: fileName,
           textureType: 'Albedo',
           batchId,
+          kind: dropKind,
         })
 
         // 4. Complete the upload with texture set ID
@@ -255,6 +290,70 @@ export function TextureSetList() {
         onFilesSelected={files => handleFileDrop(files)}
       />
 
+      <div className="kind-filter-bar">
+        <div className="kind-filter-select p-selectbutton p-component">
+          {kindFilterOptions.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              className={
+                'p-button p-component' +
+                (kindFilter === opt.value ? ' p-highlight' : '') +
+                (dragOverTab === opt.value && kindFilter !== opt.value
+                  ? ' p-button-outlined kind-drop-target'
+                  : '')
+              }
+              onClick={() => {
+                if (kindFilter === opt.value) return
+                setKindFilter(opt.value)
+                setTextureSets([])
+              }}
+              onDragOver={e => {
+                if (
+                  e.dataTransfer.types.includes('application/x-texture-set-id')
+                ) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setDragOverTab(opt.value)
+                }
+              }}
+              onDragLeave={() => setDragOverTab(null)}
+              onDrop={async e => {
+                e.preventDefault()
+                e.stopPropagation()
+                setDragOverTab(null)
+                const textureSetId = e.dataTransfer.getData(
+                  'application/x-texture-set-id'
+                )
+                if (!textureSetId) return
+                // Only change kind when dropping on a different tab
+                if (opt.value === kindFilter) return
+                try {
+                  await updateTextureSetKind(Number(textureSetId), opt.kind)
+                  toast.current?.show({
+                    severity: 'success',
+                    summary: 'Kind Changed',
+                    detail: `Texture set moved to ${opt.label}`,
+                    life: 3000,
+                  })
+                  await loadTextureSets()
+                } catch (error) {
+                  console.error('Failed to change texture set kind:', error)
+                  toast.current?.show({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to change texture set kind',
+                    life: 3000,
+                  })
+                }
+              }}
+            >
+              <span className="p-button-label">{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <TextureSetGrid
         textureSets={textureSets}
         loading={loading}
@@ -297,4 +396,3 @@ export function TextureSetList() {
     </div>
   )
 }
-

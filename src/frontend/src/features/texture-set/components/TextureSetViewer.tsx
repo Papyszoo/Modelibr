@@ -1,12 +1,15 @@
 import { useState, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { TabView, TabPanel } from 'primereact/tabview'
-import { TextureType } from '@/types'
+import { TextureType, TextureSetKind } from '@/types'
 import {
   useTextureSetByIdQuery,
   getTextureSetByIdQueryOptions,
 } from '@/features/texture-set/api/queries'
-import { updateTextureSet } from '@/features/texture-set/api/textureSetApi'
+import {
+  updateTextureSet,
+  regenerateTextureSetThumbnail,
+} from '@/features/texture-set/api/textureSetApi'
 import { getNonHeightTypes } from '@/utils/textureTypeUtils'
 import { SetHeader } from '@/features/texture-set/dialogs/SetHeader'
 import { SetStats } from '@/features/texture-set/dialogs/SetStats'
@@ -24,7 +27,10 @@ interface TextureSetViewerProps {
   side?: 'left' | 'right'
 }
 
-export function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps) {
+export function TextureSetViewer({
+  setId,
+  side = 'left',
+}: TextureSetViewerProps) {
   const [updating, setUpdating] = useState(false)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const queryClient = useQueryClient()
@@ -57,6 +63,13 @@ export function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps
       }
       return updateTextureSet(textureSet.id, { name: newName })
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['textureSets'] })
+    },
+  })
+
+  const regenerateThumbnailMutation = useMutation({
+    mutationFn: (id: number) => regenerateTextureSetThumbnail(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['textureSets'] })
     },
@@ -106,6 +119,24 @@ export function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps
             />
             <SetStats textureSet={textureSet} />
           </div>
+          {textureSet.kind === TextureSetKind.Universal &&
+            textureSet.textureCount > 0 && (
+              <button
+                className="p-button p-button-sm p-button-outlined"
+                title="Regenerate sphere thumbnail preview"
+                disabled={regenerateThumbnailMutation.isPending}
+                onClick={() =>
+                  regenerateThumbnailMutation.mutate(textureSet.id)
+                }
+                style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
+              >
+                <i
+                  className={`pi ${regenerateThumbnailMutation.isPending ? 'pi-spin pi-spinner' : 'pi-refresh'}`}
+                  style={{ marginRight: '0.4rem' }}
+                />
+                Regenerate Thumbnail
+              </button>
+            )}
         </div>
       </header>
 
@@ -169,17 +200,19 @@ export function TextureSetViewer({ setId, side = 'left' }: TextureSetViewerProps
           />
         </TabPanel>
 
-        <TabPanel header="Models" leftIcon="pi pi-box">
-          <TextureSetModelList textureSetId={textureSet.id} />
-        </TabPanel>
-
-        {textureSet.textureCount > 0 && (
-          <TabPanel header="Preview" leftIcon="pi pi-eye">
-            <TexturePreviewPanel textureSet={textureSet} side={side} />
+        {textureSet.kind !== TextureSetKind.Universal && (
+          <TabPanel header="Models" leftIcon="pi pi-box">
+            <TextureSetModelList textureSetId={textureSet.id} />
           </TabPanel>
         )}
+
+        {textureSet.kind === TextureSetKind.Universal &&
+          textureSet.textureCount > 0 && (
+            <TabPanel header="Preview" leftIcon="pi pi-eye">
+              <TexturePreviewPanel textureSet={textureSet} side={side} />
+            </TabPanel>
+          )}
       </TabView>
     </div>
   )
 }
-

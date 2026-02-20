@@ -13,6 +13,7 @@ import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { useTabContext } from '@/hooks/useTabContext'
 import '@/features/models/components/ModelGrid/ModelGrid.css'
+import '@/shared/components/ContainerViewer.css'
 
 interface TextureSetModelListProps {
   textureSetId: number
@@ -95,15 +96,6 @@ export function TextureSetModelList({
             style={{ width: '100%' }}
           />
         </span>
-        <CardWidthSlider
-          value={cardWidth}
-          min={120}
-          max={400}
-          onChange={width => setCardWidth('textureSets', width)}
-        />
-      </div>
-
-      <div className="model-grid-actions">
         <Button
           icon="pi pi-refresh"
           className="p-button-text p-button-sm"
@@ -111,6 +103,12 @@ export function TextureSetModelList({
           tooltip="Refresh"
           tooltipOptions={{ position: 'bottom' }}
           aria-label="Refresh models"
+        />
+        <CardWidthSlider
+          value={cardWidth}
+          min={120}
+          max={400}
+          onChange={width => setCardWidth('textureSets', width)}
         />
       </div>
 

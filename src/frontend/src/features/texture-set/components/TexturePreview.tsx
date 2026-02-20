@@ -1,133 +1,91 @@
-import { useEffect, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { TextureChannel } from '@/types'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface TexturePreviewProps {
+  /** Preview URL (should be a /files/{id}/preview?channel=rgb endpoint) */
   src: string
   alt: string
   sourceChannel?: TextureChannel
+  /** File name (kept for API compatibility, no longer used for EXR detection) */
+  fileName?: string
   className?: string
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Map TextureChannel enum to the query param value */
+function channelToParam(channel: TextureChannel): string {
+  switch (channel) {
+    case TextureChannel.R:
+      return 'r'
+    case TextureChannel.G:
+      return 'g'
+    case TextureChannel.B:
+      return 'b'
+    case TextureChannel.A:
+      return 'a'
+    default:
+      return 'rgb'
+  }
+}
+
 /**
- * TexturePreview component that displays a texture with optional channel extraction.
- * For single-channel textures (R, G, B, A), extracts that channel and displays as grayscale.
- * Uses Canvas for actual pixel manipulation instead of SVG filters.
+ * Replace the channel query parameter in a preview URL.
+ * Handles both ?channel=rgb and absence of the parameter.
+ */
+function withChannel(url: string, channel: TextureChannel): string {
+  if (channel === TextureChannel.RGB) return url
+  const param = channelToParam(channel)
+  if (url.includes('channel=')) {
+    return url.replace(/channel=\w+/, `channel=${param}`)
+  }
+  return url + (url.includes('?') ? '&' : '?') + `channel=${param}`
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * TexturePreview — displays a thumbnail preview of a texture file.
+ *
+ * Always uses server-generated preview thumbnails (never the raw file).
+ * Channel-specific thumbnails (R, G, B) are served by the backend.
  */
 export function TexturePreview({
   src,
   alt,
   sourceChannel = TextureChannel.RGB,
+  fileName: _fileName,
   className = '',
 }: TexturePreviewProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [imageLoaded, setImageLoaded] = useState(false)
   const [error, setError] = useState(false)
 
-  // Determine if we need to extract a single channel
-  const needsChannelExtraction = sourceChannel !== TextureChannel.RGB
+  const previewUrl = useMemo(
+    () => withChannel(src, sourceChannel),
+    [src, sourceChannel]
+  )
 
-  useEffect(() => {
-    if (!needsChannelExtraction) {
-      return
-    }
-
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-
-    img.onload = () => {
-      // Set canvas size to match image
-      canvas.width = img.width
-      canvas.height = img.height
-
-      // Draw original image
-      ctx.drawImage(img, 0, 0)
-
-      // Get image data
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const data = imageData.data
-
-      // Extract the specified channel and convert to grayscale
-      const channelIndex = getChannelIndex(sourceChannel)
-
-      for (let i = 0; i < data.length; i += 4) {
-        const channelValue = data[i + channelIndex]
-        // Set R, G, B to the channel value (grayscale)
-        data[i] = channelValue // R
-        data[i + 1] = channelValue // G
-        data[i + 2] = channelValue // B
-        // Keep alpha as is (data[i + 3])
-      }
-
-      ctx.putImageData(imageData, 0, 0)
-      setImageLoaded(true)
-    }
-
-    img.onerror = () => {
-      setError(true)
-    }
-
-    img.src = src
-  }, [src, sourceChannel, needsChannelExtraction])
-
-  // For RGB textures, just render a regular image
-  if (!needsChannelExtraction) {
+  if (error) {
     return (
-      <img
-        src={src}
-        alt={alt}
-        className={className}
-        onError={() => setError(true)}
-      />
+      <div className={`texture-error ${className}`}>
+        <i className="pi pi-exclamation-triangle" />
+      </div>
     )
   }
 
-  // For single-channel textures, use canvas
   return (
-    <>
-      <canvas
-        ref={canvasRef}
-        className={className}
-        style={{
-          display: imageLoaded && !error ? 'block' : 'none',
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-        }}
-      />
-      {!imageLoaded && !error && (
-        <div className={`texture-loading ${className}`}>
-          <i className="pi pi-spin pi-spinner" />
-        </div>
-      )}
-      {error && (
-        <div className={`texture-error ${className}`}>
-          <i className="pi pi-exclamation-triangle" />
-        </div>
-      )}
-    </>
+    <img
+      src={previewUrl}
+      alt={alt}
+      className={className}
+      onError={() => setError(true)}
+    />
   )
-}
-
-/**
- * Get the index in RGBA data array for a given channel
- */
-function getChannelIndex(channel: TextureChannel): number {
-  switch (channel) {
-    case TextureChannel.R:
-      return 0
-    case TextureChannel.G:
-      return 1
-    case TextureChannel.B:
-      return 2
-    case TextureChannel.A:
-      return 3
-    default:
-      return 0
-  }
 }

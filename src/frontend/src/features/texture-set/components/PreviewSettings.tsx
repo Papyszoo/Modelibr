@@ -20,14 +20,21 @@ export interface PreviewSettingsType {
   // Torus parameters
   torusRadius: number
   torusTube: number
+  // UV Scale — direct texture repeat multiplier
+  uvScale: number
 }
 
 interface PreviewSettingsProps {
   settings: PreviewSettingsType
   onSettingsChange: (settings: PreviewSettingsType) => void
+  showTilingControls?: boolean
 }
 
-export function PreviewSettings({ settings, onSettingsChange }: PreviewSettingsProps) {
+export function PreviewSettings({
+  settings,
+  onSettingsChange,
+  showTilingControls = false,
+}: PreviewSettingsProps) {
   const handleChange = (
     key: keyof PreviewSettingsType,
     value: number | boolean | GeometryType
@@ -244,7 +251,28 @@ export function PreviewSettings({ settings, onSettingsChange }: PreviewSettingsP
           </div>
         </div>
       )}
+
+      {showTilingControls && (
+        <div className="settings-group">
+          <h4 className="settings-group-title">UV Scale</h4>
+
+          <div className="setting-item">
+            <label>Scale</label>
+            <div className="setting-control">
+              <Slider
+                value={settings.uvScale}
+                onChange={e => handleChange('uvScale', e.value as number)}
+                min={0.1}
+                max={10}
+                step={0.1}
+              />
+              <span className="setting-value">
+                {settings.uvScale.toFixed(1)}x
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-

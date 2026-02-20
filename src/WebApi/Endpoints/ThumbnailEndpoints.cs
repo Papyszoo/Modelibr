@@ -5,6 +5,7 @@ using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using WebApi.Files;
+using WebApi.Infrastructure;
 using WebApi.Services;
 
 namespace WebApi.Endpoints;
@@ -133,6 +134,7 @@ public static class ThumbnailEndpoints
         })
         .WithName("Upload Thumbnail")
         .WithTags("Thumbnails")
+        .AddEndpointFilter<WorkerApiKeyFilter>()
         .DisableAntiforgery();
 
         app.MapPost("/models/{id}/thumbnail/png-upload", async (
@@ -190,6 +192,7 @@ public static class ThumbnailEndpoints
         })
         .WithName("Upload PNG Thumbnail")
         .WithTags("Thumbnails")
+        .AddEndpointFilter<WorkerApiKeyFilter>()
         .DisableAntiforgery();
 
         app.MapGet("/models/{id}/thumbnail/file", async (
