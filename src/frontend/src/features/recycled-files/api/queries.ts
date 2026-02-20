@@ -8,6 +8,7 @@ export function getRecycledFilesQueryOptions() {
   return queryOptions({
     queryKey: ['recycledFiles'] as const,
     queryFn: () => getAllRecycledFiles(),
+    staleTime: 0, // Always refetch on mount for real-time updates
   })
 }
 

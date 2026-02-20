@@ -7,6 +7,12 @@ public interface IFileRepository
     Task<Domain.Models.File?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Domain.Models.File?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Domain.Models.File?> GetBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Gets a soft-deleted file by its SHA256 hash, ignoring query filters.
+    /// Used during re-upload to detect and clean up recycled files.
+    /// </summary>
+    Task<Domain.Models.File?> GetDeletedBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default);
     Task<IEnumerable<Domain.Models.File>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<Domain.Models.File>> GetAllDeletedAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<Domain.Models.File>> GetFilesByModelIdAsync(int modelId, CancellationToken cancellationToken = default);

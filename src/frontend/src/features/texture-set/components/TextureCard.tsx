@@ -338,11 +338,12 @@ export const TextureCard = memo(function TextureCard({
                     aria-label="Texture info"
                   />
                   <Button
-                    icon="pi pi-trash"
-                    className="p-button-rounded p-button-text p-button-danger texture-icon-btn"
+                    icon="pi pi-times"
+                    className="p-button-rounded p-button-text p-button-warning texture-icon-btn"
                     onClick={handleRemoveClick}
                     disabled={uploading}
-                    aria-label="Remove texture"
+                    aria-label="Unlink texture"
+                    title="Unlink texture from type"
                   />
                 </div>
                 <div className="texture-overlay-center">

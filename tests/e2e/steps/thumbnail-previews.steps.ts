@@ -126,14 +126,30 @@ Given("I have a sprite with an uploaded image", async () => {
 // ============= UI navigation steps =============
 
 /** After navigating to texture sets page, switch to Model-Specific tab
- *  (the default is Global Materials, but our API creates Model-Specific sets) */
-async function switchToModelSpecificKind(page: any) {
+ *  (the default is Global Materials, but our API creates Model-Specific sets)
+ *  Optionally searches for a specific card name to handle pagination (>50 sets). */
+async function switchToModelSpecificKind(page: any, searchText?: string) {
     const modelSpecificBtn = page.locator(".kind-filter-select button").filter({
         hasText: "Model-Specific",
     });
-    await modelSpecificBtn.click();
-    // Wait for the query to complete
-    await page.waitForTimeout(1000);
+    await expect(modelSpecificBtn).toBeVisible({ timeout: 5000 });
+    const isActive = await modelSpecificBtn.evaluate((el: Element) =>
+        el.classList.contains("p-highlight"),
+    );
+    if (!isActive) {
+        await modelSpecificBtn.click();
+    }
+    // Wait for the query to settle
+    await page.waitForTimeout(500);
+    // If a search text is provided, filter the grid so the card appears on the first page
+    if (searchText) {
+        const searchInput = page.locator(".search-input");
+        if (await searchInput.isVisible({ timeout: 3000 })) {
+            await searchInput.clear();
+            await searchInput.fill(searchText);
+            await page.waitForTimeout(500);
+        }
+    }
 }
 
 When(
@@ -141,7 +157,7 @@ When(
     async ({ page }) => {
         const textureSetsPage = new TextureSetsPage(page);
         await textureSetsPage.goto();
-        await switchToModelSpecificKind(page);
+        await switchToModelSpecificKind(page, lastTextureSetName ?? undefined);
     },
 );
 
@@ -150,7 +166,7 @@ When("I open the texture set detail viewer", async ({ page }) => {
 
     const textureSetsPage = new TextureSetsPage(page);
     await textureSetsPage.goto();
-    await switchToModelSpecificKind(page);
+    await switchToModelSpecificKind(page, lastTextureSetName!);
 
     // Click the texture set card with the right name
     const card = page.locator(".texture-set-card").filter({
@@ -179,9 +195,9 @@ Then(
 
         const textureSetsPage = new TextureSetsPage(page);
         await textureSetsPage.goto();
-        await switchToModelSpecificKind(page);
+        await switchToModelSpecificKind(page, lastTextureSetName!);
 
-        // Find the card with our texture set name
+        // Find the card with our texture set name (search has already filtered the grid)
         const card = page.locator(".texture-set-card").filter({
             hasText: lastTextureSetName!,
         });

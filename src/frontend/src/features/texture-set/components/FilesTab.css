@@ -51,6 +51,13 @@
   border: 1px solid var(--surface-border);
 }
 
+.file-preview-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .file-preview {
   flex-shrink: 0;
   width: 80px;
@@ -59,8 +66,14 @@
   overflow: hidden;
   background: var(--surface-ground);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+.file-delete-btn {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
 }
 
 .file-preview img,

@@ -42,6 +42,20 @@ public static class FilesEndpoints
             .WithSummary("Uploads a PNG preview for a file (used by the worker)")
             .AddEndpointFilter<WorkerApiKeyFilter>()
             .DisableAntiforgery();
+
+        app.MapDelete("/files/{id}", async (int id, ICommandHandler<SoftDeleteFileCommand> commandHandler, CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new SoftDeleteFileCommand(id), cancellationToken);
+            
+            if (result.IsFailure)
+            {
+                return Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new { message = "File moved to recycled files" });
+        })
+        .WithName("Soft Delete File")
+        .WithSummary("Soft-deletes a file, moving it to the recycled files");
     }
 
     private static async Task<IResult> ServeFilePreview(

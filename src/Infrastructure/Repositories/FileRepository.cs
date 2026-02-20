@@ -28,6 +28,15 @@ internal sealed class FileRepository : IFileRepository
             .FirstOrDefaultAsync(f => f.Sha256Hash == sha256Hash, cancellationToken);
     }
 
+    public async Task<Domain.Models.File?> GetDeletedBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        return await _context.Files
+            .IgnoreQueryFilters()
+            .Where(f => f.IsDeleted)
+            .Include(f => f.Models)
+            .FirstOrDefaultAsync(f => f.Sha256Hash == sha256Hash, cancellationToken);
+    }
+
     public async Task<IEnumerable<Domain.Models.File>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Files

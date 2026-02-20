@@ -167,6 +167,10 @@ export async function softDeleteModel(modelId: number): Promise<void> {
   await client.delete(`/models/${modelId}`)
 }
 
+export async function softDeleteFile(fileId: number): Promise<void> {
+  await client.delete(`/files/${fileId}`)
+}
+
 export async function setDefaultTextureSet(
   modelId: number,
   textureSetId: number | null,

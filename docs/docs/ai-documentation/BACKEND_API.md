@@ -44,14 +44,17 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `GET`  | `/models/{modelId}/versions/{versionId}/file`           | Download renderable file |
 | `GET`  | `/models/{modelId}/versions/{versionId}/files/{fileId}` | Download specific file   |
 
-### Files (4 endpoints)
+### Files (5 endpoints)
 
-| Method | Endpoint                     | Description                                       | Auth        |
-| ------ | ---------------------------- | ------------------------------------------------- | ----------- |
-| `POST` | `/files`                     | Upload a file (auto-generates thumbnail previews) | None        |
-| `GET`  | `/files/{id}`                | Download any file by ID                           | None        |
-| `GET`  | `/files/{id}/preview`        | Download PNG preview (?channel=rgb\|r\|g\|b)      | None        |
-| `POST` | `/files/{id}/preview/upload` | Upload PNG preview for a file (used by worker)    | `X-Api-Key` |
+| Method   | Endpoint                     | Description                                       | Auth        |
+| -------- | ---------------------------- | ------------------------------------------------- | ----------- |
+| `POST`   | `/files`                     | Upload a file (auto-generates thumbnail previews) | None        |
+| `GET`    | `/files/{id}`                | Download any file by ID (incl. soft-deleted)      | None        |
+| `GET`    | `/files/{id}/preview`        | Download PNG preview (?channel=rgb\|r\|g\|b)      | None        |
+| `POST`   | `/files/{id}/preview/upload` | Upload PNG preview for a file (used by worker)    | `X-Api-Key` |
+| `DELETE` | `/files/{id}`                | Soft-delete file (moves to Recycled Files)        | None        |
+
+> **Note:** `GET /files/{id}` and `GET /files/{id}/preview` serve both active and soft-deleted files, enabling thumbnail display in the Recycled Files view. The same applies to model and model version thumbnail endpoints.
 
 ### Thumbnails - Models (4 endpoints)
 

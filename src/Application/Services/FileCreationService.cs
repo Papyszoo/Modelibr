@@ -54,12 +54,11 @@ internal sealed class FileCreationService : IFileCreationService
         // Calculate hash first to check for existing files before saving to disk
         var hash = await _fileUtilityService.CalculateFileHashAsync(fileUpload, cancellationToken);
 
-        // Check if file already exists in database by hash
+        // Check if file already exists in database by hash (non-deleted)
         var existingFile = await _fileRepository.GetBySha256HashAsync(hash, cancellationToken);
         if (existingFile != null)
         {
-            // Verify the physical file still exists on disk — it may have been
-            // permanently deleted while the DB record remained orphaned.
+            // Active file with same hash exists — reuse it
             if (_storage.FileExists(existingFile.FilePath))
             {
                 // Generate thumbnails if they don't already exist (migration case)
@@ -67,11 +66,23 @@ internal sealed class FileCreationService : IFileCreationService
                 return Result.Success(existingFile);
             }
 
-            // Physical file is missing — clean up orphaned DB record so we can re-save
+            // Physical file is missing but DB record exists — this shouldn't normally happen.
+            // Log a warning and proceed to re-upload the file. Clean up the orphan.
             _logger.LogWarning(
                 "Orphaned file record {FileId} detected (hash {Hash}): physical file missing at {Path}. Cleaning up.",
                 existingFile.Id, hash, existingFile.FilePath);
             await _fileRepository.HardDeleteAsync(existingFile.Id, cancellationToken);
+        }
+
+        // Check if a soft-deleted (recycled) file with the same hash exists.
+        // If so, remove the recycled record — the re-upload replaces it as a fresh file.
+        var deletedFile = await _fileRepository.GetDeletedBySha256HashAsync(hash, cancellationToken);
+        if (deletedFile != null)
+        {
+            _logger.LogInformation(
+                "Re-uploading file with hash {Hash} that was in recycled files (ID {FileId}). Removing recycled record.",
+                hash, deletedFile.Id);
+            await _fileRepository.HardDeleteAsync(deletedFile.Id, cancellationToken);
         }
 
         // File doesn't exist, save to disk and create file entity

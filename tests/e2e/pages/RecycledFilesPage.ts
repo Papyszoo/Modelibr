@@ -1,5 +1,5 @@
 import { Page, expect } from "@playwright/test";
-import { navigateToTab } from "../helpers/navigation-helper";
+import { navigateToTab, openTabViaMenu } from "../helpers/navigation-helper";
 
 /**
  * Page Object for the Recycled Files Page (Recycle Bin)
@@ -10,8 +10,6 @@ export class RecycledFilesPage {
     // Main container selectors
     private readonly recycledFilesList = ".recycled-files-list";
     private readonly recycledFilesHeader = ".recycled-files-header h2";
-    private readonly refreshButton =
-        ".recycled-files-header .p-button-outlined";
     private readonly emptyState = ".recycled-files-empty";
     private readonly loading = ".recycled-files-loading";
 
@@ -21,6 +19,7 @@ export class RecycledFilesPage {
     private readonly textureSetsSection = ".recycled-section:has(.pi-images)";
     private readonly spritesSection =
         ".recycled-section[data-section='sprites']";
+    private readonly filesSection = ".recycled-section[data-section='files']";
 
     // Card selectors
     private readonly recycledCard = ".recycled-card";
@@ -38,10 +37,18 @@ export class RecycledFilesPage {
     private readonly cancelButton = ".p-dialog-footer .p-button-text";
 
     /**
-     * Navigate to the Recycled Files page via UI interaction
+     * Navigate to the Recycled Files page via UI interaction (opens in left panel)
      */
     async goto(): Promise<void> {
         await navigateToTab(this.page, "recycledFiles");
+        await this.waitForLoaded();
+    }
+
+    /**
+     * Open the Recycled Files page in the right panel
+     */
+    async gotoInRightPanel(): Promise<void> {
+        await openTabViaMenu(this.page, "recycledFiles", "right");
         await this.waitForLoaded();
     }
 
@@ -78,11 +85,13 @@ export class RecycledFilesPage {
     }
 
     /**
-     * Click the refresh button
+     * Force a data refresh by reloading the page and navigating back.
+     * The Refresh button was removed from the UI; staleTime: 0 ensures
+     * fresh data on each mount.
      */
     async refresh(): Promise<void> {
-        await this.page.locator(this.refreshButton).click();
-        await this.waitForLoaded();
+        await this.page.reload({ waitUntil: "domcontentloaded" });
+        await this.goto();
     }
 
     // ===== Models Section =====
@@ -318,6 +327,64 @@ export class RecycledFilesPage {
         await card.locator(this.deleteForeverButton).click();
         await this.page.waitForSelector(this.deleteDialog, {
             state: "visible",
+        });
+    }
+
+    // ===== Files Section =====
+
+    /**
+     * Get count of recycled files
+     */
+    async getRecycledFileCount(): Promise<number> {
+        const section = this.page.locator(this.filesSection);
+        if (!(await section.isVisible())) return 0;
+        return await section.locator(this.recycledCard).count();
+    }
+
+    /**
+     * Get a recycled file card by index
+     */
+    getFileCard(index: number) {
+        return this.page
+            .locator(this.filesSection)
+            .locator(this.recycledCard)
+            .nth(index);
+    }
+
+    /**
+     * Get the name of a recycled file
+     */
+    async getFileName(index: number): Promise<string | null> {
+        const card = this.getFileCard(index);
+        return await card.locator(this.recycledCardName).textContent();
+    }
+
+    /**
+     * Check if a file with the given name exists in the recycled files section
+     */
+    async hasFileWithName(name: string): Promise<boolean> {
+        const section = this.page.locator(this.filesSection);
+        if (!(await section.isVisible())) return false;
+        const cards = section.locator(this.recycledCard);
+        const count = await cards.count();
+        for (let i = 0; i < count; i++) {
+            const cardName = await cards
+                .nth(i)
+                .locator(this.recycledCardName)
+                .textContent();
+            if (cardName?.includes(name)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Wait until the files section appears and has at least one card
+     */
+    async waitForFileInSection(timeout = 10000): Promise<void> {
+        const section = this.page.locator(this.filesSection);
+        await expect(section).toBeVisible({ timeout });
+        await expect(section.locator(this.recycledCard).first()).toBeVisible({
+            timeout,
         });
     }
 

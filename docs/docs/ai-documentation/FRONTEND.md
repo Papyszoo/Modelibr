@@ -263,27 +263,37 @@ Universal (Global Material) texture sets get auto-generated sphere-preview thumb
 
 ### Recycled Files
 
-**Purpose:** Soft delete and restore models, versions, texture sets, sprites. Protects shared files from permanent deletion.
+**Purpose:** Soft delete and restore models, versions, texture sets, sprites, sounds, and individual files. Protects shared files from permanent deletion.
 
 **Where to look:**
 | Layer | Location |
 |-------|----------|
 | Frontend | `features/recycled-files/components/` |
 | Backend API | `WebApi/Endpoints/RecycledFilesEndpoints.cs` |
+| Backend API | `WebApi/Endpoints/FilesEndpoints.cs` (`DELETE /files/{id}` for soft-delete) |
 | E2E tests | `tests/e2e/features/04-recycled-files/` (7 feature files) |
 
 **Key behaviors (from E2E tests):**
 
 - Recycled items disappear from main grids
-- Recycled items appear in Recycle Bin
+- Recycled items appear in Recycle Bin (sections: Models, Model Versions, Texture Sets, Files, Sprites, Sounds)
+- Thumbnails and previews display for all recycled item types (backend serves files/thumbnails regardless of soft-delete status)
+- Recycled files list auto-refreshes on every mount (`staleTime: 0`) — no manual Refresh button
 - Restore moves items back to main grids
-- Permanent delete removes from database
+- Permanent delete removes from database and disk
 - Shared file protection: cannot permanently delete files used elsewhere
+- Re-uploading a file whose hash matches a recycled file cleans up the recycled record
+
+**File deletion flow:**
+
+- **Files tab** (texture set viewer): "Delete" button below preview soft-deletes individual files → moves to Recycled Files
+- **Texture Types tab**: × icon unlinks texture from type (file remains)
+- **Recycled Files**: "Delete Forever" hard-deletes from both disk and database
 
 **Effects of changes:**
 
-- Soft delete → sets `IsRecycled=true`, removes from main queries
-- Restore → clears `IsRecycled`, item reappears
+- Soft delete → sets `IsDeleted=true`, removes from main queries
+- Restore → clears `IsDeleted`, item reappears
 - Permanent delete → cascading deletion respects shared files
 
 ---

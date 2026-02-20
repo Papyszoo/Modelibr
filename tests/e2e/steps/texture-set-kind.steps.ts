@@ -173,8 +173,25 @@ Then(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
+        // Use search to filter by name — avoids pagination issues when >50 sets exist
+        const searchInput = page.locator(".search-input");
+        const searchVisible = await searchInput
+            .isVisible({ timeout: 3000 })
+            .catch(() => false);
+        if (searchVisible) {
+            await searchInput.clear();
+            await searchInput.fill(set.name);
+            await page.waitForTimeout(300);
+        }
+
         const card = getCardLocator(page, set.name);
         await expect(card).toBeVisible({ timeout: 10000 });
+
+        // Clear search so it doesn't affect subsequent steps
+        if (searchVisible) {
+            await searchInput.clear();
+            await page.waitForTimeout(300);
+        }
     },
 );
 
