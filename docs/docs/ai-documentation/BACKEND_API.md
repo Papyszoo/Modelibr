@@ -73,7 +73,7 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `POST` | `/texture-sets/{id}/thumbnail/png-upload` | Upload PNG thumbnail for texture set     | `X-Api-Key` |
 | `GET`  | `/texture-sets/{id}/thumbnail/file`       | Download WebP thumbnail image            | None        |
 | `GET`  | `/texture-sets/{id}/thumbnail/png-file`   | Download PNG thumbnail image             | None        |
-| `POST` | `/texture-sets/{id}/thumbnail/regenerate` | Queue texture set thumbnail regeneration | None        |
+| `POST` | `/texture-sets/{id}/thumbnail/regenerate` | Queue texture set thumbnail regeneration (body: `{ uvScale?, geometryType? }`) | None        |
 
 ### Texture Sets (16 endpoints)
 

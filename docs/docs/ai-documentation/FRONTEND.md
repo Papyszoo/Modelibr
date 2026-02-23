@@ -136,7 +136,7 @@ src/frontend/src/
 - Deleting texture set → affects all linked model versions
 - Updating tiling scale / UV mapping → only allowed for Universal kind (API returns 400 for ModelSpecific)
 - Adding texture to Universal set → auto-enqueues thumbnail generation (sphere preview)
-- "Regenerate Thumbnail" button on Universal set viewer → re-queues sphere render job
+- "Regenerate Thumbnail" button inside the 3D Preview tab (TexturePreviewPanel) for Universal sets. Passes live UV Scale and Geometry Type to the backend.
 - "Regenerate Thumbnail" option in TextureSetGrid context menu (right-click) for Universal sets
 - Changing kind to Universal → auto-enqueues thumbnail generation on the backend
 
@@ -164,13 +164,15 @@ Key rendering features:
 - **Vertex welding**: All primitives are passed through `mergeVertices()` (from `BufferGeometryUtils`) before rendering. This welds shared vertices so displacement mapping doesn't tear the mesh at edges/seams.
 - **Icosahedron for sphere**: The sphere uses `IcosahedronGeometry(radius, 5)` instead of `SphereGeometry` to provide uniform vertex distribution and eliminate pole-pinching artifacts.
 - **Simple UV scaling**: The `uvScale` value from the database is used directly as `texture.repeat.set(scale, scale)`. No complex physical tiling calculations.
+- **Fixed geometry sizes**: All primitive geometries use hardcoded unit sizes (e.g., box 2×2×2, sphere radius 1.2). The `<Stage>` / `<Bounds>` component auto-frames the object, so dynamic physical sizes are unnecessary and would cause camera jumps.
+- **Simplified Global Material controls**: For Universal (Global Material) texture sets, the PreviewSettings panel hides Scale, Rotation Speed, and per-geometry parameter sliders. Only Geometry Type, UV Scale, and Wireframe are shown.
 - **IBL lighting**: The preview uses `<Stage environment="city">` from `@react-three/drei` for Image-Based Lighting, providing realistic reflections and depth.
 
 The component loads textures (standard + EXR) asynchronously, sets correct color spaces (sRGB for color textures, linear for data textures), and applies `RepeatWrapping`.
 
 **Thumbnail generation for Universal sets:**
 
-Universal (Global Material) texture sets get auto-generated sphere-preview thumbnails. When textures are added to a Universal set, the backend auto-enqueues a thumbnail job. The asset processor's `TextureSetProcessor` renders a sphere with the textures applied (albedo, normal, roughness, metallic, etc.), generates a single static image (30° angle, 15° elevation), and uploads the result. The frontend `TextureSetGrid` prefers the generated thumbnail URL over the albedo texture for Universal sets that have a `thumbnailPath`. The `TextureSetViewer` header shows a "Regenerate Thumbnail" button for Universal sets.
+Universal (Global Material) texture sets get auto-generated preview thumbnails. When textures are added to a Universal set, the backend auto-enqueues a thumbnail job. The asset processor's `TextureSetProcessor` renders the textures on the configured geometry type (sphere by default, but also supports box, cylinder, torus), generates a single static image (30° angle, 15° elevation), and uploads the result. The frontend `TextureSetGrid` prefers the generated thumbnail URL over the albedo texture for Universal sets that have a `thumbnailPath`. The "Regenerate Thumbnail" button lives inside the `TexturePreviewPanel` (the Preview tab's 3D canvas area) and passes the current live `uvScale` and `geometryType` to the backend, so the generated thumbnail matches what the user sees on screen.
 
 ---
 

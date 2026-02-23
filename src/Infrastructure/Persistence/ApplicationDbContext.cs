@@ -239,6 +239,9 @@ namespace Infrastructure.Persistence
                     .HasDefaultValue(UvMappingMode.Standard);
                 entity.Property(tp => tp.UvScale).IsRequired()
                     .HasDefaultValue(1.0f);
+                entity.Property(tp => tp.PreviewGeometryType).IsRequired()
+                    .HasMaxLength(20)
+                    .HasDefaultValue("plane");
                 entity.Property(tp => tp.CreatedAt).IsRequired();
                 entity.Property(tp => tp.UpdatedAt).IsRequired();
                 entity.Property(tp => tp.IsDeleted).IsRequired();

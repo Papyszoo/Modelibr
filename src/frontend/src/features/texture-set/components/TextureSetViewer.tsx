@@ -8,7 +8,6 @@ import {
 } from '@/features/texture-set/api/queries'
 import {
   updateTextureSet,
-  regenerateTextureSetThumbnail,
 } from '@/features/texture-set/api/textureSetApi'
 import { getNonHeightTypes } from '@/utils/textureTypeUtils'
 import { SetHeader } from '@/features/texture-set/dialogs/SetHeader'
@@ -47,7 +46,8 @@ export function TextureSetViewer({
     textureSetQuery.error instanceof Error ? textureSetQuery.error.message : ''
 
   const { settings, setCardWidth } = useCardWidthStore()
-  const cardWidth = settings.textureSetViewer
+  const cardWidthKey = side === 'right' ? 'textureSetViewerRight' : 'textureSetViewerLeft'
+  const cardWidth = settings[cardWidthKey]
 
   const refreshTextureSet = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -63,13 +63,6 @@ export function TextureSetViewer({
       }
       return updateTextureSet(textureSet.id, { name: newName })
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['textureSets'] })
-    },
-  })
-
-  const regenerateThumbnailMutation = useMutation({
-    mutationFn: (id: number) => regenerateTextureSetThumbnail(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['textureSets'] })
     },
@@ -119,24 +112,6 @@ export function TextureSetViewer({
             />
             <SetStats textureSet={textureSet} />
           </div>
-          {textureSet.kind === TextureSetKind.Universal &&
-            textureSet.textureCount > 0 && (
-              <button
-                className="p-button p-button-sm p-button-outlined"
-                title="Regenerate sphere thumbnail preview"
-                disabled={regenerateThumbnailMutation.isPending}
-                onClick={() =>
-                  regenerateThumbnailMutation.mutate(textureSet.id)
-                }
-                style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
-              >
-                <i
-                  className={`pi ${regenerateThumbnailMutation.isPending ? 'pi-spin pi-spinner' : 'pi-refresh'}`}
-                  style={{ marginRight: '0.4rem' }}
-                />
-                Regenerate Thumbnail
-              </button>
-            )}
         </div>
       </header>
 
@@ -157,7 +132,7 @@ export function TextureSetViewer({
               value={cardWidth}
               min={200}
               max={500}
-              onChange={width => setCardWidth('textureSetViewer', width)}
+              onChange={width => setCardWidth(cardWidthKey, width)}
             />
           </div>
           <div

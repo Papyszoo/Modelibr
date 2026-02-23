@@ -212,9 +212,10 @@ export async function updateTilingScale(
 }
 
 export async function regenerateTextureSetThumbnail(
-  textureSetId: number
+  textureSetId: number,
+  options?: { uvScale?: number; geometryType?: string }
 ): Promise<void> {
-  await client.post(`/texture-sets/${textureSetId}/thumbnail/regenerate`)
+  await client.post(`/texture-sets/${textureSetId}/thumbnail/regenerate`, options)
 }
 
 export async function updateTextureSetKind(

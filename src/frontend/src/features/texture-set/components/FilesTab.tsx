@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
@@ -116,7 +116,6 @@ function getChannelType(
   // We rely strictly on explicit sourceChannel now.
   // Implicit guessing led to bugs where type assigned to Channel G appeared on Channel R.
   return null
-  return null
 }
 
 function getTextureByChannel(
@@ -133,7 +132,60 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
     Record<number, string>
   >({})
   const toast = useRef<Toast>(null)
-  const { changeTextureType, addTextureToSetEndpoint } = useTextureSets()
+  const { changeTextureType, addTextureToSetEndpoint, removeTextureFromSet } = useTextureSets()
+
+  // Compute all texture types currently assigned across the entire texture set
+  // This is used to disable already-taken options in dropdowns
+  const takenTextureTypes = useMemo(() => {
+    const taken = new Set<TextureType>()
+    textureSet.textures.forEach(t => {
+      if (t.textureType !== TextureType.SplitChannel) {
+        taken.add(t.textureType)
+      }
+    })
+    return taken
+  }, [textureSet])
+
+  // Returns dropdown options with already-taken types disabled,
+  // excluding the value currently assigned to this specific channel
+  const getOptionsWithDisabled = useCallback(
+    (
+      baseOptions: { label: string; value: TextureType | null }[],
+      currentValue: TextureType | null
+    ) => {
+      return baseOptions.map(opt => ({
+        ...opt,
+        disabled:
+          opt.value !== null &&
+          opt.value !== currentValue &&
+          takenTextureTypes.has(opt.value),
+      }))
+    },
+    [takenTextureTypes]
+  )
+
+  // Returns RGB dropdown options with already-taken types disabled
+  const getRgbOptionsWithDisabled = useCallback(
+    (currentValue: string) => {
+      return rgbOptions.map(opt => {
+        if (opt.value === 'none' || opt.value === 'split' || opt.value === currentValue) {
+          return opt
+        }
+        // Map option value to TextureType
+        const typeMap: Record<string, TextureType> = {
+          albedo: TextureType.Albedo,
+          normal: TextureType.Normal,
+          emissive: TextureType.Emissive,
+        }
+        const textureType = typeMap[opt.value]
+        return {
+          ...opt,
+          disabled: textureType !== undefined && takenTextureTypes.has(textureType),
+        }
+      })
+    },
+    [takenTextureTypes]
+  )
 
   const handleDeleteFile = (fileMapping: FileMapping) => {
     confirmDialog({
@@ -245,8 +297,32 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
         })
       }
     } else if (newOption === 'none') {
-      // Remove all textures for this file
-      // Logic for removing all not implemented yet to avoid accidental data loss without confirmation
+      // Remove all texture mappings for this file from the set
+      const texturesToRemove = fileMapping.existingTextures.filter(
+        t => t.textureType !== TextureType.SplitChannel
+      )
+      if (texturesToRemove.length === 0) return
+
+      try {
+        for (const texture of texturesToRemove) {
+          await removeTextureFromSet(textureSet.id, texture.id)
+        }
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Cleared',
+          detail: `Removed all texture mappings for ${fileMapping.fileName}`,
+          life: 2000,
+        })
+        onMappingChanged()
+      } catch (error) {
+        console.error('Failed to remove texture mappings:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to remove texture mappings',
+          life: 3000,
+        })
+      }
     } else {
       // Switched to specific RGB type (Albedo, Normal, Emissive)
       let targetType: TextureType | null = null
@@ -325,14 +401,25 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
 
     // Texture exists for this channel
     if (newTextureType === null) {
-      // User selected "None" - would need to delete the texture
-      toast.current?.show({
-        severity: 'info',
-        summary: 'Info',
-        detail:
-          'Removing texture mappings is not yet implemented. Use the Texture Types tab to remove textures.',
-        life: 4000,
-      })
+      // User selected "None" — remove the texture mapping
+      try {
+        await removeTextureFromSet(textureSet.id, texture.id)
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Removed',
+          detail: `Removed ${getTextureTypeLabel(texture.textureType)} mapping`,
+          life: 2000,
+        })
+        onMappingChanged()
+      } catch (error) {
+        console.error('Failed to remove texture mapping:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to remove texture mapping',
+          life: 3000,
+        })
+      }
       return
     }
 
@@ -413,7 +500,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                 <label>RGB:</label>
                 <Dropdown
                   value={fm.rgbOption}
-                  options={rgbOptions}
+                  options={getRgbOptionsWithDisabled(fm.rgbOption)}
                   className="channel-dropdown"
                   onChange={e => handleRgbOptionChange(fm, e.value)}
                   data-testid={`channel-mapping-rgb-${fm.fileId}`}
@@ -429,7 +516,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                     <label>R:</label>
                     <Dropdown
                       value={fm.rChannel}
-                      options={grayscaleTypeOptions}
+                      options={getOptionsWithDisabled(grayscaleTypeOptions, fm.rChannel)}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.R, e.value)
                       }
@@ -442,7 +529,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                     <label>G:</label>
                     <Dropdown
                       value={fm.gChannel}
-                      options={grayscaleTypeOptions}
+                      options={getOptionsWithDisabled(grayscaleTypeOptions, fm.gChannel)}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.G, e.value)
                       }
@@ -455,7 +542,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                     <label>B:</label>
                     <Dropdown
                       value={fm.bChannel}
-                      options={grayscaleTypeOptions}
+                      options={getOptionsWithDisabled(grayscaleTypeOptions, fm.bChannel)}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.B, e.value)
                       }
@@ -472,7 +559,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                   <label>A:</label>
                   <Dropdown
                     value={fm.aChannel}
-                    options={alphaTypeOptions}
+                    options={getOptionsWithDisabled(alphaTypeOptions, fm.aChannel)}
                     onChange={e =>
                       handleTextureTypeChange(fm, TextureChannel.A, e.value)
                     }

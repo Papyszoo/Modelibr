@@ -59,6 +59,7 @@ export interface TextureSetDto {
   tilingScaleY: number
   uvMappingMode: UvMappingMode
   uvScale: number
+  previewGeometryType?: string
   createdAt: string
   updatedAt: string
   textureCount: number

@@ -7,7 +7,6 @@ import './PreviewSettings.css'
 export interface PreviewSettingsType {
   type: GeometryType
   scale: number
-  rotationSpeed: number
   wireframe: boolean
   // Cube parameters
   cubeSize: number
@@ -28,12 +27,15 @@ interface PreviewSettingsProps {
   settings: PreviewSettingsType
   onSettingsChange: (settings: PreviewSettingsType) => void
   showTilingControls?: boolean
+  /** When true, shows only Geometry Type, UV Scale, and Wireframe (hides Scale, Rotation Speed, per-geometry params) */
+  isGlobalMaterial?: boolean
 }
 
 export function PreviewSettings({
   settings,
   onSettingsChange,
   showTilingControls = false,
+  isGlobalMaterial = false,
 }: PreviewSettingsProps) {
   const handleChange = (
     key: keyof PreviewSettingsType,
@@ -46,6 +48,7 @@ export function PreviewSettings({
   }
 
   const geometryOptions = [
+    { label: 'Plane', value: 'plane' as GeometryType },
     { label: 'Cube', value: 'box' as GeometryType },
     { label: 'Sphere', value: 'sphere' as GeometryType },
     { label: 'Cylinder', value: 'cylinder' as GeometryType },
@@ -69,37 +72,23 @@ export function PreviewSettings({
           </div>
         </div>
 
-        <div className="setting-item">
-          <label>Scale</label>
-          <div className="setting-control">
-            <Slider
-              value={settings.scale}
-              onChange={e => handleChange('scale', e.value as number)}
-              min={0.5}
-              max={3}
-              step={0.1}
-            />
-            <span className="setting-value">{settings.scale.toFixed(1)}x</span>
+        {!isGlobalMaterial && (
+          <div className="setting-item">
+            <label>Scale</label>
+            <div className="setting-control">
+              <Slider
+                value={settings.scale}
+                onChange={e => handleChange('scale', e.value as number)}
+                min={0.5}
+                max={3}
+                step={0.1}
+              />
+              <span className="setting-value">
+                {settings.scale.toFixed(1)}x
+              </span>
+            </div>
           </div>
-        </div>
-
-        <div className="setting-item">
-          <label>Rotation Speed</label>
-          <div className="setting-control">
-            <Slider
-              value={settings.rotationSpeed}
-              onChange={e => handleChange('rotationSpeed', e.value as number)}
-              min={0}
-              max={0.05}
-              step={0.001}
-            />
-            <span className="setting-value">
-              {settings.rotationSpeed === 0
-                ? 'Off'
-                : settings.rotationSpeed.toFixed(3)}
-            </span>
-          </div>
-        </div>
+        )}
 
         <div className="setting-item">
           <label>Wireframe</label>
@@ -112,7 +101,8 @@ export function PreviewSettings({
         </div>
       </div>
 
-      {settings.type === 'box' && (
+      {/* Per-geometry parameter sliders — hidden for Global Materials (Bounds auto-fits) */}
+      {!isGlobalMaterial && settings.type === 'box' && (
         <div className="settings-group">
           <h4 className="settings-group-title">Cube Parameters</h4>
 
@@ -134,7 +124,7 @@ export function PreviewSettings({
         </div>
       )}
 
-      {settings.type === 'sphere' && (
+      {!isGlobalMaterial && settings.type === 'sphere' && (
         <div className="settings-group">
           <h4 className="settings-group-title">Sphere Parameters</h4>
 
@@ -172,7 +162,7 @@ export function PreviewSettings({
         </div>
       )}
 
-      {settings.type === 'cylinder' && (
+      {!isGlobalMaterial && settings.type === 'cylinder' && (
         <div className="settings-group">
           <h4 className="settings-group-title">Cylinder Parameters</h4>
 
@@ -214,7 +204,7 @@ export function PreviewSettings({
         </div>
       )}
 
-      {settings.type === 'torus' && (
+      {!isGlobalMaterial && settings.type === 'torus' && (
         <div className="settings-group">
           <h4 className="settings-group-title">Torus Parameters</h4>
 

@@ -1,15 +1,19 @@
-import { Suspense, useState, useCallback, useEffect, useRef } from 'react'
+import { Suspense, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Stage, OrbitControls } from '@react-three/drei'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { TextureSetDto, TextureSetKind } from '@/types'
-import { TexturedGeometry } from './TexturedGeometry'
+import { TexturedGeometry, TextureLoadingState, TextureStrengths } from './TexturedGeometry'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { PreviewInfo } from './PreviewInfo'
 import { PreviewSettings, PreviewSettingsType } from './PreviewSettings'
-import { updateTilingScale } from '@/features/texture-set/api/textureSetApi'
+import {
+  updateTilingScale,
+  regenerateTextureSetThumbnail,
+} from '@/features/texture-set/api/textureSetApi'
 import { Button } from 'primereact/button'
+import { ProgressBar } from 'primereact/progressbar'
 import './TexturePreviewPanel.css'
 
 interface TexturePreviewPanelProps {
@@ -26,10 +30,11 @@ export function TexturePreviewPanel({
   const [infoWindowVisible, setInfoWindowVisible] = useState<boolean>(false)
   const [settingsWindowVisible, setSettingsWindowVisible] =
     useState<boolean>(false)
+  const [disabledTextures, setDisabledTextures] = useState<Set<string>>(new Set())
+  const [textureStrengths, setTextureStrengths] = useState<TextureStrengths>({})
   const [previewSettings, setPreviewSettings] = useState<PreviewSettingsType>({
-    type: isUniversal ? 'sphere' : 'box',
+    type: isUniversal ? 'plane' : 'box',
     scale: 1,
-    rotationSpeed: 0.01,
     wireframe: false,
     cubeSize: 2,
     sphereRadius: 1.2,
@@ -89,11 +94,59 @@ export function TexturePreviewPanel({
     }
   }, [])
 
-  // Combine settings for geometry params
-  const geometryParams = {
+  // Regenerate thumbnail with current live preview settings
+  const regenerateThumbnailMutation = useMutation({
+    mutationFn: () =>
+      regenerateTextureSetThumbnail(textureSet.id, {
+        uvScale: previewSettings.uvScale,
+        geometryType: previewSettings.type,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['textureSets'] })
+    },
+  })
+
+  // Toggle texture visibility in preview
+  const handleToggleTexture = useCallback((textureType: string) => {
+    setDisabledTextures(prev => {
+      const next = new Set(prev)
+      if (next.has(textureType)) {
+        next.delete(textureType)
+      } else {
+        next.add(textureType)
+      }
+      return next
+    })
+  }, [])
+
+  // Update per-texture strength
+  const handleStrengthChange = useCallback(
+    (textureType: string, value: number) => {
+      setTextureStrengths(prev => ({ ...prev, [textureType]: value }))
+    },
+    []
+  )
+
+  // Texture loading progress state
+  const [textureLoading, setTextureLoading] = useState<TextureLoadingState>({
+    isLoading: true,
+    loaded: 0,
+    total: 0,
+  })
+
+  const handleLoadingChange = useCallback((state: TextureLoadingState) => {
+    setTextureLoading(state)
+  }, [])
+
+  const loadingPercent =
+    textureLoading.total > 0
+      ? Math.round((textureLoading.loaded / textureLoading.total) * 100)
+      : 0
+
+  // Combine settings for geometry params — memoised to avoid unnecessary re-renders
+  const geometryParams = useMemo(() => ({
     type: previewSettings.type,
     scale: previewSettings.scale,
-    rotationSpeed: previewSettings.rotationSpeed,
     wireframe: previewSettings.wireframe,
     cubeSize: previewSettings.cubeSize,
     sphereRadius: previewSettings.sphereRadius,
@@ -103,13 +156,23 @@ export function TexturePreviewPanel({
     torusRadius: previewSettings.torusRadius,
     torusTube: previewSettings.torusTube,
     uvScale: previewSettings.uvScale,
-  }
+  }), [previewSettings])
 
   return (
     <div className="texture-preview-panel">
       <div className="preview-canvas-container">
         {/* Floating control buttons */}
         <div className="preview-controls preview-controls-right">
+          {isUniversal && (
+            <Button
+              icon={`pi ${regenerateThumbnailMutation.isPending ? 'pi-spin pi-spinner' : 'pi-refresh'}`}
+              className="p-button-rounded preview-control-btn"
+              onClick={() => regenerateThumbnailMutation.mutate()}
+              disabled={regenerateThumbnailMutation.isPending}
+              tooltip="Regenerate Thumbnail"
+              tooltipOptions={{ position: 'left' }}
+            />
+          )}
           <Button
             icon="pi pi-cog"
             className="p-button-rounded preview-control-btn"
@@ -126,9 +189,27 @@ export function TexturePreviewPanel({
           />
         </div>
 
+        {/* Loading overlay */}
+        {textureLoading.isLoading && (
+          <div className="texture-loading-overlay">
+            <div className="texture-loading-content">
+              <i className="pi pi-spinner pi-spin texture-loading-icon" />
+              <span className="texture-loading-text">
+                Loading textures ({textureLoading.loaded}/{textureLoading.total})
+              </span>
+              <ProgressBar
+                value={loadingPercent}
+                showValue={false}
+                className="texture-loading-progress"
+              />
+            </div>
+          </div>
+        )}
+
         <Canvas
           shadows
           className="texture-preview-canvas"
+          camera={{ position: [3, 2, 3], fov: 45 }}
           gl={{
             antialias: true,
             alpha: true,
@@ -137,18 +218,22 @@ export function TexturePreviewPanel({
           dpr={Math.min(window.devicePixelRatio, 2)}
         >
           {/* Stage provides automatic lighting, shadows, and camera positioning */}
-          <Stage intensity={0.5} environment="city" adjustCamera={2.5}>
+          <Stage intensity={0.5} environment="city" adjustCamera={false}>
             <Suspense fallback={<LoadingPlaceholder />}>
               <TexturedGeometry
                 geometryType={previewSettings.type}
                 textureSet={textureSet}
                 geometryParams={geometryParams}
+                disabledTextures={disabledTextures}
+                textureStrengths={textureStrengths}
+                onLoadingChange={handleLoadingChange}
               />
             </Suspense>
           </Stage>
 
           {/* Controls */}
           <OrbitControls
+            makeDefault
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
@@ -170,6 +255,7 @@ export function TexturePreviewPanel({
           settings={previewSettings}
           onSettingsChange={handleSettingsChange}
           showTilingControls={isUniversal}
+          isGlobalMaterial={isUniversal}
         />
       </FloatingWindow>
       <FloatingWindow
@@ -182,6 +268,10 @@ export function TexturePreviewPanel({
         <PreviewInfo
           textureSet={textureSet}
           geometryType={previewSettings.type}
+          disabledTextures={disabledTextures}
+          textureStrengths={textureStrengths}
+          onToggleTexture={handleToggleTexture}
+          onStrengthChange={handleStrengthChange}
         />
       </FloatingWindow>
     </div>

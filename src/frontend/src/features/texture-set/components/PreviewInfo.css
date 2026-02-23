@@ -61,13 +61,61 @@
 
 .texture-list-item {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.25rem;
   padding: 0.5rem;
   background: var(--surface-ground);
   border-radius: 4px;
   font-size: 0.875rem;
   color: var(--text-color);
+  transition: opacity 0.15s ease;
+  user-select: none;
+}
+
+.texture-list-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.texture-list-item:hover {
+  background: var(--surface-hover);
+}
+
+.texture-list-item.texture-disabled {
+  opacity: 0.5;
+}
+
+.texture-list-item.texture-disabled span {
+  text-decoration: line-through;
+}
+
+.texture-checkbox {
+  flex-shrink: 0;
+}
+
+.texture-strength-value {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  font-weight: 500;
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.texture-strength-slider {
+  padding: 0.25rem 0.25rem 0.25rem 1.75rem;
+}
+
+.texture-strength-slider .p-slider {
+  height: 4px;
+}
+
+.texture-strength-slider .p-slider .p-slider-handle {
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
 }
 
 .no-textures {

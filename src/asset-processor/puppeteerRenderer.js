@@ -447,6 +447,123 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Load a primitive geometry into the scene for texture set previews.
+   * Supports plane (default), sphere, box, cylinder, and torus.
+   * Uses fixed unit sizes — the camera auto-frames the object.
+   * @param {string} [geometryType='plane'] - One of 'plane', 'sphere', 'box', 'cylinder', 'torus'
+   * @returns {Promise<number>} Polygon count
+   */
+  async loadPrimitive(geometryType = 'plane') {
+    // For backward compatibility, delegate 'sphere' to loadSphere
+    if (geometryType === 'sphere') {
+      return this.loadSphere(5)
+    }
+
+    // Check if page exists, is not closed, AND the frame is still usable
+    if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
+      logger.warn(
+        'Renderer page is not available or frame is detached, reinitializing'
+      )
+      await this._reinitialize()
+    }
+
+    // Clear any previous model
+    try {
+      await this.page.evaluate(() => {
+        if (typeof window.clearScene === 'function') {
+          window.clearScene()
+        }
+      })
+    } catch (e) {
+      logger.warn('Failed to clear scene before loading primitive', {
+        error: e.message,
+      })
+      if (
+        e.message.includes('detached') ||
+        e.message.includes('Target closed') ||
+        e.message.includes('Session closed') ||
+        e.message.includes('Execution context was destroyed')
+      ) {
+        logger.warn(
+          'Page frame is detached during clearScene, reinitializing renderer'
+        )
+        await this._reinitialize()
+      }
+    }
+
+    const result = await this.page.evaluate(geoType => {
+      try {
+        const THREE = window.THREE
+        let geometry
+
+        switch (geoType) {
+          case 'plane':
+            geometry = new THREE.PlaneGeometry(2.4, 2.4, 512, 512)
+            break
+          case 'box':
+            geometry = new THREE.BoxGeometry(2, 2, 2, 128, 128, 128)
+            break
+          case 'cylinder':
+            geometry = new THREE.CylinderGeometry(1, 1, 2, 128, 128, false)
+            break
+          case 'torus':
+            geometry = new THREE.TorusGeometry(1, 0.4, 64, 128)
+            break
+          default:
+            // Fallback to plane
+            geometry = new THREE.PlaneGeometry(2.4, 2.4, 512, 512)
+        }
+
+        // Weld shared vertices for smooth displacement mapping
+        if (window.BufferGeometryUtils) {
+          geometry = window.BufferGeometryUtils.mergeVertices(geometry)
+        }
+        geometry.computeVertexNormals()
+
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          metalness: 0.0,
+          roughness: 0.5,
+        })
+
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.castShadow = true
+        mesh.receiveShadow = true
+
+        const model = new THREE.Group()
+        model.add(mesh)
+
+        const normInfo = window.normalizeModel(model, 2.0)
+        window.modelRenderer.model = model
+        window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
+        window.modelRenderer.isReady = true
+
+        const polygonCount = window.countPolygons(model)
+
+        return {
+          success: true,
+          polygonCount,
+          boundingSphereRadius: normInfo.boundingSphereRadius,
+        }
+      } catch (error) {
+        console.error('Primitive creation error:', error)
+        return { success: false, error: error.message }
+      }
+    }, geometryType)
+
+    if (!result.success) {
+      throw new Error(result.error || `Failed to create ${geometryType} primitive`)
+    }
+
+    logger.info('Primitive loaded in browser', {
+      polygonCount: result.polygonCount,
+      geometryType,
+    })
+
+    return result.polygonCount
+  }
+
+  /**
    * Apply textures to the loaded model
    * @param {Object} texturePaths - Map of texture types to texture info {filePath, sourceChannel}
    * @param {string} fileType - Model file type (gltf, glb, obj, fbx) for flipY setting
@@ -730,17 +847,25 @@ export class PuppeteerRenderer {
               if (child.isMesh) {
                 meshCount++
 
+                // AO maps require a second UV set — copy uv to uv2
+                if (loadedTextures.aoMap && child.geometry) {
+                  const uvAttr = child.geometry.getAttribute('uv')
+                  if (uvAttr) {
+                    child.geometry.setAttribute('uv2', uvAttr.clone())
+                  }
+                }
+
                 // Create new material with white base color for textures
                 child.material = new THREE.MeshStandardMaterial({
                   color: loadedTextures.map
                     ? 0xffffff
                     : new THREE.Color(0.7, 0.7, 0.9),
-                  metalness: loadedTextures.metalnessMap ? 1 : 0.3,
-                  roughness: loadedTextures.roughnessMap ? 1 : 0.4,
+                  metalness: loadedTextures.metalnessMap ? 1 : 0,
+                  roughness: loadedTextures.roughnessMap ? 1 : 0.8,
                   envMapIntensity: 1.0,
                 })
 
-                // Apply each loaded texture
+                // Apply each loaded texture with proper material settings
                 for (const [property, texture] of Object.entries(
                   loadedTextures
                 )) {
@@ -749,13 +874,25 @@ export class PuppeteerRenderer {
                     child.material.needsUpdate = true
                     console.log(`Applied ${property} to mesh`)
 
-                    // Special handling for emissive
+                    // Special handling per texture type — match frontend behavior
                     if (property === 'emissiveMap') {
                       child.material.emissive = new THREE.Color(0xffffff)
+                      child.material.emissiveIntensity = 1.0
                     }
-                    // Match frontend displacementScale
                     if (property === 'displacementMap') {
                       child.material.displacementScale = 0.1
+                    }
+                    if (property === 'normalMap') {
+                      child.material.normalScale = new THREE.Vector2(1, 1)
+                    }
+                    if (property === 'bumpMap') {
+                      child.material.bumpScale = 0.5
+                    }
+                    if (property === 'aoMap') {
+                      child.material.aoMapIntensity = 1.0
+                    }
+                    if (property === 'alphaMap') {
+                      child.material.transparent = true
                     }
                   }
                 }

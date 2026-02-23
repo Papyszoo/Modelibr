@@ -345,8 +345,13 @@ public static class TextureSetEndpoints
         ICommandHandler<ChangeTextureTypeCommand> commandHandler,
         CancellationToken cancellationToken)
     {
+        if (request.TextureType is null)
+        {
+            return Results.BadRequest(new { error = "InvalidTextureType", message = "Texture type cannot be null. To remove a texture, use the DELETE endpoint." });
+        }
+
         var result = await commandHandler.Handle(
-            new ChangeTextureTypeCommand(setId, textureId, request.TextureType),
+            new ChangeTextureTypeCommand(setId, textureId, request.TextureType.Value),
             cancellationToken);
 
         if (result.IsFailure)
@@ -533,9 +538,11 @@ public static class TextureSetEndpoints
     private static async Task<IResult> RegenerateTextureSetThumbnail(
         int id,
         ICommandHandler<RegenerateTextureSetThumbnailCommand> commandHandler,
+        RegenerateTextureSetThumbnailRequest? request,
         CancellationToken cancellationToken)
     {
-        var result = await commandHandler.Handle(new RegenerateTextureSetThumbnailCommand(id), cancellationToken);
+        var command = new RegenerateTextureSetThumbnailCommand(id, request?.UvScale, request?.GeometryType);
+        var result = await commandHandler.Handle(command, cancellationToken);
 
         if (result.IsFailure)
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
@@ -550,5 +557,6 @@ public record UpdateTextureSetRequest(string Name);
 public record UpdateTextureSetKindRequest(TextureSetKind Kind);
 public record UpdateTilingScaleRequest(float TilingScaleX, float TilingScaleY, UvMappingMode? UvMappingMode = null, float? UvScale = null);
 public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);
-public record ChangeTextureTypeRequest(TextureType TextureType);
+public record ChangeTextureTypeRequest(TextureType? TextureType);
 public record ChangeTextureChannelRequest(TextureChannel SourceChannel);
+public record RegenerateTextureSetThumbnailRequest(float? UvScale = null, string? GeometryType = null);

@@ -33,6 +33,7 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
             TilingScaleY = textureSet.TilingScaleY,
             UvMappingMode = textureSet.UvMappingMode,
             UvScale = textureSet.UvScale,
+            PreviewGeometryType = textureSet.PreviewGeometryType,
             CreatedAt = textureSet.CreatedAt,
             UpdatedAt = textureSet.UpdatedAt,
             TextureCount = textureSet.TextureCount,
@@ -86,6 +87,7 @@ public record TextureSetDetailDto
     public float TilingScaleY { get; init; } = 1.0f;
     public UvMappingMode UvMappingMode { get; init; } = UvMappingMode.Standard;
     public float UvScale { get; init; } = 1.0f;
+    public string PreviewGeometryType { get; init; } = "plane";
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int TextureCount { get; init; }

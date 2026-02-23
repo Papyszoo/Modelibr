@@ -490,14 +490,14 @@ npm test
 - `baseProcessor.js` - Abstract base class defining the processor contract
 - `meshProcessor.js` - 3D mesh thumbnail generation (OBJ, FBX, GLTF, GLB)
 - `soundProcessor.js` - Audio waveform generation
-- `textureSetProcessor.js` - Texture set sphere-preview thumbnail generation (Universal/Global Materials). Renders a single static image at 30° angle with 15° elevation using `sharp` for encoding (not orbit animation). Supports two UV mapping modes: **Physical** (computes sphere tiling from `uvScale` using `2πr/uvScale` and `πr/uvScale` for a unit sphere) and **Standard** (uses raw `tilingScaleX`/`tilingScaleY` repeat values). Passes computed tiling to `puppeteerRenderer` for accurate texture repeat. After generating the texture set thumbnail, also generates lightweight PNG previews for individual texture files (EXR or >1MB) and uploads them via `POST /files/{id}/preview/upload`.
+- `textureSetProcessor.js` - Texture set preview thumbnail generation (Universal/Global Materials). Renders a single static image at 30° angle with 15° elevation using `sharp` for encoding (not orbit animation). Reads `previewGeometryType` from the texture set to render on the appropriate geometry (sphere, box, cylinder, or torus — defaults to sphere). Uses `uvScale` directly as texture repeat multiplier. After generating the texture set thumbnail, also generates lightweight PNG previews for individual texture files (EXR or >1MB) and uploads them via `POST /files/{id}/preview/upload`.
 - `thumbnailProcessor.js` - Generic thumbnail processing
 
 **imagePreviewGenerator.js** - Utility for converting EXR files to PNG (via Three.js EXRLoader + Reinhard tone mapping + sharp) and resizing large standard images. Used by both `puppeteerRenderer.js` (pre-processing textures for browser) and `textureSetProcessor.js` (generating individual file previews).
 
 **modelFileService.js** - Downloads and manages model files from backend API
 
-**puppeteerRenderer.js** - Browser-based 3D rendering with Puppeteer and Three.js (supports `loadModel()` for meshes and `loadSphere()` for texture set previews). Textures use `RepeatWrapping` for proper tiling on sphere. Accepts `tilingScale` parameter from `textureSetProcessor.js` and applies `texture.repeat.set(tiling.x, tiling.y)` to all loaded textures for accurate tiling in generated thumbnails. Pre-processes EXR textures (converts to PNG via `imagePreviewGenerator.js`) and resizes large images before sending to the browser. Supports all texture types: Albedo, Normal, Height, AO, Roughness, Metallic, Emissive, Bump, Alpha, and Displacement.
+**puppeteerRenderer.js** - Browser-based 3D rendering with Puppeteer and Three.js (supports `loadModel()` for meshes, `loadSphere()` for sphere previews, and `loadPrimitive(type)` for arbitrary geometry types including box, cylinder, torus). Textures use `RepeatWrapping` for proper tiling. Accepts `tilingScale` parameter and applies `texture.repeat.set(tiling.x, tiling.y)` to all loaded textures for accurate tiling in generated thumbnails. Pre-processes EXR textures (converts to PNG via `imagePreviewGenerator.js`) and resizes large images before sending to the browser. Supports all texture types: Albedo, Normal, Height, AO, Roughness, Metallic, Emissive, Bump, Alpha, and Displacement.
 
 **frameEncoderService.js** - Encodes frames to animated WebP and poster with Sharp/node-webpmux
 
@@ -516,7 +516,7 @@ npm test
 3. **Dispatch** - ProcessorRegistry routes to appropriate processor based on asset type:
     - `Model` → MeshProcessor (3D model orbit animation thumbnail)
     - `Sound` → SoundProcessor (waveform generation)
-    - `TextureSet` → TextureSetProcessor (single static sphere preview image)
+    - `TextureSet` → TextureSetProcessor (single static preview image on configured geometry)
 4. **Download** - Fetch asset files from API
 5. **Load** - Parse asset (3D model with Three.js / audio with FFmpeg / sphere geometry for textures)
 6. **Render** - Generate orbit frames at configured angles (models) or single static frame (texture sets)

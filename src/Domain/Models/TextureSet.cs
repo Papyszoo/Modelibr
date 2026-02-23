@@ -35,6 +35,12 @@ public class TextureSet : AggregateRoot
     /// </summary>
     public float UvScale { get; private set; } = 1.0f;
     
+    /// <summary>
+    /// Geometry type used for thumbnail preview rendering (e.g. "sphere", "box", "cylinder", "torus").
+    /// Only relevant for Universal sets. Defaults to "sphere".
+    /// </summary>
+    public string PreviewGeometryType { get; private set; } = "plane";
+    
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
@@ -203,6 +209,37 @@ public class TextureSet : AggregateRoot
 
         UvMappingMode = uvMappingMode;
         UvScale = uvScale;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Updates preview settings used for thumbnail generation.
+    /// Allows setting UV scale and geometry type from the live preview.
+    /// </summary>
+    /// <param name="uvScale">UV scale (texture repeat multiplier)</param>
+    /// <param name="geometryType">Geometry type for thumbnail rendering (sphere, box, cylinder, torus)</param>
+    /// <param name="updatedAt">When the update occurred</param>
+    public void UpdatePreviewSettings(float? uvScale, string? geometryType, DateTime updatedAt)
+    {
+        if (Kind != TextureSetKind.Universal)
+            throw new InvalidOperationException("Preview settings can only be changed on Universal texture sets.");
+
+        if (uvScale.HasValue)
+        {
+            if (uvScale.Value <= 0)
+                throw new ArgumentException("UV scale must be a positive value.", nameof(uvScale));
+            UvScale = uvScale.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(geometryType))
+        {
+            var validTypes = new[] { "plane", "sphere", "box", "cylinder", "torus" };
+            var normalised = geometryType.Trim().ToLowerInvariant();
+            if (!validTypes.Contains(normalised))
+                throw new ArgumentException($"Invalid geometry type '{geometryType}'. Valid types: {string.Join(", ", validTypes)}.", nameof(geometryType));
+            PreviewGeometryType = normalised;
+        }
+
         UpdatedAt = updatedAt;
     }
 

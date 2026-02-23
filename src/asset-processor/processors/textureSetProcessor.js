@@ -78,14 +78,16 @@ export class TextureSetProcessor extends BaseProcessor {
         types: Object.keys(texturePaths),
       })
 
-      // Step 3: Initialize renderer and create a sphere
+      // Step 3: Initialize renderer and load the preview geometry
       if (!this.puppeteerRenderer) {
         this.puppeteerRenderer = new PuppeteerRenderer()
         await this.puppeteerRenderer.initialize()
       }
 
-      const polygonCount = await this.puppeteerRenderer.loadSphere(5)
-      jobLogger.info('Sphere loaded', { polygonCount })
+      // Use the stored preview geometry type (defaults to plane)
+      const geometryType = textureSet.previewGeometryType || 'plane'
+      const polygonCount = await this.puppeteerRenderer.loadPrimitive(geometryType)
+      jobLogger.info('Primitive loaded', { polygonCount, geometryType })
 
       // Step 4: Apply textures to the sphere
       // Use 'obj' fileType so flipY is true (sphere is not glTF)
@@ -112,7 +114,8 @@ export class TextureSetProcessor extends BaseProcessor {
       // Step 5: Render a single frame at a good angle
       const cameraDistance =
         await this.puppeteerRenderer.calculateOptimalCameraDistance()
-      const cameraAngle = 30 // Slightly angled view for 3D appearance
+      // Plane faces camera directly; 3D shapes get a slight angle for depth
+      const cameraAngle = geometryType === 'plane' ? 0 : 30
 
       const frameData = await this.puppeteerRenderer.renderFrame(
         cameraAngle,
