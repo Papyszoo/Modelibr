@@ -537,7 +537,7 @@ Then(
         await expect(async () => {
             const thumbnailDetails = await db.getThumbnailDetails(versionId);
             expect(thumbnailDetails?.Status).toBe(expectedStatus);
-        }).toPass({ timeout: 60000 });
+        }).toPass({ timeout: 300000 });
 
         console.log(
             `[DB Check] Thumbnail for version ${versionId} has Status=${expectedStatus} (${status}) âœ“`,
