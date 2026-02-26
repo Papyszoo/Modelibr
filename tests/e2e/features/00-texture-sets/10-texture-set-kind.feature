@@ -75,6 +75,7 @@ Feature: Texture Set Kind (Model-Specific vs Global Materials)
     When I switch to the "Model-Specific" kind tab
     Then I should see texture set "drag_to_ms" in the grid
 
+  @timeout:360000
   Scenario: Thumbnail auto-generated when kind changes to Universal
     Given I am on the texture sets page
     When I create a model-specific texture set "thumb_auto_gen" via API

@@ -73,9 +73,9 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `POST` | `/texture-sets/{id}/thumbnail/png-upload` | Upload PNG thumbnail for texture set     | `X-Api-Key` |
 | `GET`  | `/texture-sets/{id}/thumbnail/file`       | Download WebP thumbnail image            | None        |
 | `GET`  | `/texture-sets/{id}/thumbnail/png-file`   | Download PNG thumbnail image             | None        |
-| `POST` | `/texture-sets/{id}/thumbnail/regenerate` | Queue texture set thumbnail regeneration (body: `{ uvScale?, geometryType? }`) | None        |
+| `POST` | `/texture-sets/{id}/thumbnail/regenerate` | Queue texture set thumbnail regeneration (body: `{ uvScale?, geometryType?, proxySize? }`) | None        |
 
-### Texture Sets (16 endpoints)
+### Texture Sets (17 endpoints)
 
 | Method   | Endpoint                                                 | Description                                                                                                          |
 | -------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -87,6 +87,7 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `PUT`    | `/texture-sets/{id}`                                     | Update texture set                                                                                                   |
 | `PUT`    | `/texture-sets/{id}/kind`                                | Change texture set kind (0=ModelSpecific, 1=Universal); auto-enqueues thumbnail generation when changed to Universal |
 | `PUT`    | `/texture-sets/{id}/tiling-scale`                        | Update tiling scale + UV mapping (Universal only; optional uvMappingMode, uvScale)                                   |
+| `PUT`    | `/texture-sets/{setId}/textures/{textureId}/web-proxy`   | Upload web proxy for a texture (?size query param, multipart file). Auth: `X-Api-Key`                                |
 | `DELETE` | `/texture-sets/{id}`                                     | Soft delete texture set                                                                                              |
 | `DELETE` | `/texture-sets/{id}/hard`                                | Hard delete (keeps files)                                                                                            |
 | `POST`   | `/texture-sets/{id}/textures`                            | Add texture to set                                                                                                   |
@@ -114,7 +115,15 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `POST` | `/thumbnail-jobs/texture-sets/{jobId}/finish` | Mark texture set job complete/failed   |
 | `POST` | `/test/thumbnail-complete/{modelId}`          | Test completion notification (dev)     |
 
-**Total:** 49 endpoints
+### Settings (3 endpoints)
+
+| Method | Endpoint         | Description                                                                   |
+| ------ | ---------------- | ----------------------------------------------------------------------------- |
+| `GET`  | `/settings`      | Get application settings (includes `textureProxySize`)                        |
+| `GET`  | `/settings/all`  | Get all settings (key-value)                                                  |
+| `PUT`  | `/settings`      | Update application settings (includes `textureProxySize`: 256/512/1024/2048)  |
+
+**Total:** 52 endpoints
 
 ## Pagination
 

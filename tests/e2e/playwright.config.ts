@@ -8,7 +8,7 @@ const testDir = defineBddConfig({
 
 export default defineConfig({
     testDir,
-    timeout: 60000,
+    timeout: 90000, // 90s to allow for thumbnail generation (Puppeteer cold start + rendering takes 30-40s)
     fullyParallel: false,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,

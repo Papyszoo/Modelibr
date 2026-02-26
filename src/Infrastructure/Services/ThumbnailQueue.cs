@@ -107,6 +107,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
     public async Task<ThumbnailJob> EnqueueTextureSetThumbnailAsync(
         int textureSetId,
+        int? proxySize = null,
         int maxAttempts = 3,
         int lockTimeoutMinutes = 10,
         CancellationToken cancellationToken = default)
@@ -128,7 +129,7 @@ public class ThumbnailQueue : IThumbnailQueue
             return existingJob;
         }
 
-        var job = ThumbnailJob.CreateForTextureSet(textureSetId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var job = ThumbnailJob.CreateForTextureSet(textureSetId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes, proxySize);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
 
         _logger.LogInformation("Enqueued texture set thumbnail job {JobId} for texture set {TextureSetId}",

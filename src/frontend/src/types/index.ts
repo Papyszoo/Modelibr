@@ -11,6 +11,7 @@ export {
   TextureSetKind,
   UvMappingMode,
   type TextureDto,
+  type TextureProxyDto,
   type ModelSummaryDto,
   type PackSummaryDto,
   type TextureSetDto,

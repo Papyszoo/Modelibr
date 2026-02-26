@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using SharedKernel;
 
@@ -149,6 +150,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
     private readonly IFileStorage _fileStorage;
+    private readonly IThumbnailQueue _thumbnailQueue;
 
     public PermanentDeleteEntityCommandHandler(
         IModelRepository modelRepository,
@@ -157,7 +159,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
-        IFileStorage fileStorage)
+        IFileStorage fileStorage,
+        IThumbnailQueue thumbnailQueue)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -166,6 +169,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
         _fileStorage = fileStorage;
+        _thumbnailQueue = thumbnailQueue;
     }
 
     public async Task<Result<PermanentDeleteEntityResponse>> Handle(PermanentDeleteEntityCommand request, CancellationToken cancellationToken)
@@ -179,6 +183,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (model == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("ModelNotFound", "Model not found"));
                 
+                // Cancel any pending/processing thumbnail jobs for this model
+                await _thumbnailQueue.CancelActiveJobsForModelAsync(request.EntityId, cancellationToken);
                 
                 // Delete version files from disk (version files have direct FK to version, not shared)
                 foreach (var version in model.Versions)

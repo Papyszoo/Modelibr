@@ -46,10 +46,11 @@ Health check: `curl http://localhost:3001/health`
 4. Worker → Dispatches to processor based on asset type (Model/Sound/TextureSet)
 5. Worker → Downloads asset files from API
 6. Worker → Loads and normalizes asset (3D model / sphere geometry / audio)
-7. Worker → Generates orbit animation frames (360°) for models, single static image for texture sets, or waveform for sounds
-8. Worker → Encodes frames to animated WebP + poster image (models) or single WebP image (texture sets)
+7. Worker → Generates orbit animation frames (360°) for models, swing animation frames for texture sets, or waveform for sounds
+8. Worker → Encodes frames to animated WebP + poster image
 9. Worker → Uploads thumbnail to API
-10. Worker → Reports completion status
+10. Worker → (TextureSet only) Generates web proxy textures at the configured resolution (from `/settings` API `textureProxySize`, or overridden by `job.proxySize` if set) and uploads via PUT /texture-sets/{id}/textures/{textureId}/web-proxy
+11. Worker → Reports completion status
 ```
 
 ## Configuration
@@ -490,7 +491,8 @@ npm test
 - `baseProcessor.js` - Abstract base class defining the processor contract
 - `meshProcessor.js` - 3D mesh thumbnail generation (OBJ, FBX, GLTF, GLB)
 - `soundProcessor.js` - Audio waveform generation
-- `textureSetProcessor.js` - Texture set preview thumbnail generation (Universal/Global Materials). Renders a single static image at 30° angle with 15° elevation using `sharp` for encoding (not orbit animation). Reads `previewGeometryType` from the texture set to render on the appropriate geometry (sphere, box, cylinder, or torus — defaults to sphere). Uses `uvScale` directly as texture repeat multiplier. After generating the texture set thumbnail, also generates lightweight PNG previews for individual texture files (EXR or >1MB) and uploads them via `POST /files/{id}/preview/upload`.
+- `textureSetProcessor.js` - Texture set preview thumbnail generation (Universal/Global Materials). Renders a swing animation (camera swings from 45° top-left to 30° bottom-right and back) encoded as animated WebP via `FrameEncoderService`. Reads `previewGeometryType` from the texture set to render on the appropriate geometry (sphere, box, cylinder, or torus — defaults to plane). Uses `uvScale` directly as texture repeat multiplier. After generating the thumbnail, generates web proxy textures at the configured size (from settings, or overridden by `job.proxySize`). Also generates lightweight PNG previews for individual texture files (EXR or >1MB) and uploads them via `POST /files/{id}/preview/upload`.
+- `textureProxyGenerator.js` - Generates resized proxy textures per texture type category. Each function receives `sourceChannel` (0=RGB, 1=R, 2=G, 3=B, 4=A) and calls `sharp.extractChannel()` for packed/split-channel textures before resizing. Three encoding strategies: **sRGB** (Albedo, Emissive) → lossy WebP q80 for RGB, or lossless WebP for single-channel extraction; **Linear** (AO, Roughness, Metallic, Height, Displacement, Opacity, etc.) → lossless WebP, with `extractChannel` for packed maps or `toColourspace('b-w')` for full-RGB data; **Normal** → lossless PNG with per-pixel renormalization after resize (falls back to linear proxy for channel-extracted normals). Filenames include channel suffix (`_R`, `_G`, `_B`, `_A`) for split-channel proxies to avoid collisions.
 - `thumbnailProcessor.js` - Generic thumbnail processing
 
 **imagePreviewGenerator.js** - Utility for converting EXR files to PNG (via Three.js EXRLoader + Reinhard tone mapping + sharp) and resizing large standard images. Used by both `puppeteerRenderer.js` (pre-processing textures for browser) and `textureSetProcessor.js` (generating individual file previews).
@@ -516,11 +518,11 @@ npm test
 3. **Dispatch** - ProcessorRegistry routes to appropriate processor based on asset type:
     - `Model` → MeshProcessor (3D model orbit animation thumbnail)
     - `Sound` → SoundProcessor (waveform generation)
-    - `TextureSet` → TextureSetProcessor (single static preview image on configured geometry)
+    - `TextureSet` → TextureSetProcessor (animated swing preview on configured geometry)
 4. **Download** - Fetch asset files from API
 5. **Load** - Parse asset (3D model with Three.js / audio with FFmpeg / sphere geometry for textures)
-6. **Render** - Generate orbit frames at configured angles (models) or single static frame (texture sets)
-7. **Encode** - Create animated WebP + poster image (models) or single WebP via Sharp (texture sets)
+6. **Render** - Generate orbit frames at configured angles (models) or swing animation frames (texture sets)
+7. **Encode** - Create animated WebP + poster image for both models and texture sets
 8. **Upload** - Send thumbnail to API via multipart form
 9. **Report** - Update job status (completed/failed)
 

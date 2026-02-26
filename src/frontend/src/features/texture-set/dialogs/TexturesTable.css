@@ -1,0 +1,17 @@
+.textures-table-proxy-badges {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.textures-table-proxy-badge {
+  font-size: 0.65rem !important;
+  padding: 0.1rem 0.35rem !important;
+  min-width: unset !important;
+}
+
+.textures-table-proxy-badge-missing {
+  opacity: 0.35;
+  background: var(--surface-border) !important;
+  color: var(--text-color-secondary) !important;
+}

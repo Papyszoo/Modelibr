@@ -217,6 +217,7 @@ export class ModelDataService {
           texturePaths[texture.textureType] = {
             filePath,
             sourceChannel: texture.sourceChannel ?? 0, // Default to RGB (0)
+            textureId: texture.id, // Needed for proxy generation
           }
           logger.debug('Texture downloaded', {
             textureType: texture.textureType,

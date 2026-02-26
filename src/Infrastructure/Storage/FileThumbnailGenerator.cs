@@ -52,10 +52,16 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
             return;
         }
 
-        // Check if RGB preview already exists (deduplication — same hash = same content)
-        if (_previewService.GetPreviewPath(sha256Hash) != null)
+        // Check which previews are missing and only generate those (deduplication — same hash = same content)
+        var rgbExists = _previewService.GetPreviewPath(sha256Hash) != null;
+        var needsChannels = TextureMimeTypes.Contains(mimeType);
+        var rExists = needsChannels && _previewService.GetPreviewPath(sha256Hash, "r") != null;
+        var gExists = needsChannels && _previewService.GetPreviewPath(sha256Hash, "g") != null;
+        var bExists = needsChannels && _previewService.GetPreviewPath(sha256Hash, "b") != null;
+
+        if (rgbExists && (!needsChannels || (rExists && gExists && bExists)))
         {
-            _logger.LogDebug("Preview already exists for hash {Hash}", sha256Hash);
+            _logger.LogDebug("All previews already exist for hash {Hash}", sha256Hash);
             return;
         }
 
@@ -63,15 +69,16 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
         {
             using var image = await LoadImageAsync(fullPath, ct);
 
-            // Generate RGB thumbnail
-            await GenerateRgbThumbnailAsync(image, sha256Hash, ct);
+            // Generate RGB thumbnail if missing
+            if (!rgbExists)
+                await GenerateRgbThumbnailAsync(image, sha256Hash, ct);
 
-            // For texture files, also generate R, G, B channel thumbnails
-            if (TextureMimeTypes.Contains(mimeType))
+            // For texture files, generate missing R, G, B channel thumbnails
+            if (needsChannels)
             {
-                await GenerateChannelThumbnailAsync(image, sha256Hash, "r", ct);
-                await GenerateChannelThumbnailAsync(image, sha256Hash, "g", ct);
-                await GenerateChannelThumbnailAsync(image, sha256Hash, "b", ct);
+                if (!rExists) await GenerateChannelThumbnailAsync(image, sha256Hash, "r", ct);
+                if (!gExists) await GenerateChannelThumbnailAsync(image, sha256Hash, "g", ct);
+                if (!bExists) await GenerateChannelThumbnailAsync(image, sha256Hash, "b", ct);
             }
 
             _logger.LogInformation(
@@ -197,13 +204,6 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
 
     private async Task GenerateChannelThumbnailAsync(Image<Rgba32> source, string sha256Hash, string channel, CancellationToken ct)
     {
-        // Calculate thumbnail dimensions maintaining aspect ratio
-        var ratioX = (double)ThumbnailSize / source.Width;
-        var ratioY = (double)ThumbnailSize / source.Height;
-        var ratio = Math.Min(ratioX, ratioY);
-        var newWidth = Math.Max(1, (int)(source.Width * ratio));
-        var newHeight = Math.Max(1, (int)(source.Height * ratio));
-
         using var resized = source.Clone(ctx =>
             ctx.Resize(new ResizeOptions
             {

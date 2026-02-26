@@ -66,7 +66,7 @@ const renderWithProviders = (ui: React.ReactElement) =>
 describe('TexturePreviewPanel', () => {
   it('should render without errors', () => {
     expect(() => {
-      renderWithProviders(<TexturePreviewPanel textureSet={mockTextureSet} />)
+      renderWithProviders(<TexturePreviewPanel textureSet={mockTextureSet} textureQuality={0} />)
     }).not.toThrow()
   })
 
@@ -86,7 +86,7 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      renderWithProviders(<TexturePreviewPanel textureSet={setWithAlbedo} />)
+      renderWithProviders(<TexturePreviewPanel textureSet={setWithAlbedo} textureQuality={0} />)
     }).not.toThrow()
   })
 
@@ -121,7 +121,7 @@ describe('TexturePreviewPanel', () => {
 
     expect(() => {
       renderWithProviders(
-        <TexturePreviewPanel textureSet={setWithMultipleTextures} />
+        <TexturePreviewPanel textureSet={setWithMultipleTextures} textureQuality={0} />
       )
     }).not.toThrow()
   })

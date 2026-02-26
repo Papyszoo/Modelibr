@@ -24,6 +24,7 @@ namespace Infrastructure.Persistence
         public DbSet<SpriteCategory> SpriteCategories => Set<SpriteCategory>();
         public DbSet<Sound> Sounds => Set<Sound>();
         public DbSet<SoundCategory> SoundCategories => Set<SoundCategory>();
+        public DbSet<TextureProxy> TextureProxies => Set<TextureProxy>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -224,6 +225,35 @@ namespace Infrastructure.Persistence
                 entity.HasQueryFilter(t => !t.IsDeleted);
             });
 
+            // Configure TextureProxy entity
+            modelBuilder.Entity<TextureProxy>(entity =>
+            {
+                entity.HasKey(tp => tp.Id);
+                entity.Property(tp => tp.TextureId).IsRequired();
+                entity.Property(tp => tp.FileId).IsRequired();
+                entity.Property(tp => tp.Size).IsRequired();
+                entity.Property(tp => tp.CreatedAt).IsRequired();
+
+                // Configure relationship with Texture
+                entity.HasOne(tp => tp.Texture)
+                    .WithMany(t => t.Proxies)
+                    .HasForeignKey(tp => tp.TextureId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure relationship with File
+                entity.HasOne(tp => tp.File)
+                    .WithMany()
+                    .HasForeignKey(tp => tp.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Unique constraint: one proxy per texture per size
+                entity.HasIndex(tp => new { tp.TextureId, tp.Size })
+                    .IsUnique();
+
+                // Index for efficient querying by texture
+                entity.HasIndex(tp => tp.TextureId);
+            });
+
             // Configure TextureSet entity
             modelBuilder.Entity<TextureSet>(entity =>
             {
@@ -345,6 +375,7 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.LockTimeoutMinutes).IsRequired();
                 entity.Property(tj => tj.CreatedAt).IsRequired();
                 entity.Property(tj => tj.UpdatedAt).IsRequired();
+                entity.Property(tj => tj.ProxySize).IsRequired(false);
 
                 // Create composite unique index for ModelHash + ModelVersionId to prevent duplicate jobs per version
                 // This allows different versions to have separate thumbnail jobs even when sharing the same model file
@@ -421,6 +452,8 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailWidth).IsRequired();
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
                 entity.Property(s => s.CleanRecycledFilesAfterDays).IsRequired();
+                entity.Property(s => s.TextureProxySize).IsRequired()
+                    .HasDefaultValue(512);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
             });

@@ -1,7 +1,7 @@
 import { useRef, useMemo, useEffect, useState } from 'react'
 import * as THREE from 'three'
 import { GeometryType } from './GeometrySelector'
-import { TextureSetDto, TextureType } from '@/types'
+import { TextureSetDto, TextureType, TextureChannel } from '@/types'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { isExrFile } from '@/utils/fileUtils'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
@@ -36,26 +36,58 @@ interface TexturedGeometryProps {
   disabledTextures?: Set<string>
   textureStrengths?: TextureStrengths
   onLoadingChange?: (state: TextureLoadingState) => void
+  /** 0 = Original, 256/512/1024/2048 = proxy size */
+  textureQuality?: number
 }
 
 interface TextureUrlInfo {
   url: string
   isExrFormat: boolean
+  /** Channel to extract client-side (1=R, 2=G, 3=B, 4=A, undefined=full RGB).
+   *  Only set when textureQuality=0 (original) and texture uses a split channel.
+   *  When using proxies, channel extraction is done server-side. */
+  sourceChannel?: number
 }
 
-/** Build ALL texture URLs from the texture set (never filters by disabled state) */
+/** Build ALL texture URLs from the texture set (never filters by disabled state).
+ *  When textureQuality > 0 and a proxy at that size exists, use the proxy file.
+ *  For split-channel textures at original quality, includes sourceChannel for
+ *  client-side channel extraction. */
 function buildTextureUrls(
-  textureSet: TextureSetDto
+  textureSet: TextureSetDto,
+  textureQuality: number = 0
 ): Record<string, TextureUrlInfo> {
   const urls: Record<string, TextureUrlInfo> = {}
 
   const makeInfo = (t: {
     fileId: number
     fileName?: string
-  }): TextureUrlInfo => ({
-    url: getFileUrl(t.fileId.toString()),
-    isExrFormat: isExrFile(t.fileName),
-  })
+    sourceChannel?: TextureChannel
+    proxies?: { fileId: number; size: number }[]
+  }): TextureUrlInfo => {
+    // If a specific proxy size is requested and a matching proxy exists, use it.
+    // Proxy files already have the correct channel extracted server-side.
+    if (textureQuality > 0 && t.proxies && t.proxies.length > 0) {
+      const proxy = t.proxies.find(p => p.size === textureQuality)
+      if (proxy) {
+        return {
+          url: getFileUrl(proxy.fileId.toString()),
+          isExrFormat: false, // proxies are always WebP/PNG, never EXR
+        }
+      }
+    }
+    // Original quality — include sourceChannel for client-side extraction
+    const needsChannelExtract =
+      t.sourceChannel !== undefined &&
+      t.sourceChannel !== TextureChannel.RGB &&
+      t.sourceChannel >= TextureChannel.R &&
+      t.sourceChannel <= TextureChannel.A
+    return {
+      url: getFileUrl(t.fileId.toString()),
+      isExrFormat: isExrFile(t.fileName),
+      sourceChannel: needsChannelExtract ? t.sourceChannel : undefined,
+    }
+  }
 
   const albedo = textureSet.textures.find(
     t => t.textureType === TextureType.Albedo
@@ -151,13 +183,47 @@ function createGeometry(
 const COLOR_TEXTURE_PROPS = new Set(['map', 'emissiveMap'])
 
 /**
+ * Extract a single channel from an ImageBitmap, producing a grayscale canvas texture.
+ * @param bitmap Source ImageBitmap (will be closed after extraction)
+ * @param channel 1=R, 2=G, 3=B, 4=A
+ */
+function extractChannelFromBitmap(
+  bitmap: ImageBitmap,
+  channel: number
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(bitmap, 0, 0)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = imageData.data
+  const offset = channel - 1 // 1→0, 2→1, 3→2, 4→3
+
+  for (let i = 0; i < data.length; i += 4) {
+    const v = data[i + offset]
+    data[i] = v     // R
+    data[i + 1] = v // G
+    data[i + 2] = v // B
+    data[i + 3] = 255
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+  bitmap.close()
+  return canvas
+}
+
+/**
  * Load a single texture off the main thread using fetch + createImageBitmap.
  * Falls back to TextureLoader for formats that don't support ImageBitmap.
+ * Accepts a pre-fetched blob to enable URL deduplication across split-channel textures.
  */
 async function loadTextureOffThread(
   url: string,
   isExr: boolean,
-  signal: AbortSignal
+  signal: AbortSignal,
+  sourceChannel?: number,
+  cachedBlob?: Blob
 ): Promise<THREE.Texture> {
   if (isExr) {
     // EXR must use the specialised loader — no ImageBitmap path
@@ -165,13 +231,26 @@ async function loadTextureOffThread(
     return exrLoader.loadAsync(url)
   }
 
-  // Fetch blob, then decode off-thread via createImageBitmap
-  const response = await fetch(url, { signal })
-  if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`)
-  const blob = await response.blob()
-  // imageOrientation: 'flipY' ensures the bitmap is flipped to match WebGL's
-  // bottom-left origin. Without this, textures appear distorted / mirrored.
+  // Fetch blob (or use cached one for dedup), then decode off-thread
+  let blob: Blob
+  if (cachedBlob) {
+    blob = cachedBlob
+  } else {
+    const response = await fetch(url, { signal })
+    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`)
+    blob = await response.blob()
+  }
+
   const bitmap = await createImageBitmap(blob, { imageOrientation: 'flipY' })
+
+  // If a specific channel needs extraction, do it via canvas
+  if (sourceChannel && sourceChannel >= 1 && sourceChannel <= 4) {
+    const canvas = extractChannelFromBitmap(bitmap, sourceChannel)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    return texture
+  }
+
   const texture = new THREE.Texture(bitmap)
   texture.needsUpdate = true
   return texture
@@ -260,7 +339,9 @@ function TexturedMesh({
   // Stable URL key for dependency tracking
   const urlsKey = useMemo(() => JSON.stringify(textureUrls), [textureUrls])
 
-  // Load all textures off the main thread with per-item progress
+  // Load all textures off the main thread with per-item progress.
+  // Deduplicates fetches: when multiple texture slots share the same URL
+  // (split-channel textures), the file is downloaded once and reused.
   useEffect(() => {
     const entries = Object.entries(textureUrls)
     const total = entries.length
@@ -281,13 +362,42 @@ function TexturedMesh({
     async function loadAll() {
       const result: Record<string, THREE.Texture> = {}
 
+      // Step 1: Deduplicate — fetch each unique URL once
+      const uniqueUrls = new Map<string, boolean>() // url → isExr
+      for (const [, info] of entries) {
+        if (!uniqueUrls.has(info.url)) {
+          uniqueUrls.set(info.url, info.isExrFormat)
+        }
+      }
+
+      const blobCache = new Map<string, Blob>()
+      await Promise.all(
+        Array.from(uniqueUrls.entries()).map(async ([url, isExr]) => {
+          if (isExr) return // EXR uses its own loader, no blob caching
+          try {
+            const response = await fetch(url, { signal: abortController.signal })
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            blobCache.set(url, await response.blob())
+          } catch (err) {
+            if (!abortController.signal.aborted) {
+              console.warn(`Failed to fetch ${url}:`, err)
+            }
+          }
+        })
+      )
+
+      if (abortController.signal.aborted) return
+
+      // Step 2: Create textures per entry, with channel extraction where needed
       await Promise.all(
         entries.map(async ([prop, info]) => {
           try {
             const texture = await loadTextureOffThread(
               info.url,
               info.isExrFormat,
-              abortController.signal
+              abortController.signal,
+              info.sourceChannel,
+              blobCache.get(info.url)
             )
             if (!abortController.signal.aborted) {
               // Set color space based on texture property
@@ -411,11 +521,13 @@ export function TexturedGeometry({
   disabledTextures,
   textureStrengths,
   onLoadingChange,
+  textureQuality = 0,
 }: TexturedGeometryProps) {
   // Build ALL texture URLs — does NOT depend on disabledTextures
+  // When textureQuality > 0, use proxy files where available
   const textureUrls = useMemo(
-    () => buildTextureUrls(textureSet),
-    [textureSet]
+    () => buildTextureUrls(textureSet, textureQuality),
+    [textureSet, textureQuality]
   )
 
   return (

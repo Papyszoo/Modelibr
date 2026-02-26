@@ -202,6 +202,16 @@ export class PuppeteerRenderer {
         // The texture temp files sit in the provided directory
         const filePath = path.join(textureDir, requestedName)
 
+        // Prevent path traversal attacks
+        const resolvedDir = path.resolve(textureDir)
+        const resolvedFile = path.resolve(filePath)
+        if (!resolvedFile.startsWith(resolvedDir + path.sep) && resolvedFile !== resolvedDir) {
+          logger.warn('Path traversal attempt blocked', { requestedName })
+          res.writeHead(403)
+          res.end('Forbidden')
+          return
+        }
+
         if (!fs.existsSync(filePath)) {
           res.writeHead(404)
           res.end('Not found')
@@ -1024,12 +1034,15 @@ export class PuppeteerRenderer {
    * @param {number} angle - Camera angle in degrees
    * @param {number} distance - Camera distance from center
    * @param {number} frameIndex - Frame index for logging
+   * @param {number} [elevation] - Optional elevation override (degrees). Defaults to config.orbit.cameraHeight.
    * @returns {Promise<Object>} Frame data object
    */
-  async renderFrame(angle, distance, frameIndex) {
+  async renderFrame(angle, distance, frameIndex, elevation) {
     if (!this.page) {
       throw new Error('Renderer not initialized')
     }
+
+    const elevationAngle = elevation !== undefined ? elevation : config.orbit.cameraHeight
 
     // Position camera and render in browser (async for WebGPU support)
     const result = await this.page.evaluate(
@@ -1063,7 +1076,7 @@ export class PuppeteerRenderer {
       },
       angle,
       distance,
-      config.orbit.cameraHeight
+      elevationAngle
     )
 
     if (!result.success) {

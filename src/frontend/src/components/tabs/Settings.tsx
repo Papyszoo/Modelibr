@@ -17,6 +17,7 @@ interface SettingsData {
   thumbnailWidth: number
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
+  textureProxySize: number
 }
 
 type SettingsFormValues = z.input<typeof settingsFormSchema>
@@ -35,7 +36,7 @@ export function Settings(): JSX.Element {
   const { theme, setTheme } = useTheme()
 
   // Accordion state
-  const [activeIndex, setActiveIndex] = useState<number | number[]>([0, 1, 2])
+  const [activeIndex, setActiveIndex] = useState<number | number[]>([0, 1, 2, 3])
 
   const {
     register,
@@ -54,6 +55,7 @@ export function Settings(): JSX.Element {
       thumbnailWidth: 256,
       thumbnailHeight: 256,
       generateThumbnailOnUpload: true,
+      textureProxySize: 512,
     },
   })
 
@@ -66,6 +68,7 @@ export function Settings(): JSX.Element {
     thumbnailWidth: number
     thumbnailHeight: number
     generateThumbnailOnUpload: boolean
+    textureProxySize: number
   } | null>(null)
 
   const maxFileSizeMB = watch('maxFileSizeMB')
@@ -75,6 +78,7 @@ export function Settings(): JSX.Element {
   const thumbnailWidth = watch('thumbnailWidth')
   const thumbnailHeight = watch('thumbnailHeight')
   const generateThumbnailOnUpload = watch('generateThumbnailOnUpload')
+  const textureProxySize = watch('textureProxySize')
 
   // Check if field is dirty (changed from original)
   const isFieldDirty = (fieldName: string): boolean => {
@@ -97,6 +101,8 @@ export function Settings(): JSX.Element {
         return (
           generateThumbnailOnUpload !== originalValues.generateThumbnailOnUpload
         )
+      case 'textureProxySize':
+        return textureProxySize !== originalValues.textureProxySize
       default:
         return false
     }
@@ -111,7 +117,8 @@ export function Settings(): JSX.Element {
       isFieldDirty('thumbnailCameraAngle') ||
       isFieldDirty('thumbnailWidth') ||
       isFieldDirty('thumbnailHeight') ||
-      isFieldDirty('generateThumbnailOnUpload')
+      isFieldDirty('generateThumbnailOnUpload') ||
+      isFieldDirty('textureProxySize')
     )
   }
 
@@ -147,6 +154,7 @@ export function Settings(): JSX.Element {
       thumbnailWidth: data.thumbnailWidth,
       thumbnailHeight: data.thumbnailHeight,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+      textureProxySize: data.textureProxySize ?? 512,
     })
 
     setOriginalValues({
@@ -157,6 +165,7 @@ export function Settings(): JSX.Element {
       thumbnailWidth: data.thumbnailWidth,
       thumbnailHeight: data.thumbnailHeight,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+      textureProxySize: data.textureProxySize ?? 512,
     })
   }, [settingsQuery.data, reset])
 
@@ -179,6 +188,7 @@ export function Settings(): JSX.Element {
       thumbnailWidth: values.thumbnailWidth,
       thumbnailHeight: values.thumbnailHeight,
       generateThumbnailOnUpload: values.generateThumbnailOnUpload,
+      textureProxySize: values.textureProxySize,
     }
 
     try {
@@ -198,6 +208,7 @@ export function Settings(): JSX.Element {
         thumbnailWidth: data.thumbnailWidth,
         thumbnailHeight: data.thumbnailHeight,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+        textureProxySize: data.textureProxySize ?? 512,
       })
 
       reset({
@@ -208,6 +219,7 @@ export function Settings(): JSX.Element {
         thumbnailWidth: data.thumbnailWidth,
         thumbnailHeight: data.thumbnailHeight,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+        textureProxySize: data.textureProxySize ?? 512,
       })
 
       setSuccessMessage('Settings saved successfully!')
@@ -540,6 +552,64 @@ export function Settings(): JSX.Element {
                     Height in pixels (64-2048)
                   </span>
                   <span className="settings-default">Default: 256 px</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="settings-section">
+            <div
+              className="settings-section-header"
+              onClick={() =>
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(3)
+                      ? prev.filter(i => i !== 3)
+                      : [...prev, 3]
+                    : [3]
+                )
+              }
+            >
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(3)
+                  ? '▼'
+                  : '▶'}{' '}
+                Texture Proxy Settings
+              </span>
+            </div>
+            {Array.isArray(activeIndex) && activeIndex.includes(3) && (
+              <div className="settings-section-content">
+                <div className="settings-field">
+                  <label htmlFor="textureProxySize">
+                    Web Proxy Resolution
+                    {isFieldDirty('textureProxySize') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
+                  </label>
+                  <select
+                    id="textureProxySize"
+                    {...register('textureProxySize', { valueAsNumber: true })}
+                    disabled={isSaving}
+                    className={
+                      errors.textureProxySize ? 'settings-input-error' : 'settings-select'
+                    }
+                  >
+                    <option value={256}>256 px</option>
+                    <option value={512}>512 px</option>
+                    <option value={1024}>1024 px</option>
+                    <option value={2048}>2048 px</option>
+                  </select>
+                  {errors.textureProxySize && (
+                    <span className="settings-error-message">
+                      {errors.textureProxySize.message}
+                    </span>
+                  )}
+                  <span className="settings-help">
+                    Maximum square resolution for web preview textures. Lower
+                    values load faster; higher values show more detail. Proxies
+                    are generated on next texture set processing.
+                  </span>
+                  <span className="settings-default">Default: 512 px</span>
                 </div>
               </div>
             )}

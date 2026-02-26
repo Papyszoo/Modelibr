@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
 import { Button } from 'primereact/button'
+import { Tag } from 'primereact/tag'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { TextureSetDto, TextureDto, TextureType, TextureChannel } from '@/types'
 import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
@@ -580,6 +581,31 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                     .join(', ')}
                 </span>
               </div>
+
+              {/* Proxy size badges — aggregate across all textures from this file */}
+              {(() => {
+                const proxySizes = new Set<number>()
+                fm.existingTextures.forEach(t => {
+                  (t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+                })
+                const ALL_SIZES = [256, 512, 1024, 2048]
+                if (proxySizes.size === 0) return null
+                return (
+                  <div className="file-proxy-badges">
+                    <span className="textures-label">Proxies:</span>
+                    <div className="file-proxy-badge-list">
+                      {ALL_SIZES.map(size => (
+                        <Tag
+                          key={size}
+                          value={`${size}`}
+                          severity={proxySizes.has(size) ? 'success' : undefined}
+                          className={`file-proxy-badge ${!proxySizes.has(size) ? 'file-proxy-badge-missing' : ''}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         ))}

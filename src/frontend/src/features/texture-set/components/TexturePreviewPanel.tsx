@@ -19,11 +19,13 @@ import './TexturePreviewPanel.css'
 interface TexturePreviewPanelProps {
   textureSet: TextureSetDto
   side?: 'left' | 'right'
+  textureQuality: number
 }
 
 export function TexturePreviewPanel({
   textureSet,
   side = 'left',
+  textureQuality,
 }: TexturePreviewPanelProps) {
   const isUniversal = textureSet.kind === TextureSetKind.Universal
 
@@ -44,6 +46,7 @@ export function TexturePreviewPanel({
     torusRadius: 1,
     torusTube: 0.4,
     uvScale: textureSet.uvScale ?? 1,
+    textureQuality: 0, // kept in type for compat but controlled via prop
   })
 
   // Auto-save tiling scale for Universal sets (debounced)
@@ -105,6 +108,8 @@ export function TexturePreviewPanel({
       queryClient.invalidateQueries({ queryKey: ['textureSets'] })
     },
   })
+
+  // Generate proxies at a specific size — handled by TextureSetViewer now
 
   // Toggle texture visibility in preview
   const handleToggleTexture = useCallback((textureType: string) => {
@@ -227,6 +232,7 @@ export function TexturePreviewPanel({
                 disabledTextures={disabledTextures}
                 textureStrengths={textureStrengths}
                 onLoadingChange={handleLoadingChange}
+                textureQuality={textureQuality}
               />
             </Suspense>
           </Stage>

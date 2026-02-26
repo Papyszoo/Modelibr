@@ -30,6 +30,11 @@ export enum UvMappingMode {
   Physical = 1,
 }
 
+export interface TextureProxyDto {
+  fileId: number
+  size: number
+}
+
 export interface TextureDto {
   id: number
   textureType: TextureType
@@ -37,6 +42,7 @@ export interface TextureDto {
   fileId: number
   fileName?: string
   createdAt: string
+  proxies?: TextureProxyDto[]
 }
 
 export interface ModelSummaryDto {

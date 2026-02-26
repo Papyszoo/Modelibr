@@ -70,7 +70,8 @@ public static class SettingsEndpoints
                 request.ThumbnailCameraVerticalAngle,
                 request.ThumbnailWidth,
                 request.ThumbnailHeight,
-                request.GenerateThumbnailOnUpload
+                request.GenerateThumbnailOnUpload,
+                request.TextureProxySize
             );
 
             var result = await commandHandler.Handle(command, cancellationToken);
@@ -96,5 +97,6 @@ public record UpdateSettingsRequest(
     double ThumbnailCameraVerticalAngle,
     int ThumbnailWidth,
     int ThumbnailHeight,
-    bool GenerateThumbnailOnUpload
+    bool GenerateThumbnailOnUpload,
+    int TextureProxySize = 512
 );

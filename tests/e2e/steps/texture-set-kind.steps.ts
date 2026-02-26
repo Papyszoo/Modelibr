@@ -249,9 +249,10 @@ Then(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
-        // Poll the API for a few seconds to allow thumbnail generation
+        // Poll the API for up to 60 seconds to allow thumbnail generation
+        // (Puppeteer cold start + rendering can take 30-40 seconds)
         let hasThumbnail = false;
-        for (let attempt = 0; attempt < 10; attempt++) {
+        for (let attempt = 0; attempt < 300; attempt++) {
             const textureSets = await apiHelper.getAllTextureSets();
             const found = textureSets.find((ts: any) => ts.id === set.id);
             if (
@@ -261,12 +262,13 @@ Then(
             ) {
                 hasThumbnail = true;
                 console.log(
-                    `[API] Texture set "${set.name}" has thumbnail: ${found.thumbnailPath}`,
+                    `[API] Texture set "${set.name}" has thumbnail after ${attempt + 1}s: ${found.thumbnailPath}`,
                 );
                 break;
             }
-            // Wait 500ms between attempts (max ~5 seconds total)
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            // Wait 1s between attempts (max ~300 seconds total — texture set
+            // thumbnail jobs are processed sequentially and each takes ~25s)
+            await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
         expect(hasThumbnail).toBeTruthy();

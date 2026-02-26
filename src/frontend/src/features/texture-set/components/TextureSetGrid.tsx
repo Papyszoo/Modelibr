@@ -3,6 +3,7 @@ import { Dialog } from 'primereact/dialog'
 import { ContextMenu } from 'primereact/contextmenu'
 import { MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
+import { Tag } from 'primereact/tag'
 import './TextureSetGrid.css'
 import {
   TextureSetDto,
@@ -346,6 +347,32 @@ export function TextureSetGrid({
   }
 
   // Handle "Regenerate Thumbnail" from context menu
+  const ALL_PROXY_SIZES = [256, 512, 1024, 2048]
+
+  const handleGenerateProxy = async (size: number) => {
+    if (!selectedTextureSet) return
+    try {
+      await regenerateTextureSetThumbnail(selectedTextureSet.id, { proxySize: size })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Proxy Generation',
+        detail: `${size}px proxy generation started`,
+        life: 3000,
+      })
+      if (onTextureSetUpdated) {
+        onTextureSetUpdated()
+      }
+    } catch (error) {
+      console.error('Failed to generate proxy:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: `Failed to generate ${size}px proxy`,
+        life: 3000,
+      })
+    }
+  }
+
   const handleRegenerateThumbnail = async () => {
     if (!selectedTextureSet) return
 
@@ -390,6 +417,15 @@ export function TextureSetGrid({
       icon: 'pi pi-refresh',
       command: handleRegenerateThumbnail,
       visible: selectedTextureSet?.kind === TextureSetKind.Universal,
+    },
+    {
+      label: 'Generate Proxies',
+      icon: 'pi pi-images',
+      visible: selectedTextureSet?.kind === TextureSetKind.Universal,
+      items: ALL_PROXY_SIZES.map(size => ({
+        label: `${size}px`,
+        command: () => handleGenerateProxy(size),
+      })),
     },
     {
       label: 'Add to pack',
@@ -525,6 +561,20 @@ export function TextureSetGrid({
                     </span>
                   </div>
                 </div>
+                {(() => {
+                  const proxySizes = new Set<number>()
+                  textureSet.textures?.forEach(t => {
+                    (t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+                  })
+                  if (proxySizes.size === 0) return null
+                  return (
+                    <div className="texture-set-card-badges">
+                      {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(size => (
+                        <Tag key={size} value={`${size}`} severity="success" className="grid-proxy-badge" />
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )

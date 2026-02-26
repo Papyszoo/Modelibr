@@ -33,7 +33,8 @@ export class ModelFileService {
   async fetchModelFile(modelId, modelVersionId = null) {
     logger.debug('Fetching model file', { modelId, modelVersionId })
 
-    // Retry logic for race condition where file might not be immediately available after upload
+    // Retry logic for transient errors (network issues, server overload)
+    // 404 errors are NOT retried — they indicate the model/version is deleted
     const maxRetries = 3
     const retryDelay = 1000 // 1 second
 
@@ -59,8 +60,13 @@ export class ModelFileService {
           error: error.message,
         })
 
-        // If it's the last attempt or not a "file not found" error, rethrow
-        if (attempt === maxRetries || !this.isFileNotFoundError(error)) {
+        // If it's a 404/not-found error, fail immediately — model is likely deleted
+        if (this.isFileNotFoundError(error)) {
+          throw error
+        }
+
+        // For transient errors, retry unless it's the last attempt
+        if (attempt === maxRetries) {
           throw error
         }
 

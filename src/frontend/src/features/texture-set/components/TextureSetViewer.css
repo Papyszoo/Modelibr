@@ -38,6 +38,43 @@
   gap: 1rem;
 }
 
+.set-viewer-quality {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.quality-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quality-dropdown-header {
+  min-width: 160px;
+}
+
+.quality-option-unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.quality-option-label-na {
+  opacity: 0.5;
+}
+
+.quality-generate-btn {
+  padding: 0.15rem 0.35rem !important;
+  font-size: 0.75rem !important;
+}
+
 .set-viewer-tabs {
   flex: 1;
   display: flex;

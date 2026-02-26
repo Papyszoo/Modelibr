@@ -143,3 +143,25 @@
   color: var(--primary-color);
   font-weight: 500;
 }
+
+.file-proxy-badges {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.file-proxy-badge-list {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.file-proxy-badge {
+  font-size: 0.7rem !important;
+  padding: 0.1rem 0.35rem !important;
+}
+
+.file-proxy-badge-missing {
+  display: none;
+}

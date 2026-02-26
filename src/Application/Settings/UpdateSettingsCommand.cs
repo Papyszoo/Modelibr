@@ -9,7 +9,8 @@ public record UpdateSettingsCommand(
     double ThumbnailCameraVerticalAngle,
     int ThumbnailWidth,
     int ThumbnailHeight,
-    bool GenerateThumbnailOnUpload
+    bool GenerateThumbnailOnUpload,
+    int TextureProxySize
 ) : ICommand<UpdateSettingsResponse>;
 
 public record UpdateSettingsResponse(
@@ -20,5 +21,6 @@ public record UpdateSettingsResponse(
     int ThumbnailWidth,
     int ThumbnailHeight,
     bool GenerateThumbnailOnUpload,
+    int TextureProxySize,
     DateTime UpdatedAt
 );

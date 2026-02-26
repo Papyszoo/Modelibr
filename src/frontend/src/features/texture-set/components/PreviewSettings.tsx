@@ -21,6 +21,8 @@ export interface PreviewSettingsType {
   torusTube: number
   // UV Scale — direct texture repeat multiplier
   uvScale: number
+  // Texture quality: 0 = Original, 256/512/1024/2048 = proxy size
+  textureQuality: number
 }
 
 interface PreviewSettingsProps {

@@ -2,6 +2,8 @@ import { BaseProcessor } from './baseProcessor.js'
 import { ModelDataService } from '../modelDataService.js'
 import { PuppeteerRenderer } from '../puppeteerRenderer.js'
 import { TextureSetApiService } from '../textureSetApiService.js'
+import { FrameEncoderService } from '../frameEncoderService.js'
+import { generateTextureProxies } from '../textureProxyGenerator.js'
 import { config } from '../config.js'
 import sharp from 'sharp'
 import path from 'path'
@@ -10,10 +12,10 @@ import os from 'os'
 
 /**
  * Processor for generating texture set preview thumbnails.
- * Renders textures applied to a sphere, producing a single static WebP + PNG image.
+ * Renders textures applied to geometry, producing an animated WebP orbit swing.
  *
- * Pipeline: fetch texture set → download textures → create sphere → apply textures
- *           → render single frame → encode static images → upload via texture-set thumbnail endpoints
+ * Pipeline: fetch texture set → download textures → create geometry → apply textures
+ *           → render swing animation → encode animated WebP → upload via texture-set thumbnail endpoints
  */
 export class TextureSetProcessor extends BaseProcessor {
   constructor() {
@@ -111,28 +113,27 @@ export class TextureSetProcessor extends BaseProcessor {
         jobLogger.info('Textures applied to sphere')
       }
 
-      // Step 5: Render a single frame at a good angle
+      // Step 5: Render swing animation frames
+      // Camera swings from 45° top-left to -30° bottom-right, then back
       const cameraDistance =
         await this.puppeteerRenderer.calculateOptimalCameraDistance()
-      // Plane faces camera directly; 3D shapes get a slight angle for depth
-      const cameraAngle = geometryType === 'plane' ? 0 : 30
 
-      const frameData = await this.puppeteerRenderer.renderFrame(
-        cameraAngle,
+      const swingFrames = await this._renderSwingFrames(
         cameraDistance,
-        0
+        geometryType,
+        jobLogger
       )
 
-      jobLogger.info('Single frame rendered for texture set', {
-        angle: cameraAngle,
+      jobLogger.info('Swing animation rendered for texture set', {
+        frameCount: swingFrames.length,
         cameraDistance,
       })
 
-      // Step 6: Encode frame as static WebP + PNG
-      const encodingResult = await this._encodeSingleFrame(
+      // Step 6: Encode frames as animated WebP + PNG poster
+      const encodingResult = await this._encodeAnimatedFrames(
         job,
         jobLogger,
-        frameData
+        swingFrames
       )
 
       // Step 7: Upload thumbnails via texture-set-specific endpoints
@@ -146,6 +147,16 @@ export class TextureSetProcessor extends BaseProcessor {
         const successfulUpload = uploadResult.uploads.find(
           u => u.success && u.data
         )
+
+        // Step 8: Generate texture web proxies (non-blocking — failure here does not fail the job)
+        try {
+          await this._generateWebProxies(textureSet, texturePaths, jobLogger, job.proxySize)
+        } catch (proxyError) {
+          jobLogger.warn('Texture proxy generation failed (non-blocking)', {
+            error: proxyError.message,
+          })
+        }
+
         if (successfulUpload?.data) {
           return {
             thumbnailPath: successfulUpload.data.thumbnailPath,
@@ -167,54 +178,85 @@ export class TextureSetProcessor extends BaseProcessor {
   }
 
   /**
-   * Encode a single rendered frame into static WebP + PNG files.
+   * Render swing animation frames.
+   * Camera swings from top-left (azimuth -45°, elevation 30°) to bottom-right
+   * (azimuth 30°, elevation -20°) and back, creating a smooth looping animation.
+   * Plane geometry gets a gentler swing since it faces the camera.
    * @private
    */
-  async _encodeSingleFrame(job, jobLogger, frameData) {
-    const jobId = Date.now().toString(36) + Math.random().toString(36).substr(2)
-    const workingDir = path.join(os.tmpdir(), `textureset-${jobId}`)
-    fs.mkdirSync(workingDir, { recursive: true })
+  async _renderSwingFrames(cameraDistance, geometryType, jobLogger) {
+    const isPlane = geometryType === 'plane'
 
-    const startTime = Date.now()
+    // Swing parameters — gentler for planes
+    const startAzimuth = isPlane ? -15 : -45
+    const endAzimuth = isPlane ? 15 : 30
+    const startElevation = isPlane ? 10 : 30
+    const endElevation = isPlane ? -10 : -20
+    const forwardFrameCount = 15
 
-    try {
-      const inputBuffer = frameData.pixels
-      const width = config.rendering.outputWidth
-      const height = config.rendering.outputHeight
+    const frames = []
 
-      // Create static WebP from frame
-      const webpPath = path.join(workingDir, 'thumbnail.webp')
-      await sharp(inputBuffer)
-        .resize(width, height, { fit: 'cover' })
-        .webp({ quality: 85 })
-        .toFile(webpPath)
+    // Forward swing: top-left → bottom-right
+    for (let i = 0; i < forwardFrameCount; i++) {
+      const t = i / (forwardFrameCount - 1) // 0..1
+      const azimuth = startAzimuth + (endAzimuth - startAzimuth) * t
+      const elevation = startElevation + (endElevation - startElevation) * t
 
-      // Create PNG from frame
-      const pngPath = path.join(workingDir, 'thumbnail.png')
-      await sharp(inputBuffer)
-        .resize(width, height, { fit: 'cover' })
-        .png()
-        .toFile(pngPath)
-
-      const encodeTime = Date.now() - startTime
-
-      jobLogger.info('Single frame encoding completed', {
-        webpPath,
-        pngPath,
-        encodeTimeMs: encodeTime,
-      })
-
-      return { webpPath, pngPath, encodeTimeMs: encodeTime }
-    } catch (error) {
-      jobLogger.error('Single frame encoding failed', {
-        error: error.message,
-      })
-      // Cleanup working dir on failure
-      try {
-        fs.rmSync(workingDir, { recursive: true, force: true })
-      } catch (_) {}
-      throw error
+      const frameData = await this.puppeteerRenderer.renderFrame(
+        azimuth,
+        cameraDistance,
+        frames.length,
+        elevation
+      )
+      frames.push(frameData)
     }
+
+    // Reverse swing: bottom-right → top-left (skip first and last to avoid duplicate frames at turnaround)
+    for (let i = forwardFrameCount - 2; i >= 1; i--) {
+      const t = i / (forwardFrameCount - 1)
+      const azimuth = startAzimuth + (endAzimuth - startAzimuth) * t
+      const elevation = startElevation + (endElevation - startElevation) * t
+
+      const frameData = await this.puppeteerRenderer.renderFrame(
+        azimuth,
+        cameraDistance,
+        frames.length,
+        elevation
+      )
+      frames.push(frameData)
+    }
+
+    jobLogger.info('Swing frames rendered', {
+      totalFrames: frames.length,
+      azimuthRange: `${startAzimuth}° → ${endAzimuth}°`,
+      elevationRange: `${startElevation}° → ${endElevation}°`,
+    })
+
+    return frames
+  }
+
+  /**
+   * Encode rendered frames into animated WebP + static PNG.
+   * Uses FrameEncoderService for animated WebP creation.
+   * @private
+   */
+  async _encodeAnimatedFrames(job, jobLogger, frames) {
+    if (!this.frameEncoder) {
+      this.frameEncoder = new FrameEncoderService()
+    }
+
+    const encodingResult = await this.frameEncoder.encodeFrames(
+      frames,
+      jobLogger
+    )
+
+    jobLogger.info('Animated encoding completed', {
+      webpPath: encodingResult.webpPath,
+      pngPath: encodingResult.pngPath,
+      encodeTimeMs: encodingResult.encodeTimeMs,
+    })
+
+    return encodingResult
   }
 
   /**
@@ -242,6 +284,56 @@ export class TextureSetProcessor extends BaseProcessor {
   }
 
   /**
+   * Generate and upload web proxy textures for all textures in the set.
+   * Fetches the configured proxy size from settings (or uses job-level override),
+   * then uses the proxy generator.
+   * @private
+   */
+  async _generateWebProxies(textureSet, texturePaths, jobLogger, overrideSize) {
+    jobLogger.info('Starting texture web proxy generation', {
+      textureSetId: textureSet.id,
+    })
+
+    let proxySize = overrideSize || 512 // use override or default
+
+    if (!overrideSize) {
+      // Fetch the configured proxy size from settings API
+      try {
+        const settingsResponse =
+          await this.textureSetApiService.client.get('/settings')
+        if (settingsResponse.data?.textureProxySize) {
+          proxySize = settingsResponse.data.textureProxySize
+        }
+        jobLogger.info('Proxy size from settings', { proxySize })
+      } catch (settingsError) {
+        jobLogger.warn(
+          'Could not fetch settings, using default proxy size 512',
+          {
+            error: settingsError.message,
+          }
+        )
+      }
+    } else {
+      jobLogger.info('Using job-level proxy size override', { proxySize })
+    }
+
+    const stats = await generateTextureProxies(
+      textureSet,
+      texturePaths,
+      proxySize,
+      this.textureSetApiService.client,
+      jobLogger
+    )
+
+    jobLogger.info('Texture web proxy generation completed', {
+      textureSetId: textureSet.id,
+      ...stats,
+    })
+
+    return stats
+  }
+
+  /**
    * Override completion to use texture-set-specific API endpoint.
    */
   async markCompleted(job, result) {
@@ -259,6 +351,10 @@ export class TextureSetProcessor extends BaseProcessor {
     if (this.puppeteerRenderer) {
       await this.puppeteerRenderer.dispose()
       this.puppeteerRenderer = null
+    }
+    if (this.frameEncoder) {
+      await this.frameEncoder.cleanupOldFiles(0)
+      this.frameEncoder = null
     }
   }
 }

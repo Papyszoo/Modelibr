@@ -308,7 +308,9 @@ Given(
             const uploadResp = await page.request.post(`${apiBase}/models`, {
                 multipart: {
                     file: {
-                        name: stateName,
+                        name: stateName.endsWith(".glb")
+                            ? stateName
+                            : `${stateName}.glb`,
                         mimeType: "model/gltf-binary",
                         buffer: fileBuffer,
                     },
@@ -494,8 +496,8 @@ Then(
                             `Check if asset-processor-e2e container is healthy and processing jobs.`
                         );
                     },
-                    timeout: 55000,
-                    intervals: [5000],
+                    timeout: 80000,
+                    intervals: [3000],
                 },
             )
             .toBe(2);

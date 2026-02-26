@@ -1,12 +1,17 @@
 import { Button } from 'primereact/button'
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
+import { Tag } from 'primereact/tag'
 import { TextureDto } from '@/types'
 import {
   getTextureTypeLabel,
   getTextureTypeColor,
   getTextureTypeIcon,
 } from '../../../utils/textureTypeUtils'
+import './TexturesTable.css'
+
+/** All proxy sizes that can be generated */
+const ALL_PROXY_SIZES = [256, 512, 1024, 2048] as const
 
 interface TexturesTableProps {
   textures: TextureDto[]
@@ -43,6 +48,25 @@ export function TexturesTable({
         onClick={() => onRemoveTexture(rowData)}
         tooltip="Remove from pack"
       />
+    )
+  }
+
+  const textureProxiesBodyTemplate = (rowData: TextureDto) => {
+    const proxySizes = (rowData.proxies ?? []).map(p => p.size)
+    return (
+      <div className="textures-table-proxy-badges">
+        {ALL_PROXY_SIZES.map(size => {
+          const available = proxySizes.includes(size)
+          return (
+            <Tag
+              key={size}
+              value={`${size}`}
+              severity={available ? 'success' : undefined}
+              className={`textures-table-proxy-badge ${!available ? 'textures-table-proxy-badge-missing' : ''}`}
+            />
+          )
+        })}
+      </div>
     )
   }
 
@@ -84,6 +108,11 @@ export function TexturesTable({
           body={textureDateBodyTemplate}
           sortable
           style={{ minWidth: '120px' }}
+        />
+        <Column
+          header="Proxies"
+          body={textureProxiesBodyTemplate}
+          style={{ minWidth: '180px' }}
         />
         <Column
           body={textureActionsBodyTemplate}

@@ -66,6 +66,8 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Take(pageSize)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.Proxies)
             .Include(tp => tp.ModelVersions)
                 .ThenInclude(mv => mv.Model)
             .Include(tp => tp.Packs)
@@ -113,6 +115,8 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         return await _context.TextureSets
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.Proxies)
             .Include(tp => tp.ModelVersions)
                 .ThenInclude(mv => mv.Model)
             .Include(tp => tp.Packs)

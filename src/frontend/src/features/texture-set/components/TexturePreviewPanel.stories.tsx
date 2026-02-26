@@ -50,5 +50,6 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {
   args: {
     textureSet: mockTextureSet,
+    textureQuality: 0,
   },
 }

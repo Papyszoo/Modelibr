@@ -47,7 +47,12 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
                 SourceChannel = t.SourceChannel,
                 FileId = t.FileId,
                 FileName = t.File?.OriginalFileName,
-                CreatedAt = t.CreatedAt
+                CreatedAt = t.CreatedAt,
+                Proxies = t.Proxies.Select(p => new TextureProxyDto
+                {
+                    FileId = p.FileId,
+                    Size = p.Size
+                }).ToList()
             }).ToList(),
             AssociatedModels = textureSet.ModelVersions.Select(mv => new ModelSummaryDto
             {
@@ -111,6 +116,17 @@ public record TextureDto
     public int FileId { get; init; }
     public string? FileName { get; init; }
     public DateTime CreatedAt { get; init; }
+    /// <summary>
+    /// Available web proxy versions (resized for WebGL rendering).
+    /// Each entry maps a size (e.g. 512) to the proxy file ID.
+    /// </summary>
+    public ICollection<TextureProxyDto> Proxies { get; init; } = new List<TextureProxyDto>();
+}
+
+public record TextureProxyDto
+{
+    public int FileId { get; init; }
+    public int Size { get; init; }
 }
 
 public record ModelSummaryDto

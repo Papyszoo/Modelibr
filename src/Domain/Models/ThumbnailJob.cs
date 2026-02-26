@@ -95,6 +95,12 @@ public class ThumbnailJob
     /// </summary>
     public DateTime? CompletedAt { get; private set; }
     
+    /// <summary>
+    /// Optional proxy size override for texture set jobs.
+    /// When set, generates proxies at this specific size instead of the settings-configured size.
+    /// </summary>
+    public int? ProxySize { get; private set; }
+    
     // Navigation properties
     public Model? Model { get; set; }
     public ModelVersion? ModelVersion { get; set; }
@@ -155,7 +161,7 @@ public class ThumbnailJob
     /// Creates a new thumbnail job for texture set thumbnail processing.
     /// Renders textures on a sphere to produce a material preview.
     /// </summary>
-    public static ThumbnailJob CreateForTextureSet(int textureSetId, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
+    public static ThumbnailJob CreateForTextureSet(int textureSetId, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10, int? proxySize = null)
     {
         if (textureSetId <= 0)
             throw new ArgumentException("Texture set ID must be a positive integer.", nameof(textureSetId));
@@ -170,7 +176,8 @@ public class ThumbnailJob
             MaxAttempts = maxAttempts,
             LockTimeoutMinutes = lockTimeoutMinutes,
             CreatedAt = createdAt,
-            UpdatedAt = createdAt
+            UpdatedAt = createdAt,
+            ProxySize = proxySize
         };
     }
 

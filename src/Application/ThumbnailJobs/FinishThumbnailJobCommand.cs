@@ -101,9 +101,17 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
         var model = await _modelRepository.GetByIdAsync(job.ModelId.Value, cancellationToken);
         if (model == null)
         {
-            _logger.LogWarning("Model {ModelId} not found for thumbnail job {JobId}", job.ModelId, command.JobId);
-            return Result.Failure<FinishThumbnailJobResponse>(
-                new Error("ModelNotFound", $"Model {job.ModelId} not found"));
+            _logger.LogWarning("Model {ModelId} not found for thumbnail job {JobId} — marking job as dead to prevent retry backlog", 
+                job.ModelId, command.JobId);
+            
+            // Mark the job as dead immediately to prevent it from being retried.
+            // Without this, the job stays in Processing until lock expires, then gets
+            // re-queued — creating a backlog of stale jobs that block legitimate work.
+            await _thumbnailQueue.CancelActiveJobsForModelAsync(job.ModelId.Value, cancellationToken);
+            
+            // Return success with Failed status so the worker treats this as handled
+            // (returning 400 would cause the worker to attempt fallback error handling)
+            return Result.Success(new FinishThumbnailJobResponse(job.ModelId.Value, job.ModelVersionId.Value, ThumbnailStatus.Failed));
         }
 
         try

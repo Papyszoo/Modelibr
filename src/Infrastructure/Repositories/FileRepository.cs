@@ -133,7 +133,21 @@ internal sealed class FileRepository : IFileRepository
             .Where(t => t.FileId == fileId)
             .AnyAsync(cancellationToken);
         
-        return textureExists;
+        if (textureExists) return true;
+        
+        // Check if any non-deleted Sprite references this file
+        var spriteExists = await _context.Sprites
+            .Where(s => s.FileId == fileId)
+            .AnyAsync(cancellationToken);
+        
+        if (spriteExists) return true;
+        
+        // Check if any non-deleted Sound references this file
+        var soundExists = await _context.Sounds
+            .Where(s => s.FileId == fileId)
+            .AnyAsync(cancellationToken);
+        
+        return soundExists;
     }
 
     public async Task HardDeleteAsync(int id, CancellationToken cancellationToken = default)

@@ -3,7 +3,8 @@ namespace WebApi.Infrastructure;
 /// <summary>
 /// Endpoint filter that validates the X-Api-Key header against the configured WORKER_API_KEY.
 /// Applied to worker-facing upload endpoints (preview, thumbnail, waveform).
-/// If WORKER_API_KEY is not configured, all requests are allowed (development mode).
+/// If WORKER_API_KEY is not configured in Development, requests are allowed for backward compatibility.
+/// In non-Development environments, missing WORKER_API_KEY results in Unauthorized.
 /// </summary>
 public class WorkerApiKeyFilter : IEndpointFilter
 {
@@ -12,10 +13,15 @@ public class WorkerApiKeyFilter : IEndpointFilter
         var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
         var expectedKey = configuration["WORKER_API_KEY"];
 
-        // If no key is configured, allow all requests (development/backward compatibility)
         if (string.IsNullOrEmpty(expectedKey))
         {
-            return await next(context);
+            var environment = context.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>();
+            if (environment.IsDevelopment())
+            {
+                return await next(context);
+            }
+
+            return Results.Unauthorized();
         }
 
         var providedKey = context.HttpContext.Request.Headers["X-Api-Key"].FirstOrDefault();

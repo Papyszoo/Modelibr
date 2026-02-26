@@ -76,6 +76,14 @@ public static class TextureSetEndpoints
             .WithSummary("Changes the source channel of an existing texture in a set")
             .WithOpenApi();
 
+        // Web proxy (worker-only)
+        app.MapPut("/texture-sets/{setId}/textures/{textureId}/web-proxy", SetTextureWebProxy)
+            .WithName("Set Texture Web Proxy")
+            .WithSummary("Attaches a resized web proxy file to a texture (worker-only)")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
+            .DisableAntiforgery()
+            .WithOpenApi();
+
 
         // Model version association
         app.MapPost("/texture-sets/{packId}/model-versions/{modelVersionId}", AssociateTextureSetWithModelVersion)
@@ -541,13 +549,38 @@ public static class TextureSetEndpoints
         RegenerateTextureSetThumbnailRequest? request,
         CancellationToken cancellationToken)
     {
-        var command = new RegenerateTextureSetThumbnailCommand(id, request?.UvScale, request?.GeometryType);
+        var command = new RegenerateTextureSetThumbnailCommand(id, request?.UvScale, request?.GeometryType, request?.ProxySize);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         if (result.IsFailure)
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
 
         return Results.Ok(new { Message = "Texture set thumbnail regeneration queued", TextureSetId = id });
+    }
+
+    private static async Task<IResult> SetTextureWebProxy(
+        int setId,
+        int textureId,
+        IFormFile file,
+        [FromQuery] int size,
+        ICommandHandler<SetTextureWebProxyCommand, SetTextureWebProxyResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return Results.BadRequest(new { error = "InvalidFile", message = "A proxy file must be provided." });
+
+        var command = new SetTextureWebProxyCommand(
+            setId,
+            textureId,
+            new FormFileUpload(file),
+            size);
+
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (result.IsFailure)
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Results.Ok(result.Value);
     }
 }
 
@@ -559,4 +592,4 @@ public record UpdateTilingScaleRequest(float TilingScaleX, float TilingScaleY, U
 public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);
 public record ChangeTextureTypeRequest(TextureType? TextureType);
 public record ChangeTextureChannelRequest(TextureChannel SourceChannel);
-public record RegenerateTextureSetThumbnailRequest(float? UvScale = null, string? GeometryType = null);
+public record RegenerateTextureSetThumbnailRequest(float? UvScale = null, string? GeometryType = null, int? ProxySize = null);
