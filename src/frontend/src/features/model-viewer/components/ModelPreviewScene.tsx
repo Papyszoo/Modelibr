@@ -1,13 +1,15 @@
-import { JSX, Suspense, useRef } from 'react'
-import { Stage, OrbitControls, useHelper } from '@react-three/drei'
+import { OrbitControls, Stage, useHelper } from '@react-three/drei'
+import { type JSX, Suspense, useRef } from 'react'
 import * as THREE from 'three'
-import { Model } from './Model'
-import { TexturedModel } from './TexturedModel'
+
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { Model as ModelType } from '@/utils/fileUtils'
-import { ViewerSettingsType } from './ViewerSettings'
-import { TextureSetDto } from '@/types'
+import { type TextureSetDto } from '@/types'
+import { type Model as ModelType } from '@/utils/fileUtils'
+
+import { Model } from './Model'
+import { TexturedModel } from './TexturedModel'
+import { type ViewerSettingsType } from './ViewerSettings'
 
 // Helper component to show directional light with visual indicator
 function FillLight({
@@ -167,4 +169,3 @@ export function Scene({
     </>
   )
 }
-

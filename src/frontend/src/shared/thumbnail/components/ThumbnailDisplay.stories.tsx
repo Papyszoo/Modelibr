@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { ThumbnailDisplay } from './ThumbnailDisplay'
+
 import * as thumbnailApi from '@/shared/thumbnail/api/thumbnailApi'
+
+import { ThumbnailDisplay } from './ThumbnailDisplay'
 
 const meta = {
   title: 'Components/ThumbnailDisplay',

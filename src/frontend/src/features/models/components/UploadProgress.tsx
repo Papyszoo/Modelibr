@@ -5,10 +5,7 @@ interface UploadProgressProps {
   progress: number
 }
 
-export function UploadProgress({
-  visible,
-  progress,
-}: UploadProgressProps) {
+export function UploadProgress({ visible, progress }: UploadProgressProps) {
   if (!visible) return null
 
   return (

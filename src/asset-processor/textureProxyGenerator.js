@@ -3,8 +3,6 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import FormData from 'form-data'
-import logger from './logger.js'
-import { config } from './config.js'
 
 /**
  * Texture type classification for processing rules.
@@ -81,9 +79,9 @@ function renormalizeNormalMap(pixelBuffer, width, height) {
     }
 
     // Remap [-1, 1] → [0, 255]
-    buf[offset] = Math.round((x + 1) / 2 * 255)
-    buf[offset + 1] = Math.round((y + 1) / 2 * 255)
-    buf[offset + 2] = Math.round((z + 1) / 2 * 255)
+    buf[offset] = Math.round(((x + 1) / 2) * 255)
+    buf[offset + 1] = Math.round(((y + 1) / 2) * 255)
+    buf[offset + 2] = Math.round(((z + 1) / 2) * 255)
   }
 
   return buf
@@ -104,21 +102,46 @@ function renormalizeNormalMap(pixelBuffer, width, height) {
  * @param {number} sourceChannel - Source channel: 0/5=RGB (full), 1=R, 2=G, 3=B, 4=A
  * @returns {Promise<{outputPath: string, fileName: string}>} Path and filename of generated proxy
  */
-async function generateProxy(inputPath, textureType, size, outputDir, sourceChannel = 0) {
+async function generateProxy(
+  inputPath,
+  textureType,
+  size,
+  outputDir,
+  sourceChannel = 0
+) {
   const category = getTextureCategory(textureType)
   const baseName = path.basename(inputPath, path.extname(inputPath))
   // Append channel suffix to filename for split-channel textures to avoid collisions
   const channelSuffixes = { 1: '_R', 2: '_G', 3: '_B', 4: '_A' }
-  const effectiveName = sourceChannel > 0 && sourceChannel <= 4
-    ? `${baseName}${channelSuffixes[sourceChannel]}`
-    : baseName
+  const effectiveName =
+    sourceChannel > 0 && sourceChannel <= 4
+      ? `${baseName}${channelSuffixes[sourceChannel]}`
+      : baseName
 
   if (category === 'normal') {
-    return await generateNormalMapProxy(inputPath, size, outputDir, effectiveName, sourceChannel)
+    return await generateNormalMapProxy(
+      inputPath,
+      size,
+      outputDir,
+      effectiveName,
+      sourceChannel
+    )
   } else if (category === 'linear') {
-    return await generateLinearProxy(inputPath, size, outputDir, effectiveName, sourceChannel)
+    return await generateLinearProxy(
+      inputPath,
+      size,
+      outputDir,
+      effectiveName,
+      sourceChannel
+    )
   } else {
-    return await generateSrgbProxy(inputPath, size, outputDir, effectiveName, sourceChannel)
+    return await generateSrgbProxy(
+      inputPath,
+      size,
+      outputDir,
+      effectiveName,
+      sourceChannel
+    )
   }
 }
 
@@ -127,15 +150,20 @@ async function generateProxy(inputPath, textureType, size, outputDir, sourceChan
  * Standard Lanczos3 resize, saved as compressed WebP.
  * For split-channel textures, extracts the specific channel first.
  */
-async function generateSrgbProxy(inputPath, size, outputDir, baseName, sourceChannel = 0) {
+async function generateSrgbProxy(
+  inputPath,
+  size,
+  outputDir,
+  baseName,
+  sourceChannel = 0
+) {
   const fileName = `${baseName}_proxy_${size}.webp`
   const outputPath = path.join(outputDir, fileName)
 
-  let pipeline = sharp(inputPath)
-    .resize(size, size, {
-      fit: 'cover',
-      kernel: sharp.kernel.lanczos3,
-    })
+  let pipeline = sharp(inputPath).resize(size, size, {
+    fit: 'cover',
+    kernel: sharp.kernel.lanczos3,
+  })
 
   if (sourceChannel > 0 && sourceChannel <= 4) {
     // Extract specific channel for packed textures
@@ -156,15 +184,20 @@ async function generateSrgbProxy(inputPath, size, outputDir, baseName, sourceCha
  * For split-channel textures (sourceChannel > 0), extracts the specific channel
  * instead of converting to grayscale, which would incorrectly blend all channels.
  */
-async function generateLinearProxy(inputPath, size, outputDir, baseName, sourceChannel = 0) {
+async function generateLinearProxy(
+  inputPath,
+  size,
+  outputDir,
+  baseName,
+  sourceChannel = 0
+) {
   const fileName = `${baseName}_proxy_${size}.webp`
   const outputPath = path.join(outputDir, fileName)
 
-  let pipeline = sharp(inputPath)
-    .resize(size, size, {
-      fit: 'cover',
-      kernel: sharp.kernel.lanczos3,
-    })
+  let pipeline = sharp(inputPath).resize(size, size, {
+    fit: 'cover',
+    kernel: sharp.kernel.lanczos3,
+  })
 
   if (sourceChannel > 0 && sourceChannel <= 4) {
     // Extract the specific channel for packed textures (e.g., ARM map)
@@ -191,11 +224,23 @@ async function generateLinearProxy(inputPath, size, outputDir, baseName, sourceC
  *   5. Save as PNG (lossless — lossy compression introduces block artifacts
  *      in normal vectors causing visible shading errors)
  */
-async function generateNormalMapProxy(inputPath, size, outputDir, baseName, sourceChannel = 0) {
+async function generateNormalMapProxy(
+  inputPath,
+  size,
+  outputDir,
+  baseName,
+  sourceChannel = 0
+) {
   // Normal maps with a specific source channel shouldn't be re-normalized;
   // fall back to linear proxy which just extracts the channel.
   if (sourceChannel > 0 && sourceChannel <= 4) {
-    return await generateLinearProxy(inputPath, size, outputDir, baseName, sourceChannel)
+    return await generateLinearProxy(
+      inputPath,
+      size,
+      outputDir,
+      baseName,
+      sourceChannel
+    )
   }
 
   const fileName = `${baseName}_proxy_${size}.png`
@@ -214,7 +259,11 @@ async function generateNormalMapProxy(inputPath, size, outputDir, baseName, sour
 
   // Step 2-3: Re-normalize the normal vectors
   const { data: pixelBuffer, info } = resized
-  const normalizedBuffer = renormalizeNormalMap(pixelBuffer, info.width, info.height)
+  const normalizedBuffer = renormalizeNormalMap(
+    pixelBuffer,
+    info.width,
+    info.height
+  )
 
   // Step 4-5: Write the re-normalized buffer to PNG
   await sharp(normalizedBuffer, {
@@ -346,6 +395,8 @@ export async function generateTextureProxies(
     // Clean up working directory
     try {
       fs.rmSync(workingDir, { recursive: true, force: true })
-    } catch (_) {}
+    } catch {
+      // Cleanup failure is non-critical
+    }
   }
 }

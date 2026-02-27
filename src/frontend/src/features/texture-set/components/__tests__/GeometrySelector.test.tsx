@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+
 import { GeometrySelector } from '@/features/texture-set/components/GeometrySelector'
 
 describe('GeometrySelector', () => {

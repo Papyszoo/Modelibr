@@ -1,10 +1,12 @@
+import './App.css'
+
 import { NuqsAdapter } from 'nuqs/adapters/react'
+
 import { SplitterLayout } from '@/components/layout/SplitterLayout'
 import { useGlobalDragPrevention } from '@/hooks/useGlobalDragPrevention'
 import { useTheme } from '@/hooks/useTheme'
-import { useThumbnailSignalR } from '@/shared/thumbnail/hooks/useThumbnailSignalR'
 import { UploadProgressWindow } from '@/shared/components'
-import './App.css'
+import { useThumbnailSignalR } from '@/shared/thumbnail/hooks/useThumbnailSignalR'
 
 function App(): JSX.Element {
   // Prevent global drag and drop of files from opening in browser

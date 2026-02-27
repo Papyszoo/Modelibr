@@ -65,9 +65,8 @@ public class FinishTextureSetThumbnailJobCommandHandler
         else
         {
             job.MarkAsFailed(command.ErrorMessage ?? "Unknown error", now);
-            var sanitizedError = SanitizeLogMessage(command.ErrorMessage);
-            _logger.LogWarning("Texture set thumbnail job {JobId} failed for TextureSetId {TextureSetId}: {Error}",
-                command.JobId, job.TextureSetId, sanitizedError);
+            _logger.LogWarning("Texture set thumbnail job {JobId} failed for TextureSetId {TextureSetId}",
+                command.JobId, job.TextureSetId);
         }
 
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
@@ -75,20 +74,5 @@ public class FinishTextureSetThumbnailJobCommandHandler
         return Result.Success(new FinishTextureSetThumbnailJobResponse(
             command.JobId,
             command.Success ? "Completed" : "Failed"));
-    }
-
-    private static string? SanitizeLogMessage(string? message)
-    {
-        if (string.IsNullOrEmpty(message))
-            return message;
-
-        const int maxLength = 500;
-        var sanitized = new string(message
-            .Select(c => char.IsControl(c) ? ' ' : c)
-            .ToArray());
-
-        return sanitized.Length > maxLength
-            ? sanitized[..maxLength] + "..."
-            : sanitized;
     }
 }

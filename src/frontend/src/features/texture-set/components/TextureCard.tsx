@@ -1,15 +1,18 @@
-import { memo, useState, useRef } from 'react'
-import { Card } from 'primereact/card'
+import './TextureCard.css'
+
 import { Button } from 'primereact/button'
-import { Toast } from 'primereact/toast'
+import { Card } from 'primereact/card'
 import { Dialog } from 'primereact/dialog'
-import { TextureType, TextureDto } from '@/types'
-import { getTextureTypeInfo } from '@/utils/textureTypeUtils'
+import { Toast } from 'primereact/toast'
+import { memo, useRef, useState } from 'react'
+
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { useGenericFileUpload } from '@/shared/hooks/useGenericFileUpload'
-import { getFilePreviewUrl } from '@/features/models/api/modelApi'
-import './TextureCard.css'
+import { type TextureDto, type TextureType } from '@/types'
+import { getTextureTypeInfo } from '@/utils/textureTypeUtils'
+
 import { TexturePreview } from './TexturePreview'
 
 interface TextureCardProps {

@@ -1,20 +1,34 @@
-import { Suspense, useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import './TexturePreviewPanel.css'
+
+import { OrbitControls, Stage } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
-import { Stage, OrbitControls } from '@react-three/drei'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { TextureSetDto, TextureSetKind } from '@/types'
-import { TexturedGeometry, TextureLoadingState, TextureStrengths } from './TexturedGeometry'
-import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
-import { FloatingWindow } from '@/components/FloatingWindow'
-import { PreviewInfo } from './PreviewInfo'
-import { PreviewSettings, PreviewSettingsType } from './PreviewSettings'
-import {
-  updateTilingScale,
-  regenerateTextureSetThumbnail,
-} from '@/features/texture-set/api/textureSetApi'
 import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
-import './TexturePreviewPanel.css'
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
+import { FloatingWindow } from '@/components/FloatingWindow'
+import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
+import {
+  regenerateTextureSetThumbnail,
+  updateTilingScale,
+} from '@/features/texture-set/api/textureSetApi'
+import { type TextureSetDto, TextureSetKind } from '@/types'
+
+import { PreviewInfo } from './PreviewInfo'
+import { PreviewSettings, type PreviewSettingsType } from './PreviewSettings'
+import {
+  TexturedGeometry,
+  type TextureLoadingState,
+  type TextureStrengths,
+} from './TexturedGeometry'
 
 interface TexturePreviewPanelProps {
   textureSet: TextureSetDto
@@ -32,7 +46,9 @@ export function TexturePreviewPanel({
   const [infoWindowVisible, setInfoWindowVisible] = useState<boolean>(false)
   const [settingsWindowVisible, setSettingsWindowVisible] =
     useState<boolean>(false)
-  const [disabledTextures, setDisabledTextures] = useState<Set<string>>(new Set())
+  const [disabledTextures, setDisabledTextures] = useState<Set<string>>(
+    new Set()
+  )
   const [textureStrengths, setTextureStrengths] = useState<TextureStrengths>({})
   const [previewSettings, setPreviewSettings] = useState<PreviewSettingsType>({
     type: isUniversal ? 'plane' : 'box',
@@ -54,11 +70,7 @@ export function TexturePreviewPanel({
   const tilingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const saveTilingMutation = useMutation({
-    mutationFn: ({
-      uvScale,
-    }: {
-      uvScale: number
-    }) =>
+    mutationFn: ({ uvScale }: { uvScale: number }) =>
       updateTilingScale(textureSet.id, {
         tilingScaleX: uvScale,
         tilingScaleY: uvScale,
@@ -75,8 +87,7 @@ export function TexturePreviewPanel({
 
       // Auto-save UV scale changes for Universal sets (debounced 1s)
       if (isUniversal) {
-        const tilingChanged =
-          newSettings.uvScale !== previewSettings.uvScale
+        const tilingChanged = newSettings.uvScale !== previewSettings.uvScale
         if (tilingChanged) {
           if (tilingDebounceRef.current) clearTimeout(tilingDebounceRef.current)
           tilingDebounceRef.current = setTimeout(() => {
@@ -149,19 +160,22 @@ export function TexturePreviewPanel({
       : 0
 
   // Combine settings for geometry params — memoised to avoid unnecessary re-renders
-  const geometryParams = useMemo(() => ({
-    type: previewSettings.type,
-    scale: previewSettings.scale,
-    wireframe: previewSettings.wireframe,
-    cubeSize: previewSettings.cubeSize,
-    sphereRadius: previewSettings.sphereRadius,
-    sphereSegments: previewSettings.sphereSegments,
-    cylinderRadius: previewSettings.cylinderRadius,
-    cylinderHeight: previewSettings.cylinderHeight,
-    torusRadius: previewSettings.torusRadius,
-    torusTube: previewSettings.torusTube,
-    uvScale: previewSettings.uvScale,
-  }), [previewSettings])
+  const geometryParams = useMemo(
+    () => ({
+      type: previewSettings.type,
+      scale: previewSettings.scale,
+      wireframe: previewSettings.wireframe,
+      cubeSize: previewSettings.cubeSize,
+      sphereRadius: previewSettings.sphereRadius,
+      sphereSegments: previewSettings.sphereSegments,
+      cylinderRadius: previewSettings.cylinderRadius,
+      cylinderHeight: previewSettings.cylinderHeight,
+      torusRadius: previewSettings.torusRadius,
+      torusTube: previewSettings.torusTube,
+      uvScale: previewSettings.uvScale,
+    }),
+    [previewSettings]
+  )
 
   return (
     <div className="texture-preview-panel">
@@ -200,7 +214,8 @@ export function TexturePreviewPanel({
             <div className="texture-loading-content">
               <i className="pi pi-spinner pi-spin texture-loading-icon" />
               <span className="texture-loading-text">
-                Loading textures ({textureLoading.loaded}/{textureLoading.total})
+                Loading textures ({textureLoading.loaded}/{textureLoading.total}
+                )
               </span>
               <ProgressBar
                 value={loadingPercent}

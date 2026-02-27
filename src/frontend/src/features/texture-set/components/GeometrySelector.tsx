@@ -1,5 +1,6 @@
-import { Button } from 'primereact/button'
 import './GeometrySelector.css'
+
+import { Button } from 'primereact/button'
 
 export type GeometryType = 'plane' | 'box' | 'sphere' | 'cylinder' | 'torus'
 
@@ -38,4 +39,3 @@ export function GeometrySelector({ onGeometrySelect }: GeometrySelectorProps) {
     </div>
   )
 }
-

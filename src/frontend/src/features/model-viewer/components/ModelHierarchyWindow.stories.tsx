@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { useState } from 'react'
-import { ModelHierarchyWindow } from './ModelHierarchyWindow'
-import { ModelProvider } from '@/contexts/ModelContext'
 import { Button } from 'primereact/button'
+import { useState } from 'react'
 import * as THREE from 'three'
+
+import { ModelProvider } from '@/contexts/ModelContext'
+
+import { ModelHierarchyWindow } from './ModelHierarchyWindow'
 
 const meta = {
   title: 'Components/ModelHierarchyWindow',

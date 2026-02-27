@@ -1,16 +1,18 @@
-import { AxiosResponse } from 'axios'
+import { type AxiosResponse } from 'axios'
+
 import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+
 import {
-  TextureSetDto,
-  GetAllTextureSetsResponse,
-  CreateTextureSetRequest,
-  CreateTextureSetResponse,
-  UpdateTextureSetRequest,
-  UpdateTextureSetResponse,
-  AddTextureToSetRequest,
-  AddTextureToSetResponse,
-  UpdateTilingScaleRequest,
-  UpdateTilingScaleResponse,
+  type AddTextureToSetRequest,
+  type AddTextureToSetResponse,
+  type CreateTextureSetRequest,
+  type CreateTextureSetResponse,
+  type GetAllTextureSetsResponse,
+  type TextureSetDto,
+  type UpdateTextureSetRequest,
+  type UpdateTextureSetResponse,
+  type UpdateTilingScaleRequest,
+  type UpdateTilingScaleResponse,
 } from '../../../types'
 
 export async function getAllTextureSets(
@@ -215,7 +217,10 @@ export async function regenerateTextureSetThumbnail(
   textureSetId: number,
   options?: { uvScale?: number; geometryType?: string; proxySize?: number }
 ): Promise<void> {
-  await client.post(`/texture-sets/${textureSetId}/thumbnail/regenerate`, options)
+  await client.post(
+    `/texture-sets/${textureSetId}/thumbnail/regenerate`,
+    options
+  )
 }
 
 export async function updateTextureSetKind(

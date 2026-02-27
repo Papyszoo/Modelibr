@@ -1,4 +1,5 @@
 import { renderHook } from '@testing-library/react'
+
 import { useGlobalDragPrevention } from '@/hooks/useGlobalDragPrevention'
 
 // Mock window event listener methods

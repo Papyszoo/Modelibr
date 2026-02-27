@@ -1,6 +1,6 @@
 export { apiClient as ApiClient } from './ApiClient'
-export { thumbnailSignalRService } from './ThumbnailSignalRService'
 export type {
-  ThumbnailStatusChangedEvent,
   ActiveVersionChangedEvent,
+  ThumbnailStatusChangedEvent,
 } from './ThumbnailSignalRService'
+export { thumbnailSignalRService } from './ThumbnailSignalRService'

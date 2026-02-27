@@ -1,13 +1,14 @@
-import { Tab } from '@/types'
 import { useDockContext } from '@/contexts/DockContext'
 import {
-  getWindowId,
   broadcastNavigation,
   createTab,
+  getWindowId,
 } from '@/stores/navigationStore'
+import { type Tab } from '@/types'
+
 import { DockBar } from './dock-panel/DockBar'
-import { DockEmptyState } from './dock-panel/DockEmptyState'
 import { DockContentArea } from './dock-panel/DockContentArea'
+import { DockEmptyState } from './dock-panel/DockEmptyState'
 
 interface DockPanelContentProps {
   side: 'left' | 'right'
@@ -222,4 +223,3 @@ export function DockPanelContent({
     </div>
   )
 }
-

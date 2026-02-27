@@ -1,22 +1,24 @@
-import { useState } from 'react'
+import './ProjectList.css'
+
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
+import { useState } from 'react'
 import { useRef } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
+import { type z } from 'zod'
+
 import { createProject, deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
-import { ProjectDto } from '@/types'
-import { openTabInPanel } from '@/utils/tabNavigation'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { projectCreateFormSchema } from '@/shared/validation/formSchemas'
-import './ProjectList.css'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { type ProjectDto } from '@/types'
+import { openTabInPanel } from '@/utils/tabNavigation'
 
 type ProjectCreateFormInput = z.input<typeof projectCreateFormSchema>
 type ProjectCreateFormOutput = z.output<typeof projectCreateFormSchema>

@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react'
-import { ProgressBar } from 'primereact/progressbar'
-import { Button } from 'primereact/button'
-import { useUploadProgress } from '@/hooks/useUploadProgress'
-import { FloatingWindow } from '@/components/FloatingWindow'
-import { openTabInPanel } from '@/utils/tabNavigation'
 import './UploadProgressWindow.css'
+
+import { Button } from 'primereact/button'
+import { ProgressBar } from 'primereact/progressbar'
+import { useEffect, useRef } from 'react'
+
+import { FloatingWindow } from '@/components/FloatingWindow'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { openTabInPanel } from '@/utils/tabNavigation'
 
 // Utility function to get file extension
 const getFileExtension = (fileName: string): string => {

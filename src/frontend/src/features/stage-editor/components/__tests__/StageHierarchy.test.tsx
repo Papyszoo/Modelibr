@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
+
+import { type StageConfig } from '@/features/stage-editor/components/SceneEditor'
 import { StageHierarchy } from '@/features/stage-editor/components/StageHierarchy'
-import { StageConfig } from '@/features/stage-editor/components/SceneEditor'
 
 describe('StageHierarchy', () => {
   const mockOnSelectObject = jest.fn()

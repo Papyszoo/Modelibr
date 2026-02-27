@@ -1,41 +1,51 @@
-import { useState, useEffect, useRef } from 'react'
+import './ContainerViewer.css'
+
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { Toast } from 'primereact/toast'
-import { Dialog } from 'primereact/dialog'
-import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
-import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
-import { TabView, TabPanel } from 'primereact/tabview'
-import { TextureSetDto, TextureType, SpriteDto, SoundDto } from '@/types'
-import { ContainerAdapter, ContainerDto } from '@/shared/types/ContainerTypes'
+import { ContextMenu } from 'primereact/contextmenu'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
+import { type MenuItem } from 'primereact/menuitem'
+import { TabPanel, TabView } from 'primereact/tabview'
+import { Toast } from 'primereact/toast'
+import { useEffect, useRef, useState } from 'react'
+
+import { getFileUrl } from '@/features/models/api/modelApi'
 import { ModelGrid } from '@/features/models/components/ModelGrid'
-import { UploadableGrid } from '@/shared/components'
-import { useTabContext } from '@/hooks/useTabContext'
-import { useTabUiState } from '@/hooks/useTabUiState'
-import { useUploadProgress } from '@/hooks/useUploadProgress'
 import {
-  getAllTextureSets,
-  getTextureSetsPaginated,
-} from '@/features/texture-set/api/textureSetApi'
+  createSoundWithFile,
+  getAllSounds,
+  getSoundsPaginated,
+} from '@/features/sounds/api/soundApi'
 import {
   createSpriteWithFile,
   getAllSprites,
   getSpritesPaginated,
 } from '@/features/sprite/api/spriteApi'
 import {
-  createSoundWithFile,
-  getAllSounds,
-  getSoundsPaginated,
-} from '@/features/sounds/api/soundApi'
-import { getFileUrl } from '@/features/models/api/modelApi'
+  getAllTextureSets,
+  getTextureSetsPaginated,
+} from '@/features/texture-set/api/textureSetApi'
+import { useTabContext } from '@/hooks/useTabContext'
+import { useTabUiState } from '@/hooks/useTabUiState'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { UploadableGrid } from '@/shared/components'
 import {
-  formatDuration,
+  type ContainerAdapter,
+  type ContainerDto,
+} from '@/shared/types/ContainerTypes'
+import {
+  type SoundDto,
+  type SpriteDto,
+  type TextureSetDto,
+  TextureType,
+} from '@/types'
+import {
   filterAudioFiles,
+  formatDuration,
   processAudioFile,
 } from '@/utils/audioUtils'
-import './ContainerViewer.css'
 
 interface ContainerViewerProps {
   adapter: ContainerAdapter

@@ -1,5 +1,5 @@
-import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
+import { DataTable } from 'primereact/datatable'
 
 export interface FileOption {
   id: number

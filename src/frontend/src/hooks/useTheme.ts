@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
-import { useThemeStore, Theme } from '@/stores/themeStore'
+
+import { type Theme, useThemeStore } from '@/stores/themeStore'
 
 const THEME_LINK_ID = 'primereact-theme-link'
 
 // Import theme CSS files - Vite will handle bundling
 // The ?url suffix tells Vite to return the URL to the file instead of its contents
-import lightTheme from 'primereact/resources/themes/lara-light-blue/theme.css?url'
 import darkTheme from 'primereact/resources/themes/lara-dark-blue/theme.css?url'
+import lightTheme from 'primereact/resources/themes/lara-light-blue/theme.css?url'
 
 const getThemeUrl = (theme: Theme): string => {
   return theme === 'dark' ? darkTheme : lightTheme

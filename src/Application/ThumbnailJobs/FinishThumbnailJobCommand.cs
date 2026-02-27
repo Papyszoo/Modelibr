@@ -159,8 +159,8 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
                 // Mark the job as failed (handles retry logic and dead letter queue)
                 await _thumbnailQueue.MarkFailedAsync(command.JobId, command.ErrorMessage!, cancellationToken);
                 
-                _logger.LogInformation("Marked thumbnail job {JobId} as failed for model {ModelId} version {ModelVersionId}: {ErrorMessage}", 
-                    command.JobId, job.ModelId, job.ModelVersionId, command.ErrorMessage);
+                _logger.LogInformation("Marked thumbnail job {JobId} as failed for model {ModelId} version {ModelVersionId}", 
+                    command.JobId, job.ModelId, job.ModelVersionId);
             }
 
             // Save changes

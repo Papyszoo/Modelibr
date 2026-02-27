@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import { Tab, TabType } from '@/types'
+import { createJSONStorage, persist } from 'zustand/middleware'
+
+import { type Tab, type TabType } from '@/types'
 import { getTabLabel } from '@/utils/tabSerialization'
 
 // ─── Constants ────────────────────────────────────────────────────────

@@ -1,14 +1,16 @@
-import { useState, useEffect, useMemo } from 'react'
+import './ModelVersionWindow.css'
+
+import { Button } from 'primereact/button'
+import { useEffect, useMemo, useState } from 'react'
+
 import { FloatingWindow } from '@/components/FloatingWindow'
-import { Model } from '@/utils/fileUtils'
-import { ModelVersionDto } from '@/types'
 import {
   getVersionFileUrl,
   setActiveVersion,
 } from '@/features/model-viewer/api/modelVersionApi'
 import { useModelVersionsQuery } from '@/features/model-viewer/api/queries'
-import { Button } from 'primereact/button'
-import './ModelVersionWindow.css'
+import { type ModelVersionDto } from '@/types'
+import { type Model } from '@/utils/fileUtils'
 
 interface ModelVersionWindowProps {
   visible: boolean

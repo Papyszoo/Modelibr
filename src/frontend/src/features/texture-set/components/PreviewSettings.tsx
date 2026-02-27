@@ -1,8 +1,10 @@
-import { Slider } from 'primereact/slider'
-import { InputSwitch } from 'primereact/inputswitch'
-import { Dropdown } from 'primereact/dropdown'
-import { GeometryType } from './GeometrySelector'
 import './PreviewSettings.css'
+
+import { Dropdown } from 'primereact/dropdown'
+import { InputSwitch } from 'primereact/inputswitch'
+import { Slider } from 'primereact/slider'
+
+import { type GeometryType } from './GeometrySelector'
 
 export interface PreviewSettingsType {
   type: GeometryType

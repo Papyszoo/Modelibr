@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
-import { useNavigationStore, getWindowId } from '@/stores/navigationStore'
+
+import { getWindowId, useNavigationStore } from '@/stores/navigationStore'
 
 /**
  * Hook that exposes session recovery capabilities.

@@ -1,5 +1,6 @@
 import { Dropdown } from 'primereact/dropdown'
-import { TextureType } from '@/types'
+
+import { type TextureType } from '@/types'
 
 interface TextureTypeOption {
   label: string

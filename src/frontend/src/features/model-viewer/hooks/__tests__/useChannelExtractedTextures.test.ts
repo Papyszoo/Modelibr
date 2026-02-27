@@ -1,6 +1,6 @@
 import {
   getChannelIndex,
-  TextureConfig,
+  type TextureConfig,
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { TextureChannel } from '@/types'
 

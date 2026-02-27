@@ -1,12 +1,15 @@
-import { Suspense, useRef } from 'react'
+import './EditorCanvas.css'
+
+import { Grid, OrbitControls } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Grid } from '@react-three/drei'
+import { Suspense, useRef } from 'react'
+
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
+
+import { type StageConfig } from './SceneEditor'
+import { SceneHelpers } from './SceneHelpers'
 import { SceneLights } from './SceneLights'
 import { SceneMeshes } from './SceneMeshes'
-import { SceneHelpers } from './SceneHelpers'
-import { StageConfig } from './SceneEditor'
-import './EditorCanvas.css'
 
 interface EditorCanvasProps {
   stageConfig: StageConfig
@@ -95,4 +98,3 @@ export function EditorCanvas({
     </div>
   )
 }
-

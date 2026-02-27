@@ -1,12 +1,13 @@
 import { TextureType } from '@/types'
+
 import {
-  TEXTURE_TYPE_INFO,
   getAllTextureTypes,
   getTextureTypeColor,
   getTextureTypeIcon,
   getTextureTypeInfo,
   getTextureTypeLabel,
   getTextureTypeOptions,
+  TEXTURE_TYPE_INFO,
 } from '../textureTypeUtils'
 
 describe('textureTypeUtils', () => {

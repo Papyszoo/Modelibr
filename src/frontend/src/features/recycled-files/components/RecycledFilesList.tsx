@@ -1,22 +1,24 @@
-import { useState, useRef } from 'react'
+import './RecycledFilesList.css'
+
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
-import { Toast } from 'primereact/toast'
 import { ProgressBar } from 'primereact/progressbar'
+import { Toast } from 'primereact/toast'
+import { useRef, useState } from 'react'
+
+import { getFilePreviewUrl, getFileUrl } from '@/features/models/api/modelApi'
+import { useRecycledFilesQuery } from '@/features/recycled-files/api/queries'
 import {
   getDeletePreview,
   permanentlyDeleteEntity,
   restoreEntity,
 } from '@/features/recycled-files/api/recycledApi'
-import { getVersionThumbnailUrl } from '@/shared/thumbnail/api/thumbnailApi'
-import { getFileUrl, getFilePreviewUrl } from '@/features/models/api/modelApi'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRecycledFilesQuery } from '@/features/recycled-files/api/queries'
-import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
+import { getVersionThumbnailUrl } from '@/shared/thumbnail/api/thumbnailApi'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { formatDuration } from '@/utils/audioUtils'
-import './RecycledFilesList.css'
 
 interface RecycledModel {
   id: number

@@ -1,27 +1,34 @@
-import { useState, useEffect, useCallback } from 'react'
+import './TextureSetList.css'
+
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Button } from 'primereact/button'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
+import { useCallback, useEffect, useState } from 'react'
 import { useRef } from 'react'
-import { TextureSetDto, PaginationState, TextureSetKind } from '@/types'
-import { useTabContext } from '@/hooks/useTabContext'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import { useUploadProgress } from '@/hooks/useUploadProgress'
+
+import {
+  getTextureSetsQueryOptions,
+  useTextureSetsQuery,
+} from '@/features/texture-set/api/queries'
 import {
   createTextureSet,
   createTextureSetWithFile,
   deleteTextureSet,
   updateTextureSetKind,
 } from '@/features/texture-set/api/textureSetApi'
-import {
-  getTextureSetsQueryOptions,
-  useTextureSetsQuery,
-} from '@/features/texture-set/api/queries'
-import { Button } from 'primereact/button'
 import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
-import { TextureSetListHeader } from './TextureSetListHeader'
+import { useTabContext } from '@/hooks/useTabContext'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import {
+  type PaginationState,
+  type TextureSetDto,
+  TextureSetKind,
+} from '@/types'
+
 import { TextureSetGrid } from './TextureSetGrid'
-import './TextureSetList.css'
+import { TextureSetListHeader } from './TextureSetListHeader'
 
 type KindFilter = 'model-specific' | 'universal'
 

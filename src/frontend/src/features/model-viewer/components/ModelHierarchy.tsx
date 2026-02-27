@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { Tree } from 'primereact/tree'
-import { TreeNode } from 'primereact/treenode'
-import { HierarchyNode } from '@/features/model-viewer/hooks/useModelHierarchy'
 import './ModelHierarchy.css'
+
+import { Tree } from 'primereact/tree'
+import { type TreeNode } from 'primereact/treenode'
+import { useState } from 'react'
+
+import { type HierarchyNode } from '@/features/model-viewer/hooks/useModelHierarchy'
 
 interface ModelHierarchyProps {
   hierarchy: HierarchyNode | null
@@ -164,4 +166,3 @@ function findNodeById(node: HierarchyNode, id: string): HierarchyNode | null {
 
   return null
 }
-

@@ -1,30 +1,33 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import './TextureSetViewer.css'
+
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { TabView, TabPanel } from 'primereact/tabview'
-import { Dropdown } from 'primereact/dropdown'
 import { Button } from 'primereact/button'
+import { Dropdown } from 'primereact/dropdown'
+import { TabPanel, TabView } from 'primereact/tabview'
 import { Toast } from 'primereact/toast'
-import { TextureType, TextureSetKind } from '@/types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { getFileUrl } from '@/features/models/api/modelApi'
 import {
-  useTextureSetByIdQuery,
   getTextureSetByIdQueryOptions,
+  useTextureSetByIdQuery,
 } from '@/features/texture-set/api/queries'
 import {
-  updateTextureSet,
   regenerateTextureSetThumbnail,
+  updateTextureSet,
 } from '@/features/texture-set/api/textureSetApi'
-import { getNonHeightTypes } from '@/utils/textureTypeUtils'
-import { getFileUrl } from '@/features/models/api/modelApi'
 import { SetHeader } from '@/features/texture-set/dialogs/SetHeader'
 import { SetStats } from '@/features/texture-set/dialogs/SetStats'
-import { TextureSetModelList } from './TextureSetModelList'
-import { TextureCard } from './TextureCard'
-import { HeightCard } from './HeightCard'
-import { FilesTab } from './FilesTab'
-import { TexturePreviewPanel } from './TexturePreviewPanel'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-import './TextureSetViewer.css'
+import { TextureSetKind, TextureType } from '@/types'
+import { getNonHeightTypes } from '@/utils/textureTypeUtils'
+
+import { FilesTab } from './FilesTab'
+import { HeightCard } from './HeightCard'
+import { TextureCard } from './TextureCard'
+import { TexturePreviewPanel } from './TexturePreviewPanel'
+import { TextureSetModelList } from './TextureSetModelList'
 
 /** All proxy sizes that can be generated */
 const ALL_PROXY_SIZES = [256, 512, 1024, 2048] as const
@@ -41,7 +44,9 @@ export function TextureSetViewer({
   const [updating, setUpdating] = useState(false)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const [textureQuality, setTextureQuality] = useState(0)
-  const [originalResolution, setOriginalResolution] = useState<number | null>(null)
+  const [originalResolution, setOriginalResolution] = useState<number | null>(
+    null
+  )
   const queryClient = useQueryClient()
   const toast = useRef<Toast>(null)
   const textureSetId = parseInt(setId)
@@ -57,7 +62,8 @@ export function TextureSetViewer({
     textureSetQuery.error instanceof Error ? textureSetQuery.error.message : ''
 
   const { settings, setCardWidth } = useCardWidthStore()
-  const cardWidthKey = side === 'right' ? 'textureSetViewerRight' : 'textureSetViewerLeft'
+  const cardWidthKey =
+    side === 'right' ? 'textureSetViewerRight' : 'textureSetViewerLeft'
   const cardWidth = settings[cardWidthKey]
 
   const refreshTextureSet = useCallback(async () => {
@@ -163,7 +169,11 @@ export function TextureSetViewer({
   }, [availableSizes, originalResolution])
 
   // Custom item template for quality dropdown — unavailable sizes get a Generate button
-  const qualityItemTemplate = (option: { label: string; value: number; available?: boolean }) => {
+  const qualityItemTemplate = (option: {
+    label: string
+    value: number
+    available?: boolean
+  }) => {
     const isAvailable = option.value === 0 || option.available
     if (isAvailable) {
       return <span>{option.label}</span>
@@ -177,7 +187,7 @@ export function TextureSetViewer({
           tooltip={`Generate ${option.value}px proxies`}
           tooltipOptions={{ position: 'left' }}
           loading={generateProxyMutation.isPending}
-          onClick={(e) => {
+          onClick={e => {
             e.stopPropagation()
             generateProxyMutation.mutate(option.value)
           }}
@@ -187,12 +197,15 @@ export function TextureSetViewer({
   }
 
   // Handle quality dropdown change — only allow selecting available sizes
-  const handleQualityChange = useCallback((value: number) => {
-    if (value === 0 || availableSizes.has(value)) {
-      setTextureQuality(value)
-    }
-    // Clicking unavailable size does nothing (Generate button handles it)
-  }, [availableSizes])
+  const handleQualityChange = useCallback(
+    (value: number) => {
+      if (value === 0 || availableSizes.has(value)) {
+        setTextureQuality(value)
+      }
+      // Clicking unavailable size does nothing (Generate button handles it)
+    },
+    [availableSizes]
+  )
 
   if (loading) {
     return (
@@ -308,7 +321,11 @@ export function TextureSetViewer({
         {textureSet.kind === TextureSetKind.Universal &&
           textureSet.textureCount > 0 && (
             <TabPanel header="Preview" leftIcon="pi pi-eye">
-              <TexturePreviewPanel textureSet={textureSet} side={side} textureQuality={textureQuality} />
+              <TexturePreviewPanel
+                textureSet={textureSet}
+                side={side}
+                textureQuality={textureQuality}
+              />
             </TabPanel>
           )}
       </TabView>

@@ -1,17 +1,25 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import './FilesTab.css'
+
 import { useQueryClient } from '@tanstack/react-query'
-import { Dropdown } from 'primereact/dropdown'
-import { Toast } from 'primereact/toast'
 import { Button } from 'primereact/button'
-import { Tag } from 'primereact/tag'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
-import { TextureSetDto, TextureDto, TextureType, TextureChannel } from '@/types'
-import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
-import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { Dropdown } from 'primereact/dropdown'
+import { Tag } from 'primereact/tag'
+import { Toast } from 'primereact/toast'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { softDeleteFile } from '@/features/models/api/modelApi'
+import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import {
+  TextureChannel,
+  type TextureDto,
+  type TextureSetDto,
+  TextureType,
+} from '@/types'
+import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
+
 import { TexturePreview } from './TexturePreview'
-import './FilesTab.css'
 
 interface FilesTabProps {
   textureSet: TextureSetDto
@@ -133,7 +141,8 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
     Record<number, string>
   >({})
   const toast = useRef<Toast>(null)
-  const { changeTextureType, addTextureToSetEndpoint, removeTextureFromSet } = useTextureSets()
+  const { changeTextureType, addTextureToSetEndpoint, removeTextureFromSet } =
+    useTextureSets()
 
   // Compute all texture types currently assigned across the entire texture set
   // This is used to disable already-taken options in dropdowns
@@ -169,7 +178,11 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
   const getRgbOptionsWithDisabled = useCallback(
     (currentValue: string) => {
       return rgbOptions.map(opt => {
-        if (opt.value === 'none' || opt.value === 'split' || opt.value === currentValue) {
+        if (
+          opt.value === 'none' ||
+          opt.value === 'split' ||
+          opt.value === currentValue
+        ) {
           return opt
         }
         // Map option value to TextureType
@@ -181,7 +194,8 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
         const textureType = typeMap[opt.value]
         return {
           ...opt,
-          disabled: textureType !== undefined && takenTextureTypes.has(textureType),
+          disabled:
+            textureType !== undefined && takenTextureTypes.has(textureType),
         }
       })
     },
@@ -517,7 +531,10 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                     <label>R:</label>
                     <Dropdown
                       value={fm.rChannel}
-                      options={getOptionsWithDisabled(grayscaleTypeOptions, fm.rChannel)}
+                      options={getOptionsWithDisabled(
+                        grayscaleTypeOptions,
+                        fm.rChannel
+                      )}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.R, e.value)
                       }
@@ -530,7 +547,10 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                     <label>G:</label>
                     <Dropdown
                       value={fm.gChannel}
-                      options={getOptionsWithDisabled(grayscaleTypeOptions, fm.gChannel)}
+                      options={getOptionsWithDisabled(
+                        grayscaleTypeOptions,
+                        fm.gChannel
+                      )}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.G, e.value)
                       }
@@ -543,7 +563,10 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                     <label>B:</label>
                     <Dropdown
                       value={fm.bChannel}
-                      options={getOptionsWithDisabled(grayscaleTypeOptions, fm.bChannel)}
+                      options={getOptionsWithDisabled(
+                        grayscaleTypeOptions,
+                        fm.bChannel
+                      )}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.B, e.value)
                       }
@@ -560,7 +583,10 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                   <label>A:</label>
                   <Dropdown
                     value={fm.aChannel}
-                    options={getOptionsWithDisabled(alphaTypeOptions, fm.aChannel)}
+                    options={getOptionsWithDisabled(
+                      alphaTypeOptions,
+                      fm.aChannel
+                    )}
                     onChange={e =>
                       handleTextureTypeChange(fm, TextureChannel.A, e.value)
                     }
@@ -586,7 +612,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
               {(() => {
                 const proxySizes = new Set<number>()
                 fm.existingTextures.forEach(t => {
-                  (t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+                  ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
                 })
                 const ALL_SIZES = [256, 512, 1024, 2048]
                 if (proxySizes.size === 0) return null
@@ -598,7 +624,9 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                         <Tag
                           key={size}
                           value={`${size}`}
-                          severity={proxySizes.has(size) ? 'success' : undefined}
+                          severity={
+                            proxySizes.has(size) ? 'success' : undefined
+                          }
                           className={`file-proxy-badge ${!proxySizes.has(size) ? 'file-proxy-badge-missing' : ''}`}
                         />
                       ))}

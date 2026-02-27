@@ -1,22 +1,24 @@
-import { useState } from 'react'
+import './PackList.css'
+
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
+import { useState } from 'react'
 import { useRef } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
+import { type z } from 'zod'
+
 import { createPack, deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
-import { PackDto } from '@/types'
-import { openTabInPanel } from '@/utils/tabNavigation'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { packCreateFormSchema } from '@/shared/validation/formSchemas'
-import './PackList.css'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { type PackDto } from '@/types'
+import { openTabInPanel } from '@/utils/tabNavigation'
 
 type PackCreateFormInput = z.input<typeof packCreateFormSchema>
 type PackCreateFormOutput = z.output<typeof packCreateFormSchema>

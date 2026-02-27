@@ -1,8 +1,9 @@
-import { render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render } from '@testing-library/react'
+
 import { TexturePreviewPanel } from '@/features/texture-set/components/TexturePreviewPanel'
 import {
-  TextureSetDto,
+  type TextureSetDto,
   TextureSetKind,
   TextureType,
   UvMappingMode,
@@ -66,7 +67,9 @@ const renderWithProviders = (ui: React.ReactElement) =>
 describe('TexturePreviewPanel', () => {
   it('should render without errors', () => {
     expect(() => {
-      renderWithProviders(<TexturePreviewPanel textureSet={mockTextureSet} textureQuality={0} />)
+      renderWithProviders(
+        <TexturePreviewPanel textureSet={mockTextureSet} textureQuality={0} />
+      )
     }).not.toThrow()
   })
 
@@ -86,7 +89,9 @@ describe('TexturePreviewPanel', () => {
     }
 
     expect(() => {
-      renderWithProviders(<TexturePreviewPanel textureSet={setWithAlbedo} textureQuality={0} />)
+      renderWithProviders(
+        <TexturePreviewPanel textureSet={setWithAlbedo} textureQuality={0} />
+      )
     }).not.toThrow()
   })
 
@@ -121,7 +126,10 @@ describe('TexturePreviewPanel', () => {
 
     expect(() => {
       renderWithProviders(
-        <TexturePreviewPanel textureSet={setWithMultipleTextures} textureQuality={0} />
+        <TexturePreviewPanel
+          textureSet={setWithMultipleTextures}
+          textureQuality={0}
+        />
       )
     }).not.toThrow()
   })

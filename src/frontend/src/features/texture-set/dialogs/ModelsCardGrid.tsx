@@ -1,12 +1,14 @@
-import { useRef, useMemo, useState } from 'react'
-import { Button } from 'primereact/button'
-import { Badge } from 'primereact/badge'
-import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
-import { ModelSummaryDto } from '@/types'
-import { ThumbnailDisplay } from '@/shared/thumbnail'
-import { openTabInPanel } from '@/utils/tabNavigation'
 import './ModelsCardGrid.css'
+
+import { Badge } from 'primereact/badge'
+import { Button } from 'primereact/button'
+import { ContextMenu } from 'primereact/contextmenu'
+import { type MenuItem } from 'primereact/menuitem'
+import { useMemo, useRef, useState } from 'react'
+
+import { ThumbnailDisplay } from '@/shared/thumbnail'
+import { type ModelSummaryDto } from '@/types'
+import { openTabInPanel } from '@/utils/tabNavigation'
 
 interface ModelsCardGridProps {
   models: ModelSummaryDto[]

@@ -1,14 +1,17 @@
+import './TexturesTable.css'
+
 import { Button } from 'primereact/button'
-import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
+import { DataTable } from 'primereact/datatable'
 import { Tag } from 'primereact/tag'
-import { TextureDto } from '@/types'
+
+import { type TextureDto } from '@/types'
+
 import {
-  getTextureTypeLabel,
   getTextureTypeColor,
   getTextureTypeIcon,
+  getTextureTypeLabel,
 } from '../../../utils/textureTypeUtils'
-import './TexturesTable.css'
 
 /** All proxy sizes that can be generated */
 const ALL_PROXY_SIZES = [256, 512, 1024, 2048] as const

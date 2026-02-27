@@ -4,11 +4,6 @@ import { PuppeteerRenderer } from '../puppeteerRenderer.js'
 import { TextureSetApiService } from '../textureSetApiService.js'
 import { FrameEncoderService } from '../frameEncoderService.js'
 import { generateTextureProxies } from '../textureProxyGenerator.js'
-import { config } from '../config.js'
-import sharp from 'sharp'
-import path from 'path'
-import fs from 'fs'
-import os from 'os'
 
 /**
  * Processor for generating texture set preview thumbnails.
@@ -88,7 +83,8 @@ export class TextureSetProcessor extends BaseProcessor {
 
       // Use the stored preview geometry type (defaults to plane)
       const geometryType = textureSet.previewGeometryType || 'plane'
-      const polygonCount = await this.puppeteerRenderer.loadPrimitive(geometryType)
+      const polygonCount =
+        await this.puppeteerRenderer.loadPrimitive(geometryType)
       jobLogger.info('Primitive loaded', { polygonCount, geometryType })
 
       // Step 4: Apply textures to the sphere
@@ -150,7 +146,12 @@ export class TextureSetProcessor extends BaseProcessor {
 
         // Step 8: Generate texture web proxies (non-blocking — failure here does not fail the job)
         try {
-          await this._generateWebProxies(textureSet, texturePaths, jobLogger, job.proxySize)
+          await this._generateWebProxies(
+            textureSet,
+            texturePaths,
+            jobLogger,
+            job.proxySize
+          )
         } catch (proxyError) {
           jobLogger.warn('Texture proxy generation failed (non-blocking)', {
             error: proxyError.message,

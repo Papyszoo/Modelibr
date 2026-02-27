@@ -1,17 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import './SplitterLayout.css'
+
 import { Splitter, SplitterPanel } from 'primereact/splitter'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { DockProvider } from '@/contexts/DockContext'
-import { DockPanel } from './DockPanel'
-import { Tab, SplitterEvent } from '@/types'
-import { useNavigationStore, createTab } from '@/stores/navigationStore'
-import { useWindowInit } from '@/hooks/useWindowInit'
 import { useDeepLinkHandler } from '@/hooks/useDeepLinkHandler'
+import { useWindowInit } from '@/hooks/useWindowInit'
+import { createTab, useNavigationStore } from '@/stores/navigationStore'
 import { usePanelStore } from '@/stores/panelStore'
+import { type SplitterEvent, type Tab } from '@/types'
 import {
   parseCompactTabFormatAsync,
   serializeToCompactFormat,
 } from '@/utils/tabSerialization'
-import './SplitterLayout.css'
+
+import { DockPanel } from './DockPanel'
 
 export function SplitterLayout(): JSX.Element {
   // ── Window identity & lifecycle ─────────────────────────────────────

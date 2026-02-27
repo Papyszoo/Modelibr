@@ -1,34 +1,36 @@
-import { useState, useRef, useEffect } from 'react'
-import { Dialog } from 'primereact/dialog'
-import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
-import { Toast } from 'primereact/toast'
-import { Tag } from 'primereact/tag'
 import './TextureSetGrid.css'
-import {
-  TextureSetDto,
-  TextureType,
-  TextureChannel,
-  PackDto,
-  TextureSetKind,
-} from '@/types'
+
+import { ContextMenu } from 'primereact/contextmenu'
+import { Dialog } from 'primereact/dialog'
+import { type MenuItem } from 'primereact/menuitem'
 import { ProgressBar } from 'primereact/progressbar'
+import { Tag } from 'primereact/tag'
+import { Toast } from 'primereact/toast'
+import { useEffect, useRef, useState } from 'react'
+
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { addTextureSetToPack, getAllPacks } from '@/features/pack/api/packApi'
 import {
   addTextureToSetEndpoint,
   hardDeleteTextureSet,
-  softDeleteTextureSet,
   regenerateTextureSetThumbnail,
+  softDeleteTextureSet,
 } from '@/features/texture-set/api/textureSetApi'
-import { getFilePreviewUrl } from '@/features/models/api/modelApi'
-import { baseURL } from '@/lib/apiBase'
 import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextureSetDialog'
+import { baseURL } from '@/lib/apiBase'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
-  openInFileExplorer,
+  type PackDto,
+  type TextureChannel,
+  type TextureSetDto,
+  TextureSetKind,
+  TextureType,
+} from '@/types'
+import {
   copyPathToClipboard,
   getCopyPathSuccessMessage,
+  openInFileExplorer,
 } from '@/utils/webdavUtils'
 
 // Interface for channel merge request (must match MergeTextureSetDialog)
@@ -352,7 +354,9 @@ export function TextureSetGrid({
   const handleGenerateProxy = async (size: number) => {
     if (!selectedTextureSet) return
     try {
-      await regenerateTextureSetThumbnail(selectedTextureSet.id, { proxySize: size })
+      await regenerateTextureSetThumbnail(selectedTextureSet.id, {
+        proxySize: size,
+      })
       toast.current?.show({
         severity: 'success',
         summary: 'Proxy Generation',
@@ -564,14 +568,21 @@ export function TextureSetGrid({
                 {(() => {
                   const proxySizes = new Set<number>()
                   textureSet.textures?.forEach(t => {
-                    (t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+                    ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
                   })
                   if (proxySizes.size === 0) return null
                   return (
                     <div className="texture-set-card-badges">
-                      {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(size => (
-                        <Tag key={size} value={`${size}`} severity="success" className="grid-proxy-badge" />
-                      ))}
+                      {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(
+                        size => (
+                          <Tag
+                            key={size}
+                            value={`${size}`}
+                            severity="success"
+                            className="grid-proxy-badge"
+                          />
+                        )
+                      )}
                     </div>
                   )
                 })()}

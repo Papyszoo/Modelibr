@@ -1,8 +1,9 @@
-import { useRef, useEffect } from 'react'
 import { ContextMenu } from 'primereact/contextmenu'
-import { Tab } from '@/types'
+import { useEffect, useRef } from 'react'
+
 import { useDockContext } from '@/contexts/DockContext'
 import { useTabMenuItems } from '@/hooks/useTabMenuItems'
+import { type Tab } from '@/types'
 
 interface DockEmptyStateProps {
   onAddTab: (type: Tab['type'], title: string) => void

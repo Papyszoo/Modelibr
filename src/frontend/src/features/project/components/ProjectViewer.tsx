@@ -1,23 +1,27 @@
 import { useMemo } from 'react'
-import { ContainerViewer } from '@/shared/components/ContainerViewer'
-import { ContainerAdapter, ContainerDto } from '@/shared/types/ContainerTypes'
-import { ProjectDto } from '@/types'
+
 import {
-  getProjectById,
-  getModelsByProject,
-  getTextureSetsByProject,
-  getSpritesByProject,
-  getSoundsByProject,
   addModelToProject,
-  removeModelFromProject,
-  addTextureSetToProject,
-  removeTextureSetFromProject,
-  addSpriteToProject,
-  removeSpriteFromProject,
   addSoundToProject,
-  removeSoundFromProject,
+  addSpriteToProject,
+  addTextureSetToProject,
   addTextureToProjectWithFile,
+  getModelsByProject,
+  getProjectById,
+  getSoundsByProject,
+  getSpritesByProject,
+  getTextureSetsByProject,
+  removeModelFromProject,
+  removeSoundFromProject,
+  removeSpriteFromProject,
+  removeTextureSetFromProject,
 } from '@/features/project/api/projectApi'
+import { ContainerViewer } from '@/shared/components/ContainerViewer'
+import {
+  type ContainerAdapter,
+  type ContainerDto,
+} from '@/shared/types/ContainerTypes'
+import { type ProjectDto } from '@/types'
 
 interface ProjectViewerProps {
   projectId: number
@@ -42,10 +46,7 @@ function toContainerDto(project: ProjectDto): ContainerDto {
   }
 }
 
-export function ProjectViewer({
-  projectId,
-  tabId,
-}: ProjectViewerProps) {
+export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
   const adapter = useMemo<ContainerAdapter>(
     () => ({
       type: 'project',

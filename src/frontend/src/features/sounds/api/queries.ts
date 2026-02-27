@@ -1,6 +1,8 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { QueryConfig } from '@/lib/react-query'
-import { getSoundsPaginated, getAllSoundCategories } from './soundApi'
+
+import { type QueryConfig } from '@/lib/react-query'
+
+import { getAllSoundCategories, getSoundsPaginated } from './soundApi'
 
 // --- Sounds (paginated) ---
 

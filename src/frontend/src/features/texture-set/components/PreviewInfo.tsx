@@ -1,9 +1,12 @@
-import { TextureSetDto, TextureType } from '@/types'
-import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
+import './PreviewInfo.css'
+
 import { Checkbox } from 'primereact/checkbox'
 import { Slider } from 'primereact/slider'
+
+import { type TextureSetDto, TextureType } from '@/types'
+import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
+
 import type { TextureStrengths } from './TexturedGeometry'
-import './PreviewInfo.css'
 
 interface PreviewInfoProps {
   textureSet: TextureSetDto
@@ -16,7 +19,12 @@ interface PreviewInfoProps {
 
 /** Texture types that have a meaningful strength/intensity control */
 const STRENGTH_SUPPORTED = new Set([
-  'Normal', 'AO', 'Emissive', 'Bump', 'Height', 'Displacement',
+  'Normal',
+  'AO',
+  'Emissive',
+  'Bump',
+  'Height',
+  'Displacement',
 ])
 
 export function PreviewInfo({
@@ -63,7 +71,11 @@ export function PreviewInfo({
         <div className="info-item">
           <span className="info-item-label">Textures Applied:</span>
           <span className="info-item-value highlight">
-            {availableTextures.filter(t => !disabledTextures.has(t.typeKey)).length} / {availableTextures.length}
+            {
+              availableTextures.filter(t => !disabledTextures.has(t.typeKey))
+                .length
+            }{' '}
+            / {availableTextures.length}
           </span>
         </div>
       </div>
@@ -127,4 +139,3 @@ export function PreviewInfo({
     </div>
   )
 }
-

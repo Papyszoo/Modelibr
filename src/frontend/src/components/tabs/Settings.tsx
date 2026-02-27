@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import './Settings.css'
+
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
-import { useTheme } from '@/hooks/useTheme'
+import { type z } from 'zod'
+
 import { useSettingsQuery } from '@/features/settings/api/queries'
 import { updateSettings } from '@/features/settings/api/settingsApi'
+import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
-import './Settings.css'
 
 interface SettingsData {
   maxFileSizeBytes: number
@@ -36,7 +38,9 @@ export function Settings(): JSX.Element {
   const { theme, setTheme } = useTheme()
 
   // Accordion state
-  const [activeIndex, setActiveIndex] = useState<number | number[]>([0, 1, 2, 3])
+  const [activeIndex, setActiveIndex] = useState<number | number[]>([
+    0, 1, 2, 3,
+  ])
 
   const {
     register,
@@ -591,7 +595,9 @@ export function Settings(): JSX.Element {
                     {...register('textureProxySize', { valueAsNumber: true })}
                     disabled={isSaving}
                     className={
-                      errors.textureProxySize ? 'settings-input-error' : 'settings-select'
+                      errors.textureProxySize
+                        ? 'settings-input-error'
+                        : 'settings-select'
                     }
                   >
                     <option value={256}>256 px</option>
@@ -632,4 +638,3 @@ export function Settings(): JSX.Element {
     </div>
   )
 }
-

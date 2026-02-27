@@ -1,23 +1,27 @@
 import { useMemo } from 'react'
-import { ContainerViewer } from '@/shared/components/ContainerViewer'
-import { ContainerAdapter, ContainerDto } from '@/shared/types/ContainerTypes'
-import { PackDto } from '@/types'
+
 import {
-  getPackById,
-  getModelsByPack,
-  getTextureSetsByPack,
-  getSpritesByPack,
-  getSoundsByPack,
   addModelToPack,
-  removeModelFromPack,
-  addTextureSetToPack,
-  removeTextureSetFromPack,
-  addSpriteToPack,
-  removeSpriteFromPack,
   addSoundToPack,
-  removeSoundFromPack,
+  addSpriteToPack,
+  addTextureSetToPack,
   addTextureToPackWithFile,
+  getModelsByPack,
+  getPackById,
+  getSoundsByPack,
+  getSpritesByPack,
+  getTextureSetsByPack,
+  removeModelFromPack,
+  removeSoundFromPack,
+  removeSpriteFromPack,
+  removeTextureSetFromPack,
 } from '@/features/pack/api/packApi'
+import { ContainerViewer } from '@/shared/components/ContainerViewer'
+import {
+  type ContainerAdapter,
+  type ContainerDto,
+} from '@/shared/types/ContainerTypes'
+import { type PackDto } from '@/types'
 
 interface PackViewerProps {
   packId: number

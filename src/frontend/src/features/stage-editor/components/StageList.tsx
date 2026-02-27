@@ -1,14 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
+import './StageList.css'
+
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { openTabInPanel } from '@/utils/tabNavigation'
-import { createStage } from '@/features/stage-editor/api/stageApi'
+import { useEffect, useRef, useState } from 'react'
+
 import { useStagesQuery } from '@/features/stage-editor/api/queries'
+import { createStage } from '@/features/stage-editor/api/stageApi'
+import { openTabInPanel } from '@/utils/tabNavigation'
+
+import { CreateStageDialog } from './CreateStageDialog'
 import { StageGrid } from './StageGrid'
 import { StageListHeader } from './StageListHeader'
-import { CreateStageDialog } from './CreateStageDialog'
-import './StageList.css'
 
 interface StageDto {
   id: number
@@ -124,4 +127,3 @@ export function StageList() {
     </div>
   )
 }
-

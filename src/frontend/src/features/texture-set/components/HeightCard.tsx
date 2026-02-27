@@ -1,20 +1,23 @@
-import { memo, useState, useRef, useEffect } from 'react'
-import { Card } from 'primereact/card'
+import './TextureCard.css'
+
 import { Button } from 'primereact/button'
+import { Card } from 'primereact/card'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
-import { TextureType, TextureDto } from '@/types'
-import {
-  getTextureTypeInfo,
-  getHeightModeOptions,
-  HEIGHT_RELATED_TYPES,
-} from '@/utils/textureTypeUtils'
+import { memo, useEffect, useRef, useState } from 'react'
+
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { useGenericFileUpload } from '@/shared/hooks/useGenericFileUpload'
-import { getFilePreviewUrl } from '@/features/models/api/modelApi'
+import { type TextureDto, TextureType } from '@/types'
+import {
+  getHeightModeOptions,
+  getTextureTypeInfo,
+  HEIGHT_RELATED_TYPES,
+} from '@/utils/textureTypeUtils'
+
 import { TexturePreview } from './TexturePreview'
-import './TextureCard.css'
 
 interface HeightCardProps {
   /** All textures in the set - we'll find Height/Displacement/Bump from here */

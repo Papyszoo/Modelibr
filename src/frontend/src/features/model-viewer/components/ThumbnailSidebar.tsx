@@ -1,6 +1,7 @@
 import { Button } from 'primereact/button'
+
 import { ThumbnailDisplay } from '@/shared/thumbnail'
-import { Model } from '@/utils/fileUtils'
+import { type Model } from '@/utils/fileUtils'
 
 interface ThumbnailSidebarProps {
   model: Model

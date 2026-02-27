@@ -1,15 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import './dialogs.css'
+
 import { Dialog } from 'primereact/dialog'
 import { Toast } from 'primereact/toast'
-import type { Model } from '@/utils/fileUtils'
-import { TextureSetDto, TextureType } from '@/features/texture-set/types'
-import { getTextureTypeOptions } from '@/utils/textureTypeUtils'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
-import { TextureTypeDropdown } from './TextureTypeDropdown'
-import { FileSelectionTable, FileOption } from './FileSelectionTable'
-import { NoTextureTypesWarning } from './NoTextureTypesWarning'
+import {
+  type TextureSetDto,
+  type TextureType,
+} from '@/features/texture-set/types'
+import type { Model } from '@/utils/fileUtils'
+import { getTextureTypeOptions } from '@/utils/textureTypeUtils'
+
 import { AddTextureFooter } from './AddTextureFooter'
-import './dialogs.css'
+import { type FileOption, FileSelectionTable } from './FileSelectionTable'
+import { NoTextureTypesWarning } from './NoTextureTypesWarning'
+import { TextureTypeDropdown } from './TextureTypeDropdown'
 
 interface AddTextureToSetDialogProps {
   visible: boolean
@@ -165,4 +171,3 @@ export function AddTextureToSetDialog({
     </Dialog>
   )
 }
-

@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
-import { Button } from 'primereact/button'
+import { useState } from 'react'
 
 interface CreateStageDialogProps {
   visible: boolean
@@ -68,4 +68,3 @@ export function CreateStageDialog({
     </Dialog>
   )
 }
-

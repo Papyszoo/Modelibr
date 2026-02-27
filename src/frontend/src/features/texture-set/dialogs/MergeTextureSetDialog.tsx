@@ -1,15 +1,18 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { Dialog } from 'primereact/dialog'
+import './dialogs.css'
+
 import { Button } from 'primereact/button'
+import { Dialog } from 'primereact/dialog'
 import { Dropdown } from 'primereact/dropdown'
-import { Toast } from 'primereact/toast'
 import { Message } from 'primereact/message'
-import { TextureSetDto, TextureType, TextureChannel } from '@/types'
+import { Toast } from 'primereact/toast'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
+
 import {
   getTextureTypeLabel,
   isHeightRelatedType,
 } from '../../../utils/textureTypeUtils'
-import './dialogs.css'
 
 // RGB dropdown options
 type RgbOption = 'none' | 'albedo' | 'normal' | 'emissive' | 'split'
@@ -404,4 +407,3 @@ export function MergeTextureSetDialog({
     </>
   )
 }
-

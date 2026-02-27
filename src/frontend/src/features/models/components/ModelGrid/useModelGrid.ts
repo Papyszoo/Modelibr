@@ -1,7 +1,9 @@
-import { useRef, useCallback } from 'react'
-import { PackDto, ProjectDto } from '@/types'
+import { type Toast } from 'primereact/toast'
+import { useCallback, useRef } from 'react'
+
 import { useThumbnailSignalR } from '@/shared/thumbnail/hooks/useThumbnailSignalR'
-import { Toast } from 'primereact/toast'
+import { type PackDto, type ProjectDto } from '@/types'
+
 import { useModelData } from './useModelData'
 import { useModelFilters } from './useModelFilters'
 import { useModelUpload } from './useModelUpload'

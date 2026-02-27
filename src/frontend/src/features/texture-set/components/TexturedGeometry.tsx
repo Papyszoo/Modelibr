@@ -1,10 +1,12 @@
-import { useRef, useMemo, useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { GeometryType } from './GeometrySelector'
-import { TextureSetDto, TextureType, TextureChannel } from '@/types'
-import { getFileUrl } from '@/features/models/api/modelApi'
-import { isExrFile } from '@/utils/fileUtils'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+
+import { getFileUrl } from '@/features/models/api/modelApi'
+import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
+import { isExrFile } from '@/utils/fileUtils'
+
+import { type GeometryType } from './GeometrySelector'
 
 interface GeometryParams {
   type: GeometryType
@@ -159,9 +161,7 @@ const MATERIAL_PROP_TO_TYPE_KEY: Record<string, string[]> = {
  * Uses fixed standard unit sizes — the <Stage> component positions
  * the object consistently for all geometry types.
  */
-function createGeometry(
-  geometryType: GeometryType
-): THREE.BufferGeometry {
+function createGeometry(geometryType: GeometryType): THREE.BufferGeometry {
   switch (geometryType) {
     case 'plane':
       // High subdivision (512) so displacement mapping captures fine texture detail
@@ -202,7 +202,7 @@ function extractChannelFromBitmap(
 
   for (let i = 0; i < data.length; i += 4) {
     const v = data[i + offset]
-    data[i] = v     // R
+    data[i] = v // R
     data[i + 1] = v // G
     data[i + 2] = v // B
     data[i + 3] = 255
@@ -295,10 +295,7 @@ function TexturedMesh({
   // onLoadingChange intentionally excluded — stable callback from parent
 
   // Build geometry (memoised — depends only on geometry type)
-  const geometry = useMemo(
-    () => createGeometry(geometryType),
-    [geometryType]
-  )
+  const geometry = useMemo(() => createGeometry(geometryType), [geometryType])
 
   const hasNormalMap = !!loadedTextures.normalMap
   const hasAoMap = !!loadedTextures.aoMap
@@ -375,7 +372,9 @@ function TexturedMesh({
         Array.from(uniqueUrls.entries()).map(async ([url, isExr]) => {
           if (isExr) return // EXR uses its own loader, no blob caching
           try {
-            const response = await fetch(url, { signal: abortController.signal })
+            const response = await fetch(url, {
+              signal: abortController.signal,
+            })
             if (!response.ok) throw new Error(`HTTP ${response.status}`)
             blobCache.set(url, await response.blob())
           } catch (err) {
@@ -411,7 +410,11 @@ function TexturedMesh({
               result[prop] = texture
 
               loadedCount++
-              setLoadingProgress({ isLoading: true, loaded: loadedCount, total })
+              setLoadingProgress({
+                isLoading: true,
+                loaded: loadedCount,
+                total,
+              })
             }
           } catch (err) {
             if (abortController.signal.aborted) return
@@ -475,15 +478,13 @@ function TexturedMesh({
 
   const t = loadedTextures
   const hasAlphaMap = !!t.alphaMap && !isDisabled('alphaMap')
-  const hasDisplacementMap = !!t.displacementMap && !isDisabled('displacementMap')
+  const hasDisplacementMap =
+    !!t.displacementMap && !isDisabled('displacementMap')
 
   // Key forces material re-mount when texture slots change.
   // Three.js compiles shaders based on which texture slots are non-null;
   // prop-diffing alone doesn't trigger shader recompilation.
-  const materialKey = JSON.stringify([
-    Array.from(disabled).sort(),
-    strengths,
-  ])
+  const materialKey = JSON.stringify([Array.from(disabled).sort(), strengths])
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
@@ -502,10 +503,14 @@ function TexturedMesh({
         bumpScale={getStrength('bumpMap') * 0.5}
         alphaMap={(!isDisabled('alphaMap') && t.alphaMap) || null}
         displacementMap={hasDisplacementMap ? t.displacementMap : null}
-        displacementScale={hasDisplacementMap ? getStrength('displacementMap') * 0.1 : 0}
+        displacementScale={
+          hasDisplacementMap ? getStrength('displacementMap') * 0.1 : 0
+        }
         roughness={t.roughnessMap && !isDisabled('roughnessMap') ? 1 : 0.8}
         metalness={t.metalnessMap && !isDisabled('metalnessMap') ? 1 : 0}
-        emissive={t.emissiveMap && !isDisabled('emissiveMap') ? '#ffffff' : '#000000'}
+        emissive={
+          t.emissiveMap && !isDisabled('emissiveMap') ? '#ffffff' : '#000000'
+        }
         transparent={hasAlphaMap}
         color="#ffffff"
         wireframe={geometryParams.wireframe || false}

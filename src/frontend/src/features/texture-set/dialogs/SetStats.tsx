@@ -1,4 +1,4 @@
-import { TextureSetDto, TextureSetKind } from '@/types'
+import { type TextureSetDto, TextureSetKind } from '@/types'
 
 interface SetStatsProps {
   textureSet: TextureSetDto

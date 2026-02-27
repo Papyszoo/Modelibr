@@ -1,23 +1,25 @@
-import { useState, useEffect, useRef } from 'react'
-import { Dialog } from 'primereact/dialog'
-import { Toast } from 'primereact/toast'
-import { InputText } from 'primereact/inputtext'
+import './TextureSetAssociationDialog.css'
+
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
-import type { Model } from '@/utils/fileUtils'
-import {
-  TextureSetDto,
-  PackSummaryDto,
-  TextureType,
-} from '@/features/texture-set/types'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
+import { Toast } from 'primereact/toast'
+import { useEffect, useRef, useState } from 'react'
+
+import { getFileUrl } from '@/features/models/api/modelApi'
+import { usePacksQuery } from '@/features/pack/api/queries'
+import { useAllTextureSetsQuery } from '@/features/texture-set/api/queries'
 import {
   associateTextureSetWithModelVersion,
   disassociateTextureSetFromModelVersion,
 } from '@/features/texture-set/api/textureSetApi'
-import { getFileUrl } from '@/features/models/api/modelApi'
-import { useAllTextureSetsQuery } from '@/features/texture-set/api/queries'
-import { usePacksQuery } from '@/features/pack/api/queries'
-import './TextureSetAssociationDialog.css'
+import {
+  type PackSummaryDto,
+  type TextureSetDto,
+  TextureType,
+} from '@/features/texture-set/types'
+import type { Model } from '@/utils/fileUtils'
 
 interface TextureSetAssociationDialogProps {
   visible: boolean
@@ -379,4 +381,3 @@ function TextureSetCard({
     </div>
   )
 }
-

@@ -1,15 +1,16 @@
 /* eslint-disable react-refresh/only-export-components */
+import { type ContextMenu } from 'primereact/contextmenu'
 import {
   createContext,
-  ReactNode,
+  type ReactNode,
+  type RefObject,
   useContext,
-  useRef,
   useEffect,
-  RefObject,
+  useRef,
 } from 'react'
-import { ContextMenu } from 'primereact/contextmenu'
-import { Tab } from '@/types'
+
 import { useNavigationStore } from '@/stores/navigationStore'
+import { type Tab } from '@/types'
 
 interface DockContextValue {
   recentlyClosedTabs: Tab[]

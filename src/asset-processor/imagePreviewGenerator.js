@@ -6,7 +6,6 @@
 import sharp from 'sharp'
 import fs from 'fs'
 import path from 'path'
-import logger from './logger.js'
 
 // Lazy-loaded EXRLoader (avoid import cost on every startup)
 let EXRLoaderCtor = null

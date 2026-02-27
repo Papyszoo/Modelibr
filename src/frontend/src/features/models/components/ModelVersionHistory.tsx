@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import './ModelVersionHistory.css'
+
 import { useQueryClient } from '@tanstack/react-query'
-import { ModelVersionDto } from '@/types'
+import React, { useState } from 'react'
+
 import {
   createModelVersion,
   getVersionFileUrl,
 } from '@/features/model-viewer/api/modelVersionApi'
 import { useModelVersionsQuery } from '@/features/model-viewer/api/queries'
-import './ModelVersionHistory.css'
+import { type ModelVersionDto } from '@/types'
 
 interface ModelVersionHistoryProps {
   modelId: number

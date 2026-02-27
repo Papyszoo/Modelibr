@@ -69,7 +69,7 @@ internal static class SettingValidator
 
     private static Result ValidateThumbnailCameraVerticalAngle(string value)
     {
-        if (!double.TryParse(value, out var angle))
+        if (!double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var angle))
             return Result.Failure(new Error("InvalidSetting", "ThumbnailCameraVerticalAngle must be a valid number."));
 
         if (angle < 0)

@@ -205,26 +205,29 @@ export class PuppeteerRenderer {
         // Prevent path traversal attacks
         const resolvedDir = path.resolve(textureDir)
         const resolvedFile = path.resolve(filePath)
-        if (!resolvedFile.startsWith(resolvedDir + path.sep) && resolvedFile !== resolvedDir) {
+        if (
+          !resolvedFile.startsWith(resolvedDir + path.sep) &&
+          resolvedFile !== resolvedDir
+        ) {
           logger.warn('Path traversal attempt blocked', { requestedName })
           res.writeHead(403)
           res.end('Forbidden')
           return
         }
 
-        if (!fs.existsSync(filePath)) {
+        if (!fs.existsSync(resolvedFile)) {
           res.writeHead(404)
           res.end('Not found')
           return
         }
 
-        const ext = path.extname(filePath).toLowerCase()
+        const ext = path.extname(resolvedFile).toLowerCase()
         res.writeHead(200, {
           'Content-Type': mimeTypes[ext] || 'application/octet-stream',
           'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'no-cache',
         })
-        fs.createReadStream(filePath).pipe(res)
+        fs.createReadStream(resolvedFile).pipe(res)
       })
 
       server.listen(0, '127.0.0.1', () => {
@@ -562,7 +565,9 @@ export class PuppeteerRenderer {
     }, geometryType)
 
     if (!result.success) {
-      throw new Error(result.error || `Failed to create ${geometryType} primitive`)
+      throw new Error(
+        result.error || `Failed to create ${geometryType} primitive`
+      )
     }
 
     logger.info('Primitive loaded in browser', {
@@ -1042,7 +1047,8 @@ export class PuppeteerRenderer {
       throw new Error('Renderer not initialized')
     }
 
-    const elevationAngle = elevation !== undefined ? elevation : config.orbit.cameraHeight
+    const elevationAngle =
+      elevation !== undefined ? elevation : config.orbit.cameraHeight
 
     // Position camera and render in browser (async for WebGPU support)
     const result = await this.page.evaluate(

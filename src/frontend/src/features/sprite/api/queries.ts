@@ -1,6 +1,8 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { QueryConfig } from '@/lib/react-query'
-import { getSpritesPaginated, getAllSpriteCategories } from './spriteApi'
+
+import { type QueryConfig } from '@/lib/react-query'
+
+import { getAllSpriteCategories, getSpritesPaginated } from './spriteApi'
 
 // --- Sprites (paginated) ---
 

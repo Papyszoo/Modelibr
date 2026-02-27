@@ -1,8 +1,9 @@
 import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+
 import {
-  SoundDto,
-  GetAllSoundsResponse,
-  GetAllSoundCategoriesResponse,
+  type GetAllSoundCategoriesResponse,
+  type GetAllSoundsResponse,
+  type SoundDto,
 } from '../../../types'
 
 export async function getAllSounds(options?: {

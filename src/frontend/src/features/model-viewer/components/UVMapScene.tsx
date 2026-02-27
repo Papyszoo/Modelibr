@@ -1,6 +1,7 @@
-import { JSX, useEffect, useRef } from 'react'
-import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
+import { type JSX, useEffect, useRef } from 'react'
 import * as THREE from 'three'
+
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 
 interface UVMapSceneProps {
   width: number
@@ -179,4 +180,3 @@ export function UVMapScene({ width, height }: UVMapSceneProps): JSX.Element {
     />
   )
 }
-

@@ -1,6 +1,8 @@
-import { Button } from 'primereact/button'
-import { SceneLight } from './SceneEditor'
 import './LightLibrary.css'
+
+import { Button } from 'primereact/button'
+
+import { type SceneLight } from './SceneEditor'
 
 interface LightLibraryProps {
   onAddLight: (type: SceneLight['type']) => void
@@ -68,4 +70,3 @@ export function LightLibrary({ onAddLight }: LightLibraryProps): JSX.Element {
     </div>
   )
 }
-

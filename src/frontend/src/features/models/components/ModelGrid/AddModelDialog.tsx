@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
-import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
-import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
-import { ThumbnailDisplay } from '@/shared/thumbnail'
-import { Model } from '@/utils/fileUtils'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
+import { useEffect, useState } from 'react'
+
 import { getModelsPaginated } from '@/features/models/api/modelApi'
 import { addModelToPack } from '@/features/pack/api/packApi'
 import { addModelToProject } from '@/features/project/api/projectApi'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
+import { type Model } from '@/utils/fileUtils'
 
 interface AddModelDialogProps {
   visible: boolean

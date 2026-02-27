@@ -57,6 +57,7 @@ export default [
       'modelLoaderService.js',
       'orbitFrameRenderer.js',
       'frameEncoderService.js',
+      'soundFileService.js',
     ],
     rules: {
       'no-restricted-imports': [
