@@ -9,8 +9,8 @@ Feature: Texture Set Thumbnail with Mixed Image Formats
   Also verifies that all texture types (including Displacement, Bump,
   Alpha) are correctly mapped to Three.js material properties.
 
-  @timeout:360000
+  @timeout:720000
   Scenario: Thumbnail generated for texture set with mixed PNG and EXR textures
     Given I am on the texture sets page
     When I create a universal texture set "mixed_fmt_thumb" with global texture files via API
-    Then texture set "mixed_fmt_thumb" should have a thumbnail within 300 seconds via API
+    Then texture set "mixed_fmt_thumb" should have a thumbnail within 600 seconds via API

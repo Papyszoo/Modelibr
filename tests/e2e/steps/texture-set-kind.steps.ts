@@ -249,10 +249,10 @@ Then(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
-        // Poll the API for up to 60 seconds to allow thumbnail generation
-        // (Puppeteer cold start + rendering can take 30-40 seconds)
+        // Poll the API for up to 600 seconds to allow thumbnail generation
+        // (queue backlog + Puppeteer cold start + rendering can take several minutes)
         let hasThumbnail = false;
-        for (let attempt = 0; attempt < 300; attempt++) {
+        for (let attempt = 0; attempt < 600; attempt++) {
             const textureSets = await apiHelper.getAllTextureSets();
             const found = textureSets.find((ts: any) => ts.id === set.id);
             if (

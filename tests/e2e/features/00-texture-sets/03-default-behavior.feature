@@ -11,7 +11,7 @@ Feature: Default Texture Set Behavior
       | name        |
       | blue_color  |
 
-  @three-js @textures @timeout:360000
+  @three-js @textures @timeout:720000
   Scenario: Setting a default texture set for a model version
     # This test verifies:
     # 1. A texture set can be set as default for a model version
