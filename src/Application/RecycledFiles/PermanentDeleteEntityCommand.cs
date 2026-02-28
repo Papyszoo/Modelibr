@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using SharedKernel;
 
@@ -149,6 +150,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
     private readonly IFileStorage _fileStorage;
+    private readonly IThumbnailQueue _thumbnailQueue;
 
     public PermanentDeleteEntityCommandHandler(
         IModelRepository modelRepository,
@@ -157,7 +159,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
-        IFileStorage fileStorage)
+        IFileStorage fileStorage,
+        IThumbnailQueue thumbnailQueue)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -166,6 +169,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
         _fileStorage = fileStorage;
+        _thumbnailQueue = thumbnailQueue;
     }
 
     public async Task<Result<PermanentDeleteEntityResponse>> Handle(PermanentDeleteEntityCommand request, CancellationToken cancellationToken)
@@ -179,6 +183,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (model == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("ModelNotFound", "Model not found"));
                 
+                // Cancel any pending/processing thumbnail jobs for this model
+                await _thumbnailQueue.CancelActiveJobsForModelAsync(request.EntityId, cancellationToken);
                 
                 // Delete version files from disk (version files have direct FK to version, not shared)
                 foreach (var version in model.Versions)
@@ -238,14 +244,29 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (textureSet == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("TextureSetNotFound", "Texture set not found"));
                 
-                // Delete texture files from disk
-                foreach (var texture in textureSet.Textures)
+                // Collect file info before deleting the texture set (cascade will remove Texture entities)
+                var textureFileIds = textureSet.Textures
+                    .Select(t => new { t.File.Id, t.File.FilePath, t.File.OriginalFileName, t.File.SizeBytes })
+                    .ToList();
+                
+                // Delete the texture set and its textures from database first
+                await _textureSetRepository.DeleteAsync(textureSet.Id, cancellationToken);
+                
+                // Now clean up File entities and physical files
+                foreach (var fileInfo in textureFileIds)
                 {
-                    await _fileStorage.DeleteFileAsync(texture.File.FilePath, cancellationToken);
-                    deletedFiles.Add(new DeletedFileInfo(texture.File.FilePath, texture.File.OriginalFileName, texture.File.SizeBytes));
+                    // Check if the file is still referenced by other entities
+                    var isReferenced = await _fileRepository.IsFileHashReferencedByOthersAsync(fileInfo.Id, cancellationToken);
+                    if (!isReferenced)
+                    {
+                        // Delete physical file from disk
+                        await _fileStorage.DeleteFileAsync(fileInfo.FilePath, cancellationToken);
+                        deletedFiles.Add(new DeletedFileInfo(fileInfo.FilePath, fileInfo.OriginalFileName, fileInfo.SizeBytes));
+                        // Delete orphaned File entity from database
+                        await _fileRepository.HardDeleteAsync(fileInfo.Id, cancellationToken);
+                    }
                 }
                 
-                await _textureSetRepository.DeleteAsync(textureSet.Id, cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Texture set permanently deleted", deletedFiles));
 
             case "sprite":
@@ -253,11 +274,24 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (spriteToDelete == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("SpriteNotFound", "Sprite not found"));
                 
-                // Delete sprite file from disk
-                await _fileStorage.DeleteFileAsync(spriteToDelete.File.FilePath, cancellationToken);
-                deletedFiles.Add(new DeletedFileInfo(spriteToDelete.File.FilePath, spriteToDelete.File.OriginalFileName, spriteToDelete.File.SizeBytes));
+                // Collect file info before deletion
+                var spriteFileId = spriteToDelete.File.Id;
+                var spriteFilePath = spriteToDelete.File.FilePath;
+                var spriteFileName = spriteToDelete.File.OriginalFileName;
+                var spriteFileSize = spriteToDelete.File.SizeBytes;
                 
+                // Delete sprite entity from database
                 await _spriteRepository.DeleteAsync(spriteToDelete.Id, cancellationToken);
+                
+                // Check if the file is still referenced by other entities
+                var isSpriteFileReferenced = await _fileRepository.IsFileHashReferencedByOthersAsync(spriteFileId, cancellationToken);
+                if (!isSpriteFileReferenced)
+                {
+                    await _fileStorage.DeleteFileAsync(spriteFilePath, cancellationToken);
+                    deletedFiles.Add(new DeletedFileInfo(spriteFilePath, spriteFileName, spriteFileSize));
+                    await _fileRepository.HardDeleteAsync(spriteFileId, cancellationToken);
+                }
+                
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Sprite permanently deleted", deletedFiles));
 
             case "sound":
@@ -265,11 +299,24 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (soundToDelete == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("SoundNotFound", "Sound not found"));
                 
-                // Delete sound file from disk
-                await _fileStorage.DeleteFileAsync(soundToDelete.File.FilePath, cancellationToken);
-                deletedFiles.Add(new DeletedFileInfo(soundToDelete.File.FilePath, soundToDelete.File.OriginalFileName, soundToDelete.File.SizeBytes));
+                // Collect file info before deletion
+                var soundFileId = soundToDelete.File.Id;
+                var soundFilePath = soundToDelete.File.FilePath;
+                var soundFileName = soundToDelete.File.OriginalFileName;
+                var soundFileSize = soundToDelete.File.SizeBytes;
                 
+                // Delete sound entity from database
                 await _soundRepository.DeleteAsync(soundToDelete.Id, cancellationToken);
+                
+                // Check if the file is still referenced by other entities
+                var isSoundFileReferenced = await _fileRepository.IsFileHashReferencedByOthersAsync(soundFileId, cancellationToken);
+                if (!isSoundFileReferenced)
+                {
+                    await _fileStorage.DeleteFileAsync(soundFilePath, cancellationToken);
+                    deletedFiles.Add(new DeletedFileInfo(soundFilePath, soundFileName, soundFileSize));
+                    await _fileRepository.HardDeleteAsync(soundFileId, cancellationToken);
+                }
+                
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Sound permanently deleted", deletedFiles));
 
             default:

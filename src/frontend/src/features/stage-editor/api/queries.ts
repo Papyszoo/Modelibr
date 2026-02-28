@@ -1,5 +1,7 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { QueryConfig } from '@/lib/react-query'
+
+import { type QueryConfig } from '@/lib/react-query'
+
 import { getAllStages, getStageById } from './stageApi'
 
 export function getStagesQueryOptions() {

@@ -1,5 +1,6 @@
-import { render } from '@testing-library/react'
 import { Canvas } from '@react-three/fiber'
+import { render } from '@testing-library/react'
+
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 
 // Mock @react-three/drei Text component

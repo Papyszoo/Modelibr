@@ -1,6 +1,8 @@
-import { Tab } from '@/types'
-import { DockPanelContent } from './DockPanelContent'
 import './DockPanel.css'
+
+import { type Tab } from '@/types'
+
+import { DockPanelContent } from './DockPanelContent'
 
 interface DockPanelProps {
   side: 'left' | 'right'
@@ -20,4 +22,3 @@ interface DockPanelProps {
 export function DockPanel(props: DockPanelProps): JSX.Element {
   return <DockPanelContent {...props} />
 }
-

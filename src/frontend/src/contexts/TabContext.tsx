@@ -1,5 +1,6 @@
 import { createContext } from 'react'
-import { Tab } from '@/types'
+
+import { type Tab } from '@/types'
 
 export interface TabContextValue {
   side: 'left' | 'right'
@@ -15,4 +16,3 @@ export interface TabContextValue {
 }
 
 export const TabContext = createContext<TabContextValue | null>(null)
-

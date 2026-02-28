@@ -296,6 +296,19 @@ export class ApiHelper {
     }
 
     /**
+     * Get a specific texture set by ID
+     */
+    async getTextureSetById(id: number): Promise<any> {
+        const response = await this.client.get(`/texture-sets/${id}`);
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to get texture set ${id}: ${response.status}`,
+            );
+        }
+        return response.data;
+    }
+
+    /**
      * Upload a model file and return the created model data
      */
     async uploadModel(
@@ -386,5 +399,158 @@ export class ApiHelper {
             throw new Error(`Failed to get sounds: ${response.status}`);
         }
         return response.data.sounds || [];
+    }
+
+    /**
+     * Create a texture set with a file and specific kind
+     */
+    async createTextureSetWithFileAndKind(
+        name: string,
+        filePath: string,
+        textureType: number = 1,
+        kind: number = 0, // 0 = ModelSpecific, 1 = Universal
+    ): Promise<{ textureSetId: number; name: string; fileId: number }> {
+        const formData = new FormData();
+        formData.append("file", fs.createReadStream(filePath));
+
+        const response = await this.client.post(
+            `/texture-sets/with-file?name=${encodeURIComponent(name)}&textureType=${textureType}&kind=${kind}`,
+            formData,
+            {
+                headers: formData.getHeaders(),
+            },
+        );
+
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to create texture set with file and kind: ${response.status} ${response.statusText}`,
+            );
+        }
+        return response.data;
+    }
+
+    /**
+     * Update the kind of a texture set
+     */
+    async updateTextureSetKind(
+        textureSetId: number,
+        kind: number, // 0 = ModelSpecific, 1 = Universal
+    ): Promise<void> {
+        const response = await this.client.put(
+            `/texture-sets/${textureSetId}/kind`,
+            { kind },
+        );
+
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to update texture set kind: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
+     * Get texture sets filtered by kind
+     */
+    async getTextureSetsByKind(kind: number): Promise<any[]> {
+        const response = await this.client.get(`/texture-sets?kind=${kind}`);
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to get texture sets by kind: ${response.status}`,
+            );
+        }
+        return response.data.textureSets || [];
+    }
+
+    /**
+     * Regenerate thumbnail for a texture set (Universal/Global Materials only)
+     */
+    async regenerateTextureSetThumbnail(textureSetId: number): Promise<void> {
+        const response = await this.client.post(
+            `/texture-sets/${textureSetId}/thumbnail/regenerate`,
+        );
+        if (response.status !== 200 && response.status !== 202) {
+            throw new Error(
+                `Failed to regenerate thumbnail: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
+     * Upload a file via the /files endpoint and return the file ID.
+     */
+    async uploadFile(
+        filePath: string,
+        textureSetId?: number,
+    ): Promise<{ fileId: number; alreadyExists: boolean }> {
+        const formData = new FormData();
+        formData.append("file", fs.createReadStream(filePath));
+
+        let url = "/files";
+        if (textureSetId !== undefined) {
+            url += `?textureSetId=${textureSetId}`;
+        }
+
+        const response = await this.client.post(url, formData, {
+            headers: formData.getHeaders(),
+        });
+
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to upload file: ${response.status} ${response.statusText}`,
+            );
+        }
+
+        const fileId = response.data.id || response.data.fileId;
+        return { fileId, alreadyExists: response.data.alreadyExists || false };
+    }
+
+    /**
+     * Get a file preview. Returns the HTTP status code.
+     */
+    async getFilePreview(
+        fileId: number,
+        channel?: string,
+    ): Promise<{ status: number; contentType?: string }> {
+        let url = `/files/${fileId}/preview`;
+        if (channel) {
+            url += `?channel=${channel}`;
+        }
+        const response = await this.client.get(url, {
+            responseType: "arraybuffer",
+        });
+        return {
+            status: response.status,
+            contentType: response.headers["content-type"],
+        };
+    }
+
+    /**
+     * Create a sprite from a file
+     */
+    async createSprite(
+        filePath: string,
+        name: string,
+    ): Promise<{ id: number; name: string; fileId: number }> {
+        const formData = new FormData();
+        formData.append("file", fs.createReadStream(filePath));
+
+        const response = await this.client.post(
+            `/sprites/with-file?name=${encodeURIComponent(name)}`,
+            formData,
+            {
+                headers: formData.getHeaders(),
+            },
+        );
+
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to create sprite: ${response.status} ${response.statusText}`,
+            );
+        }
+        return {
+            id: response.data.spriteId,
+            name: response.data.name,
+            fileId: response.data.fileId,
+        };
     }
 }

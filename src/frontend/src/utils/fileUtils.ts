@@ -116,3 +116,14 @@ export function isSupportedModelFormat(fileExtension: string): boolean {
 
   return (ALL_SUPPORTED_FORMATS as readonly string[]).includes(ext)
 }
+
+/**
+ * Detect EXR file by extension.
+ *
+ * NOTE: A Node.js version exists in src/asset-processor/imagePreviewGenerator.js
+ * (uses path.extname). Keep the detection logic in sync.
+ */
+export function isExrFile(fileName?: string): boolean {
+  if (!fileName) return false
+  return fileName.toLowerCase().endsWith('.exr')
+}

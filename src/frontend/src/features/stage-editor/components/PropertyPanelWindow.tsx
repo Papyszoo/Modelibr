@@ -1,6 +1,7 @@
-import { PropertyPanel } from './PropertyPanel'
 import { FloatingWindow } from '@/components/FloatingWindow'
-import { StageObject } from './SceneEditor'
+
+import { PropertyPanel } from './PropertyPanel'
+import { type StageObject } from './SceneEditor'
 
 interface PropertyPanelWindowProps {
   visible: boolean
@@ -35,4 +36,3 @@ export function PropertyPanelWindow({
     </FloatingWindow>
   )
 }
-

@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
 using Domain.Services;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.TextureSets;
@@ -32,11 +33,11 @@ internal class CreateTextureSetCommandHandler : ICommandHandler<CreateTextureSet
             }
 
             // Create new texture set using domain factory method
-            var textureSet = TextureSet.Create(command.Name, _dateTimeProvider.UtcNow);
+            var textureSet = TextureSet.Create(command.Name, _dateTimeProvider.UtcNow, command.Kind);
 
             var savedTextureSet = await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 
-            return Result.Success(new CreateTextureSetResponse(savedTextureSet.Id, savedTextureSet.Name));
+            return Result.Success(new CreateTextureSetResponse(savedTextureSet.Id, savedTextureSet.Name, savedTextureSet.Kind));
         }
         catch (ArgumentException ex)
         {
@@ -46,5 +47,5 @@ internal class CreateTextureSetCommandHandler : ICommandHandler<CreateTextureSet
     }
 }
 
-public record CreateTextureSetCommand(string Name) : ICommand<CreateTextureSetResponse>;
-public record CreateTextureSetResponse(int Id, string Name);
+public record CreateTextureSetCommand(string Name, TextureSetKind Kind = TextureSetKind.ModelSpecific) : ICommand<CreateTextureSetResponse>;
+public record CreateTextureSetResponse(int Id, string Name, TextureSetKind Kind);

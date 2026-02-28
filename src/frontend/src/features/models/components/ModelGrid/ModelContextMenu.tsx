@@ -1,10 +1,10 @@
-import { useState, useRef, useImperativeHandle, forwardRef } from 'react'
-import { Dialog } from 'primereact/dialog'
 import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
+import { Dialog } from 'primereact/dialog'
+import { type MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
-import { Model } from '@/utils/fileUtils'
-import { PackDto, ProjectDto } from '@/types'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+
+import { softDeleteModel } from '@/features/models/api/modelApi'
 import {
   addModelToPack,
   getAllPacks,
@@ -15,11 +15,12 @@ import {
   getAllProjects,
   removeModelFromProject,
 } from '@/features/project/api/projectApi'
-import { softDeleteModel } from '@/features/models/api/modelApi'
+import { type PackDto, type ProjectDto } from '@/types'
+import { type Model } from '@/utils/fileUtils'
 import {
-  openInFileExplorer,
   copyPathToClipboard,
   getCopyPathSuccessMessage,
+  openInFileExplorer,
 } from '@/utils/webdavUtils'
 
 export interface ModelContextMenuHandle {
@@ -400,4 +401,3 @@ export const ModelContextMenu = forwardRef<
 )
 
 ModelContextMenu.displayName = 'ModelContextMenu'
-

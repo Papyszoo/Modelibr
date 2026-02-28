@@ -1,7 +1,8 @@
-import { useContext, ReactNode } from 'react'
-import { TabContext, TabContextValue } from '@/contexts/TabContext'
-import { Tab } from '@/types'
+import { type ReactNode, useContext } from 'react'
+
+import { TabContext, type TabContextValue } from '@/contexts/TabContext'
 import { createTab } from '@/stores/navigationStore'
+import { type Tab } from '@/types'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useTabContext = (): TabContextValue => {
@@ -142,4 +143,3 @@ export const TabProvider = ({
 
   return <TabContext.Provider value={value}>{children}</TabContext.Provider>
 }
-

@@ -1,12 +1,15 @@
-import { JSX } from 'react'
 import './ModelList.css'
-import { useTabContext } from '@/hooks/useTabContext'
-import { TabContextValue } from '@/contexts/TabContext'
-import { ModelListHeader } from './ModelListHeader'
-import { ModelGrid } from './ModelGrid'
 import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
+
+import { type JSX } from 'react'
+
+import { type TabContextValue } from '@/contexts/TabContext'
+import { useTabContext } from '@/hooks/useTabContext'
+
+import { ModelGrid } from './ModelGrid'
+import { ModelListHeader } from './ModelListHeader'
 
 interface ModelListProps {
   onBackToUpload?: () => void
@@ -65,4 +68,3 @@ function ModelListContent({
     </div>
   )
 }
-

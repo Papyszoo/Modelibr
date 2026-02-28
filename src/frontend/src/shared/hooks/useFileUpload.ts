@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { uploadModel } from '@/features/models/api/modelApi'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
+
 import {
   isSupportedModelFormat,
   isThreeJSRenderable,
 } from '../../utils/fileUtils'
-import { useUploadProgress } from '@/hooks/useUploadProgress'
 
 /**
  * Custom hook for handling file uploads with validation and progress tracking

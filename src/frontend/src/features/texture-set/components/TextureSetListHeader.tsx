@@ -1,5 +1,5 @@
-import { useRef } from 'react'
 import { Button } from 'primereact/button'
+import { useRef } from 'react'
 
 interface TextureSetListHeaderProps {
   setCount: number
@@ -42,7 +42,7 @@ export function TextureSetListHeader({
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept="image/*"
+          accept="image/*,.exr,.tga,.bmp"
           multiple
           style={{ display: 'none' }}
           data-testid="texture-upload-input"

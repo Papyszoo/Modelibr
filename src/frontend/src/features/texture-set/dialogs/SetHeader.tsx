@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
-import { InputText } from 'primereact/inputtext'
 import { Button } from 'primereact/button'
+import { InputText } from 'primereact/inputtext'
 import { classNames } from 'primereact/utils'
-import { TextureSetDto } from '@/types'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+
 import { textureSetNameFormSchema } from '@/shared/validation/formSchemas'
+import { type TextureSetDto } from '@/types'
 
 type TextureSetNameFormValues = {
   name: string

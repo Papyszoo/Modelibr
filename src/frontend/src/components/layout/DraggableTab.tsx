@@ -1,7 +1,9 @@
-import { Tooltip } from 'primereact/tooltip'
-import { Tab } from '@/types'
-import { getWindowId } from '@/stores/navigationStore'
 import './DraggableTab.css'
+
+import { Tooltip } from 'primereact/tooltip'
+
+import { getWindowId } from '@/stores/navigationStore'
+import { type Tab } from '@/types'
 
 const getTabIcon = (tabType: Tab['type']): string => {
   switch (tabType) {
@@ -175,4 +177,3 @@ export function DraggableTab({
     </>
   )
 }
-

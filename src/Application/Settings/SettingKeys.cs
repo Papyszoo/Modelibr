@@ -12,4 +12,5 @@ public static class SettingKeys
     public const string ThumbnailWidth = "ThumbnailWidth";
     public const string ThumbnailHeight = "ThumbnailHeight";
     public const string GenerateThumbnailOnUpload = "GenerateThumbnailOnUpload";
+    public const string TextureProxySize = "TextureProxySize";
 }

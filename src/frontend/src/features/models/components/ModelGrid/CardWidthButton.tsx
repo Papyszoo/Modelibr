@@ -1,8 +1,9 @@
-import { useRef } from 'react'
+import './CardWidthButton.css'
+
 import { Button } from 'primereact/button'
 import { OverlayPanel } from 'primereact/overlaypanel'
 import { Slider } from 'primereact/slider'
-import './CardWidthButton.css'
+import { useRef } from 'react'
 
 interface CardWidthButtonProps {
   value: number

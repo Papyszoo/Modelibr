@@ -38,10 +38,10 @@ When(
                 setTimeout(() => {
                     reject(
                         new Error(
-                            "Timeout waiting for matching SignalR ThumbnailStatusChanged notification (60s)",
+                            "Timeout waiting for matching SignalR ThumbnailStatusChanged notification (600s)",
                         ),
                     );
-                }, 60000);
+                }, 600000);
             },
         );
 

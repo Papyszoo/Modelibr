@@ -1,4 +1,4 @@
-import { StageLight } from './SceneEditor'
+import { type StageLight } from './SceneEditor'
 
 interface SceneLightsProps {
   lights: StageLight[]
@@ -131,4 +131,3 @@ export function SceneLights({
     </>
   )
 }
-

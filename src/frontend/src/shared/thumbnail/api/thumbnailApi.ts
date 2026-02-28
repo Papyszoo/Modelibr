@@ -1,5 +1,6 @@
-import { AxiosResponse } from 'axios'
-import { client, baseURL } from '@/lib/apiBase'
+import { type AxiosResponse } from 'axios'
+
+import { baseURL, client } from '@/lib/apiBase'
 
 export interface ThumbnailStatus {
   status: 'Pending' | 'Processing' | 'Ready' | 'Failed'

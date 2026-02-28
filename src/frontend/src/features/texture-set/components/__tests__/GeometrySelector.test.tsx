@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+
 import { GeometrySelector } from '@/features/texture-set/components/GeometrySelector'
 
 describe('GeometrySelector', () => {
@@ -7,6 +8,7 @@ describe('GeometrySelector', () => {
     render(<GeometrySelector onGeometrySelect={mockOnSelect} />)
 
     expect(screen.getByText('Preview with Geometry')).toBeInTheDocument()
+    expect(screen.getByText('Plane')).toBeInTheDocument()
     expect(screen.getByText('Cube')).toBeInTheDocument()
     expect(screen.getByText('Sphere')).toBeInTheDocument()
     expect(screen.getByText('Cylinder')).toBeInTheDocument()
@@ -26,6 +28,9 @@ describe('GeometrySelector', () => {
   it('should call onGeometrySelect with correct geometry type for each button', () => {
     const mockOnSelect = jest.fn()
     render(<GeometrySelector onGeometrySelect={mockOnSelect} />)
+
+    fireEvent.click(screen.getByText('Plane'))
+    expect(mockOnSelect).toHaveBeenCalledWith('plane')
 
     fireEvent.click(screen.getByText('Cube'))
     expect(mockOnSelect).toHaveBeenCalledWith('box')

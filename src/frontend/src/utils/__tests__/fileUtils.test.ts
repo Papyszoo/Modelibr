@@ -1,12 +1,12 @@
 import {
+  ALL_SUPPORTED_FORMATS,
+  formatFileSize,
   getFileExtension,
   getFileName,
   getModelFileFormat,
-  formatFileSize,
-  isThreeJSRenderable,
   isSupportedModelFormat,
+  isThreeJSRenderable,
   THREEJS_SUPPORTED_FORMATS,
-  ALL_SUPPORTED_FORMATS,
 } from '../fileUtils'
 
 describe('fileUtils', () => {

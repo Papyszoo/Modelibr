@@ -1,5 +1,6 @@
-import { ViewerSettings, ViewerSettingsType } from './ViewerSettings'
 import { FloatingWindow } from '@/components/FloatingWindow'
+
+import { ViewerSettings, type ViewerSettingsType } from './ViewerSettings'
 
 interface ViewerSettingsWindowProps {
   visible: boolean
@@ -28,4 +29,3 @@ export function ViewerSettingsWindow({
     </FloatingWindow>
   )
 }
-

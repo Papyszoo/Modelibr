@@ -1,7 +1,8 @@
-import { AxiosResponse } from 'axios'
-import { client, baseURL, UPLOAD_TIMEOUT } from '@/lib/apiBase'
-import { Model } from '@/utils/fileUtils'
-import { PaginatedResponse } from '@/types'
+import { type AxiosResponse } from 'axios'
+
+import { baseURL, client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { type PaginatedResponse } from '@/types'
+import { type Model } from '@/utils/fileUtils'
 
 export interface UploadModelResponse {
   id: number
@@ -142,6 +143,11 @@ export function getFileUrl(fileId: string): string {
   return `${baseURL}/files/${fileId}`
 }
 
+export function getFilePreviewUrl(fileId: string, channel?: string): string {
+  const ch = channel || 'rgb'
+  return `${baseURL}/files/${fileId}/preview?channel=${ch}`
+}
+
 export async function updateModelTags(
   modelId: string,
   tags: string,
@@ -160,6 +166,10 @@ export async function updateModelTags(
 
 export async function softDeleteModel(modelId: number): Promise<void> {
   await client.delete(`/models/${modelId}`)
+}
+
+export async function softDeleteFile(fileId: number): Promise<void> {
+  await client.delete(`/files/${fileId}`)
 }
 
 export async function setDefaultTextureSet(

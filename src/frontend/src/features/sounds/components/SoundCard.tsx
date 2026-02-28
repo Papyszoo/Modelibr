@@ -1,9 +1,11 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { SoundDto } from '@/types'
-import { baseURL } from '@/lib/apiBase'
-import { getFileUrl } from '@/features/models/api/modelApi'
-import { formatDuration } from '@/utils/audioUtils'
 import './SoundCard.css'
+
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
+
+import { getFileUrl } from '@/features/models/api/modelApi'
+import { baseURL } from '@/lib/apiBase'
+import { type SoundDto } from '@/types'
+import { formatDuration } from '@/utils/audioUtils'
 
 interface SoundCardProps {
   sound: SoundDto

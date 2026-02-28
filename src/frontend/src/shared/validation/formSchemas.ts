@@ -100,6 +100,17 @@ export const settingsFormSchema = z.object({
       .max(2048, 'Cannot exceed 2048 pixels')
   ),
   generateThumbnailOnUpload: z.boolean(),
+  textureProxySize: z.preprocess(
+    parseNumberInput,
+    z
+      .number({
+        required_error: 'Must be a valid proxy size',
+        invalid_type_error: 'Must be a valid proxy size',
+      })
+      .refine(val => [256, 512, 1024, 2048].includes(val), {
+        message: 'Must be 256, 512, 1024, or 2048',
+      })
+  ),
 })
 
 export const soundCategoryFormSchema = z

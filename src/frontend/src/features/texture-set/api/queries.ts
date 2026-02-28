@@ -1,14 +1,17 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { QueryConfig } from '@/lib/react-query'
+
+import { type QueryConfig } from '@/lib/react-query'
+
 import {
-  getTextureSetsPaginated,
   getAllTextureSets,
   getTextureSetById,
+  getTextureSetsPaginated,
 } from './textureSetApi'
 
 export function getTextureSetsQueryOptions(params: {
   page: number
   pageSize: number
+  kind?: number
 }) {
   return queryOptions({
     queryKey: ['textureSets', params] as const,

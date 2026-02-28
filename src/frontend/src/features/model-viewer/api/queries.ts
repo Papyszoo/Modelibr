@@ -1,7 +1,9 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { QueryConfig } from '@/lib/react-query'
-import { getModelVersions } from './modelVersionApi'
+
 import { getModelById } from '@/features/models/api/modelApi'
+import { type QueryConfig } from '@/lib/react-query'
+
+import { getModelVersions } from './modelVersionApi'
 
 export function getModelVersionsQueryOptions(modelId: number) {
   return queryOptions({

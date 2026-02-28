@@ -1,17 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import './SplitterLayout.css'
+
 import { Splitter, SplitterPanel } from 'primereact/splitter'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { DockProvider } from '@/contexts/DockContext'
-import { DockPanel } from './DockPanel'
-import { Tab, SplitterEvent } from '@/types'
-import { useNavigationStore, createTab } from '@/stores/navigationStore'
-import { useWindowInit } from '@/hooks/useWindowInit'
 import { useDeepLinkHandler } from '@/hooks/useDeepLinkHandler'
+import { useWindowInit } from '@/hooks/useWindowInit'
+import { createTab, useNavigationStore } from '@/stores/navigationStore'
 import { usePanelStore } from '@/stores/panelStore'
+import { type SplitterEvent, type Tab } from '@/types'
 import {
   parseCompactTabFormatAsync,
   serializeToCompactFormat,
 } from '@/utils/tabSerialization'
-import './SplitterLayout.css'
+
+import { DockPanel } from './DockPanel'
 
 export function SplitterLayout(): JSX.Element {
   // ── Window identity & lifecycle ─────────────────────────────────────
@@ -22,10 +25,12 @@ export function SplitterLayout(): JSX.Element {
   const windowState = useNavigationStore(s => s.activeWindows[windowId])
   const setTabsAction = useNavigationStore(s => s.setTabs)
   const setActiveTabAction = useNavigationStore(s => s.setActiveTab)
+  const setActiveRightTabAction = useNavigationStore(s => s.setActiveRightTab)
   const setSplitterSizeAction = useNavigationStore(s => s.setSplitterSize)
 
   const tabs = windowState?.tabs ?? [createTab('modelList')]
   const activeTabId = windowState?.activeTabId ?? 'modelList'
+  const activeRightTabId = windowState?.activeRightTabId ?? null
   const splitterSize = windowState?.splitterSize ?? 50
 
   // ── Split tabs into left/right based on their position ──────────────
@@ -64,12 +69,12 @@ export function SplitterLayout(): JSX.Element {
   const leftTabs = tabs.filter(t => t.params?.panel !== 'right')
   const rightTabs = tabs.filter(t => t.params?.panel === 'right')
 
-  // Active tabs per panel — stored as UI state keys on the window
+  // Active tabs per panel — left uses activeTabId, right uses activeRightTabId
   const activeLeftTab = leftTabs.find(t => t.id === activeTabId)
     ? activeTabId
     : (leftTabs[0]?.id ?? '')
-  const activeRightTab = rightTabs.find(t => t.id === activeTabId)
-    ? activeTabId
+  const activeRightTab = rightTabs.find(t => t.id === activeRightTabId)
+    ? activeRightTabId!
     : (rightTabs[0]?.id ?? '')
 
   // Global drag state for cross-panel tab dragging
@@ -175,9 +180,9 @@ export function SplitterLayout(): JSX.Element {
 
   const setActiveRightTab = useCallback(
     (tabId: string) => {
-      setActiveTabAction(windowId, tabId)
+      setActiveRightTabAction(windowId, tabId)
     },
-    [windowId, setActiveTabAction]
+    [windowId, setActiveRightTabAction]
   )
 
   const handleSplitterResizeEnd = (event: SplitterEvent): void => {
@@ -293,4 +298,3 @@ export function SplitterLayout(): JSX.Element {
     </DockProvider>
   )
 }
-

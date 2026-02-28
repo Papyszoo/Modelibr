@@ -1,10 +1,12 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 
 namespace Application.TextureSets;
@@ -15,17 +17,23 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ILogger<CreateTextureSetWithFileCommandHandler> _logger;
 
     public CreateTextureSetWithFileCommandHandler(
         ITextureSetRepository textureSetRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IThumbnailQueue thumbnailQueue,
+        ILogger<CreateTextureSetWithFileCommandHandler> logger)
     {
         _textureSetRepository = textureSetRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _thumbnailQueue = thumbnailQueue;
+        _logger = logger;
     }
 
     public async Task<Result<CreateTextureSetWithFileResponse>> Handle(CreateTextureSetWithFileCommand command, CancellationToken cancellationToken)
@@ -53,7 +61,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
             var file = fileResult.Value;
 
             // 3. Create the texture set
-            var textureSet = TextureSet.Create(command.Name, _dateTimeProvider.UtcNow);
+            var textureSet = TextureSet.Create(command.Name, _dateTimeProvider.UtcNow, command.Kind);
             var createdTextureSet = await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 
             // 4. Create and add texture to the set
@@ -76,6 +84,20 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
                     textureSetId: updatedTextureSet.Id);
 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+            }
+
+            // 6. Auto-enqueue thumbnail generation for Universal texture sets
+            if (updatedTextureSet.Kind == TextureSetKind.Universal)
+            {
+                try
+                {
+                    await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(updatedTextureSet.Id, cancellationToken: cancellationToken);
+                    _logger.LogInformation("Auto-enqueued thumbnail job for Universal texture set {TextureSetId}", updatedTextureSet.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to auto-enqueue thumbnail job for texture set {TextureSetId}, can be regenerated manually", updatedTextureSet.Id);
+                }
             }
 
             return Result.Success(new CreateTextureSetWithFileResponse(
@@ -102,7 +124,8 @@ public record CreateTextureSetWithFileCommand(
     IFileUpload FileUpload,
     string Name,
     TextureType TextureType,
-    string? BatchId) : ICommand<CreateTextureSetWithFileResponse>;
+    string? BatchId,
+    TextureSetKind Kind = TextureSetKind.ModelSpecific) : ICommand<CreateTextureSetWithFileResponse>;
 
 public record CreateTextureSetWithFileResponse(
     int TextureSetId,

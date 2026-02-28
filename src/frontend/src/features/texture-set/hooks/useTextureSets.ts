@@ -1,4 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
+
+import { getModels as getModelsApi } from '@/features/models/api/modelApi'
 import {
   addTextureToSetEndpoint as addTextureToSetEndpointApi,
   associateTextureSetWithAllModelVersions as associateTextureSetWithAllModelVersionsApi,
@@ -13,16 +15,16 @@ import {
   removeTextureFromSet as removeTextureFromSetApi,
   updateTextureSet as updateTextureSetApi,
 } from '@/features/texture-set/api/textureSetApi'
-import { getModels as getModelsApi } from '@/features/models/api/modelApi'
+
 import {
-  TextureSetDto,
-  CreateTextureSetRequest,
-  CreateTextureSetResponse,
-  UpdateTextureSetRequest,
-  UpdateTextureSetResponse,
-  AddTextureToSetRequest,
-  AddTextureToSetResponse,
-  Model,
+  type AddTextureToSetRequest,
+  type AddTextureToSetResponse,
+  type CreateTextureSetRequest,
+  type CreateTextureSetResponse,
+  type Model,
+  type TextureSetDto,
+  type UpdateTextureSetRequest,
+  type UpdateTextureSetResponse,
 } from '../../../types'
 
 export function useTextureSets() {

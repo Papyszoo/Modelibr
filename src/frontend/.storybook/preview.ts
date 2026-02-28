@@ -1,12 +1,11 @@
-import type { Preview } from '@storybook/react-vite'
-
 // Import PrimeReact theme and styles
 import 'primereact/resources/themes/lara-dark-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
-
 // Import application global styles
 import '../src/index.css'
+
+import type { Preview } from '@storybook/react-vite'
 
 const preview: Preview = {
   parameters: {

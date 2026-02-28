@@ -1,16 +1,17 @@
 import {
-  Environment,
-  ContactShadows,
   AccumulativeShadows,
-  RandomizedLight,
-  Sky,
-  Stars,
   Backdrop,
+  ContactShadows,
+  Environment,
   GizmoHelper,
   GizmoViewport,
+  RandomizedLight,
+  Sky,
   Stage as DreiStage,
+  Stars,
 } from '@react-three/drei'
-import { StageHelper } from './SceneEditor'
+
+import { type StageHelper } from './SceneEditor'
 
 interface SceneHelpersProps {
   helpers: StageHelper[]
@@ -140,4 +141,3 @@ export function SceneHelpers({ helpers }: SceneHelpersProps): JSX.Element {
     </>
   )
 }
-

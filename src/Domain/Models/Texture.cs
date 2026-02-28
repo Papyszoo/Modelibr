@@ -31,6 +31,10 @@ public class Texture
     // Navigation property for the associated file
     public File File { get; private set; } = null!;
 
+    // Navigation property for generated web proxies (resized versions for WebGL rendering)
+    private readonly List<TextureProxy> _proxies = new();
+    public IReadOnlyCollection<TextureProxy> Proxies => _proxies.AsReadOnly();
+
     /// <summary>
     /// Creates a new Texture with the specified file and texture type.
     /// Source channel is automatically determined based on texture type (RGB for color, R for grayscale).

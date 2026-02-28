@@ -21,6 +21,12 @@ public class ApplicationSettings : AggregateRoot
     // Soft delete settings
     public int CleanRecycledFilesAfterDays { get; private set; }
 
+    // Texture proxy settings
+    /// <summary>
+    /// Square side length for generated texture proxies (256, 512, 1024, 2048). Default: 512.
+    /// </summary>
+    public int TextureProxySize { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -42,6 +48,7 @@ public class ApplicationSettings : AggregateRoot
             ThumbnailHeight = 256,
             GenerateThumbnailOnUpload = true, // Generate thumbnails by default
             CleanRecycledFilesAfterDays = 30, // Default: 30 days
+            TextureProxySize = 512, // Default: 512px square
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -132,6 +139,18 @@ public class ApplicationSettings : AggregateRoot
             throw new ArgumentException("Clean recycled files after days cannot exceed 365.", nameof(days));
 
         CleanRecycledFilesAfterDays = days;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Updates the texture proxy size setting.
+    /// </summary>
+    public void UpdateTextureProxySize(int size, DateTime updatedAt)
+    {
+        if (size is not (256 or 512 or 1024 or 2048))
+            throw new ArgumentException("Texture proxy size must be one of: 256, 512, 1024, 2048.", nameof(size));
+
+        TextureProxySize = size;
         UpdatedAt = updatedAt;
     }
 }

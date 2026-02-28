@@ -1,14 +1,18 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import {
-  ThumbnailStatus,
+  type ActiveVersionChangedEvent,
+  thumbnailSignalRService,
+  type ThumbnailStatusChangedEvent,
+} from '../../../services/ThumbnailSignalRService'
+import {
   getThumbnailStatus,
-  getVersionThumbnailStatus,
   getThumbnailUrl,
+  getVersionThumbnailStatus,
   getVersionThumbnailUrl,
+  type ThumbnailStatus,
 } from '../api/thumbnailApi'
-import { thumbnailSignalRService, ThumbnailStatusChangedEvent,
-  ActiveVersionChangedEvent, } from '../../../services/ThumbnailSignalRService'
 
 // Only log in development mode
 const isDev = import.meta.env.DEV

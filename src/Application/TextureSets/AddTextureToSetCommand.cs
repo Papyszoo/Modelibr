@@ -1,7 +1,10 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
+using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 
 namespace Application.TextureSets;
@@ -12,17 +15,23 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
     private readonly IFileRepository _fileRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ILogger<AddTextureToTextureSetCommandHandler> _logger;
 
     public AddTextureToTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
         IFileRepository fileRepository,
         IBatchUploadRepository batchUploadRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IThumbnailQueue thumbnailQueue,
+        ILogger<AddTextureToTextureSetCommandHandler> logger)
     {
         _textureSetRepository = textureSetRepository;
         _fileRepository = fileRepository;
         _batchUploadRepository = batchUploadRepository;
         _dateTimeProvider = dateTimeProvider;
+        _thumbnailQueue = thumbnailQueue;
+        _logger = logger;
     }
 
     public async Task<Result<AddTextureToTextureSetResponse>> Handle(AddTextureToTextureSetCommand command, CancellationToken cancellationToken)
@@ -77,6 +86,20 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
             {
                 batchUpload.TextureSetId = command.TextureSetId;
                 await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
+            }
+
+            // Auto-enqueue thumbnail generation for Universal texture sets
+            if (textureSet.Kind == TextureSetKind.Universal)
+            {
+                try
+                {
+                    await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.TextureSetId, cancellationToken: cancellationToken);
+                    _logger.LogInformation("Auto-enqueued thumbnail job for Universal texture set {TextureSetId}", command.TextureSetId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to auto-enqueue thumbnail job for texture set {TextureSetId}, can be regenerated manually", command.TextureSetId);
+                }
             }
 
             return Result.Success(new AddTextureToTextureSetResponse(texture.Id, texture.TextureType, texture.SourceChannel));

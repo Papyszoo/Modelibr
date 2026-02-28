@@ -1,10 +1,11 @@
-import { useRef, Suspense, useEffect } from 'react'
-import { useFrame, useLoader } from '@react-three/fiber'
 import { Box } from '@react-three/drei'
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import { useFrame, useLoader } from '@react-three/fiber'
+import { Suspense, useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
+
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 
@@ -314,4 +315,3 @@ export function Model({ modelUrl, fileExtension, rotationSpeed = 0.002 }) {
     </Suspense>
   )
 }
-

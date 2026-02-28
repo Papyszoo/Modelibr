@@ -1,5 +1,6 @@
-import { ComponentLibrary, ComponentType } from './ComponentLibrary'
 import { FloatingWindow } from '@/components/FloatingWindow'
+
+import { ComponentLibrary, type ComponentType } from './ComponentLibrary'
 
 interface ComponentLibraryWindowProps {
   visible: boolean
@@ -26,4 +27,3 @@ export function ComponentLibraryWindow({
     </FloatingWindow>
   )
 }
-

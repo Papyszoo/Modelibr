@@ -1,5 +1,6 @@
-import { Button } from 'primereact/button'
 import './StageListHeader.css'
+
+import { Button } from 'primereact/button'
 
 interface StageListHeaderProps {
   onCreateClick: () => void
@@ -27,4 +28,3 @@ export function StageListHeader({ onCreateClick }: StageListHeaderProps) {
     </div>
   )
 }
-

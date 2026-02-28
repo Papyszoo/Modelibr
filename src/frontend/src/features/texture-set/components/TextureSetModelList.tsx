@@ -1,18 +1,21 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Toast } from 'primereact/toast'
-import { Button } from 'primereact/button'
-import { InputText } from 'primereact/inputtext'
-import { Dialog } from 'primereact/dialog'
-import { Checkbox } from 'primereact/checkbox'
+import '@/features/models/components/ModelGrid/ModelGrid.css'
+import '@/shared/components/ContainerViewer.css'
+
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ThumbnailDisplay } from '@/shared/thumbnail'
-import { Model } from '@/utils/fileUtils'
+import { Button } from 'primereact/button'
+import { Checkbox } from 'primereact/checkbox'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
+import { Toast } from 'primereact/toast'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { useModelsQuery } from '@/features/models/api/queries'
 import { associateTextureSetWithAllModelVersions } from '@/features/texture-set/api/textureSetApi'
-import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { useTabContext } from '@/hooks/useTabContext'
-import '@/features/models/components/ModelGrid/ModelGrid.css'
+import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { type Model } from '@/utils/fileUtils'
 
 interface TextureSetModelListProps {
   textureSetId: number
@@ -95,15 +98,6 @@ export function TextureSetModelList({
             style={{ width: '100%' }}
           />
         </span>
-        <CardWidthSlider
-          value={cardWidth}
-          min={120}
-          max={400}
-          onChange={width => setCardWidth('textureSets', width)}
-        />
-      </div>
-
-      <div className="model-grid-actions">
         <Button
           icon="pi pi-refresh"
           className="p-button-text p-button-sm"
@@ -111,6 +105,12 @@ export function TextureSetModelList({
           tooltip="Refresh"
           tooltipOptions={{ position: 'bottom' }}
           aria-label="Refresh models"
+        />
+        <CardWidthSlider
+          value={cardWidth}
+          min={120}
+          max={400}
+          onChange={width => setCardWidth('textureSets', width)}
         />
       </div>
 

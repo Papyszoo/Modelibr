@@ -95,4 +95,11 @@ public sealed class HashBasedFileStorage : IFileStorage
         
         return Task.CompletedTask;
     }
+
+    public bool FileExists(string filePath)
+    {
+        var root = _pathProvider.UploadRootPath;
+        var fullPath = Path.Combine(root, filePath);
+        return File.Exists(fullPath);
+    }
 }

@@ -4,6 +4,7 @@ using Application.Sounds;
 using Application.Files;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Services;
+using WebApi.Infrastructure;
 
 namespace WebApi.Endpoints;
 
@@ -56,6 +57,7 @@ public static class SoundEndpoints
         app.MapPost("/sounds/{id}/waveform/upload", UploadWaveform)
             .WithName("Upload Waveform Thumbnail")
             .WithSummary("Uploads a waveform thumbnail PNG for a sound (called by worker service)")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
             .DisableAntiforgery()
             .WithOpenApi();
 

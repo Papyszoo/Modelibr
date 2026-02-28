@@ -1,13 +1,15 @@
-import { Button } from 'primereact/button'
 import './GeometrySelector.css'
 
-export type GeometryType = 'box' | 'sphere' | 'cylinder' | 'torus'
+import { Button } from 'primereact/button'
+
+export type GeometryType = 'plane' | 'box' | 'sphere' | 'cylinder' | 'torus'
 
 interface GeometrySelectorProps {
   onGeometrySelect: (geometry: GeometryType) => void
 }
 
 const geometries: { type: GeometryType; icon: string; label: string }[] = [
+  { type: 'plane', icon: 'pi pi-clone', label: 'Plane' },
   { type: 'box', icon: 'pi pi-stop', label: 'Cube' },
   { type: 'sphere', icon: 'pi pi-circle', label: 'Sphere' },
   { type: 'cylinder', icon: 'pi pi-tablet', label: 'Cylinder' },
@@ -37,4 +39,3 @@ export function GeometrySelector({ onGeometrySelect }: GeometrySelectorProps) {
     </div>
   )
 }
-

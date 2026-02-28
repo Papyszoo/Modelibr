@@ -3,7 +3,7 @@ Feature: SignalR Real-Time Notifications
   Tests that SignalR WebSocket connections deliver real-time updates
   for thumbnail generation and model CRUD operations.
 
-  @signalr-thumbnail-notification
+  @signalr-thumbnail-notification @timeout:720000
   Scenario: Thumbnail generation sends SignalR notification
     Given I am on the model list page
     When I upload a model and listen for SignalR thumbnail notification

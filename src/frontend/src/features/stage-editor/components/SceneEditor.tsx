@@ -1,19 +1,22 @@
-import { useState, useEffect, useRef } from 'react'
+import './SceneEditor.css'
+
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { EditorCanvas } from './EditorCanvas'
-import { ComponentType } from './ComponentLibrary'
-import { ComponentLibraryWindow } from './ComponentLibraryWindow'
-import { PropertyPanelWindow } from './PropertyPanelWindow'
-import { CodePanelWindow } from './CodePanelWindow'
-import { StageHierarchyWindow } from './StageHierarchyWindow'
-import { useTabContext } from '@/hooks/useTabContext'
+import { useEffect, useRef, useState } from 'react'
+
 import {
   createStage,
   getStageById,
   updateStage,
 } from '@/features/stage-editor/api/stageApi'
-import './SceneEditor.css'
+import { useTabContext } from '@/hooks/useTabContext'
+
+import { CodePanelWindow } from './CodePanelWindow'
+import { type ComponentType } from './ComponentLibrary'
+import { ComponentLibraryWindow } from './ComponentLibraryWindow'
+import { EditorCanvas } from './EditorCanvas'
+import { PropertyPanelWindow } from './PropertyPanelWindow'
+import { StageHierarchyWindow } from './StageHierarchyWindow'
 
 export interface StageLight {
   id: string
@@ -442,4 +445,3 @@ export function StageEditor({ stageId }: StageEditorProps = {}): JSX.Element {
     </div>
   )
 }
-

@@ -393,3 +393,18 @@
 .pack-select-no-packs i {
   font-size: 3rem;
 }
+
+.texture-set-card-badges {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+}
+
+.grid-proxy-badge {
+  font-size: 0.6rem !important;
+  padding: 0.05rem 0.3rem !important;
+  opacity: 0.9;
+}

@@ -1,6 +1,7 @@
 import { FloatingWindow } from '@/components/FloatingWindow'
+
+import { type StageConfig, type StageGroup } from './SceneEditor'
 import { StageHierarchy } from './StageHierarchy'
-import { StageConfig, StageGroup } from './SceneEditor'
 
 interface StageHierarchyWindowProps {
   visible: boolean
@@ -41,4 +42,3 @@ export function StageHierarchyWindow({
     </FloatingWindow>
   )
 }
-

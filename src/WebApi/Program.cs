@@ -1,6 +1,8 @@
 using Application;
 using Infrastructure;
 using Infrastructure.Extensions;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using WebApi.Endpoints;
 using WebApi.Infrastructure;
 using WebApi.Services;
@@ -18,6 +20,17 @@ namespace WebApi
         public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            // Allow uploads up to 1 GB (Kestrel + form options)
+            const long maxFileSize = 1L * 1024 * 1024 * 1024; // 1 GB
+            builder.WebHost.ConfigureKestrel(options =>
+            {
+                options.Limits.MaxRequestBodySize = maxFileSize;
+            });
+            builder.Services.Configure<FormOptions>(options =>
+            {
+                options.MultipartBodyLengthLimit = maxFileSize;
+            });
 
             builder.Services.AddAuthorization();
             builder.Services.AddHttpContextAccessor();
@@ -55,6 +68,8 @@ namespace WebApi
 
             builder.Services.AddSingleton<IUploadPathProvider, UploadPathProvider>();
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
+            builder.Services.AddSingleton<IFilePreviewService, FilePreviewService>();
+            builder.Services.AddSingleton<IFileThumbnailGenerator, FileThumbnailGenerator>();
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
             builder.Services.AddScoped<IThumbnailJobQueueNotificationService, SignalRThumbnailJobQueueNotificationService>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();

@@ -1,8 +1,9 @@
-import { ThumbnailDisplay } from '@/shared/thumbnail'
-import { FloatingWindow } from '@/components/FloatingWindow'
-import { Model } from '@/utils/fileUtils'
-import { ModelVersionDto } from '@/types'
 import { Button } from 'primereact/button'
+
+import { FloatingWindow } from '@/components/FloatingWindow'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
+import { type ModelVersionDto } from '@/types'
+import { type Model } from '@/utils/fileUtils'
 
 interface ThumbnailWindowProps {
   visible: boolean

@@ -1,6 +1,7 @@
-import { ModelInfo } from './ModelInfo'
 import { FloatingWindow } from '@/components/FloatingWindow'
-import { Model } from '@/utils/fileUtils'
+import { type Model } from '@/utils/fileUtils'
+
+import { ModelInfo } from './ModelInfo'
 
 interface ModelInfoWindowProps {
   visible: boolean
@@ -33,4 +34,3 @@ export function ModelInfoWindow({
     </FloatingWindow>
   )
 }
-

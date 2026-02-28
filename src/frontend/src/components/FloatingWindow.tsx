@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect, ReactNode } from 'react'
-import { usePanelStore } from '@/stores/panelStore'
 import './FloatingWindow.css'
+
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+
+import { usePanelStore } from '@/stores/panelStore'
 
 interface FloatingWindowProps {
   visible: boolean
@@ -224,4 +226,3 @@ export function FloatingWindow({
     </div>
   )
 }
-

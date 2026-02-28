@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { Dialog } from 'primereact/dialog'
 import { Button } from 'primereact/button'
-import { RadioButton } from 'primereact/radiobutton'
-import { InputText } from 'primereact/inputtext'
 import { Checkbox } from 'primereact/checkbox'
-import { ModelVersionDto } from '@/types'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
+import { RadioButton } from 'primereact/radiobutton'
+import { useState } from 'react'
+
+import { type ModelVersionDto } from '@/types'
 
 interface FileUploadModalProps {
   visible: boolean

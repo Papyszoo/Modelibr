@@ -1,18 +1,22 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import WaveSurfer from 'wavesurfer.js'
-import RegionsPlugin, { Region } from 'wavesurfer.js/dist/plugins/regions.js'
+import './SoundEditor.css'
+
 import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
-import { SoundDto } from '@/types'
-import { updateSound } from '@/features/sounds/api/soundApi'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import WaveSurfer from 'wavesurfer.js'
+import RegionsPlugin, {
+  type Region,
+} from 'wavesurfer.js/dist/plugins/regions.js'
+
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { updateSound } from '@/features/sounds/api/soundApi'
+import { type SoundDto } from '@/types'
 import {
-  decodeAudio,
-  sliceAudioBuffer,
   audioBufferToWav,
+  decodeAudio,
   formatDuration,
+  sliceAudioBuffer,
 } from '@/utils/audioUtils'
-import './SoundEditor.css'
 
 interface SoundEditorProps {
   sound: SoundDto
@@ -395,4 +399,3 @@ export function SoundEditor({
     </div>
   )
 }
-

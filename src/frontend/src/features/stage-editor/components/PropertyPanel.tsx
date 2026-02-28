@@ -1,16 +1,18 @@
-import { InputText } from 'primereact/inputtext'
-import { InputNumber } from 'primereact/inputnumber'
-import { ColorPicker } from 'primereact/colorpicker'
+import './PropertyPanel.css'
+
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
+import { ColorPicker } from 'primereact/colorpicker'
+import { InputNumber } from 'primereact/inputnumber'
+import { InputText } from 'primereact/inputtext'
+
 import {
-  StageObject,
-  StageLight,
-  StageMesh,
-  StageGroup,
-  StageHelper,
+  type StageGroup,
+  type StageHelper,
+  type StageLight,
+  type StageMesh,
+  type StageObject,
 } from './SceneEditor'
-import './PropertyPanel.css'
 
 interface PropertyPanelProps {
   selectedObject: StageObject | null
@@ -336,4 +338,3 @@ export function PropertyPanel({
     </div>
   )
 }
-

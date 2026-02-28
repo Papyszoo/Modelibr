@@ -1,8 +1,10 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { QueryConfig } from '@/lib/react-query'
-import { getModelsPaginated, getModelById } from './modelApi'
+
 import { getAllPacks } from '@/features/pack/api/packApi'
 import { getAllProjects } from '@/features/project/api/projectApi'
+import { type QueryConfig } from '@/lib/react-query'
+
+import { getModelById, getModelsPaginated } from './modelApi'
 
 // --- Models (paginated) ---
 

@@ -2,6 +2,6 @@
 export { ThumbnailDisplay } from './components/ThumbnailDisplay'
 export { useThumbnail } from './hooks/useThumbnail'
 export {
-  useThumbnailSignalR,
   useModelThumbnailUpdates,
+  useThumbnailSignalR,
 } from './hooks/useThumbnailSignalR'

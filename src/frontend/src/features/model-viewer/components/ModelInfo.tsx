@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import './ModelInfo.css'
+
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Button } from 'primereact/button'
 import { Chip } from 'primereact/chip'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { Button } from 'primereact/button'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { getModelFileFormat } from '@/utils/fileUtils'
+import { useState } from 'react'
+
 import { updateModelTags } from '@/features/models/api/modelApi'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
+import { getModelFileFormat } from '@/utils/fileUtils'
+
 import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
-import './ModelInfo.css'
 
 export function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(
@@ -235,4 +238,3 @@ export function ModelInfo({ model, onModelUpdated }) {
     </div>
   )
 }
-

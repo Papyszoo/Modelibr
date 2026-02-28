@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { ProgressBar } from 'primereact/progressbar'
+import './StageGrid.css'
+
 import { Button } from 'primereact/button'
+import { ProgressBar } from 'primereact/progressbar'
+import { useState } from 'react'
+
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-import './StageGrid.css'
 
 interface StageDto {
   id: number
@@ -133,4 +135,3 @@ export function StageGrid({
     </div>
   )
 }
-

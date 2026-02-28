@@ -45,6 +45,11 @@ namespace Infrastructure.Migrations
                     b.Property<long>("MaxThumbnailSizeBytes")
                         .HasColumnType("bigint");
 
+                    b.Property<int>("TextureProxySize")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(512);
+
                     b.Property<double>("ThumbnailCameraVerticalAngle")
                         .HasColumnType("double precision");
 
@@ -632,6 +637,38 @@ namespace Infrastructure.Migrations
                     b.ToTable("Textures");
                 });
 
+            modelBuilder.Entity("Domain.Models.TextureProxy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Size")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TextureId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("TextureId");
+
+                    b.HasIndex("TextureId", "Size")
+                        .IsUnique();
+
+                    b.ToTable("TextureProxies");
+                });
+
             modelBuilder.Entity("Domain.Models.TextureSet", b =>
                 {
                     b.Property<int>("Id")
@@ -649,17 +686,59 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("PngThumbnailPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PreviewGeometryType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("plane");
+
+                    b.Property<string>("ThumbnailPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<float>("TilingScaleX")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("real")
+                        .HasDefaultValue(1f);
+
+                    b.Property<float>("TilingScaleY")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("real")
+                        .HasDefaultValue(1f);
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UvMappingMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<float>("UvScale")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("real")
+                        .HasDefaultValue(1f);
 
                     b.HasKey("Id");
 
                     b.HasIndex("IsDeleted");
+
+                    b.HasIndex("Kind");
 
                     b.HasIndex("Name");
 
@@ -766,6 +845,9 @@ namespace Infrastructure.Migrations
                     b.Property<int?>("ModelVersionId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ProxySize")
+                        .HasColumnType("integer");
+
                     b.Property<string>("SoundHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -774,6 +856,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TextureSetId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -790,6 +875,8 @@ namespace Infrastructure.Migrations
                         .HasFilter("[SoundHash] IS NOT NULL");
 
                     b.HasIndex("SoundId");
+
+                    b.HasIndex("TextureSetId");
 
                     b.HasIndex("ModelHash", "ModelVersionId")
                         .IsUnique()
@@ -1147,6 +1234,25 @@ namespace Infrastructure.Migrations
                     b.Navigation("File");
                 });
 
+            modelBuilder.Entity("Domain.Models.TextureProxy", b =>
+                {
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Texture", "Texture")
+                        .WithMany("Proxies")
+                        .HasForeignKey("TextureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("File");
+
+                    b.Navigation("Texture");
+                });
+
             modelBuilder.Entity("Domain.Models.ThumbnailJob", b =>
                 {
                     b.HasOne("Domain.Models.Model", "Model")
@@ -1164,11 +1270,18 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("SoundId")
                         .OnDelete(DeleteBehavior.Cascade);
 
+                    b.HasOne("Domain.Models.TextureSet", "TextureSet")
+                        .WithMany()
+                        .HasForeignKey("TextureSetId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.Navigation("Model");
 
                     b.Navigation("ModelVersion");
 
                     b.Navigation("Sound");
+
+                    b.Navigation("TextureSet");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJobEvent", b =>
@@ -1345,6 +1458,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.ModelVersion", b =>
                 {
                     b.Navigation("Files");
+                });
+
+            modelBuilder.Entity("Domain.Models.Texture", b =>
+                {
+                    b.Navigation("Proxies");
                 });
 
             modelBuilder.Entity("Domain.Models.TextureSet", b =>

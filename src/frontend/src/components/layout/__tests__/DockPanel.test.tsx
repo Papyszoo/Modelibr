@@ -1,8 +1,9 @@
+import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+
 import { DockPanel } from '@/components/layout/DockPanel'
 import { DockProvider } from '@/contexts/DockContext'
-import { Tab } from '@/types'
+import { type Tab } from '@/types'
 
 // Mock navigationStore to avoid import.meta.env chain
 jest.mock('@/stores/navigationStore', () => ({

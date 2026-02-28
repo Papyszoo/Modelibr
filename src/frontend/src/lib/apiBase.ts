@@ -1,7 +1,7 @@
 import axios, {
-  AxiosError,
+  type AxiosError,
   AxiosHeaders,
-  InternalAxiosRequestConfig,
+  type InternalAxiosRequestConfig,
 } from 'axios'
 
 export const baseURL =

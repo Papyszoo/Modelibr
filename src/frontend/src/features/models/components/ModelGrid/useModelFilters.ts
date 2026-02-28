@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from 'react'
-import { useCardWidthStore, PageType } from '@/stores/cardWidthStore'
-import { Model } from '@/utils/fileUtils'
+import { useCallback, useMemo, useState } from 'react'
+
+import { type PageType, useCardWidthStore } from '@/stores/cardWidthStore'
+import { type Model } from '@/utils/fileUtils'
 
 interface UseModelFiltersOptions {
   packId?: number

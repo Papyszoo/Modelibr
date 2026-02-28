@@ -6,6 +6,7 @@ export const config = {
 
   // API connection settings
   apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:8080',
+  workerApiKey: process.env.WORKER_API_KEY || '',
   rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
 
   // Job processing settings

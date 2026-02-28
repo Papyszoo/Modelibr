@@ -1,25 +1,36 @@
-import { useState, useRef, useEffect } from 'react'
-import { Dialog } from 'primereact/dialog'
-import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
-import { Toast } from 'primereact/toast'
 import './TextureSetGrid.css'
-import { TextureSetDto, TextureType, TextureChannel, PackDto } from '@/types'
+
+import { ContextMenu } from 'primereact/contextmenu'
+import { Dialog } from 'primereact/dialog'
+import { type MenuItem } from 'primereact/menuitem'
 import { ProgressBar } from 'primereact/progressbar'
+import { Tag } from 'primereact/tag'
+import { Toast } from 'primereact/toast'
+import { useEffect, useRef, useState } from 'react'
+
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { addTextureSetToPack, getAllPacks } from '@/features/pack/api/packApi'
 import {
   addTextureToSetEndpoint,
   hardDeleteTextureSet,
+  regenerateTextureSetThumbnail,
   softDeleteTextureSet,
 } from '@/features/texture-set/api/textureSetApi'
-import { getFileUrl } from '@/features/models/api/modelApi'
 import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextureSetDialog'
+import { baseURL } from '@/lib/apiBase'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
-  openInFileExplorer,
+  type PackDto,
+  type TextureChannel,
+  type TextureSetDto,
+  TextureSetKind,
+  TextureType,
+} from '@/types'
+import {
   copyPathToClipboard,
   getCopyPathSuccessMessage,
+  openInFileExplorer,
 } from '@/utils/webdavUtils'
 
 // Interface for channel merge request (must match MergeTextureSetDialog)
@@ -280,6 +291,14 @@ export function TextureSetGrid({
   }
 
   const getAlbedoTextureUrl = (textureSet: TextureSetDto) => {
+    // For Universal (Global Materials) texture sets, prefer the generated sphere thumbnail
+    if (
+      textureSet.kind === TextureSetKind.Universal &&
+      textureSet.thumbnailPath
+    ) {
+      return `${baseURL}/texture-sets/${textureSet.id}/thumbnail/file`
+    }
+
     // Find albedo texture first, then fallback to diffuse
     const albedo = textureSet.textures?.find(
       t => t.textureType === TextureType.Albedo
@@ -290,7 +309,7 @@ export function TextureSetGrid({
 
     const texture = albedo || diffuse
     if (texture) {
-      return getFileUrl(texture.fileId.toString())
+      return getFilePreviewUrl(texture.fileId.toString())
     }
     return null
   }
@@ -329,6 +348,60 @@ export function TextureSetGrid({
     })
   }
 
+  // Handle "Regenerate Thumbnail" from context menu
+  const ALL_PROXY_SIZES = [256, 512, 1024, 2048]
+
+  const handleGenerateProxy = async (size: number) => {
+    if (!selectedTextureSet) return
+    try {
+      await regenerateTextureSetThumbnail(selectedTextureSet.id, {
+        proxySize: size,
+      })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Proxy Generation',
+        detail: `${size}px proxy generation started`,
+        life: 3000,
+      })
+      if (onTextureSetUpdated) {
+        onTextureSetUpdated()
+      }
+    } catch (error) {
+      console.error('Failed to generate proxy:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: `Failed to generate ${size}px proxy`,
+        life: 3000,
+      })
+    }
+  }
+
+  const handleRegenerateThumbnail = async () => {
+    if (!selectedTextureSet) return
+
+    try {
+      await regenerateTextureSetThumbnail(selectedTextureSet.id)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Thumbnail',
+        detail: 'Thumbnail regeneration started',
+        life: 3000,
+      })
+      if (onTextureSetUpdated) {
+        onTextureSetUpdated()
+      }
+    } catch (error) {
+      console.error('Failed to regenerate thumbnail:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to regenerate thumbnail',
+        life: 3000,
+      })
+    }
+  }
+
   const contextMenuItems: MenuItem[] = [
     {
       label: 'Show in Folder',
@@ -342,6 +415,21 @@ export function TextureSetGrid({
     },
     {
       separator: true,
+    },
+    {
+      label: 'Regenerate Thumbnail',
+      icon: 'pi pi-refresh',
+      command: handleRegenerateThumbnail,
+      visible: selectedTextureSet?.kind === TextureSetKind.Universal,
+    },
+    {
+      label: 'Generate Proxies',
+      icon: 'pi pi-images',
+      visible: selectedTextureSet?.kind === TextureSetKind.Universal,
+      items: ALL_PROXY_SIZES.map(size => ({
+        label: `${size}px`,
+        command: () => handleGenerateProxy(size),
+      })),
     },
     {
       label: 'Add to pack',
@@ -477,6 +565,27 @@ export function TextureSetGrid({
                     </span>
                   </div>
                 </div>
+                {(() => {
+                  const proxySizes = new Set<number>()
+                  textureSet.textures?.forEach(t => {
+                    ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+                  })
+                  if (proxySizes.size === 0) return null
+                  return (
+                    <div className="texture-set-card-badges">
+                      {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(
+                        size => (
+                          <Tag
+                            key={size}
+                            value={`${size}`}
+                            severity="success"
+                            className="grid-proxy-badge"
+                          />
+                        )
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )

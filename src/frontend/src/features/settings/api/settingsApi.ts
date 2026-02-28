@@ -8,6 +8,7 @@ export async function getSettings(): Promise<{
   thumbnailWidth: number
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
+  textureProxySize: number
   createdAt: string
   updatedAt: string
 }> {
@@ -23,6 +24,7 @@ export async function updateSettings(settings: {
   thumbnailWidth: number
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
+  textureProxySize: number
 }): Promise<{
   maxFileSizeBytes: number
   maxThumbnailSizeBytes: number
@@ -31,6 +33,7 @@ export async function updateSettings(settings: {
   thumbnailWidth: number
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
+  textureProxySize: number
   updatedAt: string
 }> {
   const response = await client.put('/settings', settings)

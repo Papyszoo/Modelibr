@@ -40,6 +40,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             // If settings exist in new table, use them
             if (maxFileSizeBytesSetting != null)
             {
+                var textureProxySizeSetting = await _settingRepository.GetByKeyAsync(SettingKeys.TextureProxySize, cancellationToken);
                 var response = new GetSettingsQueryResponse(
                     long.Parse(maxFileSizeBytesSetting.Value),
                     long.Parse(maxThumbnailSizeBytesSetting?.Value ?? "10485760"),
@@ -48,6 +49,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
                     int.Parse(thumbnailWidthSetting?.Value ?? "256"),
                     int.Parse(thumbnailHeightSetting?.Value ?? "256"),
                     bool.Parse(generateThumbnailOnUploadSetting?.Value ?? "true"),
+                    int.Parse(textureProxySizeSetting?.Value ?? "512"),
                     maxFileSizeBytesSetting.CreatedAt,
                     maxFileSizeBytesSetting.UpdatedAt
                 );
@@ -67,6 +69,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             settings.ThumbnailWidth,
             settings.ThumbnailHeight,
             settings.GenerateThumbnailOnUpload,
+            settings.TextureProxySize,
             settings.CreatedAt,
             settings.UpdatedAt
         );

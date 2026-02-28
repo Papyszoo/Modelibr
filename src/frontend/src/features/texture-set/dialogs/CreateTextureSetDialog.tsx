@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
+import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
-import { Button } from 'primereact/button'
+import { SelectButton } from 'primereact/selectbutton'
 import { classNames } from 'primereact/utils'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+
 import { textureSetNameFormSchema } from '@/shared/validation/formSchemas'
+import { TextureSetKind } from '@/types'
 
 type TextureSetNameFormValues = {
   name: string
@@ -14,7 +17,7 @@ type TextureSetNameFormValues = {
 interface CreateTextureSetDialogProps {
   visible: boolean
   onHide: () => void
-  onSubmit: (name: string) => Promise<void>
+  onSubmit: (name: string, kind: TextureSetKind) => Promise<void>
 }
 
 export function CreateTextureSetDialog({
@@ -23,6 +26,12 @@ export function CreateTextureSetDialog({
   onSubmit,
 }: CreateTextureSetDialogProps) {
   const [submitting, setSubmitting] = useState(false)
+  const [kind, setKind] = useState<TextureSetKind>(TextureSetKind.ModelSpecific)
+
+  const kindOptions = [
+    { label: 'Model-Specific', value: TextureSetKind.ModelSpecific },
+    { label: 'Universal (Tileable)', value: TextureSetKind.Universal },
+  ]
 
   const {
     register,
@@ -43,13 +52,14 @@ export function CreateTextureSetDialog({
   useEffect(() => {
     if (!visible) {
       reset({ name: '' })
+      setKind(TextureSetKind.ModelSpecific)
     }
   }, [visible, reset])
 
   const handleValidSubmit = async (values: TextureSetNameFormValues) => {
     try {
       setSubmitting(true)
-      await onSubmit(values.name)
+      await onSubmit(values.name, kind)
       reset({ name: '' })
     } catch (error) {
       console.error('Failed to create texture set:', error)
@@ -117,7 +127,23 @@ export function CreateTextureSetDialog({
           Choose a descriptive name for your texture set (2-200 characters)
         </small>
       </div>
+
+      <div className="p-field" style={{ marginTop: '1rem' }}>
+        <label className="p-text-bold">Type</label>
+        <SelectButton
+          value={kind}
+          options={kindOptions}
+          onChange={e => {
+            if (e.value !== null && e.value !== undefined) setKind(e.value)
+          }}
+          style={{ marginTop: '0.5rem' }}
+        />
+        <small className="p-text-secondary">
+          {kind === TextureSetKind.ModelSpecific
+            ? "Baked textures tied to a specific model's UV layout"
+            : 'Tileable/seamless textures for surfaces (walls, floors, terrain)'}
+        </small>
+      </div>
     </Dialog>
   )
 }
-

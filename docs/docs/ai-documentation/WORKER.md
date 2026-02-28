@@ -43,12 +43,14 @@ Health check: `curl http://localhost:3001/health`
 1. Upload → Backend creates job and sends SignalR notification
 2. Worker → Receives notification via SignalR
 3. Worker → Claims job via POST /thumbnail-jobs/dequeue
-4. Worker → Downloads model file from API
-5. Worker → Loads and normalizes 3D model with Three.js
-6. Worker → Generates orbit animation frames (360°)
-7. Worker → Encodes frames to animated WebP + poster image
-8. Worker → Uploads thumbnail to API
-9. Worker → Reports completion status
+4. Worker → Dispatches to processor based on asset type (Model/Sound/TextureSet)
+5. Worker → Downloads asset files from API
+6. Worker → Loads and normalizes asset (3D model / sphere geometry / audio)
+7. Worker → Generates orbit animation frames (360°) for models, swing animation frames for texture sets, or waveform for sounds
+8. Worker → Encodes frames to animated WebP + poster image
+9. Worker → Uploads thumbnail to API
+10. Worker → (TextureSet only) Generates web proxy textures at the configured resolution (from `/settings` API `textureProxySize`, or overridden by `job.proxySize` if set) and uploads via PUT /texture-sets/{id}/textures/{textureId}/web-proxy
+11. Worker → Reports completion status
 ```
 
 ## Configuration
@@ -489,15 +491,21 @@ npm test
 - `baseProcessor.js` - Abstract base class defining the processor contract
 - `meshProcessor.js` - 3D mesh thumbnail generation (OBJ, FBX, GLTF, GLB)
 - `soundProcessor.js` - Audio waveform generation
+- `textureSetProcessor.js` - Texture set preview thumbnail generation (Universal/Global Materials). Renders a swing animation (camera swings from 45° top-left to 30° bottom-right and back) encoded as animated WebP via `FrameEncoderService`. Reads `previewGeometryType` from the texture set to render on the appropriate geometry (sphere, box, cylinder, or torus — defaults to plane). Uses `uvScale` directly as texture repeat multiplier. After generating the thumbnail, generates web proxy textures at the configured size (from settings, or overridden by `job.proxySize`). Also generates lightweight PNG previews for individual texture files (EXR or >1MB) and uploads them via `POST /files/{id}/preview/upload`.
+- `textureProxyGenerator.js` - Generates resized proxy textures per texture type category. Each function receives `sourceChannel` (0=RGB, 1=R, 2=G, 3=B, 4=A) and calls `sharp.extractChannel()` for packed/split-channel textures before resizing. Three encoding strategies: **sRGB** (Albedo, Emissive) → lossy WebP q80 for RGB, or lossless WebP for single-channel extraction; **Linear** (AO, Roughness, Metallic, Height, Displacement, Opacity, etc.) → lossless WebP, with `extractChannel` for packed maps or `toColourspace('b-w')` for full-RGB data; **Normal** → lossless PNG with per-pixel renormalization after resize (falls back to linear proxy for channel-extracted normals). Filenames include channel suffix (`_R`, `_G`, `_B`, `_A`) for split-channel proxies to avoid collisions.
 - `thumbnailProcessor.js` - Generic thumbnail processing
+
+**imagePreviewGenerator.js** - Utility for converting EXR files to PNG (via Three.js EXRLoader + Reinhard tone mapping + sharp) and resizing large standard images. Used by both `puppeteerRenderer.js` (pre-processing textures for browser) and `textureSetProcessor.js` (generating individual file previews).
 
 **modelFileService.js** - Downloads and manages model files from backend API
 
-**puppeteerRenderer.js** - Browser-based 3D rendering with Puppeteer and Three.js
+**puppeteerRenderer.js** - Browser-based 3D rendering with Puppeteer and Three.js (supports `loadModel()` for meshes, `loadSphere()` for sphere previews, and `loadPrimitive(type)` for arbitrary geometry types including box, cylinder, torus). Textures use `RepeatWrapping` for proper tiling. Accepts `tilingScale` parameter and applies `texture.repeat.set(tiling.x, tiling.y)` to all loaded textures for accurate tiling in generated thumbnails. Pre-processes EXR textures (converts to PNG via `imagePreviewGenerator.js`) and resizes large images before sending to the browser. Supports all texture types: Albedo, Normal, Height, AO, Roughness, Metallic, Emissive, Bump, Alpha, and Displacement.
 
 **frameEncoderService.js** - Encodes frames to animated WebP and poster with Sharp/node-webpmux
 
-**thumbnailStorageService.js** - Uploads generated thumbnails to backend API
+**thumbnailStorageService.js** - Uploads generated thumbnails to backend API for models
+
+**textureSetApiService.js** - Uploads generated thumbnails to backend API for texture sets and individual file previews via `uploadFilePreview()`
 
 **healthServer.js** - HTTP server for /health and /status endpoints
 
@@ -507,53 +515,58 @@ npm test
 
 1. **Notification** - SignalR hub broadcasts job available
 2. **Acquisition** - Worker claims job via HTTP (first-come-first-served)
-3. **Download** - Fetch model file from API
-4. **Load** - Parse with Three.js, normalize to unit size
-5. **Render** - Generate orbit frames at configured angles
-6. **Encode** - Create animated WebP + poster image
-7. **Upload** - Send thumbnail to API via multipart form
-8. **Report** - Update job status (completed/failed)
+3. **Dispatch** - ProcessorRegistry routes to appropriate processor based on asset type:
+    - `Model` → MeshProcessor (3D model orbit animation thumbnail)
+    - `Sound` → SoundProcessor (waveform generation)
+    - `TextureSet` → TextureSetProcessor (animated swing preview on configured geometry)
+4. **Download** - Fetch asset files from API
+5. **Load** - Parse asset (3D model with Three.js / audio with FFmpeg / sphere geometry for textures)
+6. **Render** - Generate orbit frames at configured angles (models) or swing animation frames (texture sets)
+7. **Encode** - Create animated WebP + poster image for both models and texture sets
+8. **Upload** - Send thumbnail to API via multipart form
+9. **Report** - Update job status (completed/failed)
 
 ## Environment Variables Reference
 
-| Variable                       | Default                    | Description                                       |
-| ------------------------------ | -------------------------- | ------------------------------------------------- |
-| **Server**                     |                            |                                                   |
-| `WORKER_ID`                    | `worker-1`                 | Unique worker identifier                          |
-| `WORKER_PORT`                  | `3001`                     | Health server port                                |
-| **API Connection**             |                            |                                                   |
-| `API_BASE_URL`                 | `http://localhost:5009`    | Backend API URL                                   |
-| `NODE_TLS_REJECT_UNAUTHORIZED` | -                          | Set to `0` to accept self-signed certs (dev only) |
-| **Processing**                 |                            |                                                   |
-| `MAX_CONCURRENT_JOBS`          | `3`                        | Concurrent jobs per worker                        |
-| `JOB_POLLING_INTERVAL_MS`      | `5000`                     | Fallback polling interval                         |
-| **Rendering**                  |                            |                                                   |
-| `RENDER_WIDTH`                 | `256`                      | Thumbnail width in pixels                         |
-| `RENDER_HEIGHT`                | `256`                      | Thumbnail height in pixels                        |
-| `RENDER_FORMAT`                | `png`                      | Frame format (png, jpeg)                          |
-| `BACKGROUND_COLOR`             | `0xf0f0f0`                 | Background color (hex)                            |
-| `CAMERA_DISTANCE_MULTIPLIER`   | `2.5`                      | Camera distance from model                        |
-| **Orbit Animation**            |                            |                                                   |
-| `ENABLE_ORBIT_ANIMATION`       | `true`                     | Generate orbit animation                          |
-| `ORBIT_ANGLE_STEP`             | `12`                       | Degrees per frame (360/step = ~30 frames)         |
-| `CAMERA_HEIGHT_MULTIPLIER`     | `0.75`                     | Camera height relative to distance                |
-| **Encoding**                   |                            |                                                   |
-| `ENABLE_FRAME_ENCODING`        | `true`                     | Encode to animated WebP                           |
-| `ENCODING_FRAMERATE`           | `10`                       | Animation framerate (fps)                         |
-| `WEBP_QUALITY`                 | `75`                       | WebP quality (0-100)                              |
-| `JPEG_QUALITY`                 | `85`                       | JPEG quality for poster (0-100)                   |
-| **Storage**                    |                            |                                                   |
-| `THUMBNAIL_STORAGE_ENABLED`    | `true`                     | Upload to API                                     |
-| `THUMBNAIL_STORAGE_PATH`       | `/tmp/modelibr-thumbnails` | Local temp storage                                |
-| `SKIP_DUPLICATE_THUMBNAILS`    | `true`                     | Skip if hash exists                               |
-| **Logging**                    |                            |                                                   |
-| `LOG_LEVEL`                    | `info`                     | Logging level (debug, info, warn, error)          |
-| `LOG_FORMAT`                   | `pretty`                   | Format (pretty, json)                             |
-| **Cleanup**                    |                            |                                                   |
-| `CLEANUP_TEMP_FILES`           | `true`                     | Delete temp files after processing                |
-| **Health**                     |                            |                                                   |
-| `HEALTH_CHECK_ENABLED`         | `true`                     | Enable health endpoint                            |
-| `HEALTH_CHECK_PATH`            | `/health`                  | Health check path                                 |
+| Variable                       | Default                    | Description                                                     |
+| ------------------------------ | -------------------------- | --------------------------------------------------------------- |
+| **Server**                     |                            |                                                                 |
+| `WORKER_ID`                    | `worker-1`                 | Unique worker identifier                                        |
+| `WORKER_PORT`                  | `3001`                     | Health server port                                              |
+| **API Connection**             |                            |                                                                 |
+| `API_BASE_URL`                 | `http://localhost:5009`    | Backend API URL                                                 |
+| `WORKER_API_KEY`               | (empty)                    | API key for authenticated upload endpoints (`X-Api-Key` header) |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | -                          | Set to `0` to accept self-signed certs (dev only)               |
+| **Processing**                 |                            |                                                                 |
+| `MAX_CONCURRENT_JOBS`          | `3`                        | Concurrent jobs per worker                                      |
+| `JOB_POLLING_INTERVAL_MS`      | `5000`                     | Fallback polling interval                                       |
+| **Rendering**                  |                            |                                                                 |
+| `RENDER_WIDTH`                 | `256`                      | Thumbnail width in pixels                                       |
+| `RENDER_HEIGHT`                | `256`                      | Thumbnail height in pixels                                      |
+| `RENDER_FORMAT`                | `png`                      | Frame format (png, jpeg)                                        |
+| `BACKGROUND_COLOR`             | `0xf0f0f0`                 | Background color (hex)                                          |
+| `CAMERA_DISTANCE_MULTIPLIER`   | `2.5`                      | Camera distance from model                                      |
+| **Orbit Animation**            |                            |                                                                 |
+| `ENABLE_ORBIT_ANIMATION`       | `true`                     | Generate orbit animation                                        |
+| `ORBIT_ANGLE_STEP`             | `12`                       | Degrees per frame (360/step = ~30 frames)                       |
+| `CAMERA_HEIGHT_MULTIPLIER`     | `0.75`                     | Camera height relative to distance                              |
+| **Encoding**                   |                            |                                                                 |
+| `ENABLE_FRAME_ENCODING`        | `true`                     | Encode to animated WebP                                         |
+| `ENCODING_FRAMERATE`           | `10`                       | Animation framerate (fps)                                       |
+| `WEBP_QUALITY`                 | `75`                       | WebP quality (0-100)                                            |
+| `JPEG_QUALITY`                 | `85`                       | JPEG quality for poster (0-100)                                 |
+| **Storage**                    |                            |                                                                 |
+| `THUMBNAIL_STORAGE_ENABLED`    | `true`                     | Upload to API                                                   |
+| `THUMBNAIL_STORAGE_PATH`       | `/tmp/modelibr-thumbnails` | Local temp storage                                              |
+| `SKIP_DUPLICATE_THUMBNAILS`    | `true`                     | Skip if hash exists                                             |
+| **Logging**                    |                            |                                                                 |
+| `LOG_LEVEL`                    | `info`                     | Logging level (debug, info, warn, error)                        |
+| `LOG_FORMAT`                   | `pretty`                   | Format (pretty, json)                                           |
+| **Cleanup**                    |                            |                                                                 |
+| `CLEANUP_TEMP_FILES`           | `true`                     | Delete temp files after processing                              |
+| **Health**                     |                            |                                                                 |
+| `HEALTH_CHECK_ENABLED`         | `true`                     | Enable health endpoint                                          |
+| `HEALTH_CHECK_PATH`            | `/health`                  | Health check path                                               |
 
 ## Getting Help
 

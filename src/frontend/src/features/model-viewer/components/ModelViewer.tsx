@@ -1,38 +1,41 @@
-import { useState, useEffect, useRef, JSX } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { Canvas } from '@react-three/fiber'
-import * as THREE from 'three'
+import './ModelViewer.css'
+
 import { Stats } from '@react-three/drei'
-import { Scene as ModelPreviewScene } from './ModelPreviewScene'
-import { ModelInfoWindow } from './ModelInfoWindow'
-import { ThumbnailWindow } from './ThumbnailWindow'
-import { ModelHierarchyWindow } from './ModelHierarchyWindow'
-import { ViewerSettingsWindow } from './ViewerSettingsWindow'
-import { UVMapWindow } from './UVMapWindow'
-import { TextureSetSelectorWindow } from './TextureSetSelectorWindow'
-import { ModelVersionWindow } from './ModelVersionWindow'
-import { VersionStrip } from './VersionStrip'
-import { FileUploadModal } from './FileUploadModal'
-import { ViewerSettingsType } from './ViewerSettings'
+import { Canvas } from '@react-three/fiber'
+import { useQueryClient } from '@tanstack/react-query'
+import { Button } from 'primereact/button'
+import { Toast } from 'primereact/toast'
+import { type JSX, useEffect, useRef, useState } from 'react'
+import type * as THREE from 'three'
+
 import { ModelProvider } from '@/contexts/ModelContext'
-import { Model } from '@/utils/fileUtils'
-import { TextureSetDto, ModelVersionDto } from '@/types'
 import {
   addFileToVersion,
   createModelVersion,
   setActiveVersion,
   softDeleteModelVersion,
 } from '@/features/model-viewer/api/modelVersionApi'
-import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import {
   useModelByIdQuery,
   useModelVersionsQuery,
 } from '@/features/model-viewer/api/queries'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
-import { Button } from 'primereact/button'
-import { Toast } from 'primereact/toast'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
-import './ModelViewer.css'
+import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
+import { type ModelVersionDto, type TextureSetDto } from '@/types'
+import { type Model } from '@/utils/fileUtils'
+
+import { FileUploadModal } from './FileUploadModal'
+import { ModelHierarchyWindow } from './ModelHierarchyWindow'
+import { ModelInfoWindow } from './ModelInfoWindow'
+import { Scene as ModelPreviewScene } from './ModelPreviewScene'
+import { ModelVersionWindow } from './ModelVersionWindow'
+import { TextureSetSelectorWindow } from './TextureSetSelectorWindow'
+import { ThumbnailWindow } from './ThumbnailWindow'
+import { UVMapWindow } from './UVMapWindow'
+import { VersionStrip } from './VersionStrip'
+import { type ViewerSettingsType } from './ViewerSettings'
+import { ViewerSettingsWindow } from './ViewerSettingsWindow'
 
 interface ModelViewerProps {
   model?: Model
