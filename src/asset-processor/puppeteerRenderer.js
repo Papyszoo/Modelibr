@@ -199,35 +199,31 @@ export class PuppeteerRenderer {
       const server = http.createServer((req, res) => {
         // Decode the requested filename from the URL path
         const requestedName = decodeURIComponent(req.url.split('/').pop() || '')
-        // The texture temp files sit in the provided directory
-        const filePath = path.join(textureDir, requestedName)
 
-        // Prevent path traversal attacks
-        const resolvedDir = path.resolve(textureDir)
-        const resolvedFile = path.resolve(filePath)
-        if (
-          !resolvedFile.startsWith(resolvedDir + path.sep) &&
-          resolvedFile !== resolvedDir
-        ) {
-          logger.warn('Path traversal attempt blocked', { requestedName })
-          res.writeHead(403)
-          res.end('Forbidden')
+        // Sanitize: strip all directory components to prevent path traversal.
+        // path.basename() ensures only a plain filename remains — no ../ or subdirs.
+        const safeName = path.basename(requestedName)
+        if (!safeName || safeName === '.' || safeName === '..') {
+          res.writeHead(400)
+          res.end('Invalid filename')
           return
         }
 
-        if (!fs.existsSync(resolvedFile)) {
+        const safePath = path.join(textureDir, safeName)
+
+        if (!fs.existsSync(safePath)) {
           res.writeHead(404)
           res.end('Not found')
           return
         }
 
-        const ext = path.extname(resolvedFile).toLowerCase()
+        const ext = path.extname(safeName).toLowerCase()
         res.writeHead(200, {
           'Content-Type': mimeTypes[ext] || 'application/octet-stream',
           'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'no-cache',
         })
-        fs.createReadStream(resolvedFile).pipe(res)
+        fs.createReadStream(safePath).pipe(res)
       })
 
       server.listen(0, '127.0.0.1', () => {
