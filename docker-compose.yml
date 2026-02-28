@@ -30,6 +30,10 @@ services:
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
             - ConnectionStrings__Default=Host=postgres;Port=5432;Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
             - DisableHttpsRedirection=true
+            - ENABLE_HTTPS=${ENABLE_HTTPS:-false}
+            - HTTPS_PORT=${HTTPS_PORT:-8443}
+        ports:
+            - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
         volumes:
             # Use platform-appropriate secret/cert paths; on macOS $HOME works (APPDATA is Windows-specific)
             - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro

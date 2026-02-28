@@ -26,6 +26,16 @@ namespace WebApi
             builder.WebHost.ConfigureKestrel(options =>
             {
                 options.Limits.MaxRequestBodySize = maxFileSize;
+
+                var httpPort = builder.Configuration.GetValue<int>("WEBAPI_HTTP_PORT", 8080);
+                options.ListenAnyIP(httpPort);
+
+                var enableHttps = builder.Configuration.GetValue<bool>("ENABLE_HTTPS", false);
+                if (enableHttps)
+                {
+                    var httpsPort = builder.Configuration.GetValue<int>("HTTPS_PORT", 8443);
+                    options.ListenAnyIP(httpsPort, listenOptions => listenOptions.UseHttps());
+                }
             });
             builder.Services.Configure<FormOptions>(options =>
             {
