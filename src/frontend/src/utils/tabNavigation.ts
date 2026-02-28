@@ -1,9 +1,9 @@
-import { Tab, TabType } from '@/types'
 import {
-  useNavigationStore,
-  getWindowId,
   createTab,
+  getWindowId,
+  useNavigationStore,
 } from '@/stores/navigationStore'
+import { type Tab, type TabType } from '@/types'
 
 /**
  * Open a tab in the navigation store for the current window.

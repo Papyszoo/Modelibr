@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
+
+import { type Model } from '@/utils/fileUtils'
+
 import { ModelInfo } from './ModelInfo'
-import { Model } from '@/utils/fileUtils'
 
 const meta = {
   title: 'Components/ModelInfo',

@@ -1,18 +1,23 @@
-import { memo, useState, useRef, useEffect } from 'react'
-import { Card } from 'primereact/card'
+import './TextureCard.css'
+
 import { Button } from 'primereact/button'
+import { Card } from 'primereact/card'
 import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
-import { TextureType, TextureDto } from '@/types'
-import {
-  getTextureTypeInfo,
-  getHeightModeOptions,
-  HEIGHT_RELATED_TYPES,
-} from '@/utils/textureTypeUtils'
+import { memo, useEffect, useRef, useState } from 'react'
+
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { useGenericFileUpload } from '@/shared/hooks/useGenericFileUpload'
-import './TextureCard.css'
+import { type TextureDto, TextureType } from '@/types'
+import {
+  getHeightModeOptions,
+  getTextureTypeInfo,
+  HEIGHT_RELATED_TYPES,
+} from '@/utils/textureTypeUtils'
+
+import { TexturePreview } from './TexturePreview'
 
 interface HeightCardProps {
   /** All textures in the set - we'll find Height/Displacement/Bump from here */
@@ -63,8 +68,12 @@ export const HeightCard = memo(function HeightCard({
 
     const file = files[0]
 
-    // Validate it's an image
-    if (!file.type.startsWith('image/')) {
+    // Validate it's an image (allow EXR/TGA which may have empty MIME type)
+    const ext = file.name.toLowerCase().split('.').pop()
+    const isImage =
+      file.type.startsWith('image/') ||
+      ['exr', 'tga', 'bmp'].includes(ext || '')
+    if (!isImage) {
       toast.current?.show({
         severity: 'error',
         summary: 'Invalid File',
@@ -234,7 +243,7 @@ export const HeightCard = memo(function HeightCard({
         type="file"
         ref={fileInputRef}
         onChange={handleFileInputChange}
-        accept="image/*"
+        accept="image/*,.exr,.tga,.bmp"
         style={{ display: 'none' }}
       />
 
@@ -256,32 +265,56 @@ export const HeightCard = memo(function HeightCard({
             data-testid="height-mode-dropdown"
           />
         </div>
-        {existingHeightTexture && (
-          <Button
-            icon="pi pi-times"
-            className="p-button-text p-button-rounded p-button-danger texture-remove-btn"
-            onClick={e => {
-              e.stopPropagation()
-              handleRemove()
-            }}
-            tooltip="Remove texture"
-          />
-        )}
       </div>
 
       <div className="texture-card-content">
         {existingHeightTexture ? (
-          <div className="texture-preview">
-            <img
-              src={`/api/files/${existingHeightTexture.fileId}/data`}
-              alt={typeInfo?.label}
-              className="texture-image"
+          <div className="texture-card-with-preview">
+            <TexturePreview
+              src={getFilePreviewUrl(existingHeightTexture.fileId.toString())}
+              alt={typeInfo?.label || 'Height'}
+              fileName={existingHeightTexture.fileName}
+              className="texture-preview-image"
             />
+            <div className="texture-card-overlay">
+              <div className="texture-overlay-top">
+                <Button
+                  icon="pi pi-trash"
+                  className="p-button-rounded p-button-text p-button-danger texture-icon-btn"
+                  onClick={e => {
+                    e.stopPropagation()
+                    handleRemove()
+                  }}
+                  disabled={uploading}
+                  aria-label="Remove texture"
+                />
+              </div>
+              <div className="texture-overlay-center">
+                <Button
+                  icon="pi pi-upload"
+                  className="p-button-rounded p-button-lg texture-upload-btn"
+                  onClick={e => {
+                    e.stopPropagation()
+                    fileInputRef.current?.click()
+                  }}
+                  disabled={uploading}
+                  aria-label="Replace texture"
+                />
+              </div>
+              <div className="texture-overlay-bottom">
+                <span className="texture-overlay-filename">
+                  {existingHeightTexture.fileName}
+                </span>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="texture-placeholder">
-            <i className={`pi ${typeInfo?.icon || 'pi-chart-line'}`} />
-            <span>{uploading ? 'Uploading...' : 'Drop or click to add'}</span>
+          <div className="texture-card-empty" onClick={handleClick}>
+            <i
+              className="pi pi-cloud-upload"
+              style={{ fontSize: '3rem', color: '#94a3b8' }}
+            ></i>
+            <p className="drop-text">Drop image here or click to browse</p>
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { ModelHierarchy } from './ModelHierarchy'
 import * as THREE from 'three'
+
+import { ModelHierarchy } from './ModelHierarchy'
 
 /**
  * ModelHierarchy displays the structure of a 3D model,

@@ -144,6 +144,19 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
     await textureSetsPage.goto();
 
+    // Switch to Model-Specific tab (default tab is now Global Materials)
+    const msTab = page
+        .locator(".kind-filter-select .p-button")
+        .filter({ hasText: "Model-Specific" });
+    await msTab.waitFor({ state: "visible", timeout: 10000 });
+    const msTabActive = await msTab.evaluate((el: Element) =>
+        el.classList.contains("p-highlight"),
+    );
+    if (!msTabActive) {
+        await msTab.click();
+        await page.waitForTimeout(500);
+    }
+
     // Use search to find the specific card (grid may have many items off-screen)
     const searchInput = page.locator(".search-input");
     if (await searchInput.isVisible({ timeout: 3000 })) {
@@ -181,6 +194,19 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
     await textureSetsPage.goto();
 
+    // Switch to Model-Specific tab (default tab is now Global Materials)
+    const msTabOrm = page
+        .locator(".kind-filter-select .p-button")
+        .filter({ hasText: "Model-Specific" });
+    await msTabOrm.waitFor({ state: "visible", timeout: 10000 });
+    const msTabOrmActive = await msTabOrm.evaluate((el: Element) =>
+        el.classList.contains("p-highlight"),
+    );
+    if (!msTabOrmActive) {
+        await msTabOrm.click();
+        await page.waitForTimeout(500);
+    }
+
     // Verify the card is visible
     const card = page
         .locator(`.texture-set-card:has-text("${uniqueName}")`)
@@ -210,6 +236,19 @@ Given("I have a texture set with a height texture", async ({ page }) => {
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
     await textureSetsPage.goto();
+
+    // Switch to Model-Specific tab (default tab is now Global Materials)
+    const msTabHeight = page
+        .locator(".kind-filter-select .p-button")
+        .filter({ hasText: "Model-Specific" });
+    await msTabHeight.waitFor({ state: "visible", timeout: 10000 });
+    const msTabHeightActive = await msTabHeight.evaluate((el: Element) =>
+        el.classList.contains("p-highlight"),
+    );
+    if (!msTabHeightActive) {
+        await msTabHeight.click();
+        await page.waitForTimeout(500);
+    }
 
     // Use search to find the specific card (grid may have many items off-screen)
     const searchInput3 = page.locator(".search-input");

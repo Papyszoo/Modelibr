@@ -1,9 +1,15 @@
-import { useState } from 'react'
-import { Tree, TreeDragDropEvent } from 'primereact/tree'
-import { TreeNode } from 'primereact/treenode'
-import { Button } from 'primereact/button'
-import { StageConfig, StageObject, StageGroup } from './SceneEditor'
 import './StageHierarchy.css'
+
+import { Button } from 'primereact/button'
+import { Tree, type TreeDragDropEvent } from 'primereact/tree'
+import { type TreeNode } from 'primereact/treenode'
+import { useState } from 'react'
+
+import {
+  type StageConfig,
+  type StageGroup,
+  type StageObject,
+} from './SceneEditor'
 
 interface StageHierarchyProps {
   stageConfig: StageConfig
@@ -232,4 +238,3 @@ export function StageHierarchy({
     </div>
   )
 }
-

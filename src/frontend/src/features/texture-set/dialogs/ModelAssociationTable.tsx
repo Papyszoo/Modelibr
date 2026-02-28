@@ -1,6 +1,7 @@
-import { DataTable } from 'primereact/datatable'
-import { Column } from 'primereact/column'
 import { Checkbox } from 'primereact/checkbox'
+import { Column } from 'primereact/column'
+import { DataTable } from 'primereact/datatable'
+
 import type { Model } from '@/utils/fileUtils'
 
 export interface ModelAssociation {

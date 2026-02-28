@@ -54,3 +54,14 @@
 .geometry-dropdown {
   width: 100%;
 }
+
+.uv-mode-select {
+  width: 100%;
+}
+
+.uv-mode-select .p-button {
+  flex: 1;
+  justify-content: center;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.6rem;
+}

@@ -1,5 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
+
+import { render, screen, waitFor } from '@testing-library/react'
+
 import { ThumbnailDisplay } from '@/shared/thumbnail/components/ThumbnailDisplay'
 
 // Mock the useThumbnail hook directly

@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
 import './ThumbnailDisplay.css'
+
+import { useEffect, useState } from 'react'
+
 import { useThumbnail } from '@/shared/thumbnail/hooks/useThumbnail'
 
 interface ThumbnailDisplayProps {

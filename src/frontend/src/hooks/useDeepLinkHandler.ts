@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { useNavigationStore, createTab } from '@/stores/navigationStore'
-import { TabType } from '@/types'
+
+import { createTab, useNavigationStore } from '@/stores/navigationStore'
+import { type TabType } from '@/types'
 
 /**
  * Deep link route patterns.

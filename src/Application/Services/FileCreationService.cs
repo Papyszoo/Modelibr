@@ -4,6 +4,7 @@ using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Domain.Models;
 using Domain.Services;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 using FileTypeVO = Domain.ValueObjects.FileType;
 
@@ -23,17 +24,26 @@ internal sealed class FileCreationService : IFileCreationService
     private readonly IFileRepository _fileRepository;
     private readonly IFileUtilityService _fileUtilityService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IFileThumbnailGenerator _thumbnailGenerator;
+    private readonly IUploadPathProvider _pathProvider;
+    private readonly ILogger<FileCreationService> _logger;
 
     public FileCreationService(
         IFileStorage storage,
         IFileRepository fileRepository,
         IFileUtilityService fileUtilityService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IFileThumbnailGenerator thumbnailGenerator,
+        IUploadPathProvider pathProvider,
+        ILogger<FileCreationService> logger)
     {
         _storage = storage;
         _fileRepository = fileRepository;
         _fileUtilityService = fileUtilityService;
         _dateTimeProvider = dateTimeProvider;
+        _thumbnailGenerator = thumbnailGenerator;
+        _pathProvider = pathProvider;
+        _logger = logger;
     }
 
     public async Task<Result<Domain.Models.File>> CreateOrGetExistingFileAsync(
@@ -44,11 +54,35 @@ internal sealed class FileCreationService : IFileCreationService
         // Calculate hash first to check for existing files before saving to disk
         var hash = await _fileUtilityService.CalculateFileHashAsync(fileUpload, cancellationToken);
 
-        // Check if file already exists in database by hash
+        // Check if file already exists in database by hash (non-deleted)
         var existingFile = await _fileRepository.GetBySha256HashAsync(hash, cancellationToken);
         if (existingFile != null)
         {
-            return Result.Success(existingFile);
+            // Active file with same hash exists — reuse it
+            if (_storage.FileExists(existingFile.FilePath))
+            {
+                // Generate thumbnails if they don't already exist (migration case)
+                await GenerateThumbnailsSafe(existingFile.Sha256Hash, existingFile.FilePath, existingFile.MimeType, cancellationToken);
+                return Result.Success(existingFile);
+            }
+
+            // Physical file is missing but DB record exists — this shouldn't normally happen.
+            // Log a warning and proceed to re-upload the file. Clean up the orphan.
+            _logger.LogWarning(
+                "Orphaned file record {FileId} detected (hash {Hash}): physical file missing at {Path}. Cleaning up.",
+                existingFile.Id, hash, existingFile.FilePath);
+            await _fileRepository.HardDeleteAsync(existingFile.Id, cancellationToken);
+        }
+
+        // Check if a soft-deleted (recycled) file with the same hash exists.
+        // If so, remove the recycled record — the re-upload replaces it as a fresh file.
+        var deletedFile = await _fileRepository.GetDeletedBySha256HashAsync(hash, cancellationToken);
+        if (deletedFile != null)
+        {
+            _logger.LogInformation(
+                "Re-uploading file with hash {Hash} that was in recycled files (ID {FileId}). Removing recycled record.",
+                hash, deletedFile.Id);
+            await _fileRepository.HardDeleteAsync(deletedFile.Id, cancellationToken);
         }
 
         // File doesn't exist, save to disk and create file entity
@@ -71,11 +105,27 @@ internal sealed class FileCreationService : IFileCreationService
                 _dateTimeProvider.UtcNow
             );
 
+            // Generate thumbnails for the newly created file
+            await GenerateThumbnailsSafe(stored.Sha256, stored.RelativePath, fileType.GetMimeType(), cancellationToken);
+
             return Result.Success(fileEntity);
         }
         catch (ArgumentException ex)
         {
             return Result.Failure<Domain.Models.File>(new Error("FileCreationFailed", ex.Message));
+        }
+    }
+
+    private async Task GenerateThumbnailsSafe(string sha256Hash, string relativePath, string mimeType, CancellationToken ct)
+    {
+        try
+        {
+            var fullPath = Path.Combine(_pathProvider.UploadRootPath, relativePath);
+            await _thumbnailGenerator.GeneratePreviewsAsync(sha256Hash, fullPath, mimeType, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate thumbnails for file {Hash}", sha256Hash);
         }
     }
 

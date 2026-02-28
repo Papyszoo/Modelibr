@@ -36,6 +36,7 @@ public static class ThumbnailJobEndpoints
                 ModelHash = response.Job.ModelHash,
                 SoundId = response.Job.SoundId,
                 SoundHash = response.Job.SoundHash,
+                TextureSetId = response.Job.TextureSetId,
                 DefaultTextureSetId = response.Job.ModelVersion?.DefaultTextureSetId,
                 Status = response.Job.Status.ToString(),
                 AttemptCount = response.Job.AttemptCount,
@@ -103,6 +104,34 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Sound Waveform Job")
+        .WithTags("ThumbnailJobs");
+
+        app.MapPost("/thumbnail-jobs/texture-sets/{jobId:int}/finish", async (
+            int jobId,
+            [FromBody] FinishTextureSetJobRequest request,
+            ICommandHandler<FinishTextureSetThumbnailJobCommand, FinishTextureSetThumbnailJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new FinishTextureSetThumbnailJobCommand(
+                jobId,
+                request.Success,
+                request.ThumbnailPath,
+                request.SizeBytes,
+                request.ErrorMessage), cancellationToken);
+
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(result.Error.Message);
+            }
+
+            return Results.Ok(new
+            {
+                result.Value.JobId,
+                Status = result.Value.Status,
+                Message = request.Success ? "Texture set thumbnail job completed successfully" : "Texture set thumbnail job marked as failed"
+            });
+        })
+        .WithName("Finish Texture Set Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
         app.MapPost("/thumbnail-jobs/{jobId:int}/events", async (
@@ -180,6 +209,15 @@ public record FinishJobRequest(
 public record FinishSoundJobRequest(
     bool Success,
     string? WaveformPath = null,
+    long? SizeBytes = null,
+    string? ErrorMessage = null);
+
+/// <summary>
+/// Request model for finishing texture set thumbnail jobs (unified complete/fail).
+/// </summary>
+public record FinishTextureSetJobRequest(
+    bool Success,
+    string? ThumbnailPath = null,
     long? SizeBytes = null,
     string? ErrorMessage = null);
 

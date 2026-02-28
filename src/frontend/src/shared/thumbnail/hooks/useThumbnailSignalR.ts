@@ -1,7 +1,11 @@
-import { useEffect, useCallback, useState, useRef } from 'react'
-import { thumbnailSignalRService, ThumbnailStatusChangedEvent,
-  ActiveVersionChangedEvent, } from '../../../services/ThumbnailSignalRService'
 import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import {
+  type ActiveVersionChangedEvent,
+  thumbnailSignalRService,
+  type ThumbnailStatusChangedEvent,
+} from '../../../services/ThumbnailSignalRService'
 
 /**
  * Hook to subscribe to thumbnail status changes for displayed models.

@@ -26,6 +26,9 @@ public class TextureSetDomainTests
         Assert.Empty(textureSet.Textures);
         Assert.True(textureSet.IsEmpty);
         Assert.Equal(0, textureSet.TextureCount);
+        Assert.Equal(TextureSetKind.ModelSpecific, textureSet.Kind);
+        Assert.Equal(1.0f, textureSet.TilingScaleX);
+        Assert.Equal(1.0f, textureSet.TilingScaleY);
     }
 
     [Theory]
@@ -82,6 +85,102 @@ public class TextureSetDomainTests
         // Assert
         Assert.Equal(expectedName, textureSet.Name);
     }
+
+    #region TextureSetKind Tests
+
+    [Fact]
+    public void Create_WithUniversalKind_SetsKindCorrectly()
+    {
+        // Arrange & Act
+        var textureSet = TextureSet.Create("Universal Set", DateTime.UtcNow, TextureSetKind.Universal);
+
+        // Assert
+        Assert.Equal(TextureSetKind.Universal, textureSet.Kind);
+    }
+
+    [Fact]
+    public void Create_WithDefaultKind_IsModelSpecific()
+    {
+        // Arrange & Act
+        var textureSet = TextureSet.Create("Default Set", DateTime.UtcNow);
+
+        // Assert
+        Assert.Equal(TextureSetKind.ModelSpecific, textureSet.Kind);
+    }
+
+    [Fact]
+    public void UpdateKind_ChangesKindAndTimestamp()
+    {
+        // Arrange
+        var textureSet = TextureSet.Create("Test Set", DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act
+        textureSet.UpdateKind(TextureSetKind.Universal, updatedAt);
+
+        // Assert
+        Assert.Equal(TextureSetKind.Universal, textureSet.Kind);
+        Assert.Equal(updatedAt, textureSet.UpdatedAt);
+    }
+
+    #endregion
+
+    #region TilingScale Tests
+
+    [Fact]
+    public void UpdateTilingScale_OnUniversalSet_UpdatesValues()
+    {
+        // Arrange
+        var textureSet = TextureSet.Create("Universal Set", DateTime.UtcNow, TextureSetKind.Universal);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act
+        textureSet.UpdateTilingScale(2.5f, 3.0f, updatedAt);
+
+        // Assert
+        Assert.Equal(2.5f, textureSet.TilingScaleX);
+        Assert.Equal(3.0f, textureSet.TilingScaleY);
+        Assert.Equal(updatedAt, textureSet.UpdatedAt);
+    }
+
+    [Fact]
+    public void UpdateTilingScale_OnModelSpecificSet_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var textureSet = TextureSet.Create("Model Set", DateTime.UtcNow, TextureSetKind.ModelSpecific);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => textureSet.UpdateTilingScale(2.0f, 2.0f, updatedAt));
+    }
+
+    [Theory]
+    [InlineData(0f, 1f)]
+    [InlineData(-1f, 1f)]
+    [InlineData(1f, 0f)]
+    [InlineData(1f, -1f)]
+    public void UpdateTilingScale_WithNonPositiveValues_ThrowsArgumentException(float x, float y)
+    {
+        // Arrange
+        var textureSet = TextureSet.Create("Universal Set", DateTime.UtcNow, TextureSetKind.Universal);
+        var updatedAt = DateTime.UtcNow.AddMinutes(1);
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => textureSet.UpdateTilingScale(x, y, updatedAt));
+    }
+
+    [Fact]
+    public void Create_DefaultTilingScale_IsOneByOne()
+    {
+        // Arrange & Act
+        var textureSet = TextureSet.Create("Test Set", DateTime.UtcNow, TextureSetKind.Universal);
+
+        // Assert
+        Assert.Equal(1.0f, textureSet.TilingScaleX);
+        Assert.Equal(1.0f, textureSet.TilingScaleY);
+    }
+
+    #endregion
 
     [Fact]
     public void UpdateName_WithValidName_UpdatesNameAndTimestamp()

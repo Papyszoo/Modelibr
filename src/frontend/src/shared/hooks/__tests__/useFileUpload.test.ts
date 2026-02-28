@@ -1,5 +1,6 @@
-import { renderHook, act } from '@testing-library/react'
-import { useFileUpload, useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { act, renderHook } from '@testing-library/react'
+
+import { useDragAndDrop, useFileUpload } from '@/shared/hooks/useFileUpload'
 
 jest.mock('@/features/models/api/modelApi', () => ({
   uploadModel: jest.fn(),
@@ -31,6 +32,7 @@ jest.mock('../../../stores/uploadProgressStore', () => ({
 }))
 
 import { uploadModel } from '@/features/models/api/modelApi'
+
 import {
   isSupportedModelFormat,
   isThreeJSRenderable,

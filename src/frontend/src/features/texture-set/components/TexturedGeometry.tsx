@@ -1,15 +1,16 @@
-import { useRef, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { useTexture } from '@react-three/drei'
-import { GeometryType } from './GeometrySelector'
-import { TextureSetDto, TextureType } from '@/types'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
+import { isExrFile } from '@/utils/fileUtils'
+
+import { type GeometryType } from './GeometrySelector'
 
 interface GeometryParams {
   type: GeometryType
   scale: number
-  rotationSpeed: number
   wireframe: boolean
   cubeSize?: number
   sphereRadius?: number
@@ -18,219 +19,530 @@ interface GeometryParams {
   cylinderHeight?: number
   torusRadius?: number
   torusTube?: number
+  uvScale?: number
 }
+
+export interface TextureLoadingState {
+  isLoading: boolean
+  loaded: number
+  total: number
+}
+
+/** Per-texture-type strength values (0–1) */
+export type TextureStrengths = Record<string, number>
 
 interface TexturedGeometryProps {
   geometryType: GeometryType
   textureSet: TextureSetDto
   geometryParams?: GeometryParams
+  disabledTextures?: Set<string>
+  textureStrengths?: TextureStrengths
+  onLoadingChange?: (state: TextureLoadingState) => void
+  /** 0 = Original, 256/512/1024/2048 = proxy size */
+  textureQuality?: number
 }
 
-export function TexturedGeometry({
-  geometryType,
-  textureSet,
-  geometryParams = {},
-}: TexturedGeometryProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+interface TextureUrlInfo {
+  url: string
+  isExrFormat: boolean
+  /** Channel to extract client-side (1=R, 2=G, 3=B, 4=A, undefined=full RGB).
+   *  Only set when textureQuality=0 (original) and texture uses a split channel.
+   *  When using proxies, channel extraction is done server-side. */
+  sourceChannel?: number
+}
 
-  // Rotate the geometry with configurable speed
-  useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += geometryParams.rotationSpeed
+/** Build ALL texture URLs from the texture set (never filters by disabled state).
+ *  When textureQuality > 0 and a proxy at that size exists, use the proxy file.
+ *  For split-channel textures at original quality, includes sourceChannel for
+ *  client-side channel extraction. */
+function buildTextureUrls(
+  textureSet: TextureSetDto,
+  textureQuality: number = 0
+): Record<string, TextureUrlInfo> {
+  const urls: Record<string, TextureUrlInfo> = {}
+
+  const makeInfo = (t: {
+    fileId: number
+    fileName?: string
+    sourceChannel?: TextureChannel
+    proxies?: { fileId: number; size: number }[]
+  }): TextureUrlInfo => {
+    // If a specific proxy size is requested and a matching proxy exists, use it.
+    // Proxy files already have the correct channel extracted server-side.
+    if (textureQuality > 0 && t.proxies && t.proxies.length > 0) {
+      const proxy = t.proxies.find(p => p.size === textureQuality)
+      if (proxy) {
+        return {
+          url: getFileUrl(proxy.fileId.toString()),
+          isExrFormat: false, // proxies are always WebP/PNG, never EXR
+        }
+      }
     }
+    // Original quality — include sourceChannel for client-side extraction
+    const needsChannelExtract =
+      t.sourceChannel !== undefined &&
+      t.sourceChannel !== TextureChannel.RGB &&
+      t.sourceChannel >= TextureChannel.R &&
+      t.sourceChannel <= TextureChannel.A
+    return {
+      url: getFileUrl(t.fileId.toString()),
+      isExrFormat: isExrFile(t.fileName),
+      sourceChannel: needsChannelExtract ? t.sourceChannel : undefined,
+    }
+  }
+
+  const albedo = textureSet.textures.find(
+    t => t.textureType === TextureType.Albedo
+  )
+  if (albedo) urls.map = makeInfo(albedo)
+
+  const normal = textureSet.textures.find(
+    t => t.textureType === TextureType.Normal
+  )
+  if (normal) urls.normalMap = makeInfo(normal)
+
+  const roughness = textureSet.textures.find(
+    t => t.textureType === TextureType.Roughness
+  )
+  if (roughness) urls.roughnessMap = makeInfo(roughness)
+
+  const metallic = textureSet.textures.find(
+    t => t.textureType === TextureType.Metallic
+  )
+  if (metallic) urls.metalnessMap = makeInfo(metallic)
+
+  const ao = textureSet.textures.find(t => t.textureType === TextureType.AO)
+  if (ao) urls.aoMap = makeInfo(ao)
+
+  const emissive = textureSet.textures.find(
+    t => t.textureType === TextureType.Emissive
+  )
+  if (emissive) urls.emissiveMap = makeInfo(emissive)
+
+  const bump = textureSet.textures.find(t => t.textureType === TextureType.Bump)
+  if (bump) urls.bumpMap = makeInfo(bump)
+
+  const alpha = textureSet.textures.find(
+    t => t.textureType === TextureType.Alpha
+  )
+  if (alpha) urls.alphaMap = makeInfo(alpha)
+
+  const height = textureSet.textures.find(
+    t => t.textureType === TextureType.Height
+  )
+  if (height) urls.displacementMap = makeInfo(height)
+
+  const displacement = textureSet.textures.find(
+    t => t.textureType === TextureType.Displacement
+  )
+  if (displacement) urls.displacementMap = makeInfo(displacement)
+
+  return urls
+}
+
+/**
+ * Maps material property names to the TextureType enum key used by disabledTextures.
+ * Used to filter loaded textures at render time without re-fetching.
+ */
+const MATERIAL_PROP_TO_TYPE_KEY: Record<string, string[]> = {
+  map: ['Albedo'],
+  normalMap: ['Normal'],
+  roughnessMap: ['Roughness'],
+  metalnessMap: ['Metallic'],
+  aoMap: ['AO'],
+  emissiveMap: ['Emissive'],
+  bumpMap: ['Bump'],
+  alphaMap: ['Alpha'],
+  displacementMap: ['Height', 'Displacement'],
+}
+
+/**
+ * Create a BufferGeometry for the given primitive type.
+ * Uses fixed standard unit sizes — the <Stage> component positions
+ * the object consistently for all geometry types.
+ */
+function createGeometry(geometryType: GeometryType): THREE.BufferGeometry {
+  switch (geometryType) {
+    case 'plane':
+      // High subdivision (512) so displacement mapping captures fine texture detail
+      return new THREE.PlaneGeometry(2.4, 2.4, 512, 512)
+    case 'box':
+      return new THREE.BoxGeometry(2, 2, 2, 128, 128, 128)
+    case 'sphere':
+      return new THREE.SphereGeometry(1.2, 128, 128)
+    case 'cylinder':
+      return new THREE.CylinderGeometry(1, 1, 2, 128, 128, false)
+    case 'torus':
+      return new THREE.TorusGeometry(1, 0.4, 64, 128)
+    default:
+      return new THREE.PlaneGeometry(2.4, 2.4, 512, 512)
+  }
+}
+
+/** Texture properties that carry color data (need sRGB encoding) */
+const COLOR_TEXTURE_PROPS = new Set(['map', 'emissiveMap'])
+
+/**
+ * Extract a single channel from an ImageBitmap, producing a grayscale canvas texture.
+ * @param bitmap Source ImageBitmap (will be closed after extraction)
+ * @param channel 1=R, 2=G, 3=B, 4=A
+ */
+function extractChannelFromBitmap(
+  bitmap: ImageBitmap,
+  channel: number
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(bitmap, 0, 0)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = imageData.data
+  const offset = channel - 1 // 1→0, 2→1, 3→2, 4→3
+
+  for (let i = 0; i < data.length; i += 4) {
+    const v = data[i + offset]
+    data[i] = v // R
+    data[i + 1] = v // G
+    data[i + 2] = v // B
+    data[i + 3] = 255
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+  bitmap.close()
+  return canvas
+}
+
+/**
+ * Load a single texture off the main thread using fetch + createImageBitmap.
+ * Falls back to TextureLoader for formats that don't support ImageBitmap.
+ * Accepts a pre-fetched blob to enable URL deduplication across split-channel textures.
+ */
+async function loadTextureOffThread(
+  url: string,
+  isExr: boolean,
+  signal: AbortSignal,
+  sourceChannel?: number,
+  cachedBlob?: Blob
+): Promise<THREE.Texture> {
+  if (isExr) {
+    // EXR must use the specialised loader — no ImageBitmap path
+    const exrLoader = new EXRLoader()
+    return exrLoader.loadAsync(url)
+  }
+
+  // Fetch blob (or use cached one for dedup), then decode off-thread
+  let blob: Blob
+  if (cachedBlob) {
+    blob = cachedBlob
+  } else {
+    const response = await fetch(url, { signal })
+    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`)
+    blob = await response.blob()
+  }
+
+  const bitmap = await createImageBitmap(blob, { imageOrientation: 'flipY' })
+
+  // If a specific channel needs extraction, do it via canvas
+  if (sourceChannel && sourceChannel >= 1 && sourceChannel <= 4) {
+    const canvas = extractChannelFromBitmap(bitmap, sourceChannel)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const texture = new THREE.Texture(bitmap)
+  texture.needsUpdate = true
+  return texture
+}
+
+/** Sub-component that loads textures off-thread and renders the mesh */
+function TexturedMesh({
+  geometryType,
+  geometryParams,
+  textureUrls,
+  disabledTextures,
+  textureStrengths,
+  onLoadingChange,
+}: {
+  geometryType: GeometryType
+  geometryParams: GeometryParams
+  textureUrls: Record<string, TextureUrlInfo>
+  disabledTextures?: Set<string>
+  textureStrengths?: TextureStrengths
+  onLoadingChange?: (state: TextureLoadingState) => void
+}) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const [loadedTextures, setLoadedTextures] = useState<
+    Record<string, THREE.Texture>
+  >({})
+  const [texturesReady, setTexturesReady] = useState(false)
+
+  // Track loading progress as internal state — avoids cross-reconciler
+  // setState during render (R3F tree → DOM tree) which triggers React #310.
+  const [loadingProgress, setLoadingProgress] = useState<TextureLoadingState>({
+    isLoading: false,
+    loaded: 0,
+    total: 0,
   })
 
-  // Build texture URLs object (create URLs for textures that exist)
-  const textureUrlsObject = useMemo(() => {
-    const urls: Record<string, string> = {}
+  // Sync loading progress to parent via dedicated effect.
+  // This ensures the DOM-tree state update happens in its own render cycle,
+  // completely decoupled from R3F reconciler commits.
+  useEffect(() => {
+    onLoadingChange?.(loadingProgress)
+  }, [loadingProgress]) // eslint-disable-line react-hooks/exhaustive-deps
+  // onLoadingChange intentionally excluded — stable callback from parent
 
-    // Albedo or Diffuse for base color
-    const albedo = textureSet.textures.find(
-      t => t.textureType === TextureType.Albedo
-    )
-    const diffuse = textureSet.textures.find(
-      t => t.textureType === TextureType.Diffuse
-    )
-    if (albedo) {
-      urls.map = getFileUrl(albedo.fileId.toString())
-    } else if (diffuse) {
-      urls.map = getFileUrl(diffuse.fileId.toString())
+  // Build geometry (memoised — depends only on geometry type)
+  const geometry = useMemo(() => createGeometry(geometryType), [geometryType])
+
+  const hasNormalMap = !!loadedTextures.normalMap
+  const hasAoMap = !!loadedTextures.aoMap
+
+  // AO maps require a second UV set — copy uv to uv2
+  useEffect(() => {
+    const geo = geometry
+    if (hasAoMap && geo && !geo.getAttribute('uv2')) {
+      const uvAttr = geo.getAttribute('uv')
+      if (uvAttr) {
+        geo.setAttribute('uv2', uvAttr.clone())
+      }
+    }
+  }, [hasAoMap, geometry])
+
+  // Compute tangents for correct normal-map rendering
+  useEffect(() => {
+    const geo = meshRef.current?.geometry
+    if (
+      geo &&
+      hasNormalMap &&
+      geo.index &&
+      geo.getAttribute('position') &&
+      geo.getAttribute('normal') &&
+      geo.getAttribute('uv')
+    ) {
+      try {
+        geo.computeTangents()
+      } catch {
+        // computeTangents can fail on degenerate geometry — safe to ignore
+      }
+    }
+  }, [hasNormalMap, geometryType])
+
+  // Simple UV scale — direct multiplier from database value
+  const uvScale = geometryParams.uvScale ?? 1
+
+  // Stable URL key for dependency tracking
+  const urlsKey = useMemo(() => JSON.stringify(textureUrls), [textureUrls])
+
+  // Load all textures off the main thread with per-item progress.
+  // Deduplicates fetches: when multiple texture slots share the same URL
+  // (split-channel textures), the file is downloaded once and reused.
+  useEffect(() => {
+    const entries = Object.entries(textureUrls)
+    const total = entries.length
+
+    if (total === 0) {
+      setLoadedTextures({})
+      setTexturesReady(true)
+      setLoadingProgress({ isLoading: false, loaded: 0, total: 0 })
+      return
     }
 
-    // Normal map
-    const normal = textureSet.textures.find(
-      t => t.textureType === TextureType.Normal
-    )
-    if (normal) {
-      urls.normalMap = getFileUrl(normal.fileId.toString())
+    const abortController = new AbortController()
+    let loadedCount = 0
+
+    setTexturesReady(false)
+    setLoadingProgress({ isLoading: true, loaded: 0, total })
+
+    async function loadAll() {
+      const result: Record<string, THREE.Texture> = {}
+
+      // Step 1: Deduplicate — fetch each unique URL once
+      const uniqueUrls = new Map<string, boolean>() // url → isExr
+      for (const [, info] of entries) {
+        if (!uniqueUrls.has(info.url)) {
+          uniqueUrls.set(info.url, info.isExrFormat)
+        }
+      }
+
+      const blobCache = new Map<string, Blob>()
+      await Promise.all(
+        Array.from(uniqueUrls.entries()).map(async ([url, isExr]) => {
+          if (isExr) return // EXR uses its own loader, no blob caching
+          try {
+            const response = await fetch(url, {
+              signal: abortController.signal,
+            })
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            blobCache.set(url, await response.blob())
+          } catch (err) {
+            if (!abortController.signal.aborted) {
+              console.warn(`Failed to fetch ${url}:`, err)
+            }
+          }
+        })
+      )
+
+      if (abortController.signal.aborted) return
+
+      // Step 2: Create textures per entry, with channel extraction where needed
+      await Promise.all(
+        entries.map(async ([prop, info]) => {
+          try {
+            const texture = await loadTextureOffThread(
+              info.url,
+              info.isExrFormat,
+              abortController.signal,
+              info.sourceChannel,
+              blobCache.get(info.url)
+            )
+            if (!abortController.signal.aborted) {
+              // Set color space based on texture property
+              if (COLOR_TEXTURE_PROPS.has(prop)) {
+                texture.colorSpace = THREE.SRGBColorSpace
+              } else {
+                texture.colorSpace = THREE.LinearSRGBColorSpace
+              }
+              texture.wrapS = THREE.RepeatWrapping
+              texture.wrapT = THREE.RepeatWrapping
+              result[prop] = texture
+
+              loadedCount++
+              setLoadingProgress({
+                isLoading: true,
+                loaded: loadedCount,
+                total,
+              })
+            }
+          } catch (err) {
+            if (abortController.signal.aborted) return
+            console.warn(`Failed to load ${prop} texture:`, err)
+            loadedCount++
+            setLoadingProgress({ isLoading: true, loaded: loadedCount, total })
+          }
+        })
+      )
+
+      if (!abortController.signal.aborted) {
+        setLoadedTextures(result)
+        setTexturesReady(true)
+        setLoadingProgress({ isLoading: false, loaded: total, total })
+      }
     }
 
-    // Roughness map
-    const roughness = textureSet.textures.find(
-      t => t.textureType === TextureType.Roughness
-    )
-    if (roughness) {
-      urls.roughnessMap = getFileUrl(roughness.fileId.toString())
+    loadAll()
+    return () => {
+      abortController.abort()
     }
+  }, [urlsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Metallic map
-    const metallic = textureSet.textures.find(
-      t => t.textureType === TextureType.Metallic
-    )
-    if (metallic) {
-      urls.metalnessMap = getFileUrl(metallic.fileId.toString())
+  // Apply tiling whenever textures or scale changes
+  useEffect(() => {
+    Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
+      if (texture && texture.wrapS !== undefined) {
+        texture.repeat.set(uvScale, uvScale)
+      }
+    })
+  }, [loadedTextures, uvScale])
+
+  // Filter loaded textures by disabled state — instant, no re-fetch
+  const disabled = disabledTextures ?? new Set<string>()
+  const strengths = textureStrengths ?? {}
+  const isDisabled = (prop: string): boolean => {
+    const typeKeys = MATERIAL_PROP_TO_TYPE_KEY[prop]
+    if (!typeKeys) return false
+    return typeKeys.some(key => disabled.has(key))
+  }
+
+  /** Get strength value (0–1) for a material property */
+  const getStrength = (prop: string): number => {
+    const typeKeys = MATERIAL_PROP_TO_TYPE_KEY[prop]
+    if (!typeKeys) return 1
+    for (const key of typeKeys) {
+      if (strengths[key] !== undefined) return strengths[key]
     }
+    return 1
+  }
 
-    // AO map
-    const ao = textureSet.textures.find(t => t.textureType === TextureType.AO)
-    if (ao) {
-      urls.aoMap = getFileUrl(ao.fileId.toString())
-    }
-
-    // Emissive map
-    const emissive = textureSet.textures.find(
-      t => t.textureType === TextureType.Emissive
-    )
-    if (emissive) {
-      urls.emissiveMap = getFileUrl(emissive.fileId.toString())
-    }
-
-    // Bump map
-    const bump = textureSet.textures.find(
-      t => t.textureType === TextureType.Bump
-    )
-    if (bump) {
-      urls.bumpMap = getFileUrl(bump.fileId.toString())
-    }
-
-    // Alpha map
-    const alpha = textureSet.textures.find(
-      t => t.textureType === TextureType.Alpha
-    )
-    if (alpha) {
-      urls.alphaMap = getFileUrl(alpha.fileId.toString())
-    }
-
-    // Displacement map (also check Height for backwards compatibility)
-    const displacement = textureSet.textures.find(
-      t => t.textureType === TextureType.Displacement
-    )
-    const height = textureSet.textures.find(
-      t => t.textureType === TextureType.Height
-    )
-    if (displacement) {
-      urls.displacementMap = getFileUrl(displacement.fileId.toString())
-    } else if (height) {
-      urls.displacementMap = getFileUrl(height.fileId.toString())
-    }
-
-    return urls
-  }, [textureSet])
-
-  // Always call useTexture (even with empty object) to satisfy React Hooks rules
-  const loadedTextures = useTexture(
-    Object.keys(textureUrlsObject).length > 0
-      ? textureUrlsObject
-      : { dummy: '' }
+  // Normal map scale vector controlled by strength — must be before any conditional return
+  const normalStrength = getStrength('normalMap')
+  const normalScale = useMemo(
+    () => new THREE.Vector2(normalStrength, normalStrength),
+    [normalStrength]
   )
 
-  // Configure texture properties
-  Object.values(loadedTextures).forEach((texture: THREE.Texture) => {
-    if (texture && texture.wrapS !== undefined) {
-      texture.wrapS = THREE.RepeatWrapping
-      texture.wrapT = THREE.RepeatWrapping
-    }
-  })
+  // Don't render the mesh until textures are loaded
+  if (!texturesReady) return null
 
-  // Create geometry based on type with configurable parameters
-  const geometry = useMemo(() => {
-    const scale = geometryParams.scale || 1
-    switch (geometryType) {
-      case 'box': {
-        const size = geometryParams.cubeSize || 2
-        return <boxGeometry args={[size * scale, size * scale, size * scale]} />
-      }
-      case 'sphere': {
-        const radius = geometryParams.sphereRadius || 1.2
-        const segments = geometryParams.sphereSegments || 64
-        return <sphereGeometry args={[radius * scale, segments, segments]} />
-      }
-      case 'cylinder': {
-        const radius = geometryParams.cylinderRadius || 1
-        const height = geometryParams.cylinderHeight || 2
-        return (
-          <cylinderGeometry
-            args={[radius * scale, radius * scale, height * scale, 64]}
-          />
-        )
-      }
-      case 'torus': {
-        const radius = geometryParams.torusRadius || 1
-        const tube = geometryParams.torusTube || 0.4
-        return <torusGeometry args={[radius * scale, tube * scale, 32, 64]} />
-      }
-      default:
-        return <boxGeometry args={[2, 2, 2]} />
-    }
-  }, [geometryType, geometryParams])
+  const t = loadedTextures
+  const hasAlphaMap = !!t.alphaMap && !isDisabled('alphaMap')
+  const hasDisplacementMap =
+    !!t.displacementMap && !isDisabled('displacementMap')
 
-  // Extract loaded textures, handling the dummy case
-  const hasTextures = Object.keys(textureUrlsObject).length > 0
-  const textures = hasTextures
-    ? {
-        map: (loadedTextures as Record<string, THREE.Texture>).map || null,
-        normalMap:
-          (loadedTextures as Record<string, THREE.Texture>).normalMap || null,
-        roughnessMap:
-          (loadedTextures as Record<string, THREE.Texture>).roughnessMap ||
-          null,
-        metalnessMap:
-          (loadedTextures as Record<string, THREE.Texture>).metalnessMap ||
-          null,
-        aoMap: (loadedTextures as Record<string, THREE.Texture>).aoMap || null,
-        emissiveMap:
-          (loadedTextures as Record<string, THREE.Texture>).emissiveMap || null,
-        bumpMap:
-          (loadedTextures as Record<string, THREE.Texture>).bumpMap || null,
-        alphaMap:
-          (loadedTextures as Record<string, THREE.Texture>).alphaMap || null,
-        displacementMap:
-          (loadedTextures as Record<string, THREE.Texture>).displacementMap ||
-          null,
-      }
-    : {
-        map: null,
-        normalMap: null,
-        roughnessMap: null,
-        metalnessMap: null,
-        aoMap: null,
-        emissiveMap: null,
-        bumpMap: null,
-        alphaMap: null,
-        displacementMap: null,
-      }
+  // Key forces material re-mount when texture slots change.
+  // Three.js compiles shaders based on which texture slots are non-null;
+  // prop-diffing alone doesn't trigger shader recompilation.
+  const materialKey = JSON.stringify([Array.from(disabled).sort(), strengths])
 
   return (
-    <mesh ref={meshRef} castShadow receiveShadow>
-      {geometry}
+    <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
       <meshStandardMaterial
-        map={textures.map}
-        normalMap={textures.normalMap}
-        roughnessMap={textures.roughnessMap}
-        metalnessMap={textures.metalnessMap}
-        aoMap={textures.aoMap}
-        emissiveMap={textures.emissiveMap}
-        bumpMap={textures.bumpMap}
-        alphaMap={textures.alphaMap}
-        displacementMap={textures.displacementMap}
-        roughness={textures.roughnessMap ? 1 : 0.5}
-        metalness={textures.metalnessMap ? 1 : 0.3}
-        emissive={textures.emissiveMap ? '#ffffff' : '#000000'}
-        transparent={textures.alphaMap ? true : false}
-        color={textures.map ? undefined : '#ffffff'}
+        key={materialKey}
+        map={(!isDisabled('map') && t.map) || null}
+        normalMap={(!isDisabled('normalMap') && t.normalMap) || null}
+        normalScale={normalScale}
+        roughnessMap={(!isDisabled('roughnessMap') && t.roughnessMap) || null}
+        metalnessMap={(!isDisabled('metalnessMap') && t.metalnessMap) || null}
+        aoMap={(!isDisabled('aoMap') && t.aoMap) || null}
+        aoMapIntensity={getStrength('aoMap')}
+        emissiveMap={(!isDisabled('emissiveMap') && t.emissiveMap) || null}
+        emissiveIntensity={getStrength('emissiveMap')}
+        bumpMap={(!isDisabled('bumpMap') && t.bumpMap) || null}
+        bumpScale={getStrength('bumpMap') * 0.5}
+        alphaMap={(!isDisabled('alphaMap') && t.alphaMap) || null}
+        displacementMap={hasDisplacementMap ? t.displacementMap : null}
+        displacementScale={
+          hasDisplacementMap ? getStrength('displacementMap') * 0.1 : 0
+        }
+        roughness={t.roughnessMap && !isDisabled('roughnessMap') ? 1 : 0.8}
+        metalness={t.metalnessMap && !isDisabled('metalnessMap') ? 1 : 0}
+        emissive={
+          t.emissiveMap && !isDisabled('emissiveMap') ? '#ffffff' : '#000000'
+        }
+        transparent={hasAlphaMap}
+        color="#ffffff"
         wireframe={geometryParams.wireframe || false}
       />
     </mesh>
   )
 }
 
+export function TexturedGeometry({
+  geometryType,
+  textureSet,
+  geometryParams = {} as GeometryParams,
+  disabledTextures,
+  textureStrengths,
+  onLoadingChange,
+  textureQuality = 0,
+}: TexturedGeometryProps) {
+  // Build ALL texture URLs — does NOT depend on disabledTextures
+  // When textureQuality > 0, use proxy files where available
+  const textureUrls = useMemo(
+    () => buildTextureUrls(textureSet, textureQuality),
+    [textureSet, textureQuality]
+  )
+
+  return (
+    <TexturedMesh
+      geometryType={geometryType}
+      geometryParams={geometryParams}
+      textureUrls={textureUrls}
+      disabledTextures={disabledTextures}
+      textureStrengths={textureStrengths}
+      onLoadingChange={onLoadingChange}
+    />
+  )
+}

@@ -1,19 +1,26 @@
-import { useState, useEffect, useRef } from 'react'
-import { Dialog } from 'primereact/dialog'
-import { TabView, TabPanel } from 'primereact/tabview'
+import './dialogs.css'
+
 import { Button } from 'primereact/button'
-import { Toast } from 'primereact/toast'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
-import { TextureSetDto, TextureDto, ModelSummaryDto } from '@/types'
+import { Dialog } from 'primereact/dialog'
+import { TabPanel, TabView } from 'primereact/tabview'
+import { Toast } from 'primereact/toast'
+import { useEffect, useRef, useState } from 'react'
+
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import {
+  type ModelSummaryDto,
+  type TextureDto,
+  type TextureSetDto,
+} from '@/types'
+import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
+
 import { AddTextureToSetDialog } from './AddTextureToSetDialog'
 import { ModelAssociationDialog } from './ModelAssociationDialog'
+import { ModelsCardGrid } from './ModelsCardGrid'
 import { SetHeader } from './SetHeader'
 import { SetStats } from './SetStats'
 import { TexturesTable } from './TexturesTable'
-import { ModelsCardGrid } from './ModelsCardGrid'
-import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
-import './dialogs.css'
 
 interface TextureSetDetailDialogProps {
   visible: boolean
@@ -217,4 +224,3 @@ export function TextureSetDetailDialog({
     </>
   )
 }
-

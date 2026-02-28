@@ -1,20 +1,21 @@
-import { useState, useRef, useEffect } from 'react'
-import { Button } from 'primereact/button'
-import { Model } from '@/utils/fileUtils'
-import { ModelVersionDto, VersionFileDto } from '@/types'
-import { getVersionFileUrl } from '@/features/model-viewer/api/modelVersionApi'
-import { useThumbnail } from '@/shared/thumbnail'
 import './VersionStrip.css'
 
-// Import file format icons
-import fbxIcon from '@/assets/icons/fbx.svg'
-import objIcon from '@/assets/icons/obj.svg'
-import gltfIcon from '@/assets/icons/gltf.svg'
-import glbIcon from '@/assets/icons/glb.svg'
+import { Button } from 'primereact/button'
+import { useEffect, useRef, useState } from 'react'
+
 import blendIcon from '@/assets/icons/blend.png'
-import stlIcon from '@/assets/icons/stl.svg'
 import daeIcon from '@/assets/icons/dae.svg'
 import defaultIcon from '@/assets/icons/default.svg'
+// Import file format icons
+import fbxIcon from '@/assets/icons/fbx.svg'
+import glbIcon from '@/assets/icons/glb.svg'
+import gltfIcon from '@/assets/icons/gltf.svg'
+import objIcon from '@/assets/icons/obj.svg'
+import stlIcon from '@/assets/icons/stl.svg'
+import { getVersionFileUrl } from '@/features/model-viewer/api/modelVersionApi'
+import { useThumbnail } from '@/shared/thumbnail'
+import { type ModelVersionDto, type VersionFileDto } from '@/types'
+import { type Model } from '@/utils/fileUtils'
 
 interface VersionStripProps {
   model: Model

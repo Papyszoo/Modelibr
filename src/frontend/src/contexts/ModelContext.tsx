@@ -1,5 +1,5 @@
-import { createContext, useState, ReactNode } from 'react'
-import * as THREE from 'three'
+import { createContext, type ReactNode, useState } from 'react'
+import type * as THREE from 'three'
 
 export interface ModelContextType {
   modelObject: THREE.Object3D | null

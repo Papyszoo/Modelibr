@@ -1,6 +1,7 @@
-import { CodePanel } from './CodePanel'
 import { FloatingWindow } from '@/components/FloatingWindow'
-import { StageConfig } from './SceneEditor'
+
+import { CodePanel } from './CodePanel'
+import { type StageConfig } from './SceneEditor'
 
 interface CodePanelWindowProps {
   visible: boolean
@@ -27,4 +28,3 @@ export function CodePanelWindow({
     </FloatingWindow>
   )
 }
-

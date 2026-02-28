@@ -18,6 +18,9 @@ public static class ContentTypeProvider
             ".png" => "image/png",
             ".jpg" => "image/jpeg",
             ".jpeg" => "image/jpeg",
+            ".exr" => "image/x-exr",
+            ".tga" => "image/x-tga",
+            ".bmp" => "image/bmp",
             _ => "application/octet-stream"
         };
     }

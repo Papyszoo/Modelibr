@@ -18,6 +18,7 @@ internal static class SettingValidator
             SettingKeys.ThumbnailWidth => ValidateThumbnailWidth(value),
             SettingKeys.ThumbnailHeight => ValidateThumbnailHeight(value),
             SettingKeys.GenerateThumbnailOnUpload => ValidateGenerateThumbnailOnUpload(value),
+            SettingKeys.TextureProxySize => ValidateTextureProxySize(value),
             _ => Result.Success() // Unknown keys are allowed for extensibility
         };
     }
@@ -68,7 +69,7 @@ internal static class SettingValidator
 
     private static Result ValidateThumbnailCameraVerticalAngle(string value)
     {
-        if (!double.TryParse(value, out var angle))
+        if (!double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var angle))
             return Result.Failure(new Error("InvalidSetting", "ThumbnailCameraVerticalAngle must be a valid number."));
 
         if (angle < 0)
@@ -112,6 +113,17 @@ internal static class SettingValidator
     {
         if (!bool.TryParse(value, out _))
             return Result.Failure(new Error("InvalidSetting", "GenerateThumbnailOnUpload must be 'true' or 'false'."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateTextureProxySize(string value)
+    {
+        if (!int.TryParse(value, out var size))
+            return Result.Failure(new Error("InvalidSetting", "TextureProxySize must be a valid integer."));
+
+        if (size is not (256 or 512 or 1024 or 2048))
+            return Result.Failure(new Error("InvalidSetting", "TextureProxySize must be one of: 256, 512, 1024, 2048."));
 
         return Result.Success();
     }

@@ -1,31 +1,33 @@
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  DragEvent,
-  MouseEvent,
-} from 'react'
+import './SpriteList.css'
+
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Toast } from 'primereact/toast'
-import { ProgressSpinner } from 'primereact/progressspinner'
 import { Button } from 'primereact/button'
+import { Checkbox } from 'primereact/checkbox'
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
-import { Checkbox } from 'primereact/checkbox'
-import { ContextMenu } from 'primereact/contextmenu'
-import { MenuItem } from 'primereact/menuitem'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { type MenuItem } from 'primereact/menuitem'
+import { ProgressSpinner } from 'primereact/progressspinner'
+import { Toast } from 'primereact/toast'
+import {
+  type DragEvent,
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { type z } from 'zod'
+
+import { getFilePreviewUrl, getFileUrl } from '@/features/models/api/modelApi'
 import {
   getSpritesQueryOptions,
-  useSpritesQuery,
   useSpriteCategoriesQuery,
+  useSpritesQuery,
 } from '@/features/sprite/api/queries'
 import {
   createSpriteCategory,
@@ -35,20 +37,20 @@ import {
   updateSprite,
   updateSpriteCategory,
 } from '@/features/sprite/api/spriteApi'
-import { getFileUrl } from '@/features/models/api/modelApi'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { useCardWidthStore } from '@/stores/cardWidthStore'
-import {
-  openInFileExplorer,
-  copyPathToClipboard,
-  getCopyPathSuccessMessage,
-} from '@/utils/webdavUtils'
+import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import {
   spriteCategoryFormSchema,
   spriteRenameFormSchema,
 } from '@/shared/validation/formSchemas'
-import { PaginationState } from '@/types'
-import './SpriteList.css'
+import { useCardWidthStore } from '@/stores/cardWidthStore'
+import { type PaginationState } from '@/types'
+import {
+  copyPathToClipboard,
+  getCopyPathSuccessMessage,
+  openInFileExplorer,
+} from '@/utils/webdavUtils'
 
 interface SpriteDto {
   id: number
@@ -1029,7 +1031,7 @@ export function SpriteList() {
                 </div>
                 <div className="sprite-preview">
                   <img
-                    src={getFileUrl(sprite.fileId.toString())}
+                    src={getFilePreviewUrl(sprite.fileId.toString())}
                     alt={sprite.name}
                     onError={e => {
                       const target = e.target as HTMLImageElement
@@ -1228,7 +1230,7 @@ export function SpriteList() {
           <div className="sprite-modal-content">
             <div className="sprite-modal-preview">
               <img
-                src={getFileUrl(selectedSprite.fileId.toString())}
+                src={getFilePreviewUrl(selectedSprite.fileId.toString())}
                 alt={selectedSprite.name}
               />
             </div>
@@ -1277,4 +1279,3 @@ export function SpriteList() {
     </div>
   )
 }
-

@@ -17,4 +17,9 @@ public interface IFileStorage
         CancellationToken ct);
     
     Task DeleteFileAsync(string filePath, CancellationToken ct);
+    
+    /// <summary>
+    /// Checks if a physical file exists on disk.
+    /// </summary>
+    bool FileExists(string filePath);
 }

@@ -1,17 +1,18 @@
 import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
-import { Model } from '@/utils/fileUtils'
+import { type Model } from '@/utils/fileUtils'
+
 import {
-  PackDto,
-  GetAllPacksResponse,
-  CreatePackRequest,
-  CreatePackResponse,
-  UpdatePackRequest,
-  TextureSetDto,
-  GetAllTextureSetsResponse,
-  SpriteDto,
-  GetAllSpritesResponse,
-  SoundDto,
-  GetAllSoundsResponse,
+  type CreatePackRequest,
+  type CreatePackResponse,
+  type GetAllPacksResponse,
+  type GetAllSoundsResponse,
+  type GetAllSpritesResponse,
+  type GetAllTextureSetsResponse,
+  type PackDto,
+  type SoundDto,
+  type SpriteDto,
+  type TextureSetDto,
+  type UpdatePackRequest,
 } from '../../../types'
 
 export async function getAllPacks(

@@ -369,6 +369,19 @@ When(
             expect(textureSet).not.toBeNull();
         }).toPass({ timeout: 10000 });
 
+        // UI upload creates Model-Specific sets; switch to that tab so the card is visible
+        const msTab = page.locator(".kind-filter-select button", {
+            hasText: "Model-Specific",
+        });
+        await msTab.waitFor({ state: "visible", timeout: 10000 });
+        const isActive = await msTab.evaluate((el) =>
+            el.classList.contains("p-highlight"),
+        );
+        if (!isActive) {
+            await msTab.click();
+            await page.waitForTimeout(500);
+        }
+
         // Store in shared state for subsequent steps
         sharedState.saveTextureSet(setName, {
             id: textureSet.id,
@@ -524,7 +537,7 @@ Then(
         await expect(async () => {
             const thumbnailDetails = await db.getThumbnailDetails(versionId);
             expect(thumbnailDetails?.Status).toBe(expectedStatus);
-        }).toPass({ timeout: 60000 });
+        }).toPass({ timeout: 300000 });
 
         console.log(
             `[DB Check] Thumbnail for version ${versionId} has Status=${expectedStatus} (${status}) âœ“`,

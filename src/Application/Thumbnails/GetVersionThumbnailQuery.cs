@@ -20,8 +20,9 @@ public class GetVersionThumbnailQueryHandler : IQueryHandler<GetVersionThumbnail
 
     public async Task<Result<GetVersionThumbnailQueryResponse>> Handle(GetVersionThumbnailQuery query, CancellationToken cancellationToken)
     {
-        // Verify version exists
-        var version = await _modelVersionRepository.GetByIdAsync(query.VersionId, cancellationToken);
+        // Verify version exists (including soft-deleted versions for recycled items view)
+        var version = await _modelVersionRepository.GetByIdAsync(query.VersionId, cancellationToken)
+                      ?? await _modelVersionRepository.GetDeletedByIdAsync(query.VersionId, cancellationToken);
         if (version == null)
         {
             return Result.Failure<GetVersionThumbnailQueryResponse>(

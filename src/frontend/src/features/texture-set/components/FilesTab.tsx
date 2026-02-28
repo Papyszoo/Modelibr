@@ -1,10 +1,25 @@
-import { useState, useEffect, useRef } from 'react'
-import { Dropdown } from 'primereact/dropdown'
-import { Toast } from 'primereact/toast'
-import { TextureSetDto, TextureDto, TextureType, TextureChannel } from '@/types'
-import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
-import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import './FilesTab.css'
+
+import { useQueryClient } from '@tanstack/react-query'
+import { Button } from 'primereact/button'
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { Dropdown } from 'primereact/dropdown'
+import { Tag } from 'primereact/tag'
+import { Toast } from 'primereact/toast'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
+import { softDeleteFile } from '@/features/models/api/modelApi'
+import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import {
+  TextureChannel,
+  type TextureDto,
+  type TextureSetDto,
+  TextureType,
+} from '@/types'
+import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
+
+import { TexturePreview } from './TexturePreview'
 
 interface FilesTabProps {
   textureSet: TextureSetDto
@@ -110,7 +125,6 @@ function getChannelType(
   // We rely strictly on explicit sourceChannel now.
   // Implicit guessing led to bugs where type assigned to Channel G appeared on Channel R.
   return null
-  return null
 }
 
 function getTextureByChannel(
@@ -120,16 +134,103 @@ function getTextureByChannel(
   return textures.find(t => t.sourceChannel === channel)
 }
 
-export function FilesTab({
-  textureSet,
-  onMappingChanged,
-}: FilesTabProps) {
+export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
+  const queryClient = useQueryClient()
   const [fileMappings, setFileMappings] = useState<FileMapping[]>([])
   const [rgbOptionOverrides, setRgbOptionOverrides] = useState<
     Record<number, string>
   >({})
   const toast = useRef<Toast>(null)
-  const { changeTextureType, addTextureToSetEndpoint } = useTextureSets()
+  const { changeTextureType, addTextureToSetEndpoint, removeTextureFromSet } =
+    useTextureSets()
+
+  // Compute all texture types currently assigned across the entire texture set
+  // This is used to disable already-taken options in dropdowns
+  const takenTextureTypes = useMemo(() => {
+    const taken = new Set<TextureType>()
+    textureSet.textures.forEach(t => {
+      if (t.textureType !== TextureType.SplitChannel) {
+        taken.add(t.textureType)
+      }
+    })
+    return taken
+  }, [textureSet])
+
+  // Returns dropdown options with already-taken types disabled,
+  // excluding the value currently assigned to this specific channel
+  const getOptionsWithDisabled = useCallback(
+    (
+      baseOptions: { label: string; value: TextureType | null }[],
+      currentValue: TextureType | null
+    ) => {
+      return baseOptions.map(opt => ({
+        ...opt,
+        disabled:
+          opt.value !== null &&
+          opt.value !== currentValue &&
+          takenTextureTypes.has(opt.value),
+      }))
+    },
+    [takenTextureTypes]
+  )
+
+  // Returns RGB dropdown options with already-taken types disabled
+  const getRgbOptionsWithDisabled = useCallback(
+    (currentValue: string) => {
+      return rgbOptions.map(opt => {
+        if (
+          opt.value === 'none' ||
+          opt.value === 'split' ||
+          opt.value === currentValue
+        ) {
+          return opt
+        }
+        // Map option value to TextureType
+        const typeMap: Record<string, TextureType> = {
+          albedo: TextureType.Albedo,
+          normal: TextureType.Normal,
+          emissive: TextureType.Emissive,
+        }
+        const textureType = typeMap[opt.value]
+        return {
+          ...opt,
+          disabled:
+            textureType !== undefined && takenTextureTypes.has(textureType),
+        }
+      })
+    },
+    [takenTextureTypes]
+  )
+
+  const handleDeleteFile = (fileMapping: FileMapping) => {
+    confirmDialog({
+      message: `Are you sure you want to delete "${fileMapping.fileName}"? It will be moved to Recycled Files.`,
+      header: 'Delete File',
+      icon: 'pi pi-trash',
+      acceptClassName: 'p-button-danger',
+      accept: async () => {
+        try {
+          await softDeleteFile(fileMapping.fileId)
+          await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Deleted',
+            detail: `${fileMapping.fileName} moved to Recycled Files`,
+            life: 3000,
+          })
+          onMappingChanged(true)
+        } catch (error) {
+          console.error('Failed to delete file:', error)
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to delete file',
+            life: 3000,
+          })
+        }
+      },
+    })
+  }
 
   // Group textures by fileId and create mappings
   useEffect(() => {
@@ -211,8 +312,32 @@ export function FilesTab({
         })
       }
     } else if (newOption === 'none') {
-      // Remove all textures for this file
-      // Logic for removing all not implemented yet to avoid accidental data loss without confirmation
+      // Remove all texture mappings for this file from the set
+      const texturesToRemove = fileMapping.existingTextures.filter(
+        t => t.textureType !== TextureType.SplitChannel
+      )
+      if (texturesToRemove.length === 0) return
+
+      try {
+        for (const texture of texturesToRemove) {
+          await removeTextureFromSet(textureSet.id, texture.id)
+        }
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Cleared',
+          detail: `Removed all texture mappings for ${fileMapping.fileName}`,
+          life: 2000,
+        })
+        onMappingChanged()
+      } catch (error) {
+        console.error('Failed to remove texture mappings:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to remove texture mappings',
+          life: 3000,
+        })
+      }
     } else {
       // Switched to specific RGB type (Albedo, Normal, Emissive)
       let targetType: TextureType | null = null
@@ -291,14 +416,25 @@ export function FilesTab({
 
     // Texture exists for this channel
     if (newTextureType === null) {
-      // User selected "None" - would need to delete the texture
-      toast.current?.show({
-        severity: 'info',
-        summary: 'Info',
-        detail:
-          'Removing texture mappings is not yet implemented. Use the Texture Types tab to remove textures.',
-        life: 4000,
-      })
+      // User selected "None" — remove the texture mapping
+      try {
+        await removeTextureFromSet(textureSet.id, texture.id)
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Removed',
+          detail: `Removed ${getTextureTypeLabel(texture.textureType)} mapping`,
+          life: 2000,
+        })
+        onMappingChanged()
+      } catch (error) {
+        console.error('Failed to remove texture mapping:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to remove texture mapping',
+          life: 3000,
+        })
+      }
       return
     }
 
@@ -340,6 +476,7 @@ export function FilesTab({
   return (
     <div className="files-tab">
       <Toast ref={toast} />
+      <ConfirmDialog />
       <div className="files-tab-header">
         <h3>Source Files</h3>
       </div>
@@ -351,13 +488,23 @@ export function FilesTab({
             className="file-mapping-card"
             data-testid={`file-mapping-card-${fm.fileId}`}
           >
-            <div className="file-preview">
-              <img
-                src={`/api/files/${fm.fileId}/data`}
-                alt={fm.fileName}
-                onError={e => {
-                  ;(e.target as HTMLImageElement).style.display = 'none'
-                }}
+            <div className="file-preview-column">
+              <div className="file-preview">
+                <TexturePreview
+                  src={getFilePreviewUrl(fm.fileId.toString())}
+                  alt={fm.fileName}
+                  fileName={fm.fileName}
+                  className="file-preview-image"
+                />
+              </div>
+
+              <Button
+                icon="pi pi-trash"
+                label="Delete"
+                className="p-button-outlined p-button-danger p-button-sm file-delete-btn"
+                onClick={() => handleDeleteFile(fm)}
+                aria-label="Delete file"
+                title="Delete file (move to Recycled Files)"
               />
             </div>
 
@@ -368,7 +515,7 @@ export function FilesTab({
                 <label>RGB:</label>
                 <Dropdown
                   value={fm.rgbOption}
-                  options={rgbOptions}
+                  options={getRgbOptionsWithDisabled(fm.rgbOption)}
                   className="channel-dropdown"
                   onChange={e => handleRgbOptionChange(fm, e.value)}
                   data-testid={`channel-mapping-rgb-${fm.fileId}`}
@@ -384,7 +531,10 @@ export function FilesTab({
                     <label>R:</label>
                     <Dropdown
                       value={fm.rChannel}
-                      options={grayscaleTypeOptions}
+                      options={getOptionsWithDisabled(
+                        grayscaleTypeOptions,
+                        fm.rChannel
+                      )}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.R, e.value)
                       }
@@ -397,7 +547,10 @@ export function FilesTab({
                     <label>G:</label>
                     <Dropdown
                       value={fm.gChannel}
-                      options={grayscaleTypeOptions}
+                      options={getOptionsWithDisabled(
+                        grayscaleTypeOptions,
+                        fm.gChannel
+                      )}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.G, e.value)
                       }
@@ -410,7 +563,10 @@ export function FilesTab({
                     <label>B:</label>
                     <Dropdown
                       value={fm.bChannel}
-                      options={grayscaleTypeOptions}
+                      options={getOptionsWithDisabled(
+                        grayscaleTypeOptions,
+                        fm.bChannel
+                      )}
                       onChange={e =>
                         handleTextureTypeChange(fm, TextureChannel.B, e.value)
                       }
@@ -427,7 +583,10 @@ export function FilesTab({
                   <label>A:</label>
                   <Dropdown
                     value={fm.aChannel}
-                    options={alphaTypeOptions}
+                    options={getOptionsWithDisabled(
+                      alphaTypeOptions,
+                      fm.aChannel
+                    )}
                     onChange={e =>
                       handleTextureTypeChange(fm, TextureChannel.A, e.value)
                     }
@@ -448,6 +607,33 @@ export function FilesTab({
                     .join(', ')}
                 </span>
               </div>
+
+              {/* Proxy size badges — aggregate across all textures from this file */}
+              {(() => {
+                const proxySizes = new Set<number>()
+                fm.existingTextures.forEach(t => {
+                  ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+                })
+                const ALL_SIZES = [256, 512, 1024, 2048]
+                if (proxySizes.size === 0) return null
+                return (
+                  <div className="file-proxy-badges">
+                    <span className="textures-label">Proxies:</span>
+                    <div className="file-proxy-badge-list">
+                      {ALL_SIZES.map(size => (
+                        <Tag
+                          key={size}
+                          value={`${size}`}
+                          severity={
+                            proxySizes.has(size) ? 'success' : undefined
+                          }
+                          className={`file-proxy-badge ${!proxySizes.has(size) ? 'file-proxy-badge-missing' : ''}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         ))}

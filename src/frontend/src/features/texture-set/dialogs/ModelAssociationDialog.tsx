@@ -1,16 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Dialog } from 'primereact/dialog'
-import { Toast } from 'primereact/toast'
-import { InputText } from 'primereact/inputtext'
+import './dialogs.css'
+
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
+import { Dialog } from 'primereact/dialog'
+import { InputText } from 'primereact/inputtext'
 import { MultiSelect } from 'primereact/multiselect'
-import type { Model } from '@/utils/fileUtils'
-import { TextureSetDto, PackSummaryDto } from '@/features/texture-set/types'
-import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { Toast } from 'primereact/toast'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { getModelVersions } from '@/features/model-viewer/api/modelVersionApi'
+import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import {
+  type PackSummaryDto,
+  type TextureSetDto,
+} from '@/features/texture-set/types'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
-import './dialogs.css'
+import type { Model } from '@/utils/fileUtils'
 
 interface ModelAssociationDialogProps {
   visible: boolean

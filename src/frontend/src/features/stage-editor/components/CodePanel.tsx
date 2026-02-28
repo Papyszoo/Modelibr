@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { Button } from 'primereact/button'
-import { StageConfig } from './SceneEditor'
 import './CodePanel.css'
+
+import { Button } from 'primereact/button'
+import { useState } from 'react'
+
+import { type StageConfig } from './SceneEditor'
 
 interface CodePanelProps {
   stageConfig: StageConfig
@@ -167,4 +169,3 @@ ${allElements}${footer}`
     </div>
   )
 }
-

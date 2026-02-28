@@ -1,6 +1,7 @@
-import { Slider } from 'primereact/slider'
-import { InputSwitch } from 'primereact/inputswitch'
 import './ViewerSettings.css'
+
+import { InputSwitch } from 'primereact/inputswitch'
+import { Slider } from 'primereact/slider'
 
 export interface ViewerSettingsType {
   orbitSpeed: number
@@ -16,7 +17,10 @@ interface ViewerSettingsProps {
   onSettingsChange: (settings: ViewerSettingsType) => void
 }
 
-export function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsProps) {
+export function ViewerSettings({
+  settings,
+  onSettingsChange,
+}: ViewerSettingsProps) {
   const handleChange = (
     key: keyof ViewerSettingsType,
     value: number | boolean
@@ -127,4 +131,3 @@ export function ViewerSettings({ settings, onSettingsChange }: ViewerSettingsPro
     </div>
   )
 }
-

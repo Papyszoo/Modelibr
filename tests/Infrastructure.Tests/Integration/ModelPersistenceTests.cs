@@ -1,5 +1,6 @@
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Abstractions.Storage;
 using Application.Models;
 using Application.Services;
 using Domain.Models;
@@ -9,6 +10,7 @@ using Infrastructure.Storage;
 using Infrastructure.Tests.Fakes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using SharedKernel;
 using Xunit;
 
@@ -50,7 +52,7 @@ public class ModelPersistenceTests
         var storage = new HashBasedFileStorage(pathProvider, NullLogger<HashBasedFileStorage>.Instance);
         var fileUtilityService = new FileUtilityService();
         
-        var fileCreationService = new FileCreationService(storage, fileRepository, fileUtilityService, dateTimeProvider);
+        var fileCreationService = new FileCreationService(storage, fileRepository, fileUtilityService, dateTimeProvider, new Mock<IFileThumbnailGenerator>().Object, pathProvider, NullLogger<FileCreationService>.Instance);
         
         // Create a fake domain event dispatcher for testing
         var domainEventDispatcher = new FakeDomainEventDispatcher();

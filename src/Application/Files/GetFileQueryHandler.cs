@@ -18,7 +18,8 @@ namespace Application.Files
 
         public async Task<Result<GetFileQueryResponse>> Handle(GetFileQuery query, CancellationToken cancellationToken)
         {
-            var file = await _fileRepository.GetByIdAsync(query.Id, cancellationToken);
+            var file = await _fileRepository.GetByIdAsync(query.Id, cancellationToken)
+                       ?? await _fileRepository.GetDeletedByIdAsync(query.Id, cancellationToken);
             
             if (file == null)
             {

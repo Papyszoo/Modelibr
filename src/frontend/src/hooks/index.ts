@@ -1,7 +1,7 @@
 export { useDeepLinkHandler } from './useDeepLinkHandler'
 export { useGlobalDragPrevention } from './useGlobalDragPrevention'
 export { useSessionRecovery } from './useSessionRecovery'
-export { useTabContext, TabProvider } from './useTabContext'
+export { TabProvider, useTabContext } from './useTabContext'
 export { useTabMenuItems } from './useTabMenuItems'
 export { useTabUiState } from './useTabUiState'
 export { useTheme } from './useTheme'

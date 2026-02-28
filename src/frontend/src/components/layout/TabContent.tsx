@@ -1,10 +1,12 @@
-import { lazy, Suspense } from 'react'
-import { ModelList } from '@/features/models'
-import { History } from '@/features/history'
-import { Settings } from '@/components/tabs/Settings'
-import { Tab } from '@/types'
-import { useTabContext } from '@/hooks/useTabContext'
 import './TabContent.css'
+
+import { lazy, Suspense } from 'react'
+
+import { Settings } from '@/components/tabs/Settings'
+import { History } from '@/features/history'
+import { ModelList } from '@/features/models'
+import { useTabContext } from '@/hooks/useTabContext'
+import { type Tab } from '@/types'
 
 const ModelViewer = lazy(() =>
   import('@/features/model-viewer').then(module => ({

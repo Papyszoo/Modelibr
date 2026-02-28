@@ -1,10 +1,11 @@
-import { useRef, useEffect } from 'react'
 import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
+import { useEffect, useRef } from 'react'
+
 import { DraggableTab } from '@/components/layout/DraggableTab'
-import { Tab } from '@/types'
 import { useDockContext } from '@/contexts/DockContext'
 import { useTabMenuItems } from '@/hooks/useTabMenuItems'
+import { type Tab } from '@/types'
 
 interface DockBarProps {
   side: 'left' | 'right'

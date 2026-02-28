@@ -1,5 +1,6 @@
-import { Button } from 'primereact/button'
 import './ComponentLibrary.css'
+
+import { Button } from 'primereact/button'
 
 export type ComponentType =
   | 'light'
@@ -287,4 +288,3 @@ export function ComponentLibrary({
     </div>
   )
 }
-

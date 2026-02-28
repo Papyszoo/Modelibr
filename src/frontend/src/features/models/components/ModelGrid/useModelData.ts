@@ -1,13 +1,14 @@
-import { useState, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Model } from '@/utils/fileUtils'
-import { PaginationState } from '@/types'
+import { useCallback, useState } from 'react'
+
 import {
+  getModelsQueryOptions,
   useModelsQuery,
   usePacksQuery,
   useProjectsQuery,
-  getModelsQueryOptions,
 } from '@/features/models/api/queries'
+import { type PaginationState } from '@/types'
+import { type Model } from '@/utils/fileUtils'
 
 const PAGE_SIZE = 50
 

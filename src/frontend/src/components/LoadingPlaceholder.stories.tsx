@@ -1,5 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Canvas } from '@react-three/fiber'
+import type { Meta, StoryObj } from '@storybook/react-vite'
+
 import { LoadingPlaceholder } from './LoadingPlaceholder'
 
 const meta = {

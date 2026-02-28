@@ -1,10 +1,10 @@
-import { Tab } from '@/types'
-import { createTab } from '@/stores/navigationStore'
 import { getModelById } from '@/features/models/api/modelApi'
-import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
 import { getPackById } from '@/features/pack/api/packApi'
 import { getProjectById } from '@/features/project/api/projectApi'
 import { getStageById } from '@/features/stage-editor/api/stageApi'
+import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
+import { createTab } from '@/stores/navigationStore'
+import { type Tab } from '@/types'
 
 interface TabLabelOptions {
   modelId?: string

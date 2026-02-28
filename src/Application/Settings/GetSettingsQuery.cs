@@ -12,6 +12,7 @@ public record GetSettingsQueryResponse(
     int ThumbnailWidth,
     int ThumbnailHeight,
     bool GenerateThumbnailOnUpload,
+    int TextureProxySize,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

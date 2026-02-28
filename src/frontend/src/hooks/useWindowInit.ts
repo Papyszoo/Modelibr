@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
+
 import {
-  useNavigationStore,
-  getWindowId,
-  getNavigationChannel,
   broadcastNavigation,
-  NavigationBroadcast,
+  getNavigationChannel,
+  getWindowId,
+  type NavigationBroadcast,
+  useNavigationStore,
 } from '@/stores/navigationStore'
 
 /**

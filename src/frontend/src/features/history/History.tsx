@@ -1,12 +1,15 @@
-import { useState, useMemo } from 'react'
-import { ProgressBar } from 'primereact/progressbar'
-import { Button } from 'primereact/button'
+import './History.css'
+
 import { useQueryClient } from '@tanstack/react-query'
+import { Button } from 'primereact/button'
+import { ProgressBar } from 'primereact/progressbar'
+import { useMemo, useState } from 'react'
+
 import { getModelById } from '@/features/models/api/modelApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
-import { useUploadHistoryQuery } from './api/queries'
 import { openTabInPanel } from '@/utils/tabNavigation'
-import './History.css'
+
+import { useUploadHistoryQuery } from './api/queries'
 
 interface BatchUploadHistory {
   id: number

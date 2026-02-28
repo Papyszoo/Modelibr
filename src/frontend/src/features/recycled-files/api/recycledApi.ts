@@ -39,10 +39,18 @@ export interface RecycledSoundDto {
   deletedAt: string
 }
 
+export interface RecycledFileDto {
+  id: number
+  originalFileName: string
+  filePath: string
+  sizeBytes: number
+  deletedAt: string
+}
+
 export interface GetAllRecycledFilesResponse {
   models: RecycledModelDto[]
   modelVersions: RecycledModelVersionDto[]
-  files: unknown[]
+  files: RecycledFileDto[]
   textureSets: RecycledTextureSetDto[]
   textures: unknown[]
   sprites: RecycledSpriteDto[]

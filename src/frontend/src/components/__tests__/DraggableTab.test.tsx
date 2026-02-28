@@ -1,6 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+
 import { DraggableTab } from '@/components/layout/DraggableTab'
-import { Tab } from '@/types'
+import { type Tab } from '@/types'
 
 // Mock navigationStore to avoid import.meta.env chain
 jest.mock('@/stores/navigationStore', () => ({

@@ -9,6 +9,8 @@ export type PageType =
   | 'textureSets'
   | 'stages'
   | 'textureSetViewer'
+  | 'textureSetViewerLeft'
+  | 'textureSetViewerRight'
   | 'recycledFiles'
 
 interface CardWidthSettings {
@@ -20,6 +22,8 @@ interface CardWidthSettings {
   textureSets: number
   stages: number
   textureSetViewer: number
+  textureSetViewerLeft: number
+  textureSetViewerRight: number
   recycledFiles: number
 }
 
@@ -38,6 +42,8 @@ const DEFAULT_WIDTHS: CardWidthSettings = {
   textureSets: 200,
   stages: 300,
   textureSetViewer: 280,
+  textureSetViewerLeft: 280,
+  textureSetViewerRight: 280,
   recycledFiles: 200,
 }
 

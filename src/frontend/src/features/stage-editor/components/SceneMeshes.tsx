@@ -1,4 +1,4 @@
-import { StageMesh } from './SceneEditor'
+import { type StageMesh } from './SceneEditor'
 
 interface SceneMeshesProps {
   meshes: StageMesh[]
@@ -65,4 +65,3 @@ export function SceneMeshes({
     </>
   )
 }
-

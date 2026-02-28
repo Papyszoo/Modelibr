@@ -1,396 +1,430 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>3D Model Renderer</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: transparent;
-        }
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-        }
-        canvas {
-            display: block;
-        }
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: transparent;
+      }
+
+      #canvas-container {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      canvas {
+        display: block;
+      }
     </style>
-</head>
-<body>
+  </head>
+
+  <body>
     <div id="canvas-container"></div>
     <script type="importmap">
-        {
-            "imports": {
-                "three": "./node_modules/three/build/three.module.js",
-                "three/addons/": "./node_modules/three/examples/jsm/"
-            }
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js",
+          "three/addons/": "./node_modules/three/examples/jsm/"
         }
+      }
     </script>
     <script type="module">
-        import * as THREE from 'three';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+      import * as THREE from 'three'
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+      import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+      import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
+      import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'
+      import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
+      import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
-        // Global state for external control
-        window.modelRenderer = {
-            scene: null,
-            camera: null,
-            renderer: null,
-            model: null,
-            modelContainer: null, // Container for model rotation
-            isReady: false,
-            error: null,
-            useWebGPU: false
-        };
+      // Global state for external control
+      window.modelRenderer = {
+        scene: null,
+        camera: null,
+        renderer: null,
+        model: null,
+        modelContainer: null, // Container for model rotation
+        isReady: false,
+        error: null,
+        useWebGPU: false,
+      }
 
-        // Initialize scene with WebGPU or WebGL
-        async function initScene(width, height, backgroundColor) {
-            const container = document.getElementById('canvas-container');
-            
-            // Create scene
-            const scene = new THREE.Scene();
-            // Set background to null for transparency
-            scene.background = null;
+      // Initialize scene with WebGPU or WebGL
+      async function initScene(width, height, backgroundColor) {
+        const container = document.getElementById('canvas-container')
 
-            // Create camera with tighter field of view for better framing
-            const camera = new THREE.PerspectiveCamera(
-                45, // field of view - reduced from 60 to 45 for tighter framing
-                width / height, // aspect ratio
-                0.1, // near plane
-                1000 // far plane
-            );
+        // Create scene
+        const scene = new THREE.Scene()
+        // Set background to null for transparency
+        scene.background = null
 
-            // Create renderer with WebGPU or WebGL
-            let renderer;
+        // Create camera with tighter field of view for better framing
+        const camera = new THREE.PerspectiveCamera(
+          45, // field of view - reduced from 60 to 45 for tighter framing
+          width / height, // aspect ratio
+          0.1, // near plane
+          1000 // far plane
+        )
+
+        // Create renderer with WebGPU or WebGL
+        let renderer
+        try {
+          // Try WebGPU first if available
+          if (navigator.gpu) {
             try {
-                // Try WebGPU first if available
-                if (navigator.gpu) {
-                    try {
-                        console.log('WebGPU available, attempting to use WebGPU renderer');
-                        
-                        // Import WebGPU renderer dynamically
-                        const { WebGPURenderer } = await import('three/addons/renderers/webgpu/WebGPURenderer.js');
-                        
-                        renderer = new WebGPURenderer({
-                            antialias: true,
-                            alpha: true
-                        });
-                        
-                        await renderer.init();
-                        window.modelRenderer.useWebGPU = true;
-                        console.log('WebGPU renderer initialized successfully');
-                    } catch (webgpuError) {
-                        console.warn('WebGPU initialization failed, falling back to WebGL:', webgpuError);
-                        renderer = null;
+              console.log('WebGPU available, attempting to use WebGPU renderer')
+
+              // Import WebGPU renderer dynamically
+              const { WebGPURenderer } = await import(
+                'three/addons/renderers/webgpu/WebGPURenderer.js'
+              )
+
+              renderer = new WebGPURenderer({
+                antialias: true,
+                alpha: true,
+              })
+
+              await renderer.init()
+              window.modelRenderer.useWebGPU = true
+              console.log('WebGPU renderer initialized successfully')
+            } catch (webgpuError) {
+              console.warn(
+                'WebGPU initialization failed, falling back to WebGL:',
+                webgpuError
+              )
+              renderer = null
+            }
+          }
+
+          // Fallback to WebGL if WebGPU not available or failed
+          if (!renderer) {
+            console.log('Using WebGL renderer')
+            renderer = new THREE.WebGLRenderer({
+              antialias: true,
+              alpha: true,
+              preserveDrawingBuffer: false,
+            })
+            window.modelRenderer.useWebGPU = false
+          }
+        } catch (error) {
+          console.error('Failed to create renderer:', error)
+          window.modelRenderer.error = error.message
+          return false
+        }
+
+        renderer.setSize(width, height)
+        // Set clear color with alpha 0 for transparency
+        renderer.setClearColor(0x000000, 0)
+        // Keep autoClear enabled and let Three.js handle it properly
+        renderer.autoClear = true
+
+        // Shadow mapping (WebGL specific)
+        if (!window.modelRenderer.useWebGPU && renderer.shadowMap) {
+          renderer.shadowMap.enabled = true
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap
+        }
+
+        container.appendChild(renderer.domElement)
+
+        // Setup lighting — balanced to avoid overexposure on PBR materials
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.35)
+        scene.add(ambientLight)
+
+        // Main directional light from front-right
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.45)
+        directionalLight.position.set(20, 15, 20)
+        directionalLight.castShadow = true
+        directionalLight.shadow.mapSize.width = 2048
+        directionalLight.shadow.mapSize.height = 2048
+        scene.add(directionalLight)
+
+        // Fill light from opposite side to reduce hard shadows
+        const pointLight = new THREE.PointLight(0xffffff, 0.2)
+        pointLight.position.set(-15, 5, -15)
+        scene.add(pointLight)
+
+        // Top light for soft fill
+        const spotLight = new THREE.SpotLight(0xffffff, 0.25)
+        spotLight.position.set(0, 20, 0)
+        spotLight.angle = 0.4
+        spotLight.penumbra = 1
+        spotLight.castShadow = true
+        scene.add(spotLight)
+
+        // IBL via PMREMGenerator + neutral studio environment
+        const pmremGenerator = new THREE.PMREMGenerator(renderer)
+        pmremGenerator.compileEquirectangularShader()
+        const roomEnv = new RoomEnvironment(renderer)
+        const envMap = pmremGenerator.fromScene(roomEnv).texture
+        scene.environment = envMap
+        roomEnv.dispose()
+        pmremGenerator.dispose()
+
+        window.modelRenderer.scene = scene
+        window.modelRenderer.camera = camera
+        window.modelRenderer.renderer = renderer
+
+        return true
+      }
+
+      // Load model from data URL or URL
+      async function loadModel(modelData, fileType) {
+        return new Promise((resolve, reject) => {
+          let loader
+
+          if (fileType === 'gltf' || fileType === 'glb') {
+            loader = new GLTFLoader()
+          } else if (fileType === 'obj') {
+            loader = new OBJLoader()
+          } else if (fileType === 'fbx') {
+            loader = new FBXLoader()
+          } else {
+            reject(new Error(`Unsupported file type: ${fileType}`))
+            return
+          }
+
+          loader.load(
+            modelData,
+            result => {
+              let model
+              if (fileType === 'gltf' || fileType === 'glb') {
+                model = result.scene
+              } else {
+                model = result
+              }
+
+              // Apply standard material to ALL models for consistent appearance
+              // This overrides embedded GLTF textures - texture set will be applied later if configured
+              model.traverse(child => {
+                if (child.isMesh) {
+                  child.material = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(0.7, 0.7, 0.9),
+                    metalness: 0.3,
+                    roughness: 0.4,
+                    envMapIntensity: 1.0,
+                  })
+                  child.castShadow = true
+                  child.receiveShadow = true
+                }
+              })
+
+              resolve(model)
+            },
+            undefined,
+            error => {
+              reject(error)
+            }
+          )
+        })
+      }
+
+      // Normalize model to center and fit in view, centered around bounding box
+      function normalizeModel(model, scale = 2.0) {
+        // Calculate bounding box of the original model
+        const box = new THREE.Box3().setFromObject(model)
+        const center = box.getCenter(new THREE.Vector3())
+        const size = box.getSize(new THREE.Vector3())
+
+        // Scale to fit
+        const maxDimension = Math.max(size.x, size.y, size.z)
+        if (maxDimension > 0) {
+          const scaleFactor = scale / maxDimension
+          model.scale.setScalar(scaleFactor)
+        }
+
+        // Recalculate bounding box after scaling
+        const scaledBox = new THREE.Box3().setFromObject(model)
+        const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
+        const scaledSize = scaledBox.getSize(new THREE.Vector3())
+
+        // Center the model around its bounding box center (not origin)
+        // This ensures the model rotates correctly around its visual center
+        model.position.x = -scaledCenter.x
+        model.position.y = -scaledCenter.y
+        model.position.z = -scaledCenter.z
+
+        // Create a container group for rotation around the true center
+        const container = new THREE.Group()
+        container.position.set(0, 0, 0)
+
+        // Add model to container
+        container.add(model)
+
+        // Store reference to container for rotation
+        window.modelRenderer.modelContainer = container
+
+        // Calculate the diagonal radius of the bounding box
+        // This ensures the entire model is visible when rotated in any direction
+        const diagonalRadius =
+          Math.sqrt(
+            scaledSize.x * scaledSize.x +
+              scaledSize.y * scaledSize.y +
+              scaledSize.z * scaledSize.z
+          ) / 2
+
+        return {
+          center,
+          size,
+          maxDimension,
+          boundingSphereRadius: diagonalRadius,
+        }
+      }
+
+      // Position camera for rendering (now rotates model instead of camera)
+      function positionCamera(azimuthAngle, distance, elevationAngle = 0) {
+        // Set camera to fixed position based on distance
+        // Camera is positioned in front of the model along the Z-axis
+        window.modelRenderer.camera.position.set(0, 0, distance)
+        window.modelRenderer.camera.lookAt(0, 0, 0)
+
+        // Rotate the model container instead of moving the camera
+        if (window.modelRenderer.modelContainer) {
+          // Convert angles to radians
+          const azimuthRad = (azimuthAngle * Math.PI) / 180
+          const elevationRad = (elevationAngle * Math.PI) / 180
+
+          // Reset rotation first to avoid accumulation
+          window.modelRenderer.modelContainer.rotation.set(0, 0, 0)
+
+          // Apply rotations
+          // Azimuth rotates around Y-axis (horizontal rotation)
+          window.modelRenderer.modelContainer.rotation.y = azimuthRad
+
+          // Elevation rotates around X-axis (vertical tilt)
+          // Note: We use negative elevation to maintain the same viewing angle
+          // as the old camera-orbit approach
+          window.modelRenderer.modelContainer.rotation.x = -elevationRad
+        }
+      }
+
+      // Render the scene
+      async function renderScene() {
+        if (
+          !window.modelRenderer.renderer ||
+          !window.modelRenderer.scene ||
+          !window.modelRenderer.camera
+        ) {
+          return false
+        }
+
+        // WebGPU renderer uses async render
+        if (window.modelRenderer.useWebGPU) {
+          await window.modelRenderer.renderer.render(
+            window.modelRenderer.scene,
+            window.modelRenderer.camera
+          )
+        } else {
+          window.modelRenderer.renderer.render(
+            window.modelRenderer.scene,
+            window.modelRenderer.camera
+          )
+        }
+        return true
+      }
+
+      // Get canvas as data URL
+      function getCanvasDataURL() {
+        if (!window.modelRenderer.renderer) {
+          return null
+        }
+        return window.modelRenderer.renderer.domElement.toDataURL('image/png')
+      }
+
+      // Count polygons in model
+      function countPolygons(model) {
+        let count = 0
+        model.traverse(child => {
+          if (child.isMesh && child.geometry) {
+            if (child.geometry.index !== null) {
+              count += child.geometry.index.count / 3
+            } else if (child.geometry.attributes.position) {
+              count += child.geometry.attributes.position.count / 3
+            }
+          }
+        })
+        return Math.floor(count)
+      }
+
+      // Clear the scene by removing the previous model
+      function clearScene() {
+        if (window.modelRenderer.modelContainer && window.modelRenderer.scene) {
+          try {
+            // Remove the container (which includes the model) from the scene
+            window.modelRenderer.scene.remove(
+              window.modelRenderer.modelContainer
+            )
+
+            // Dispose of geometries and materials to free memory
+            if (window.modelRenderer.model) {
+              window.modelRenderer.model.traverse(child => {
+                if (child.isMesh) {
+                  try {
+                    if (child.geometry) {
+                      child.geometry.dispose()
                     }
-                }
-                
-                // Fallback to WebGL if WebGPU not available or failed
-                if (!renderer) {
-                    console.log('Using WebGL renderer');
-                    renderer = new THREE.WebGLRenderer({
-                        antialias: true,
-                        alpha: true,
-                        preserveDrawingBuffer: false
-                    });
-                    window.modelRenderer.useWebGPU = false;
-                }
-            } catch (error) {
-                console.error('Failed to create renderer:', error);
-                window.modelRenderer.error = error.message;
-                return false;
-            }
+                  } catch (e) {
+                    console.warn('Failed to dispose geometry:', e)
+                  }
 
-            renderer.setSize(width, height);
-            // Set clear color with alpha 0 for transparency
-            renderer.setClearColor(0x000000, 0);
-            // Keep autoClear enabled and let Three.js handle it properly
-            renderer.autoClear = true;
-            
-            // Shadow mapping (WebGL specific)
-            if (!window.modelRenderer.useWebGPU && renderer.shadowMap) {
-                renderer.shadowMap.enabled = true;
-                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            }
-            
-            container.appendChild(renderer.domElement);
-
-            // Setup lighting with increased ambient light and distant directional lights
-            // Higher ambient light to reduce dark areas
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
-
-            // Main directional light from front-right, positioned further away
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(20, 15, 20);
-            directionalLight.castShadow = true;
-            directionalLight.shadow.mapSize.width = 2048;
-            directionalLight.shadow.mapSize.height = 2048;
-            scene.add(directionalLight);
-
-            // Fill light from opposite side to reduce shadows
-            const pointLight = new THREE.PointLight(0xffffff, 0.4);
-            pointLight.position.set(-15, 5, -15);
-            scene.add(pointLight);
-
-            // Top light positioned higher for even illumination
-            const spotLight = new THREE.SpotLight(0xffffff, 0.6);
-            spotLight.position.set(0, 20, 0);
-            spotLight.angle = 0.4;
-            spotLight.penumbra = 1;
-            spotLight.castShadow = true;
-            scene.add(spotLight);
-
-            window.modelRenderer.scene = scene;
-            window.modelRenderer.camera = camera;
-            window.modelRenderer.renderer = renderer;
-
-            return true;
-        }
-
-        // Load model from data URL or URL
-        async function loadModel(modelData, fileType) {
-            return new Promise((resolve, reject) => {
-                let loader;
-                
-                if (fileType === 'gltf' || fileType === 'glb') {
-                    loader = new GLTFLoader();
-                } else if (fileType === 'obj') {
-                    loader = new OBJLoader();
-                } else if (fileType === 'fbx') {
-                    loader = new FBXLoader();
-                } else {
-                    reject(new Error(`Unsupported file type: ${fileType}`));
-                    return;
-                }
-
-                loader.load(
-                    modelData,
-                    (result) => {
-                        let model;
-                        if (fileType === 'gltf' || fileType === 'glb') {
-                            model = result.scene;
-                        } else {
-                            model = result;
-                        }
-                        
-                        // Apply standard material to ALL models for consistent appearance
-                        // This overrides embedded GLTF textures - texture set will be applied later if configured
-                        model.traverse((child) => {
-                            if (child.isMesh) {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    color: new THREE.Color(0.7, 0.7, 0.9),
-                                    metalness: 0.3,
-                                    roughness: 0.4,
-                                    envMapIntensity: 1.0,
-                                });
-                                child.castShadow = true;
-                                child.receiveShadow = true;
-                            }
-                        });
-                        
-                        resolve(model);
-                    },
-                    undefined,
-                    (error) => {
-                        reject(error);
+                  try {
+                    if (child.material) {
+                      if (Array.isArray(child.material)) {
+                        child.material.forEach(material => {
+                          try {
+                            material.dispose()
+                          } catch (e) {
+                            console.warn('Failed to dispose material:', e)
+                          }
+                        })
+                      } else {
+                        child.material.dispose()
+                      }
                     }
-                );
-            });
-        }
-
-        // Normalize model to center and fit in view, centered around bounding box
-        function normalizeModel(model, scale = 2.0) {
-            // Calculate bounding box of the original model
-            const box = new THREE.Box3().setFromObject(model);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            
-            // Scale to fit
-            const maxDimension = Math.max(size.x, size.y, size.z);
-            if (maxDimension > 0) {
-                const scaleFactor = scale / maxDimension;
-                model.scale.setScalar(scaleFactor);
-            }
-
-            // Recalculate bounding box after scaling
-            const scaledBox = new THREE.Box3().setFromObject(model);
-            const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
-            const scaledSize = scaledBox.getSize(new THREE.Vector3());
-
-            // Center the model around its bounding box center (not origin)
-            // This ensures the model rotates correctly around its visual center
-            model.position.x = -scaledCenter.x;
-            model.position.y = -scaledCenter.y;
-            model.position.z = -scaledCenter.z;
-            
-            // Create a container group for rotation around the true center
-            const container = new THREE.Group();
-            container.position.set(0, 0, 0);
-            
-            // Add model to container
-            container.add(model);
-            
-            // Store reference to container for rotation
-            window.modelRenderer.modelContainer = container;
-            
-            // Calculate the diagonal radius of the bounding box
-            // This ensures the entire model is visible when rotated in any direction
-            const diagonalRadius = Math.sqrt(
-                scaledSize.x * scaledSize.x + 
-                scaledSize.y * scaledSize.y + 
-                scaledSize.z * scaledSize.z
-            ) / 2;
-
-            return {
-                center,
-                size,
-                maxDimension,
-                boundingSphereRadius: diagonalRadius
-            };
-        }
-
-        // Position camera for rendering (now rotates model instead of camera)
-        function positionCamera(azimuthAngle, distance, elevationAngle = 0) {
-            // Set camera to fixed position based on distance
-            // Camera is positioned in front of the model along the Z-axis
-            window.modelRenderer.camera.position.set(0, 0, distance);
-            window.modelRenderer.camera.lookAt(0, 0, 0);
-            
-            // Rotate the model container instead of moving the camera
-            if (window.modelRenderer.modelContainer) {
-                // Convert angles to radians
-                const azimuthRad = (azimuthAngle * Math.PI) / 180;
-                const elevationRad = (elevationAngle * Math.PI) / 180;
-                
-                // Reset rotation first to avoid accumulation
-                window.modelRenderer.modelContainer.rotation.set(0, 0, 0);
-                
-                // Apply rotations
-                // Azimuth rotates around Y-axis (horizontal rotation)
-                window.modelRenderer.modelContainer.rotation.y = azimuthRad;
-                
-                // Elevation rotates around X-axis (vertical tilt)
-                // Note: We use negative elevation to maintain the same viewing angle
-                // as the old camera-orbit approach
-                window.modelRenderer.modelContainer.rotation.x = -elevationRad;
-            }
-        }
-
-        // Render the scene
-        async function renderScene() {
-            if (!window.modelRenderer.renderer || !window.modelRenderer.scene || !window.modelRenderer.camera) {
-                return false;
-            }
-            
-            // WebGPU renderer uses async render
-            if (window.modelRenderer.useWebGPU) {
-                await window.modelRenderer.renderer.render(window.modelRenderer.scene, window.modelRenderer.camera);
-            } else {
-                window.modelRenderer.renderer.render(window.modelRenderer.scene, window.modelRenderer.camera);
-            }
-            return true;
-        }
-
-        // Get canvas as data URL
-        function getCanvasDataURL() {
-            if (!window.modelRenderer.renderer) {
-                return null;
-            }
-            return window.modelRenderer.renderer.domElement.toDataURL('image/png');
-        }
-
-        // Count polygons in model
-        function countPolygons(model) {
-            let count = 0;
-            model.traverse((child) => {
-                if (child.isMesh && child.geometry) {
-                    if (child.geometry.index !== null) {
-                        count += child.geometry.index.count / 3;
-                    } else if (child.geometry.attributes.position) {
-                        count += child.geometry.attributes.position.count / 3;
-                    }
+                  } catch (e) {
+                    console.warn('Failed to dispose material:', e)
+                  }
                 }
-            });
-            return Math.floor(count);
-        }
-
-        // Clear the scene by removing the previous model
-        function clearScene() {
-            if (window.modelRenderer.modelContainer && window.modelRenderer.scene) {
-                try {
-                    // Remove the container (which includes the model) from the scene
-                    window.modelRenderer.scene.remove(window.modelRenderer.modelContainer);
-                    
-                    // Dispose of geometries and materials to free memory
-                    if (window.modelRenderer.model) {
-                        window.modelRenderer.model.traverse((child) => {
-                            if (child.isMesh) {
-                                try {
-                                    if (child.geometry) {
-                                        child.geometry.dispose();
-                                    }
-                                } catch (e) {
-                                    console.warn('Failed to dispose geometry:', e);
-                                }
-                                
-                                try {
-                                    if (child.material) {
-                                        if (Array.isArray(child.material)) {
-                                            child.material.forEach(material => {
-                                                try {
-                                                    material.dispose();
-                                                } catch (e) {
-                                                    console.warn('Failed to dispose material:', e);
-                                                }
-                                            });
-                                        } else {
-                                            child.material.dispose();
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.warn('Failed to dispose material:', e);
-                                }
-                            }
-                        });
-                    }
-                    
-                    // Clear the references
-                    window.modelRenderer.model = null;
-                    window.modelRenderer.modelContainer = null;
-                    window.modelRenderer.isReady = false;
-                    
-                    console.log('Scene cleared successfully');
-                    return true;
-                } catch (error) {
-                    console.error('Error clearing scene:', error);
-                    // Still clear the references even if disposal fails
-                    window.modelRenderer.model = null;
-                    window.modelRenderer.modelContainer = null;
-                    window.modelRenderer.isReady = false;
-                    return false;
-                }
+              })
             }
-            return false;
+
+            // Clear the references
+            window.modelRenderer.model = null
+            window.modelRenderer.modelContainer = null
+            window.modelRenderer.isReady = false
+
+            console.log('Scene cleared successfully')
+            return true
+          } catch (error) {
+            console.error('Error clearing scene:', error)
+            // Still clear the references even if disposal fails
+            window.modelRenderer.model = null
+            window.modelRenderer.modelContainer = null
+            window.modelRenderer.isReady = false
+            return false
+          }
         }
+        return false
+      }
 
-        // Expose THREE and API for Puppeteer
-        window.THREE = THREE;
-        window.initRenderer = initScene;
-        window.loadModelFromData = loadModel;
-        window.normalizeModel = normalizeModel;
-        window.positionCamera = positionCamera;
-        window.renderScene = renderScene;
-        window.getCanvasDataURL = getCanvasDataURL;
-        window.countPolygons = countPolygons;
-        window.clearScene = clearScene;
+      // Expose THREE and API for Puppeteer
+      window.THREE = THREE
+      window.initRenderer = initScene
+      window.loadModelFromData = loadModel
+      window.normalizeModel = normalizeModel
+      window.positionCamera = positionCamera
+      window.renderScene = renderScene
+      window.getCanvasDataURL = getCanvasDataURL
+      window.countPolygons = countPolygons
+      window.clearScene = clearScene
+      window.EXRLoader = EXRLoader
+      window.BufferGeometryUtils = BufferGeometryUtils
 
-        console.log('3D Renderer initialized and ready');
+      console.log('3D Renderer initialized and ready')
     </script>
-</body>
+  </body>
 </html>

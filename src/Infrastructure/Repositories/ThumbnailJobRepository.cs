@@ -76,6 +76,12 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
             .FirstOrDefaultAsync(tj => tj.ModelVersionId == modelVersionId, cancellationToken);
     }
 
+    public async Task<ThumbnailJob?> GetByTextureSetIdAsync(int textureSetId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ThumbnailJobs
+            .FirstOrDefaultAsync(tj => tj.TextureSetId == textureSetId, cancellationToken);
+    }
+
     public async Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default)
     {
         // Use a database transaction to ensure atomicity when claiming jobs

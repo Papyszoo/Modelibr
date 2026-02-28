@@ -40,6 +40,10 @@ export class UniqueFileGenerator {
         const uniqueFilename = sourceFilename;
 
         const targetPath = path.join(tempDir, uniqueFilename);
+
+        // Ensure target directory exists (handles subdirectory paths like "global texture/roughness.exr")
+        await fs.mkdir(path.dirname(targetPath), { recursive: true });
+
         const originalBuffer = await fs.readFile(sourcePath);
 
         let newBuffer: Buffer;

@@ -1,50 +1,50 @@
 export {
-  extractPeaks,
-  sliceAudioBuffer,
-  audioBufferToWav,
-  getAudioDuration,
-  formatDuration,
   AUDIO_EXTENSIONS,
-  isAudioFile,
+  audioBufferToWav,
+  extractPeaks,
   filterAudioFiles,
+  formatDuration,
+  getAudioDuration,
+  isAudioFile,
+  sliceAudioBuffer,
 } from './audioUtils'
+export type { Model, ModelFile } from './fileUtils'
 export { getFileExtension, getFileName, getModelFileFormat } from './fileUtils'
-export type { ModelFile, Model } from './fileUtils'
 export {
-  openTabInPanel,
   closeTabInPanel,
-  switchTab,
-  getCurrentWindowTabs,
   getCurrentActiveTab,
+  getCurrentWindowTabs,
+  openTabInPanel,
+  switchTab,
 } from './tabNavigation'
 export {
   getTabLabel,
   parseCompactTabFormat,
   serializeToCompactFormat,
 } from './tabSerialization'
-export {
-  TEXTURE_TYPE_INFO,
-  HEIGHT_RELATED_TYPES,
-  getTextureTypeInfo,
-  getTextureTypeLabel,
-  getTextureTypeColor,
-  getTextureTypeIcon,
-  getAllTextureTypes,
-  getTextureTypeOptions,
-  isHeightRelatedType,
-  getNonHeightTypes,
-  getHeightModeOptions,
-} from './textureTypeUtils'
 export type { TextureTypeInfo } from './textureTypeUtils'
 export {
+  getAllTextureTypes,
+  getHeightModeOptions,
+  getNonHeightTypes,
+  getTextureTypeColor,
+  getTextureTypeIcon,
+  getTextureTypeInfo,
+  getTextureTypeLabel,
+  getTextureTypeOptions,
+  HEIGHT_RELATED_TYPES,
+  isHeightRelatedType,
+  TEXTURE_TYPE_INFO,
+} from './textureTypeUtils'
+export type { OperatingSystem, WebDavPathInfo } from './webdavUtils'
+export {
   detectOS,
-  getWebDavBaseUrl,
-  getWebDavPath,
-  getProjectAssetPath,
-  getSoundCategoryPath,
   getCopyPathSuccessMessage,
   getMountInstructions,
+  getProjectAssetPath,
+  getSoundCategoryPath,
+  getWebDavBaseUrl,
+  getWebDavPath,
 } from './webdavUtils'
-export type { OperatingSystem, WebDavPathInfo } from './webdavUtils'
-export { detectWebGPU, isWebGPUSupported } from './webgpu'
 export type { WebGPUDetectionResult } from './webgpu'
+export { detectWebGPU, isWebGPUSupported } from './webgpu'

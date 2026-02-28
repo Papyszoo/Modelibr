@@ -1,17 +1,23 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
 import './ModelGrid.css'
-import { Toast } from 'primereact/toast'
+
 import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
-import { ThumbnailDisplay } from '@/shared/thumbnail'
-import { useTabContext } from '@/hooks/useTabContext'
-import { Model } from '@/utils/fileUtils'
+import { Toast } from 'primereact/toast'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { getModelsPaginated } from '@/features/models/api/modelApi'
-import { ModelGridProps } from './types'
-import { useModelGrid } from './useModelGrid'
-import { ModelsFilters } from './ModelsFilters'
-import { ModelContextMenu, ModelContextMenuHandle } from './ModelContextMenu'
+import { useTabContext } from '@/hooks/useTabContext'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
+import { type Model } from '@/utils/fileUtils'
+
 import { AddModelDialog } from './AddModelDialog'
+import {
+  ModelContextMenu,
+  type ModelContextMenuHandle,
+} from './ModelContextMenu'
+import { ModelsFilters } from './ModelsFilters'
+import { type ModelGridProps } from './types'
+import { useModelGrid } from './useModelGrid'
 
 export function ModelGrid({
   projectId,

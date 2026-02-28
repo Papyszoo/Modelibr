@@ -36,7 +36,12 @@ public class ThumbnailJob
     public string? SoundHash { get; private set; }
     
     /// <summary>
-    /// Type of asset this job is for: "Model" or "Sound".
+    /// The ID of the texture set this thumbnail job is for (null for model/sound jobs).
+    /// </summary>
+    public int? TextureSetId { get; private set; }
+    
+    /// <summary>
+    /// Type of asset this job is for: "Model", "Sound", or "TextureSet".
     /// </summary>
     public string AssetType { get; private set; } = "Model";
     
@@ -90,10 +95,17 @@ public class ThumbnailJob
     /// </summary>
     public DateTime? CompletedAt { get; private set; }
     
+    /// <summary>
+    /// Optional proxy size override for texture set jobs.
+    /// When set, generates proxies at this specific size instead of the settings-configured size.
+    /// </summary>
+    public int? ProxySize { get; private set; }
+    
     // Navigation properties
     public Model? Model { get; set; }
     public ModelVersion? ModelVersion { get; set; }
     public Sound? Sound { get; set; }
+    public TextureSet? TextureSet { get; set; }
 
     /// <summary>
     /// Creates a new thumbnail job for model processing.
@@ -142,6 +154,30 @@ public class ThumbnailJob
             LockTimeoutMinutes = lockTimeoutMinutes,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
+        };
+    }
+
+    /// <summary>
+    /// Creates a new thumbnail job for texture set thumbnail processing.
+    /// Renders textures on a sphere to produce a material preview.
+    /// </summary>
+    public static ThumbnailJob CreateForTextureSet(int textureSetId, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10, int? proxySize = null)
+    {
+        if (textureSetId <= 0)
+            throw new ArgumentException("Texture set ID must be a positive integer.", nameof(textureSetId));
+        ValidateMaxAttempts(maxAttempts);
+        ValidateLockTimeoutMinutes(lockTimeoutMinutes);
+
+        return new ThumbnailJob
+        {
+            AssetType = "TextureSet",
+            TextureSetId = textureSetId,
+            Status = ThumbnailJobStatus.Pending,
+            MaxAttempts = maxAttempts,
+            LockTimeoutMinutes = lockTimeoutMinutes,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt,
+            ProxySize = proxySize
         };
     }
 

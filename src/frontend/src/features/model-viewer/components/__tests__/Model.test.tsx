@@ -1,5 +1,6 @@
-import { render } from '@testing-library/react'
 import { Canvas } from '@react-three/fiber'
+import { render } from '@testing-library/react'
+
 import { Model } from '@/features/model-viewer/components/Model'
 
 // Mock the loaders to avoid actual file loading

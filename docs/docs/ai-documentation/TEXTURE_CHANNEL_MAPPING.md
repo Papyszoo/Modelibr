@@ -8,31 +8,47 @@ Referenced from [roadmap.md](../roadmap.md) Priority 1.
 
 Enable ORM (Occlusion/Roughness/Metallic) channel-packed textures by separating **texture files** from **texture types**. Users can upload multi-channel images and map individual channels to different texture types.
 
+### Texture Set Kinds
+
+Texture sets are categorized by `TextureSetKind` (enum in `Domain/ValueObjects/TextureSetKind.cs`):
+
+| Kind              | Value | Description                                                    | Tiling                    |
+| ----------------- | ----- | -------------------------------------------------------------- | ------------------------- |
+| **ModelSpecific** | 0     | Baked/unique textures for a specific model's UV layout         | No tiling controls        |
+| **Universal**     | 1     | Seamless tileable materials (e.g., "Brick Wall", "Wood Floor") | Adjustable TilingScaleX/Y |
+
+Channel mapping and texture type rules apply equally to both kinds. Universal texture sets additionally store `TilingScaleX` and `TilingScaleY` (default 1.0) for UV repeat in the 3D preview.
+
 ---
 
 ## Texture Type Changes
 
 ### Types Removed
+
 - `Diffuse` (redundant with Albedo)
 - `Specular` (not PBR standard)
 
 ### Types Kept (RGB/Multi-Channel)
-| Type | Channels | Notes |
-|------|----------|-------|
-| Albedo | RGB | Base color |
-| Normal | RGB | Surface normals |
-| Emissive | RGB | Glow areas |
+
+| Type     | Channels | Notes           |
+| -------- | -------- | --------------- |
+| Albedo   | RGB      | Base color      |
+| Normal   | RGB      | Surface normals |
+| Emissive | RGB      | Glow areas      |
 
 ### Types Kept (Single-Channel/Grayscale)
-| Type | Channel | Notes |
-|------|---------|-------|
-| AO | Single (R/G/B/A) | Ambient occlusion |
-| Roughness | Single | Surface roughness |
-| Metallic | Single | Metallic areas |
-| Alpha | Single | Transparency |
+
+| Type      | Channel          | Notes             |
+| --------- | ---------------- | ----------------- |
+| AO        | Single (R/G/B/A) | Ambient occlusion |
+| Roughness | Single           | Surface roughness |
+| Metallic  | Single           | Metallic areas    |
+| Alpha     | Single           | Transparency      |
 
 ### Mutually Exclusive: Height / Displacement / Bump
+
 These three types are **kept as separate enums** but with validation:
+
 - Only ONE of Height, Displacement, or Bump can be assigned per texture set
 - Backend validates this constraint on add/update
 - Frontend shows a mode dropdown that switches between these three types
@@ -71,24 +87,29 @@ When dragging one texture set onto another, the merge dialog shows **each file f
 ```
 
 **RGB Channel Dropdown Options:**
+
 - `None` - don't use this texture
 - `Albedo` - use RGB as Albedo
-- `Normal` - use RGB as Normal  
+- `Normal` - use RGB as Normal
 - `Emissive` - use RGB as Emissive
 - `Split Channels` - expand to show R/G/B dropdowns for grayscale types
 
 **When "Split Channels" is selected:**
+
 - Show 3 additional dropdowns for R, G, B channels
 - Each can be: None, AO, Roughness, Metallic, Height, Displacement, Bump, Alpha
 
 **A (Alpha) Channel Dropdown:**
+
 - Always visible as separate dropdown
 - Options: None, Alpha, Height, Displacement, Bump
 
 ### Texture Set Viewer - Two Tabs
 
 #### Tab 1: Files
+
 Lists all texture files in the set with:
+
 - Thumbnail preview of the file
 - File name
 - Channel mapping dropdowns for each available channel:
@@ -116,13 +137,16 @@ Lists all texture files in the set with:
 ```
 
 **Dropdown Options per Channel:**
+
 - `None` (unmapped)
 - For R/G/B/A single channels: AO, Roughness, Metallic, Alpha, Height, Displacement, Bump
 - For RGB group: Albedo, Normal, Emissive
 - Note: Height, Displacement, Bump are mutually exclusive - selecting one clears the others
 
 #### Tab 2: Texture Types
+
 Shows cards for each texture type with source selection:
+
 - Each card has file dropdown + channel dropdown
 - Preview shows extracted channel (grayscale) or RGB
 - Height/Displacement/Bump shows ONE card with mode dropdown (selecting mode changes the type)
@@ -159,6 +183,7 @@ Shows cards for each texture type with source selection:
 ## Data Model Changes
 
 ### Backend: TextureType Enum
+
 ```csharp
 public enum TextureType
 {
@@ -177,9 +202,10 @@ public enum TextureType
 ```
 
 ### Backend: Validation Rule
+
 ```csharp
 // TextureSet domain validation
-public static readonly TextureType[] MutuallyExclusiveHeightTypes = 
+public static readonly TextureType[] MutuallyExclusiveHeightTypes =
     { TextureType.Height, TextureType.Displacement, TextureType.Bump };
 
 // On AddTexture: reject if another height-related type already exists
@@ -192,7 +218,9 @@ if (MutuallyExclusiveHeightTypes.Contains(newType) &&
 ```
 
 ### Backend: Channel Mapping
+
 New entity or value object to store:
+
 ```csharp
 public class TextureChannelMapping
 {
@@ -211,18 +239,21 @@ public enum TextureChannel { R, G, B, A, RGB }
 ## Implementation Phases
 
 ### Phase 1: Simplify Types (Quick Win)
+
 - Remove Diffuse, Specular from enum
 - Add validation: only one of Height/Displacement/Bump per texture set
 - Update frontend to show mode dropdown for height types
 - Update frontend type selector
 
 ### Phase 2: Channel Mapping (Major)
+
 - Backend: Store channel mapping metadata
 - Frontend: Files Tab with channel dropdowns
 - Frontend: Texture Types Tab with file/channel selection
 - Frontend: Real-time grayscale channel extraction for preview
 
 ### Phase 3: Integration
+
 - Blender Addon: Import with channel mapping
 - Thumbnail Worker: Handle channel-packed textures
 - Three.js Viewer: Shader-based channel extraction

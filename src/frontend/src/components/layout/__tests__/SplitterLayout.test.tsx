@@ -1,4 +1,4 @@
-import { Tab } from '@/types'
+import { type Tab } from '@/types'
 import {
   getTabLabel,
   parseCompactTabFormat,

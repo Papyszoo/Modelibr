@@ -1,5 +1,6 @@
 import { FloatingWindow } from '@/components/FloatingWindow'
-import { Model } from '@/utils/fileUtils'
+import { type Model } from '@/utils/fileUtils'
+
 import { UVMapScene } from './UVMapScene'
 
 interface UVMapWindowProps {
@@ -44,4 +45,3 @@ export function UVMapWindow({
     </FloatingWindow>
   )
 }
-

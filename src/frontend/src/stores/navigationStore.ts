@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import { Tab, TabType } from '@/types'
+import { createJSONStorage, persist } from 'zustand/middleware'
+
+import { type Tab, type TabType } from '@/types'
 import { getTabLabel } from '@/utils/tabSerialization'
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -16,6 +17,8 @@ const SESSION_WINDOW_ID_KEY = 'modelibr_windowId'
 export interface WindowState {
   tabs: Tab[]
   activeTabId: string | null
+  /** Active tab ID for the right panel (left panel uses activeTabId) */
+  activeRightTabId: string | null
   /** Splitter percentage for the left panel */
   splitterSize: number
   /** Timestamp of last activity — used for stale-window GC */
@@ -54,6 +57,7 @@ export interface NavigationStore {
   openTab: (windowId: string, side: 'left' | 'right', tab: Tab) => void
   closeTab: (windowId: string, tabId: string) => void
   setActiveTab: (windowId: string, activeTabId: string) => void
+  setActiveRightTab: (windowId: string, activeRightTabId: string) => void
   setTabs: (windowId: string, tabs: Tab[]) => void
   moveTabBetweenPanels: (
     windowId: string,
@@ -156,6 +160,7 @@ function createDefaultWindowState(): WindowState {
   return {
     tabs: [createTab('modelList')],
     activeTabId: 'modelList',
+    activeRightTabId: null,
     splitterSize: 50,
     lastActiveAt: new Date().toISOString(),
   }
@@ -283,6 +288,13 @@ export const useNavigationStore = create<NavigationStore>()(
             }
           }
 
+          // Also handle right panel active tab
+          let newActiveRightTabId = ws.activeRightTabId ?? null
+          if (ws.activeRightTabId === tabId) {
+            const rightTabs = newTabs.filter(t => t.params?.panel === 'right')
+            newActiveRightTabId = rightTabs.length > 0 ? rightTabs[0].id : null
+          }
+
           const newRecentlyClosedTabs = closedTab
             ? [
                 closedTab,
@@ -297,6 +309,7 @@ export const useNavigationStore = create<NavigationStore>()(
                 ...ws,
                 tabs: newTabs,
                 activeTabId: newActiveTabId,
+                activeRightTabId: newActiveRightTabId,
                 lastActiveAt: new Date().toISOString(),
               },
             },
@@ -315,6 +328,23 @@ export const useNavigationStore = create<NavigationStore>()(
               [windowId]: {
                 ...ws,
                 activeTabId,
+                lastActiveAt: new Date().toISOString(),
+              },
+            },
+          }
+        })
+      },
+
+      setActiveRightTab: (windowId, activeRightTabId) => {
+        set(state => {
+          const ws = state.activeWindows[windowId]
+          if (!ws) return state
+          return {
+            activeWindows: {
+              ...state.activeWindows,
+              [windowId]: {
+                ...ws,
+                activeRightTabId,
                 lastActiveAt: new Date().toISOString(),
               },
             },
@@ -369,10 +399,22 @@ export const useNavigationStore = create<NavigationStore>()(
             }
           }
 
+          // Also handle right panel active tab
+          let newActiveRightTabId = ws.activeRightTabId ?? null
+          if (ws.activeRightTabId === tabId) {
+            const rightTabs = newTabs.filter(t => t.params?.panel === 'right')
+            newActiveRightTabId = rightTabs.length > 0 ? rightTabs[0].id : null
+          }
+
           return {
             activeWindows: {
               ...state.activeWindows,
-              [windowId]: { ...ws, tabs: newTabs, activeTabId: newActiveTabId },
+              [windowId]: {
+                ...ws,
+                tabs: newTabs,
+                activeTabId: newActiveTabId,
+                activeRightTabId: newActiveRightTabId,
+              },
             },
           }
         })

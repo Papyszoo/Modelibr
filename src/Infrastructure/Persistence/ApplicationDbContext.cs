@@ -24,6 +24,7 @@ namespace Infrastructure.Persistence
         public DbSet<SpriteCategory> SpriteCategories => Set<SpriteCategory>();
         public DbSet<Sound> Sounds => Set<Sound>();
         public DbSet<SoundCategory> SoundCategories => Set<SoundCategory>();
+        public DbSet<TextureProxy> TextureProxies => Set<TextureProxy>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -224,15 +225,59 @@ namespace Infrastructure.Persistence
                 entity.HasQueryFilter(t => !t.IsDeleted);
             });
 
+            // Configure TextureProxy entity
+            modelBuilder.Entity<TextureProxy>(entity =>
+            {
+                entity.HasKey(tp => tp.Id);
+                entity.Property(tp => tp.TextureId).IsRequired();
+                entity.Property(tp => tp.FileId).IsRequired();
+                entity.Property(tp => tp.Size).IsRequired();
+                entity.Property(tp => tp.CreatedAt).IsRequired();
+
+                // Configure relationship with Texture
+                entity.HasOne(tp => tp.Texture)
+                    .WithMany(t => t.Proxies)
+                    .HasForeignKey(tp => tp.TextureId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure relationship with File
+                entity.HasOne(tp => tp.File)
+                    .WithMany()
+                    .HasForeignKey(tp => tp.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Unique constraint: one proxy per texture per size
+                entity.HasIndex(tp => new { tp.TextureId, tp.Size })
+                    .IsUnique();
+
+                // Index for efficient querying by texture
+                entity.HasIndex(tp => tp.TextureId);
+            });
+
             // Configure TextureSet entity
             modelBuilder.Entity<TextureSet>(entity =>
             {
                 entity.HasKey(tp => tp.Id);
                 entity.Property(tp => tp.Name).IsRequired().HasMaxLength(200);
+                entity.Property(tp => tp.Kind).IsRequired()
+                    .HasDefaultValue(TextureSetKind.ModelSpecific);
+                entity.Property(tp => tp.TilingScaleX).IsRequired()
+                    .HasDefaultValue(1.0f);
+                entity.Property(tp => tp.TilingScaleY).IsRequired()
+                    .HasDefaultValue(1.0f);
+                entity.Property(tp => tp.UvMappingMode).IsRequired()
+                    .HasDefaultValue(UvMappingMode.Standard);
+                entity.Property(tp => tp.UvScale).IsRequired()
+                    .HasDefaultValue(1.0f);
+                entity.Property(tp => tp.PreviewGeometryType).IsRequired()
+                    .HasMaxLength(20)
+                    .HasDefaultValue("plane");
                 entity.Property(tp => tp.CreatedAt).IsRequired();
                 entity.Property(tp => tp.UpdatedAt).IsRequired();
                 entity.Property(tp => tp.IsDeleted).IsRequired();
                 entity.Property(tp => tp.DeletedAt);
+                entity.Property(tp => tp.ThumbnailPath).HasMaxLength(500);
+                entity.Property(tp => tp.PngThumbnailPath).HasMaxLength(500);
 
                 // Configure one-to-many relationship with Textures
                 entity.HasMany(tp => tp.Textures)
@@ -242,6 +287,9 @@ namespace Infrastructure.Persistence
 
                 // Create index for efficient querying by name
                 entity.HasIndex(tp => tp.Name);
+
+                // Add index for efficient querying by kind
+                entity.HasIndex(tp => tp.Kind);
 
                 // Add index for efficient soft delete queries
                 entity.HasIndex(tp => tp.IsDeleted);
@@ -318,6 +366,7 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.ModelHash).IsRequired(false).HasMaxLength(64);
                 entity.Property(tj => tj.SoundId).IsRequired(false);
                 entity.Property(tj => tj.SoundHash).IsRequired(false).HasMaxLength(64);
+                entity.Property(tj => tj.TextureSetId).IsRequired(false);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -326,6 +375,7 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.LockTimeoutMinutes).IsRequired();
                 entity.Property(tj => tj.CreatedAt).IsRequired();
                 entity.Property(tj => tj.UpdatedAt).IsRequired();
+                entity.Property(tj => tj.ProxySize).IsRequired(false);
 
                 // Create composite unique index for ModelHash + ModelVersionId to prevent duplicate jobs per version
                 // This allows different versions to have separate thumbnail jobs even when sharing the same model file
@@ -359,6 +409,13 @@ namespace Infrastructure.Persistence
                 entity.HasOne(tj => tj.Sound)
                     .WithMany()
                     .HasForeignKey(tj => tj.SoundId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Configure relationship with TextureSet
+                entity.HasOne(tj => tj.TextureSet)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.TextureSetId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired(false);
             });
@@ -395,6 +452,8 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.ThumbnailWidth).IsRequired();
                 entity.Property(s => s.ThumbnailHeight).IsRequired();
                 entity.Property(s => s.CleanRecycledFilesAfterDays).IsRequired();
+                entity.Property(s => s.TextureProxySize).IsRequired()
+                    .HasDefaultValue(512);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
             });

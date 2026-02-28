@@ -1,17 +1,18 @@
 import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
-import { Model } from '@/utils/fileUtils'
+import { type Model } from '@/utils/fileUtils'
+
 import {
-  ProjectDto,
-  GetAllProjectsResponse,
-  CreateProjectRequest,
-  CreateProjectResponse,
-  UpdateProjectRequest,
-  TextureSetDto,
-  GetAllTextureSetsResponse,
-  SpriteDto,
-  GetAllSpritesResponse,
-  SoundDto,
-  GetAllSoundsResponse,
+  type CreateProjectRequest,
+  type CreateProjectResponse,
+  type GetAllProjectsResponse,
+  type GetAllSoundsResponse,
+  type GetAllSpritesResponse,
+  type GetAllTextureSetsResponse,
+  type ProjectDto,
+  type SoundDto,
+  type SpriteDto,
+  type TextureSetDto,
+  type UpdateProjectRequest,
 } from '../../../types'
 
 export async function getAllProjects(

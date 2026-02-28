@@ -5,6 +5,7 @@ using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using WebApi.Files;
+using WebApi.Infrastructure;
 using WebApi.Services;
 
 namespace WebApi.Endpoints;
@@ -83,7 +84,7 @@ public static class ThumbnailEndpoints
             IFormFile file,
             [FromForm] int? width,
             [FromForm] int? height,
-            [FromForm] int? versionId,
+            [FromQuery] int? versionId,
             ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> commandHandler,
             IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> modelQueryHandler,
             Application.Settings.ISettingsService settingsService,
@@ -133,6 +134,7 @@ public static class ThumbnailEndpoints
         })
         .WithName("Upload Thumbnail")
         .WithTags("Thumbnails")
+        .AddEndpointFilter<WorkerApiKeyFilter>()
         .DisableAntiforgery();
 
         app.MapPost("/models/{id}/thumbnail/png-upload", async (
@@ -140,7 +142,7 @@ public static class ThumbnailEndpoints
             IFormFile file,
             [FromForm] int? width,
             [FromForm] int? height,
-            [FromForm] int? versionId,
+            [FromQuery] int? versionId,
             ICommandHandler<UploadPngThumbnailCommand, UploadPngThumbnailCommandResponse> commandHandler,
             IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> modelQueryHandler,
             Application.Settings.ISettingsService settingsService,
@@ -190,6 +192,7 @@ public static class ThumbnailEndpoints
         })
         .WithName("Upload PNG Thumbnail")
         .WithTags("Thumbnails")
+        .AddEndpointFilter<WorkerApiKeyFilter>()
         .DisableAntiforgery();
 
         app.MapGet("/models/{id}/thumbnail/file", async (

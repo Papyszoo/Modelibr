@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
+
+import { type StageConfig } from './SceneEditor'
 import { StageHierarchyWindow } from './StageHierarchyWindow'
-import { StageConfig } from './SceneEditor'
 
 const meta: Meta<typeof StageHierarchyWindow> = {
   title: 'Stage Editor/StageHierarchyWindow',

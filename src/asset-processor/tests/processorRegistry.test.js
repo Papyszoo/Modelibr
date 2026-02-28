@@ -64,8 +64,17 @@ vi.mock('../frameEncoderService.js', () => ({
   FrameEncoderService: vi.fn(function () {}),
 }))
 
+vi.mock('../textureSetApiService.js', () => ({
+  TextureSetApiService: vi.fn(function () {}),
+}))
+
+vi.mock('../textureProxyGenerator.js', () => ({
+  generateTextureProxies: vi.fn(),
+}))
+
 vi.mock('../config.js', () => ({
   config: {
+    apiBaseUrl: 'http://localhost:8080',
     orbit: { enabled: true },
     encoding: { enabled: true },
     thumbnailStorage: { enabled: true },
@@ -81,6 +90,9 @@ const { ThumbnailProcessor } = await import(
 )
 const { SoundProcessor } = await import('../processors/soundProcessor.js')
 const { MeshAnalysisProcessor } = await import('../processors/meshProcessor.js')
+const { TextureSetProcessor } = await import(
+  '../processors/textureSetProcessor.js'
+)
 
 describe('ProcessorRegistry', () => {
   let registry
@@ -90,10 +102,11 @@ describe('ProcessorRegistry', () => {
   })
 
   describe('initialization', () => {
-    it('should register Model, Sound, and MeshAnalysis processors', () => {
-      expect(registry.processors.size).toBe(3)
+    it('should register Model, Sound, TextureSet, and MeshAnalysis processors', () => {
+      expect(registry.processors.size).toBe(4)
       expect(registry.processors.has('Model')).toBe(true)
       expect(registry.processors.has('Sound')).toBe(true)
+      expect(registry.processors.has('TextureSet')).toBe(true)
       expect(registry.processors.has('MeshAnalysis')).toBe(true)
     })
 
@@ -102,6 +115,9 @@ describe('ProcessorRegistry', () => {
         ThumbnailProcessor
       )
       expect(registry.processors.get('Sound')).toBeInstanceOf(SoundProcessor)
+      expect(registry.processors.get('TextureSet')).toBeInstanceOf(
+        TextureSetProcessor
+      )
       expect(registry.processors.get('MeshAnalysis')).toBeInstanceOf(
         MeshAnalysisProcessor
       )
@@ -125,6 +141,14 @@ describe('ProcessorRegistry', () => {
         id: 3,
       })
       expect(processor).toBeInstanceOf(MeshAnalysisProcessor)
+    })
+
+    it('should return TextureSetProcessor for TextureSet asset type', () => {
+      const processor = registry.getProcessor({
+        assetType: 'TextureSet',
+        id: 6,
+      })
+      expect(processor).toBeInstanceOf(TextureSetProcessor)
     })
 
     it('should return null for unknown asset type', () => {
@@ -181,14 +205,16 @@ describe('ProcessorRegistry', () => {
       processors[0][1].cleanup = vi
         .fn()
         .mockRejectedValue(new Error('cleanup failed'))
-      // Second processor should still be called
-      processors[1][1].cleanup = vi.fn().mockResolvedValue(undefined)
-      processors[2][1].cleanup = vi.fn().mockResolvedValue(undefined)
+      // Remaining processors should still be called
+      for (let i = 1; i < processors.length; i++) {
+        processors[i][1].cleanup = vi.fn().mockResolvedValue(undefined)
+      }
 
       await registry.cleanupAll()
 
-      expect(processors[1][1].cleanup).toHaveBeenCalledOnce()
-      expect(processors[2][1].cleanup).toHaveBeenCalledOnce()
+      for (let i = 1; i < processors.length; i++) {
+        expect(processors[i][1].cleanup).toHaveBeenCalledOnce()
+      }
     })
   })
 })

@@ -78,9 +78,10 @@ public class FinishThumbnailJobCommandHandlerTests
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
 
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Equal("ModelNotFound", result.Error.Code);
+        // Assert - handler returns success with Failed status when model is deleted
+        // (to prevent 400 errors to worker that would cause retry cascades)
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ThumbnailStatus.Failed, result.Value.Status);
     }
 
     [Fact]

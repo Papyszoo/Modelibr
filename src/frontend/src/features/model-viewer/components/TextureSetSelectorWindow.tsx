@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import './TextureSetSelectorWindow.css'
+
 import { Button } from 'primereact/button'
-import { Model } from '@/utils/fileUtils'
-import { TextureSetDto } from '@/types'
+import { useState } from 'react'
+
+import { FloatingWindow } from '@/components/FloatingWindow'
 import {
   getFileUrl,
   setDefaultTextureSet,
 } from '@/features/models/api/modelApi'
-import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
-import { FloatingWindow } from '@/components/FloatingWindow'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
+import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
+import { type TextureSetDto } from '@/types'
+import { type Model } from '@/utils/fileUtils'
+
 import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
-import './TextureSetSelectorWindow.css'
 
 interface TextureSetSelectorWindowProps {
   visible: boolean
@@ -258,4 +261,3 @@ export function TextureSetSelectorWindow({
     </>
   )
 }
-

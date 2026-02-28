@@ -1,5 +1,6 @@
-import { Slider } from 'primereact/slider'
 import './CardWidthSlider.css'
+
+import { Slider } from 'primereact/slider'
 
 interface CardWidthSliderProps {
   value: number

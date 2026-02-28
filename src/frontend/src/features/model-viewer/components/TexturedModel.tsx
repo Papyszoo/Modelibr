@@ -1,16 +1,17 @@
-import { useRef, useEffect, useMemo } from 'react'
 import { useFrame, useLoader, useThree } from '@react-three/fiber'
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
+
 import {
+  type TextureConfig,
   useChannelExtractedTextures,
-  TextureConfig,
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
-import { TextureSetDto, TextureType, TextureChannel } from '@/types'
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 
 interface TexturedModelProps {
   modelUrl: string
@@ -450,4 +451,3 @@ export function TexturedModel({
   // Fallback to basic model without textures
   return null
 }
-

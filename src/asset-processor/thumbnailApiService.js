@@ -20,6 +20,7 @@ export class ThumbnailApiService {
       timeout: 30000, // 30 second timeout
       headers: {
         'User-Agent': 'Modelibr-ThumbnailWorker/1.0',
+        ...(config.workerApiKey ? { 'X-Api-Key': config.workerApiKey } : {}),
       },
       // Handle self-signed certificates in development/docker environments
       httpsAgent,
