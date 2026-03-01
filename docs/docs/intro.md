@@ -81,7 +81,8 @@ Modelibr comes with a default configuration that works out of the box, but you c
 
 **Key Settings:**
 
-- `WEBAPI_HTTP_PORT`: Port for the backend API (Default: 8080).
+- `HTTPS_PORT`: HTTPS port for the backend API (Default: 8443).
+- `EXPOSE_443_PORT`: Also bind to port 443 for Windows WebDAV compatibility (Default: true).
 - `FRONTEND_PORT`: Port for the web interface (Default: 3000).
 - `POSTGRES_PASSWORD`: Database password (change this for security).
 - **Note**: The data storage path is managed by Docker volumes (mapped to `./data` folder in the project root) and does not need to be changed in the `.env` file for standard usage.

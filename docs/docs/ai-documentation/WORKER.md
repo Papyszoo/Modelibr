@@ -30,6 +30,7 @@ Health check: `curl http://localhost:3001/health`
 
 - **Real-time processing** - SignalR notifications for instant job pickup
 - **3D format support** - OBJ, FBX, GLTF, GLB and more via Three.js loaders
+- **Blender .blend conversion** - Headless Blender converts .blend files to .glb before rendering (x64 Blender via QEMU on ARM64)
 - **Orbit animations** - Smooth 360° rotation at configurable angles
 - **WebP encoding** - Animated WebP with configurable quality/framerate
 - **API-based storage** - Uploads to backend, avoiding filesystem permission issues
@@ -45,6 +46,8 @@ Health check: `curl http://localhost:3001/health`
 3. Worker → Claims job via POST /thumbnail-jobs/dequeue
 4. Worker → Dispatches to processor based on asset type (Model/Sound/TextureSet)
 5. Worker → Downloads asset files from API
+5.5. Worker → If .blend file, converts to .glb via headless Blender (export_glb.py)
+5.6. Worker → Uploads converted .glb back to model version
 6. Worker → Loads and normalizes asset (3D model / sphere geometry / audio)
 7. Worker → Generates orbit animation frames (360°) for models, swing animation frames for texture sets, or waveform for sounds
 8. Worker → Encodes frames to animated WebP + poster image
@@ -311,7 +314,7 @@ docker compose exec asset-processor dpkg -l | grep -E 'libgl1|mesa'
 
 **"Failed to load model: Invalid file format"**
 
-Check supported formats: `.obj`, `.fbx`, `.gltf`, `.glb`
+Check supported formats: `.obj`, `.fbx`, `.gltf`, `.glb`, `.blend` (auto-converted to .glb)
 
 Test with a simple .obj file:
 
@@ -493,7 +496,7 @@ npm test
 - `soundProcessor.js` - Audio waveform generation
 - `textureSetProcessor.js` - Texture set preview thumbnail generation (Universal/Global Materials). Renders a swing animation (camera swings from 45° top-left to 30° bottom-right and back) encoded as animated WebP via `FrameEncoderService`. Reads `previewGeometryType` from the texture set to render on the appropriate geometry (sphere, box, cylinder, or torus — defaults to plane). Uses `uvScale` directly as texture repeat multiplier. After generating the thumbnail, generates web proxy textures at the configured size (from settings, or overridden by `job.proxySize`). Also generates lightweight PNG previews for individual texture files (EXR or >1MB) and uploads them via `POST /files/{id}/preview/upload`.
 - `textureProxyGenerator.js` - Generates resized proxy textures per texture type category. Each function receives `sourceChannel` (0=RGB, 1=R, 2=G, 3=B, 4=A) and calls `sharp.extractChannel()` for packed/split-channel textures before resizing. Three encoding strategies: **sRGB** (Albedo, Emissive) → lossy WebP q80 for RGB, or lossless WebP for single-channel extraction; **Linear** (AO, Roughness, Metallic, Height, Displacement, Opacity, etc.) → lossless WebP, with `extractChannel` for packed maps or `toColourspace('b-w')` for full-RGB data; **Normal** → lossless PNG with per-pixel renormalization after resize (falls back to linear proxy for channel-extracted normals). Filenames include channel suffix (`_R`, `_G`, `_B`, `_A`) for split-channel proxies to avoid collisions.
-- `thumbnailProcessor.js` - Generic thumbnail processing
+- `thumbnailProcessor.js` - Generic thumbnail processing; handles .blend → .glb conversion via headless Blender before Puppeteer rendering
 
 **imagePreviewGenerator.js** - Utility for converting EXR files to PNG (via Three.js EXRLoader + Reinhard tone mapping + sharp) and resizing large standard images. Used by both `puppeteerRenderer.js` (pre-processing textures for browser) and `textureSetProcessor.js` (generating individual file previews).
 

@@ -1,5 +1,7 @@
 import axios from 'axios'
 import https from 'https'
+import fs from 'fs'
+import FormData from 'form-data'
 import { config } from './config.js'
 import logger from './logger.js'
 
@@ -242,6 +244,51 @@ export class JobApiClient {
     } catch (error) {
       logger.error('Failed to get sound file', {
         soundId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Upload a renderable file (e.g. converted .glb) to an existing model version.
+   * @param {number} modelId - The model ID
+   * @param {number} versionId - The version ID to attach the file to
+   * @param {string} filePath - Path to the file to upload
+   * @param {string} fileName - Original filename for the upload
+   * @returns {Promise<Object>} Upload result
+   */
+  async uploadRenderableFile(modelId, versionId, filePath, fileName) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File not found: ${filePath}`)
+      }
+
+      const formData = new FormData()
+      formData.append('file', fs.createReadStream(filePath), fileName)
+
+      const response = await this.apiClient.post(
+        `/models/${modelId}/versions/${versionId}/files`,
+        formData,
+        {
+          headers: formData.getHeaders(),
+          timeout: 120000,
+        }
+      )
+
+      logger.info('Renderable file uploaded successfully', {
+        modelId,
+        versionId,
+        fileName,
+        responseData: response.data,
+      })
+
+      return response.data
+    } catch (error) {
+      logger.error('Failed to upload renderable file', {
+        modelId,
+        versionId,
+        fileName,
         error: error.message,
       })
       throw error
