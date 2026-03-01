@@ -70,17 +70,12 @@ export function getWebDavPath(virtualPath: string): WebDavPathInfo {
   switch (os) {
     case 'windows':
       // Windows WebDAV (Mini-Redirector / WebClient service)
-      // Format: \\server@SSL@port\path for HTTPS, \\server@port\path for HTTP
-      // IMPORTANT: Windows WebClient only supports ports 80 (HTTP) and 443 (HTTPS)
-      // by default. Non-standard ports (e.g. 3000) require a registry edit.
-      {
-        const isStandardPort =
-          (isHttps && (port === '443' || port === '')) ||
-          (!isHttps && (port === '80' || port === ''))
-        const portStr = isStandardPort ? '' : `@${port}`
-        const sslStr = isHttps ? '@SSL' : ''
-        nativePath = `\\\\${host}${sslStr}${portStr}\\modelibr\\${cleanPath.replace(/\//g, '\\')}`
-      }
+      // We always use HTTP on port 80 for Windows UNC paths because:
+      //  - The nginx proxy exposes a plain HTTP WebDAV listener on port 80
+      //  - Windows WebClient works with HTTP on port 80 with no cert or registry requirements
+      //  - HTTPS paths require a trusted certificate AND port 443 (or a registry edit)
+      // Format: \\server\share\path  (HTTP port 80 — the simplest Windows-compatible path)
+      nativePath = `\\\\${host}\\modelibr\\${cleanPath.replace(/\//g, '\\')}`
       break
 
     case 'macos':
@@ -218,18 +213,11 @@ export async function copyPathToClipboard(
  */
 export function getCopyPathSuccessMessage(): string {
   const os = detectOS()
-  const { port, isHttps } = getWebDavHostInfo()
-  const isStandardPort =
-    (isHttps && (port === '443' || port === '')) ||
-    (!isHttps && (port === '80' || port === ''))
 
   switch (os) {
     case 'macos':
       return 'Path copied. Use Finder \u2192 Go \u2192 Connect to Server (\u2318K) to open.'
     case 'windows':
-      if (!isStandardPort) {
-        return `Path copied. Note: Windows WebDAV requires port 443 for HTTPS. Currently using port ${port} which needs a registry edit (see mount instructions).`
-      }
       return 'Path copied. Paste it in File Explorer address bar to open.'
     case 'linux':
       return 'Path copied. Paste in your file manager (Ctrl+L) to open.'
@@ -252,30 +240,21 @@ export function getMountInstructions(): {
 
   switch (os) {
     case 'windows': {
-      const isStandardPort =
-        (isHttps && (port === '443' || port === '')) ||
-        (!isHttps && (port === '80' || port === ''))
-      const portWarning = !isStandardPort
-        ? `\n\n⚠️ You are using port ${port}. Windows WebClient only supports port 443 for HTTPS by default.\nTo enable non-standard ports, run these commands in an elevated Command Prompt and restart:\n\n  reg add HKLM\\SYSTEM\\CurrentControlSet\\Services\\WebClient\\Parameters /v ClientPortSetting /t REG_DWORD /d ${port} /f\n  net stop WebClient && net start WebClient`
-        : ''
-      const certWarning = isHttps
-        ? '\n\n⚠️ This server uses a self-signed certificate. You must import it into the Windows Trusted Root Certificate Store for WebDAV to work.\nDownload the certificate from the server admin and install via:\n\n  certutil -addstore Root selfsigned.crt'
-        : ''
-      const uncPath = isHttps
-        ? `\\\\${host}@SSL${isStandardPort ? '' : `@${port}`}\\modelibr`
-        : `\\\\${host}${isStandardPort ? '' : `@${port}`}\\modelibr`
+      // Use HTTP on port 80 — no certificate trust or registry edits required.
+      const uncPath = `\\\\${host}\\modelibr`
+      const httpWebDavUrl = `http://${host}/modelibr`
       return {
         os,
         instructions: `Accessing via Windows Explorer:
- 
- 1. Open File Explorer
- 2. Paste this path into the address bar:
- 
- ${uncPath}
- 
- Or use "Map network drive...":
- 1. Right-click "This PC" > "Map network drive..."
- 2. Folder: ${webDavUrl}${portWarning}${certWarning}`,
+
+1. Open File Explorer
+2. Paste this path into the address bar:
+
+${uncPath}
+
+Or use "Map network drive...":
+1. Right-click "This PC" > "Map network drive..."
+2. Folder: ${httpWebDavUrl}`,
       }
     }
 

@@ -30,13 +30,14 @@ internal class GetVersionRenderableFileQueryHandler : IQueryHandler<GetVersionRe
                 new Error("VersionNotFound", $"Model version with ID {query.VersionId} was not found."));
         }
 
-        // Find the first renderable file in the version
-        var renderableFile = version.Files.FirstOrDefault(f => f.FileType.IsRenderable);
+        // Find the first renderable file; fall back to any file (e.g. .blend for worker conversion)
+        var renderableFile = version.Files.FirstOrDefault(f => f.FileType.IsRenderable)
+            ?? version.Files.FirstOrDefault();
         
         if (renderableFile == null)
         {
             return Result.Failure<GetVersionRenderableFileResponse>(
-                new Error("NoRenderableFile", $"Model version {query.VersionId} has no renderable files."));
+                new Error("NoRenderableFile", $"Model version {query.VersionId} has no files."));
         }
 
         // Construct full path from relative path
