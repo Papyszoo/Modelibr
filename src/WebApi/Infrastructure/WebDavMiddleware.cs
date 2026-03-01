@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Application.Models;
 using Infrastructure.Persistence;
@@ -226,6 +227,18 @@ public class WebDavMiddleware
 
                 _logger.LogInformation("Created model version {VersionId} for model {ModelId} via Blender save",
                     createResult.Value.VersionId, modelId);
+
+                // Dispatch ModelUploadedEvent so the asset-processor picks up the
+                // .blend file, converts it to .glb, and generates a thumbnail.
+                // The CreateModelVersionCommandHandler only raises this event for
+                // renderable file types; .blend is a project file, so we raise it manually.
+                var dispatcher = sp.GetRequiredService<IDomainEventDispatcher>();
+                var uploadedEvent = new Domain.Events.ModelUploadedEvent(
+                    modelId,
+                    createResult.Value.VersionId,
+                    uploadedHash,
+                    isNewModel: false);
+                await dispatcher.PublishAsync(new[] { uploadedEvent }, context.RequestAborted);
             }
         }
         catch (Exception ex)
