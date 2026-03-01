@@ -242,6 +242,7 @@ export class ModelFileService {
       '.fbx': 'fbx',
       '.gltf': 'gltf',
       '.glb': 'glb',
+      '.blend': 'blend',
     }
 
     return supportedTypes[extension.toLowerCase()] || null
