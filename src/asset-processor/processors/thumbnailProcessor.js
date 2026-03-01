@@ -102,12 +102,15 @@ export class ThumbnailProcessor extends BaseProcessor {
           )
         } catch (blenderError) {
           const stderr = blenderError.stderr?.toString() || ''
+          const stdout = blenderError.stdout?.toString() || ''
+          const output = stderr || stdout // Blender often writes errors to stdout
           jobLogger.error('Blender GLB export failed', {
             exitCode: blenderError.status,
             stderr: stderr.slice(-2000),
+            stdout: stdout.slice(-2000),
           })
           throw new Error(
-            `Blender GLB export failed (exit ${blenderError.status}): ${stderr.slice(-500)}`
+            `Blender GLB export failed (exit ${blenderError.status}): ${output.slice(-500)}`
           )
         }
 
