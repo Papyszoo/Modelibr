@@ -260,6 +260,10 @@ export class JobApiClient {
    */
   async uploadRenderableFile(modelId, versionId, filePath, fileName) {
     try {
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File not found: ${filePath}`)
+      }
+
       const formData = new FormData()
       formData.append('file', fs.createReadStream(filePath), fileName)
 

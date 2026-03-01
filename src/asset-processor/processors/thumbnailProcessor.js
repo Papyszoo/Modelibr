@@ -92,18 +92,30 @@ export class ThumbnailProcessor extends BaseProcessor {
         const blenderPath = process.env.BLENDER_PATH || 'blender'
         const __dirname = path.dirname(fileURLToPath(import.meta.url))
         const scriptPath = path.resolve(__dirname, '..', 'export_glb.py')
-        glbConvertedPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')
+        const candidateGlbPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')
 
-        execFileSync(
-          blenderPath,
-          ['-b', fileInfo.filePath, '-P', scriptPath, '--', glbConvertedPath],
-          { timeout: 120000 }
-        )
+        try {
+          execFileSync(
+            blenderPath,
+            ['-b', fileInfo.filePath, '-P', scriptPath, '--', candidateGlbPath],
+            { timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] }
+          )
+        } catch (blenderError) {
+          const stderr = blenderError.stderr?.toString() || ''
+          jobLogger.error('Blender GLB export failed', {
+            exitCode: blenderError.status,
+            stderr: stderr.slice(-2000),
+          })
+          throw new Error(
+            `Blender GLB export failed (exit ${blenderError.status}): ${stderr.slice(-500)}`
+          )
+        }
 
-        if (!fs.existsSync(glbConvertedPath)) {
+        if (!fs.existsSync(candidateGlbPath)) {
           throw new Error('Blender GLB export failed — output file not found')
         }
 
+        glbConvertedPath = candidateGlbPath
         jobLogger.info('.blend converted to .glb', { glbConvertedPath })
 
         // Upload the converted .glb back to the model version
