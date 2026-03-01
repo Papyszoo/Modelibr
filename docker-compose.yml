@@ -8,6 +8,7 @@ services:
         ports:
             - "${FRONTEND_PORT:-3000}:443"
             - "${WEBDAV_PORT:-443}:443"
+            - "${WEBDAV_HTTP_PORT:-80}:80"
         depends_on:
             - frontend
             - webapi
@@ -33,7 +34,6 @@ services:
             - EXPOSE_443_PORT=${EXPOSE_443_PORT:-true}
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
-            - "443:443"
         volumes:
             # Use platform-appropriate secret/cert paths; on macOS $HOME works (APPDATA is Windows-specific)
             - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro
@@ -62,6 +62,7 @@ services:
             dockerfile: Dockerfile
             args:
                 ENABLE_BLENDER: ${ENABLE_BLENDER:-false}
+                BLENDER_VERSION: ${BLENDER_VERSION:-5.0.1}
         container_name: asset-processor
         environment:
             - WORKER_ID=${WORKER_ID:-worker-1}
@@ -73,8 +74,9 @@ services:
             - RENDER_HEIGHT=${RENDER_HEIGHT:-256}
             - RENDER_FORMAT=${RENDER_FORMAT:-png}
             - LOG_LEVEL=${LOG_LEVEL:-info}
-            - NODE_TLS_REJECT_UNAUTHORIZED=0  # Required for self-signed cert; do NOT use in production with external TLS
+            - NODE_TLS_REJECT_UNAUTHORIZED=0 # Required for self-signed cert; do NOT use in production with external TLS
             - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
+            - BLENDER_PATH=/opt/blender/blender
         ports:
             - "${WORKER_PORT:-3001}:3001"
         volumes:

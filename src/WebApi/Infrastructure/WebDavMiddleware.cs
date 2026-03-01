@@ -72,6 +72,16 @@ public class WebDavMiddleware
             return;
         }
 
+        // Handle verification/property requests for Blender temp files.
+        // Windows WebDAV MiniRedirector sends HEAD, PROPFIND, and PROPPATCH after PUT
+        // to verify the file was written. Without these, Windows considers the write failed
+        // and Blender reports "Cannot change old file (file saved with @)".
+        if (IsBlenderTempFile(requestPath) && method is "HEAD" or "GET" or "PROPFIND" or "PROPPATCH" or "DELETE")
+        {
+            await HandleBlenderTempFileRequestAsync(context, method, requestPath);
+            return;
+        }
+
         // Ignore Blender backup operations (.blend1 files or DELETE of temp files)
         if (IsBlenderBackupOperation(method, requestPath, context))
         {
@@ -104,7 +114,15 @@ public class WebDavMiddleware
         if (string.IsNullOrEmpty(destination))
             return false;
 
-        var destFileName = Path.GetFileName(new Uri(destination).AbsolutePath);
+        // Destination may be an absolute URI (RFC 4918) or a relative path.
+        // Use Uri.TryCreate so we never throw on malformed values.
+        string destPath;
+        if (Uri.TryCreate(destination, UriKind.Absolute, out var absUri))
+            destPath = absUri.AbsolutePath;
+        else
+            destPath = destination; // treat as raw path
+
+        var destFileName = Path.GetFileName(destPath.TrimEnd('/'));
         return destFileName.Equals("newestVersion.blend", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -127,13 +145,114 @@ public class WebDavMiddleware
             var destination = context.Request.Headers["Destination"].ToString();
             if (!string.IsNullOrEmpty(destination))
             {
-                var destFileName = Path.GetFileName(new Uri(destination).AbsolutePath);
+                string destPath;
+                if (Uri.TryCreate(destination, UriKind.Absolute, out var absUri))
+                    destPath = absUri.AbsolutePath;
+                else
+                    destPath = destination;
+
+                var destFileName = Path.GetFileName(destPath.TrimEnd('/'));
                 if (destFileName.EndsWith(".blend1", StringComparison.OrdinalIgnoreCase))
                     return true;
             }
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Handles HEAD, GET, PROPFIND, PROPPATCH, and DELETE for Blender temp files.
+    /// Windows WebDAV MiniRedirector sends these after PUT to verify/configure the temp file.
+    /// </summary>
+    private async Task HandleBlenderTempFileRequestAsync(HttpContext context, string method, string requestPath)
+    {
+        var tempKey = GetTempFileKey(requestPath);
+        var tempFilePath = Path.Combine(_pathProvider.UploadRootPath, "webdav-blend-temp", tempKey);
+
+        if (!System.IO.File.Exists(tempFilePath))
+        {
+            _logger.LogDebug("Blender temp file {Method} for {Path} — no temp file found", method, requestPath);
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        var fileInfo = new System.IO.FileInfo(tempFilePath);
+
+        switch (method)
+        {
+            case "HEAD":
+                context.Response.StatusCode = 200;
+                context.Response.ContentType = "application/octet-stream";
+                context.Response.ContentLength = fileInfo.Length;
+                context.Response.Headers["Last-Modified"] = fileInfo.LastWriteTimeUtc.ToString("R");
+                break;
+
+            case "GET":
+                context.Response.StatusCode = 200;
+                context.Response.ContentType = "application/octet-stream";
+                context.Response.ContentLength = fileInfo.Length;
+                context.Response.Headers["Last-Modified"] = fileInfo.LastWriteTimeUtc.ToString("R");
+                await using (var fs = System.IO.File.OpenRead(tempFilePath))
+                {
+                    await fs.CopyToAsync(context.Response.Body, context.RequestAborted);
+                }
+                break;
+
+            case "PROPFIND":
+            {
+                var href = System.Security.SecurityElement.Escape(context.Request.Path.Value ?? requestPath);
+                var lastModified = fileInfo.LastWriteTimeUtc.ToString("R");
+                var creationDate = fileInfo.CreationTimeUtc.ToString("yyyy-MM-ddTHH:mm:ssZ");
+                var xml =
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+                    "<D:multistatus xmlns:D=\"DAV:\">" +
+                    "<D:response>" +
+                    $"<D:href>{href}</D:href>" +
+                    "<D:propstat>" +
+                    "<D:prop>" +
+                    "<D:resourcetype/>" +
+                    $"<D:getcontentlength>{fileInfo.Length}</D:getcontentlength>" +
+                    $"<D:getlastmodified>{lastModified}</D:getlastmodified>" +
+                    $"<D:creationdate>{creationDate}</D:creationdate>" +
+                    "<D:getcontenttype>application/octet-stream</D:getcontenttype>" +
+                    "</D:prop>" +
+                    "<D:status>HTTP/1.1 200 OK</D:status>" +
+                    "</D:propstat>" +
+                    "</D:response>" +
+                    "</D:multistatus>";
+                context.Response.StatusCode = 207;
+                context.Response.ContentType = "application/xml; charset=utf-8";
+                await context.Response.WriteAsync(xml);
+                break;
+            }
+
+            case "PROPPATCH":
+            {
+                // Accept property changes silently (Windows sets Win32 timestamps)
+                var href = System.Security.SecurityElement.Escape(context.Request.Path.Value ?? requestPath);
+                var xml =
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+                    "<D:multistatus xmlns:D=\"DAV:\">" +
+                    "<D:response>" +
+                    $"<D:href>{href}</D:href>" +
+                    "<D:propstat>" +
+                    "<D:prop/>" +
+                    "<D:status>HTTP/1.1 200 OK</D:status>" +
+                    "</D:propstat>" +
+                    "</D:response>" +
+                    "</D:multistatus>";
+                context.Response.StatusCode = 207;
+                context.Response.ContentType = "application/xml; charset=utf-8";
+                await context.Response.WriteAsync(xml);
+                break;
+            }
+
+            case "DELETE":
+                try { System.IO.File.Delete(tempFilePath); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete Blender temp file {Path}", tempFilePath); }
+                context.Response.StatusCode = 204;
+                break;
+        }
     }
 
     /// <summary>
@@ -220,9 +339,19 @@ public class WebDavMiddleware
 
                 if (createResult.IsFailure)
                 {
-                    _logger.LogError("Failed to create new model version for model {ModelId}: {Error}", modelId, createResult.Error?.Message);
-                    context.Response.StatusCode = 500;
-                    return;
+                    // DuplicateFile means the saved content already exists in a previous version.
+                    // Treat as success (204) so Blender is not confused — the data is already stored.
+                    // All other failures are real errors and should surface as 500.
+                    if (createResult.Error?.Code == "DuplicateFile")
+                    {
+                        _logger.LogInformation("Blender save: file content matches an existing version for model {ModelId}, treating as no-op", modelId);
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to create new model version for model {ModelId}: {Error}", modelId, createResult.Error?.Message);
+                        context.Response.StatusCode = 500;
+                        return;
+                    }
                 }
 
                 _logger.LogInformation("Created model version {VersionId} for model {ModelId} via Blender save",
@@ -271,7 +400,9 @@ public class WebDavMiddleware
 
     /// <summary>
     /// Resolves the model ID and current blend file hash from the WebDAV request path.
-    /// Expects path like: /modelibr/Projects/{ProjectName}/Models/{ModelName}/newestVersion.blend@
+    /// Supports both project-based and global model paths:
+    ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/newestVersion.blend@
+    ///   /modelibr/Models/{ModelName}/newestVersion.blend@
     /// </summary>
     private async Task<(int ModelId, string? CurrentBlendHash)?> ResolveModelInfoFromPathAsync(IServiceProvider sp, string requestPath)
     {
@@ -285,39 +416,65 @@ public class WebDavMiddleware
                            .Select(Uri.UnescapeDataString)
                            .ToArray();
 
-        // Expect: Projects / {ProjectName} / Models / {ModelName} / newestVersion.blend@
-        if (segments.Length < 5)
-            return null;
+        string? projectName = null;
+        string? modelName = null;
 
-        if (!segments[0].Equals("Projects", StringComparison.OrdinalIgnoreCase) ||
-            !segments[2].Equals("Models", StringComparison.OrdinalIgnoreCase))
+        // Project-based path: Projects / {ProjectName} / Models / {ModelName} / newestVersion.blend@
+        if (segments.Length >= 5 &&
+            segments[0].Equals("Projects", StringComparison.OrdinalIgnoreCase) &&
+            segments[2].Equals("Models", StringComparison.OrdinalIgnoreCase))
+        {
+            projectName = segments[1];
+            modelName = segments[3];
+        }
+        // Global model path: Models / {ModelName} / newestVersion.blend@
+        else if (segments.Length >= 3 &&
+                 segments[0].Equals("Models", StringComparison.OrdinalIgnoreCase))
+        {
+            modelName = segments[1];
+        }
+        else
+        {
+            _logger.LogWarning("ResolveModelInfo: unrecognized path structure: {Segments}", string.Join("/", segments));
             return null;
+        }
 
-        var projectName = segments[1];
-        var modelName = segments[3];
+        _logger.LogInformation("ResolveModelInfo: project={Project}, model={Model}", projectName ?? "(global)", modelName);
 
         var dbContext = sp.GetRequiredService<ApplicationDbContext>();
 
-        var newestVersionFiles = await dbContext.Set<Domain.Models.Model>()
+        // Build query: filter by project name if project-based, else by model name only
+        var modelQuery = dbContext.Set<Domain.Models.Model>()
             .AsNoTracking()
-            .Where(m => !m.IsDeleted && m.Projects.Any(p => p.Name == projectName) && m.Name == modelName)
-            .SelectMany(m => m.Versions.Where(v => !v.IsDeleted).OrderByDescending(v => v.VersionNumber).Take(1))
-            .Include(v => v.Files)
-            .FirstOrDefaultAsync();
+            .Where(m => !m.IsDeleted && m.Name == modelName);
 
-        if (newestVersionFiles == null)
-            return null;
+        if (projectName != null)
+            modelQuery = modelQuery.Where(m => m.Projects.Any(p => p.Name == projectName));
 
-        var model = await dbContext.Set<Domain.Models.Model>()
-            .AsNoTracking()
-            .Where(m => !m.IsDeleted && m.Projects.Any(p => p.Name == projectName) && m.Name == modelName)
+        var model = await modelQuery
             .Select(m => new { m.Id })
             .FirstOrDefaultAsync();
 
         if (model == null)
+        {
+            _logger.LogWarning("ResolveModelInfo: model '{Model}' not found", modelName);
             return null;
+        }
 
-        var blendFile = newestVersionFiles.Files
+        var newestVersion = await dbContext.Set<Domain.Models.ModelVersion>()
+            .AsNoTracking()
+            .Include(v => v.Files)
+            .Where(v => !v.IsDeleted && v.ModelId == model.Id)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstOrDefaultAsync();
+
+        if (newestVersion == null)
+        {
+            _logger.LogWarning("ResolveModelInfo: no versions for model {ModelId}", model.Id); 
+            return null;
+        }
+
+        var blendFile = newestVersion.Files
             .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
 
         return (model.Id, blendFile?.Sha256Hash);

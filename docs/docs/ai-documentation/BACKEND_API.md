@@ -35,14 +35,14 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 ### Model Versions (6 endpoints)
 
-| Method | Endpoint                                                | Description              |
-| ------ | ------------------------------------------------------- | ------------------------ |
-| `POST` | `/models/{modelId}/versions`                            | Create new version       |
-| `POST` | `/models/{modelId}/versions/{versionId}/files`          | Add file to version      |
-| `GET`  | `/models/{modelId}/versions`                            | List all versions        |
-| `GET`  | `/models/{modelId}/versions/{versionId}`                | Get version details      |
-| `GET`  | `/models/{modelId}/versions/{versionId}/file`           | Download renderable file |
-| `GET`  | `/models/{modelId}/versions/{versionId}/files/{fileId}` | Download specific file   |
+| Method | Endpoint                                                | Description                                                               |
+| ------ | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `POST` | `/models/{modelId}/versions`                            | Create new version                                                        |
+| `POST` | `/models/{modelId}/versions/{versionId}/files`          | Add file to version                                                       |
+| `GET`  | `/models/{modelId}/versions`                            | List all versions                                                         |
+| `GET`  | `/models/{modelId}/versions/{versionId}`                | Get version details                                                       |
+| `GET`  | `/models/{modelId}/versions/{versionId}/file`           | Download renderable file (falls back to any file if no renderable exists) |
+| `GET`  | `/models/{modelId}/versions/{versionId}/files/{fileId}` | Download specific file                                                    |
 
 ### Files (5 endpoints)
 
@@ -67,12 +67,12 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 ### Thumbnails - Texture Sets (5 endpoints)
 
-| Method | Endpoint                                  | Description                              | Auth        |
-| ------ | ----------------------------------------- | ---------------------------------------- | ----------- |
-| `POST` | `/texture-sets/{id}/thumbnail/upload`     | Upload WebP thumbnail for texture set    | `X-Api-Key` |
-| `POST` | `/texture-sets/{id}/thumbnail/png-upload` | Upload PNG thumbnail for texture set     | `X-Api-Key` |
-| `GET`  | `/texture-sets/{id}/thumbnail/file`       | Download WebP thumbnail image            | None        |
-| `GET`  | `/texture-sets/{id}/thumbnail/png-file`   | Download PNG thumbnail image             | None        |
+| Method | Endpoint                                  | Description                                                                                | Auth        |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------ | ----------- |
+| `POST` | `/texture-sets/{id}/thumbnail/upload`     | Upload WebP thumbnail for texture set                                                      | `X-Api-Key` |
+| `POST` | `/texture-sets/{id}/thumbnail/png-upload` | Upload PNG thumbnail for texture set                                                       | `X-Api-Key` |
+| `GET`  | `/texture-sets/{id}/thumbnail/file`       | Download WebP thumbnail image                                                              | None        |
+| `GET`  | `/texture-sets/{id}/thumbnail/png-file`   | Download PNG thumbnail image                                                               | None        |
 | `POST` | `/texture-sets/{id}/thumbnail/regenerate` | Queue texture set thumbnail regeneration (body: `{ uvScale?, geometryType?, proxySize? }`) | None        |
 
 ### Texture Sets (17 endpoints)
@@ -117,11 +117,11 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 ### Settings (3 endpoints)
 
-| Method | Endpoint         | Description                                                                   |
-| ------ | ---------------- | ----------------------------------------------------------------------------- |
-| `GET`  | `/settings`      | Get application settings (includes `textureProxySize`)                        |
-| `GET`  | `/settings/all`  | Get all settings (key-value)                                                  |
-| `PUT`  | `/settings`      | Update application settings (includes `textureProxySize`: 256/512/1024/2048)  |
+| Method | Endpoint        | Description                                                                  |
+| ------ | --------------- | ---------------------------------------------------------------------------- |
+| `GET`  | `/settings`     | Get application settings (includes `textureProxySize`)                       |
+| `GET`  | `/settings/all` | Get all settings (key-value)                                                 |
+| `PUT`  | `/settings`     | Update application settings (includes `textureProxySize`: 256/512/1024/2048) |
 
 **Total:** 52 endpoints
 

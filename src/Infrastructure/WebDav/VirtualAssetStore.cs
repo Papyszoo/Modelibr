@@ -813,6 +813,33 @@ public sealed class VirtualAssetStore : IStore
 
         // /Models/{ModelName}/v{N} or /Models/{ModelName}/newest
         var versionName = Uri.UnescapeDataString(segments[2]);
+
+        // /Models/{ModelName}/newestVersion.blend → shortcut to newest .blend file
+        if (versionName.Equals("newestVersion.blend", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVer = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            var blendFile = newestVer?.Files
+                .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
+
+            if (blendFile == null)
+                return null;
+
+            return new VirtualAssetFile(
+                _itemPropertyManager,
+                _lockingManager,
+                "newestVersion.blend",
+                blendFile.Sha256Hash,
+                blendFile.SizeBytes,
+                blendFile.MimeType,
+                blendFile.CreatedAt,
+                blendFile.UpdatedAt,
+                _pathProvider);
+        }
+
         Domain.Models.ModelVersion? version;
 
         if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))

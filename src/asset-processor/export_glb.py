@@ -18,12 +18,20 @@ def main():
 
     output_path = argv[separator_index + 1]
 
-    bpy.ops.export_scene.gltf(
-        filepath=output_path,
-        export_format='GLB',
-        export_apply_modifiers=True,
-        export_animations=True,
-    )
+    # Build export kwargs compatible with Blender 3.x and 4.x+/5.x
+    kwargs = {
+        'filepath': output_path,
+        'export_format': 'GLB',
+        'export_animations': True,
+    }
+
+    # Blender 4.0+ renamed export_apply_modifiers → export_apply
+    if bpy.app.version >= (4, 0, 0):
+        kwargs['export_apply'] = True
+    else:
+        kwargs['export_apply_modifiers'] = True
+
+    bpy.ops.export_scene.gltf(**kwargs)
 
     print(f"GLB exported to: {output_path}")
 
