@@ -13,8 +13,8 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 ## Base URL
 
-- **Development:** `http://localhost:5009`
-- **Docker (HTTP):** `http://localhost:8080`
+- **Development:** `https://localhost:5009`
+- **Docker (HTTPS):** `https://localhost:8443`
 
 ## Quick Reference
 

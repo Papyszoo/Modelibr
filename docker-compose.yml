@@ -73,7 +73,7 @@ services:
             - RENDER_HEIGHT=${RENDER_HEIGHT:-256}
             - RENDER_FORMAT=${RENDER_FORMAT:-png}
             - LOG_LEVEL=${LOG_LEVEL:-info}
-            - NODE_TLS_REJECT_UNAUTHORIZED=0
+            - NODE_TLS_REJECT_UNAUTHORIZED=0  # Required for self-signed cert; do NOT use in production with external TLS
             - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
         ports:
             - "${WORKER_PORT:-3001}:3001"
