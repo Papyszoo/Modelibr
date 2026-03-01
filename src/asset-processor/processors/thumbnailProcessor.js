@@ -6,6 +6,10 @@ import { FrameEncoderService } from '../frameEncoderService.js'
 import { ThumbnailStorageService } from '../thumbnailStorageService.js'
 import { ThumbnailApiService } from '../thumbnailApiService.js'
 import { config } from '../config.js'
+import { execFileSync } from 'child_process'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 
 /**
  * Processor for generating 3D model thumbnails.
@@ -34,6 +38,7 @@ export class ThumbnailProcessor extends BaseProcessor {
    */
   async process(job, jobLogger) {
     let tempFilePath = null
+    let glbConvertedPath = null
     let texturePaths = null
 
     try {
@@ -79,6 +84,41 @@ export class ThumbnailProcessor extends BaseProcessor {
         fileInfo.fileType,
         fileInfo.filePath
       )
+
+      // Step 2.5: Convert .blend to .glb via headless Blender if needed
+      if (fileInfo.fileType === 'blend') {
+        jobLogger.info('Detected .blend file, converting to .glb via Blender')
+
+        const blenderPath = process.env.BLENDER_PATH || 'blender'
+        const __dirname = path.dirname(fileURLToPath(import.meta.url))
+        const scriptPath = path.resolve(__dirname, '..', 'export_glb.py')
+        glbConvertedPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')
+
+        execFileSync(
+          blenderPath,
+          ['-b', fileInfo.filePath, '-P', scriptPath, '--', glbConvertedPath],
+          { timeout: 120000 }
+        )
+
+        if (!fs.existsSync(glbConvertedPath)) {
+          throw new Error('Blender GLB export failed — output file not found')
+        }
+
+        jobLogger.info('.blend converted to .glb', { glbConvertedPath })
+
+        // Upload the converted .glb back to the model version
+        await this.jobService.uploadRenderableFile(
+          job.modelId,
+          job.modelVersionId,
+          glbConvertedPath,
+          'model.glb'
+        )
+        jobLogger.info('Uploaded converted .glb to model version')
+
+        // Switch to the .glb for the rest of the pipeline
+        fileInfo.filePath = glbConvertedPath
+        fileInfo.fileType = 'glb'
+      }
 
       // Step 3: Initialize renderer and load model
       await this.jobEventService.logModelLoadingStarted(
@@ -156,6 +196,9 @@ export class ThumbnailProcessor extends BaseProcessor {
     } finally {
       if (tempFilePath) {
         await this.modelFileService.cleanupFile(tempFilePath)
+      }
+      if (glbConvertedPath) {
+        await this.modelFileService.cleanupFile(glbConvertedPath)
       }
       if (texturePaths) {
         await this.modelDataService.cleanupTextureFiles(texturePaths)
