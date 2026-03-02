@@ -204,6 +204,7 @@ Universal (Global Material) texture sets get auto-generated preview thumbnails. 
 - Control buttons: Add Version, Viewer Settings, Model Info, Texture Sets, Model Hierarchy, Thumbnail Details, UV Map
 - Version dropdown with thumbnail previews
 - Switching versions updates viewer and file info
+- **Drag-and-drop file onto viewer** (including `.blend`) opens `FileUploadModal` — user chooses "add to current version" or "create new version". `.blend` files no longer bypass this modal. `.glb` extraction via the asset-processor only fires when "create new version" is chosen (triggers `ModelUploadedEvent`).
 
 **Effects of changes:**
 

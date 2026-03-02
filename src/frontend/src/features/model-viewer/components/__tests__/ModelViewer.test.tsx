@@ -1,9 +1,41 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 
 import { ModelProvider } from '@/contexts/ModelContext'
 import { ModelViewer } from '@/features/model-viewer/components/ModelViewer'
+
+// Mock modelVersionApi
+const mockCreateModelVersion = jest.fn()
+jest.mock('../../api/modelVersionApi', () => ({
+  __esModule: true,
+  createModelVersion: (...args: unknown[]) => mockCreateModelVersion(...args),
+  addFileToVersion: jest.fn(),
+  setActiveVersion: jest.fn(),
+  softDeleteModelVersion: jest.fn(),
+}))
+
+// Mock queries used by ModelViewer
+jest.mock('../../api/queries', () => ({
+  useModelByIdQuery: () => ({ data: null, refetch: jest.fn() }),
+  useModelVersionsQuery: () => ({
+    data: [],
+    refetch: jest.fn(),
+    isLoading: false,
+  }),
+}))
+
+jest.mock('@/features/texture-set/api/queries', () => ({
+  useTextureSetByIdQuery: () => ({ data: null }),
+}))
+
+jest.mock('@/shared/thumbnail', () => ({
+  useModelThumbnailUpdates: jest.fn(),
+}))
+
+jest.mock('@/shared/thumbnail/api/thumbnailApi', () => ({
+  regenerateThumbnail: jest.fn(),
+}))
 
 // Mock ApiClient
 jest.mock('../../../../services/ApiClient', () => ({
@@ -77,7 +109,9 @@ jest.mock('../ModelVersionWindow', () => ({
 }))
 
 jest.mock('../FileUploadModal', () => ({
-  FileUploadModal: () => <div data-testid="file-upload-modal" />,
+  FileUploadModal: ({ visible }: { visible: boolean }) => (
+    <div data-testid="file-upload-modal" data-visible={String(visible)} />
+  ),
 }))
 
 jest.mock('../VersionStrip', () => ({
@@ -187,5 +221,96 @@ describe('ModelViewer', () => {
     renderWithProviders(<ModelViewer model={undefined} side="left" />)
 
     expect(screen.getByText('No model data available')).toBeInTheDocument()
+  })
+
+  describe('.blend drop behavior', () => {
+    beforeEach(() => {
+      jest.clearAllMocks()
+    })
+
+    const createDropEvent = (fileName: string) => {
+      const file = new File(['data'], fileName, {
+        type: 'application/octet-stream',
+      })
+      const dataTransfer = {
+        files: [file],
+        items: [{ kind: 'file', getAsFile: () => file }],
+        types: ['Files'],
+      }
+      return { file, dataTransfer }
+    }
+
+    it('should open the FileUploadModal when a .blend file is dropped', async () => {
+      renderWithProviders(<ModelViewer model={mockModel} side="left" />)
+
+      // Modal should start hidden
+      expect(screen.getByTestId('file-upload-modal')).toHaveAttribute(
+        'data-visible',
+        'false'
+      )
+
+      const { dataTransfer } = createDropEvent('scene.blend')
+      const dropTarget =
+        screen.getByTestId('canvas').closest('.model-viewer') ||
+        screen.getByTestId('canvas').parentElement?.parentElement
+
+      if (dropTarget) {
+        fireEvent.drop(dropTarget, { dataTransfer })
+      }
+
+      // Modal should now be visible — .blend goes through the same modal as other files
+      await waitFor(() => {
+        expect(screen.getByTestId('file-upload-modal')).toHaveAttribute(
+          'data-visible',
+          'true'
+        )
+      })
+
+      // createModelVersion should NOT be called directly — the user must confirm in the modal
+      expect(mockCreateModelVersion).not.toHaveBeenCalled()
+    })
+
+    it('should NOT call createModelVersion directly when .blend file is dropped', async () => {
+      mockCreateModelVersion.mockResolvedValue({
+        id: 10,
+        versionNumber: 2,
+      })
+
+      renderWithProviders(<ModelViewer model={mockModel} side="left" />)
+
+      const { dataTransfer } = createDropEvent('scene.blend')
+      const dropTarget =
+        screen.getByTestId('canvas').closest('.model-viewer') ||
+        screen.getByTestId('canvas').parentElement?.parentElement
+
+      if (dropTarget) {
+        fireEvent.drop(dropTarget, { dataTransfer })
+      }
+
+      await waitFor(() => {
+        // Modal opens, but createModelVersion is not called until modal is submitted
+        expect(mockCreateModelVersion).not.toHaveBeenCalled()
+      })
+    })
+
+    it('should open the FileUploadModal for non-.blend file drop', async () => {
+      renderWithProviders(<ModelViewer model={mockModel} side="left" />)
+
+      const { dataTransfer } = createDropEvent('model.obj')
+      const dropTarget =
+        screen.getByTestId('canvas').closest('.model-viewer') ||
+        screen.getByTestId('canvas').parentElement?.parentElement
+
+      if (dropTarget) {
+        fireEvent.drop(dropTarget, { dataTransfer })
+      }
+
+      await waitFor(() => {
+        expect(screen.getByTestId('file-upload-modal')).toHaveAttribute(
+          'data-visible',
+          'true'
+        )
+      })
+    })
   })
 })

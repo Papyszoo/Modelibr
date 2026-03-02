@@ -553,4 +553,151 @@ export class ApiHelper {
             fileId: response.data.fileId,
         };
     }
+
+    // ── Blend / WebDAV helpers ───────────────────────────────────────────
+
+    /**
+     * Create a new model by uploading a .blend file via the WebDAV PUT endpoint.
+     * Simulates: PUT /modelibr/Models/{modelName}.blend
+     */
+    async createModelViaWebDavBlend(
+        filePath: string,
+        modelName: string,
+    ): Promise<{ status: number }> {
+        const fileBuffer = fs.readFileSync(filePath);
+        const response = await this.client.put(
+            `/modelibr/Models/${encodeURIComponent(modelName)}.blend`,
+            fileBuffer,
+            {
+                headers: {
+                    "Content-Type": "application/octet-stream",
+                },
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+            },
+        );
+        return { status: response.status };
+    }
+
+    /**
+     * Simulate Blender Safe Save (PUT temp + MOVE) to create a new model version
+     * via WebDAV. This is the pattern Blender uses when saving to an existing file:
+     *   1. PUT /modelibr/Models/{modelName}/newestVersion.blend@  (temp upload)
+     *   2. MOVE the temp file → newestVersion.blend (triggers version creation)
+     */
+    async createVersionViaWebDavBlendSave(
+        filePath: string,
+        modelName: string,
+    ): Promise<{ putStatus: number; moveStatus: number }> {
+        const fileBuffer = fs.readFileSync(filePath);
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+        const encodedName = encodeURIComponent(modelName);
+
+        // Step 1: PUT the temp file (newestVersion.blend@)
+        const putResponse = await this.client.put(
+            `/modelibr/Models/${encodedName}/newestVersion.blend@`,
+            fileBuffer,
+            {
+                headers: {
+                    "Content-Type": "application/octet-stream",
+                },
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+            },
+        );
+
+        // Step 2: MOVE temp → newestVersion.blend
+        const moveResponse = await this.client.request({
+            method: "MOVE",
+            url: `/modelibr/Models/${encodedName}/newestVersion.blend@`,
+            headers: {
+                Destination: `${baseUrl}/modelibr/Models/${encodedName}/newestVersion.blend`,
+                Overwrite: "T",
+            },
+        });
+
+        return {
+            putStatus: putResponse.status,
+            moveStatus: moveResponse.status,
+        };
+    }
+
+    /**
+     * Create a new model version by uploading a file via POST /models/{modelId}/versions.
+     * This is the HTTP API path the frontend uses (drag-drop onto model viewer).
+     */
+    async createModelVersion(
+        modelId: number,
+        filePath: string,
+        description?: string,
+        setAsActive: boolean = true,
+    ): Promise<{
+        versionId: number;
+        versionNumber: number;
+        fileId: number;
+    }> {
+        const formData = new FormData();
+        formData.append("file", fs.createReadStream(filePath));
+
+        let url = `/models/${modelId}/versions?setAsActive=${setAsActive}`;
+        if (description) {
+            url += `&description=${encodeURIComponent(description)}`;
+        }
+
+        const response = await this.client.post(url, formData, {
+            headers: formData.getHeaders(),
+        });
+
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to create model version: ${response.status} ${response.statusText} - ${JSON.stringify(response.data)}`,
+            );
+        }
+        return response.data;
+    }
+
+    /**
+     * Get the thumbnail for a model. Returns status and content-type.
+     */
+    async getModelThumbnail(
+        modelId: number,
+    ): Promise<{ status: number; contentType?: string; size?: number }> {
+        const response = await this.client.get(`/models/${modelId}/thumbnail`, {
+            responseType: "arraybuffer",
+        });
+        return {
+            status: response.status,
+            contentType: response.headers["content-type"],
+            size: response.data?.byteLength,
+        };
+    }
+
+    /**
+     * Get the blender-enabled setting from the backend.
+     */
+    async getBlenderEnabled(): Promise<boolean> {
+        const response = await this.client.get("/settings/blender-enabled");
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to get blender-enabled: ${response.status}`,
+            );
+        }
+        return response.data.enableBlender;
+    }
+
+    /**
+     * Get version files for a specific model version.
+     */
+    async getModelVersionFiles(
+        modelId: number,
+        versionId: number,
+    ): Promise<any[]> {
+        const response = await this.client.get(
+            `/models/${modelId}/versions/${versionId}`,
+        );
+        if (response.status !== 200) {
+            throw new Error(`Failed to get model version: ${response.status}`);
+        }
+        return response.data.files || [];
+    }
 }

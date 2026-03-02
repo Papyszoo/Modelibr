@@ -115,3 +115,27 @@ python run_tests.py
 - **Avoid over-testing** - Don't add tests just for coverage
 - **Challenge bad tests** - Remove tests that clutter without value
 - **E2E tests are source of truth** - Use them to understand features
+
+---
+
+## E2E Test Features
+
+### Blend Upload Tests (`features/15-blend-upload/`)
+
+Tests .blend file upload via WebDAV and REST API. Requires `ENABLE_BLENDER=true` in `docker-compose.e2e.yml` for both `webapi-e2e` and `asset-processor-e2e`.
+
+**Scenarios tested:**
+
+- New model via WebDAV PUT
+- New model via POST /models (REST API)
+- New version via WebDAV Safe Save (PUT temp + MOVE)
+- New version via POST /models/{id}/versions
+- Dedup: same .blend hash across models returns existing model
+- Dedup: same content re-saved to same model skips version creation
+- **Multi-file simultaneous WebDAV upload**: 3 unique `.blend` files PUT concurrently → 3 separate models created, each with 1 version, `.blend` file, and thumbnail
+
+**Key infrastructure:**
+
+- `UniqueFileGenerator` supports `.blend` files by appending a unique trailing marker after the ENDB block
+- `ApiHelper` has WebDAV simulation methods: `createModelViaWebDavBlend()`, `createVersionViaWebDavBlendSave()`, `createModelVersion()`
+- Thumbnail generation is verified by polling `GET /models/{id}/thumbnail` with a 5s interval
