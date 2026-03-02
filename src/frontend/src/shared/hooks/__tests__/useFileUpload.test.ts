@@ -81,7 +81,8 @@ describe('useFileUpload', () => {
       mockIsSupportedModelFormat.mockReturnValue(true)
       mockIsThreeJSRenderable.mockReturnValue(false)
 
-      const mockFile = new File(['content'], 'test.blend', {
+      // Use a non-.blend file that is supported but not renderable
+      const mockFile = new File(['content'], 'test.step', {
         type: 'application/octet-stream',
       })
       const mockToast = { current: { show: jest.fn() } }
@@ -101,6 +102,31 @@ describe('useFileUpload', () => {
       expect(uploadResult.failed[0].error.type).toBe('NON_RENDERABLE')
       expect(result.current.uploading).toBe(false)
       expect(result.current.uploadProgress).toBe(0)
+    })
+
+    it('should allow .blend files to bypass Three.js renderability check', async () => {
+      mockIsSupportedModelFormat.mockReturnValue(true)
+      mockIsThreeJSRenderable.mockReturnValue(false)
+      mockUploadModel.mockResolvedValue({ id: 1, alreadyExists: false })
+
+      const mockFile = new File(['content'], 'model.blend', {
+        type: 'application/octet-stream',
+      })
+
+      const { result } = renderHook(() =>
+        useFileUpload({
+          requireThreeJSRenderable: true,
+        })
+      )
+
+      const uploadResult = await act(async () => {
+        return result.current.uploadMultipleFiles([mockFile])
+      })
+
+      // .blend should NOT be rejected — it bypasses the renderable check
+      expect(uploadResult.failed).toHaveLength(0)
+      expect(uploadResult.succeeded).toHaveLength(1)
+      expect(mockUploadModel).toHaveBeenCalledWith(mockFile, expect.anything())
     })
 
     it('should round progress to 2 decimal places', async () => {

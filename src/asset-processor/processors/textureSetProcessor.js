@@ -195,6 +195,13 @@ export class TextureSetProcessor extends BaseProcessor {
     const endElevation = isPlane ? -10 : -20
     const forwardFrameCount = 15
 
+    // For plane geometry the auto-calculated camera distance is capped at the
+    // baseDistance (5 units) which puts the flat plane too far away. Bring the
+    // camera closer so the texture fills most of the frame.
+    const effectiveCameraDistance = isPlane
+      ? cameraDistance * 0.7
+      : cameraDistance
+
     const frames = []
 
     // Forward swing: top-left → bottom-right
@@ -205,7 +212,7 @@ export class TextureSetProcessor extends BaseProcessor {
 
       const frameData = await this.puppeteerRenderer.renderFrame(
         azimuth,
-        cameraDistance,
+        effectiveCameraDistance,
         frames.length,
         elevation
       )
@@ -220,7 +227,7 @@ export class TextureSetProcessor extends BaseProcessor {
 
       const frameData = await this.puppeteerRenderer.renderFrame(
         azimuth,
-        cameraDistance,
+        effectiveCameraDistance,
         frames.length,
         elevation
       )
@@ -231,6 +238,7 @@ export class TextureSetProcessor extends BaseProcessor {
       totalFrames: frames.length,
       azimuthRange: `${startAzimuth}° → ${endAzimuth}°`,
       elevationRange: `${startElevation}° → ${endElevation}°`,
+      effectiveCameraDistance,
     })
 
     return frames

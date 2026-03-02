@@ -12,6 +12,7 @@ services:
             - DisableHttpsRedirection=true
             - AllowedOrigins__0=http://localhost:3002
             - AllowedOrigins__1=http://localhost:3000
+            - ENABLE_BLENDER=true
         ports:
             - "8090:8080"
         healthcheck:
@@ -43,7 +44,7 @@ services:
             context: ../../src/asset-processor
             dockerfile: Dockerfile
             args:
-                ENABLE_BLENDER: "false"
+                ENABLE_BLENDER: "true"
         container_name: asset-processor-e2e
         environment:
             - WORKER_ID=worker-e2e
