@@ -161,6 +161,7 @@ Generation is handled by `FileThumbnailGenerator` (Infrastructure layer, registe
 The texture-set viewer renders a 3D preview of applied textures on selectable geometry shapes: box, sphere, cylinder, or torus. The cylinder uses `openEnded: false` (caps visible).
 
 Key rendering features:
+
 - **Vertex welding**: All primitives are passed through `mergeVertices()` (from `BufferGeometryUtils`) before rendering. This welds shared vertices so displacement mapping doesn't tear the mesh at edges/seams.
 - **Icosahedron for sphere**: The sphere uses `IcosahedronGeometry(radius, 5)` instead of `SphereGeometry` to provide uniform vertex distribution and eliminate pole-pinching artifacts.
 - **Simple UV scaling**: The `uvScale` value from the database is used directly as `texture.repeat.set(scale, scale)`. No complex physical tiling calculations.

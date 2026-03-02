@@ -384,12 +384,7 @@ let multiFileModelNames: string[] = [];
 
 When(
     "I upload 3 unique .blend files simultaneously via WebDAV PUT as models {string}, {string}, {string}",
-    async (
-        {},
-        nameA: string,
-        nameB: string,
-        nameC: string,
-    ) => {
+    async ({}, nameA: string, nameB: string, nameC: string) => {
         const blendFiles = ["test.blend", "test2.blend", "test3.blend"];
         const modelNames = [nameA, nameB, nameC];
         multiFileModelNames = modelNames;
@@ -432,7 +427,10 @@ Then(
             const versions = await api.getModelVersions(model.id);
             expect(versions.length).toBe(1);
 
-            const files = await api.getModelVersionFiles(model.id, versions[0].id);
+            const files = await api.getModelVersionFiles(
+                model.id,
+                versions[0].id,
+            );
             const hasBlend = files.some((f: any) =>
                 f.originalFileName?.endsWith(".blend"),
             );
