@@ -65,7 +65,13 @@ export function useFileUpload(options = {}) {
     }
 
     // Check Three.js renderability if required
-    if (requireThreeJSRenderable && !isThreeJSRenderable(fileExtension)) {
+    // .blend files bypass this check when blenderEnabled is true — they're handled by the asset-processor
+    const isBlendFile = fileExtension === '.blend'
+    if (
+      requireThreeJSRenderable &&
+      !isThreeJSRenderable(fileExtension) &&
+      !isBlendFile
+    ) {
       const error = new Error(
         `File ${file.name} (${fileExtension.toUpperCase()}) is supported but not renderable in 3D viewer. Use the upload page for this file type.`
       )

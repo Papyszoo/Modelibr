@@ -115,15 +115,30 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `POST` | `/thumbnail-jobs/texture-sets/{jobId}/finish` | Mark texture set job complete/failed   |
 | `POST` | `/test/thumbnail-complete/{modelId}`          | Test completion notification (dev)     |
 
-### Settings (3 endpoints)
+### Settings (4 endpoints)
 
-| Method | Endpoint        | Description                                                                  |
-| ------ | --------------- | ---------------------------------------------------------------------------- |
-| `GET`  | `/settings`     | Get application settings (includes `textureProxySize`)                       |
-| `GET`  | `/settings/all` | Get all settings (key-value)                                                 |
-| `PUT`  | `/settings`     | Update application settings (includes `textureProxySize`: 256/512/1024/2048) |
+| Method | Endpoint                    | Description                                                                  |
+| ------ | --------------------------- | ---------------------------------------------------------------------------- |
+| `GET`  | `/settings`                 | Get application settings (includes `textureProxySize`)                       |
+| `GET`  | `/settings/all`             | Get all settings (key-value)                                                 |
+| `GET`  | `/settings/blender-enabled` | Get Blender integration status (`{ enableBlender: bool }`)                   |
+| `PUT`  | `/settings`                 | Update application settings (includes `textureProxySize`: 256/512/1024/2048) |
 
-**Total:** 52 endpoints
+### Blender / WebDAV (3 virtual endpoints)
+
+Handled by `WebDavMiddleware` — not standard REST endpoints. Requires `ENABLE_BLENDER=true` environment variable.
+
+| Method | Path                                                      | Description                                                        |
+| ------ | --------------------------------------------------------- | ------------------------------------------------------------------ |
+| `PUT`  | `/modelibr/Models/{name}.blend`                           | Create new model from .blend file (returns 201 or 403 if disabled) |
+| `PUT`  | `/modelibr/Models/{name}/newestVersion.blend@`            | Upload temp .blend file (Blender Safe Save step 1)                 |
+| `MOVE` | `/modelibr/Models/{name}/newestVersion.blend@` → `.blend` | Create new version from temp file (Blender Safe Save step 2)       |
+
+**Blender Safe Save flow:** Blender writes to a temp file (`newestVersion.blend@`), then renames (MOVE) it to the final path. The middleware intercepts the MOVE, computes the hash, and creates a new model version via `CreateModelVersionCommand` if the content changed. A `ModelUploadedEvent` is dispatched to trigger the asset-processor's .blend → .glb conversion and thumbnail generation.
+
+**REST API .blend support:** `POST /models` and `POST /models/{modelId}/versions` also accept `.blend` files. The `ModelUploadedEvent` is dispatched for both renderable and project (`.blend`) file types, triggering the asset-processor pipeline.
+
+**Total:** 55 endpoints (52 REST + 3 WebDAV)
 
 ## Pagination
 

@@ -26,6 +26,7 @@ services:
         container_name: webapi
         environment:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+            - ENABLE_BLENDER=${ENABLE_BLENDER:-false}
             - WORKER_API_KEY=${WORKER_API_KEY:-}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
             - ConnectionStrings__Default=Host=postgres;Port=5432;Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
