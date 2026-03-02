@@ -110,10 +110,10 @@ public sealed class FileType : IEquatable<FileType>
             return fileTypeResult;
 
         var fileType = fileTypeResult.Value;
-        if (!fileType.IsRenderable)
+        if (!fileType.IsRenderable && fileType.Category != FileTypeCategory.Project)
         {
             return Result.Failure<FileType>(
-                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for model upload. Only .obj, .fbx, .gltf, and .glb files are allowed."));
+                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for model upload. Only .obj, .fbx, .gltf, .glb, and .blend files are allowed."));
         }
 
         return Result.Success(fileType);

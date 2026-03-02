@@ -6,6 +6,7 @@ using Application.Abstractions.Storage;
 using Application.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NWebDav.Server;
@@ -86,6 +87,13 @@ public class WebDavMiddleware
         if (IsBlenderBackupOperation(method, requestPath, context))
         {
             context.Response.StatusCode = 204;
+            return;
+        }
+
+        // Intercept PUT /modelibr/Models/{filename}.blend — create a new model from .blend
+        if (method == "PUT" && IsNewModelBlendPut(requestPath))
+        {
+            await HandleNewModelBlendPutAsync(context, requestPath);
             return;
         }
 
@@ -382,6 +390,100 @@ public class WebDavMiddleware
         }
 
         context.Response.StatusCode = 204;
+    }
+
+    /// <summary>
+    /// Returns true if this is a PUT of a .blend file directly into the Models folder
+    /// (e.g. PUT /modelibr/Models/MyModel.blend) — used to create a new model.
+    /// </summary>
+    private bool IsNewModelBlendPut(string requestPath)
+    {
+        var path = requestPath;
+        var prefix = _pathPrefix.TrimEnd('/');
+        if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            path = path[prefix.Length..];
+
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        // Expect exactly: Models / {filename}.blend
+        if (segments.Length != 2)
+            return false;
+
+        if (!segments[0].Equals("Models", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var fileName = segments[1];
+        return fileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase)
+            && !fileName.Equals("newestVersion.blend", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Handles PUT /modelibr/Models/{filename}.blend — creates a new model from a .blend file.
+    /// Returns 403 when ENABLE_BLENDER=false, 201 on success.
+    /// </summary>
+    private async Task HandleNewModelBlendPutAsync(HttpContext context, string requestPath)
+    {
+        // Check ENABLE_BLENDER gate
+        var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
+        var enableBlender = configuration.GetValue<bool>("ENABLE_BLENDER", false);
+        if (!enableBlender)
+        {
+            _logger.LogWarning("PUT .blend rejected: ENABLE_BLENDER is false");
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsync("Blender integration is disabled");
+            return;
+        }
+
+        // Extract model name from filename
+        var fileName = Path.GetFileName(requestPath);
+        var modelName = Path.GetFileNameWithoutExtension(fileName);
+
+        // Save the uploaded body to a temp file
+        var tempDir = Path.Combine(_pathProvider.UploadRootPath, "webdav-blend-temp");
+        Directory.CreateDirectory(tempDir);
+        var tempFilePath = Path.Combine(tempDir, $"new-model-{Guid.NewGuid()}.blend");
+
+        try
+        {
+            await using (var fs = System.IO.File.Create(tempFilePath))
+            {
+                await context.Request.Body.CopyToAsync(fs, context.RequestAborted);
+            }
+
+            var fileInfo = new System.IO.FileInfo(tempFilePath);
+            var fileUpload = new BlenderFileUpload(fileName, tempFilePath, fileInfo.Length);
+
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider
+                .GetRequiredService<ICommandHandler<CreateModelFromBlendCommand, CreateModelFromBlendResponse>>();
+
+            var result = await handler.Handle(
+                new CreateModelFromBlendCommand(modelName, fileUpload),
+                context.RequestAborted);
+
+            if (result.IsFailure)
+            {
+                _logger.LogError("Failed to create model from .blend: {Error}", result.Error.Message);
+                context.Response.StatusCode = 500;
+                await context.Response.WriteAsync(result.Error.Message);
+                return;
+            }
+
+            _logger.LogInformation("Created model {ModelId} from WebDAV .blend PUT (alreadyExists={AlreadyExists})",
+                result.Value.ModelId, result.Value.AlreadyExists);
+
+            context.Response.StatusCode = 201;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling new model .blend PUT for {RequestPath}", requestPath);
+            context.Response.StatusCode = 500;
+        }
+        finally
+        {
+            try { System.IO.File.Delete(tempFilePath); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to cleanup temp file {Path}", tempFilePath); }
+        }
     }
 
     /// <summary>

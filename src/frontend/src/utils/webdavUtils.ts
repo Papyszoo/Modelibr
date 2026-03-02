@@ -235,12 +235,13 @@ export function getMountInstructions(): {
 } {
   const os = detectOS()
   const { host, port, isHttps } = getWebDavHostInfo()
-  const protocol = isHttps ? 'https' : 'http'
-  const webDavUrl = `${protocol}://${host}:${port}/modelibr`
+  // Use window.location.host (omits default port 80/443) for clean URLs
+  const webDavBaseUrl = getWebDavBaseUrl()
 
   switch (os) {
     case 'windows': {
       // Use HTTP on port 80 — no certificate trust or registry edits required.
+      // Windows WebDAV Mini-Redirector uses UNC paths (\\server\share).
       const uncPath = `\\\\${host}\\modelibr`
       const httpWebDavUrl = `http://${host}/modelibr`
       return {
@@ -259,18 +260,26 @@ Or use "Map network drive...":
     }
 
     case 'macos':
+      // macOS Finder uses HTTP WebDAV via "Connect to Server" (Cmd+K).
+      // Use the base URL without an explicit port so standard HTTP (port 80)
+      // or HTTPS (port 443) connections work without a ":port" suffix.
       return {
         os,
         instructions: `To mount the WebDAV drive on macOS:
 
 1. Open Finder
 2. Press Cmd+K or select Go > Connect to Server
-3. Enter: ${webDavUrl}
+3. Enter: ${webDavBaseUrl}
 4. Click "Connect"
-5. Enter credentials if prompted`,
+5. Enter credentials if prompted
+
+To access directly in Blender's "Open External" dialog, use:
+${webDavBaseUrl}/Models`,
       }
 
-    case 'linux':
+    case 'linux': {
+      // Linux uses davfs2 or gvfs (GNOME Nautilus).
+      const davProtocol = isHttps ? 'davs' : 'dav'
       return {
         os,
         instructions: `To mount the WebDAV drive on Linux:
@@ -278,14 +287,15 @@ Or use "Map network drive...":
 Using GNOME/Nautilus:
 1. Open Files (Nautilus)
 2. Press Ctrl+L to show the location bar
-3. Enter: davs://${host}:${port}/modelibr
+3. Enter: ${davProtocol}://${host}:${port}/modelibr
 4. Press Enter and enter credentials`,
       }
+    }
 
     default:
       return {
         os,
-        instructions: `Connect to WebDAV server at: ${webDavUrl}`,
+        instructions: `Connect to WebDAV server at: ${webDavBaseUrl}`,
       }
   }
 }
