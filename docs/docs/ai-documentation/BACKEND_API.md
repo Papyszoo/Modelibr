@@ -124,21 +124,25 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `GET`  | `/settings/blender-enabled` | Get Blender integration status (`{ enableBlender: bool }`)                   |
 | `PUT`  | `/settings`                 | Update application settings (includes `textureProxySize`: 256/512/1024/2048) |
 
-### Blender / WebDAV (3 virtual endpoints)
+### Blender / WebDAV (5 virtual endpoints)
 
 Handled by `WebDavMiddleware` — not standard REST endpoints. Requires `ENABLE_BLENDER=true` environment variable.
 
-| Method | Path                                                      | Description                                                        |
-| ------ | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| `PUT`  | `/modelibr/Models/{name}.blend`                           | Create new model from .blend file (returns 201 or 403 if disabled) |
-| `PUT`  | `/modelibr/Models/{name}/newestVersion.blend@`            | Upload temp .blend file (Blender Safe Save step 1)                 |
-| `MOVE` | `/modelibr/Models/{name}/newestVersion.blend@` → `.blend` | Create new version from temp file (Blender Safe Save step 2)       |
+| Method   | Path                                                      | Description                                                                  |
+| -------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `LOCK`   | `/modelibr/Models/{name}.blend`                           | Synthetic lock for macOS Finder / Windows pre-PUT flow — returns token (201) |
+| `UNLOCK` | `/modelibr/Models/{name}.blend`                           | Releases synthetic lock — returns 204                                        |
+| `PUT`    | `/modelibr/Models/{name}.blend`                           | Create new model from .blend file (returns 201 or 403 if disabled)           |
+| `PUT`    | `/modelibr/Models/{name}/newestVersion.blend@`            | Upload temp .blend file (Blender Safe Save step 1)                           |
+| `MOVE`   | `/modelibr/Models/{name}/newestVersion.blend@` → `.blend` | Create new version from temp file (Blender Safe Save step 2)                 |
 
 **Blender Safe Save flow:** Blender writes to a temp file (`newestVersion.blend@`), then renames (MOVE) it to the final path. The middleware intercepts the MOVE, computes the hash, and creates a new model version via `CreateModelVersionCommand` if the content changed. A `ModelUploadedEvent` is dispatched to trigger the asset-processor's .blend → .glb conversion and thumbnail generation.
 
+**Multi-file drop (macOS Finder / Windows Explorer):** When a user drops multiple `.blend` files onto the mounted WebDAV `Models` folder, macOS Finder sends a `LOCK` before each `PUT`. The middleware intercepts `LOCK`/`UNLOCK` for `{name}.blend` paths and returns a synthetic lock token so the NWebDav library cannot block concurrent uploads. A 0-byte `PUT` guard skips model creation and returns 201 so the client does not retry; only PUTs with actual content create a model.
+
 **REST API .blend support:** `POST /models` and `POST /models/{modelId}/versions` also accept `.blend` files. The `ModelUploadedEvent` is dispatched for both renderable and project (`.blend`) file types, triggering the asset-processor pipeline.
 
-**Total:** 55 endpoints (52 REST + 3 WebDAV)
+**Total:** 57 endpoints (52 REST + 5 WebDAV)
 
 ## Pagination
 

@@ -59,6 +59,24 @@ public class WebDavMiddleware
         var method = context.Request.Method.ToUpperInvariant();
         var requestPath = context.Request.Path.Value ?? string.Empty;
 
+        // Silently discard macOS AppleDouble resource fork files (._filename).
+        // macOS Finder writes these 4096-byte metadata companion files alongside every real file
+        // when copying to a non-HFS filesystem (e.g. WebDAV). They are NOT valid .blend files
+        // and must not be stored as model records. Return the most appropriate success code
+        // per method so the OS does not retry or show an error to the user.
+        var requestFileName = Path.GetFileName(requestPath);
+        if (requestFileName.StartsWith("._", StringComparison.Ordinal))
+        {
+            context.Response.StatusCode = method switch
+            {
+                "DELETE" => 204,
+                "GET"    => 404,
+                _        => 201, // PUT, LOCK, PROPFIND, etc. — appear to succeed
+            };
+            _logger.LogDebug("Ignored macOS AppleDouble file {FileName} ({Method})", requestFileName, method);
+            return;
+        }
+
         // Intercept Blender Safe Save: PUT newestVersion.blend@ (temp upload)
         if (method == "PUT" && IsBlenderTempFile(requestPath))
         {
@@ -85,6 +103,23 @@ public class WebDavMiddleware
 
         // Ignore Blender backup operations (.blend1 files or DELETE of temp files)
         if (IsBlenderBackupOperation(method, requestPath, context))
+        {
+            context.Response.StatusCode = 204;
+            return;
+        }
+
+        // Intercept LOCK for new .blend model paths.
+        // macOS Finder (and some Windows clients) send LOCK before PUT when writing a new file.
+        // We handle LOCK ourselves so the NWebDav library cannot interfere with the PUT body
+        // and so concurrent locks for different files don't block each other.
+        if (method == "LOCK" && IsNewModelBlendPut(requestPath))
+        {
+            await HandleSyntheticLockAsync(context, requestPath);
+            return;
+        }
+
+        // Intercept UNLOCK for the same paths — always succeed silently.
+        if (method == "UNLOCK" && IsNewModelBlendPut(requestPath))
         {
             context.Response.StatusCode = 204;
             return;
@@ -418,6 +453,40 @@ public class WebDavMiddleware
     }
 
     /// <summary>
+    /// Returns a synthetic WebDAV lock token for a new .blend file path.
+    /// macOS Finder (and some Windows clients) require a LOCK response before PUT-ing a new file.
+    /// We generate a per-request UUID token which we do not actually enforce — its sole purpose
+    /// is to satisfy the client so the subsequent PUT proceeds and carries the full file body.
+    /// </summary>
+    private async Task HandleSyntheticLockAsync(HttpContext context, string requestPath)
+    {
+        var lockToken = $"urn:uuid:{Guid.NewGuid()}";
+        var escapedPath = System.Security.SecurityElement.Escape(requestPath);
+        var xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<D:prop xmlns:D=\"DAV:\">" +
+            "<D:lockdiscovery>" +
+            "<D:activelock>" +
+            "<D:locktype><D:write/></D:locktype>" +
+            "<D:lockscope><D:exclusive/></D:lockscope>" +
+            "<D:depth>0</D:depth>" +
+            "<D:timeout>Second-3600</D:timeout>" +
+            $"<D:locktoken><D:href>{lockToken}</D:href></D:locktoken>" +
+            $"<D:lockroot><D:href>{escapedPath}</D:href></D:lockroot>" +
+            "</D:activelock>" +
+            "</D:lockdiscovery>" +
+            "</D:prop>";
+
+        // 201 = file stub created + locked (new resource); 200 = locked existing resource.
+        // We always return 201 since the .blend does not yet exist in our store.
+        context.Response.StatusCode = 201;
+        context.Response.ContentType = "application/xml; charset=utf-8";
+        context.Response.Headers["Lock-Token"] = $"<{lockToken}>";
+        await context.Response.WriteAsync(xml);
+        _logger.LogDebug("Synthetic LOCK returned for {Path} (token={Token})", requestPath, lockToken);
+    }
+
+    /// <summary>
     /// Handles PUT /modelibr/Models/{filename}.blend — creates a new model from a .blend file.
     /// Returns 403 when ENABLE_BLENDER=false, 201 on success.
     /// </summary>
@@ -451,6 +520,20 @@ public class WebDavMiddleware
             }
 
             var fileInfo = new System.IO.FileInfo(tempFilePath);
+
+            // Guard: some WebDAV clients (macOS Finder, Windows) send an initial 0-byte PUT
+            // to "create" the file slot before sending a LOCK + actual-content PUT.
+            // Storing a 0-byte .blend produces a corrupted model that Blender cannot open.
+            // Return 201 (success) so the client does not retry endlessly, but skip model
+            // creation — the follow-up PUT with real content will create the model.
+            if (fileInfo.Length == 0)
+            {
+                _logger.LogWarning(
+                    "PUT .blend '{FileName}' has 0-byte body — returning 201 without creating a model (pre-create stub)",
+                    fileName);
+                context.Response.StatusCode = 201;
+                return;
+            }
             var fileUpload = new BlenderFileUpload(fileName, tempFilePath, fileInfo.Length);
 
             using var scope = _scopeFactory.CreateScope();

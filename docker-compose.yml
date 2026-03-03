@@ -33,6 +33,9 @@ services:
             - DisableHttpsRedirection=true
             - HTTPS_PORT=${HTTPS_PORT:-8443}
             - EXPOSE_443_PORT=${EXPOSE_443_PORT:-true}
+            # reduce verbosity: only warnings and above
+            - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Warning
+            - ASPNETCORE_LOGGING__LOGLEVEL__Microsoft=Warning
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
         volumes:
