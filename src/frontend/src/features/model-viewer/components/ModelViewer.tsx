@@ -344,6 +344,10 @@ export function ModelViewer({
     const files = e.dataTransfer.files
     if (files && files.length > 0) {
       const file = files[0]
+      // All dropped files (including .blend) open the modal so the user can
+      // choose to add the file to the current version or create a new version.
+      // GLB extraction only happens when "new version" is chosen, which calls
+      // createModelVersion → ModelUploadedEvent → asset-processor pipeline.
       setDroppedFile(file)
       setUploadModalVisible(true)
     }
@@ -506,7 +510,7 @@ export function ModelViewer({
           ref={fileInputRef}
           style={{ display: 'none' }}
           onChange={handleFileSelect}
-          accept=".obj,.fbx,.gltf,.glb"
+          accept=".obj,.fbx,.gltf,.glb,.blend"
         />
         <div className="viewer-container">
           {/* Model name overlay */}

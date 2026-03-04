@@ -161,6 +161,7 @@ Generation is handled by `FileThumbnailGenerator` (Infrastructure layer, registe
 The texture-set viewer renders a 3D preview of applied textures on selectable geometry shapes: box, sphere, cylinder, or torus. The cylinder uses `openEnded: false` (caps visible).
 
 Key rendering features:
+
 - **Vertex welding**: All primitives are passed through `mergeVertices()` (from `BufferGeometryUtils`) before rendering. This welds shared vertices so displacement mapping doesn't tear the mesh at edges/seams.
 - **Icosahedron for sphere**: The sphere uses `IcosahedronGeometry(radius, 5)` instead of `SphereGeometry` to provide uniform vertex distribution and eliminate pole-pinching artifacts.
 - **Simple UV scaling**: The `uvScale` value from the database is used directly as `texture.repeat.set(scale, scale)`. No complex physical tiling calculations.
@@ -204,6 +205,7 @@ Universal (Global Material) texture sets get auto-generated preview thumbnails. 
 - Control buttons: Add Version, Viewer Settings, Model Info, Texture Sets, Model Hierarchy, Thumbnail Details, UV Map
 - Version dropdown with thumbnail previews
 - Switching versions updates viewer and file info
+- **Drag-and-drop file onto viewer** (including `.blend`) opens `FileUploadModal` — user chooses "add to current version" or "create new version". `.blend` files no longer bypass this modal. `.glb` extraction via the asset-processor only fires when "create new version" is chosen (triggers `ModelUploadedEvent`).
 
 **Effects of changes:**
 

@@ -250,11 +250,38 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
         }
 
-        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest
-        var versionName = Uri.UnescapeDataString(segments[4]);
+        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or newestVersion.blend
+        var segment4 = Uri.UnescapeDataString(segments[4]);
+
+        // /Projects/{P}/Models/{ModelName}/newestVersion.blend → shortcut to newest .blend file
+        if (segment4.Equals("newestVersion.blend", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVersion = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            var blendFile = newestVersion?.Files
+                .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
+
+            if (blendFile == null)
+                return null;
+
+            return new VirtualAssetFile(
+                _itemPropertyManager,
+                _lockingManager,
+                "newestVersion.blend",
+                blendFile.Sha256Hash,
+                blendFile.SizeBytes,
+                blendFile.MimeType,
+                blendFile.CreatedAt,
+                blendFile.UpdatedAt,
+                _pathProvider);
+        }
+
         Domain.Models.ModelVersion? version;
 
-        if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+        if (segment4.Equals("newest", StringComparison.OrdinalIgnoreCase))
         {
             // Get the highest version number
             version = model.Versions
@@ -262,8 +289,8 @@ public sealed class VirtualAssetStore : IStore
                 .OrderByDescending(v => v.VersionNumber)
                 .FirstOrDefault();
         }
-        else if (versionName.StartsWith("v", StringComparison.OrdinalIgnoreCase) &&
-                 int.TryParse(versionName[1..], out var versionNumber))
+        else if (segment4.StartsWith("v", StringComparison.OrdinalIgnoreCase) &&
+                 int.TryParse(segment4[1..], out var versionNumber))
         {
             version = model.Versions.FirstOrDefault(v => !v.IsDeleted && v.VersionNumber == versionNumber);
         }
@@ -278,7 +305,7 @@ public sealed class VirtualAssetStore : IStore
         // /Projects/{P}/Models/{ModelName}/v{N} or newest → show files in version
         if (segments.Length == 5)
         {
-            if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))
+            if (segment4.Equals("newest", StringComparison.OrdinalIgnoreCase))
             {
                 return new VirtualNewestVersionCollection(_collectionPropertyManager, _lockingManager, model, version, _itemPropertyManager, _pathProvider);
             }
@@ -786,6 +813,33 @@ public sealed class VirtualAssetStore : IStore
 
         // /Models/{ModelName}/v{N} or /Models/{ModelName}/newest
         var versionName = Uri.UnescapeDataString(segments[2]);
+
+        // /Models/{ModelName}/newestVersion.blend → shortcut to newest .blend file
+        if (versionName.Equals("newestVersion.blend", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVer = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            var blendFile = newestVer?.Files
+                .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
+
+            if (blendFile == null)
+                return null;
+
+            return new VirtualAssetFile(
+                _itemPropertyManager,
+                _lockingManager,
+                "newestVersion.blend",
+                blendFile.Sha256Hash,
+                blendFile.SizeBytes,
+                blendFile.MimeType,
+                blendFile.CreatedAt,
+                blendFile.UpdatedAt,
+                _pathProvider);
+        }
+
         Domain.Models.ModelVersion? version;
 
         if (versionName.Equals("newest", StringComparison.OrdinalIgnoreCase))

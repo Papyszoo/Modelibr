@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Settings;
+using Microsoft.Extensions.Configuration;
 
 namespace WebApi.Endpoints;
 
@@ -84,6 +85,14 @@ public static class SettingsEndpoints
             return Results.Ok(result.Value);
         })
         .WithName("Update Settings")
+        .WithTags("Settings");
+
+        app.MapGet("/settings/blender-enabled", (IConfiguration configuration) =>
+        {
+            var enabled = configuration.GetValue<bool>("ENABLE_BLENDER", false);
+            return Results.Ok(new { enableBlender = enabled });
+        })
+        .WithName("Get Blender Enabled")
         .WithTags("Settings");
     }
 }

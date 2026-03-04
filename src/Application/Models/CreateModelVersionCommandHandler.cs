@@ -101,8 +101,9 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         await _modelRepository.UpdateAsync(model, cancellationToken);
 
         // Raise domain event to trigger thumbnail generation for the new version
-        // Only trigger if the file is renderable (can generate thumbnail from it)
-        if (fileType.IsRenderable)
+        // Trigger for renderable files (direct thumbnail) and project files like .blend
+        // (asset-processor converts .blend → .glb first, then generates thumbnail)
+        if (fileType.IsRenderable || fileType.Category == Domain.ValueObjects.FileTypeCategory.Project)
         {
             model.RaiseModelUploadedEvent(savedVersion.Id, fileEntity.Sha256Hash, true);
         }
