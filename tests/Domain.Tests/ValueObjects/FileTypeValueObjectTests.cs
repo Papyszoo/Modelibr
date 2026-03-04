@@ -84,7 +84,6 @@ public class FileTypeValueObjectTests
 
     [Theory]
     [InlineData("texture.jpg")]
-    [InlineData("project.blend")]
     [InlineData("material.mtl")]
     [InlineData("unknown.xyz")]
     public void ValidateForModelUpload_WithNonRenderableFiles_ReturnsFailure(string fileName)
@@ -95,6 +94,18 @@ public class FileTypeValueObjectTests
         // Assert
         Assert.False(result.IsSuccess);
         Assert.Equal("InvalidFileType", result.Error.Code);
+    }
+
+    [Theory]
+    [InlineData("project.blend")]
+    public void ValidateForModelUpload_WithProjectFiles_ReturnsSuccess(string fileName)
+    {
+        // Act
+        var result = FileType.ValidateForModelUpload(fileName);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(FileTypeCategory.Project, result.Value.Category);
     }
 
     [Theory]

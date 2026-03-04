@@ -148,10 +148,12 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
 }
 
 /// <summary>
-/// Collection representing a single model - shows version subdirectories (v1, v2, etc.).
+/// Collection representing a single model - shows version subdirectories (v1, v2, etc.) and a newestVersion.blend shortcut.
 /// </summary>
 public sealed class VirtualModelCollection : VirtualCollectionBase
 {
+    private const string NewestBlendFileName = "newestVersion.blend";
+
     private readonly Model _model;
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly IUploadPathProvider _pathProvider;
@@ -168,6 +170,25 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
+        // Serve newestVersion.blend as the .blend file from the newest version
+        if (name.Equals(NewestBlendFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            var newestBlendFile = GetNewestBlendFile();
+            if (newestBlendFile == null)
+                return Task.FromResult<IStoreItem?>(null);
+
+            return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
+                _itemPropertyManager,
+                LockingManager,
+                NewestBlendFileName,
+                newestBlendFile.Sha256Hash,
+                newestBlendFile.SizeBytes,
+                newestBlendFile.MimeType,
+                newestBlendFile.CreatedAt,
+                newestBlendFile.UpdatedAt,
+                _pathProvider));
+        }
+
         // Handle "newest" folder - returns the highest version number
         if (name.Equals("newest", StringComparison.OrdinalIgnoreCase))
         {
@@ -235,9 +256,36 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                 newestVersion,
                 _itemPropertyManager,
                 _pathProvider));
+
+            // Inject newestVersion.blend if a .blend file exists in the newest version
+            var newestBlendFile = GetNewestBlendFile();
+            if (newestBlendFile != null)
+            {
+                versionItems.Add(new VirtualAssetFile(
+                    _itemPropertyManager,
+                    LockingManager,
+                    NewestBlendFileName,
+                    newestBlendFile.Sha256Hash,
+                    newestBlendFile.SizeBytes,
+                    newestBlendFile.MimeType,
+                    newestBlendFile.CreatedAt,
+                    newestBlendFile.UpdatedAt,
+                    _pathProvider));
+            }
         }
 
         return Task.FromResult<IEnumerable<IStoreItem>>(versionItems);
+    }
+
+    private Domain.Models.File? GetNewestBlendFile()
+    {
+        var newestVersion = _model.Versions
+            .Where(v => !v.IsDeleted)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstOrDefault();
+
+        return newestVersion?.Files
+            .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
     }
 }
 

@@ -4,6 +4,7 @@ import { type RefObject, useCallback } from 'react'
 import { addModelToPack } from '@/features/pack/api/packApi'
 import { addModelToProject } from '@/features/project/api/projectApi'
 import { useDragAndDrop, useFileUpload } from '@/shared/hooks/useFileUpload'
+import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
 
 interface UseModelUploadOptions {
   packId?: number
@@ -18,6 +19,8 @@ export function useModelUpload({
   toast,
   onUploadComplete,
 }: UseModelUploadOptions) {
+  const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
+
   const associateModel = useCallback(
     async (modelId: number) => {
       if (packId) {
@@ -51,13 +54,27 @@ export function useModelUpload({
     },
   })
 
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
-    useDragAndDrop(uploadMultipleFiles)
+  // Wrap uploadMultipleFiles to filter out .blend when blenderEnabled is false
+  const filteredUploadMultipleFiles = useCallback(
+    (files: File[] | FileList) => {
+      const fileArray = Array.from(files)
+      const filtered = blenderEnabled
+        ? fileArray
+        : fileArray.filter(f => !f.name.toLowerCase().endsWith('.blend'))
+      if (filtered.length === 0) return
+      return uploadMultipleFiles(filtered)
+    },
+    [blenderEnabled, uploadMultipleFiles]
+  )
+
+  const { onDrop, onDragOver, onDragEnter, onDragLeave } = useDragAndDrop(
+    filteredUploadMultipleFiles
+  )
 
   return {
     uploading,
     uploadProgress,
-    uploadMultipleFiles,
+    uploadMultipleFiles: filteredUploadMultipleFiles,
     onDrop,
     onDragOver,
     onDragEnter,

@@ -6,6 +6,10 @@ import { FrameEncoderService } from '../frameEncoderService.js'
 import { ThumbnailStorageService } from '../thumbnailStorageService.js'
 import { ThumbnailApiService } from '../thumbnailApiService.js'
 import { config } from '../config.js'
+import { execFileSync } from 'child_process'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 
 /**
  * Processor for generating 3D model thumbnails.
@@ -34,6 +38,7 @@ export class ThumbnailProcessor extends BaseProcessor {
    */
   async process(job, jobLogger) {
     let tempFilePath = null
+    let glbConvertedPath = null
     let texturePaths = null
 
     try {
@@ -79,6 +84,56 @@ export class ThumbnailProcessor extends BaseProcessor {
         fileInfo.fileType,
         fileInfo.filePath
       )
+
+      // Step 2.5: Convert .blend to .glb via headless Blender if needed
+      if (fileInfo.fileType === 'blend') {
+        jobLogger.info('Detected .blend file, converting to .glb via Blender')
+
+        const blenderPath = process.env.BLENDER_PATH || 'blender'
+        const __dirname = path.dirname(fileURLToPath(import.meta.url))
+        const scriptPath = path.resolve(__dirname, '..', 'export_glb.py')
+        const candidateGlbPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')
+
+        try {
+          execFileSync(
+            blenderPath,
+            ['-b', fileInfo.filePath, '-P', scriptPath, '--', candidateGlbPath],
+            { timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] }
+          )
+        } catch (blenderError) {
+          const stderr = blenderError.stderr?.toString() || ''
+          const stdout = blenderError.stdout?.toString() || ''
+          const output = stderr || stdout // Blender often writes errors to stdout
+          jobLogger.error('Blender GLB export failed', {
+            exitCode: blenderError.status,
+            stderr: stderr.slice(-2000),
+            stdout: stdout.slice(-2000),
+          })
+          throw new Error(
+            `Blender GLB export failed (exit ${blenderError.status}): ${output.slice(-500)}`
+          )
+        }
+
+        if (!fs.existsSync(candidateGlbPath)) {
+          throw new Error('Blender GLB export failed — output file not found')
+        }
+
+        glbConvertedPath = candidateGlbPath
+        jobLogger.info('.blend converted to .glb', { glbConvertedPath })
+
+        // Upload the converted .glb back to the model version
+        await this.jobService.uploadRenderableFile(
+          job.modelId,
+          job.modelVersionId,
+          glbConvertedPath,
+          'model.glb'
+        )
+        jobLogger.info('Uploaded converted .glb to model version')
+
+        // Switch to the .glb for the rest of the pipeline
+        fileInfo.filePath = glbConvertedPath
+        fileInfo.fileType = 'glb'
+      }
 
       // Step 3: Initialize renderer and load model
       await this.jobEventService.logModelLoadingStarted(
@@ -156,6 +211,9 @@ export class ThumbnailProcessor extends BaseProcessor {
     } finally {
       if (tempFilePath) {
         await this.modelFileService.cleanupFile(tempFilePath)
+      }
+      if (glbConvertedPath) {
+        await this.modelFileService.cleanupFile(glbConvertedPath)
       }
       if (texturePaths) {
         await this.modelDataService.cleanupTextureFiles(texturePaths)

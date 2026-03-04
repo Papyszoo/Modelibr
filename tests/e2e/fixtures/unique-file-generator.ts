@@ -69,6 +69,15 @@ export class UniqueFileGenerator {
             }
         } else if (ext === ".wav") {
             newBuffer = this.modifyWAV(originalBuffer, uniqueId);
+        } else if (ext === ".blend") {
+            // .blend files: append a unique trailing comment after the ENDB block.
+            // Blender stops reading at the ENDB block, so trailing bytes are ignored.
+            // This changes the SHA256 hash without corrupting the file.
+            const marker = Buffer.from(`\x00MODELIBR_UNIQUE:${uniqueId}\x00`);
+            newBuffer = Buffer.concat([originalBuffer, marker]);
+            console.log(
+                `[UniqueFileGenerator] .blend file: appended unique marker (${marker.length} bytes)`,
+            );
         } else {
             // FBX, OBJ, etc — can't safely modify binary formats
             newBuffer = originalBuffer;
