@@ -14,3 +14,5 @@ static/videos/
 # Video generation test results
 videos/test-results/
 videos/node_modules/
+
+RESEARCH/*

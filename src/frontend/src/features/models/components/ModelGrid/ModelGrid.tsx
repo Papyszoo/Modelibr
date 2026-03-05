@@ -5,10 +5,8 @@ import { ProgressBar } from 'primereact/progressbar'
 import { Toast } from 'primereact/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { getModelsPaginated } from '@/features/models/api/modelApi'
 import { useTabContext } from '@/hooks/useTabContext'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
-import { type Model } from '@/utils/fileUtils'
 
 import { AddModelDialog } from './AddModelDialog'
 import {
@@ -29,20 +27,9 @@ export function ModelGrid({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { openModelDetailsTab } = useTabContext()
   const [showAddModelDialog, setShowAddModelDialog] = useState(false)
-  const [preloadedModels, setPreloadedModels] = useState<Model[]>([])
   const isContainerContext = !!packId || !!projectId
 
-  const openAddModelDialog = useCallback(async () => {
-    try {
-      const response = await getModelsPaginated({
-        page: 1,
-        pageSize: 200,
-      })
-      setPreloadedModels(response.items)
-    } catch (error) {
-      console.error('Failed to pre-load models:', error)
-      setPreloadedModels([])
-    }
+  const openAddModelDialog = useCallback(() => {
     setShowAddModelDialog(true)
   }, [])
 
@@ -157,8 +144,6 @@ export function ModelGrid({
         packId={packId}
         projectId={projectId}
         pathPrefix={buildPathPrefix()}
-        packs={packs}
-        projects={projects}
       />
 
       <ModelsFilters
@@ -285,7 +270,6 @@ export function ModelGrid({
           projectId={projectId}
           existingModelIds={filteredModels.map(m => String(m.id))}
           onModelsAdded={() => fetchModels()}
-          preloadedModels={preloadedModels}
         />
       )}
     </div>

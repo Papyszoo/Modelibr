@@ -1,3 +1,5 @@
+import './DockPanel.css'
+
 import { useDockContext } from '@/contexts/DockContext'
 import {
   broadcastNavigation,
@@ -16,10 +18,6 @@ interface DockPanelContentProps {
   setTabs: (tabs: Tab[]) => void
   activeTab: string
   setActiveTab: (tabId: string) => void
-  otherTabs: Tab[]
-  setOtherTabs: (tabs: Tab[]) => void
-  otherActiveTab: string
-  setOtherActiveTab: (tabId: string) => void
   draggedTab: Tab | null
   setDraggedTab: (tab: Tab | null) => void
   moveTabBetweenPanels: (tab: Tab, fromSide: 'left' | 'right') => void
@@ -31,10 +29,6 @@ export function DockPanelContent({
   setTabs,
   activeTab,
   setActiveTab,
-  otherTabs: _otherTabs,
-  setOtherTabs: _setOtherTabs,
-  otherActiveTab: _otherActiveTab, // prefix with underscore to indicate intentionally unused
-  setOtherActiveTab: _setOtherActiveTab,
   draggedTab,
   setDraggedTab,
   moveTabBetweenPanels,

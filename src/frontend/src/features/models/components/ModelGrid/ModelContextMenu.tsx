@@ -38,8 +38,6 @@ interface ModelContextMenuComponentProps {
   projectId?: number
   /** Optional prefix for the copy path (e.g. "ProjectName/TextureSetName") */
   pathPrefix?: string
-  packs: PackDto[]
-  projects: ProjectDto[]
 }
 
 export const ModelContextMenu = forwardRef<
@@ -55,25 +53,17 @@ export const ModelContextMenu = forwardRef<
       packId,
       projectId,
       pathPrefix,
-      packs,
-      projects,
     },
     ref
   ) => {
-    const [contextMenuPacks, setContextMenuPacks] = useState<PackDto[]>(packs)
+    const [contextMenuPacks, setContextMenuPacks] = useState<PackDto[]>([])
     const [contextMenuProjects, setContextMenuProjects] =
-      useState<ProjectDto[]>(projects)
+      useState<ProjectDto[]>([])
     const [selectedModel, setSelectedModel] = useState<Model | null>(null)
     const [showPackDialog, setShowPackDialog] = useState(false)
     const [showProjectDialog, setShowProjectDialog] = useState(false)
     const contextMenu = useRef<ContextMenu>(null)
     const toast = useRef<Toast>(null)
-
-    // Keep in sync with parent props
-    useState(() => {
-      setContextMenuPacks(packs)
-      setContextMenuProjects(projects)
-    })
 
     useImperativeHandle(ref, () => ({
       show: (event: React.MouseEvent, model: Model) => {

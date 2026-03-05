@@ -14,7 +14,7 @@ import {
   serializeToCompactFormat,
 } from '@/utils/tabSerialization'
 
-import { DockPanel } from './DockPanel'
+import { DockPanelContent } from './DockPanelContent'
 
 export function SplitterLayout(): JSX.Element {
   // ── Window identity & lifecycle ─────────────────────────────────────
@@ -262,32 +262,24 @@ export function SplitterLayout(): JSX.Element {
       <div className="splitter-layout">
         <Splitter layout="horizontal" onResizeEnd={handleSplitterResizeEnd}>
           <SplitterPanel size={leftSize} minSize={20}>
-            <DockPanel
+            <DockPanelContent
               side="left"
               tabs={leftTabs}
               setTabs={setLeftTabs}
               activeTab={activeLeftTab}
               setActiveTab={setActiveLeftTab}
-              otherTabs={rightTabs}
-              setOtherTabs={setRightTabs}
-              otherActiveTab={activeRightTab}
-              setOtherActiveTab={setActiveRightTab}
               draggedTab={draggedTab}
               setDraggedTab={setDraggedTab}
               moveTabBetweenPanels={moveTabBetweenPanels}
             />
           </SplitterPanel>
           <SplitterPanel size={rightSize} minSize={20}>
-            <DockPanel
+            <DockPanelContent
               side="right"
               tabs={rightTabs}
               setTabs={setRightTabs}
               activeTab={activeRightTab}
               setActiveTab={setActiveRightTab}
-              otherTabs={leftTabs}
-              setOtherTabs={setLeftTabs}
-              otherActiveTab={activeLeftTab}
-              setOtherActiveTab={setActiveLeftTab}
               draggedTab={draggedTab}
               setDraggedTab={setDraggedTab}
               moveTabBetweenPanels={moveTabBetweenPanels}
