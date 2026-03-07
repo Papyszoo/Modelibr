@@ -1,21 +1,16 @@
 import './SoundList.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
-import { ContextMenu } from 'primereact/contextmenu'
+import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
-import { InputText } from 'primereact/inputtext'
-import { InputTextarea } from 'primereact/inputtextarea'
-import { type MenuItem } from 'primereact/menuitem'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
   type MouseEvent,
   useCallback,
-  useEffect,
   useRef,
   useState,
 } from 'react'
@@ -23,38 +18,24 @@ import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import {
-  getSoundsQueryOptions,
-  useSoundCategoriesQuery,
-  useSoundsQuery,
-} from '@/features/sounds/api/queries'
-import {
-  createSoundCategory,
-  createSoundWithFile,
-  deleteSoundCategory,
-  softDeleteSound,
-  updateSound,
-  updateSoundCategory,
-} from '@/features/sounds/api/soundApi'
-import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { useSoundListData } from '@/features/sounds/hooks/useSoundListData'
+import { useSoundMutations } from '@/features/sounds/hooks/useSoundMutations'
+import { useSoundUpload } from '@/features/sounds/hooks/useSoundUpload'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { soundCategoryFormSchema } from '@/shared/validation/formSchemas'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-import {
-  type PaginationState,
-  type SoundCategoryDto,
-  type SoundDto,
-} from '@/types'
-import { decodeAudio, extractPeaks } from '@/utils/audioUtils'
+import { type SoundCategoryDto, type SoundDto } from '@/types'
 import {
   copyPathToClipboard,
   getCopyPathSuccessMessage,
   openInFileExplorer,
 } from '@/utils/webdavUtils'
 
-import { SoundCard } from './SoundCard'
+import { SoundCategoryDialog } from './SoundCategoryDialog'
+import { SoundCategoryTabs } from './SoundCategoryTabs'
+import { SoundContextMenu } from './SoundContextMenu'
 import { SoundEditor } from './SoundEditor'
+import { SoundGridContent } from './SoundGridContent'
 
 const UNASSIGNED_CATEGORY_ID = -1
 
@@ -62,17 +43,43 @@ type SoundCategoryFormInput = z.input<typeof soundCategoryFormSchema>
 type SoundCategoryFormOutput = z.output<typeof soundCategoryFormSchema>
 
 export function SoundList() {
-  const [sounds, setSounds] = useState<SoundDto[]>([])
-  const [categories, setCategories] = useState<SoundCategoryDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const toast = useRef<Toast>(null)
+  const contextMenuRef = useRef<ContextMenu>(null)
+  const soundGridRef = useRef<HTMLDivElement>(null)
+
+  const showToast = useCallback(
+    (opts: {
+      severity: string
+      summary: string
+      detail: string
+      life: number
+    }) => {
+      toast.current?.show(opts as Parameters<Toast['show']>[0])
+    },
+    []
+  )
+
+  // --- Extracted hooks ---
+  const {
+    sounds,
+    categories,
+    loading,
+    totalCount,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    activeCategoryId,
+    setActiveCategoryId,
+    filteredSounds,
+    invalidateSounds,
+    loadCategories,
+  } = useSoundListData(showToast)
+
   const [showCategoryDialog, setShowCategoryDialog] = useState(false)
   const [showSoundModal, setShowSoundModal] = useState(false)
   const [editingCategory, setEditingCategory] =
     useState<SoundCategoryDto | null>(null)
   const [selectedSound, setSelectedSound] = useState<SoundDto | null>(null)
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
-    UNASSIGNED_CATEGORY_ID
-  )
   const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
     null
   )
@@ -80,14 +87,6 @@ export function SoundList() {
   const [selectedSoundIds, setSelectedSoundIds] = useState<Set<number>>(
     new Set()
   )
-  const [pagination, setPagination] = useState<PaginationState>({
-    page: 1,
-    pageSize: 50,
-    totalCount: 0,
-    totalPages: 0,
-    hasMore: false,
-  })
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState<{
     startX: number
@@ -95,11 +94,6 @@ export function SoundList() {
     currentX: number
     currentY: number
   } | null>(null)
-  const soundGridRef = useRef<HTMLDivElement>(null)
-  const toast = useRef<Toast>(null)
-  const uploadProgressContext = useUploadProgress()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const contextMenuRef = useRef<ContextMenu>(null)
   const [contextMenuTarget, setContextMenuTarget] = useState<SoundDto | null>(
     null
   )
@@ -120,335 +114,34 @@ export function SoundList() {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sounds
 
-  const queryClient = useQueryClient()
-  const soundsQuery = useSoundsQuery({ params: { page: 1, pageSize: 50 } })
-  const categoriesQuery = useSoundCategoriesQuery()
-
-  // Sync initial query data into local state (for load-more accumulation)
-  useEffect(() => {
-    if (soundsQuery.data && pagination.page === 1) {
-      setSounds(soundsQuery.data.sounds || [])
-      setPagination({
-        page: 1,
-        pageSize: soundsQuery.data.pageSize,
-        totalCount: soundsQuery.data.totalCount,
-        totalPages: soundsQuery.data.totalPages,
-        hasMore: 1 < soundsQuery.data.totalPages,
-      })
-      setLoading(false)
-    }
-  }, [soundsQuery.data, pagination.page])
-
-  useEffect(() => {
-    if (soundsQuery.isFetched && !soundsQuery.data) {
-      setLoading(false)
-      setSounds([])
-      setPagination(prev => ({
-        ...prev,
-        totalCount: 0,
-        totalPages: 0,
-        hasMore: false,
-      }))
-    }
-  }, [soundsQuery.isFetched, soundsQuery.data])
-
-  useEffect(() => {
-    if (categoriesQuery.data) {
-      setCategories(categoriesQuery.data.categories || [])
-    }
-  }, [categoriesQuery.data])
-
-  const loadSounds = useCallback(
-    async (loadMore = false) => {
-      if (!loadMore) {
-        // For full refresh, invalidate React Query and let it refetch
-        queryClient.invalidateQueries({ queryKey: ['sounds'] })
-        return
-      }
-      // Load more: fetch next page manually and append
-      try {
-        setIsLoadingMore(true)
-        const page = pagination.page + 1
-        const result = await queryClient.fetchQuery(
-          getSoundsQueryOptions({
-            page,
-            pageSize: 50,
-          })
-        )
-        setSounds(prev => [...prev, ...result.sounds])
-        setPagination({
-          page,
-          pageSize: result.pageSize,
-          totalCount: result.totalCount,
-          totalPages: result.totalPages,
-          hasMore: page < result.totalPages,
-        })
-      } catch (error) {
-        console.error('Failed to load more sounds:', error)
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'Failed to load more sounds',
-          life: 3000,
-        })
-      } finally {
-        setIsLoadingMore(false)
-      }
-    },
-    [pagination.page, queryClient]
-  )
-
-  const loadCategories = useCallback(async () => {
-    queryClient.invalidateQueries({ queryKey: ['soundCategories'] })
-  }, [queryClient])
-
-  const saveCategoryMutation = useMutation({
-    mutationFn: async (vars: {
-      editingCategory: SoundCategoryDto | null
-      name: string
-      description?: string
-    }): Promise<{ type: 'create' | 'update'; createdId?: number }> => {
-      if (vars.editingCategory) {
-        await updateSoundCategory(
-          vars.editingCategory.id,
-          vars.name,
-          vars.description
-        )
-        return { type: 'update' }
-      }
-
-      const created = await createSoundCategory(vars.name, vars.description)
-      return { type: 'create', createdId: created.id }
-    },
-    onSuccess: async (result, vars) => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: vars.editingCategory
-          ? 'Category updated successfully'
-          : 'Category created successfully',
-        life: 3000,
-      })
-
-      if (result.type === 'create' && typeof result.createdId === 'number') {
-        setActiveCategoryId(result.createdId)
-      }
-
-      setShowCategoryDialog(false)
-      await loadCategories()
-      await loadSounds()
-    },
-    onError: error => {
-      console.error('Failed to save category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to save category',
-        life: 3000,
-      })
-    },
+  const {
+    saveCategoryMutation,
+    deleteCategoryMutation,
+    moveSoundsToCategoryMutation,
+    recycleSoundsMutation,
+  } = useSoundMutations({
+    showToast,
+    loadSounds: invalidateSounds,
+    loadCategories,
+    activeCategoryId,
+    setActiveCategoryId,
+    categories,
+    setSelectedSoundIds,
+    setContextMenuTarget,
   })
 
-  const deleteCategoryMutation = useMutation({
-    mutationFn: async (categoryId: number) => {
-      await deleteSoundCategory(categoryId)
-    },
-    onSuccess: async (_data, categoryId) => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category deleted successfully',
-        life: 3000,
-      })
-      if (activeCategoryId === categoryId) {
-        setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
-      }
-      await loadCategories()
-      await loadSounds()
-    },
-    onError: error => {
-      console.error('Failed to delete category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to delete category',
-        life: 3000,
-      })
-    },
+  const {
+    onDrop,
+    onDragOver,
+    onDragEnter,
+    onDragLeave,
+    fileInputRef,
+    handleFileDrop,
+  } = useSoundUpload({
+    showToast,
+    activeCategoryId,
+    loadSounds: invalidateSounds,
   })
-
-  const moveSoundsToCategoryMutation = useMutation({
-    mutationFn: async (vars: {
-      soundIds: number[]
-      categoryId: number | null
-    }) => {
-      await Promise.all(
-        vars.soundIds.map(id =>
-          updateSound(id, { categoryId: vars.categoryId })
-        )
-      )
-    },
-    onSuccess: async (_data, vars) => {
-      const targetCategoryName =
-        vars.categoryId === null
-          ? 'Unassigned'
-          : categories.find(c => c.id === vars.categoryId)?.name ||
-            'Unknown Category'
-      const message =
-        vars.soundIds.length === 1
-          ? `Sound moved to ${targetCategoryName}`
-          : `${vars.soundIds.length} sounds moved to ${targetCategoryName}`
-
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: message,
-        life: 3000,
-      })
-      setSelectedSoundIds(new Set())
-      await loadSounds()
-    },
-    onError: error => {
-      console.error('Failed to update sound category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to update sound category',
-        life: 3000,
-      })
-    },
-  })
-
-  const recycleSoundsMutation = useMutation({
-    mutationFn: async (soundIds: number[]) => {
-      await Promise.all(soundIds.map(id => softDeleteSound(id)))
-    },
-    onSuccess: async (_data, soundIds) => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Recycled',
-        detail:
-          soundIds.length > 1
-            ? `${soundIds.length} sounds moved to recycle bin`
-            : 'Sound moved to recycle bin',
-        life: 3000,
-      })
-      setSelectedSoundIds(new Set())
-      setContextMenuTarget(null)
-      await loadSounds()
-    },
-    onError: error => {
-      console.error('Failed to recycle sounds:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to recycle sounds',
-        life: 3000,
-      })
-    },
-  })
-
-  const handleFileDrop = async (files: File[] | FileList) => {
-    const fileArray = Array.from(files)
-
-    const audioFiles = fileArray.filter(
-      file =>
-        file.type.startsWith('audio/') ||
-        /\.(mp3|wav|ogg|flac|aac|m4a)$/i.test(file.name)
-    )
-
-    if (audioFiles.length === 0) {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Invalid Files',
-        detail: 'Please drop audio files only',
-        life: 3000,
-      })
-      return
-    }
-
-    const batchId = uploadProgressContext?.createBatch() || undefined
-    const categoryIdToAssign =
-      activeCategoryId === UNASSIGNED_CATEGORY_ID
-        ? undefined
-        : (activeCategoryId ?? undefined)
-
-    for (const file of audioFiles) {
-      let uploadId: string | null = null
-      try {
-        uploadId =
-          uploadProgressContext?.addUpload(file, 'sound', batchId) || null
-
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 20)
-        }
-
-        // Decode audio to extract duration and peaks
-        let duration = 0
-        let peaks: string | undefined
-        try {
-          const audioBuffer = await decodeAudio(file)
-          duration = audioBuffer.duration
-          try {
-            const peakData = extractPeaks(audioBuffer, 200)
-            peaks = JSON.stringify(peakData)
-          } catch (peakError) {
-            console.warn('Could not extract peaks:', peakError)
-          }
-        } catch (decodeError) {
-          console.warn(
-            'Could not decode audio for peaks, using defaults:',
-            decodeError
-          )
-        }
-
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 50)
-        }
-
-        const fileName = file.name.replace(/\.[^/.]+$/, '')
-        const result = await createSoundWithFile(file, {
-          name: fileName,
-          duration,
-          peaks,
-          categoryId: categoryIdToAssign,
-          batchId,
-        })
-
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 100)
-          uploadProgressContext.completeUpload(uploadId, {
-            fileId: result.fileId,
-            soundId: result.soundId,
-          })
-        }
-
-        toast.current?.show({
-          severity: 'success',
-          summary: 'Success',
-          detail: `Sound "${fileName}" created successfully`,
-          life: 3000,
-        })
-      } catch (error) {
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.failUpload(uploadId, error as Error)
-        }
-
-        console.error('Failed to create sound from file:', error)
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: `Failed to create sound from ${file.name}`,
-          life: 3000,
-        })
-      }
-    }
-
-    loadSounds()
-  }
-
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
-    useDragAndDrop(handleFileDrop)
 
   const openCreateCategoryDialog = () => {
     setEditingCategory(null)
@@ -467,14 +160,21 @@ export function SoundList() {
 
   const handleSaveCategory = handleCategorySubmit(
     values => {
-      saveCategoryMutation.mutate({
-        editingCategory,
-        name: values.name,
-        description: values.description,
-      })
+      saveCategoryMutation.mutate(
+        {
+          editingCategory,
+          name: values.name,
+          description: values.description,
+        },
+        {
+          onSuccess: () => {
+            setShowCategoryDialog(false)
+          },
+        }
+      )
     },
     () => {
-      toast.current?.show({
+      showToast({
         severity: 'warn',
         summary: 'Validation Error',
         detail: 'Category name is required',
@@ -518,7 +218,7 @@ export function SoundList() {
       URL.revokeObjectURL(link.href)
     } catch (error) {
       console.error('Failed to download sound:', error)
-      toast.current?.show({
+      showToast({
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to download sound',
@@ -694,13 +394,6 @@ export function SoundList() {
     setDraggedSoundId(null)
   }
 
-  const filteredSounds = sounds.filter(sound => {
-    if (activeCategoryId === UNASSIGNED_CATEGORY_ID) {
-      return sound.categoryId === null
-    }
-    return sound.categoryId === activeCategoryId
-  })
-
   // Handle recycling sounds via context menu
   const handleRecycleSounds = async () => {
     const soundIdsToRecycle =
@@ -731,7 +424,7 @@ export function SoundList() {
     }
 
     const result = await openInFileExplorer(virtualPath)
-    toast.current?.show({
+    showToast({
       severity: result.success ? 'info' : 'warn',
       summary: result.success ? 'Opening' : 'Note',
       detail: result.message,
@@ -756,7 +449,7 @@ export function SoundList() {
 
     const result = await copyPathToClipboard(virtualPath)
 
-    toast.current?.show({
+    showToast({
       severity: result.success ? 'success' : 'error',
       summary: result.success ? 'Copied' : 'Failed',
       detail: result.success
@@ -764,34 +457,6 @@ export function SoundList() {
         : 'Failed to copy path to clipboard',
       life: 5000,
     })
-  }
-
-  // Get context menu items (dynamic label based on selection)
-  const getContextMenuItems = (): MenuItem[] => {
-    const selectedCount = selectedSoundIds.size
-    const label =
-      selectedCount > 1 ? `Recycle ${selectedCount} sounds` : 'Recycle'
-
-    return [
-      {
-        label: 'Show in Folder',
-        icon: 'pi pi-folder-open',
-        command: handleShowInFolder,
-      },
-      {
-        label: 'Copy Folder Path',
-        icon: 'pi pi-copy',
-        command: handleCopyPath,
-      },
-      {
-        separator: true,
-      },
-      {
-        label,
-        icon: 'pi pi-trash',
-        command: handleRecycleSounds,
-      },
-    ]
   }
 
   // Handle right-click on sound card
@@ -826,7 +491,13 @@ export function SoundList() {
     >
       <Toast ref={toast} />
       <ConfirmDialog />
-      <ContextMenu ref={contextMenuRef} model={getContextMenuItems()} />
+      <SoundContextMenu
+        contextMenuRef={contextMenuRef}
+        selectedCount={selectedSoundIds.size}
+        onShowInFolder={handleShowInFolder}
+        onCopyPath={handleCopyPath}
+        onRecycle={handleRecycleSounds}
+      />
 
       <div className="sound-list-header">
         <div className="sound-list-title">
@@ -860,181 +531,54 @@ export function SoundList() {
         </div>
       </div>
 
-      <div className="sound-category-tabs">
-        <div
-          className={`category-tab ${activeCategoryId === UNASSIGNED_CATEGORY_ID ? 'active' : ''} ${dragOverCategoryId === UNASSIGNED_CATEGORY_ID ? 'drag-over' : ''}`}
-          onClick={() => setActiveCategoryId(UNASSIGNED_CATEGORY_ID)}
-          onDragOver={e => handleCategoryDragOver(e, UNASSIGNED_CATEGORY_ID)}
-          onDragLeave={handleCategoryDragLeave}
-          onDrop={e => handleCategoryDrop(e, UNASSIGNED_CATEGORY_ID)}
-        >
-          <span>Unassigned</span>
-          <span className="category-count">
-            ({sounds.filter(s => s.categoryId === null).length})
-          </span>
-        </div>
-        {categories.map(category => (
-          <div
-            key={category.id}
-            className={`category-tab ${activeCategoryId === category.id ? 'active' : ''} ${dragOverCategoryId === category.id ? 'drag-over' : ''}`}
-            onClick={() => setActiveCategoryId(category.id)}
-            onDragOver={e => handleCategoryDragOver(e, category.id)}
-            onDragLeave={handleCategoryDragLeave}
-            onDrop={e => handleCategoryDrop(e, category.id)}
-          >
-            <span>{category.name}</span>
-            <span className="category-count">
-              ({sounds.filter(s => s.categoryId === category.id).length})
-            </span>
-            {activeCategoryId === category.id && (
-              <div className="category-tab-actions">
-                <Button
-                  icon="pi pi-pencil"
-                  className="p-button-text p-button-sm"
-                  onClick={e => {
-                    e.stopPropagation()
-                    openEditCategoryDialog(category)
-                  }}
-                  tooltip="Rename category"
-                />
-                <Button
-                  icon="pi pi-trash"
-                  className="p-button-text p-button-sm p-button-danger"
-                  onClick={e => {
-                    e.stopPropagation()
-                    handleDeleteCategory(category)
-                  }}
-                  tooltip="Delete category"
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      <SoundCategoryTabs
+        categories={categories}
+        sounds={sounds}
+        activeCategoryId={activeCategoryId}
+        dragOverCategoryId={dragOverCategoryId}
+        onCategoryChange={setActiveCategoryId}
+        onCategoryDragOver={handleCategoryDragOver}
+        onCategoryDragLeave={handleCategoryDragLeave}
+        onCategoryDrop={handleCategoryDrop}
+        onEditCategory={openEditCategoryDialog}
+        onDeleteCategory={handleDeleteCategory}
+      />
 
-      {filteredSounds.length === 0 ? (
-        <div className="sound-list-empty">
-          <i
-            className="pi pi-volume-up"
-            style={{ fontSize: '3rem', marginBottom: '1rem' }}
-          />
-          <p>No sounds in this category</p>
-          <p className="hint">Drag and drop audio files here to upload</p>
-        </div>
-      ) : (
-        <div
-          className="sound-grid-container"
-          ref={soundGridRef}
-          onMouseDown={handleGridMouseDown}
-          onMouseMove={handleGridMouseMove}
-          onMouseUp={handleGridMouseUp}
-          onMouseLeave={handleGridMouseUp}
-        >
-          <div
-            className="sound-grid"
-            style={{
-              gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
-            }}
-          >
-            {filteredSounds.map(sound => (
-              <SoundCard
-                key={sound.id}
-                sound={sound}
-                isSelected={selectedSoundIds.has(sound.id)}
-                isDragging={draggedSoundId === sound.id}
-                onSelect={e => toggleSoundSelection(sound.id, e)}
-                onClick={() => openSoundModal(sound)}
-                onContextMenu={e => handleSoundContextMenu(e, sound)}
-                onDragStart={e => handleSoundDragStart(e, sound)}
-                onDragEnd={handleSoundDragEnd}
-              />
-            ))}
-          </div>
-          {isAreaSelecting && selectionBox && (
-            <div
-              className="selection-box"
-              style={{
-                left: Math.min(selectionBox.startX, selectionBox.currentX),
-                top: Math.min(selectionBox.startY, selectionBox.currentY),
-                width: Math.abs(selectionBox.currentX - selectionBox.startX),
-                height: Math.abs(selectionBox.currentY - selectionBox.startY),
-              }}
-            />
-          )}
-        </div>
-      )}
-
-      {pagination.hasMore && (
-        <div
-          style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}
-        >
-          <Button
-            label={
-              isLoadingMore
-                ? 'Loading...'
-                : `Load More (${sounds.length} of ${pagination.totalCount})`
-            }
-            icon={
-              isLoadingMore ? 'pi pi-spinner pi-spin' : 'pi pi-chevron-down'
-            }
-            onClick={() => loadSounds(true)}
-            disabled={isLoadingMore}
-            className="p-button-outlined"
-          />
-        </div>
-      )}
+      <SoundGridContent
+        filteredSounds={filteredSounds}
+        cardWidth={cardWidth}
+        selectedSoundIds={selectedSoundIds}
+        draggedSoundId={draggedSoundId}
+        soundGridRef={soundGridRef}
+        isAreaSelecting={isAreaSelecting}
+        selectionBox={selectionBox}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        totalCount={totalCount}
+        totalSoundsCount={sounds.length}
+        onToggleSelection={toggleSoundSelection}
+        onSoundClick={openSoundModal}
+        onContextMenu={handleSoundContextMenu}
+        onSoundDragStart={handleSoundDragStart}
+        onSoundDragEnd={handleSoundDragEnd}
+        onGridMouseDown={handleGridMouseDown}
+        onGridMouseMove={handleGridMouseMove}
+        onGridMouseUp={handleGridMouseUp}
+        onLoadMore={() => fetchNextPage()}
+      />
 
       <div className="sound-drop-overlay">
         <i className="pi pi-upload" />
         <span>Drop audio files here</span>
       </div>
 
-      {/* Create/Edit Category Dialog */}
-      <Dialog
-        header={editingCategory ? 'Rename Category' : 'Add Category'}
+      <SoundCategoryDialog
         visible={showCategoryDialog}
+        isEditing={editingCategory !== null}
         onHide={() => setShowCategoryDialog(false)}
-        style={{ width: '400px' }}
-        data-testid="sound-category-dialog"
-        footer={
-          <div>
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              className="p-button-text"
-              onClick={() => setShowCategoryDialog(false)}
-              data-testid="sound-category-dialog-cancel"
-            />
-            <Button
-              label="Save"
-              icon="pi pi-check"
-              onClick={handleSaveCategory}
-              data-testid="sound-category-dialog-save"
-            />
-          </div>
-        }
-      >
-        <div className="p-fluid">
-          <div className="field">
-            <label htmlFor="categoryName">Name *</label>
-            <InputText
-              id="categoryName"
-              {...registerCategory('name')}
-              autoFocus
-              data-testid="sound-category-name-input"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="categoryDescription">Description</label>
-            <InputTextarea
-              id="categoryDescription"
-              {...registerCategory('description')}
-              rows={3}
-              data-testid="sound-category-description-input"
-            />
-          </div>
-        </div>
-      </Dialog>
+        onSave={handleSaveCategory}
+        registerCategory={registerCategory}
+      />
 
       {/* Sound Editor Modal */}
       <Dialog
@@ -1055,11 +599,7 @@ export function SoundList() {
               setSelectedSound(prev =>
                 prev && prev.id === soundId ? { ...prev, name } : prev
               )
-              setSounds(prev =>
-                prev.map(sound =>
-                  sound.id === soundId ? { ...sound, name } : sound
-                )
-              )
+              invalidateSounds()
             }}
           />
         )}

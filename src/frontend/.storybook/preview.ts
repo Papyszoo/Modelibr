@@ -6,6 +6,12 @@ import 'primeicons/primeicons.css'
 import '../src/index.css'
 
 import type { Preview } from '@storybook/react-vite'
+import { initialize, mswLoader } from 'msw-storybook-addon'
+
+import { handlers } from '../src/mocks/handlers'
+
+// Initialize MSW with default handlers
+initialize()
 
 const preview: Preview = {
   parameters: {
@@ -28,7 +34,11 @@ const preview: Preview = {
         },
       ],
     },
+    msw: {
+      handlers,
+    },
   },
+  loaders: [mswLoader],
 }
 
 export default preview

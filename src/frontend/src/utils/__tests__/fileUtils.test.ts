@@ -1,5 +1,6 @@
 import {
   ALL_SUPPORTED_FORMATS,
+  formatDate,
   formatFileSize,
   getFileExtension,
   getFileName,
@@ -144,6 +145,25 @@ describe('fileUtils', () => {
       expect(isSupportedModelFormat('.jpg')).toBe(false)
       expect(isSupportedModelFormat('.mp4')).toBe(false)
       expect(isSupportedModelFormat('.unknown')).toBe(false)
+    })
+  })
+
+  describe('formatDate', () => {
+    it('should format ISO date strings to locale format', () => {
+      const result = formatDate('2024-01-15T10:30:00.000Z')
+      expect(typeof result).toBe('string')
+      expect(result.length).toBeGreaterThan(0)
+    })
+
+    it('should handle date-only strings', () => {
+      const result = formatDate('2024-06-01')
+      expect(typeof result).toBe('string')
+      expect(result.length).toBeGreaterThan(0)
+    })
+
+    it('should return consistent output for same input', () => {
+      const date = '2024-03-15T14:00:00.000Z'
+      expect(formatDate(date)).toBe(formatDate(date))
     })
   })
 

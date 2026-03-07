@@ -151,7 +151,6 @@ export const SoundCard = memo(function SoundCard({
     <div
       className={`sound-card ${isSelected ? 'selected' : ''}`}
       data-sound-id={sound.id}
-      src={getFileUrl(sound.fileId.toString())}
       onClick={onClick}
       onContextMenu={onContextMenu}
       draggable

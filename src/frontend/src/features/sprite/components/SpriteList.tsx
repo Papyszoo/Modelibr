@@ -1,9 +1,7 @@
 import './SpriteList.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { Checkbox } from 'primereact/checkbox'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
@@ -16,7 +14,6 @@ import {
   type DragEvent,
   type MouseEvent,
   useCallback,
-  useEffect,
   useRef,
   useState,
 } from 'react'
@@ -24,19 +21,9 @@ import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
 import { getFilePreviewUrl, getFileUrl } from '@/features/models/api/modelApi'
-import {
-  getSpritesQueryOptions,
-  useSpriteCategoriesQuery,
-  useSpritesQuery,
-} from '@/features/sprite/api/queries'
-import {
-  createSpriteCategory,
-  createSpriteWithFile,
-  deleteSpriteCategory,
-  softDeleteSprite,
-  updateSprite,
-  updateSpriteCategory,
-} from '@/features/sprite/api/spriteApi'
+import { useSpriteListData } from '@/features/sprite/hooks/useSpriteListData'
+import { useSpriteMutations } from '@/features/sprite/hooks/useSpriteMutations'
+import { useSpriteUpload } from '@/features/sprite/hooks/useSpriteUpload'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
@@ -45,46 +32,24 @@ import {
   spriteRenameFormSchema,
 } from '@/shared/validation/formSchemas'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-import { type PaginationState } from '@/types'
+import { type SpriteCategoryDto, type SpriteDto } from '@/types'
 import {
   copyPathToClipboard,
   getCopyPathSuccessMessage,
   openInFileExplorer,
 } from '@/utils/webdavUtils'
 
-interface SpriteDto {
-  id: number
-  name: string
-  fileId: number
-  spriteType: number
-  categoryId: number | null
-  categoryName: string | null
-  fileName: string
-  fileSizeBytes: number
-  createdAt: string
-  updatedAt: string
-}
-
-interface SpriteCategoryDto {
-  id: number
-  name: string
-  description: string | null
-  createdAt: string
-  updatedAt: string
-}
+import { SpriteCategoryTabs } from './SpriteCategoryTabs'
+import { SpriteGridContent } from './SpriteGridContent'
 
 const UNASSIGNED_CATEGORY_ID = -1
-const SPRITE_TYPE_STATIC = 1
-const SPRITE_TYPE_GIF = 3
 
 export function SpriteList() {
   type SpriteCategoryFormInput = z.input<typeof spriteCategoryFormSchema>
   type SpriteCategoryFormOutput = z.output<typeof spriteCategoryFormSchema>
   type SpriteRenameFormValues = z.infer<typeof spriteRenameFormSchema>
 
-  const [sprites, setSprites] = useState<SpriteDto[]>([])
-  const [categories, setCategories] = useState<SpriteCategoryDto[]>([])
-  const [loading, setLoading] = useState(true)
+  // ── UI State ────────────────────────────────────────────────────────
   const [showCategoryDialog, setShowCategoryDialog] = useState(false)
   const [showSpriteModal, setShowSpriteModal] = useState(false)
   const [editingCategory, setEditingCategory] =
@@ -92,9 +57,6 @@ export function SpriteList() {
   const [selectedSprite, setSelectedSprite] = useState<SpriteDto | null>(null)
   const [isEditingSpriteName, setIsEditingSpriteName] = useState(false)
   const [isSavingSpriteName, setIsSavingSpriteName] = useState(false)
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
-    UNASSIGNED_CATEGORY_ID
-  )
   const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
     null
   )
@@ -102,14 +64,6 @@ export function SpriteList() {
   const [selectedSpriteIds, setSelectedSpriteIds] = useState<Set<number>>(
     new Set()
   )
-  const [pagination, setPagination] = useState<PaginationState>({
-    page: 1,
-    pageSize: 50,
-    totalCount: 0,
-    totalPages: 0,
-    hasMore: false,
-  })
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState<{
     startX: number
@@ -117,15 +71,17 @@ export function SpriteList() {
     currentX: number
     currentY: number
   } | null>(null)
-  const spriteGridRef = useRef<HTMLDivElement>(null)
-  const toast = useRef<Toast>(null)
-  const uploadProgressContext = useUploadProgress()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const contextMenuRef = useRef<ContextMenu>(null)
   const [contextMenuTarget, setContextMenuTarget] = useState<SpriteDto | null>(
     null
   )
 
+  // ── Refs ────────────────────────────────────────────────────────────
+  const spriteGridRef = useRef<HTMLDivElement>(null)
+  const toast = useRef<Toast>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const contextMenuRef = useRef<ContextMenu>(null)
+
+  // ── Forms ───────────────────────────────────────────────────────────
   const {
     register: registerCategory,
     handleSubmit: handleCategorySubmit,
@@ -133,10 +89,7 @@ export function SpriteList() {
   } = useForm<SpriteCategoryFormInput, unknown, SpriteCategoryFormOutput>({
     resolver: zodResolver(spriteCategoryFormSchema),
     mode: 'onChange',
-    defaultValues: {
-      name: '',
-      description: '',
-    },
+    defaultValues: { name: '', description: '' },
   })
 
   const {
@@ -146,366 +99,66 @@ export function SpriteList() {
   } = useForm<SpriteRenameFormValues>({
     resolver: zodResolver(spriteRenameFormSchema),
     mode: 'onChange',
-    defaultValues: {
-      name: '',
-    },
+    defaultValues: { name: '' },
   })
 
+  // ── Store ───────────────────────────────────────────────────────────
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sprites
+  const uploadProgressContext = useUploadProgress()
 
-  const queryClient = useQueryClient()
-  const spritesQuery = useSpritesQuery({ params: { page: 1, pageSize: 50 } })
-  const categoriesQuery = useSpriteCategoriesQuery()
+  // ── Data Hook ───────────────────────────────────────────────────────
+  const {
+    sprites,
+    categories,
+    loading,
+    totalCount,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    activeCategoryId,
+    setActiveCategoryId,
+    filteredSprites,
+    invalidateSprites,
+    loadCategories,
+  } = useSpriteListData()
 
-  // Sync initial query data into local state (for load-more accumulation)
-  useEffect(() => {
-    if (spritesQuery.data && pagination.page === 1) {
-      setSprites(spritesQuery.data.sprites || [])
-      setPagination({
-        page: 1,
-        pageSize: spritesQuery.data.pageSize,
-        totalCount: spritesQuery.data.totalCount,
-        totalPages: spritesQuery.data.totalPages,
-        hasMore: 1 < spritesQuery.data.totalPages,
-      })
-      setLoading(false)
-    }
-  }, [spritesQuery.data, pagination.page])
-
-  useEffect(() => {
-    if (categoriesQuery.data) {
-      setCategories(categoriesQuery.data.categories || [])
-    }
-  }, [categoriesQuery.data])
-
-  const loadSprites = useCallback(
-    async (loadMore = false) => {
-      if (!loadMore) {
-        // For full refresh, invalidate React Query and let it refetch
-        queryClient.invalidateQueries({ queryKey: ['sprites'] })
-        return
-      }
-      // Load more: fetch next page manually and append
-      try {
-        setIsLoadingMore(true)
-        const page = pagination.page + 1
-        const result = await queryClient.fetchQuery(
-          getSpritesQueryOptions({
-            page,
-            pageSize: 50,
-          })
-        )
-        setSprites(prev => [...prev, ...result.sprites])
-        setPagination({
-          page,
-          pageSize: result.pageSize,
-          totalCount: result.totalCount,
-          totalPages: result.totalPages,
-          hasMore: page < result.totalPages,
-        })
-      } catch (error) {
-        console.error('Failed to load more sprites:', error)
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'Failed to load more sprites',
-          life: 3000,
-        })
-      } finally {
-        setIsLoadingMore(false)
-      }
-    },
-    [pagination.page, queryClient]
-  )
-
-  const loadCategories = useCallback(async () => {
-    queryClient.invalidateQueries({ queryKey: ['spriteCategories'] })
-  }, [queryClient])
-
-  const saveCategoryMutation = useMutation({
-    mutationFn: async (vars: {
-      editingCategory: SpriteCategoryDto | null
-      name: string
-      description?: string
-    }): Promise<{ type: 'create' | 'update'; createdId?: number }> => {
-      if (vars.editingCategory) {
-        await updateSpriteCategory(
-          vars.editingCategory.id,
-          vars.name,
-          vars.description
-        )
-        return { type: 'update' }
-      }
-
-      const created = await createSpriteCategory(vars.name, vars.description)
-      return { type: 'create', createdId: created.id }
-    },
-    onSuccess: async (result, vars) => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: vars.editingCategory
-          ? 'Category updated successfully'
-          : 'Category created successfully',
-        life: 3000,
-      })
-
-      if (result.type === 'create' && typeof result.createdId === 'number') {
-        setActiveCategoryId(result.createdId)
-      }
-
-      setShowCategoryDialog(false)
-      await loadCategories()
-      await loadSprites()
-    },
-    onError: error => {
-      console.error('Failed to save category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to save category',
-        life: 3000,
-      })
-    },
+  // ── Mutations Hook ──────────────────────────────────────────────────
+  const {
+    saveCategoryMutation,
+    deleteCategoryMutation,
+    moveSpritesToCategoryMutation,
+    recycleSpritesMutation,
+    renameSpriteMutation,
+  } = useSpriteMutations({
+    categories,
+    activeCategoryId,
+    setActiveCategoryId,
+    setSelectedSpriteIds,
+    setContextMenuTarget,
+    setSelectedSprite,
+    setIsEditingSpriteName,
+    resetSpriteRenameForm,
+    setIsSavingSpriteName,
+    setShowCategoryDialog,
+    invalidateSprites,
+    loadCategories,
+    showToast: opts => toast.current?.show(opts),
+    toast,
   })
 
-  const deleteCategoryMutation = useMutation({
-    mutationFn: async (categoryId: number) => {
-      await deleteSpriteCategory(categoryId)
-    },
-    onSuccess: async (_data, categoryId) => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category deleted successfully',
-        life: 3000,
-      })
-      if (activeCategoryId === categoryId) {
-        setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
-      }
-      await loadCategories()
-      await loadSprites()
-    },
-    onError: error => {
-      console.error('Failed to delete category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to delete category',
-        life: 3000,
-      })
-    },
+  // ── Upload Hook ─────────────────────────────────────────────────────
+  const { handleFileDrop } = useSpriteUpload({
+    activeCategoryId,
+    uploadProgressContext,
+    invalidateSprites,
+    toast,
   })
-
-  const moveSpritesToCategoryMutation = useMutation({
-    mutationFn: async (vars: {
-      spriteIds: number[]
-      categoryId: number | null
-    }) => {
-      await Promise.all(
-        vars.spriteIds.map(id =>
-          updateSprite(id, { categoryId: vars.categoryId })
-        )
-      )
-    },
-    onSuccess: async (_data, vars) => {
-      const targetCategoryName =
-        vars.categoryId === null
-          ? 'Unassigned'
-          : categories.find(c => c.id === vars.categoryId)?.name ||
-            'Unknown Category'
-      const message =
-        vars.spriteIds.length === 1
-          ? `Sprite moved to ${targetCategoryName}`
-          : `${vars.spriteIds.length} sprites moved to ${targetCategoryName}`
-
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: message,
-        life: 3000,
-      })
-      setSelectedSpriteIds(new Set())
-      await loadSprites()
-    },
-    onError: error => {
-      console.error('Failed to update sprite category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to update sprite category',
-        life: 3000,
-      })
-    },
-  })
-
-  const recycleSpritesMutation = useMutation({
-    mutationFn: async (spriteIds: number[]) => {
-      await Promise.all(spriteIds.map(id => softDeleteSprite(id)))
-    },
-    onSuccess: async (_data, spriteIds) => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Recycled',
-        detail:
-          spriteIds.length > 1
-            ? `${spriteIds.length} sprites moved to recycle bin`
-            : 'Sprite moved to recycle bin',
-        life: 3000,
-      })
-      setSelectedSpriteIds(new Set())
-      setContextMenuTarget(null)
-      await loadSprites()
-    },
-    onError: error => {
-      console.error('Failed to recycle sprites:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to recycle sprites',
-        life: 3000,
-      })
-    },
-  })
-
-  const renameSpriteMutation = useMutation({
-    mutationFn: async (vars: { sprite: SpriteDto; newName: string }) => {
-      await updateSprite(vars.sprite.id, { name: vars.newName })
-    },
-    onSuccess: (_data, vars) => {
-      setSelectedSprite({ ...vars.sprite, name: vars.newName })
-      setSprites(prev =>
-        prev.map(s =>
-          s.id === vars.sprite.id ? { ...s, name: vars.newName } : s
-        )
-      )
-      setIsEditingSpriteName(false)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Updated',
-        detail: `Sprite renamed to "${vars.newName}"`,
-        life: 3000,
-      })
-    },
-    onError: (error, vars) => {
-      console.error('Failed to rename sprite:', error)
-      resetSpriteRenameForm({ name: vars.sprite.name })
-      setIsEditingSpriteName(false)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to rename sprite',
-        life: 3000,
-      })
-    },
-    onSettled: () => {
-      setIsSavingSpriteName(false)
-    },
-  })
-
-  const handleFileDrop = async (files: File[] | FileList) => {
-    const fileArray = Array.from(files)
-
-    const imageFiles = fileArray.filter(
-      file =>
-        file.type.startsWith('image/') ||
-        /\.(png|jpg|jpeg|gif|webp|apng|bmp|svg)$/i.test(file.name)
-    )
-
-    if (imageFiles.length === 0) {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Invalid Files',
-        detail: 'Please drop image files only',
-        life: 3000,
-      })
-      return
-    }
-
-    const batchId = uploadProgressContext?.createBatch() || undefined
-    const categoryIdToAssign =
-      activeCategoryId === UNASSIGNED_CATEGORY_ID
-        ? undefined
-        : (activeCategoryId ?? undefined)
-
-    for (const file of imageFiles) {
-      let uploadId: string | null = null
-      try {
-        uploadId =
-          uploadProgressContext?.addUpload(file, 'sprite', batchId) || null
-
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 50)
-        }
-
-        const fileName = file.name.replace(/\.[^/.]+$/, '')
-        const result = await createSpriteWithFile(file, {
-          name: fileName,
-          spriteType:
-            file.type === 'image/gif' ? SPRITE_TYPE_GIF : SPRITE_TYPE_STATIC,
-          categoryId: categoryIdToAssign,
-          batchId,
-        })
-
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 100)
-          uploadProgressContext.completeUpload(uploadId, {
-            fileId: result.fileId,
-            spriteId: result.spriteId,
-          })
-        }
-
-        toast.current?.show({
-          severity: 'success',
-          summary: 'Success',
-          detail: `Sprite "${fileName}" created successfully`,
-          life: 3000,
-        })
-      } catch (error) {
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.failUpload(uploadId, error as Error)
-        }
-
-        console.error('Failed to create sprite from file:', error)
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: `Failed to create sprite from ${file.name}`,
-          life: 3000,
-        })
-      }
-    }
-
-    loadSprites()
-  }
 
   const { onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDragAndDrop(handleFileDrop)
 
-  const getSpriteTypeName = (type: number): string => {
-    switch (type) {
-      case 1:
-        return 'Static'
-      case 2:
-        return 'Sprite Sheet'
-      case 3:
-        return 'GIF'
-      case 4:
-        return 'APNG'
-      case 5:
-        return 'Animated WebP'
-      default:
-        return 'Unknown'
-    }
-  }
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-
+  // ── Category Dialog Handlers ────────────────────────────────────────
   const openCreateCategoryDialog = () => {
     setEditingCategory(null)
     resetCategoryForm({ name: '', description: '' })
@@ -522,7 +175,7 @@ export function SpriteList() {
   }
 
   const handleSaveCategory = handleCategorySubmit(
-    async values => {
+    values => {
       saveCategoryMutation.mutate({
         editingCategory,
         name: values.name,
@@ -551,6 +204,7 @@ export function SpriteList() {
     })
   }
 
+  // ── Sprite Modal Handlers ──────────────────────────────────────────
   const openSpriteModal = (sprite: SpriteDto) => {
     setSelectedSprite(sprite)
     resetSpriteRenameForm({ name: sprite.name })
@@ -575,12 +229,10 @@ export function SpriteList() {
 
   const handleDownload = async () => {
     if (!selectedSprite) return
-
     try {
       const url = getFileUrl(selectedSprite.fileId.toString())
       const response = await fetch(url)
       const blob = await response.blob()
-
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       const extension = selectedSprite.fileName.split('.').pop() || 'png'
@@ -600,28 +252,22 @@ export function SpriteList() {
     }
   }
 
+  // ── Selection & Drag ───────────────────────────────────────────────
   const toggleSpriteSelection = (spriteId: number, e: MouseEvent) => {
     e.stopPropagation()
     setSelectedSpriteIds(prev => {
       const next = new Set(prev)
-      if (next.has(spriteId)) {
-        next.delete(spriteId)
-      } else {
-        next.add(spriteId)
-      }
+      if (next.has(spriteId)) next.delete(spriteId)
+      else next.add(spriteId)
       return next
     })
   }
 
-  const clearSelection = () => {
-    setSelectedSpriteIds(new Set())
-  }
+  const clearSelection = () => setSelectedSpriteIds(new Set())
 
   const handleGridMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement
-    if (target.closest('.sprite-card')) {
-      return
-    }
+    if (target.closest('.sprite-card')) return
     if (spriteGridRef.current) {
       const rect = spriteGridRef.current.getBoundingClientRect()
       setIsAreaSelecting(true)
@@ -682,15 +328,11 @@ export function SpriteList() {
           cardTop <= selectionBottom
         ) {
           const spriteId = card.getAttribute('data-sprite-id')
-          if (spriteId) {
-            newSelected.add(parseInt(spriteId, 10))
-          }
+          if (spriteId) newSelected.add(parseInt(spriteId, 10))
         }
       })
 
-      if (newSelected.size > 0) {
-        setSelectedSpriteIds(newSelected)
-      }
+      if (newSelected.size > 0) setSelectedSpriteIds(newSelected)
     }
     setIsAreaSelecting(false)
     setSelectionBox(null)
@@ -700,9 +342,8 @@ export function SpriteList() {
     e: DragEvent<HTMLDivElement>,
     sprite: SpriteDto
   ) => {
-    if (!selectedSpriteIds.has(sprite.id)) {
+    if (!selectedSpriteIds.has(sprite.id))
       setSelectedSpriteIds(new Set([sprite.id]))
-    }
     setDraggedSpriteId(sprite.id)
     e.dataTransfer.effectAllowed = 'move'
     const spriteIdsToMove = selectedSpriteIds.has(sprite.id)
@@ -716,15 +357,14 @@ export function SpriteList() {
     setDragOverCategoryId(null)
   }
 
+  // ── Category Drag-to-Move ──────────────────────────────────────────
   const handleCategoryDragOver = (
     e: DragEvent<HTMLDivElement>,
     categoryId: number | null
   ) => {
     e.preventDefault()
     e.stopPropagation()
-    if (draggedSpriteId !== null) {
-      setDragOverCategoryId(categoryId)
-    }
+    if (draggedSpriteId !== null) setDragOverCategoryId(categoryId)
   }
 
   const handleCategoryDragLeave = (e: DragEvent<HTMLDivElement>) => {
@@ -733,62 +373,43 @@ export function SpriteList() {
     setDragOverCategoryId(null)
   }
 
-  const handleCategoryDrop = async (
-    e: DragEvent<HTMLDivElement>,
-    targetCategoryId: number | null
-  ) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverCategoryId(null)
-
-    if (draggedSpriteId === null) return
-
-    const newCategoryId =
-      targetCategoryId === UNASSIGNED_CATEGORY_ID ? null : targetCategoryId
-
-    const spriteIdsToMove = selectedSpriteIds.has(draggedSpriteId)
-      ? Array.from(selectedSpriteIds)
-      : [draggedSpriteId]
-
-    const spritesToMove = sprites.filter(
-      s => spriteIdsToMove.includes(s.id) && s.categoryId !== newCategoryId
-    )
-
-    if (spritesToMove.length === 0) {
+  const handleCategoryDrop = useCallback(
+    async (e: DragEvent<HTMLDivElement>, targetCategoryId: number | null) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOverCategoryId(null)
+      if (draggedSpriteId === null) return
+      const newCategoryId =
+        targetCategoryId === UNASSIGNED_CATEGORY_ID ? null : targetCategoryId
+      const spriteIdsToMove = selectedSpriteIds.has(draggedSpriteId)
+        ? Array.from(selectedSpriteIds)
+        : [draggedSpriteId]
+      const spritesToMove = sprites.filter(
+        s => spriteIdsToMove.includes(s.id) && s.categoryId !== newCategoryId
+      )
+      if (spritesToMove.length === 0) {
+        setDraggedSpriteId(null)
+        return
+      }
+      moveSpritesToCategoryMutation.mutate({
+        spriteIds: spritesToMove.map(s => s.id),
+        categoryId: newCategoryId,
+      })
       setDraggedSpriteId(null)
-      return
-    }
+    },
+    [draggedSpriteId, selectedSpriteIds, sprites, moveSpritesToCategoryMutation]
+  )
 
-    moveSpritesToCategoryMutation.mutate({
-      spriteIds: spritesToMove.map(s => s.id),
-      categoryId: newCategoryId,
-    })
-
-    setDraggedSpriteId(null)
-  }
-
-  const filteredSprites = sprites.filter(sprite => {
-    if (activeCategoryId === UNASSIGNED_CATEGORY_ID) {
-      return sprite.categoryId === null
-    }
-    return sprite.categoryId === activeCategoryId
-  })
-
-  // Handle "Show in Folder" from context menu
+  // ── Context Menu ───────────────────────────────────────────────────
   const handleShowInFolder = async () => {
-    // For unassigned sprites, show root Sprites folder
-    // For categorized sprites, show the category folder
     let virtualPath = 'Sprites'
     if (
       activeCategoryId !== null &&
       activeCategoryId !== UNASSIGNED_CATEGORY_ID
     ) {
       const category = categories.find(c => c.id === activeCategoryId)
-      if (category) {
-        virtualPath = `Sprites/${category.name}`
-      }
+      if (category) virtualPath = `Sprites/${category.name}`
     }
-
     const result = await openInFileExplorer(virtualPath)
     toast.current?.show({
       severity: result.success ? 'info' : 'warn',
@@ -798,23 +419,16 @@ export function SpriteList() {
     })
   }
 
-  // Handle "Copy Path" from context menu
   const handleCopyPath = async () => {
-    // For unassigned sprites, copy path to root Sprites folder
-    // For categorized sprites, copy path to the category folder
     let virtualPath = 'Sprites'
     if (
       activeCategoryId !== null &&
       activeCategoryId !== UNASSIGNED_CATEGORY_ID
     ) {
       const category = categories.find(c => c.id === activeCategoryId)
-      if (category) {
-        virtualPath = `Sprites/${category.name}`
-      }
+      if (category) virtualPath = `Sprites/${category.name}`
     }
-
     const result = await copyPathToClipboard(virtualPath)
-
     toast.current?.show({
       severity: result.success ? 'success' : 'error',
       summary: result.success ? 'Copied' : 'Failed',
@@ -825,26 +439,21 @@ export function SpriteList() {
     })
   }
 
-  // Handle recycling sprites via context menu
-  const handleRecycleSprites = async () => {
+  const handleRecycleSprites = () => {
     const spriteIdsToRecycle =
       selectedSpriteIds.size > 0
         ? Array.from(selectedSpriteIds)
         : contextMenuTarget
           ? [contextMenuTarget.id]
           : []
-
     if (spriteIdsToRecycle.length === 0) return
-
     recycleSpritesMutation.mutate(spriteIdsToRecycle)
   }
 
-  // Get context menu items (dynamic label based on selection)
   const getContextMenuItems = (): MenuItem[] => {
     const selectedCount = selectedSpriteIds.size
     const label =
       selectedCount > 1 ? `Recycle ${selectedCount} sprites` : 'Recycle'
-
     return [
       {
         label: 'Show in Folder',
@@ -856,31 +465,23 @@ export function SpriteList() {
         icon: 'pi pi-copy',
         command: handleCopyPath,
       },
-      {
-        separator: true,
-      },
-      {
-        label,
-        icon: 'pi pi-trash',
-        command: handleRecycleSprites,
-      },
+      { separator: true },
+      { label, icon: 'pi pi-trash', command: handleRecycleSprites },
     ]
   }
 
-  // Handle right-click on sprite card
   const handleSpriteContextMenu = (
     e: React.MouseEvent<HTMLDivElement>,
     sprite: SpriteDto
   ) => {
     e.preventDefault()
-    // If right-clicked sprite is not in selection, select only that sprite
-    if (!selectedSpriteIds.has(sprite.id)) {
+    if (!selectedSpriteIds.has(sprite.id))
       setSelectedSpriteIds(new Set([sprite.id]))
-    }
     setContextMenuTarget(sprite)
     contextMenuRef.current?.show(e)
   }
 
+  // ── Render ─────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="sprite-list-loading">
@@ -901,6 +502,7 @@ export function SpriteList() {
       <ConfirmDialog />
       <ContextMenu ref={contextMenuRef} model={getContextMenuItems()} />
 
+      {/* Header */}
       <div className="sprite-list-header">
         <div className="sprite-list-title">
           <h2>Sprites</h2>
@@ -933,159 +535,43 @@ export function SpriteList() {
         </div>
       </div>
 
-      <div className="sprite-category-tabs">
-        <div
-          className={`category-tab ${activeCategoryId === UNASSIGNED_CATEGORY_ID ? 'active' : ''} ${dragOverCategoryId === UNASSIGNED_CATEGORY_ID ? 'drag-over' : ''}`}
-          onClick={() => setActiveCategoryId(UNASSIGNED_CATEGORY_ID)}
-          onDragOver={e => handleCategoryDragOver(e, UNASSIGNED_CATEGORY_ID)}
-          onDragLeave={handleCategoryDragLeave}
-          onDrop={e => handleCategoryDrop(e, UNASSIGNED_CATEGORY_ID)}
-        >
-          <span>Unassigned</span>
-          <span className="category-count">
-            ({sprites.filter(s => s.categoryId === null).length})
-          </span>
-        </div>
-        {categories.map(category => (
-          <div
-            key={category.id}
-            className={`category-tab ${activeCategoryId === category.id ? 'active' : ''} ${dragOverCategoryId === category.id ? 'drag-over' : ''}`}
-            onClick={() => setActiveCategoryId(category.id)}
-            onDragOver={e => handleCategoryDragOver(e, category.id)}
-            onDragLeave={handleCategoryDragLeave}
-            onDrop={e => handleCategoryDrop(e, category.id)}
-          >
-            <span>{category.name}</span>
-            <span className="category-count">
-              ({sprites.filter(s => s.categoryId === category.id).length})
-            </span>
-            {activeCategoryId === category.id && (
-              <div className="category-tab-actions">
-                <Button
-                  icon="pi pi-pencil"
-                  className="p-button-text p-button-sm"
-                  onClick={e => {
-                    e.stopPropagation()
-                    openEditCategoryDialog(category)
-                  }}
-                  tooltip="Rename category"
-                />
-                <Button
-                  icon="pi pi-trash"
-                  className="p-button-text p-button-sm p-button-danger"
-                  onClick={e => {
-                    e.stopPropagation()
-                    handleDeleteCategory(category)
-                  }}
-                  tooltip="Delete category"
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* Category Tabs */}
+      <SpriteCategoryTabs
+        categories={categories}
+        sprites={sprites}
+        activeCategoryId={activeCategoryId}
+        dragOverCategoryId={dragOverCategoryId}
+        onCategoryChange={setActiveCategoryId}
+        onCategoryDragOver={handleCategoryDragOver}
+        onCategoryDragLeave={handleCategoryDragLeave}
+        onCategoryDrop={handleCategoryDrop}
+        onEditCategory={openEditCategoryDialog}
+        onDeleteCategory={handleDeleteCategory}
+      />
 
-      {filteredSprites.length === 0 ? (
-        <div className="sprite-list-empty">
-          <i
-            className="pi pi-image"
-            style={{ fontSize: '3rem', marginBottom: '1rem' }}
-          />
-          <p>No sprites in this category</p>
-          <p className="hint">Drag and drop image files here to upload</p>
-        </div>
-      ) : (
-        <div
-          className="sprite-grid-container"
-          ref={spriteGridRef}
-          onMouseDown={handleGridMouseDown}
-          onMouseMove={handleGridMouseMove}
-          onMouseUp={handleGridMouseUp}
-          onMouseLeave={handleGridMouseUp}
-        >
-          <div
-            className="sprite-grid"
-            style={{
-              gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
-            }}
-          >
-            {filteredSprites.map(sprite => (
-              <div
-                key={sprite.id}
-                data-sprite-id={sprite.id}
-                className={`sprite-card ${draggedSpriteId === sprite.id ? 'dragging' : ''} ${selectedSpriteIds.has(sprite.id) ? 'selected' : ''}`}
-                onClick={() => openSpriteModal(sprite)}
-                onContextMenu={e => handleSpriteContextMenu(e, sprite)}
-                draggable
-                onDragStart={e => handleSpriteDragStart(e, sprite)}
-                onDragEnd={handleSpriteDragEnd}
-              >
-                <div
-                  className="sprite-select-checkbox"
-                  onClick={e => toggleSpriteSelection(sprite.id, e)}
-                >
-                  <Checkbox
-                    checked={selectedSpriteIds.has(sprite.id)}
-                    readOnly
-                  />
-                </div>
-                <div className="sprite-preview">
-                  <img
-                    src={getFilePreviewUrl(sprite.fileId.toString())}
-                    alt={sprite.name}
-                    onError={e => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                    }}
-                  />
-                </div>
-                <div className="sprite-info">
-                  <h3 className="sprite-name">{sprite.name}</h3>
-                  <div className="sprite-meta">
-                    <span className="sprite-type">
-                      {getSpriteTypeName(sprite.spriteType)}
-                    </span>
-                  </div>
-                  <span className="sprite-size">
-                    {formatFileSize(sprite.fileSizeBytes)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          {isAreaSelecting && selectionBox && (
-            <div
-              className="selection-box"
-              style={{
-                left: Math.min(selectionBox.startX, selectionBox.currentX),
-                top: Math.min(selectionBox.startY, selectionBox.currentY),
-                width: Math.abs(selectionBox.currentX - selectionBox.startX),
-                height: Math.abs(selectionBox.currentY - selectionBox.startY),
-              }}
-            />
-          )}
-        </div>
-      )}
-
-      {pagination.hasMore && (
-        <div
-          style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}
-        >
-          <Button
-            label={
-              isLoadingMore
-                ? 'Loading...'
-                : `Load More (${sprites.length} of ${pagination.totalCount})`
-            }
-            icon={
-              isLoadingMore ? 'pi pi-spinner pi-spin' : 'pi pi-chevron-down'
-            }
-            onClick={() => loadSprites(true)}
-            disabled={isLoadingMore}
-            className="p-button-outlined"
-          />
-        </div>
-      )}
+      {/* Grid Content */}
+      <SpriteGridContent
+        filteredSprites={filteredSprites}
+        cardWidth={cardWidth}
+        selectedSpriteIds={selectedSpriteIds}
+        draggedSpriteId={draggedSpriteId}
+        spriteGridRef={spriteGridRef}
+        isAreaSelecting={isAreaSelecting}
+        selectionBox={selectionBox}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        totalCount={totalCount}
+        totalSpritesCount={sprites.length}
+        onToggleSelection={toggleSpriteSelection}
+        onSpriteClick={openSpriteModal}
+        onContextMenu={handleSpriteContextMenu}
+        onSpriteDragStart={handleSpriteDragStart}
+        onSpriteDragEnd={handleSpriteDragEnd}
+        onGridMouseDown={handleGridMouseDown}
+        onGridMouseMove={handleGridMouseMove}
+        onGridMouseUp={handleGridMouseUp}
+        onLoadMore={() => fetchNextPage()}
+      />
 
       <div className="sprite-drop-overlay">
         <i className="pi pi-upload" />
@@ -1218,9 +704,8 @@ export function SpriteList() {
         onHide={() => {
           setShowSpriteModal(false)
           setIsEditingSpriteName(false)
-          if (selectedSprite) {
+          if (selectedSprite)
             resetSpriteRenameForm({ name: selectedSprite.name })
-          }
         }}
         style={{ width: '600px' }}
         className="sprite-detail-modal"
@@ -1271,11 +756,33 @@ export function SpriteList() {
         style={{ display: 'none' }}
         accept="image/*"
         onChange={e => {
-          if (e.target.files) {
-            handleFileDrop(e.target.files)
-          }
+          if (e.target.files) handleFileDrop(e.target.files)
         }}
       />
     </div>
   )
+}
+
+// ── Utility functions used in sprite detail modal ─────────────────────
+function getSpriteTypeName(type: number): string {
+  switch (type) {
+    case 1:
+      return 'Static'
+    case 2:
+      return 'Sprite Sheet'
+    case 3:
+      return 'GIF'
+    case 4:
+      return 'APNG'
+    case 5:
+      return 'Animated WebP'
+    default:
+      return 'Unknown'
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

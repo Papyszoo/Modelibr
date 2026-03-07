@@ -1,5 +1,7 @@
 import './DockPanel.css'
 
+import { useMemo } from 'react'
+
 import { useDockContext } from '@/contexts/DockContext'
 import {
   broadcastNavigation,
@@ -11,6 +13,10 @@ import { type Tab } from '@/types'
 import { DockBar } from './dock-panel/DockBar'
 import { DockContentArea } from './dock-panel/DockContentArea'
 import { DockEmptyState } from './dock-panel/DockEmptyState'
+import {
+  type DockPanelActions,
+  DockPanelActionsContext,
+} from './dock-panel/DockPanelActionsContext'
 
 interface DockPanelContentProps {
   side: 'left' | 'right'
@@ -32,7 +38,7 @@ export function DockPanelContent({
   draggedTab,
   setDraggedTab,
   moveTabBetweenPanels,
-}: DockPanelContentProps): JSX.Element {
+}: DockPanelContentProps) {
   const { addRecentlyClosedTab, removeRecentlyClosedTab } = useDockContext()
 
   const addTab = (type: Tab['type'], title: string): void => {
@@ -173,47 +179,49 @@ export function DockPanelContent({
 
   const activeTabData = tabs.find(tab => tab.id === activeTab)
 
-  return (
-    <div className={`dock-panel dock-panel-${side}`}>
-      {/* Dock/Menu Bar */}
-      <DockBar
-        side={side}
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabSelect={setActiveTab}
-        onTabClose={closeTab}
-        onTabDragStart={handleTabDragStart}
-        onTabDragEnd={handleTabDragEnd}
-        onAddTab={addTab}
-        onReopenTab={reopenTab}
-        onDrop={handleDropOnOtherPanel}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-      />
+  const actions: DockPanelActions = useMemo(
+    () => ({
+      addTab,
+      reopenTab,
+      closeTab,
+      onTabDragStart: handleTabDragStart,
+      onTabDragEnd: handleTabDragEnd,
+      onDrop: handleDropOnOtherPanel,
+      onDragOver: handleDragOver,
+      onDragEnter: handleDragEnter,
+      onDragLeave: handleDragLeave,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- actions depend on tabs/activeTab which change every render
+    [tabs, activeTab, draggedTab]
+  )
 
-      {/* Content Area */}
-      <div className="dock-content">
-        {activeTabData ? (
-          <DockContentArea
-            side={side}
-            tabs={tabs}
-            setTabs={setTabs}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            activeTabData={activeTabData}
-          />
-        ) : (
-          <DockEmptyState
-            onAddTab={addTab}
-            onReopenTab={reopenTab}
-            onDrop={handleDropOnOtherPanel}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-          />
-        )}
+  return (
+    <DockPanelActionsContext.Provider value={actions}>
+      <div className={`dock-panel dock-panel-${side}`}>
+        {/* Dock/Menu Bar */}
+        <DockBar
+          side={side}
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabSelect={setActiveTab}
+        />
+
+        {/* Content Area */}
+        <div className="dock-content">
+          {activeTabData ? (
+            <DockContentArea
+              side={side}
+              tabs={tabs}
+              setTabs={setTabs}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              activeTabData={activeTabData}
+            />
+          ) : (
+            <DockEmptyState />
+          )}
+        </div>
       </div>
-    </div>
+    </DockPanelActionsContext.Provider>
   )
 }

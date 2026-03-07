@@ -19,6 +19,7 @@ import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { getVersionThumbnailUrl } from '@/shared/thumbnail/api/thumbnailApi'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { formatDuration } from '@/utils/audioUtils'
+import { formatDate, formatFileSize } from '@/utils/fileUtils'
 
 interface RecycledModel {
   id: number
@@ -360,18 +361,6 @@ export function RecycledFilesList() {
     if (!deletePreview) return
 
     await permanentDeleteMutation.mutateAsync({ item: deletePreview.item })
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
   }
 
   const getTexturePreviewUrl = (textureSet: RecycledTextureSet) => {

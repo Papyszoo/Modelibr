@@ -1,5 +1,4 @@
 import { FloatingWindow } from '@/components/FloatingWindow'
-import { type Model } from '@/utils/fileUtils'
 
 import { UVMapScene } from './UVMapScene'
 
@@ -7,14 +6,14 @@ interface UVMapWindowProps {
   visible: boolean
   onClose: () => void
   side?: 'left' | 'right'
-  model: Model | null
+  modelId: string | null
 }
 
 export function UVMapWindow({
   visible,
   onClose,
   side = 'left',
-  model,
+  modelId,
 }: UVMapWindowProps) {
   return (
     <FloatingWindow
@@ -24,7 +23,7 @@ export function UVMapWindow({
       side={side}
       windowId="uvmap"
     >
-      {model ? (
+      {modelId ? (
         <div style={{ width: '100%', height: '400px' }}>
           <div
             style={{

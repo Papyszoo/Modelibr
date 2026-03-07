@@ -16,7 +16,7 @@ import {
 
 import { DockPanelContent } from './DockPanelContent'
 
-export function SplitterLayout(): JSX.Element {
+export function SplitterLayout() {
   // ── Window identity & lifecycle ─────────────────────────────────────
   const windowId = useWindowInit()
   useDeepLinkHandler(windowId)

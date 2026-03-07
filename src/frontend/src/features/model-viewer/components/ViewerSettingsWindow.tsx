@@ -1,22 +1,22 @@
 import { FloatingWindow } from '@/components/FloatingWindow'
+import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 
-import { ViewerSettings, type ViewerSettingsType } from './ViewerSettings'
+import { ViewerSettings } from './ViewerSettings'
 
 interface ViewerSettingsWindowProps {
   visible: boolean
   onClose: () => void
   side?: 'left' | 'right'
-  settings: ViewerSettingsType
-  onSettingsChange: (settings: ViewerSettingsType) => void
 }
 
 export function ViewerSettingsWindow({
   visible,
   onClose,
   side = 'left',
-  settings,
-  onSettingsChange,
 }: ViewerSettingsWindowProps) {
+  const settings = useViewerSettingsStore(s => s.settings)
+  const setSettings = useViewerSettingsStore(s => s.setSettings)
+
   return (
     <FloatingWindow
       visible={visible}
@@ -25,7 +25,7 @@ export function ViewerSettingsWindow({
       side={side}
       windowId="settings"
     >
-      <ViewerSettings settings={settings} onSettingsChange={onSettingsChange} />
+      <ViewerSettings settings={settings} onSettingsChange={setSettings} />
     </FloatingWindow>
   )
 }

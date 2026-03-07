@@ -1,15 +1,14 @@
 import './TextureSetGrid.css'
 
 import { ContextMenu } from 'primereact/contextmenu'
-import { Dialog } from 'primereact/dialog'
 import { type MenuItem } from 'primereact/menuitem'
 import { ProgressBar } from 'primereact/progressbar'
 import { Tag } from 'primereact/tag'
 import { Toast } from 'primereact/toast'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
-import { addTextureSetToPack, getAllPacks } from '@/features/pack/api/packApi'
+import { addTextureSetToPack } from '@/features/pack/api/packApi'
 import {
   addTextureToSetEndpoint,
   hardDeleteTextureSet,
@@ -19,9 +18,9 @@ import {
 import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextureSetDialog'
 import { baseURL } from '@/lib/apiBase'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
-  type PackDto,
   type TextureChannel,
   type TextureSetDto,
   TextureSetKind,
@@ -66,7 +65,6 @@ export function TextureSetGrid({
   onTextureSetUpdated,
 }: TextureSetGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [packs, setPacks] = useState<PackDto[]>([])
   const [selectedTextureSet, setSelectedTextureSet] =
     useState<TextureSetDto | null>(null)
   const [showPackDialog, setShowPackDialog] = useState(false)
@@ -82,19 +80,6 @@ export function TextureSetGrid({
 
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.textureSets
-
-  useEffect(() => {
-    loadPacks()
-  }, [])
-
-  const loadPacks = async () => {
-    try {
-      const data = await getAllPacks()
-      setPacks(data)
-    } catch (error) {
-      console.error('Failed to load packs:', error)
-    }
-  }
 
   const handleAddToPack = async (packId: number) => {
     if (!selectedTextureSet) return
@@ -435,7 +420,6 @@ export function TextureSetGrid({
       label: 'Add to pack',
       icon: 'pi pi-box',
       command: () => {
-        loadPacks()
         setShowPackDialog(true)
       },
     },
@@ -599,43 +583,11 @@ export function TextureSetGrid({
         </div>
       )}
 
-      {/* Add to Pack Dialog */}
-      <Dialog
-        header="Add to Pack"
+      <SelectPackDialog
         visible={showPackDialog}
-        style={{ width: '500px' }}
         onHide={() => setShowPackDialog(false)}
-      >
-        <div className="pack-selection-dialog">
-          <p>Select a pack to add this texture set to:</p>
-          <div className="pack-select-list">
-            {packs.map(pack => (
-              <div
-                key={pack.id}
-                className="pack-select-item"
-                onClick={() => handleAddToPack(pack.id)}
-              >
-                <i className="pi pi-box" />
-                <div className="pack-select-item-content">
-                  <span className="pack-select-item-name">{pack.name}</span>
-                  {pack.description && (
-                    <span className="pack-select-item-description">
-                      {pack.description}
-                    </span>
-                  )}
-                </div>
-                <i className="pi pi-chevron-right" />
-              </div>
-            ))}
-          </div>
-          {packs.length === 0 && (
-            <div className="pack-select-no-packs">
-              <i className="pi pi-inbox" />
-              <p>No packs available. Create a pack first.</p>
-            </div>
-          )}
-        </div>
-      </Dialog>
+        onSelect={handleAddToPack}
+      />
 
       {/* Merge Texture Set Dialog */}
       <MergeTextureSetDialog
