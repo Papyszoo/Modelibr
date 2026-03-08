@@ -34,6 +34,7 @@ export {
 export {
   type GetAllSpritesResponse,
   type GetAllSpritesResponsePaginated,
+  type SpriteCategoryDto,
   type SpriteDto,
 } from '@/features/sprite/types'
 export {

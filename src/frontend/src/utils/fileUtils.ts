@@ -73,6 +73,13 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
+ * Format ISO date string to locale display format
+ */
+export function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleString()
+}
+
+/**
  * Three.js supported file formats that can be rendered
  */
 export const THREEJS_SUPPORTED_FORMATS = [

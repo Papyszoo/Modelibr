@@ -1,27 +1,19 @@
 import './ProjectList.css'
 
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { Dialog } from 'primereact/dialog'
-import { InputText } from 'primereact/inputtext'
-import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
 import { useRef } from 'react'
-import { useForm } from 'react-hook-form'
-import { type z } from 'zod'
 
-import { createProject, deleteProject } from '@/features/project/api/projectApi'
+import { deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { projectCreateFormSchema } from '@/shared/validation/formSchemas'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ProjectDto } from '@/types'
 import { openTabInPanel } from '@/utils/tabNavigation'
 
-type ProjectCreateFormInput = z.input<typeof projectCreateFormSchema>
-type ProjectCreateFormOutput = z.output<typeof projectCreateFormSchema>
+import { CreateProjectDialog } from './CreateProjectDialog'
 
 export function ProjectList() {
   const queryClient = useQueryClient()
@@ -31,51 +23,12 @@ export function ProjectList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const toast = useRef<Toast>(null)
 
-  const { register, handleSubmit, reset } = useForm<
-    ProjectCreateFormInput,
-    unknown,
-    ProjectCreateFormOutput
-  >({
-    resolver: zodResolver(projectCreateFormSchema),
-    mode: 'onChange',
-    defaultValues: {
-      name: '',
-      description: '',
-    },
-  })
-
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.projects
 
   const invalidateProjects = async () => {
     await queryClient.invalidateQueries({ queryKey: ['projects'] })
   }
-
-  const createProjectMutation = useMutation({
-    mutationFn: (payload: { name: string; description?: string }) =>
-      createProject(payload),
-    onSuccess: async () => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Project created successfully',
-        life: 3000,
-      })
-
-      setShowCreateDialog(false)
-      reset({ name: '', description: '' })
-      await invalidateProjects()
-    },
-    onError: error => {
-      console.error('Failed to create project:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to create project',
-        life: 3000,
-      })
-    },
-  })
 
   const deleteProjectMutation = useMutation({
     mutationFn: (projectId: number) => deleteProject(projectId),
@@ -113,20 +66,6 @@ export function ProjectList() {
       await invalidateProjects()
     },
   })
-
-  const handleCreateProject = handleSubmit(
-    async values => {
-      await createProjectMutation.mutateAsync(values)
-    },
-    () => {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Validation Error',
-        detail: 'Project name is required',
-        life: 3000,
-      })
-    }
-  )
 
   const handleDeleteProject = async (projectId: number) => {
     await deleteProjectMutation.mutateAsync(projectId)
@@ -243,54 +182,10 @@ export function ProjectList() {
         </div>
       )}
 
-      <Dialog
-        header="Create New Project"
+      <CreateProjectDialog
         visible={showCreateDialog}
-        style={{ width: '500px' }}
-        onHide={() => {
-          setShowCreateDialog(false)
-          reset({ name: '', description: '' })
-        }}
-        footer={
-          <div>
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              onClick={() => {
-                setShowCreateDialog(false)
-                reset({ name: '', description: '' })
-              }}
-              className="p-button-text"
-            />
-            <Button
-              label="Create"
-              icon="pi pi-check"
-              onClick={handleCreateProject}
-              autoFocus
-            />
-          </div>
-        }
-      >
-        <div className="p-fluid">
-          <div className="field">
-            <label htmlFor="project-name">Name *</label>
-            <InputText
-              id="project-name"
-              {...register('name')}
-              placeholder="Enter project name"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="project-description">Description</label>
-            <InputTextarea
-              id="project-description"
-              {...register('description')}
-              rows={3}
-              placeholder="Enter project description (optional)"
-            />
-          </div>
-        </div>
-      </Dialog>
+        onHide={() => setShowCreateDialog(false)}
+      />
     </div>
   )
 }

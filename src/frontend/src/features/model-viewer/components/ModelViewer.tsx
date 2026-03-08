@@ -5,13 +5,11 @@ import { Canvas } from '@react-three/fiber'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { type JSX, useEffect, useRef, useState } from 'react'
+import { type JSX, useCallback, useRef } from 'react'
 import type * as THREE from 'three'
 
 import { ModelProvider } from '@/contexts/ModelContext'
 import {
-  addFileToVersion,
-  createModelVersion,
   setActiveVersion,
   softDeleteModelVersion,
 } from '@/features/model-viewer/api/modelVersionApi'
@@ -19,9 +17,13 @@ import {
   useModelByIdQuery,
   useModelVersionsQuery,
 } from '@/features/model-viewer/api/queries'
+import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
+import { useModelViewerWindows } from '@/features/model-viewer/hooks/useModelViewerWindows'
+import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
+import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 import { type ModelVersionDto, type TextureSetDto } from '@/types'
 import { type Model } from '@/utils/fileUtils'
 
@@ -34,7 +36,6 @@ import { TextureSetSelectorWindow } from './TextureSetSelectorWindow'
 import { ThumbnailWindow } from './ThumbnailWindow'
 import { UVMapWindow } from './UVMapWindow'
 import { VersionStrip } from './VersionStrip'
-import { type ViewerSettingsType } from './ViewerSettings'
 import { ViewerSettingsWindow } from './ViewerSettingsWindow'
 
 interface ModelViewerProps {
@@ -48,40 +49,12 @@ export function ModelViewer({
   modelId,
   side = 'left',
 }: ModelViewerProps): JSX.Element {
-  const [infoWindowVisible, setInfoWindowVisible] = useState<boolean>(false)
-  const [thumbnailWindowVisible, setThumbnailWindowVisible] =
-    useState<boolean>(false)
-  const [hierarchyWindowVisible, setHierarchyWindowVisible] =
-    useState<boolean>(false)
-  const [settingsWindowVisible, setSettingsWindowVisible] =
-    useState<boolean>(false)
-  const [uvMapWindowVisible, setUvMapWindowVisible] = useState<boolean>(false)
-  const [textureSetWindowVisible, setTextureSetWindowVisible] =
-    useState<boolean>(false)
-  const [versionWindowVisible, setVersionWindowVisible] =
-    useState<boolean>(false)
-  const [selectedTextureSetId, setSelectedTextureSetId] = useState<
-    number | null
-  >(null)
-  const [viewerSettings, setViewerSettings] = useState<ViewerSettingsType>({
-    orbitSpeed: 1,
-    zoomSpeed: 1,
-    panSpeed: 1,
-    modelRotationSpeed: 0.002,
-    showShadows: true,
-    showStats: false,
-  })
-  const [dragOver, setDragOver] = useState(false)
-  const [uploadModalVisible, setUploadModalVisible] = useState(false)
-  const [droppedFile, setDroppedFile] = useState<File | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [selectedVersion, setSelectedVersion] =
-    useState<ModelVersionDto | null>(null)
-  const [versionModel, setVersionModel] = useState<Model | null>(null)
-  const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
+  const viewerSettings = useViewerSettingsStore(s => s.settings)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+
+  // --- Data queries ---
   const modelQuery = useModelByIdQuery({
     modelId: modelId || '',
     queryConfig: {
@@ -97,6 +70,20 @@ export function ModelViewer({
     },
   })
   const versions: ModelVersionDto[] = versionsQuery.data ?? []
+
+  // --- Extracted hooks ---
+  const windows = useModelViewerWindows()
+  const versionSelection = useVersionSelection(model, versions)
+  const {
+    selectedVersion,
+    versionModel,
+    defaultFileId,
+    selectedTextureSetId,
+    handleVersionSelect,
+    handleDefaultFileChange,
+    handleTextureSetSelect,
+  } = versionSelection
+
   const textureSetQuery = useTextureSetByIdQuery({
     textureSetId: selectedTextureSetId ?? 0,
     queryConfig: {
@@ -108,53 +95,9 @@ export function ModelViewer({
   const loading = !propModel && !!modelId && modelQuery.isLoading
   const error =
     modelQuery.error instanceof Error ? modelQuery.error.message : ''
-
-  // Determine which side for button positioning
   const buttonPosition = side === 'left' ? 'right' : 'left'
 
-  // Load default file preference from localStorage
-  useEffect(() => {
-    if (model) {
-      const stored = localStorage.getItem(`model-${model.id}-default-file`)
-      if (stored) {
-        setDefaultFileId(parseInt(stored))
-      }
-    }
-  }, [model])
-
-  useEffect(() => {
-    if (!model) return
-
-    if (versions.length === 0) {
-      setSelectedVersion(null)
-      setVersionModel(null)
-      return
-    }
-
-    if (!selectedVersion) {
-      const activeVersion =
-        versions.find(v => v.id === model.activeVersionId) ||
-        versions[versions.length - 1]
-      handleVersionSelect(activeVersion)
-      return
-    }
-
-    const updatedVersion = versions.find(v => v.id === selectedVersion.id)
-    if (updatedVersion) {
-      handleVersionSelect(updatedVersion)
-      return
-    }
-
-    const fallbackVersion =
-      versions.find(v => v.id === model.activeVersionId) ||
-      versions[versions.length - 1]
-    if (fallbackVersion) {
-      handleVersionSelect(fallbackVersion)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Keep selected version and derived preview model aligned with server versions
-  }, [versions, model?.activeVersionId])
-
-  // Subscribe via hook (keeps components from importing services directly)
+  // --- Thumbnail subscription ---
   useModelThumbnailUpdates(
     model?.id ? parseInt(model.id) : null,
     undefined,
@@ -170,30 +113,17 @@ export function ModelViewer({
     }
   )
 
-  // Set initial selected texture set to default if available
-  // Only auto-select if user hasn't made a manual selection yet
-  // Apply version's default texture set when version changes
-  useEffect(() => {
-    if (selectedVersion?.defaultTextureSetId) {
-      setSelectedTextureSetId(selectedVersion.defaultTextureSetId)
-    } else if (selectedVersion && !selectedVersion.defaultTextureSetId) {
-      // Version has no default, clear selection
-      setSelectedTextureSetId(null)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Effect reacts to selected version identity and default texture fields
-  }, [selectedVersion?.id, selectedVersion?.defaultTextureSetId])
-
-  const handleModelUpdated = async () => {
+  // --- Handlers ---
+  const handleModelUpdated = useCallback(async () => {
     if (modelId && !propModel) {
       await modelQuery.refetch()
     }
     await queryClient.invalidateQueries({ queryKey: ['modelVersions'] })
     await versionsQuery.refetch()
-  }
+  }, [modelId, propModel, modelQuery, queryClient, versionsQuery])
 
-  const handleRegenerateThumbnail = async () => {
+  const handleRegenerateThumbnail = useCallback(async () => {
     if (!model) return
-
     try {
       await regenerateThumbnail(model.id.toString(), selectedVersion?.id)
       const versionInfo = selectedVersion
@@ -213,229 +143,91 @@ export function ModelViewer({
         life: 5000,
       })
     }
-  }
+  }, [model, selectedVersion])
 
-  const handleTextureSetSelect = (textureSetId: number | null) => {
-    setSelectedTextureSetId(textureSetId)
-  }
-
-  const handleVersionSelect = (version: ModelVersionDto) => {
-    setSelectedVersion(version)
-
-    // Apply version's default texture set immediately
-    if (version.defaultTextureSetId) {
-      setSelectedTextureSetId(version.defaultTextureSetId)
-    } else {
-      // Version has no default, clear selection
-      setSelectedTextureSetId(null)
-    }
-
-    // Create a temporary model with the version's files for preview
-    if (model) {
-      const versionModelData: Model = {
-        ...model,
-        files: version.files.map(f => ({
-          id: f.id.toString(),
-          originalFileName: f.originalFileName,
-          storedFileName: f.originalFileName,
-          filePath: '',
-          mimeType: f.mimeType,
-          sizeBytes: f.sizeBytes,
-          sha256Hash: '',
-          fileType: f.fileType,
-          isRenderable: f.isRenderable,
-          createdAt: version.createdAt,
-          updatedAt: version.createdAt,
-        })),
-      }
-      setVersionModel(versionModelData)
-
-      // Auto-select first renderable file if no file is currently selected
-      // or if the currently selected file is not in this version
-      const renderableFiles = version.files.filter(f => f.isRenderable)
-      if (renderableFiles.length > 0) {
-        const currentFileInVersion = version.files.find(
-          f => f.id === defaultFileId
-        )
-        if (!currentFileInVersion || !currentFileInVersion.isRenderable) {
-          setDefaultFileId(renderableFiles[0].id)
+  const handleSetActiveVersion = useCallback(
+    async (versionId: number) => {
+      if (!model) return
+      try {
+        await setActiveVersion(parseInt(model.id), versionId)
+        await versionsQuery.refetch()
+        if (modelId && !propModel) {
+          await modelQuery.refetch()
         }
+      } catch (error) {
+        console.error('Failed to set active version:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to set active version',
+          life: 3000,
+        })
       }
-    }
-  }
+    },
+    [model, modelId, propModel, versionsQuery, modelQuery]
+  )
 
-  const handleDefaultFileChange = (fileId: number) => {
-    setDefaultFileId(fileId)
-    // Save preference to localStorage
-    if (model) {
-      localStorage.setItem(`model-${model.id}-default-file`, fileId.toString())
-    }
-    if (versionModel) {
-      setVersionModel({ ...versionModel })
-    }
-  }
-
-  const handleSetActiveVersion = async (versionId: number) => {
-    if (!model) return
-    try {
-      await setActiveVersion(parseInt(model.id), versionId)
-      await versionsQuery.refetch()
-      if (modelId && !propModel) {
-        await modelQuery.refetch()
-      }
-    } catch (error) {
-      console.error('Failed to set active version:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to set active version',
-        life: 3000,
-      })
-    }
-  }
-
-  const handleRecycleVersion = async (versionId: number) => {
-    if (!model) return
-    try {
-      await softDeleteModelVersion(parseInt(model.id), versionId)
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Model version recycled successfully',
-        life: 3000,
-      })
-      if (modelId && !propModel) {
-        await modelQuery.refetch()
-      }
-      await versionsQuery.refetch()
-    } catch (error) {
-      console.error('Failed to recycle version:', error)
-      const errorMessage =
-        error instanceof Error &&
-        error.message.includes('last remaining version')
-          ? 'Cannot delete the last version. A model must have at least one version.'
-          : 'Failed to recycle model version'
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: errorMessage,
-        life: 3000,
-      })
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(false)
-
-    const files = e.dataTransfer.files
-    if (files && files.length > 0) {
-      const file = files[0]
-      // All dropped files (including .blend) open the modal so the user can
-      // choose to add the file to the current version or create a new version.
-      // GLB extraction only happens when "new version" is chosen, which calls
-      // createModelVersion → ModelUploadedEvent → asset-processor pipeline.
-      setDroppedFile(file)
-      setUploadModalVisible(true)
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setDroppedFile(e.target.files[0])
-      setUploadModalVisible(true)
-      // Reset input
-      e.target.value = ''
-    }
-  }
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileUpload = async (
-    file: File,
-    action: 'current' | 'new',
-    description?: string,
-    targetVersionNumber?: number,
-    setAsActive?: boolean
-  ) => {
-    if (!model) return
-
-    try {
-      if (action === 'new') {
-        // Always create new version when explicitly requested
-        await createModelVersion(
-          parseInt(model.id),
-          file,
-          description,
-          setAsActive ?? true
-        )
-      } else {
-        // Add to current/selected version
-        // If no versions are loaded yet, reload them first to check if version 1 exists
-        if (versions.length === 0) {
-          const refreshedVersions = await versionsQuery.refetch()
-          const currentVersions = refreshedVersions.data ?? []
-
-          if (currentVersions.length > 0) {
-            // Version 1 exists (auto-created), add file to it
-            const latestVersion = currentVersions[currentVersions.length - 1]
-            await addFileToVersion(parseInt(model.id), latestVersion.id, file)
-          } else {
-            // No versions exist at all, create first version
-            await createModelVersion(
-              parseInt(model.id),
-              file,
-              description,
-              setAsActive ?? true
-            )
-          }
-        } else {
-          // Versions are already loaded, use selected or latest
-          const currentVersion =
-            selectedVersion || versions[versions.length - 1]
-          await addFileToVersion(parseInt(model.id), currentVersion.id, file)
+  const handleRecycleVersion = useCallback(
+    async (versionId: number) => {
+      if (!model) return
+      try {
+        await softDeleteModelVersion(parseInt(model.id), versionId)
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Model version recycled successfully',
+          life: 3000,
+        })
+        if (modelId && !propModel) {
+          await modelQuery.refetch()
         }
+        await versionsQuery.refetch()
+      } catch (error) {
+        console.error('Failed to recycle version:', error)
+        const errorMessage =
+          error instanceof Error &&
+          error.message.includes('last remaining version')
+            ? 'Cannot delete the last version. A model must have at least one version.'
+            : 'Failed to recycle model version'
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: errorMessage,
+          life: 3000,
+        })
       }
+    },
+    [model, modelId, propModel, versionsQuery, modelQuery]
+  )
 
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Upload Successful',
-        detail: `File "${file.name}" uploaded successfully`,
-        life: 3000,
-      })
+  const showToast = useCallback(
+    (opts: {
+      severity: string
+      summary: string
+      detail: string
+      life: number
+    }) => {
+      toast.current?.show(opts)
+    },
+    []
+  )
 
-      // Reload versions and model
+  const fileUpload = useFileUploadHandlers({
+    model,
+    versions,
+    selectedVersion,
+    onSuccess: async () => {
       await versionsQuery.refetch()
       if (modelId && !propModel) {
         await modelQuery.refetch()
       }
       await handleModelUpdated()
-    } catch (error) {
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Upload Failed',
-        detail: error instanceof Error ? error.message : 'Unknown error',
-        life: 5000,
-      })
-      throw error
-    }
-  }
+    },
+    showToast,
+    refetchVersions: versionsQuery.refetch,
+  })
 
+  // --- Early returns ---
   if (loading) {
     return <div className="model-viewer-loading">Loading model...</div>
   }
@@ -451,13 +243,13 @@ export function ModelViewer({
   return (
     <div
       className="model-viewer model-viewer-tab"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onDragOver={fileUpload.handleDragOver}
+      onDragLeave={fileUpload.handleDragLeave}
+      onDrop={fileUpload.handleDrop}
     >
       <Toast ref={toast} />
 
-      {dragOver && (
+      {fileUpload.dragOver && (
         <div
           style={{
             position: 'absolute',
@@ -507,9 +299,9 @@ export function ModelViewer({
       <ModelProvider>
         <input
           type="file"
-          ref={fileInputRef}
+          ref={fileUpload.fileInputRef}
           style={{ display: 'none' }}
-          onChange={handleFileSelect}
+          onChange={fileUpload.handleFileSelect}
           accept=".obj,.fbx,.gltf,.glb,.blend"
         />
         <div className="viewer-container">
@@ -522,7 +314,7 @@ export function ModelViewer({
             <Button
               icon="pi pi-plus"
               className="p-button-rounded viewer-control-btn"
-              onClick={handleUploadClick}
+              onClick={fileUpload.handleUploadClick}
               tooltip="Add Version"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -532,7 +324,7 @@ export function ModelViewer({
             <Button
               icon="pi pi-cog"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => setSettingsWindowVisible(!settingsWindowVisible)}
+              onClick={() => windows.toggle('settings')}
               tooltip="Viewer Settings"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -541,7 +333,7 @@ export function ModelViewer({
             <Button
               icon="pi pi-info-circle"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => setInfoWindowVisible(!infoWindowVisible)}
+              onClick={() => windows.toggle('info')}
               tooltip="Model Information"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -550,19 +342,16 @@ export function ModelViewer({
             <Button
               icon="pi pi-palette"
               className="p-button-rounded viewer-control-btn"
-              onClick={() =>
-                setTextureSetWindowVisible(!textureSetWindowVisible)
-              }
+              onClick={() => windows.toggle('textureSet')}
               tooltip="Texture Sets"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
               }}
             />
-            {/* Model Versions button removed - versions now in header strip */}
             <Button
               icon="pi pi-sitemap"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => setHierarchyWindowVisible(!hierarchyWindowVisible)}
+              onClick={() => windows.toggle('hierarchy')}
               tooltip="Model Hierarchy"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -571,7 +360,7 @@ export function ModelViewer({
             <Button
               icon="pi pi-image"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => setThumbnailWindowVisible(!thumbnailWindowVisible)}
+              onClick={() => windows.toggle('thumbnail')}
               tooltip="Thumbnail Details"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -580,7 +369,7 @@ export function ModelViewer({
             <Button
               icon="pi pi-map"
               className="p-button-rounded viewer-control-btn"
-              onClick={() => setUvMapWindowVisible(!uvMapWindowVisible)}
+              onClick={() => windows.toggle('uvMap')}
               tooltip="UV Map"
               tooltipOptions={{
                 position: buttonPosition === 'left' ? 'right' : 'left',
@@ -629,8 +418,6 @@ export function ModelViewer({
                 }}
                 dpr={Math.min(window.devicePixelRatio, 2)}
                 onCreated={state => {
-                  // Expose Three.js scene for E2E testing
-                  // This allows Playwright to verify actual 3D content is rendered
                   if (typeof window !== 'undefined') {
                     ;(
                       window as Window & {
@@ -655,7 +442,6 @@ export function ModelViewer({
                   defaultFileId={defaultFileId}
                 />
               </Canvas>
-              {/* Stats container positioned in bottom-left corner of viewer */}
               <div ref={statsContainerRef} className="stats-container" />
               {viewerSettings.showStats && statsContainerRef.current && (
                 <Stats showPanel={0} parent={statsContainerRef} />
@@ -666,24 +452,22 @@ export function ModelViewer({
 
         {/* Floating Windows */}
         <ViewerSettingsWindow
-          visible={settingsWindowVisible}
-          onClose={() => setSettingsWindowVisible(false)}
+          visible={windows.visibility.settings}
+          onClose={() => windows.close('settings')}
           side={side}
-          settings={viewerSettings}
-          onSettingsChange={setViewerSettings}
         />
         <ModelInfoWindow
-          visible={infoWindowVisible}
-          onClose={() => setInfoWindowVisible(false)}
+          visible={windows.visibility.info}
+          onClose={() => windows.close('info')}
           side={side}
-          model={model}
+          modelId={model.id}
           onModelUpdated={handleModelUpdated}
         />
         <TextureSetSelectorWindow
-          visible={textureSetWindowVisible}
-          onClose={() => setTextureSetWindowVisible(false)}
+          visible={windows.visibility.textureSet}
+          onClose={() => windows.close('textureSet')}
           side={side}
-          model={model}
+          modelId={model.id}
           modelVersionId={selectedVersion?.id || model.activeVersionId || null}
           selectedVersion={selectedVersion}
           selectedTextureSetId={selectedTextureSetId}
@@ -691,29 +475,29 @@ export function ModelViewer({
           onModelUpdated={handleModelUpdated}
         />
         <ThumbnailWindow
-          visible={thumbnailWindowVisible}
-          onClose={() => setThumbnailWindowVisible(false)}
+          visible={windows.visibility.thumbnail}
+          onClose={() => windows.close('thumbnail')}
           side={side}
-          model={model}
+          modelId={model.id}
           selectedVersion={selectedVersion}
           onRegenerate={handleRegenerateThumbnail}
         />
         <ModelHierarchyWindow
-          visible={hierarchyWindowVisible}
-          onClose={() => setHierarchyWindowVisible(false)}
+          visible={windows.visibility.hierarchy}
+          onClose={() => windows.close('hierarchy')}
           side={side}
         />
         <UVMapWindow
-          visible={uvMapWindowVisible}
-          onClose={() => setUvMapWindowVisible(false)}
+          visible={windows.visibility.uvMap}
+          onClose={() => windows.close('uvMap')}
           side={side}
-          model={model}
+          modelId={model.id}
         />
         <ModelVersionWindow
-          visible={versionWindowVisible}
-          onClose={() => setVersionWindowVisible(false)}
+          visible={windows.visibility.version}
+          onClose={() => windows.close('version')}
           side={side}
-          model={model}
+          modelId={model.id}
           onVersionSelect={handleVersionSelect}
           onDefaultFileChange={handleDefaultFileChange}
           onModelUpdate={handleModelUpdated}
@@ -723,16 +507,13 @@ export function ModelViewer({
 
       {/* File Upload Modal */}
       <FileUploadModal
-        visible={uploadModalVisible}
-        onHide={() => {
-          setUploadModalVisible(false)
-          setDroppedFile(null)
-        }}
-        file={droppedFile}
+        visible={fileUpload.uploadModalVisible}
+        onHide={fileUpload.hideUploadModal}
+        file={fileUpload.droppedFile}
         modelId={model?.id ? parseInt(model.id) : 0}
         versions={versions}
         selectedVersion={selectedVersion}
-        onUpload={handleFileUpload}
+        onUpload={fileUpload.handleFileUpload}
       />
     </div>
   )

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 
-import { DockPanel } from '@/components/layout/DockPanel'
+import { DockPanelContent } from '@/components/layout/DockPanelContent'
 import { DockProvider } from '@/contexts/DockContext'
 import { type Tab } from '@/types'
 
@@ -111,17 +111,13 @@ jest.mock('../../../hooks/useTabContext', () => {
   }
 })
 
-describe('DockPanel', () => {
+describe('DockPanelContent', () => {
   const mockProps = {
     side: 'left' as const,
     tabs: [],
     setTabs: jest.fn(),
     activeTab: '',
     setActiveTab: jest.fn(),
-    otherTabs: [],
-    setOtherTabs: jest.fn(),
-    otherActiveTab: '',
-    setOtherActiveTab: jest.fn(),
     draggedTab: null,
     setDraggedTab: jest.fn(),
     moveTabBetweenPanels: jest.fn(),
@@ -132,7 +128,7 @@ describe('DockPanel', () => {
   })
 
   it('should render empty dock panel when no tabs are open', () => {
-    render(<DockPanel {...mockProps} />, { wrapper: TestWrapper })
+    render(<DockPanelContent {...mockProps} />, { wrapper: TestWrapper })
 
     expect(screen.getByText('No tabs open')).toBeInTheDocument()
     expect(
@@ -156,7 +152,7 @@ describe('DockPanel', () => {
       activeTab: 'test-tab',
     }
 
-    render(<DockPanel {...propsWithTabs} />, { wrapper: TestWrapper })
+    render(<DockPanelContent {...propsWithTabs} />, { wrapper: TestWrapper })
 
     expect(screen.getByTestId('tab-content')).toBeInTheDocument()
     expect(screen.getByText('Test Tab Content')).toBeInTheDocument()
@@ -178,7 +174,7 @@ describe('DockPanel', () => {
       activeTab: 'test-tab',
     }
 
-    const { container } = render(<DockPanel {...propsWithTabs} />, {
+    const { container } = render(<DockPanelContent {...propsWithTabs} />, {
       wrapper: TestWrapper,
     })
 
@@ -192,7 +188,7 @@ describe('DockPanel', () => {
   })
 
   it('should show empty dock area with drag handlers when no tabs are open', () => {
-    const { container } = render(<DockPanel {...mockProps} />, {
+    const { container } = render(<DockPanelContent {...mockProps} />, {
       wrapper: TestWrapper,
     })
 
@@ -234,7 +230,7 @@ describe('DockPanel', () => {
       const setTabs = jest.fn()
 
       render(
-        <DockPanel
+        <DockPanelContent
           {...mockProps}
           tabs={tabs}
           activeTab="tab-2"
@@ -296,7 +292,7 @@ describe('DockPanel', () => {
       const setTabs = jest.fn()
 
       render(
-        <DockPanel
+        <DockPanelContent
           {...mockProps}
           tabs={tabs}
           activeTab="tab-1"
@@ -358,7 +354,7 @@ describe('DockPanel', () => {
       const setTabs = jest.fn()
 
       render(
-        <DockPanel
+        <DockPanelContent
           {...mockProps}
           tabs={tabs}
           activeTab="tab-3"
@@ -406,7 +402,7 @@ describe('DockPanel', () => {
       const setTabs = jest.fn()
 
       render(
-        <DockPanel
+        <DockPanelContent
           {...mockProps}
           tabs={tabs}
           activeTab="tab-1"
@@ -453,7 +449,7 @@ describe('DockPanel', () => {
       const setTabs = jest.fn()
 
       render(
-        <DockPanel
+        <DockPanelContent
           {...mockProps}
           tabs={tabs}
           activeTab="tab-2"

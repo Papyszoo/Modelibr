@@ -29,6 +29,11 @@ coverage
 *storybook.log
 storybook-static
 
+# Visual regression test artifacts
+visual-tests/test-results/
+/test-results/
+/playwright-report/
+
 # Environment files (may contain secrets)
 .env
 !.env.example

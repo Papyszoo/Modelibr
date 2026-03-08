@@ -88,6 +88,40 @@ npm test
 
 ---
 
+### Storybook Visual Regression Tests
+
+**Location:** `src/frontend/visual-tests/`
+
+**Purpose:** Catch unintended UI changes by comparing screenshots of every Storybook story against baseline snapshots. Uses Playwright's `toHaveScreenshot()` for pixel-level diffing.
+
+**Prerequisites:**
+
+```bash
+cd src/frontend
+npx playwright install chromium   # One-time browser install
+npm run build-storybook            # Build static Storybook
+```
+
+**Running:**
+
+```bash
+cd src/frontend
+npm run test-storybook             # Run visual regression tests
+npm run test-storybook:update      # Update baseline snapshots after intentional UI changes
+npm run test-storybook:ci          # CI mode (GitHub reporter, no server reuse)
+```
+
+**How it works:**
+1. Storybook is built to `storybook-static/`
+2. `http-server` serves the static build on port 6007
+3. Playwright reads `/index.json` to auto-discover all stories
+4. Each story is rendered in isolation and screenshotted
+5. Screenshots are compared against baselines in `visual-tests/__snapshots__/`
+
+**Config:** `src/frontend/playwright.config.ts`
+
+---
+
 ### Blender Addon Tests
 
 **Location:** `blender-addon/tests/`

@@ -1,5 +1,4 @@
 import { ContextMenu } from 'primereact/contextmenu'
-import { Dialog } from 'primereact/dialog'
 import { type MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
@@ -7,15 +6,14 @@ import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { softDeleteModel } from '@/features/models/api/modelApi'
 import {
   addModelToPack,
-  getAllPacks,
   removeModelFromPack,
 } from '@/features/pack/api/packApi'
 import {
   addModelToProject,
-  getAllProjects,
   removeModelFromProject,
 } from '@/features/project/api/projectApi'
-import { type PackDto, type ProjectDto } from '@/types'
+import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
+import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
 import { type Model } from '@/utils/fileUtils'
 import {
   copyPathToClipboard,
@@ -38,8 +36,6 @@ interface ModelContextMenuComponentProps {
   projectId?: number
   /** Optional prefix for the copy path (e.g. "ProjectName/TextureSetName") */
   pathPrefix?: string
-  packs: PackDto[]
-  projects: ProjectDto[]
 }
 
 export const ModelContextMenu = forwardRef<
@@ -55,25 +51,14 @@ export const ModelContextMenu = forwardRef<
       packId,
       projectId,
       pathPrefix,
-      packs,
-      projects,
     },
     ref
   ) => {
-    const [contextMenuPacks, setContextMenuPacks] = useState<PackDto[]>(packs)
-    const [contextMenuProjects, setContextMenuProjects] =
-      useState<ProjectDto[]>(projects)
     const [selectedModel, setSelectedModel] = useState<Model | null>(null)
     const [showPackDialog, setShowPackDialog] = useState(false)
     const [showProjectDialog, setShowProjectDialog] = useState(false)
     const contextMenu = useRef<ContextMenu>(null)
     const toast = useRef<Toast>(null)
-
-    // Keep in sync with parent props
-    useState(() => {
-      setContextMenuPacks(packs)
-      setContextMenuProjects(projects)
-    })
 
     useImperativeHandle(ref, () => ({
       show: (event: React.MouseEvent, model: Model) => {
@@ -82,24 +67,6 @@ export const ModelContextMenu = forwardRef<
         contextMenu.current?.show(event as unknown as React.SyntheticEvent)
       },
     }))
-
-    const loadPacks = async () => {
-      try {
-        const data = await getAllPacks()
-        setContextMenuPacks(data)
-      } catch (error) {
-        console.error('Failed to load packs:', error)
-      }
-    }
-
-    const loadProjects = async () => {
-      try {
-        const data = await getAllProjects()
-        setContextMenuProjects(data)
-      } catch (error) {
-        console.error('Failed to load projects:', error)
-      }
-    }
 
     const getModelName = (model: Model) => {
       if (model.name) return model.name
@@ -270,7 +237,6 @@ export const ModelContextMenu = forwardRef<
               label: 'Add to pack',
               icon: 'pi pi-box',
               command: () => {
-                loadPacks()
                 setShowPackDialog(true)
               },
             },
@@ -282,7 +248,6 @@ export const ModelContextMenu = forwardRef<
               label: 'Add to project',
               icon: 'pi pi-folder',
               command: () => {
-                loadProjects()
                 setShowProjectDialog(true)
               },
             },
@@ -318,83 +283,17 @@ export const ModelContextMenu = forwardRef<
         <Toast ref={toast} />
         <ContextMenu model={contextMenuItems} ref={contextMenu} />
 
-        {/* Add to Pack Dialog */}
-        <Dialog
-          header="Add to Pack"
+        <SelectPackDialog
           visible={showPackDialog}
-          style={{ width: '500px' }}
           onHide={() => setShowPackDialog(false)}
-        >
-          <div className="pack-selection-dialog">
-            <p>Select a pack to add this model to:</p>
-            <div className="pack-select-list">
-              {contextMenuPacks.map(pack => (
-                <div
-                  key={pack.id}
-                  className="pack-select-item"
-                  onClick={() => handleAddToPack(pack.id)}
-                >
-                  <i className="pi pi-box" />
-                  <div className="pack-select-item-content">
-                    <span className="pack-select-item-name">{pack.name}</span>
-                    {pack.description && (
-                      <span className="pack-select-item-description">
-                        {pack.description}
-                      </span>
-                    )}
-                  </div>
-                  <i className="pi pi-chevron-right" />
-                </div>
-              ))}
-            </div>
-            {contextMenuPacks.length === 0 && (
-              <div className="pack-select-no-packs">
-                <i className="pi pi-inbox" />
-                <p>No packs available. Create a pack first.</p>
-              </div>
-            )}
-          </div>
-        </Dialog>
+          onSelect={handleAddToPack}
+        />
 
-        {/* Add to Project Dialog */}
-        <Dialog
-          header="Add to Project"
+        <SelectProjectDialog
           visible={showProjectDialog}
-          style={{ width: '500px' }}
           onHide={() => setShowProjectDialog(false)}
-        >
-          <div className="pack-selection-dialog">
-            <p>Select a project to add this model to:</p>
-            <div className="pack-select-list">
-              {contextMenuProjects.map(project => (
-                <div
-                  key={project.id}
-                  className="pack-select-item"
-                  onClick={() => handleAddToProject(project.id)}
-                >
-                  <i className="pi pi-folder" />
-                  <div className="pack-select-item-content">
-                    <span className="pack-select-item-name">
-                      {project.name}
-                    </span>
-                    {project.description && (
-                      <span className="pack-select-item-description">
-                        {project.description}
-                      </span>
-                    )}
-                  </div>
-                  <i className="pi pi-chevron-right" />
-                </div>
-              ))}
-            </div>
-            {contextMenuProjects.length === 0 && (
-              <div className="pack-select-no-packs">
-                <i className="pi pi-inbox" />
-                <p>No projects available. Create a project first.</p>
-              </div>
-            )}
-          </div>
-        </Dialog>
+          onSelect={handleAddToProject}
+        />
       </>
     )
   }
