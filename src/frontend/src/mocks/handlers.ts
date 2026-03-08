@@ -130,12 +130,12 @@ export const handlers = [
 
   // Packs
   http.get(`${BASE_URL}/packs`, () => {
-    return HttpResponse.json(mockPacks)
+    return HttpResponse.json({ packs: mockPacks })
   }),
 
   // Projects
   http.get(`${BASE_URL}/projects`, () => {
-    return HttpResponse.json(mockProjects)
+    return HttpResponse.json({ projects: mockProjects })
   }),
 
   // Sounds (paginated)
@@ -150,11 +150,12 @@ export const handlers = [
       totalCount: mockSounds.length,
       page,
       pageSize,
+      totalPages: Math.ceil(mockSounds.length / pageSize),
     })
   }),
 
   // Sound categories
-  http.get(`${BASE_URL}/sounds/categories`, () => {
+  http.get(`${BASE_URL}/sound-categories`, () => {
     return HttpResponse.json({ categories: [] })
   }),
 
@@ -164,7 +165,7 @@ export const handlers = [
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
     return HttpResponse.json({
-      items: [],
+      sprites: [],
       totalCount: 0,
       page,
       pageSize,
@@ -173,8 +174,8 @@ export const handlers = [
   }),
 
   // Sprite categories
-  http.get(`${BASE_URL}/sprites/categories`, () => {
-    return HttpResponse.json([])
+  http.get(`${BASE_URL}/sprite-categories`, () => {
+    return HttpResponse.json({ categories: [] })
   }),
 
   // Texture sets (paginated)

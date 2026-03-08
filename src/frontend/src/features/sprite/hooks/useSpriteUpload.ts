@@ -1,7 +1,7 @@
 import { type RefObject } from 'react'
 
 import { createSpriteWithFile } from '@/features/sprite/api/spriteApi'
-import { type useUploadProgress } from '@/hooks/useUploadProgress'
+import { useUploadProgress } from '@/hooks/useUploadProgress'
 
 const UNASSIGNED_CATEGORY_ID = -1
 const SPRITE_TYPE_STATIC = 1
