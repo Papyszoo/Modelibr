@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 
 import { useSoundCategoriesQuery } from '@/features/sounds/api/queries'
 import { getSoundsPaginated } from '@/features/sounds/api/soundApi'

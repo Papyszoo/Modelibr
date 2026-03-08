@@ -110,21 +110,13 @@ export function ModelVersionWindow({
 
   const handleDownloadFile = (fileId: number, _fileName: string) => {
     if (!selectedVersion || !numericModelId) return
-    const url = getVersionFileUrl(
-      numericModelId,
-      selectedVersion.id,
-      fileId
-    )
+    const url = getVersionFileUrl(numericModelId, selectedVersion.id, fileId)
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleOpenInBlender = (fileId: number, _fileName: string) => {
     if (!selectedVersion || !numericModelId) return
-    const url = getVersionFileUrl(
-      numericModelId,
-      selectedVersion.id,
-      fileId
-    )
+    const url = getVersionFileUrl(numericModelId, selectedVersion.id, fileId)
     // Try to open with blender:// protocol
     const blenderUrl = `blender://${url}`
     window.location.href = blenderUrl

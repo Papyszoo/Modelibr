@@ -1,5 +1,5 @@
-import { useCallback, type RefObject } from 'react'
 import type { Toast } from 'primereact/toast'
+import { type RefObject, useCallback } from 'react'
 
 import { createStage, updateStage } from '@/features/stage-editor/api/stageApi'
 import type { ComponentType } from '@/features/stage-editor/components/ComponentLibrary'

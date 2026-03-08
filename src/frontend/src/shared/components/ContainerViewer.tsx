@@ -6,10 +6,10 @@ import { useCallback, useRef, useState } from 'react'
 
 import { ModelGrid } from '@/features/models/components/ModelGrid'
 import { useTabUiState } from '@/hooks/useTabUiState'
-import { useContainerData } from '@/shared/hooks/useContainerData'
 import { ContainerSoundsTab } from '@/shared/components/container-tabs/ContainerSoundsTab'
 import { ContainerSpritesTab } from '@/shared/components/container-tabs/ContainerSpritesTab'
 import { ContainerTextureSetsTab } from '@/shared/components/container-tabs/ContainerTextureSetsTab'
+import { useContainerData } from '@/shared/hooks/useContainerData'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 
 interface ContainerViewerProps {

@@ -163,7 +163,7 @@ Tests .blend file upload via WebDAV and REST API. Requires `ENABLE_BLENDER=true`
 - New model via WebDAV PUT
 - New model via POST /models (REST API)
 - New version via WebDAV Safe Save (PUT temp + MOVE)
-- New version via POST /models/{id}/versions
+- New version via POST `/models/{id}/versions`
 - Dedup: same .blend hash across models returns existing model
 - Dedup: same content re-saved to same model skips version creation
 - **Multi-file simultaneous WebDAV upload**: 3 unique `.blend` files PUT concurrently → 3 separate models created, each with 1 version, `.blend` file, and thumbnail

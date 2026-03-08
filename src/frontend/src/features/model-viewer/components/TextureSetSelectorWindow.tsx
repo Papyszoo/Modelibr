@@ -4,11 +4,11 @@ import { Button } from 'primereact/button'
 import { useState } from 'react'
 
 import { FloatingWindow } from '@/components/FloatingWindow'
+import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 import {
   getFileUrl,
   setDefaultTextureSet,
 } from '@/features/models/api/modelApi'
-import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
 import { type TextureSetDto } from '@/types'
@@ -63,11 +63,7 @@ export function TextureSetSelectorWindow({
     }
     try {
       setSettingDefault(true)
-      await setDefaultTextureSet(
-        numericModelId,
-        textureSetId,
-        modelVersionId
-      )
+      await setDefaultTextureSet(numericModelId, textureSetId, modelVersionId)
       // Refresh the model to show updated default
       onModelUpdated()
     } catch (error) {

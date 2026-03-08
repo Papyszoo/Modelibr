@@ -32,7 +32,9 @@ test.describe('Visual Regression', () => {
     expect(response?.ok()).toBeTruthy()
 
     const index: StoryIndex = await response!.json()
-    const stories = Object.values(index.entries).filter(entry => entry.type === 'story')
+    const stories = Object.values(index.entries).filter(
+      entry => entry.type === 'story'
+    )
 
     expect(stories.length).toBeGreaterThan(0)
 
@@ -44,7 +46,9 @@ test.describe('Visual Regression', () => {
         })
 
         // Wait for the Storybook root to be present
-        await page.locator('#storybook-root').waitFor({ state: 'visible', timeout: 10_000 })
+        await page
+          .locator('#storybook-root')
+          .waitFor({ state: 'visible', timeout: 10_000 })
 
         // Small delay for animations/renders to settle
         await page.waitForTimeout(500)

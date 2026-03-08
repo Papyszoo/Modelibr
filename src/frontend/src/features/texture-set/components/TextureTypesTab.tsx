@@ -1,6 +1,6 @@
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-import { TextureType, type TextureSetDto } from '@/types'
+import { type TextureSetDto, type TextureType } from '@/types'
 import { getNonHeightTypes } from '@/utils/textureTypeUtils'
 
 import { HeightCard } from './HeightCard'

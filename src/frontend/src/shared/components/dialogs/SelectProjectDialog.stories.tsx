@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 
 import { SelectProjectDialog } from './SelectProjectDialog'
@@ -85,9 +85,7 @@ export const WithProjects: Story = {
   parameters: {
     msw: {
       handlers: [
-        http.get(`${BASE_URL}/projects`, () =>
-          HttpResponse.json(mockProjects)
-        ),
+        http.get(`${BASE_URL}/projects`, () => HttpResponse.json(mockProjects)),
       ],
     },
   },
@@ -125,9 +123,7 @@ export const CustomHeader: Story = {
   parameters: {
     msw: {
       handlers: [
-        http.get(`${BASE_URL}/projects`, () =>
-          HttpResponse.json(mockProjects)
-        ),
+        http.get(`${BASE_URL}/projects`, () => HttpResponse.json(mockProjects)),
       ],
     },
   },

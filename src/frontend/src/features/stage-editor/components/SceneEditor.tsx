@@ -5,9 +5,9 @@ import { useEffect } from 'react'
 
 import { useTabContext } from '@/hooks/useTabContext'
 
-import { EditorLayout } from './EditorLayout'
 import { useSceneActions } from '../hooks/useSceneActions'
 import { useSceneState } from '../hooks/useSceneState'
+import { EditorLayout } from './EditorLayout'
 
 export type { ComponentType } from './ComponentLibrary'
 

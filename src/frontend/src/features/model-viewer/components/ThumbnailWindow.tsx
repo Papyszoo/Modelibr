@@ -31,10 +31,7 @@ export function ThumbnailWindow({
     >
       {modelId ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <ThumbnailDisplay
-            modelId={modelId}
-            versionId={selectedVersion?.id}
-          />
+          <ThumbnailDisplay modelId={modelId} versionId={selectedVersion?.id} />
           {onRegenerate && (
             <Button
               label="Regenerate Thumbnail"

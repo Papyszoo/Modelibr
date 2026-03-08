@@ -1,5 +1,5 @@
-import { type RefObject } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { type RefObject } from 'react'
 
 import {
   createSpriteCategory,

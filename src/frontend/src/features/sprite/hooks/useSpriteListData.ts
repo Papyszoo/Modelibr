@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 
 import { useSpriteCategoriesQuery } from '@/features/sprite/api/queries'
 import { getSpritesPaginated } from '@/features/sprite/api/spriteApi'

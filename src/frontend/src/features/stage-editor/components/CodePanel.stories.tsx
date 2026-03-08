@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { type StageConfig } from './SceneEditor'
 import { CodePanel } from './CodePanel'
+import { type StageConfig } from './SceneEditor'
 
 const mockConfig: StageConfig = {
   lights: [

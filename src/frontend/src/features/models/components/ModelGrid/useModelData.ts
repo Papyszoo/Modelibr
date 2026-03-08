@@ -76,7 +76,7 @@ export function useModelData({
   )
 
   const removeModel = useCallback(
-    (modelId: number) => {
+    (_modelId: number) => {
       queryClient.invalidateQueries({ queryKey: ['models'] })
     },
     [queryClient]

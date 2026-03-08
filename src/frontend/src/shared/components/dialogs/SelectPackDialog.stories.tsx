@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 
 import { SelectPackDialog } from './SelectPackDialog'
@@ -95,9 +95,7 @@ export const Empty: Story = {
   parameters: {
     msw: {
       handlers: [
-        http.get(`${BASE_URL}/packs`, () =>
-          HttpResponse.json({ packs: [] })
-        ),
+        http.get(`${BASE_URL}/packs`, () => HttpResponse.json({ packs: [] })),
       ],
     },
   },

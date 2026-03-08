@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
+import { PropertyPanel } from './PropertyPanel'
 import {
   type StageGroup,
   type StageHelper,
   type StageLight,
   type StageMesh,
 } from './SceneEditor'
-import { PropertyPanel } from './PropertyPanel'
 
 const noop = () => {}
 

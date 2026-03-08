@@ -5,7 +5,7 @@ import { useCallback } from 'react'
 import { SetHeader } from '@/features/texture-set/dialogs/SetHeader'
 import { SetStats } from '@/features/texture-set/dialogs/SetStats'
 import type { QualityOption } from '@/features/texture-set/hooks/useTextureSetViewerData'
-import { TextureSetKind, type TextureSetDto } from '@/types'
+import { type TextureSetDto, TextureSetKind } from '@/types'
 
 interface TextureSetViewerHeaderProps {
   textureSet: TextureSetDto
