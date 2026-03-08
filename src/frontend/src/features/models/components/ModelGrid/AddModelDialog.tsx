@@ -17,7 +17,6 @@ interface AddModelDialogProps {
   projectId?: number
   existingModelIds: string[]
   onModelsAdded: () => void
-  preloadedModels?: Model[]
 }
 
 export function AddModelDialog({
@@ -27,7 +26,6 @@ export function AddModelDialog({
   projectId,
   existingModelIds,
   onModelsAdded,
-  preloadedModels,
 }: AddModelDialogProps) {
   const [availableModels, setAvailableModels] = useState<Model[]>([])
   const [selectedModelIds, setSelectedModelIds] = useState<number[]>([])
@@ -36,22 +34,15 @@ export function AddModelDialog({
 
   const label = packId ? 'Pack' : 'Project'
 
-  // Use pre-loaded models if available, otherwise fetch on dialog open
+  // Fetch available models when dialog opens
   useEffect(() => {
     if (visible) {
-      if (preloadedModels) {
-        const filtered = preloadedModels.filter(
-          (m: Model) => !existingModelIds.includes(String(m.id))
-        )
-        setAvailableModels(filtered)
-      } else {
-        loadAvailableModels()
-      }
+      loadAvailableModels()
       setSelectedModelIds([])
       setSearchQuery('')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Dialog initialization should rerun only on visibility/preloaded models changes
-  }, [visible, preloadedModels])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Dialog initialization should rerun only on visibility changes
+  }, [visible])
 
   const loadAvailableModels = async () => {
     setLoading(true)

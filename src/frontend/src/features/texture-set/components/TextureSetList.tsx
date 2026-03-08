@@ -1,16 +1,16 @@
 import './TextureSetList.css'
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
-import { useCallback, useEffect, useState } from 'react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 
-import {
-  getTextureSetsQueryOptions,
-  useTextureSetsQuery,
-} from '@/features/texture-set/api/queries'
+import { getTextureSetsPaginated } from '@/features/texture-set/api/textureSetApi'
 import {
   createTextureSet,
   createTextureSetWithFile,
@@ -21,11 +21,7 @@ import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTex
 import { useTabContext } from '@/hooks/useTabContext'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import {
-  type PaginationState,
-  type TextureSetDto,
-  TextureSetKind,
-} from '@/types'
+import { type TextureSetDto, TextureSetKind } from '@/types'
 
 import { TextureSetGrid } from './TextureSetGrid'
 import { TextureSetListHeader } from './TextureSetListHeader'
@@ -56,94 +52,44 @@ function kindFilterToApiKind(filter: KindFilter): number {
 }
 
 export function TextureSetList() {
-  const [textureSets, setTextureSets] = useState<TextureSetDto[]>([])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [kindFilter, setKindFilter] = useState<KindFilter>('universal')
   const [dragOverTab, setDragOverTab] = useState<KindFilter | null>(null)
-  const [pagination, setPagination] = useState<PaginationState>({
-    page: 1,
-    pageSize: 50,
-    totalCount: 0,
-    totalPages: 0,
-    hasMore: false,
-  })
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const toast = useRef<Toast>(null)
   const { openTextureSetDetailsTab } = useTabContext()
   const uploadProgressContext = useUploadProgress()
   const queryClient = useQueryClient()
-  const textureSetsQuery = useTextureSetsQuery({
-    params: { page: 1, pageSize: 50, kind: kindFilterToApiKind(kindFilter) },
+
+  const PAGE_SIZE = 50
+
+  const {
+    data: paginatedData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ['textureSets', { kind: kindFilterToApiKind(kindFilter) }],
+    queryFn: ({ pageParam }) =>
+      getTextureSetsPaginated({
+        page: pageParam,
+        pageSize: PAGE_SIZE,
+        kind: kindFilterToApiKind(kindFilter),
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.textureSets.length, 0)
+      return loaded < lastPage.totalCount ? allPages.length + 1 : undefined
+    },
   })
 
-  const loading = textureSetsQuery.isLoading && textureSets.length === 0
+  const textureSets = paginatedData?.pages.flatMap(p => p.textureSets) ?? []
+  const totalCount = paginatedData?.pages[0]?.totalCount ?? 0
+  const loading = isLoading
 
-  useEffect(() => {
-    if (!textureSetsQuery.data) return
-
-    setTextureSets(textureSetsQuery.data.textureSets || [])
-    setPagination({
-      page: 1,
-      pageSize: textureSetsQuery.data.pageSize,
-      totalCount: textureSetsQuery.data.totalCount,
-      totalPages: textureSetsQuery.data.totalPages,
-      hasMore: 1 < textureSetsQuery.data.totalPages,
-    })
-  }, [textureSetsQuery.data])
-
-  useEffect(() => {
-    if (!textureSetsQuery.error) return
-
-    console.error('Failed to load texture sets:', textureSetsQuery.error)
-    setTextureSets([])
-    toast.current?.show({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to load texture sets',
-      life: 3000,
-    })
-  }, [textureSetsQuery.error])
-
-  const loadTextureSets = useCallback(
-    async (loadMore = false) => {
-      if (!loadMore) {
-        await queryClient.invalidateQueries({ queryKey: ['textureSets'] })
-        return
-      }
-
-      try {
-        setIsLoadingMore(true)
-        const page = pagination.page + 1
-        const result = await queryClient.fetchQuery(
-          getTextureSetsQueryOptions({
-            page,
-            pageSize: 50,
-            kind: kindFilterToApiKind(kindFilter),
-          })
-        )
-
-        setTextureSets(prev => [...prev, ...(result.textureSets || [])])
-        setPagination({
-          page,
-          pageSize: result.pageSize,
-          totalCount: result.totalCount,
-          totalPages: result.totalPages,
-          hasMore: page < result.totalPages,
-        })
-      } catch (error) {
-        console.error('Failed to load texture sets:', error)
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'Failed to load texture sets',
-          life: 3000,
-        })
-      } finally {
-        setIsLoadingMore(false)
-      }
-    },
-    [pagination.page, queryClient, kindFilter]
-  )
+  const invalidateTextureSets = () => {
+    queryClient.invalidateQueries({ queryKey: ['textureSets'] })
+  }
 
   const createTextureSetMutation = useMutation({
     mutationFn: async ({ name, kind }: { name: string; kind: number }) => {
@@ -156,7 +102,7 @@ export function TextureSetList() {
         detail: 'Texture set created successfully',
         life: 3000,
       })
-      await loadTextureSets()
+      invalidateTextureSets()
       setShowCreateDialog(false)
     },
     onError: error => {
@@ -181,7 +127,7 @@ export function TextureSetList() {
         detail: 'Texture set deleted successfully',
         life: 3000,
       })
-      await loadTextureSets()
+      invalidateTextureSets()
     },
     onError: error => {
       console.error('Failed to delete texture set:', error)
@@ -213,9 +159,8 @@ export function TextureSetList() {
     openTextureSetDetailsTab(textureSet.id, textureSet.name)
   }
 
-  const handleTextureSetRecycled = (textureSetId: number) => {
-    // Remove the recycled texture set from the list without making a new request
-    setTextureSets(prevSets => prevSets.filter(ts => ts.id !== textureSetId))
+  const handleTextureSetRecycled = (_textureSetId: number) => {
+    invalidateTextureSets()
   }
 
   const handleFileDrop = async (files: File[] | FileList) => {
@@ -279,7 +224,7 @@ export function TextureSetList() {
     }
 
     // Refresh the texture sets list
-    loadTextureSets()
+    invalidateTextureSets()
   }
 
   // Use drag and drop hook
@@ -292,7 +237,7 @@ export function TextureSetList() {
       <ConfirmDialog />
 
       <TextureSetListHeader
-        setCount={pagination.totalCount || textureSets.length}
+        setCount={totalCount || textureSets.length}
         onCreateSet={() => setShowCreateDialog(true)}
         onFilesSelected={files => handleFileDrop(files)}
       />
@@ -313,7 +258,6 @@ export function TextureSetList() {
               onClick={() => {
                 if (kindFilter === opt.value) return
                 setKindFilter(opt.value)
-                setTextureSets([])
               }}
               onDragOver={e => {
                 if (
@@ -343,7 +287,7 @@ export function TextureSetList() {
                     detail: `Texture set moved to ${opt.label}`,
                     life: 3000,
                   })
-                  await loadTextureSets()
+                  invalidateTextureSets()
                 } catch (error) {
                   console.error('Failed to change texture set kind:', error)
                   toast.current?.show({
@@ -370,24 +314,26 @@ export function TextureSetList() {
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onTextureSetRecycled={handleTextureSetRecycled}
-        onTextureSetUpdated={loadTextureSets}
+        onTextureSetUpdated={invalidateTextureSets}
       />
 
-      {pagination.hasMore && (
+      {hasNextPage && (
         <div
           style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}
         >
           <Button
             label={
-              isLoadingMore
+              isFetchingNextPage
                 ? 'Loading...'
-                : `Load More (${textureSets.length} of ${pagination.totalCount})`
+                : `Load More (${textureSets.length} of ${totalCount})`
             }
             icon={
-              isLoadingMore ? 'pi pi-spinner pi-spin' : 'pi pi-chevron-down'
+              isFetchingNextPage
+                ? 'pi pi-spinner pi-spin'
+                : 'pi pi-chevron-down'
             }
-            onClick={() => loadTextureSets(true)}
-            disabled={isLoadingMore}
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
             className="p-button-outlined"
           />
         </div>

@@ -6,21 +6,13 @@ import { useEffect, useRef } from 'react'
 
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { formatFileSize } from '@/utils/fileUtils'
 import { openTabInPanel } from '@/utils/tabNavigation'
 
 // Utility function to get file extension
 const getFileExtension = (fileName: string): string => {
   const parts = fileName.split('.')
   return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : ''
-}
-
-// Utility function to format file size
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
 // Map file extensions to PrimeIcons with extension name display

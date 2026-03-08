@@ -3,25 +3,12 @@ import { useEffect, useRef } from 'react'
 
 import { useDockContext } from '@/contexts/DockContext'
 import { useTabMenuItems } from '@/hooks/useTabMenuItems'
-import { type Tab } from '@/types'
 
-interface DockEmptyStateProps {
-  onAddTab: (type: Tab['type'], title: string) => void
-  onReopenTab: (tab: Tab) => void
-  onDrop: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDragEnter: (e: React.DragEvent) => void
-  onDragLeave: (e: React.DragEvent) => void
-}
+import { useDockPanelActions } from './DockPanelActionsContext'
 
-export function DockEmptyState({
-  onAddTab,
-  onReopenTab,
-  onDrop,
-  onDragOver,
-  onDragEnter,
-  onDragLeave,
-}: DockEmptyStateProps) {
+export function DockEmptyState() {
+  const { addTab, reopenTab, onDrop, onDragOver, onDragEnter, onDragLeave } =
+    useDockPanelActions()
   const contextMenuRef = useRef<ContextMenu>(null)
   const {
     recentlyClosedTabs,
@@ -31,9 +18,9 @@ export function DockEmptyState({
   } = useDockContext()
 
   const addMenuItems = useTabMenuItems({
-    onAddTab,
+    onAddTab: addTab,
     recentlyClosedTabs,
-    onReopenTab,
+    onReopenTab: reopenTab,
   })
 
   useEffect(() => {

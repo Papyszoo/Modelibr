@@ -4,6 +4,7 @@ import { Button } from 'primereact/button'
 import { useState } from 'react'
 
 import { FloatingWindow } from '@/components/FloatingWindow'
+import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 import {
   getFileUrl,
   setDefaultTextureSet,
@@ -11,7 +12,6 @@ import {
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
 import { type TextureSetDto } from '@/types'
-import { type Model } from '@/utils/fileUtils'
 
 import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
 
@@ -19,7 +19,7 @@ interface TextureSetSelectorWindowProps {
   visible: boolean
   onClose: () => void
   side: 'left' | 'right'
-  model: Model
+  modelId: string | null
   modelVersionId: number | null
   selectedVersion: { id: number; defaultTextureSetId?: number } | null
   selectedTextureSetId: number | null
@@ -31,13 +31,19 @@ export function TextureSetSelectorWindow({
   visible,
   onClose,
   side,
-  model,
+  modelId,
   modelVersionId,
   selectedVersion,
   selectedTextureSetId,
   onTextureSetSelect,
   onModelUpdated,
 }: TextureSetSelectorWindowProps) {
+  const modelQuery = useModelByIdQuery({
+    modelId: modelId ?? '',
+    queryConfig: { enabled: !!modelId },
+  })
+  const model = modelQuery.data ?? null
+  const numericModelId = modelId ? parseInt(modelId) : null
   const [settingDefault, setSettingDefault] = useState(false)
   const [linkDialogVisible, setLinkDialogVisible] = useState(false)
   const [unlinking, setUnlinking] = useState<number | null>(null)
@@ -51,17 +57,13 @@ export function TextureSetSelectorWindow({
   const loading = textureSetsQuery.isLoading || textureSetsQuery.isFetching
 
   const handleSetDefault = async (textureSetId: number | null) => {
-    if (!modelVersionId) {
+    if (!modelVersionId || !numericModelId) {
       console.error('No model version ID available')
       return
     }
     try {
       setSettingDefault(true)
-      await setDefaultTextureSet(
-        parseInt(model.id),
-        textureSetId,
-        modelVersionId
-      )
+      await setDefaultTextureSet(numericModelId, textureSetId, modelVersionId)
       // Refresh the model to show updated default
       onModelUpdated()
     } catch (error) {
@@ -99,7 +101,7 @@ export function TextureSetSelectorWindow({
         const newDefaultId =
           remainingTextureSets.length > 0 ? remainingTextureSets[0].id : null
         await setDefaultTextureSet(
-          parseInt(model.id),
+          numericModelId!,
           newDefaultId,
           modelVersionId
         )
@@ -251,13 +253,15 @@ export function TextureSetSelectorWindow({
         </div>
       </FloatingWindow>
 
-      <TextureSetAssociationDialog
-        visible={linkDialogVisible}
-        model={model}
-        modelVersionId={modelVersionId!}
-        onHide={handleLinkDialogClose}
-        onAssociationsChanged={handleLinkDialogClose}
-      />
+      {model && (
+        <TextureSetAssociationDialog
+          visible={linkDialogVisible}
+          model={model}
+          modelVersionId={modelVersionId!}
+          onHide={handleLinkDialogClose}
+          onAssociationsChanged={handleLinkDialogClose}
+        />
+      )}
     </>
   )
 }

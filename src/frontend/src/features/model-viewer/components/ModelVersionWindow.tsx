@@ -8,15 +8,18 @@ import {
   getVersionFileUrl,
   setActiveVersion,
 } from '@/features/model-viewer/api/modelVersionApi'
-import { useModelVersionsQuery } from '@/features/model-viewer/api/queries'
+import {
+  useModelByIdQuery,
+  useModelVersionsQuery,
+} from '@/features/model-viewer/api/queries'
 import { type ModelVersionDto } from '@/types'
-import { type Model } from '@/utils/fileUtils'
+import { formatDate, formatFileSize } from '@/utils/fileUtils'
 
 interface ModelVersionWindowProps {
   visible: boolean
   onClose: () => void
   side?: 'left' | 'right'
-  model: Model | null
+  modelId: string | null
   onVersionSelect?: (version: ModelVersionDto) => void
   onDefaultFileChange?: (fileId: number) => void
   onModelUpdate?: () => void
@@ -27,16 +30,21 @@ export function ModelVersionWindow({
   visible,
   onClose,
   side = 'left',
-  model,
+  modelId,
   onVersionSelect,
   onDefaultFileChange,
   onModelUpdate,
   onRecycleVersion,
 }: ModelVersionWindowProps) {
+  const modelQuery = useModelByIdQuery({
+    modelId: modelId ?? '',
+    queryConfig: { enabled: !!modelId },
+  })
+  const model = modelQuery.data ?? null
   const [selectedVersion, setSelectedVersion] =
     useState<ModelVersionDto | null>(null)
   const [defaultFileId, setDefaultFileId] = useState<number | null>(null)
-  const numericModelId = model ? parseInt(model.id) : null
+  const numericModelId = modelId ? parseInt(modelId) : null
   const versionsQuery = useModelVersionsQuery({
     modelId: numericModelId ?? 0,
     queryConfig: {
@@ -48,13 +56,13 @@ export function ModelVersionWindow({
 
   // Load default file preference from localStorage
   useEffect(() => {
-    if (model) {
-      const stored = localStorage.getItem(`model-${model.id}-default-file`)
+    if (modelId) {
+      const stored = localStorage.getItem(`model-${modelId}-default-file`)
       if (stored) {
         setDefaultFileId(parseInt(stored))
       }
     }
-  }, [model])
+  }, [modelId])
 
   useEffect(() => {
     if (!visible) return
@@ -101,40 +109,32 @@ export function ModelVersionWindow({
   }
 
   const handleDownloadFile = (fileId: number, _fileName: string) => {
-    if (!selectedVersion || !model) return
-    const url = getVersionFileUrl(
-      parseInt(model.id),
-      selectedVersion.id,
-      fileId
-    )
+    if (!selectedVersion || !numericModelId) return
+    const url = getVersionFileUrl(numericModelId, selectedVersion.id, fileId)
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleOpenInBlender = (fileId: number, _fileName: string) => {
-    if (!selectedVersion || !model) return
-    const url = getVersionFileUrl(
-      parseInt(model.id),
-      selectedVersion.id,
-      fileId
-    )
+    if (!selectedVersion || !numericModelId) return
+    const url = getVersionFileUrl(numericModelId, selectedVersion.id, fileId)
     // Try to open with blender:// protocol
     const blenderUrl = `blender://${url}`
     window.location.href = blenderUrl
   }
 
   const handleSetDefaultFile = (fileId: number) => {
-    if (!model) return
+    if (!modelId) return
     setDefaultFileId(fileId)
-    localStorage.setItem(`model-${model.id}-default-file`, fileId.toString())
+    localStorage.setItem(`model-${modelId}-default-file`, fileId.toString())
     if (onDefaultFileChange) {
       onDefaultFileChange(fileId)
     }
   }
 
   const handleSetActiveVersion = async (versionId: number) => {
-    if (!model) return
+    if (!numericModelId) return
     try {
-      await setActiveVersion(parseInt(model.id), versionId)
+      await setActiveVersion(numericModelId, versionId)
       await versionsQuery.refetch()
       // Notify parent to refresh model data so UI updates immediately
       if (onModelUpdate) {
@@ -143,19 +143,6 @@ export function ModelVersionWindow({
     } catch (error) {
       console.error('Failed to set active version:', error)
     }
-  }
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleString()
   }
 
   return (

@@ -11,6 +11,8 @@
     "vite.config.js",
     "jest.config.js",
     "eslint.config.js",
-    ".storybook/**/*"
+    "playwright.config.ts",
+    ".storybook/**/*",
+    "visual-tests/**/*"
   ]
 }

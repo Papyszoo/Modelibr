@@ -148,8 +148,10 @@ describe('ModelViewer', () => {
   }
 
   const mockModel = {
-    id: 1,
+    id: '1',
     name: 'Test Model',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
     files: [
       {
         id: '123',
@@ -157,7 +159,7 @@ describe('ModelViewer', () => {
         isRenderable: true,
       },
     ],
-  }
+  } as any
 
   it('should render Canvas and scene when model is provided', () => {
     renderWithProviders(<ModelViewer model={mockModel} side="left" />)

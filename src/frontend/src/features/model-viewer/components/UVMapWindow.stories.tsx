@@ -3,7 +3,6 @@ import { Button } from 'primereact/button'
 import { useState } from 'react'
 
 import { ModelProvider } from '@/contexts/ModelContext'
-import { type Model } from '@/utils/fileUtils'
 
 import { UVMapWindow } from './UVMapWindow'
 
@@ -30,24 +29,6 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const mockModel: Model = {
-  id: 1,
-  name: 'Test Model',
-  createdAt: new Date().toISOString(),
-  files: [
-    {
-      id: 1,
-      modelId: 1,
-      originalFileName: 'cube.obj',
-      storedFileName: 'cube.obj',
-      sizeInBytes: 1024,
-      uploadedAt: new Date().toISOString(),
-      hash: 'test-hash',
-      isRenderable: true,
-    },
-  ],
-}
-
 function DemoWrapper() {
   const [visible, setVisible] = useState(true)
 
@@ -61,7 +42,7 @@ function DemoWrapper() {
       <UVMapWindow
         visible={visible}
         onClose={() => setVisible(false)}
-        model={mockModel}
+        modelId="1"
       />
     </div>
   )
@@ -85,7 +66,7 @@ export const NoModel: Story = {
           <UVMapWindow
             visible={visible}
             onClose={() => setVisible(false)}
-            model={null}
+            modelId={null}
           />
         </div>
       )

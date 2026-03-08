@@ -17,6 +17,8 @@ describe('cardWidthStore', () => {
         textureSets: 200,
         stages: 300,
         textureSetViewer: 280,
+        textureSetViewerLeft: 280,
+        textureSetViewerRight: 280,
         recycledFiles: 200,
       },
     })

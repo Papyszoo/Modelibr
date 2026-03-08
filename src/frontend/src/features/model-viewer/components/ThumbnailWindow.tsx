@@ -3,13 +3,12 @@ import { Button } from 'primereact/button'
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { type ModelVersionDto } from '@/types'
-import { type Model } from '@/utils/fileUtils'
 
 interface ThumbnailWindowProps {
   visible: boolean
   onClose: () => void
   side?: 'left' | 'right'
-  model: Model | null
+  modelId: string | null
   selectedVersion?: ModelVersionDto | null
   onRegenerate?: () => void
 }
@@ -18,7 +17,7 @@ export function ThumbnailWindow({
   visible,
   onClose,
   side = 'left',
-  model,
+  modelId,
   selectedVersion,
   onRegenerate,
 }: ThumbnailWindowProps) {
@@ -30,12 +29,9 @@ export function ThumbnailWindow({
       side={side}
       windowId="thumbnail"
     >
-      {model ? (
+      {modelId ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <ThumbnailDisplay
-            modelId={model.id.toString()}
-            versionId={selectedVersion?.id}
-          />
+          <ThumbnailDisplay modelId={modelId} versionId={selectedVersion?.id} />
           {onRegenerate && (
             <Button
               label="Regenerate Thumbnail"

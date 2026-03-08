@@ -655,6 +655,8 @@ Then("I take a screenshot named {string}", async ({ page }, name: string) => {
 /**
  * Verifies that the thumbnail is actually visible in the model list card UI.
  * This goes beyond DB verification to ensure the image actually loads in the browser.
+ * Targets the specific model that was just uploaded (via uploadTracker) to avoid
+ * false positives/negatives from stale models left over from previous runs.
  */
 Then("the thumbnail should be visible in the model card", async ({ page }) => {
     const modelListPage = new ModelListPage(page);
@@ -663,28 +665,47 @@ Then("the thumbnail should be visible in the model card", async ({ page }) => {
     await modelListPage.goto();
     await page.waitForLoadState("domcontentloaded");
 
-    // Wait for any thumbnail image in a model card to be visible
-    const thumbnailImg = page
-        .locator(".model-grid .thumbnail-image, .model-card .thumbnail-image")
-        .first();
-
-    // First check if there's a thumbnail image (not placeholder)
-    const hasImage = (await thumbnailImg.count()) > 0;
-
-    if (!hasImage) {
-        // Take a screenshot to show the issue
-        await page.screenshot({
-            path: "test-results/thumbnail-missing-in-card.png",
-        });
-        throw new Error(
-            "No thumbnail image found in model card - only placeholder is showing. See test-results/thumbnail-missing-in-card.png",
+    // Target the specific model card that was just uploaded
+    const modelName = uploadTracker.modelName;
+    let thumbnailImg;
+    if (modelName) {
+        // Find the card containing this model's name, then locate its thumbnail
+        const modelCard = page
+            .locator(".model-grid .model-card, .model-card")
+            .filter({ hasText: modelName });
+        thumbnailImg = modelCard.locator(".thumbnail-image").first();
+        console.log(
+            `[UI] Looking for thumbnail in card for model "${modelName}"`,
+        );
+    } else {
+        // Fallback: use first thumbnail image if no model name tracked
+        thumbnailImg = page
+            .locator(
+                ".model-grid .thumbnail-image, .model-card .thumbnail-image",
+            )
+            .first();
+        console.log(
+            "[UI] No model name tracked, using first thumbnail image",
         );
     }
+
+    // Wait for the thumbnail image to appear (not placeholder)
+    await expect
+        .poll(
+            async () => {
+                return (await thumbnailImg.count()) > 0;
+            },
+            {
+                message: `Waiting for thumbnail image to appear in model card${modelName ? ` for "${modelName}"` : ""}`,
+                timeout: 15000,
+            },
+        )
+        .toBe(true);
 
     await expect(thumbnailImg).toBeVisible({ timeout: 15000 });
 
     // Verify the image actually loaded (naturalWidth > 0)
-    const isLoaded = await expect
+    await expect
         .poll(
             async () => {
                 return await thumbnailImg.evaluate((img: HTMLImageElement) => {

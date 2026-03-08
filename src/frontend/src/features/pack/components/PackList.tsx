@@ -1,27 +1,19 @@
 import './PackList.css'
 
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { Dialog } from 'primereact/dialog'
-import { InputText } from 'primereact/inputtext'
-import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
 import { useRef } from 'react'
-import { useForm } from 'react-hook-form'
-import { type z } from 'zod'
 
-import { createPack, deletePack } from '@/features/pack/api/packApi'
+import { deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { packCreateFormSchema } from '@/shared/validation/formSchemas'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type PackDto } from '@/types'
 import { openTabInPanel } from '@/utils/tabNavigation'
 
-type PackCreateFormInput = z.input<typeof packCreateFormSchema>
-type PackCreateFormOutput = z.output<typeof packCreateFormSchema>
+import { CreatePackDialog } from './CreatePackDialog'
 
 export function PackList() {
   const queryClient = useQueryClient()
@@ -31,51 +23,12 @@ export function PackList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const toast = useRef<Toast>(null)
 
-  const { register, handleSubmit, reset } = useForm<
-    PackCreateFormInput,
-    unknown,
-    PackCreateFormOutput
-  >({
-    resolver: zodResolver(packCreateFormSchema),
-    mode: 'onChange',
-    defaultValues: {
-      name: '',
-      description: '',
-    },
-  })
-
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.packs
 
   const invalidatePacks = async () => {
     await queryClient.invalidateQueries({ queryKey: ['packs'] })
   }
-
-  const createPackMutation = useMutation({
-    mutationFn: (payload: { name: string; description?: string }) =>
-      createPack(payload),
-    onSuccess: async () => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Pack created successfully',
-        life: 3000,
-      })
-
-      setShowCreateDialog(false)
-      reset({ name: '', description: '' })
-      await invalidatePacks()
-    },
-    onError: error => {
-      console.error('Failed to create pack:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to create pack',
-        life: 3000,
-      })
-    },
-  })
 
   const deletePackMutation = useMutation({
     mutationFn: (packId: number) => deletePack(packId),
@@ -111,20 +64,6 @@ export function PackList() {
       await invalidatePacks()
     },
   })
-
-  const handleCreatePack = handleSubmit(
-    async values => {
-      await createPackMutation.mutateAsync(values)
-    },
-    () => {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Validation Error',
-        detail: 'Pack name is required',
-        life: 3000,
-      })
-    }
-  )
 
   const handleDeletePack = async (packId: number) => {
     await deletePackMutation.mutateAsync(packId)
@@ -241,54 +180,10 @@ export function PackList() {
         </div>
       )}
 
-      <Dialog
-        header="Create New Pack"
+      <CreatePackDialog
         visible={showCreateDialog}
-        style={{ width: '500px' }}
-        onHide={() => {
-          setShowCreateDialog(false)
-          reset({ name: '', description: '' })
-        }}
-        footer={
-          <div>
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              onClick={() => {
-                setShowCreateDialog(false)
-                reset({ name: '', description: '' })
-              }}
-              className="p-button-text"
-            />
-            <Button
-              label="Create"
-              icon="pi pi-check"
-              onClick={handleCreatePack}
-              autoFocus
-            />
-          </div>
-        }
-      >
-        <div className="p-fluid">
-          <div className="field">
-            <label htmlFor="pack-name">Name *</label>
-            <InputText
-              id="pack-name"
-              {...register('name')}
-              placeholder="Enter pack name"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="pack-description">Description</label>
-            <InputTextarea
-              id="pack-description"
-              {...register('description')}
-              rows={3}
-              placeholder="Enter pack description (optional)"
-            />
-          </div>
-        </div>
-      </Dialog>
+        onHide={() => setShowCreateDialog(false)}
+      />
     </div>
   )
 }

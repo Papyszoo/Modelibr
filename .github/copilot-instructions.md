@@ -88,6 +88,20 @@ If the task requires modifying more than 3 files not mentioned in the original r
 
 After every backend edit: `dotnet build Modelibr.sln`. After every frontend edit: check for lint/type errors. If the build fails, **revert the last edit** and ask the user for guidance — do not attempt speculative fixes.
 
+### E2E Test Verification
+
+After making changes that affect frontend behavior, backend endpoints, or test infrastructure, **always run e2e tests** to verify nothing is broken:
+
+```bash
+cd tests/e2e
+npm run test          # Full suite (~163 tests, ~5 min)
+```
+
+- If only specific features were changed, run targeted tests: `npm run test -- --grep "feature name"`
+- E2e tests use Docker Compose (builds + starts containers automatically). Never cancel mid-run.
+- If e2e tests fail, investigate error context in `tests/e2e/test-results/` before attempting fixes.
+- A task is **not complete** if e2e tests fail due to the changes made.
+
 ### Confidence Signaling
 
 Prefix implementation proposals with a confidence level:

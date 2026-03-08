@@ -7,37 +7,27 @@ import { useDockContext } from '@/contexts/DockContext'
 import { useTabMenuItems } from '@/hooks/useTabMenuItems'
 import { type Tab } from '@/types'
 
+import { useDockPanelActions } from './DockPanelActionsContext'
+
 interface DockBarProps {
   side: 'left' | 'right'
   tabs: Tab[]
   activeTab: string
   onTabSelect: (tabId: string) => void
-  onTabClose: (tabId: string) => void
-  onTabDragStart: (tab: Tab) => void
-  onTabDragEnd: () => void
-  onAddTab: (type: Tab['type'], title: string) => void
-  onReopenTab: (tab: Tab) => void
-  onDrop: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDragEnter: (e: React.DragEvent) => void
-  onDragLeave: (e: React.DragEvent) => void
 }
 
-export function DockBar({
-  side,
-  tabs,
-  activeTab,
-  onTabSelect,
-  onTabClose,
-  onTabDragStart,
-  onTabDragEnd,
-  onAddTab,
-  onReopenTab,
-  onDrop,
-  onDragOver,
-  onDragEnter,
-  onDragLeave,
-}: DockBarProps) {
+export function DockBar({ side, tabs, activeTab, onTabSelect }: DockBarProps) {
+  const {
+    closeTab,
+    onTabDragStart,
+    onTabDragEnd,
+    addTab,
+    reopenTab,
+    onDrop,
+    onDragOver,
+    onDragEnter,
+    onDragLeave,
+  } = useDockPanelActions()
   const menuRef = useRef<ContextMenu>(null)
   const {
     recentlyClosedTabs,
@@ -47,9 +37,9 @@ export function DockBar({
   } = useDockContext()
 
   const addMenuItems = useTabMenuItems({
-    onAddTab,
+    onAddTab: addTab,
     recentlyClosedTabs,
-    onReopenTab,
+    onReopenTab: reopenTab,
   })
 
   useEffect(() => {
@@ -89,7 +79,7 @@ export function DockBar({
             tab={tab}
             isActive={tab.id === activeTab}
             onSelect={() => onTabSelect(tab.id)}
-            onClose={() => onTabClose(tab.id)}
+            onClose={() => closeTab(tab.id)}
             onDragStart={onTabDragStart}
             onDragEnd={onTabDragEnd}
             side={side}

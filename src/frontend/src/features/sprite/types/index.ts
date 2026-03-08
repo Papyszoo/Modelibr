@@ -11,6 +11,14 @@ export interface SpriteDto {
   updatedAt: string
 }
 
+export interface SpriteCategoryDto {
+  id: number
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface GetAllSpritesResponse {
   sprites: SpriteDto[]
 }

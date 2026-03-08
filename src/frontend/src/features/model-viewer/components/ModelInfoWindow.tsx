@@ -1,5 +1,5 @@
 import { FloatingWindow } from '@/components/FloatingWindow'
-import { type Model } from '@/utils/fileUtils'
+import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 
 import { ModelInfo } from './ModelInfo'
 
@@ -7,7 +7,7 @@ interface ModelInfoWindowProps {
   visible: boolean
   onClose: () => void
   side?: 'left' | 'right'
-  model: Model | null
+  modelId: string | null
   onModelUpdated?: () => void
 }
 
@@ -15,9 +15,15 @@ export function ModelInfoWindow({
   visible,
   onClose,
   side = 'left',
-  model,
+  modelId,
   onModelUpdated,
 }: ModelInfoWindowProps) {
+  const modelQuery = useModelByIdQuery({
+    modelId: modelId ?? '',
+    queryConfig: { enabled: !!modelId },
+  })
+  const model = modelQuery.data ?? null
+
   return (
     <FloatingWindow
       visible={visible}
