@@ -242,7 +242,7 @@ Then(
         // Reload page to ensure frontend has latest version data with thumbnail URLs
         // This is more reliable than depending on SignalR in tests
         await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(".viewer-controls", {
+        await page.waitForSelector(".p-menubar", {
             state: "visible",
             timeout: 30000,
         });
@@ -465,13 +465,10 @@ When(
 
         // Reload page to force frontend to pick up new default texture set
         await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(
-            ".viewer-controls, .version-dropdown-trigger",
-            {
-                state: "visible",
-                timeout: 30000,
-            },
-        );
+        await page.waitForSelector(".p-menubar, .version-dropdown-trigger", {
+            state: "visible",
+            timeout: 30000,
+        });
     },
 );
 
@@ -633,13 +630,10 @@ When(
 
         // Reload page to force frontend to pick up new default texture set
         await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(
-            ".viewer-controls, .version-dropdown-trigger",
-            {
-                state: "visible",
-                timeout: 30000,
-            },
-        );
+        await page.waitForSelector(".p-menubar, .version-dropdown-trigger", {
+            state: "visible",
+            timeout: 30000,
+        });
     },
 );
 

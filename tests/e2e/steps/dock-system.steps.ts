@@ -41,7 +41,7 @@ When(
 
         // Wait for model viewer to load
         await page.waitForSelector(
-            ".model-viewer, .viewer-canvas, .viewer-controls",
+            ".model-viewer, .viewer-canvas, .p-menubar",
             {
                 state: "visible",
                 timeout: 10000,
@@ -155,7 +155,7 @@ When(
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
         await clickTarget.dblclick();
         await page.waitForSelector(
-            ".model-viewer, .viewer-canvas, .viewer-controls",
+            ".model-viewer, .viewer-canvas, .p-menubar",
             { state: "visible", timeout: 10000 },
         );
         console.log(`[UI] Clicked on model "${modelName}" again ✓`);

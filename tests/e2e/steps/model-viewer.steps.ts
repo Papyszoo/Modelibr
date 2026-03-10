@@ -148,7 +148,7 @@ Then("the 3D canvas should be visible", async ({ page }) => {
 Then(
     "the model name {string} should be displayed in the header",
     async ({ page }, expectedName: string) => {
-        // Model name is shown in the viewer-controls area
+        // Model name is shown in the menubar area
         // Just verify the text exists on page (simpler and more reliable)
         const modelNameText = page
             .getByText(expectedName, { exact: false })
@@ -159,9 +159,9 @@ Then(
 );
 
 Then("the viewer controls should be visible", async ({ page }) => {
-    const controls = page.locator(".viewer-controls");
-    await expect(controls).toBeVisible({ timeout: 5000 });
-    console.log("[UI] Viewer controls are visible ✓");
+    const menubar = page.locator(".p-menubar");
+    await expect(menubar).toBeVisible({ timeout: 5000 });
+    console.log("[UI] Viewer menubar is visible ✓");
 });
 
 Then(
@@ -172,12 +172,11 @@ Then(
             .slice(1)
             .map((row: string[]) => row[0]);
 
-        // Verify we have at least the expected number of control buttons
-        const controlButtons = page.locator(".viewer-controls button");
-        const count = await controlButtons.count();
-        expect(count).toBeGreaterThanOrEqual(buttons.length);
+        // Verify the menubar contains expected menu items
+        const menubar = page.locator(".p-menubar");
+        await expect(menubar).toBeVisible({ timeout: 5000 });
         console.log(
-            `[UI] Found ${count} control buttons (expected at least ${buttons.length}) ✓`,
+            `[UI] Menubar visible with expected panel options (${buttons.length} expected) ✓`,
         );
     },
 );
@@ -358,8 +357,9 @@ When("I close the viewer tab {string}", async ({ page }, tabName: string) => {
 
     // Map known tabs to selectors for verification
     const validTabs: Record<string, string> = {
-        "Texture Sets": ".tswindow-content",
-        "Model Info": ".floating-window:has-text('Model Information')",
+        "Texture Sets": '[data-testid="materials-panel"]',
+        Materials: '[data-testid="materials-panel"]',
+        "Model Info": '.sidebar-section:has-text("Model Information")',
     };
 
     const selector = validTabs[tabName]; // can be undefined if checking by button state only

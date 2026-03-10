@@ -10,6 +10,15 @@ export interface ViewerSettingsType {
   modelRotationSpeed: number
   showShadows: boolean
   showStats: boolean
+  // Lights
+  ambientIntensity: number
+  directionalIntensity: number
+  showLightHelpers: boolean
+  // Environment
+  environmentPreset: string
+  showEnvironmentBackground: boolean
+  backgroundIntensity: number
+  environmentIntensity: number
 }
 
 interface ViewerSettingsProps {

@@ -9,6 +9,7 @@ import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { sharedState } from "../fixtures/shared-state";
 import { ModelListPage } from "../pages/ModelListPage";
+import { ModelViewerPage } from "../pages/ModelViewerPage";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 
 const { Given, When, Then } = createBdd();
@@ -300,30 +301,21 @@ Then("I take a screenshot of model version deletion", async ({ page }) => {
 // ============= Thumbnail Management Steps =============
 
 When("I click the regenerate thumbnail button", async ({ page }) => {
-    // 1. Open Thumbnail Window if not visible
-    // FloatingWindow uses class 'floating-window-title' for the title span
-    const thumbnailTitle = page.locator(
-        ".floating-window-title:has-text('Thumbnail Details')",
+    const modelViewer = new ModelViewerPage(page);
+
+    // 1. Open Thumbnail Details panel if not visible
+    const thumbnailSection = page.locator(
+        '.sidebar-section:has-text("Thumbnail Details")',
     );
 
-    if (!(await thumbnailTitle.isVisible({ timeout: 3000 }))) {
-        // Click the thumbnail details button in controls
-        const toggleBtn = page
-            .locator("button[aria-label='Thumbnail Details']")
-            .or(
-                page
-                    .locator("button")
-                    .filter({ has: page.locator(".pi-image") }),
-            );
-        await toggleBtn.first().click();
-        await expect(thumbnailTitle).toBeVisible({ timeout: 5000 });
-        console.log("[Action] Opened Thumbnail Details window");
+    if (!(await thumbnailSection.isVisible({ timeout: 3000 }))) {
+        await modelViewer.openTab("Thumbnail Details");
+        await expect(thumbnailSection).toBeVisible({ timeout: 5000 });
+        console.log("[Action] Opened Thumbnail Details panel");
     }
 
-    // 2. Click Regenerate button inside the floating window
-    const regenButton = page.locator(
-        ".floating-window button:has-text('Regenerate Thumbnail')",
-    );
+    // 2. Click Regenerate button inside the panel
+    const regenButton = page.locator('button:has-text("Regenerate")');
     await regenButton.click();
     // Wait for server processing confirmation (toast or SignalR response)
     await page

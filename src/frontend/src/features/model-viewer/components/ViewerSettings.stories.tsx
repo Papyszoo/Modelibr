@@ -9,6 +9,13 @@ const defaultSettings: ViewerSettingsType = {
   modelRotationSpeed: 0,
   showShadows: true,
   showStats: false,
+  ambientIntensity: 0.3,
+  directionalIntensity: 1.0,
+  showLightHelpers: false,
+  environmentPreset: 'city',
+  showEnvironmentBackground: false,
+  backgroundIntensity: 1.0,
+  environmentIntensity: 1.0,
 }
 
 const meta: Meta<typeof ViewerSettings> = {

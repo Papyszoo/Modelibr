@@ -939,7 +939,7 @@ GivenBdd(
 
         // Wait for model viewer to load
         await page.waitForSelector(
-            ".model-viewer, .viewer-canvas, .viewer-controls",
+            ".model-viewer, .viewer-canvas, .p-menubar",
             { state: "visible", timeout: 10000 },
         );
 

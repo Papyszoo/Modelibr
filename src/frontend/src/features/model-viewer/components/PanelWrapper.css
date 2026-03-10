@@ -1,0 +1,156 @@
+.panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface-card, #1e1e2e);
+}
+
+.panel-wrapper-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--surface-ground, #181825);
+  border-bottom: 1px solid var(--surface-border, #333);
+  min-height: 32px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.panel-wrapper-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-color, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.panel-wrapper-expand-left {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.panel-wrapper-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin-left: auto;
+}
+
+.panel-expand-btn,
+.panel-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-color-secondary, #aaa);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.7rem;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.panel-expand-btn:hover {
+  background: var(--surface-hover, #333);
+  color: var(--primary-color, #6366f1);
+}
+
+.panel-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.panel-wrapper-content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Resize dividers between panels and canvas */
+.viewer-resize-divider {
+  flex-shrink: 0;
+  background: var(--surface-border, #333);
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+
+.viewer-resize-divider:hover,
+.viewer-resize-divider.resizing {
+  background: var(--primary-color, #6366f1);
+}
+
+.viewer-resize-divider-h {
+  width: 4px;
+  cursor: col-resize;
+}
+
+.viewer-resize-divider-v {
+  height: 4px;
+  cursor: row-resize;
+}
+
+/* Corner expand icons on dividers */
+.divider-expand-icon {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: var(--surface-hover, #333);
+  border: 1px solid var(--surface-border, #444);
+  border-radius: 3px;
+  color: var(--text-color-secondary, #aaa);
+  cursor: pointer;
+  font-size: 0.55rem;
+  z-index: 15;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.divider-expand-icon:hover {
+  background: var(--primary-color, #6366f1);
+  color: white;
+  border-color: var(--primary-color, #6366f1);
+}
+
+/* Vertical divider expand icons */
+.viewer-resize-divider-h .divider-expand-icon {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.viewer-resize-divider-h .divider-expand-icon-top {
+  top: 4px;
+}
+
+.viewer-resize-divider-h .divider-expand-icon-bottom {
+  bottom: 4px;
+}
+
+/* Horizontal divider expand icons */
+.viewer-resize-divider-v .divider-expand-icon {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.viewer-resize-divider-v .divider-expand-icon-left {
+  left: 4px;
+}
+
+.viewer-resize-divider-v .divider-expand-icon-right {
+  right: 4px;
+}

@@ -8,10 +8,7 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { useState } from 'react'
 
 import { updateModelTags } from '@/features/models/api/modelApi'
-import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
 import { getModelFileFormat } from '@/utils/fileUtils'
-
-import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
 
 export function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(
@@ -19,7 +16,6 @@ export function ModelInfo({ model, onModelUpdated }) {
   )
   const [description, setDescription] = useState(model.description || '')
   const [newTag, setNewTag] = useState('')
-  const [showTextureSetDialog, setShowTextureSetDialog] = useState(false)
   const queryClient = useQueryClient()
 
   const invalidateModelQueries = () => {
@@ -48,28 +44,6 @@ export function ModelInfo({ model, onModelUpdated }) {
     },
   })
 
-  const removeTextureSetMutation = useMutation({
-    mutationFn: async (textureSetId: number) => {
-      const activeVersionId = model.activeVersionId
-      if (!activeVersionId) {
-        throw new Error('Model has no active version')
-      }
-      await disassociateTextureSetFromModelVersion(
-        textureSetId,
-        activeVersionId
-      )
-    },
-    onSuccess: () => {
-      invalidateModelQueries()
-      if (onModelUpdated) {
-        onModelUpdated()
-      }
-    },
-    onError: error => {
-      console.error('Failed to remove texture set:', error)
-    },
-  })
-
   const handleAddTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       setTags([...tags, newTag.trim()])
@@ -92,14 +66,9 @@ export function ModelInfo({ model, onModelUpdated }) {
     saveModelInfoMutation.mutate({ tagsString, desc: description })
   }
 
-  const handleRemoveTextureSet = (textureSetId: number) => {
-    removeTextureSetMutation.mutate(textureSetId)
-  }
-
   return (
     <div className="model-info">
       <div className="model-info-section">
-        <h3 className="model-info-title">Model Information</h3>
         <div className="model-info-grid">
           <div className="model-info-item">
             <label>ID:</label>
@@ -121,8 +90,6 @@ export function ModelInfo({ model, onModelUpdated }) {
       </div>
 
       <div className="model-info-section">
-        <h3 className="model-info-title">Tags &amp; Description</h3>
-
         <div className="tags-section">
           <label className="field-label">Tags:</label>
           <div className="tags-container">
@@ -177,64 +144,6 @@ export function ModelInfo({ model, onModelUpdated }) {
           className="save-button"
         />
       </div>
-
-      <div className="model-info-section">
-        <h3 className="model-info-title">Linked Texture Sets</h3>
-        <div className="texture-sets-section">
-          <div className="tags-container">
-            {model.textureSets && model.textureSets.length > 0 ? (
-              model.textureSets.map(textureSet => (
-                <Chip
-                  key={textureSet.id}
-                  label={textureSet.name}
-                  removable
-                  onRemove={() => handleRemoveTextureSet(textureSet.id)}
-                  icon="pi pi-image"
-                  style={{ background: '#8b5cf6', color: 'white' }}
-                />
-              ))
-            ) : (
-              <span className="empty-state-text">No texture sets linked</span>
-            )}
-          </div>
-          <Button
-            label="Link Texture Sets"
-            icon="pi pi-link"
-            onClick={() => setShowTextureSetDialog(true)}
-            className="link-button"
-            size="small"
-          />
-        </div>
-      </div>
-
-      <div className="model-info-section">
-        <h3 className="model-info-title">Controls</h3>
-        <ul className="controls-list">
-          <li>
-            <strong>Mouse:</strong> Rotate view
-          </li>
-          <li>
-            <strong>Scroll:</strong> Zoom in/out
-          </li>
-          <li>
-            <strong>Right-click + drag:</strong> Pan view
-          </li>
-        </ul>
-      </div>
-
-      {showTextureSetDialog && (
-        <TextureSetAssociationDialog
-          visible={showTextureSetDialog}
-          model={model}
-          onHide={() => setShowTextureSetDialog(false)}
-          onAssociationsChanged={() => {
-            setShowTextureSetDialog(false)
-            if (onModelUpdated) {
-              onModelUpdated()
-            }
-          }}
-        />
-      )}
     </div>
   )
 }

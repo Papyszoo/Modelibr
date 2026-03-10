@@ -25,6 +25,8 @@ interface TextureSetAssociationDialogProps {
   visible: boolean
   model: Model
   modelVersionId: number
+  materialName?: string
+  variantName?: string
   onHide: () => void
   onAssociationsChanged: () => void
 }
@@ -39,6 +41,8 @@ export function TextureSetAssociationDialog({
   visible,
   model,
   modelVersionId,
+  materialName,
+  variantName,
   onHide,
   onAssociationsChanged,
 }: TextureSetAssociationDialogProps) {
@@ -155,14 +159,21 @@ export function TextureSetAssociationDialog({
 
       // Process associations for the selected model version
       for (const textureSet of toAssociate) {
-        await associateTextureSetWithModelVersion(textureSet.id, modelVersionId)
+        await associateTextureSetWithModelVersion(
+          textureSet.id,
+          modelVersionId,
+          materialName,
+          variantName
+        )
       }
 
       // Process disassociations
       for (const textureSet of toDisassociate) {
         await disassociateTextureSetFromModelVersion(
           textureSet.id,
-          modelVersionId
+          modelVersionId,
+          materialName,
+          variantName
         )
       }
 

@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Files;
+using WebApi.Infrastructure;
 using WebApi.Services;
 
 namespace WebApi.Endpoints;
@@ -29,6 +30,17 @@ public static class ModelVersionEndpoints
 
         app.MapGet("/models/{modelId}/versions/{versionId}/files/{fileId}", GetVersionFile)
             .WithName("Get Version File");
+
+        app.MapPut("/model-versions/{versionId}/material-names", UpdateMaterialNames)
+            .WithName("Update Material Names")
+            .WithSummary("Updates the material names extracted from the 3D model")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
+            .WithOpenApi();
+
+        app.MapPut("/model-versions/{versionId}/main-variant", SetMainVariant)
+            .WithName("Set Main Variant")
+            .WithSummary("Sets the main variant for a model version")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> CreateModelVersion(
@@ -154,4 +166,43 @@ public static class ModelVersionEndpoints
         var fileStream = System.IO.File.OpenRead(result.Value.FilePath);
         return Results.File(fileStream, result.Value.MimeType, result.Value.OriginalFileName, enableRangeProcessing: true);
     }
+
+    private static async Task<IResult> UpdateMaterialNames(
+        int versionId,
+        [FromBody] UpdateMaterialNamesRequest request,
+        ICommandHandler<UpdateMaterialNamesCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UpdateMaterialNamesCommand(versionId, request.MaterialNames),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> SetMainVariant(
+        int versionId,
+        [FromBody] SetMainVariantRequest request,
+        ICommandHandler<SetMainVariantCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new SetMainVariantCommand(versionId, request.VariantName),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
 }
+
+public record UpdateMaterialNamesRequest(List<string> MaterialNames);
+public record SetMainVariantRequest(string VariantName);

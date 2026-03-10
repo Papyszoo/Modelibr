@@ -97,10 +97,18 @@ src/frontend/src/
 
 ### Texture Sets
 
-**Purpose:** Manage PBR texture collections that can be applied to 3D models. Each model version can have independent default texture sets. Texture sets are distinguished by **kind**:
+**Purpose:** Manage PBR texture collections that can be applied to 3D models via **material-slot-based mapping**. Each model version has material names (extracted by the asset processor from the 3D file), and texture sets are linked to specific material slots. Each model version can have independent default texture sets. Texture sets are distinguished by **kind**:
 
 - **Model-Specific (Baked)** — default; textures baked for a specific model's UV layout.
 - **Universal (Tileable)** — seamless material textures (e.g., "Brick Wall", "Wood Floor") that can tile and be shared across models.
+
+**Material-Slot Mapping (Key Types):**
+
+- `TextureMappingDto` in `features/model-viewer/types/index.ts`: `{ materialName: string, textureSetId: number }`
+- `ModelVersionDto` includes: `materialNames: string[]`, `textureMappings: TextureMappingDto[]`, `textureSetIds: number[]`
+- `ModelSummaryDto` in `features/texture-set/types/index.ts` includes: `materialName: string`
+- `textureSetApi.ts` association functions accept optional `materialName` parameter
+- Empty string `materialName` = "default/all materials" (backward compatibility)
 
 **Where to look:**
 | Layer | Location |
@@ -108,9 +116,11 @@ src/frontend/src/
 | Frontend components | `features/texture-set/components/` (22 files) |
 | Frontend dialogs | `features/texture-set/dialogs/` (20 files) |
 | Frontend hooks | `features/texture-set/hooks/` |
-| Frontend types | `features/texture-set/types/index.ts` (`TextureSetKind`, `UvMappingMode` enums) |
+| Frontend types | `features/texture-set/types/index.ts` (`TextureSetKind`, `UvMappingMode` enums, `ModelSummaryDto.materialName`) |
+| Model viewer types | `features/model-viewer/types/index.ts` (`TextureMappingDto`, `ModelVersionDto.materialNames/textureMappings`) |
+| Texture set API | `features/texture-set/api/textureSetApi.ts` (association with optional `materialName`) |
 | Backend API | `WebApi/Endpoints/TextureSetEndpoints.cs` |
-| Backend domain | `Domain/Models/TextureSet.cs`, `Domain/ValueObjects/TextureSetKind.cs` |
+| Backend domain | `Domain/Models/TextureSet.cs`, `Domain/Models/ModelVersionTextureSet.cs` |
 | E2E tests | `tests/e2e/features/00-texture-sets/` |
 
 **Key behaviors (from E2E tests):**
@@ -132,7 +142,8 @@ src/frontend/src/
 **Effects of changes:**
 
 - Changing default texture set → triggers thumbnail worker job
-- Linking/unlinking → updates ModelVersion associations
+- Linking/unlinking → updates ModelVersion material-slot associations (via `ModelVersionTextureSet` join entity with composite PK: `ModelVersionId, TextureSetId, MaterialName`)
+- Asset processor extracts material names from 3D files and saves them via `PUT /model-versions/{id}/material-names`
 - Deleting texture set → affects all linked model versions
 - Updating tiling scale / UV mapping → only allowed for Universal kind (API returns 400 for ModelSpecific)
 - Adding texture to Universal set → auto-enqueues thumbnail generation (sphere preview)

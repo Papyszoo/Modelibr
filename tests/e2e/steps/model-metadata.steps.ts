@@ -31,16 +31,16 @@ Given("I open a model in the viewer", async ({ page }) => {
 
 Given("I open the model info panel", async ({ page }) => {
     const viewerPage = new ModelViewerPage(page);
-    await viewerPage.openTab("Model Info", "#info");
+    await viewerPage.openTab("Model Info", '[data-testid="model-info-panel"]');
 
     // Wait for the info panel to be visible
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
     await expect(infoPanel).toBeVisible({ timeout: 10000 });
     console.log("[UI] Model info panel is visible ✓");
 });
 
 Given("the model has at least one tag", async ({ page }) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
     const existingTags = infoPanel.locator(".p-chip");
     const count = await existingTags.count();
 
@@ -73,7 +73,7 @@ Given("the model has at least one tag", async ({ page }) => {
 // ============= When Steps =============
 
 When("I add the tag {string}", async ({ page }, tag: string) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
     const tagInput = infoPanel.locator(
         'input[placeholder="Add new tag..."], .tag-input',
@@ -91,7 +91,7 @@ When("I add the tag {string}", async ({ page }, tag: string) => {
 });
 
 When("I remove the first tag", async ({ page }) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
     // Record count before removal
     tagCountBeforeRemove = await infoPanel.locator(".p-chip").count();
@@ -114,7 +114,7 @@ When("I remove the first tag", async ({ page }) => {
 });
 
 When("I save the model info changes", async ({ page }) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
     const saveButton = infoPanel.getByRole("button", {
         name: "Save Changes",
@@ -128,7 +128,7 @@ When("I save the model info changes", async ({ page }) => {
 });
 
 When("I set the description to {string}", async ({ page }, text: string) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
     const textarea = infoPanel.locator(
         'textarea[placeholder="Enter description..."], .description-textarea',
@@ -187,9 +187,12 @@ Then(
 
         // Re-open the info panel
         const viewerPage = new ModelViewerPage(page);
-        await viewerPage.openTab("Model Info", "#info");
+        await viewerPage.openTab(
+            "Model Info",
+            '[data-testid="model-info-panel"]',
+        );
 
-        const infoPanel = page.locator("#info");
+        const infoPanel = page.locator('[data-testid="model-info-panel"]');
         await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
         // Verify both tags are present
@@ -220,9 +223,9 @@ Then("the tag count should have decreased", async ({ page }) => {
 
     // Re-open the info panel
     const viewerPage = new ModelViewerPage(page);
-    await viewerPage.openTab("Model Info", "#info");
+    await viewerPage.openTab("Model Info", '[data-testid="model-info-panel"]');
 
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
     await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
     const currentCount = await infoPanel.locator(".p-chip").count();
@@ -250,9 +253,12 @@ Then(
 
         // Re-open the info panel
         const viewerPage = new ModelViewerPage(page);
-        await viewerPage.openTab("Model Info", "#info");
+        await viewerPage.openTab(
+            "Model Info",
+            '[data-testid="model-info-panel"]',
+        );
 
-        const infoPanel = page.locator("#info");
+        const infoPanel = page.locator('[data-testid="model-info-panel"]');
         await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
         const textarea = infoPanel.locator(

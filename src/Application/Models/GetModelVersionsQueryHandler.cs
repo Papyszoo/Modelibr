@@ -42,7 +42,16 @@ internal class GetModelVersionsQueryHandler : IQueryHandler<GetModelVersionsQuer
                 SizeBytes = f.SizeBytes,
                 IsRenderable = f.FileType.IsRenderable
             }).ToList(),
-            TextureSetIds = v.TextureSets.Select(ts => ts.Id).ToList()
+            TextureSetIds = v.TextureMappings.Select(m => m.TextureSetId).Distinct().ToList(),
+            MaterialNames = v.MaterialNames,
+            MainVariantName = v.MainVariantName,
+            VariantNames = v.TextureMappings.Select(m => m.VariantName).Distinct().OrderBy(n => n).ToList(),
+            TextureMappings = v.TextureMappings.Select(m => new TextureMappingDto
+            {
+                MaterialName = m.MaterialName,
+                TextureSetId = m.TextureSetId,
+                VariantName = m.VariantName
+            }).ToList()
         }).ToList();
 
         return Result.Success(new GetModelVersionsResponse(versionDtos));
@@ -65,6 +74,17 @@ public class ModelVersionDto
     public string? PngThumbnailUrl { get; set; }
     public List<VersionFileDto> Files { get; set; } = new();
     public List<int> TextureSetIds { get; set; } = new();
+    public List<string> MaterialNames { get; set; } = new();
+    public string? MainVariantName { get; set; }
+    public List<string> VariantNames { get; set; } = new();
+    public List<TextureMappingDto> TextureMappings { get; set; } = new();
+}
+
+public class TextureMappingDto
+{
+    public string MaterialName { get; set; } = string.Empty;
+    public int TextureSetId { get; set; }
+    public string VariantName { get; set; } = string.Empty;
 }
 
 public class VersionFileDto

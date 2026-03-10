@@ -358,7 +358,47 @@ Returns `400` if the texture set is not Universal kind.
 ### Associate with Model Version
 
 ```http
-POST /texture-sets/{packId}/model-versions/{modelVersionId}
+POST /texture-sets/{packId}/model-versions/{modelVersionId}?materialName={optional}
+```
+
+Optional `materialName` query parameter links the texture set to a specific material slot in the 3D model. When omitted, defaults to empty string (applies to all materials). Composite PK: `(ModelVersionId, TextureSetId, MaterialName)`.
+
+### Disassociate from Model Version
+
+```http
+DELETE /texture-sets/{packId}/model-versions/{modelVersionId}?materialName={optional}
+```
+
+When `materialName` is provided, removes only the specific material mapping. When omitted, removes all mappings for that texture set from the model version.
+
+### Set Material Names (Worker API)
+
+```http
+PUT /model-versions/{versionId}/material-names
+X-Api-Key: {workerApiKey}
+Content-Type: application/json
+
+{
+    "materialNames": ["Material.001", "Material.002"]
+}
+```
+
+Called by the asset processor after extracting material names from the 3D model file. Material names are stored as a PostgreSQL `text[]` column on ModelVersion.
+
+### Model Version Response DTOs
+
+`GET /models/{modelId}/versions` now returns additional fields:
+
+```json
+{
+    "id": 1,
+    "materialNames": ["Material.001", "Material.002"],
+    "textureMappings": [
+        { "materialName": "", "textureSetId": 5 },
+        { "materialName": "Material.001", "textureSetId": 7 }
+    ],
+    "textureSetIds": [5, 7]
+}
 ```
 
 ---

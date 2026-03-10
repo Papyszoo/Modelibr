@@ -16,15 +16,12 @@ Feature: Model 3D Viewer Rendering
     And I take a screenshot of the 3D model rendering
 
   @ui @controls
-  Scenario: Floating control buttons are accessible
+  Scenario: Menubar controls are accessible
     Given I am on the model viewer page for "multi-version-model"
     Then the following control buttons should be visible:
       | button            |
-      | Add Version       |
-      | Viewer Settings   |
-      | Model Info        |
-      | Texture Sets      |
-      | Model Hierarchy   |
-      | Thumbnail Details |
-      | UV Map            |
+      | Left Panel        |
+      | File              |
+      | View              |
+      | Right Panel       |
     And I take a screenshot of the control buttons
