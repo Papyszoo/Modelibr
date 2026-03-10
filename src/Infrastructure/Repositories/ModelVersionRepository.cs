@@ -108,7 +108,23 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         var mapping = await _context.Set<ModelVersionTextureSet>()
             .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId 
                 && m.TextureSetId == textureSetId 
-                && m.MaterialName == materialName, cancellationToken);
+                && m.MaterialName == materialName
+                && m.VariantName == string.Empty, cancellationToken);
+        if (mapping != null)
+        {
+            _context.Set<ModelVersionTextureSet>().Remove(mapping);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, string variantName, CancellationToken cancellationToken = default)
+    {
+        variantName ??= string.Empty;
+        var mapping = await _context.Set<ModelVersionTextureSet>()
+            .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId 
+                && m.TextureSetId == textureSetId 
+                && m.MaterialName == materialName
+                && m.VariantName == variantName, cancellationToken);
         if (mapping != null)
         {
             _context.Set<ModelVersionTextureSet>().Remove(mapping);

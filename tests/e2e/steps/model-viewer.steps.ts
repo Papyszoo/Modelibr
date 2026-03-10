@@ -359,7 +359,7 @@ When("I close the viewer tab {string}", async ({ page }, tabName: string) => {
     const validTabs: Record<string, string> = {
         "Texture Sets": '[data-testid="materials-panel"]',
         Materials: '[data-testid="materials-panel"]',
-        "Model Info": '.sidebar-section:has-text("Model Information")',
+        "Model Info": '[data-testid="model-info-panel"]',
     };
 
     const selector = validTabs[tabName]; // can be undefined if checking by button state only

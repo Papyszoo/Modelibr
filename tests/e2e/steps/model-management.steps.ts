@@ -304,9 +304,7 @@ When("I click the regenerate thumbnail button", async ({ page }) => {
     const modelViewer = new ModelViewerPage(page);
 
     // 1. Open Thumbnail Details panel if not visible
-    const thumbnailSection = page.locator(
-        '.sidebar-section:has-text("Thumbnail Details")',
-    );
+    const thumbnailSection = page.locator(".thumbnail-panel");
 
     if (!(await thumbnailSection.isVisible({ timeout: 3000 }))) {
         await modelViewer.openTab("Thumbnail Details");

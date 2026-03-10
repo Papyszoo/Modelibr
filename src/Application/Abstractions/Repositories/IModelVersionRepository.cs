@@ -18,6 +18,7 @@ public interface IModelVersionRepository
     Task AddTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default);
     Task AddTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, string variantName, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default);
+    Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, string variantName, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingsByTextureSetIdAsync(int modelVersionId, int textureSetId, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingByMaterialAsync(int modelVersionId, string materialName, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingByMaterialAndVariantAsync(int modelVersionId, string materialName, string variantName, CancellationToken cancellationToken = default);

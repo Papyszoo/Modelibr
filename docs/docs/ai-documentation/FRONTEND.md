@@ -104,11 +104,15 @@ src/frontend/src/
 
 **Material-Slot Mapping (Key Types):**
 
-- `TextureMappingDto` in `features/model-viewer/types/index.ts`: `{ materialName: string, textureSetId: number }`
-- `ModelVersionDto` includes: `materialNames: string[]`, `textureMappings: TextureMappingDto[]`, `textureSetIds: number[]`
+- `TextureMappingDto` in `features/model-viewer/types/index.ts`: `{ materialName: string, textureSetId: number, variantName: string }`
+- `ModelVersionDto` includes: `materialNames: string[]`, `textureMappings: TextureMappingDto[]`, `textureSetIds: number[]`, `variantNames: string[]`, `mainVariantName: string | null`
 - `ModelSummaryDto` in `features/texture-set/types/index.ts` includes: `materialName: string`
 - `textureSetApi.ts` association functions accept optional `materialName` parameter
 - Empty string `materialName` = "default/all materials" (backward compatibility)
+- `variantName` field: identifies the preset/variant for the mapping. Empty string = Default preset.
+- `textureSetApi.ts` association/disassociation functions accept optional `variantName` parameter
+- **Presets (Variants):** Implicit entities derived from `variantName` field. No separate Variant table — presets exist when at least one texture mapping references that name. Composite PK: `(ModelVersionId, TextureSetId, MaterialName, VariantName)`
+- `MaterialsPanel.tsx` always shows the preset dropdown, with Add/Delete buttons and "Set as Main" action. Setting main triggers thumbnail regeneration.
 
 **Where to look:**
 | Layer | Location |
@@ -142,7 +146,7 @@ src/frontend/src/
 **Effects of changes:**
 
 - Changing default texture set → triggers thumbnail worker job
-- Linking/unlinking → updates ModelVersion material-slot associations (via `ModelVersionTextureSet` join entity with composite PK: `ModelVersionId, TextureSetId, MaterialName`)
+- Linking/unlinking → updates ModelVersion material-slot associations (via `ModelVersionTextureSet` join entity with composite PK: `ModelVersionId, TextureSetId, MaterialName, VariantName`)
 - Asset processor extracts material names from 3D files and saves them via `PUT /model-versions/{id}/material-names`
 - Deleting texture set → affects all linked model versions
 - Updating tiling scale / UV mapping → only allowed for Universal kind (API returns 400 for ModelSpecific)

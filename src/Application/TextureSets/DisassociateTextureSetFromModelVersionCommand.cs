@@ -36,8 +36,9 @@ internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHa
             // Remove the texture mapping directly via repository
             if (!string.IsNullOrEmpty(materialName))
             {
-                await _modelVersionRepository.RemoveTextureMappingByMaterialAndVariantAsync(
-                    modelVersion.Id, materialName, variantName, cancellationToken);
+                // Use full composite key (including textureSetId) to ensure we remove the correct mapping
+                await _modelVersionRepository.RemoveTextureMappingAsync(
+                    modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
             }
             else
             {

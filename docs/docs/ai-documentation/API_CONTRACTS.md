@@ -361,7 +361,7 @@ Returns `400` if the texture set is not Universal kind.
 POST /texture-sets/{packId}/model-versions/{modelVersionId}?materialName={optional}
 ```
 
-Optional `materialName` query parameter links the texture set to a specific material slot in the 3D model. When omitted, defaults to empty string (applies to all materials). Composite PK: `(ModelVersionId, TextureSetId, MaterialName)`.
+Optional `materialName` and `variantName` query parameters link the texture set to a specific material slot and preset/variant. When omitted, both default to empty string (applies to all materials / Default preset). Composite PK: `(ModelVersionId, TextureSetId, MaterialName, VariantName)`.
 
 ### Disassociate from Model Version
 
@@ -394,8 +394,17 @@ Called by the asset processor after extracting material names from the 3D model 
     "id": 1,
     "materialNames": ["Material.001", "Material.002"],
     "textureMappings": [
-        { "materialName": "", "textureSetId": 5 },
-        { "materialName": "Material.001", "textureSetId": 7 }
+        { "materialName": "", "textureSetId": 5, "variantName": "" },
+        {
+            "materialName": "Material.001",
+            "textureSetId": 7,
+            "variantName": ""
+        },
+        {
+            "materialName": "Material.001",
+            "textureSetId": 8,
+            "variantName": "Damaged"
+        }
     ],
     "textureSetIds": [5, 7]
 }

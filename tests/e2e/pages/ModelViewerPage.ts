@@ -150,25 +150,20 @@ export class ModelViewerPage {
     }
 
     async linkTextureSetToModel(setName: string) {
-        // 1. Open Model Info panel
-        await this.openTab(
-            "Model Info",
-            '.sidebar-section:has-text("Model Information")',
-        );
+        // 1. Open Materials panel (texture set linking is now per-material in the Materials panel)
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        // Wait for the Model Information sidebar to be visible
-        await this.page.waitForSelector(
-            '.sidebar-section:has-text("Model Information")',
-            {
-                state: "visible",
-                timeout: 10000,
-            },
-        );
+        // Wait for the Materials panel to be visible
+        await this.page.waitForSelector('[data-testid="materials-panel"]', {
+            state: "visible",
+            timeout: 10000,
+        });
 
-        // 2. Click Link Texture Sets button
-        await this.page
-            .getByRole("button", { name: /link texture sets/i })
-            .click();
+        // 2. Click Link Texture Set button on the first unlinked material
+        const linkButton = this.page
+            .getByRole("button", { name: /link texture set/i })
+            .first();
+        await linkButton.click();
 
         // 3. Wait for dialog and select the set
         await this.page.waitForSelector(".texture-set-association-card", {
@@ -192,47 +187,69 @@ export class ModelViewerPage {
     }
 
     async setDefaultTextureSet(name: string) {
+        // Ensure viewer is loaded before trying to open panels
+        await this.waitForModelLoaded();
         await this.openTab("Materials", '[data-testid="materials-panel"]');
 
         // Wait for materials panel to be visible
         await this.page.waitForSelector('[data-testid="materials-panel"]', {
             state: "visible",
-            timeout: 10000,
+            timeout: 15000,
         });
 
-        // Find the texture set item and click the "Set as default" button
-        const item = this.page.locator(".materials-ts-item", { hasText: name });
-        await expect(item).toBeVisible({ timeout: 10000 });
+        // Wait for material items to render
+        await this.page.waitForSelector(".materials-item", {
+            state: "visible",
+            timeout: 15000,
+        });
 
-        // Click the star button to set as default
-        const defaultBtn = item
-            .locator("button")
-            .filter({ hasText: /default/i });
-        if (await defaultBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await defaultBtn.click();
-        } else {
-            // Fallback: click on the item itself
-            await item.click();
-        }
+        // Find the material item that has this texture set linked (via data-texture-set attribute)
+        const item = this.page.locator(
+            `.materials-item[data-texture-set*="${name}"]`,
+        );
+        // Fall back to looking for the texture set name as text inside a materials-item
+        const fallbackItem = this.page.locator(".materials-item", {
+            hasText: name,
+        });
+        const targetItem =
+            (await item.count()) > 0 ? item.first() : fallbackItem.first();
+        await expect(targetItem).toBeVisible({ timeout: 15000 });
 
-        // Wait for the default badge to appear
-        await expect(item.locator(".materials-badge, .p-badge")).toBeVisible({
+        // The default texture set is set via API in the step definitions.
+        // Verify the Default badge is visible.
+        await expect(targetItem.locator(".p-badge")).toBeVisible({
             timeout: 10000,
         });
     }
 
     async expectDefaultTextureSet(name: string) {
+        // Ensure viewer is loaded before trying to open panels
+        await this.waitForModelLoaded();
         await this.openTab("Materials", '[data-testid="materials-panel"]');
 
         // Wait for materials panel to be visible
         await this.page.waitForSelector('[data-testid="materials-panel"]', {
             state: "visible",
-            timeout: 10000,
+            timeout: 15000,
         });
 
-        const item = this.page.locator(".materials-ts-item", { hasText: name });
-        await expect(item).toBeVisible({ timeout: 10000 });
-        await expect(item.locator(".p-badge")).toHaveText("Default");
+        // Wait for material items to render (they load async via React Query)
+        await this.page.waitForSelector(".materials-item", {
+            state: "visible",
+            timeout: 15000,
+        });
+
+        // Find the material item that has this texture set linked
+        const item = this.page.locator(
+            `.materials-item[data-texture-set*="${name}"]`,
+        );
+        const fallbackItem = this.page.locator(".materials-item", {
+            hasText: name,
+        });
+        const targetItem =
+            (await item.count()) > 0 ? item.first() : fallbackItem.first();
+        await expect(targetItem).toBeVisible({ timeout: 15000 });
+        await expect(targetItem.locator(".p-badge")).toHaveText("Default");
     }
 
     async uploadNewVersion(filePath: string) {
@@ -598,21 +615,30 @@ export class ModelViewerPage {
             timeout: 10000,
         });
 
-        // Find and click the texture set item to select it
-        const item = this.page.locator(".materials-ts-item", { hasText: name });
-        await expect(item).toBeVisible({ timeout: 10000 });
-        await item.click();
-
-        // Wait for texture set to be selected
-        await expect(item).toHaveClass(/materials-ts-selected/, {
-            timeout: 10000,
+        // Find the material item with this texture set linked and click the preview to select it
+        const item = this.page.locator(
+            `.materials-item[data-texture-set*="${name}"]`,
+        );
+        const fallbackItem = this.page.locator(".materials-item", {
+            hasText: name,
         });
+        const targetItem =
+            (await item.count()) > 0 ? item.first() : fallbackItem.first();
+        await expect(targetItem).toBeVisible({ timeout: 10000 });
+
+        // Click the preview to select this texture set
+        const preview = targetItem.locator(".materials-item-preview");
+        if (await preview.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await preview.click();
+        } else {
+            await targetItem.click();
+        }
 
         console.log(`[UI] Selected texture set "${name}" ✓`);
     }
 
     /**
-     * Check if a texture set is currently selected (highlighted in the selector)
+     * Check if a texture set is currently linked to any material
      */
     async isTextureSetSelected(name: string): Promise<boolean> {
         await this.openTab("Materials", '[data-testid="materials-panel"]');
@@ -623,11 +649,11 @@ export class ModelViewerPage {
         });
 
         const item = this.page.locator(
-            ".materials-ts-item.materials-ts-selected",
-            {
-                hasText: name,
-            },
+            `.materials-item[data-texture-set*="${name}"]`,
         );
-        return await item.isVisible({ timeout: 2000 }).catch(() => false);
+        return await item
+            .first()
+            .isVisible({ timeout: 2000 })
+            .catch(() => false);
     }
 }

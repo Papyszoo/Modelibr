@@ -2,7 +2,7 @@ import './PanelWrapper.css'
 
 import { type ReactNode } from 'react'
 
-import { type PanelSide } from '@/features/model-viewer/hooks/useResizable'
+export type PanelSide = 'left' | 'right' | 'top' | 'bottom'
 
 export interface ExpandAction {
   direction: 'left' | 'right' | 'up' | 'down'
