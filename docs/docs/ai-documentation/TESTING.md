@@ -40,13 +40,13 @@ E2E tests use a two-phase approach for reliable parallel execution:
 
 **Key files:**
 
-| File                             | Purpose                                                        |
-| -------------------------------- | -------------------------------------------------------------- |
-| `run-e2e.js`                     | Cross-platform test runner with Docker lifecycle               |
-| `global-setup.ts`                | Pre-test cleanup (clears bridge + stale models in setup phase) |
-| `fixtures/setup-state-bridge.ts` | JSON file bridge for setup→chromium state transfer             |
-| `fixtures/shared-state.ts`       | Per-scenario state via `WeakMap<Page, ScenarioState>`          |
-| `helpers/cleanup-helper.ts`      | Removes duplicate models, protects bridge IDs                  |
+| File                             | Purpose                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `run-e2e.js`                     | Cross-platform test runner with Docker lifecycle                                                                               |
+| `global-setup.ts`                | Pre-test cleanup: in setup phase clears ALL entities; in chromium phase deletes all except bridge-protected ones               |
+| `fixtures/setup-state-bridge.ts` | JSON file bridge for setup→chromium state transfer; exposes `loadAllPersistedModelIds()` and `loadAllPersistedTextureSetIds()` |
+| `fixtures/shared-state.ts`       | Per-scenario state via `WeakMap<Page, ScenarioState>`                                                                          |
+| `helpers/cleanup-helper.ts`      | Removes ALL unprotected models, texture sets, sprites and sounds before tests (prevents alphabetical-order pagination issues)  |
 
 **E2E conventions:**
 
@@ -192,3 +192,79 @@ Tests .blend file upload via WebDAV and REST API. Requires `ENABLE_BLENDER=true`
 - `UniqueFileGenerator` supports `.blend` files by appending a unique trailing marker after the ENDB block
 - `ApiHelper` has WebDAV simulation methods: `createModelViaWebDavBlend()`, `createVersionViaWebDavBlendSave()`, `createModelVersion()`
 - Thumbnail generation is verified by polling `GET /models/{id}/thumbnail` with a 5s interval
+- `ApiHelper.softDeleteModel(id)` and `softDeleteModelsByName(name)` clean up stale models before blend tests run to prevent version accumulation
+
+### Data Accumulation Patterns
+
+When tests run repeatedly without a full teardown/setup cycle, stale data accumulates. The following patterns are in place to handle this:
+
+**Global cleanup (`global-setup.ts` + `helpers/cleanup-helper.ts`)**
+
+Before every test phase, the global setup deletes **all** accumulated entities that are not protected by the bridge:
+
+- `cleanupStaleModels(protectedIds)` — deletes ALL models except bridge-protected ones (setup phase: no protection; chromium phase: protects the 4 setup-created models). This prevents Status=3 blend-model thumbnails from polluting the `version {int} should have a thumbnail image` DB query.
+- `cleanupStaleTextureSets(protectedIds)` — deletes ALL texture sets except bridge-protected (blue_color, red_color). Previously, 247+ sets filled the 50-item alphabetical page, making freshly created search items invisible.
+- `cleanupStaleSprites()` — deletes ALL sprites. Previously 73+ sprites caused the same pagination problem.
+- `cleanupStaleSounds()` — deletes ALL sounds.
+
+This ensures that at the start of every test run the DB contains only the 4 bridge models + 2 bridge texture sets from setup, so newly created items are always within the first 50 alphabetically.
+
+**Infinite Scroll — Load More before asserting card visibility**
+
+Sounds and sprites use infinite scroll (50 items per page). When accumulated items push a target card beyond page 1, `[data-sound-id="N"]` or `[data-sprite-id="N"]` will not be in the DOM. Steps that open a sound by ID (e.g. `I open the sound {string} for viewing`) now click the **"Load More"** button in a loop until the card is visible or there are no more pages:
+
+```typescript
+const loadMoreSelector = 'button:has-text("Load More")';
+while (!(await soundCard.isVisible().catch(() => false))) {
+    const loadMoreBtn = page.locator(loadMoreSelector).first();
+    if (!(await loadMoreBtn.isVisible().catch(() => false))) break;
+    await loadMoreBtn.click();
+    await page.waitForTimeout(500);
+}
+await expect(soundCard).toBeVisible({ timeout: 10000 });
+```
+
+`SoundListPage.clickSoundById()` uses the same pattern. Add this wherever `[data-sound-id]` or `[data-sprite-id]` selectors are used with `.toBeVisible()`.
+
+**Per-test patterns:**
+
+- **Blend upload tests**: `blend-upload.steps.ts` calls `softDeleteModelsByName` before creating via WebDAV to prevent version accumulation.
+- **Project CRUD tests**: `ProjectsPage.createProject` deletes all existing projects with the same name via API before creating fresh, ensuring the new card is always rendered in the list.
+- **Stage CRUD tests**: `stages.steps.ts` navigates to the stages page before calling `isStageVisible`, ensuring the check has correct DOM context. `.first()` is used on all stage card locators to handle duplicate stages in data-accumulated state gracefully.
+- **Multi-version-model bridge validation**: `shared-setup.steps.ts` validates that version 1 of `multi-version-model` has files; if not (from partial setup runs), it uploads `test-torus.fbx` to recover. **After the upload it polls the DB for thumbnail Status=2 (up to 120 s) before continuing**, so the downstream version-switching tests don't need to wait.
+
+### Thumbnail Step Scoping
+
+The `version {int} should have a thumbnail image` step in `model-viewer.steps.ts` scopes its DB poll to the **currently open model** (resolved via `ModelViewerPage.getCurrentModelId()` from localStorage). Without scoping, accumulated models with Status=3 thumbnails (e.g. blend-upload artifacts) shadowed the correct Status=2 rows for the same `VersionNumber`, causing the poll to never terminate.
+
+### Scenario Timeouts
+
+Several scenarios override the default 90 s test timeout via the `@timeout:VALUE` BDD tag (handled natively by playwright-bdd v7):
+
+| Scenario                                                                               | Tag               | Reason                                               |
+| -------------------------------------------------------------------------------------- | ----------------- | ---------------------------------------------------- |
+| `Create model with two versions` (`01-setup.feature`)                                  | `@timeout:720000` | FBX thumbnail generation cold-start can take > 4 min |
+| `Version dropdown shows all versions with thumbnails` (`02-version-switching.feature`) | `@timeout:300000` | Recovery path uploads FBX and waits for thumbnail    |
+| Various texture-set and blend tests                                                    | `@timeout:720000` | Asset-processor thumbnail generation latency         |
+
+### Slow Test Files and Worker Count
+
+Two test files are inherently slow because they wait on Blender/asset-processor thumbnail generation:
+
+| File                                                | Typical duration | Why slow                                                 |
+| --------------------------------------------------- | ---------------- | -------------------------------------------------------- |
+| `00-texture-sets/12-mixed-format-thumbnail.feature` | ~10 min          | Polls API up to 600 s for thumbnail with mixed PNG + EXR |
+| `08-signalr/01-signalr-notifications.feature`       | ~6 min           | Waits for real SignalR `ThumbnailStatusChanged` event    |
+
+**Worker count is set to 3 locally (4 on CI)** so both slow tests each get a dedicated worker while a third worker drains all fast tests. With workers=2 both slow tests could share a worker with fast tests, blocking total time to ~13 min. With workers=3 total time drops to ~10.5 min (bounded by the slowest thumbnail, not queuing).
+
+```
+workers: 3  # local — run-e2e.js, package.json test:quick, playwright.config.ts default
+workers: 4  # CI    — run-e2e.js
+```
+
+**DB sharding** (per-worker database isolation) is not implemented. The Docker e2e stack uses a single WebAPI + single PostgreSQL container, so per-worker DB routing would require N WebAPI+DB container pairs — impractical overhead. The existing `PARALLEL_DB` / `resolveDatabaseName()` stub in `db-helper.ts` only scopes direct DB queries; it has no effect on the API. The Load More loop in step files and global cleanup before each phase are the correct mitigations for data accumulation.
+
+### Intermittent Thumbnail Failures
+
+Thumbnail-related tests (`texture set thumbnail previews`, `version dropdown with thumbnails`) may fail intermittently when the Blender/asset-processor worker is under load or exits abnormally (`exitCode: null`). These are infrastructure-level flaky tests, not code bugs. Running the tests in isolation (`--grep "thumbnail"`) after a cool-down usually passes.

@@ -10,10 +10,14 @@
 import {
     cleanupStaleModels,
     cleanupStaleRecycledModels,
+    cleanupStaleTextureSets,
+    cleanupStaleSprites,
+    cleanupStaleSounds,
 } from "./helpers/cleanup-helper";
 import {
     clearPersistedState,
     loadAllPersistedModelIds,
+    loadAllPersistedTextureSetIds,
 } from "./fixtures/setup-state-bridge";
 
 export default async function globalSetup() {
@@ -25,10 +29,17 @@ export default async function globalSetup() {
         // Setup phase: clear old bridge file, then clean everything
         clearPersistedState();
         await cleanupStaleModels();
+        await cleanupStaleTextureSets(); // no protected IDs — setup will re-create
+        await cleanupStaleSprites();
+        await cleanupStaleSounds();
     } else {
-        // Chromium phase: clean duplicates but protect setup-created models
-        const protectedIds = loadAllPersistedModelIds();
-        await cleanupStaleModels(protectedIds);
+        // Chromium phase: clean duplicates but protect setup-created entities
+        const protectedModelIds = loadAllPersistedModelIds();
+        const protectedTsIds = loadAllPersistedTextureSetIds();
+        await cleanupStaleModels(protectedModelIds);
+        await cleanupStaleTextureSets(protectedTsIds);
+        await cleanupStaleSprites(); // no bridge entries for sprites
+        await cleanupStaleSounds(); // no bridge entries for sounds
     }
 
     await cleanupStaleRecycledModels();

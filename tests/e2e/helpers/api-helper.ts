@@ -368,6 +368,36 @@ export class ApiHelper {
     }
 
     /**
+     * Soft-delete a model by ID (sends it to the recycle bin).
+     */
+    async softDeleteModel(modelId: number): Promise<void> {
+        const response = await this.client.delete(`/models/${modelId}`);
+        if (response.status !== 200 && response.status !== 204) {
+            throw new Error(
+                `Failed to soft-delete model ${modelId}: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
+     * Delete every non-deleted model whose name matches modelName.
+     * Useful for blend tests that re-use model names across runs.
+     */
+    async softDeleteModelsByName(modelName: string): Promise<void> {
+        const models = await this.getModels();
+        const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
+        const matches = models.filter(
+            (m) => m.name === modelName || m.name === nameWithoutExt,
+        );
+        for (const m of matches) {
+            await this.softDeleteModel(m.id);
+            console.log(
+                `[Blend Cleanup] Soft-deleted existing model "${m.name}" (id=${m.id})`,
+            );
+        }
+    }
+
+    /**
      * Delete a sound by ID
      */
     async deleteSound(soundId: number): Promise<void> {

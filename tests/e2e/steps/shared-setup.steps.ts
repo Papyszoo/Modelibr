@@ -46,6 +46,95 @@ Given(
                 // First try: load from persisted setup state file
                 const persisted = loadPersistedModel(modelName);
                 if (persisted) {
+                    // Validate: ensure every version has at least one file.
+                    // If not (e.g. setup ran on a dirty DB), recover by uploading the missing file.
+                    const apiBase =
+                        process.env.API_BASE_URL || "http://localhost:8090";
+                    const vResp = await page.request.get(
+                        `${apiBase}/models/${persisted.id}/versions`,
+                    );
+                    if (vResp.ok()) {
+                        const versions: any[] = await vResp.json();
+                        const v1 = versions.find(
+                            (v: any) => v.versionNumber === 1,
+                        );
+                        if (
+                            v1 &&
+                            v1.files.length === 0 &&
+                            modelName.includes("multi-version")
+                        ) {
+                            console.log(
+                                `[AutoProvision] Bridge model "${modelName}" v1 has no files — recovering with test-torus.fbx`,
+                            );
+                            const fsModule = await import("fs");
+                            const torusPath = path.join(
+                                __dirname,
+                                "..",
+                                "assets",
+                                "test-torus.fbx",
+                            );
+                            const torusBuffer =
+                                fsModule.readFileSync(torusPath);
+                            const uploadResp = await page.request.post(
+                                `${apiBase}/models/${persisted.id}/versions/${v1.id}/files`,
+                                {
+                                    multipart: {
+                                        file: {
+                                            name: "test-torus.fbx",
+                                            mimeType:
+                                                "application/octet-stream",
+                                            buffer: torusBuffer,
+                                        },
+                                    },
+                                },
+                            );
+                            if (uploadResp.ok()) {
+                                console.log(
+                                    `[AutoProvision] Uploaded test-torus.fbx to "${modelName}" v1 (id=${v1.id}) ✓`,
+                                );
+                                // Wait for thumbnail generation before proceeding —
+                                // this prevents the version-switching test from polling
+                                // within its own 90s window.
+                                const { DbHelper } =
+                                    await import("../fixtures/db-helper");
+                                const thumbDb = new DbHelper();
+                                try {
+                                    console.log(
+                                        `[AutoProvision] Waiting for v1 thumbnail (up to 120s)...`,
+                                    );
+                                    const deadline = Date.now() + 120_000;
+                                    while (Date.now() < deadline) {
+                                        const thumbResult = await thumbDb.query(
+                                            `SELECT t."Status"
+                                             FROM "Thumbnails" t
+                                             JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                                             WHERE mv."Id" = $1`,
+                                            [v1.id],
+                                        );
+                                        if (
+                                            thumbResult.rows.length > 0 &&
+                                            thumbResult.rows[0].Status === 2
+                                        ) {
+                                            console.log(
+                                                `[AutoProvision] v1 thumbnail ready ✓`,
+                                            );
+                                            break;
+                                        }
+                                        await new Promise((r) =>
+                                            setTimeout(r, 3000),
+                                        );
+                                    }
+                                } finally {
+                                    await thumbDb.close();
+                                }
+                            } else {
+                                console.warn(
+                                    `[AutoProvision] Failed to upload test-torus.fbx to v1: ${uploadResp.status()}`,
+                                );
+                            }
+                        }
+                    }
+
                     getScenarioState(page).saveModel(modelName, {
                         id: persisted.id,
                         name: persisted.name,

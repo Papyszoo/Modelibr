@@ -46,6 +46,9 @@ Given("the backend has Blender integration enabled", async () => {
 Given(
     "a model {string} was created via WebDAV with {string}",
     async ({}, modelName: string, blendFile: string) => {
+        // Remove any model with this name left over from a previous run to keep version count predictable
+        await api.softDeleteModelsByName(modelName);
+
         // Use UniqueFileGenerator to ensure each test gets a unique hash
         const filePath = await UniqueFileGenerator.generate(blendFile);
         const result = await api.createModelViaWebDavBlend(filePath, modelName);
@@ -69,6 +72,9 @@ Given(
 Given(
     "a model {string} was created from raw file {string} via WebDAV",
     async ({}, modelName: string, blendFile: string) => {
+        // Remove any model with this name left over from a previous run
+        await api.softDeleteModelsByName(modelName);
+
         const filePath = path.join(ASSETS_DIR, blendFile);
         const result = await api.createModelViaWebDavBlend(filePath, modelName);
         expect(result.status).toBe(201);

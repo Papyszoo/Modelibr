@@ -54,20 +54,23 @@ export class ProjectsPage {
         name: string,
         description?: string,
     ): Promise<ProjectInfo> {
-        // Check if project already exists via API (idempotent)
+        // Delete any stale projects with this name from prior runs to avoid list overflow,
+        // which can cause the newly-created card to be outside the rendered DOM.
         const checkResponse = await this.page.request.get(
             `${API_BASE}/projects`,
         );
         if (checkResponse.ok()) {
             const checkData = await checkResponse.json();
-            const existing = (checkData.projects || []).find(
+            const stale = (checkData.projects || []).filter(
                 (p: any) => p.name === name,
             );
-            if (existing) {
-                console.log(
-                    `[Project] Project "${name}" already exists (ID: ${existing.id}), skipping creation`,
+            for (const staleProject of stale) {
+                await this.page.request.delete(
+                    `${API_BASE}/projects/${staleProject.id}`,
                 );
-                return { id: existing.id, name, description };
+                console.log(
+                    `[Project] Deleted stale project "${name}" (ID: ${staleProject.id})`,
+                );
             }
         }
 

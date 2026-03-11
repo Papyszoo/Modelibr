@@ -127,9 +127,18 @@ async function main() {
     // Two-phase execution:
     //   Phase 1: Setup tests with 1 worker (sequential — avoids asset-processor overload)
     //   Phase 2: Chromium tests with multiple workers (parallel — uses auto-provisioning)
+    //
+    // Worker count rationale:
+    //   Two test files are inherently slow (thumbnail generation, SignalR):
+    //     - 00-texture-sets/12-mixed-format-thumbnail  (~10min)
+    //     - 08-signalr/01-signalr-notifications        (~6min)
+    //   With workers=3 locally both slow tests each occupy a dedicated worker
+    //   while the third worker handles the 150+ fast tests, bounding total time
+    //   to the slowest thumbnail (~10.5min) instead of ~13min with workers=2.
+    //   CI uses 4 workers for extra headroom.
     const args = process.argv.slice(2).join(" ");
     const setupEnv = { ...testEnv, PW_WORKERS: "1" };
-    const chromiumWorkers = process.env.CI ? "4" : "2";
+    const chromiumWorkers = process.env.CI ? "4" : "3";
     const chromiumEnv = { ...testEnv, PW_WORKERS: chromiumWorkers };
 
     console.log("📋 Phase 1: Setup tests (workers=1)\n");

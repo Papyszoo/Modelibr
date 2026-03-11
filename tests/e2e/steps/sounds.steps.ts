@@ -352,6 +352,26 @@ When(
         );
 
         const soundCard = page.locator(`[data-sound-id="${sound.id}"]`);
+        // Sound may have been auto-provisioned via API *after* the page loaded.
+        // If the card isn't visible yet, navigate to the sounds page to refresh the list.
+        if (!(await soundCard.isVisible().catch(() => false))) {
+            const soundListPage = new SoundListPage(page);
+            await soundListPage.goto();
+            await waitForSoundsUiReady(page);
+        }
+
+        // The sounds list uses infinite scroll (50 items/page). If the target card is
+        // not in the first page, click "Load More" repeatedly until it appears.
+        const loadMoreSelector = 'button:has-text("Load More")';
+        while (!(await soundCard.isVisible().catch(() => false))) {
+            const loadMoreBtn = page.locator(loadMoreSelector).first();
+            if (!(await loadMoreBtn.isVisible().catch(() => false))) {
+                break; // No more pages to load
+            }
+            await loadMoreBtn.click();
+            await page.waitForTimeout(500); // Wait for new items to render
+        }
+
         await expect(soundCard).toBeVisible({ timeout: 10000 });
         await soundCard.scrollIntoViewIfNeeded();
         await soundCard.click();

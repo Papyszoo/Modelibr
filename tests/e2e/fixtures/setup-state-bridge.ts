@@ -110,3 +110,13 @@ export function loadAllPersistedModelIds(): Set<number> {
     }
     return ids;
 }
+
+/** Load ALL persisted texture set IDs as a Set (for cleanup protection) */
+export function loadAllPersistedTextureSetIds(): Set<number> {
+    const state = readState();
+    const ids = new Set<number>();
+    for (const ts of Object.values(state.textureSets)) {
+        if (ts.id) ids.add(ts.id);
+    }
+    return ids;
+}

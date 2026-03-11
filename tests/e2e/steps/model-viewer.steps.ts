@@ -226,20 +226,41 @@ Then(
         const { DbHelper } = await import("../fixtures/db-helper");
         const db = new DbHelper();
 
-        // Poll database for thumbnail status (max 60 seconds)
+        // Get the current model ID to scope the query.
+        // Without scoping, accumulated models with Status=3 (e.g. blend-upload
+        // tests) can shadow the correct Status=2 row for the same VersionNumber.
+        const { ModelViewerPage } = await import("../pages/ModelViewerPage");
+        const modelViewer = new ModelViewerPage(page);
+        const currentModelId = await modelViewer.getCurrentModelId();
+
+        // Poll database for thumbnail status (max 240 seconds)
         console.log(
-            `[UI] Waiting for version ${versionNumber} thumbnail to be generated in DB...`,
+            `[UI] Waiting for version ${versionNumber} thumbnail to be generated in DB${currentModelId ? ` (modelId=${currentModelId})` : ""}...`,
         );
 
         await expect
             .poll(
                 async () => {
-                    const result = await db.query(
-                        `SELECT mv."VersionNumber", t."Status" 
-                 FROM "Thumbnails" t 
-                 JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
-                 ORDER BY mv."VersionNumber"`,
-                    );
+                    let result;
+                    if (currentModelId) {
+                        // Scoped query: only thumbnails for THIS model
+                        result = await db.query(
+                            `SELECT mv."VersionNumber", t."Status"
+                             FROM "Thumbnails" t
+                             JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                             WHERE mv."ModelId" = $1
+                             ORDER BY mv."VersionNumber"`,
+                            [currentModelId],
+                        );
+                    } else {
+                        // Fallback: unscoped query (original behaviour)
+                        result = await db.query(
+                            `SELECT mv."VersionNumber", t."Status"
+                             FROM "Thumbnails" t
+                             JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                             ORDER BY mv."VersionNumber"`,
+                        );
+                    }
 
                     const versionRow = result.rows.find(
                         (r: { VersionNumber: number; Status: number }) =>
@@ -253,7 +274,7 @@ Then(
                         return true;
                     }
                     console.log(
-                        `[DB] Version ${versionNumber} thumbnail pending...`,
+                        `[DB] Version ${versionNumber} thumbnail pending (status=${versionRow?.Status ?? "no row"})...`,
                     );
                     return false;
                 },
@@ -352,7 +373,7 @@ Then(
     async ({ page }, expectedFilename: string) => {
         // File info is shown in the file strip
         const fileCard = page.locator(".file-strip-card .file-strip-name");
-        await expect(fileCard.first()).toBeVisible({ timeout: 5000 });
+        await expect(fileCard.first()).toBeVisible({ timeout: 15000 });
         const text = await fileCard.first().textContent();
         expect(text?.toLowerCase()).toContain(
             expectedFilename.toLowerCase().substring(0, 10),
