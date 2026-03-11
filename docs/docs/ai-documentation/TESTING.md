@@ -27,9 +27,26 @@ Testing philosophy: Tests should be readable documentation, not just coverage me
 
 ```bash
 cd tests/e2e
-node run-e2e.js          # Full run with cleanup
-npm run test:quick       # Quick run (existing containers)
+node run-e2e.js          # Full run (setup + teardown Docker containers)
+npm run test:quick       # Quick run (existing containers, two-phase execution)
 ```
+
+**Two-phase execution:**
+
+E2E tests use a two-phase approach for reliable parallel execution:
+
+1. **Phase 1 — Setup** (`workers=1`, `PW_PHASE=setup`): Creates shared test data (models, texture sets) sequentially to avoid asset processor overload. State is persisted to `.setup-state.json` via the setup-state-bridge.
+2. **Phase 2 — Chromium** (`workers=N`, no `PW_PHASE`): Runs all test features in parallel using `N` workers. Auto-provisioning reads the bridge file to recover exact model/texture IDs from setup.
+
+**Key files:**
+
+| File                             | Purpose                                                        |
+| -------------------------------- | -------------------------------------------------------------- |
+| `run-e2e.js`                     | Cross-platform test runner with Docker lifecycle               |
+| `global-setup.ts`                | Pre-test cleanup (clears bridge + stale models in setup phase) |
+| `fixtures/setup-state-bridge.ts` | JSON file bridge for setup→chromium state transfer             |
+| `fixtures/shared-state.ts`       | Per-scenario state via `WeakMap<Page, ScenarioState>`          |
+| `helpers/cleanup-helper.ts`      | Removes duplicate models, protects bridge IDs                  |
 
 **E2E conventions:**
 
@@ -44,6 +61,7 @@ npm run test:quick       # Quick run (existing containers)
 
 **E2E common pitfalls:**
 
+- **Two-phase execution**: Setup must run with `PW_PHASE=setup` and `PW_WORKERS=1` before chromium tests. The setup phase creates data and persists IDs to `.setup-state.json`. Without this, auto-provisioning falls back to DB queries that may pick the wrong model.
 - **Always add a `Background:` section** to every feature file. Without it, the page starts at `about:blank` and UI steps will timeout. Minimum background: `Given I am on the model list page`.
 - **Pagination: use search before finding a card** — Texture sets are sorted alphabetically (A-Z), and each kind tab shows max 50 per page. As test data accumulates across runs, newly created sets may fall beyond page 50. Always fill the `.search-input` box before asserting card visibility:
     ```typescript
@@ -112,6 +130,7 @@ npm run test-storybook:ci          # CI mode (GitHub reporter, no server reuse)
 ```
 
 **How it works:**
+
 1. Storybook is built to `storybook-static/`
 2. `http-server` serves the static build on port 6007
 3. Playwright reads `/index.json` to auto-discover all stories

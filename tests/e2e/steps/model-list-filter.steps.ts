@@ -1,6 +1,6 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import { navigateToAppClean } from "../helpers/navigation-helper";
 
 const { Given, When, Then } = createBdd();
@@ -12,7 +12,7 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 When(
     "I filter the model list by pack {string}",
     async ({ page }, packName: string) => {
-        const pack = sharedState.getPack(packName);
+        const pack = getScenarioState(page).getPack(packName);
         if (!pack) {
             throw new Error(`Pack "${packName}" not found in shared state`);
         }
@@ -53,7 +53,7 @@ When(
 When(
     "I filter the model list by project {string}",
     async ({ page }, projectName: string) => {
-        const project = sharedState.getProject(projectName);
+        const project = getScenarioState(page).getProject(projectName);
         if (!project) {
             throw new Error(
                 `Project "${projectName}" not found in shared state`,
@@ -132,8 +132,8 @@ When("I clear the model list filter", async ({ page }) => {
 Given(
     "the model {string} is in the pack {string}",
     async ({ page }, modelStateName: string, packName: string) => {
-        const model = sharedState.getModel(modelStateName);
-        const pack = sharedState.getPack(packName);
+        const model = getScenarioState(page).getModel(modelStateName);
+        const pack = getScenarioState(page).getPack(packName);
 
         if (!model) {
             throw new Error(
@@ -170,8 +170,8 @@ Given(
 Given(
     "the model {string} is in the project {string}",
     async ({ page }, modelStateName: string, projectName: string) => {
-        const model = sharedState.getModel(modelStateName);
-        const project = sharedState.getProject(projectName);
+        const model = getScenarioState(page).getModel(modelStateName);
+        const project = getScenarioState(page).getProject(projectName);
 
         if (!model) {
             throw new Error(
@@ -210,7 +210,7 @@ Given(
 Given(
     "the model list is filtered by pack {string}",
     async ({ page }, packName: string) => {
-        const pack = sharedState.getPack(packName);
+        const pack = getScenarioState(page).getPack(packName);
         if (!pack) {
             throw new Error(`Pack "${packName}" not found in shared state`);
         }
@@ -244,7 +244,7 @@ Given(
 Given(
     "the model list is filtered by project {string}",
     async ({ page }, projectName: string) => {
-        const project = sharedState.getProject(projectName);
+        const project = getScenarioState(page).getProject(projectName);
         if (!project) {
             throw new Error(
                 `Project "${projectName}" not found in shared state`,
@@ -284,7 +284,7 @@ Given(
 Then(
     "the model list should show model {string}",
     async ({ page }, modelStateName: string) => {
-        const model = sharedState.getModel(modelStateName);
+        const model = getScenarioState(page).getModel(modelStateName);
         if (!model) {
             throw new Error(
                 `Model "${modelStateName}" not found in shared state`,
@@ -363,7 +363,7 @@ Given(
                         );
                     }
                 }
-                sharedState.savePack(packName, {
+                getScenarioState(page).savePack(packName, {
                     id: existing.id,
                     name: packName,
                 });
@@ -384,7 +384,7 @@ Given(
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
         expect(data.id).toBeTruthy();
-        sharedState.savePack(packName, { id: data.id, name: packName });
+        getScenarioState(page).savePack(packName, { id: data.id, name: packName });
         console.log(`[API] Created pack "${packName}" (ID: ${data.id})`);
     },
 );
@@ -420,7 +420,7 @@ Given(
         const actualName = path
             .basename(uniqueFilePath)
             .replace(/\.[^/.]+$/, "");
-        sharedState.saveModel(modelName, {
+        getScenarioState(page).saveModel(modelName, {
             id: data.id,
             name: actualName,
             versions: [],
@@ -434,8 +434,8 @@ Given(
 Given(
     "I add the model {string} to the pack {string} via API",
     async ({ page }, modelName: string, packName: string) => {
-        const model = sharedState.getModel(modelName);
-        const pack = sharedState.getPack(packName);
+        const model = getScenarioState(page).getModel(modelName);
+        const pack = getScenarioState(page).getPack(packName);
 
         if (!model) {
             throw new Error(`Model "${modelName}" not found in shared state`);
@@ -473,7 +473,7 @@ Given(
                 (p: any) => p.name === projectName,
             );
             if (existing) {
-                sharedState.saveProject(projectName, {
+                getScenarioState(page).saveProject(projectName, {
                     id: existing.id,
                     name: projectName,
                 });
@@ -494,7 +494,7 @@ Given(
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
         expect(data.id).toBeTruthy();
-        sharedState.saveProject(projectName, {
+        getScenarioState(page).saveProject(projectName, {
             id: data.id,
             name: projectName,
         });
@@ -505,8 +505,8 @@ Given(
 Given(
     "I add the model {string} to the project {string} via API",
     async ({ page }, modelName: string, projectName: string) => {
-        const model = sharedState.getModel(modelName);
-        const project = sharedState.getProject(projectName);
+        const model = getScenarioState(page).getModel(modelName);
+        const project = getScenarioState(page).getProject(projectName);
 
         if (!model) {
             throw new Error(`Model "${modelName}" not found in shared state`);
@@ -569,7 +569,7 @@ Given(
         const spriteId = data.spriteId || data.id;
         expect(spriteId).toBeTruthy();
         const fileId = data.fileId || spriteId; // Fallback to spriteId if fileId not returned
-        sharedState.saveSprite(spriteName, {
+        getScenarioState(page).saveSprite(spriteName, {
             id: spriteId,
             name: spriteName,
             fileId,
@@ -582,8 +582,8 @@ Given(
 Given(
     "I add the sprite {string} to the pack {string} via API",
     async ({ page }, spriteName: string, packName: string) => {
-        const sprite = sharedState.getSprite(spriteName);
-        const pack = sharedState.getPack(packName);
+        const sprite = getScenarioState(page).getSprite(spriteName);
+        const pack = getScenarioState(page).getPack(packName);
 
         if (!sprite) {
             throw new Error(`Sprite "${spriteName}" not found in shared state`);
@@ -613,8 +613,8 @@ Given(
 Given(
     "I add the sprite {string} to the project {string} via API",
     async ({ page }, spriteName: string, projectName: string) => {
-        const sprite = sharedState.getSprite(spriteName);
-        const project = sharedState.getProject(projectName);
+        const sprite = getScenarioState(page).getSprite(spriteName);
+        const project = getScenarioState(page).getProject(projectName);
 
         if (!sprite) {
             throw new Error(`Sprite "${spriteName}" not found in shared state`);
@@ -678,7 +678,7 @@ Given(
                     ).find((c: any) => c.name === categoryName);
                     if (existing) {
                         expect(existing.id).toBeTruthy();
-                        sharedState.saveSpriteCategory(categoryName, {
+                        getScenarioState(page).saveSpriteCategory(categoryName, {
                             id: existing.id,
                             name: categoryName,
                             description: existing.description,
@@ -698,7 +698,7 @@ Given(
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
         expect(data.id).toBeTruthy();
-        sharedState.saveSpriteCategory(categoryName, {
+        getScenarioState(page).saveSpriteCategory(categoryName, {
             id: data.id,
             name: categoryName,
             description: data.description,
@@ -712,8 +712,8 @@ Given(
 Given(
     "I assign the sprite {string} to category {string} via API",
     async ({ page }, spriteName: string, categoryName: string) => {
-        const sprite = sharedState.getSprite(spriteName);
-        const category = sharedState.getSpriteCategory(categoryName);
+        const sprite = getScenarioState(page).getSprite(spriteName);
+        const category = getScenarioState(page).getSpriteCategory(categoryName);
 
         if (!sprite) {
             throw new Error(`Sprite "${spriteName}" not found in shared state`);

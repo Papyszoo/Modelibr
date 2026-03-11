@@ -1,6 +1,6 @@
 import { createBdd } from "playwright-bdd";
 import { expect, test } from "@playwright/test";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import {
     openTabViaMenu,
     clickTab,
@@ -18,9 +18,9 @@ When(
     "I click on the model {string} to open it",
     async ({ page }, modelName: string) => {
         const modelData =
-            sharedState.getModel(modelName) ||
-            sharedState.getModel(modelName + ".glb") ||
-            sharedState.getModel(modelName + ".fbx");
+            getScenarioState(page).getModel(modelName) ||
+            getScenarioState(page).getModel(modelName + ".glb") ||
+            getScenarioState(page).getModel(modelName + ".fbx");
         if (!modelData) {
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
@@ -147,7 +147,7 @@ When("I go back to the model list", async ({ page }) => {
 When(
     "I click on the model {string} to open it again",
     async ({ page }, modelName: string) => {
-        const modelData = sharedState.getModel(modelName);
+        const modelData = getScenarioState(page).getModel(modelName);
         if (!modelData) {
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
@@ -214,7 +214,7 @@ When("I close the Settings tab", async ({ page }) => {
 });
 
 When("I close the {string} tab", async ({ page }, modelName: string) => {
-    const modelData = sharedState.getModel(modelName);
+    const modelData = getScenarioState(page).getModel(modelName);
     const tooltipText = modelData ? modelData.name : modelName;
     await closeTabByTooltip(page, tooltipText);
     console.log(`[UI] Closed "${modelName}" tab ✓`);

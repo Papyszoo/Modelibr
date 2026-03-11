@@ -39,23 +39,32 @@ const { Given, When, Then } = createBdd();
  * [Three.js] ✓ Model visible in camera!
  */
 Then("the 3D canvas should be visible", async ({ page }) => {
-    // First check we're not on an error state
-    const noVersionsError = page.locator("text=No versions available");
-    const isErrorVisible = await noVersionsError
-        .isVisible({ timeout: 1000 })
+    // Wait for version data to load FIRST — the version-dropdown-trigger only
+    // renders when versions.length > 0.  During the initial render the
+    // VersionStrip briefly shows "No versions available" while the API call is
+    // in flight, so we must wait for the dropdown before error-checking.
+    const versionDropdown = page.locator(".version-dropdown-trigger");
+    const dropdownVisible = await versionDropdown
+        .isVisible({ timeout: 15000 })
         .catch(() => false);
 
-    if (isErrorVisible) {
+    if (!dropdownVisible) {
+        // Version dropdown never appeared — check for genuine error state
+        const noVersionsError = page.locator("text=No versions available");
+        const isErrorVisible = await noVersionsError
+            .isVisible({ timeout: 2000 })
+            .catch(() => false);
         const currentUrl = page.url();
-        console.log(`[ERROR] Current URL: ${currentUrl}`);
+        if (isErrorVisible) {
+            console.log(`[ERROR] Current URL: ${currentUrl}`);
+            throw new Error(
+                `Model has "No versions available" - URL: ${currentUrl}`,
+            );
+        }
         throw new Error(
-            `Model has "No versions available" - URL: ${currentUrl}`,
+            `Version dropdown not found within 15 s — model may not have loaded. URL: ${currentUrl}`,
         );
     }
-
-    // Check for version dropdown (indicates model loaded correctly)
-    const versionDropdown = page.locator(".version-dropdown-trigger");
-    await expect(versionDropdown).toBeVisible({ timeout: 10000 });
     console.log("[UI] Version dropdown visible - model loaded correctly ✓");
 
     // The canvas is rendered by Three.js/React Three Fiber
@@ -250,7 +259,7 @@ Then(
                 },
                 {
                     message: `Thumbnail for version ${versionNumber} did not become ready in DB within timeout`,
-                    timeout: 60000,
+                    timeout: 240000,
                     intervals: [3000],
                 },
             )

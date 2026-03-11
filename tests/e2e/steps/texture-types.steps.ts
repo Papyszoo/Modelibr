@@ -11,7 +11,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { ApiHelper } from "../helpers/api-helper";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -26,9 +26,9 @@ const apiHelper = new ApiHelper();
 const runId = Date.now().toString(36).slice(-4);
 
 // Store the last created texture set name for the viewer to use
-let lastCreatedTextureSetName: string | null = null;
+// Tracked via getScenarioState(page).getCustom('lastCreatedTextureSetName')
 
-// Track whether cleanup has been done this run
+// Track whether cleanup has been done this run (per-worker, not per-scenario)
 let cleanupDone = false;
 
 /**
@@ -134,7 +134,7 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
         testFile,
         1, // Albedo
     );
-    lastCreatedTextureSetName = uniqueName;
+    getScenarioState(page).setCustom("lastCreatedTextureSetName", uniqueName);
     console.log(
         `[API] Created texture set "${uniqueName}" with file, ID ${result.textureSetId}`,
     );
@@ -184,7 +184,7 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
         testFile,
         1, // Albedo
     );
-    lastCreatedTextureSetName = uniqueName;
+    getScenarioState(page).setCustom("lastCreatedTextureSetName", uniqueName);
     console.log(
         `[API] Created texture set "${uniqueName}" with ORM file, ID ${result.textureSetId}`,
     );
@@ -227,7 +227,7 @@ Given("I have a texture set with a height texture", async ({ page }) => {
         testFile,
         3, // Height
     );
-    lastCreatedTextureSetName = uniqueName;
+    getScenarioState(page).setCustom("lastCreatedTextureSetName", uniqueName);
     console.log(
         `[API] Created texture set "${uniqueName}" with Height texture, ID ${result.textureSetId}`,
     );
@@ -266,16 +266,15 @@ Given("I have a texture set with a height texture", async ({ page }) => {
 
 When("I open the texture set viewer", async ({ page }) => {
     // Open the specific texture set that was just created, not a random .first()
+    const lastTsName = getScenarioState(page).getCustom<string>(
+        "lastCreatedTextureSetName",
+    );
     let card;
-    if (lastCreatedTextureSetName) {
+    if (lastTsName) {
         card = page
-            .locator(
-                `.texture-set-card:has-text("${lastCreatedTextureSetName}")`,
-            )
+            .locator(`.texture-set-card:has-text("${lastTsName}")`)
             .first();
-        console.log(
-            `[Navigation] Opening texture set "${lastCreatedTextureSetName}"`,
-        );
+        console.log(`[Navigation] Opening texture set "${lastTsName}"`);
     } else {
         card = page.locator(".texture-set-card").first();
         console.log(

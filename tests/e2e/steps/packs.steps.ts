@@ -1,6 +1,6 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import { PacksPage } from "../pages/PacksPage";
 import { navigateToTab } from "../helpers/navigation-helper";
 
@@ -29,7 +29,7 @@ Given("I am on the pack list page", async ({ page }) => {
 Given(
     "I am on the pack viewer for {string}",
     async ({ page }, packName: string) => {
-        const pack = sharedState.getPack(packName);
+        const pack = getScenarioState(page).getPack(packName);
 
         if (!pack) {
             throw new Error(`Pack "${packName}" not found in shared state`);
@@ -69,10 +69,10 @@ Given(
 
         for (const row of packs) {
             const packName = row.name;
-            let pack = sharedState.getPack(packName);
+            let pack = getScenarioState(page).getPack(packName);
 
             if (!pack) {
-                // Self-provision: create the pack via API
+                // Self-provision: create or find the pack via API
                 console.log(
                     `[AutoProvision] Pack "${packName}" not in shared state, creating via API...`,
                 );
@@ -80,16 +80,38 @@ Given(
                 const response = await page.request.post(`${API}/packs`, {
                     data: { name: packName, description: "" },
                 });
-                if (!response.ok()) {
-                    throw new Error(
-                        `Failed to auto-provision pack "${packName}": ${response.status()}`,
+                if (response.ok()) {
+                    const data = await response.json();
+                    getScenarioState(page).savePack(packName, {
+                        id: data.id,
+                        name: packName,
+                    });
+                    console.log(
+                        `[AutoProvision] Created pack "${packName}" (ID: ${data.id})`,
+                    );
+                } else {
+                    // Pack likely already exists (created by setup or another worker)
+                    const listResp = await page.request.get(`${API}/packs`);
+                    const packsResp = await listResp.json();
+                    const packList = Array.isArray(packsResp)
+                        ? packsResp
+                        : packsResp.packs || packsResp.items || [];
+                    const existing = packList.find(
+                        (p: any) => p.name === packName,
+                    );
+                    if (!existing) {
+                        throw new Error(
+                            `Failed to auto-provision pack "${packName}": ${response.status()} and not found via GET`,
+                        );
+                    }
+                    getScenarioState(page).savePack(packName, {
+                        id: existing.id,
+                        name: packName,
+                    });
+                    console.log(
+                        `[AutoProvision] Found existing pack "${packName}" (ID: ${existing.id})`,
                     );
                 }
-                const data = await response.json();
-                sharedState.savePack(packName, { id: data.id, name: packName });
-                console.log(
-                    `[AutoProvision] Created pack "${packName}" (ID: ${data.id})`,
-                );
             } else {
                 console.log(`[SharedState] Verified pack exists: ${packName}`);
             }
@@ -98,10 +120,10 @@ Given(
 );
 
 Given("the pack {string} exists", async ({ page }, packName: string) => {
-    let pack = sharedState.getPack(packName);
+    let pack = getScenarioState(page).getPack(packName);
 
     if (!pack) {
-        // Self-provision: create the pack via API
+        // Self-provision: create or find the pack via API
         console.log(
             `[AutoProvision] Pack "${packName}" not in shared state, creating via API...`,
         );
@@ -109,17 +131,32 @@ Given("the pack {string} exists", async ({ page }, packName: string) => {
         const response = await page.request.post(`${API}/packs`, {
             data: { name: packName, description: "" },
         });
-        if (!response.ok()) {
-            throw new Error(
-                `Failed to auto-provision pack "${packName}": ${response.status()}`,
+        if (response.ok()) {
+            const data = await response.json();
+            pack = { id: data.id, name: packName };
+            getScenarioState(page).savePack(packName, pack);
+            console.log(
+                `[AutoProvision] Created pack "${packName}" (ID: ${pack.id})`,
+            );
+        } else {
+            // Pack likely already exists (created by setup or another worker)
+            const listResp = await page.request.get(`${API}/packs`);
+            const packsResp = await listResp.json();
+            const packList = Array.isArray(packsResp)
+                ? packsResp
+                : packsResp.packs || packsResp.items || [];
+            const existing = packList.find((p: any) => p.name === packName);
+            if (!existing) {
+                throw new Error(
+                    `Failed to auto-provision pack "${packName}": ${response.status()} and not found via GET`,
+                );
+            }
+            pack = { id: existing.id, name: packName };
+            getScenarioState(page).savePack(packName, pack);
+            console.log(
+                `[AutoProvision] Found existing pack "${packName}" (ID: ${pack.id})`,
             );
         }
-        const data = await response.json();
-        pack = { id: data.id, name: packName };
-        sharedState.savePack(packName, pack);
-        console.log(
-            `[AutoProvision] Created pack "${packName}" (ID: ${pack.id})`,
-        );
     }
     console.log(
         `[SharedState] Verified pack exists: ${packName} (ID: ${pack.id})`,
@@ -134,7 +171,7 @@ When(
         const packsPage = new PacksPage(page);
         const pack = await packsPage.createPack(name, description);
 
-        sharedState.savePack(name, pack);
+        getScenarioState(page).savePack(name, pack);
         console.log(`[Action] Created and stored pack "${name}"`);
     },
 );
@@ -145,7 +182,7 @@ When(
         const packsPage = new PacksPage(page);
         const pack = await packsPage.createPack(name);
 
-        sharedState.savePack(name, pack);
+        getScenarioState(page).savePack(name, pack);
         console.log(
             `[Action] Created and stored pack "${name}" (no description)`,
         );
@@ -197,7 +234,7 @@ Then(
 Then(
     "the pack {string} should be stored in shared state",
     async ({ page }, packName: string) => {
-        const pack = sharedState.getPack(packName);
+        const pack = getScenarioState(page).getPack(packName);
         expect(pack).toBeDefined();
         expect(pack?.name).toBe(packName);
         console.log(`[SharedState] Pack "${packName}" stored ✓`);
@@ -225,7 +262,7 @@ Then(
 When(
     "I add model {string} to the pack",
     async ({ page }, modelStateName: string) => {
-        const model = sharedState.getModel(modelStateName);
+        const model = getScenarioState(page).getModel(modelStateName);
 
         if (!model) {
             throw new Error(
@@ -362,7 +399,7 @@ When(
 When(
     "I remove model {string} from the pack",
     async ({ page }, modelStateName: string) => {
-        const model = sharedState.getModel(modelStateName);
+        const model = getScenarioState(page).getModel(modelStateName);
 
         if (!model) {
             throw new Error(
@@ -408,7 +445,7 @@ When(
 When(
     "I add texture set {string} to the pack",
     async ({ page }, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
         if (!textureSet) {
             throw new Error(
@@ -454,7 +491,7 @@ When(
 When(
     "I remove texture set {string} from the pack",
     async ({ page }, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
         if (!textureSet) {
             throw new Error(
@@ -500,7 +537,7 @@ When(
 Then(
     "the pack should contain model {string}",
     async ({ page }, modelStateName: string) => {
-        const model = sharedState.getModel(modelStateName);
+        const model = getScenarioState(page).getModel(modelStateName);
 
         if (!model) {
             throw new Error(
@@ -526,7 +563,7 @@ Then(
 Then(
     "the pack should not contain model {string}",
     async ({ page }, modelStateName: string) => {
-        const model = sharedState.getModel(modelStateName);
+        const model = getScenarioState(page).getModel(modelStateName);
 
         if (!model) {
             throw new Error(
@@ -575,7 +612,7 @@ Then(
 Then(
     "the pack should contain texture set {string}",
     async ({ page }, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
         if (!textureSet) {
             throw new Error(
@@ -600,7 +637,7 @@ Then(
 Then(
     "the pack should not contain texture set {string}",
     async ({ page }, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
         if (!textureSet) {
             throw new Error(
@@ -652,7 +689,7 @@ Then(
 Given(
     "the pack contains model {string}",
     async ({ page }, modelStateName: string) => {
-        const model = sharedState.getModel(modelStateName);
+        const model = getScenarioState(page).getModel(modelStateName);
         if (!model) {
             throw new Error(
                 `Model "${modelStateName}" not found in shared state`,
@@ -683,7 +720,7 @@ Given(
 Given(
     "the pack contains texture set {string}",
     async ({ page }, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
         if (!textureSet) {
             throw new Error(
                 `Texture set "${textureSetName}" not found in shared state`,

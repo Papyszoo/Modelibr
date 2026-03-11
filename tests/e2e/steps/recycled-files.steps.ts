@@ -2,16 +2,13 @@ import { createBdd } from "playwright-bdd";
 import { expect, Page, test } from "@playwright/test";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
 import { ModelListPage } from "../pages/ModelListPage";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import path from "path";
 import { fileURLToPath } from "url";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { DbHelper } from "../fixtures/db-helper";
 import fs from "fs/promises";
-import {
-    cleanupStaleModels,
-    cleanupStaleRecycledModels,
-} from "../helpers/cleanup-helper";
+// Cleanup now runs once in global-setup.ts (before any workers start)
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,10 +93,6 @@ async function waitForThumbnails(
 GivenBdd(
     "I upload and delete a model {string}",
     async ({ page }, modelName: string) => {
-        // Clean up accumulated models from previous test runs
-        await cleanupStaleModels();
-        await cleanupStaleRecycledModels();
-
         // Upload via API to capture exact model ID (avoids name-matching ambiguity)
         const filePath = await UniqueFileGenerator.generate("test-cube.glb");
         const fs = await import("fs");
@@ -146,10 +139,6 @@ GivenBdd(
 GivenBdd(
     "I upload a model for recycling test {string}",
     async ({ page }, modelName: string) => {
-        // Clean up accumulated models from previous test runs
-        await cleanupStaleModels();
-        await cleanupStaleRecycledModels();
-
         // Upload via API to capture exact model ID
         const filePath = await UniqueFileGenerator.generate("test-cube.glb");
         const fs = await import("fs");
@@ -291,7 +280,7 @@ WhenBdd("I navigate back to the model viewer", async ({ page }) => {
     let modelName: string | null = null;
 
     for (const key of modelKeys) {
-        const model = sharedState.getModel(key);
+        const model = getScenarioState(page).getModel(key);
         if (model && model.name) {
             modelName = model.name;
             console.log(
@@ -348,7 +337,7 @@ WhenBdd(
         let modelName: string | null = null;
 
         for (const key of modelKeys) {
-            const model = sharedState.getModel(key);
+            const model = getScenarioState(page).getModel(key);
             if (model && model.name) {
                 modelName = model.name;
                 console.log(
@@ -918,8 +907,8 @@ ThenBdd("I take a screenshot showing remaining model", async ({ page }) => {
 // ============================================
 
 // State for model version tests
-let lastVersionTestModelId: number | null = null;
-let lastVersionTestModelName = "";
+// lastVersionTestModelId tracked via getScenarioState(page).getCustom
+// lastVersionTestModelName tracked via getScenarioState(page).getCustom
 
 GivenBdd(
     "I upload a model with multiple versions for recycling test {string}",
@@ -948,8 +937,14 @@ GivenBdd(
         const modelViewer = new ModelViewerPage(page);
         const extractedModelId = await modelViewer.getCurrentModelId();
         if (extractedModelId) {
-            lastVersionTestModelId = extractedModelId;
-            lastVersionTestModelName = testName;
+            getScenarioState(page).setCustom(
+                "lastVersionTestModelId",
+                extractedModelId,
+            );
+            getScenarioState(page).setCustom(
+                "lastVersionTestModelName",
+                testName,
+            );
         }
 
         // Upload second version
@@ -968,7 +963,7 @@ GivenBdd(
         await page.waitForLoadState("domcontentloaded");
 
         console.log(
-            `[Setup] Created model with multiple versions for test "${testName}" (ID: ${lastVersionTestModelId})`,
+            `[Setup] Created model with multiple versions for test "${testName}" (ID: ${getScenarioState(page).getCustom<number>("lastVersionTestModelId")})`,
         );
     },
 );
@@ -988,13 +983,15 @@ ThenBdd(
 WhenBdd(
     "I navigate to the model viewer for {string}",
     async ({ page }, testName: string) => {
-        if (lastVersionTestModelId) {
+        if (
+            getScenarioState(page).getCustom<number>("lastVersionTestModelId")
+        ) {
             const { navigateToAppClean, openModelViewer } =
                 await import("../helpers/navigation-helper");
             // Lookup the model name from shared state
             const model =
-                sharedState.getModel(testName) ||
-                sharedState.getModel("multi-version-test-model");
+                getScenarioState(page).getModel(testName) ||
+                getScenarioState(page).getModel("multi-version-test-model");
             const modelName = model?.name || testName;
 
             await navigateToAppClean(page);
@@ -1106,7 +1103,7 @@ WhenBdd("I restore the recycled model version", async ({ page }) => {
     let modelId: number | null = null;
 
     for (const key of modelKeys) {
-        const model = sharedState.getModel(key);
+        const model = getScenarioState(page).getModel(key);
         if (model && model.id) {
             modelId = model.id;
             console.log(
@@ -1198,8 +1195,8 @@ ThenBdd("I take a screenshot of restored version", async ({ page }) => {
 // ============================================
 
 // State for texture set tests
-let lastTextureSetId: number | null = null;
-let lastTextureSetName = "";
+// lastTextureSetId tracked via getScenarioState(page).getCustom
+// lastTextureSetName tracked via getScenarioState(page).getCustom
 
 GivenBdd(
     "I create a texture set {string} with a color texture",
@@ -1250,10 +1247,13 @@ GivenBdd(
 
         if (response.ok()) {
             const data = await response.json();
-            lastTextureSetId = data.id || data.Id;
-            lastTextureSetName = name;
+            getScenarioState(page).setCustom(
+                "lastTextureSetId",
+                data.id || data.Id,
+            );
+            getScenarioState(page).setCustom("lastTextureSetName", name);
             console.log(
-                `[Setup] Created texture set "${name}" (ID: ${lastTextureSetId})`,
+                `[Setup] Created texture set "${name}" (ID: ${getScenarioState(page).getCustom<number>("lastTextureSetId")})`,
             );
         } else {
             const errorText = await response.text();
@@ -1283,10 +1283,10 @@ ThenBdd("I take a screenshot of the texture sets list", async ({ page }) => {
 WhenBdd("I delete the texture set {string}", async ({ page }, name: string) => {
     const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
 
-    if (lastTextureSetId) {
+    if (getScenarioState(page).getCustom<number>("lastTextureSetId")) {
         // Note: soft delete endpoint is /texture-sets/{id} - same as regular delete (DELETE method does soft delete)
         const response = await page.request.delete(
-            `${baseUrl}/texture-sets/${lastTextureSetId}`,
+            `${baseUrl}/texture-sets/${getScenarioState(page).getCustom<number>("lastTextureSetId")}`,
         );
         if (response.ok()) {
             console.log(`[Action] Soft deleted texture set "${name}"`);
@@ -1309,13 +1309,15 @@ ThenBdd(
         // Wait for texture sets page to fully load
         await page.waitForLoadState("domcontentloaded");
 
-        if (lastTextureSetName) {
+        if (getScenarioState(page).getCustom<string>("lastTextureSetName")) {
+            const tsName =
+                getScenarioState(page).getCustom<string>("lastTextureSetName")!;
             const textureSetCard = page.locator(
-                `.texture-set-card:has-text("${lastTextureSetName}")`,
+                `.texture-set-card:has-text("${tsName}")`,
             );
             await expect(textureSetCard).not.toBeVisible({ timeout: 5000 });
             console.log(
-                `[Verify] Texture set "${lastTextureSetName}" not visible in list ✓`,
+                `[Verify] Texture set "${tsName}" not visible in list ✓`,
             );
         }
     },
@@ -1362,13 +1364,13 @@ ThenBdd(
 
 WhenBdd("I restore the recycled texture set", async ({ page }) => {
     // Use API-based restore for reliability (avoids index-based UI targeting ambiguity)
-    if (lastTextureSetId) {
+    if (getScenarioState(page).getCustom<number>("lastTextureSetId")) {
         const restoreResponse = await page.request.post(
-            `${API_BASE_URL}/recycled/textureSet/${lastTextureSetId}/restore`,
+            `${API_BASE_URL}/recycled/textureSet/${getScenarioState(page).getCustom<number>("lastTextureSetId")}/restore`,
         );
         expect(restoreResponse.ok()).toBe(true);
         console.log(
-            `[Action] Restored recycled texture set (ID: ${lastTextureSetId}) via API`,
+            `[Action] Restored recycled texture set (ID: ${getScenarioState(page).getCustom<number>("lastTextureSetId")}) via API`,
         );
     } else {
         // Fallback to UI
@@ -1383,14 +1385,14 @@ ThenBdd(
     "the texture set should be removed from the recycle bin",
     async ({ page }) => {
         // Verify via API that the texture set is no longer soft-deleted
-        if (lastTextureSetId) {
+        if (getScenarioState(page).getCustom<number>("lastTextureSetId")) {
             const response = await page.request.get(
-                `${API_BASE_URL}/texture-sets/${lastTextureSetId}`,
+                `${API_BASE_URL}/texture-sets/${getScenarioState(page).getCustom<number>("lastTextureSetId")}`,
             );
             // After restore, the texture set should be accessible (not 404)
             expect(response.ok()).toBe(true);
             console.log(
-                `[API] Texture set (ID: ${lastTextureSetId}) restored successfully ✓`,
+                `[API] Texture set (ID: ${getScenarioState(page).getCustom<number>("lastTextureSetId")}) restored successfully ✓`,
             );
         } else {
             // Fallback to UI check
@@ -1465,7 +1467,7 @@ ThenBdd("I take a screenshot of the restored texture set", async ({ page }) => {
 // Sprite Recycling Steps
 // ============================================
 
-let lastRecycledSpriteName = "";
+// lastRecycledSpriteName tracked via getScenarioState(page).getCustom
 
 GivenBdd("I am on the sprites page", async ({ page }) => {
     const { navigateToTab } = await import("../helpers/navigation-helper");
@@ -1595,7 +1597,7 @@ ThenBdd(
 WhenBdd(
     "I recycle the sprite {string}",
     async ({ page }, spriteName: string) => {
-        lastRecycledSpriteName = spriteName;
+        getScenarioState(page).setCustom("lastRecycledSpriteName", spriteName);
 
         // Use API-based soft-delete for reliability
         const tracked = spritesByAlias.get(spriteName);
@@ -1666,10 +1668,14 @@ ThenBdd(
     async ({ page }) => {
         // Wait for the recycled sprite card to disappear from the UI
         // (no reload needed — frontend invalidates sprite queries after recycling)
-        const spriteCard = lastRecycledSpriteName
+        const _lastRecycledSpriteName =
+            getScenarioState(page).getCustom<string>(
+                "lastRecycledSpriteName",
+            ) || "";
+        const spriteCard = _lastRecycledSpriteName
             ? page.locator(".sprite-card").filter({
                   has: page.locator(".sprite-name", {
-                      hasText: lastRecycledSpriteName,
+                      hasText: _lastRecycledSpriteName,
                   }),
               })
             : page.locator(".sprite-card").first();
@@ -1695,8 +1701,17 @@ ThenBdd(
         expect(spriteCount).toBeGreaterThan(0);
 
         // Verify the specific sprite name appears in the recycled section
-        const tracked = spritesByAlias.get(lastRecycledSpriteName);
-        const expectedName = tracked?.name || lastRecycledSpriteName;
+        const tracked = spritesByAlias.get(
+            getScenarioState(page).getCustom<string>(
+                "lastRecycledSpriteName",
+            ) || "",
+        );
+        const expectedName =
+            tracked?.name ||
+            getScenarioState(page).getCustom<string>(
+                "lastRecycledSpriteName",
+            ) ||
+            "";
         if (expectedName) {
             const recycledCards = page.locator(".recycled-card");
             const cardCount = await recycledCards.count();
@@ -1763,7 +1778,10 @@ WhenBdd("I take a screenshot of recycle bin with sprite", async ({ page }) => {
 
 WhenBdd("I restore the recycled sprite", async ({ page }) => {
     // Use API-based restore for reliability
-    const tracked = spritesByAlias.get(lastRecycledSpriteName);
+    const tracked = spritesByAlias.get(
+        getScenarioState(page).getCustom<string>("lastRecycledSpriteName") ||
+            "",
+    );
     if (tracked) {
         const restoreResponse = await page.request.post(
             `${API_BASE_URL}/recycled/sprite/${tracked.id}/restore`,
@@ -1784,7 +1802,11 @@ ThenBdd(
     "the sprite should be removed from the recycle bin",
     async ({ page }) => {
         // Use API to verify sprite is no longer soft-deleted (restored successfully)
-        const tracked = spritesByAlias.get(lastRecycledSpriteName);
+        const tracked = spritesByAlias.get(
+            getScenarioState(page).getCustom<string>(
+                "lastRecycledSpriteName",
+            ) || "",
+        );
         if (tracked) {
             // Sprite should appear in the non-deleted sprites list after restore
             const response = await page.request.get(`${API_BASE_URL}/sprites`);

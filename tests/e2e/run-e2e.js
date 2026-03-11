@@ -6,7 +6,6 @@
 
 import { execSync } from "child_process";
 import path from "path";
-import fs from "fs";
 import http from "http";
 import { fileURLToPath } from "url";
 
@@ -90,13 +89,6 @@ function isE2ERunning() {
 function cleanup() {
     console.log("\n🧹 Cleaning up...\n");
     run(`docker compose -f ${COMPOSE_FILE} down -v`);
-
-    // Clear shared state file
-    const statePath = path.join(__dirname, "fixtures", ".shared-state.json");
-    if (fs.existsSync(statePath)) {
-        fs.rmSync(statePath, { force: true });
-        console.log("Removed shared state file");
-    }
 }
 
 async function main() {
@@ -104,21 +96,12 @@ async function main() {
 
     console.log("🚀 Starting E2E test environment...\n");
 
-    // Always clean up state before starting for a fresh run
-    const statePath = path.join(__dirname, ".shared-state.json");
-
     // Stop any running containers first
     if (isE2ERunning()) {
         console.log(
             "⚠️  E2E environment is already running. Stopping containers...\n",
         );
         run(`docker compose -f ${COMPOSE_FILE} down -v`);
-    }
-
-    // Always clean shared state file if it exists
-    if (fs.existsSync(statePath)) {
-        fs.rmSync(statePath, { force: true });
-        console.log("🗑️  Removed stale shared state file");
     }
 
     // Start containers
@@ -141,10 +124,35 @@ async function main() {
 
     console.log("\n🧪 Running tests...\n");
 
-    // Run tests (use test:quick to avoid recursion since npm test now calls this script)
-    // Pass through any arguments from the command line
+    // Two-phase execution:
+    //   Phase 1: Setup tests with 1 worker (sequential — avoids asset-processor overload)
+    //   Phase 2: Chromium tests with multiple workers (parallel — uses auto-provisioning)
     const args = process.argv.slice(2).join(" ");
-    const testResult = run(`npm run test:quick -- ${args}`, { env: testEnv });
+    const setupEnv = { ...testEnv, PW_WORKERS: "1" };
+    const chromiumWorkers = process.env.CI ? "4" : "2";
+    const chromiumEnv = { ...testEnv, PW_WORKERS: chromiumWorkers };
+
+    console.log("📋 Phase 1: Setup tests (workers=1)\n");
+    const bddResult = run("npx bddgen", { env: testEnv });
+    if (bddResult !== 0) {
+        console.error("❌ bddgen failed");
+        cleanup();
+        process.exit(1);
+    }
+    const setupResult = run(`npx playwright test --project=setup ${args}`, {
+        env: { ...setupEnv, PW_PHASE: "setup" },
+    });
+    if (setupResult !== 0) {
+        console.error("❌ Setup tests failed");
+        cleanup();
+        process.exit(1);
+    }
+
+    console.log(`\n📋 Phase 2: Chromium tests (workers=${chromiumWorkers})\n`);
+    const testResult = run(
+        `npx playwright test --project=chromium --no-deps ${args}`,
+        { env: chromiumEnv },
+    );
 
     // Cleanup
     cleanup();

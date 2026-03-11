@@ -14,9 +14,13 @@ let modelCleanupDone = false;
  * Keeps at most 1 copy of each model name. Soft-deletes duplicates
  * then permanently deletes them from the recycle bin.
  *
+ * @param protectedIds - Model IDs that must NOT be deleted (e.g. setup-created models)
+ *
  * Safe to call multiple times per run — only executes once.
  */
-export async function cleanupStaleModels(): Promise<void> {
+export async function cleanupStaleModels(
+    protectedIds: Set<number> = new Set(),
+): Promise<void> {
     if (modelCleanupDone) return;
     modelCleanupDone = true;
 
@@ -35,6 +39,12 @@ export async function cleanupStaleModels(): Promise<void> {
         }>;
         console.log(`[Model Cleanup] Found ${models.length} models total`);
 
+        if (protectedIds.size > 0) {
+            console.log(
+                `[Model Cleanup] Protecting ${protectedIds.size} bridge model IDs: ${[...protectedIds].join(", ")}`,
+            );
+        }
+
         if (models.length <= 10) {
             console.log(
                 `[Model Cleanup] Count is manageable, skipping cleanup`,
@@ -42,11 +52,16 @@ export async function cleanupStaleModels(): Promise<void> {
             return;
         }
 
-        // Group by name, keep only the first of each
+        // Group by name, keep only the first of each AND any protected IDs
         const seen = new Map<string, number>(); // name -> kept id
         const toDelete: number[] = [];
 
         for (const m of models) {
+            if (protectedIds.has(m.id)) {
+                // Always keep protected models (from setup bridge)
+                seen.set(m.name, m.id);
+                continue;
+            }
             if (seen.has(m.name)) {
                 toDelete.push(m.id);
             } else {

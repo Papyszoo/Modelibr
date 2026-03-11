@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
@@ -18,8 +18,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ============= Model Setup Steps =============
-
-let multiVersionModelId: number | null = null;
 
 Given("a model with at least 2 versions exists", async ({ page }) => {
     // Check if we have a multi-version model from previous tests or create one
@@ -50,7 +48,11 @@ Given("a model with at least 2 versions exists", async ({ page }) => {
     }
 
     const uploadData = await uploadResponse.json();
-    multiVersionModelId = uploadData.id;
+    const multiVersionModelId = uploadData.id;
+    getScenarioState(page).setCustom(
+        "multiVersionModelId",
+        multiVersionModelId,
+    );
     console.log(`[Setup] Created base model (ID: ${multiVersionModelId})`);
 
     // 3. Upload second version (requires setAsActive query param)
@@ -86,8 +88,8 @@ Given("a model with at least 2 versions exists", async ({ page }) => {
         modelDetail?.name || path.basename(modelFile, path.extname(modelFile));
 
     // Save to shared state for later use
-    sharedState.saveModel("multi-version-test-model", {
-        id: multiVersionModelId!, // Non-null after successful upload
+    getScenarioState(page).saveModel("multi-version-test-model", {
+        id: multiVersionModelId,
         name: actualModelName,
     });
 
@@ -99,7 +101,7 @@ Given("a model with at least 2 versions exists", async ({ page }) => {
 
 Given("the test model {string} exists", async ({ page }, modelName: string) => {
     const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
-    let model = sharedState.getModel(modelName);
+    let model = getScenarioState(page).getModel(modelName);
 
     // If model is in shared state, verify it still exists in the backend
     if (model) {
@@ -118,11 +120,11 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
                 console.log(
                     `[Setup] Updating shared state name from "${model.name}" to "${checkData.name}"`,
                 );
-                sharedState.saveModel(modelName, {
+                getScenarioState(page).saveModel(modelName, {
                     ...model,
                     name: checkData.name,
                 });
-                model = sharedState.getModel(modelName);
+                model = getScenarioState(page).getModel(modelName);
             }
         }
     }
@@ -177,7 +179,7 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
 
         // Store in shared state — use actual name from API (based on filename),
         // not the parameterized modelName, so UI card matching works
-        sharedState.saveModel(modelName, {
+        getScenarioState(page).saveModel(modelName, {
             id: modelId,
             name: actualName,
             versions: versionId
@@ -193,7 +195,7 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
         console.log(
             `[Setup] Created test model "${modelName}" (ID: ${modelId}) via API`,
         );
-        model = sharedState.getModel(modelName);
+        model = getScenarioState(page).getModel(modelName);
     }
 
     console.log(
@@ -206,13 +208,16 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
 When(
     "I open the model viewer for the multi-version model",
     async ({ page }) => {
+        const multiVersionModelId = getScenarioState(page).getCustom<number>(
+            "multiVersionModelId",
+        );
         if (!multiVersionModelId)
             throw new Error("Multi-version model ID not set");
 
-        // Find the model name from shared state — check this test's own key first
+        // Find the model name from scenario state
         const multiModel =
-            sharedState.getModel("multi-version-test-model") ||
-            sharedState.getModel("multi-version-model");
+            getScenarioState(page).getModel("multi-version-test-model") ||
+            getScenarioState(page).getModel("multi-version-model");
         const modelName = multiModel?.name || "multi-version-model";
 
         const { navigateToAppClean, openModelViewer } =
@@ -229,7 +234,7 @@ When(
 When(
     "I open the model viewer for {string}",
     async ({ page }, modelName: string) => {
-        const model = sharedState.getModel(modelName);
+        const model = getScenarioState(page).getModel(modelName);
         if (!model)
             throw new Error(`Model "${modelName}" not found in shared state`);
 
