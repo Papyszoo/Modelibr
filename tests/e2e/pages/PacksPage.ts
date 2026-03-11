@@ -151,7 +151,12 @@ export class PacksPage {
         const packCard = this.page.locator(
             `.pack-grid-card:has-text("${packName}")`,
         );
-        return await packCard.isVisible();
+        try {
+            await packCard.waitFor({ state: "visible", timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // PackViewer methods (ContainerViewer with tabs)

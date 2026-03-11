@@ -7,7 +7,7 @@ Feature: Model 3D Viewer Rendering
       | name                 |
       | multi-version-model  |
 
-  @three-js @rendering
+  @three-js @rendering @timeout:300000
   Scenario: Model renders in 3D canvas after opening viewer
     Given I am on the model viewer page for "multi-version-model"
     Then the 3D canvas should be visible

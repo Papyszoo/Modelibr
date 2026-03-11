@@ -135,10 +135,11 @@ async function main() {
     //   With workers=3 locally both slow tests each occupy a dedicated worker
     //   while the third worker handles the 150+ fast tests, bounding total time
     //   to the slowest thumbnail (~10.5min) instead of ~13min with workers=2.
-    //   CI uses 4 workers for extra headroom.
+    //   CI uses 3 workers (same as local) — 4 workers caused asset-processor
+    //   contention on slower CI hardware, leading to thumbnail generation timeouts.
     const args = process.argv.slice(2).join(" ");
     const setupEnv = { ...testEnv, PW_WORKERS: "1" };
-    const chromiumWorkers = process.env.CI ? "4" : "3";
+    const chromiumWorkers = process.env.CI ? "3" : "3";
     const chromiumEnv = { ...testEnv, PW_WORKERS: chromiumWorkers };
 
     console.log("📋 Phase 1: Setup tests (workers=1)\n");

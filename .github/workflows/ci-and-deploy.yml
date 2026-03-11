@@ -451,7 +451,7 @@ jobs:
               run: npm run test:quick
               env:
                   FRONTEND_URL: http://localhost:3002
-                  PW_WORKERS: "4"
+                  PW_WORKERS: "3"
 
             - name: Upload Playwright report
               uses: actions/upload-artifact@v4

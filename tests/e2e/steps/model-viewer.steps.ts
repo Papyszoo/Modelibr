@@ -44,8 +44,9 @@ Then("the 3D canvas should be visible", async ({ page }) => {
     // VersionStrip briefly shows "No versions available" while the API call is
     // in flight, so we must wait for the dropdown before error-checking.
     const versionDropdown = page.locator(".version-dropdown-trigger");
+    const ciTimeout = process.env.CI ? 60000 : 15000;
     const dropdownVisible = await versionDropdown
-        .isVisible({ timeout: 15000 })
+        .isVisible({ timeout: ciTimeout })
         .catch(() => false);
 
     if (!dropdownVisible) {
@@ -62,14 +63,14 @@ Then("the 3D canvas should be visible", async ({ page }) => {
             );
         }
         throw new Error(
-            `Version dropdown not found within 15 s — model may not have loaded. URL: ${currentUrl}`,
+            `Version dropdown not found within ${ciTimeout / 1000} s — model may not have loaded. URL: ${currentUrl}`,
         );
     }
     console.log("[UI] Version dropdown visible - model loaded correctly ✓");
 
     // The canvas is rendered by Three.js/React Three Fiber
     const canvas = page.locator(".viewer-canvas canvas");
-    await expect(canvas).toBeVisible({ timeout: 15000 });
+    await expect(canvas).toBeVisible({ timeout: 30000 });
     console.log("[UI] 3D canvas element is visible ✓");
 
     // Poll for scene initialization and mesh loading

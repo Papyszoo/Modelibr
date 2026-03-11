@@ -24,7 +24,7 @@ Feature: Default Texture Set Behavior
     And the texture set selector should be visible
     And the model should have textures applied in the 3D scene
 
-  @version-independence
+  @version-independence @timeout:300000
   Scenario: Independent default texture sets for different versions
     # Verifies that each version can have its own default texture set
     Given the following models exist in shared state:

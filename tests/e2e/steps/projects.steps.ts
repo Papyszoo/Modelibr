@@ -83,7 +83,7 @@ Given(
                 `.project-grid-card:has-text("${projectName}"), .container-card:has-text("${projectName}")`,
             )
             .first();
-        await projectCard.waitFor({ state: "visible", timeout: 10000 });
+        await projectCard.waitFor({ state: "visible", timeout: 30000 });
         await projectCard.dblclick();
 
         // Wait for project viewer content to fully load

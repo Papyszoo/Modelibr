@@ -45,7 +45,7 @@ Given(
                 `.pack-grid-card:has-text("${packName}"), .container-card:has-text("${packName}")`,
             )
             .first();
-        await packCard.waitFor({ state: "visible", timeout: 10000 });
+        await packCard.waitFor({ state: "visible", timeout: 30000 });
         await packCard.dblclick();
 
         // Wait for container viewer content to fully load

@@ -12,7 +12,7 @@ export default defineConfig({
     timeout: 90000, // 90s to allow for thumbnail generation (Puppeteer cold start + rendering takes 30-40s)
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
-    retries: process.env.CI ? 2 : 0,
+    retries: process.env.CI ? 1 : 0,
     // Workers are controlled per-phase by run-e2e.js:
     //   setup    → --workers=1  (sequential, avoids asset-processor overload)
     //   chromium → --workers=3  (local) / --workers=4  (CI)
