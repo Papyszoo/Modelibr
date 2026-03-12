@@ -176,7 +176,8 @@ Then(
         // Use search to filter by name — avoids pagination issues when >50 sets exist
         const searchInput = page.locator(".search-input");
         const searchVisible = await searchInput
-            .isVisible({ timeout: 3000 })
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
             .catch(() => false);
         if (searchVisible) {
             await searchInput.clear();

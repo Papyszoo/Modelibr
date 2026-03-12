@@ -86,7 +86,12 @@ export class ModelListPage {
                     '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times',
                 )
                 .first();
-            if (await closeButton.isVisible({ timeout: 1000 })) {
+            if (
+                await closeButton
+                    .waitFor({ state: "visible", timeout: 1000 })
+                    .then(() => true)
+                    .catch(() => false)
+            ) {
                 await closeButton.click();
                 // Wait for window to disappear
                 await expect(

@@ -173,7 +173,7 @@ Then("no console errors should be present", async ({ page }) => {
         "#webpack-dev-server-client-overlay, .error-boundary, .react-error-overlay",
     );
     const hasError = await errorOverlay
-        .isVisible({ timeout: 1000 })
+        .isVisible()
         .catch(() => false);
     expect(hasError).toBe(false);
     console.log("[UI] No console errors or error overlays detected ✓");
@@ -202,11 +202,11 @@ Then("the 3D preview should have textures applied", async ({ page }) => {
 
     // Verify no error boundary is showing
     const errorOverlay = page.locator(".error-boundary, [class*='error']");
-    const hasError = await errorOverlay
+    const hasError2 = await errorOverlay
         .filter({ hasText: "Something went wrong" })
-        .isVisible({ timeout: 1000 })
+        .isVisible()
         .catch(() => false);
-    expect(hasError).toBe(false);
+    expect(hasError2).toBe(false);
 
     console.log(
         "[UI] 3D preview has textures applied including EXR (canvas rendered with valid dimensions) ✓",

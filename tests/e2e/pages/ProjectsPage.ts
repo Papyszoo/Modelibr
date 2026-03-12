@@ -44,7 +44,12 @@ export class ProjectsPage {
                 `.project-card[data-project-id="${projectId}"], .container-card[data-id="${projectId}"]`,
             )
             .first();
-        if (await projectCard.isVisible({ timeout: 5000 }).catch(() => false)) {
+        if (
+            await projectCard
+                .waitFor({ state: "visible", timeout: 5000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await projectCard.dblclick();
         }
         await this.page.waitForLoadState("domcontentloaded");
@@ -157,7 +162,12 @@ export class ProjectsPage {
         const confirmBtn = this.page.locator(
             '.p-dialog button:has-text("Delete"), .p-dialog button:has-text("Yes")',
         );
-        if (await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (
+            await confirmBtn
+                .waitFor({ state: "visible", timeout: 1000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await confirmBtn.click();
         }
 

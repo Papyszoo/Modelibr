@@ -1027,7 +1027,12 @@ WhenBdd("I delete version 1 from the model", async ({ page }) => {
             const confirmBtn = page.locator(
                 ".p-dialog-footer button:has-text('Delete'), .p-dialog-footer button:has-text('Confirm')",
             );
-            if (await confirmBtn.isVisible({ timeout: 2000 })) {
+            if (
+                await confirmBtn
+                    .waitFor({ state: "visible", timeout: 2000 })
+                    .then(() => true)
+                    .catch(() => false)
+            ) {
                 await confirmBtn.click();
                 // Wait for delete confirmation dialog to close
                 await expect(confirmBtn).not.toBeVisible({ timeout: 5000 });
@@ -2339,7 +2344,12 @@ GivenBdd(
 
         // Use the search box to avoid pagination issues (>50 sets alphabetically before this one)
         const searchInput = page.locator(".search-input");
-        if (await searchInput.isVisible({ timeout: 3000 })) {
+        if (
+            await searchInput
+                .waitFor({ state: "visible", timeout: 3000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await searchInput.clear();
             await searchInput.fill(name);
             await page.waitForTimeout(500);

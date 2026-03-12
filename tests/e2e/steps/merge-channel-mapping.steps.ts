@@ -373,10 +373,18 @@ Then(
         );
         const oldTab = page.locator('.p-tabview-nav-link:has-text("Textures")');
 
-        if (await newTab.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (
+            await newTab
+                .waitFor({ state: "visible", timeout: 1000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await newTab.click();
         } else if (
-            await oldTab.isVisible({ timeout: 1000 }).catch(() => false)
+            await oldTab
+                .waitFor({ state: "visible", timeout: 1000 })
+                .then(() => true)
+                .catch(() => false)
         ) {
             await oldTab.click();
         }

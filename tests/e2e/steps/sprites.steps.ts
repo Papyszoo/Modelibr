@@ -505,7 +505,8 @@ When(
         const dialog = page.locator('[data-testid="sprite-detail-modal"]');
         // Fall back to generic .p-dialog if the specific testid doesn't exist
         const dialogVisible = await dialog
-            .isVisible({ timeout: 3000 })
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
             .catch(() => false);
         const targetDialog = dialogVisible
             ? dialog
@@ -520,7 +521,8 @@ When(
             '[data-testid="sprite-name-edit"]',
         );
         const editButtonVisible = await editButton
-            .isVisible({ timeout: 3000 })
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
             .catch(() => false);
 
         if (!editButtonVisible) {

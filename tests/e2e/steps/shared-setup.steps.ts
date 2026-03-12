@@ -777,7 +777,12 @@ Then("the version dropdown should be open", async ({ page }) => {
     );
     for (let i = 0; i < (await closeButtons.count()); i++) {
         const btn = closeButtons.nth(i);
-        if (await btn.isVisible({ timeout: 500 })) {
+        if (
+            await btn
+                .waitFor({ state: "visible", timeout: 500 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await btn.click();
             await btn
                 .waitFor({ state: "hidden", timeout: 2000 })

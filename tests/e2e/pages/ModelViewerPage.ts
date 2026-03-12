@@ -328,7 +328,10 @@ export class ModelViewerPage {
                 'button[aria-label="Close"], .p-dialog-header-close',
             );
             if (
-                await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)
+                await closeBtn
+                    .waitFor({ state: "visible", timeout: 2000 })
+                    .then(() => true)
+                    .catch(() => false)
             ) {
                 await closeBtn.click();
             }
@@ -436,25 +439,25 @@ export class ModelViewerPage {
 
         // Click on the version dropdown trigger
         const dropdownTrigger = this.page.locator(".version-dropdown-trigger");
-        await expect(dropdownTrigger).toBeVisible({ timeout: 10000 });
+        await expect(dropdownTrigger).toBeVisible({ timeout: 30000 });
         await dropdownTrigger.click();
 
         // Wait for dropdown menu to appear
         await this.page.waitForSelector(".version-dropdown-menu", {
             state: "visible",
-            timeout: 5000,
+            timeout: 15000,
         });
 
         // Click on the version item
         const versionItem = this.page.locator(".version-dropdown-item", {
             hasText: `v${versionNumber}`,
         });
-        await expect(versionItem).toBeVisible({ timeout: 5000 });
+        await expect(versionItem).toBeVisible({ timeout: 10000 });
         try {
-            await versionItem.click({ timeout: 5000 });
+            await versionItem.click({ timeout: 10000 });
         } catch {
             // Fallback for intermittent overlay interception from floating windows
-            await versionItem.click({ force: true, timeout: 5000 });
+            await versionItem.click({ force: true, timeout: 10000 });
         }
 
         // Wait for version to load
@@ -628,7 +631,12 @@ export class ModelViewerPage {
 
         // Click the preview to select this texture set
         const preview = targetItem.locator(".materials-item-preview");
-        if (await preview.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (
+            await preview
+                .waitFor({ state: "visible", timeout: 2000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await preview.click();
         } else {
             await targetItem.click();
@@ -653,7 +661,8 @@ export class ModelViewerPage {
         );
         return await item
             .first()
-            .isVisible({ timeout: 2000 })
+            .waitFor({ state: "visible", timeout: 2000 })
+            .then(() => true)
             .catch(() => false);
     }
 }

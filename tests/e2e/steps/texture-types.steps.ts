@@ -159,7 +159,12 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
 
     // Use search to find the specific card (grid may have many items off-screen)
     const searchInput = page.locator(".search-input");
-    if (await searchInput.isVisible({ timeout: 3000 })) {
+    if (
+        await searchInput
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await searchInput.fill(uniqueName);
         await page.waitForTimeout(500);
     }
@@ -252,7 +257,12 @@ Given("I have a texture set with a height texture", async ({ page }) => {
 
     // Use search to find the specific card (grid may have many items off-screen)
     const searchInput3 = page.locator(".search-input");
-    if (await searchInput3.isVisible({ timeout: 3000 })) {
+    if (
+        await searchInput3
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await searchInput3.fill(uniqueName);
         await page.waitForTimeout(500);
     }
@@ -600,7 +610,12 @@ When(
 When("I save the texture set changes", async ({ page }) => {
     // Look for a save button in the texture set viewer
     const saveButton = page.getByRole("button", { name: /save/i });
-    if (await saveButton.isVisible({ timeout: 2000 })) {
+    if (
+        await saveButton
+            .waitFor({ state: "visible", timeout: 2000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await saveButton.click();
         // Wait for save confirmation toast
         await page

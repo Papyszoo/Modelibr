@@ -311,7 +311,12 @@ When("I click the regenerate thumbnail button", async ({ page }) => {
     // 1. Open Thumbnail Details panel if not visible
     const thumbnailSection = page.locator(".thumbnail-panel");
 
-    if (!(await thumbnailSection.isVisible({ timeout: 3000 }))) {
+    if (
+        !(await thumbnailSection
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false))
+    ) {
         await modelViewer.openTab("Thumbnail Details");
         await expect(thumbnailSection).toBeVisible({ timeout: 5000 });
         console.log("[Action] Opened Thumbnail Details panel");

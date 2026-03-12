@@ -27,7 +27,12 @@ When(
 
         // Find and double-click on the model in the grid
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
-        if (await clickTarget.isVisible({ timeout: 5000 })) {
+        if (
+            await clickTarget
+                .waitFor({ state: "visible", timeout: 5000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await clickTarget.dblclick();
         } else {
             // Fall back to model card locator
@@ -68,7 +73,12 @@ Then("the Texture Sets content should be visible", async ({ page }) => {
         .locator(".dock-bar-left")
         .locator(".draggable-tab:has(.pi-folder)")
         .first();
-    if (await textureSetsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (
+        await textureSetsTab
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await textureSetsTab.click();
     }
 
@@ -125,7 +135,12 @@ When("I open the Texture Sets tab in the left panel", async ({ page }) => {
     const existingTab = page
         .locator(".dock-bar-left")
         .locator(".draggable-tab:has(.pi-folder)");
-    if (await existingTab.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (
+        await existingTab
+            .waitFor({ state: "visible", timeout: 1000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await existingTab.click();
         await expect(existingTab).toHaveClass(/active/, { timeout: 3000 });
         console.log("[UI] Switched to existing Texture Sets tab ✓");
@@ -199,7 +214,12 @@ When("I switch to {string} tab", async ({ page }, tabName: string) => {
     const tab = page
         .locator(`.draggable-tab[data-pr-tooltip*="${tabName}"]`)
         .first();
-    if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (
+        await tab
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await tab.click();
         await expect(tab).toHaveClass(/active/, { timeout: 3000 });
     }

@@ -280,12 +280,14 @@ export async function isTabActive(
         return page
             .locator(`.dock-bar-${side}`)
             .locator(selector)
-            .isVisible({ timeout: 2000 })
+            .waitFor({ state: "visible", timeout: 2000 })
+            .then(() => true)
             .catch(() => false);
     }
     return page
         .locator(selector)
-        .isVisible({ timeout: 2000 })
+        .waitFor({ state: "visible", timeout: 2000 })
+        .then(() => true)
         .catch(() => false);
 }
 
