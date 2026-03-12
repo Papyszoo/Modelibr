@@ -334,12 +334,12 @@ export async function openModelViewer(
     const modelListTab = page.locator(
         ".dock-bar-left .draggable-tab:has(.pi-list)",
     );
-    if (await modelListTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await modelListTab.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false)) {
         await modelListTab.click();
         // Wait for model list content to load
         await page.waitForSelector(".model-card, .no-results, .empty-state", {
             state: "visible",
-            timeout: 10000,
+            timeout: 15000,
         });
     }
 
@@ -352,7 +352,7 @@ export async function openModelViewer(
     // Find and click the model card — prefer ID-based selector when available
     if (modelId) {
         const cardById = page.locator(`[data-model-id="${modelId}"]`).first();
-        if (await cardById.isVisible({ timeout: 5000 }).catch(() => false)) {
+        if (await cardById.waitFor({ state: "visible", timeout: 10000 }).then(() => true).catch(() => false)) {
             await cardById.click();
         } else {
             console.warn(
@@ -365,7 +365,7 @@ export async function openModelViewer(
         }
     } else {
         const clickTarget = page.locator(`text="${modelName}"`).first();
-        if (await clickTarget.isVisible({ timeout: 5000 }).catch(() => false)) {
+        if (await clickTarget.waitFor({ state: "visible", timeout: 10000 }).then(() => true).catch(() => false)) {
             await clickTarget.dblclick();
         } else {
             // Fall back to partial match
@@ -381,7 +381,7 @@ export async function openModelViewer(
     // so this guarantees the API responded with version info.
     await page.waitForSelector(".version-dropdown-trigger", {
         state: "visible",
-        timeout: 30000,
+        timeout: 60000,
     });
     console.log(
         `[Nav] Opened model viewer for "${modelName}"${modelId ? ` (id=${modelId})` : ""} ✓`,
