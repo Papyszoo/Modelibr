@@ -225,31 +225,26 @@ When("I restore the recycled sound via UI", async ({ page }) => {
 Then(
     "the sound should be removed from the recycled sounds section",
     async ({ page }) => {
-        // Check that the sounds section is either gone or has no cards
-        const soundsSection = page.locator(
-            '.recycled-section[data-section="sounds"]',
-        );
-        const sectionVisible = await soundsSection
-            .isVisible()
-            .catch(() => false);
+        const tracked = soundsByAlias.get(lastRecycledSoundName!);
 
-        if (sectionVisible) {
-            const soundCards = soundsSection.locator(".recycled-card");
-            const tracked = soundsByAlias.get(lastRecycledSoundName!);
-            if (tracked) {
-                // Verify the specific sound is no longer present
-                const cardCount = await soundCards.count();
-                let nameFound = false;
-                for (let i = 0; i < cardCount; i++) {
-                    const cardText = await soundCards.nth(i).textContent();
-                    if (cardText && cardText.includes(tracked.name)) {
-                        nameFound = true;
-                        break;
-                    }
-                }
-                expect(nameFound).toBe(false);
-            } else {
-                // Generic check: no sound cards remain
+        if (tracked) {
+            // Wait for the specific sound card to disappear from the recycled section
+            const soundCardWithName = page.locator(
+                `.recycled-section[data-section="sounds"] .recycled-card:has-text("${tracked.name}")`,
+            );
+            await expect(soundCardWithName).toHaveCount(0, { timeout: 15000 });
+        } else {
+            // Generic check: sounds section should be gone or empty
+            await page.waitForTimeout(2000);
+            const soundsSection = page.locator(
+                '.recycled-section[data-section="sounds"]',
+            );
+            const sectionVisible = await soundsSection
+                .isVisible()
+                .catch(() => false);
+
+            if (sectionVisible) {
+                const soundCards = soundsSection.locator(".recycled-card");
                 await expect(soundCards).toHaveCount(0, { timeout: 10000 });
             }
         }

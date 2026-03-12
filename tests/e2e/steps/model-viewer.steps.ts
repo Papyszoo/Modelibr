@@ -46,14 +46,15 @@ Then("the 3D canvas should be visible", async ({ page }) => {
     const versionDropdown = page.locator(".version-dropdown-trigger");
     const ciTimeout = process.env.CI ? 60000 : 15000;
     const dropdownVisible = await versionDropdown
-        .isVisible({ timeout: ciTimeout })
+        .waitFor({ state: "visible", timeout: ciTimeout })
+        .then(() => true)
         .catch(() => false);
 
     if (!dropdownVisible) {
         // Version dropdown never appeared — check for genuine error state
         const noVersionsError = page.locator("text=No versions available");
         const isErrorVisible = await noVersionsError
-            .isVisible({ timeout: 2000 })
+            .isVisible()
             .catch(() => false);
         const currentUrl = page.url();
         if (isErrorVisible) {
