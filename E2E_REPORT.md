@@ -8,8 +8,8 @@
 **Step Definition Files:** 30 (~16,000 lines)
 **CI Platform:** GitHub Actions (`ubuntu-latest`)
 **Local Run Time:** ~10.5 min (macOS, 3 workers)
-**CI Run Time:** ~53.5 min (initial) → ~37.5 min (after 3 rounds) → TBD (after round 4)
-**Test Results:** 12 failures (initial) → 5 failures (round 3) → TBD (round 4)
+**CI Run Time:** ~53.5 min (initial) → ~37.5 min (after 3 rounds) → **36.2 min (after round 4)**
+**Test Results:** 12 failures (initial) → 5 failures (round 3) → **2 failures, 0 flaky (round 4)**
 
 ---
 
@@ -37,8 +37,8 @@ The Modelibr E2E test suite is **comprehensive and well-structured**, covering 1
 | Coverage breadth | 9/10 | Covers all major features end-to-end |
 | Test quality | 7/10 | Good isolation, some interdependency issues |
 | Readability | 9/10 | Gherkin BDD is excellent for stakeholder communication |
-| CI reliability | 4/10 | 12 failures initially → 5 after 3 rounds → TBD round 4 |
-| Performance | 3/10 | 53.5 min → 37.5 min CI time, targeting ~30 min |
+| CI reliability | 6/10 | 12 failures → 2 inherent after 4 fix rounds, 0 flaky |
+| Performance | 5/10 | 53.5 min → 36.2 min CI time (retries 2→1, workers 4→3) |
 | Maintainability | 6/10 | Large step files (2500+ lines), some duplication |
 | ROI | 7/10 | Has caught real regressions, but CI flakiness undermines trust |
 
@@ -255,6 +255,19 @@ await locator.waitFor({ state: "visible", timeout: 5000 })
 ```
 
 This affected **25+ call sites** and was the root cause of at least 5 test failures on CI where elements hadn't rendered yet but the instant check returned `false`.
+
+### Round 4 Results (CI Run 22984626055)
+
+**153 passed, 2 failed, 0 flaky in 36.2 minutes**
+
+The only 2 remaining failures are **inherent Blender speed limitations** on CI:
+1. **Mixed format thumbnail** — Blender rendering EXR+PNG exceeds 720s timeout on 2 vCPU runners
+2. **SignalR notification** — Asset-processor never completes thumbnail generation in time
+
+These cannot be fixed with timeout adjustments. They require either:
+- Moving to a "nightly" test suite (recommended)
+- Running on beefier CI runners
+- Reducing Blender render complexity further
 
 ---
 
