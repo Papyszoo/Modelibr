@@ -20,8 +20,8 @@ Testing philosophy: Tests should be readable documentation, not just coverage me
 | `features/01-model-viewer/`            | 3D rendering, version switching                                                                                                                                                                                                                                                                            |
 | `features/02-dock-system/`             | Tab state management, deduplication, persistence, cross-panel tab independence (2 scenarios)                                                                                                                                                                                                               |
 | `features/03-upload-window/`           | Progress tracking, batch uploads                                                                                                                                                                                                                                                                           |
-| `features/04-recycled-files/`          | Soft delete, restore, permanent delete of models/versions/texture sets/sprites/sounds; file deletion real-time panel updates (`08-file-deletion-realtime.feature`); `RecycledFilesPage` supports left + right panel via `goto()` / `gotoInRightPanel()`; `refresh()` reloads page (Refresh button removed) |
-| `features/10-texture-set-kind.feature` | Kind tabs, creating with kind, changing kind via API, drag-drop between tabs, default tab, thumbnail auto-generation, context menu, regenerate action, tab persistence, API filtering, global texture file upload (14 scenarios)                                                                           |
+| `features/04-recycled-files/`          | Soft delete, restore, permanent delete of models/versions/texture sets/sprites/sounds; file deletion real-time panel updates (`08-file-deletion-realtime.feature`); `RecycledFilesPage` supports left + right panel via `goto()` / `gotoInRightPanel()`; `refresh()` reloads page (Refresh button removed). Steps split into 5 domain files: `recycled-files-common`, `-models`, `-textures`, `-sprites`, `-sounds` |
+| `features/10-texture-set-kind.feature` | Kind tabs, creating with kind, changing kind via API, drag-drop between tabs, thumbnail auto-generation, context menu, persistence, API filtering, global texture files (8 consolidated scenarios, down from 14)                                                                                           |
 
 **Running E2E tests:**
 
@@ -36,7 +36,8 @@ npm run test:quick       # Quick run (existing containers, two-phase execution)
 E2E tests use a two-phase approach for reliable parallel execution:
 
 1. **Phase 1 — Setup** (`workers=1`, `PW_PHASE=setup`): Creates shared test data (models, texture sets) sequentially to avoid asset processor overload. State is persisted to `.setup-state.json` via the setup-state-bridge.
-2. **Phase 2 — Chromium** (`workers=N`, no `PW_PHASE`): Runs all test features in parallel using `N` workers. Auto-provisioning reads the bridge file to recover exact model/texture IDs from setup.
+2. **Phase 2 — Chromium** (`workers=N`, no `PW_PHASE`): Runs fast test features in parallel using `N` workers. Tests tagged `@slow` are excluded.
+3. **Phase 3 — Slow** (`workers=1`): Runs `@slow`-tagged tests sequentially to avoid asset-processor contention. Includes mixed-format-thumbnail, SignalR, blend-upload, and thumbnail auto-gen scenarios.
 
 **Key files:**
 
@@ -249,19 +250,23 @@ Several scenarios override the default 90 s test timeout via the `@timeout:VALUE
 
 ### Slow Test Files and Worker Count
 
-Two test files are inherently slow because they wait on Blender/asset-processor thumbnail generation:
+Slow tests are tagged `@slow` and run in a dedicated `slow` Playwright project (workers=1, timeout=720s):
 
-| File                                                | Typical duration | Why slow                                                 |
-| --------------------------------------------------- | ---------------- | -------------------------------------------------------- |
-| `00-texture-sets/12-mixed-format-thumbnail.feature` | ~10 min          | Polls API up to 600 s for thumbnail with mixed PNG + EXR |
-| `08-signalr/01-signalr-notifications.feature`       | ~6 min           | Waits for real SignalR `ThumbnailStatusChanged` event    |
+| File                                                | Tag    | Typical duration | Why slow                                                 |
+| --------------------------------------------------- | ------ | ---------------- | -------------------------------------------------------- |
+| `00-texture-sets/12-mixed-format-thumbnail.feature` | @slow  | ~10 min          | Polls API up to 600 s for thumbnail with mixed PNG + EXR |
+| `08-signalr/01-signalr-notifications.feature`       | @slow  | ~6 min           | Waits for real SignalR `ThumbnailStatusChanged` event    |
+| `15-blend-upload/blend-upload.feature`               | @slow  | ~8 min           | Blender .blend → .glb conversion + thumbnail             |
+| `10-texture-set-kind.feature` (scenario 5)          | @slow  | ~4 min           | Thumbnail auto-gen on kind change to Universal           |
 
-**Worker count is set to 3 locally (4 on CI)** so both slow tests each get a dedicated worker while a third worker drains all fast tests. With workers=2 both slow tests could share a worker with fast tests, blocking total time to ~13 min. With workers=3 total time drops to ~10.5 min (bounded by the slowest thumbnail, not queuing).
+**Three Playwright projects**: `setup` (workers=1, sequential), `chromium` (workers=3, fast tests), `slow` (workers=1, sequential). The `chromium` project excludes `@slow` tests via `grepInvert`.
 
 ```
-workers: 3  # local — run-e2e.js, package.json test:quick, playwright.config.ts default
-workers: 4  # CI    — run-e2e.js
+workers: 3  # chromium project — run-e2e.js, package.json test:quick
+workers: 1  # slow project — sequential to avoid asset-processor contention
 ```
+
+A **nightly workflow** (`.github/workflows/nightly-e2e.yml`) runs slow tests independently at 3 AM UTC daily.
 
 **DB sharding** (per-worker database isolation) is not implemented. The Docker e2e stack uses a single WebAPI + single PostgreSQL container, so per-worker DB routing would require N WebAPI+DB container pairs — impractical overhead. The existing `PARALLEL_DB` / `resolveDatabaseName()` stub in `db-helper.ts` only scopes direct DB queries; it has no effect on the API. The Load More loop in step files and global cleanup before each phase are the correct mitigations for data accumulation.
 
