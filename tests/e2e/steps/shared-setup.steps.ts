@@ -771,6 +771,8 @@ Then("the texture set should be linked to the model", async ({ page }) => {
  * This allows the test screenshot to show all available versions.
  */
 Then("the version dropdown should be open", async ({ page }) => {
+    const modelViewer = new ModelViewerPage(page);
+
     // Close any open dialogs first (e.g., upload confirmation)
     const closeButtons = page.locator(
         'button[aria-label="Close"], .p-dialog-header-close',
@@ -801,19 +803,18 @@ Then("the version dropdown should be open", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
 
     // Wait for dropdown trigger to be visible with longer timeout
-    const dropdownTrigger = page.locator(".version-dropdown-trigger");
-    await dropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
+    await modelViewer.versionDropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
 
     // Click with retry logic
     try {
-        await dropdownTrigger.click();
+        await modelViewer.versionDropdownTrigger.click();
     } catch (e) {
         console.log("[Screenshot] First click failed, retrying...");
-        await dropdownTrigger.waitFor({ state: "visible", timeout: 2000 });
-        await dropdownTrigger.click({ force: true });
+        await modelViewer.versionDropdownTrigger.waitFor({ state: "visible", timeout: 2000 });
+        await modelViewer.versionDropdownTrigger.click({ force: true });
     }
 
-    await page.waitForSelector(".version-dropdown-menu", {
+    await modelViewer.versionDropdownMenu.waitFor({
         state: "visible",
         timeout: 5000,
     });

@@ -2,6 +2,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { getScenarioState } from "../fixtures/shared-state";
 import { navigateToAppClean } from "../helpers/navigation-helper";
+import { ModelListPage } from "../pages/ModelListPage";
 
 const { Given, When, Then } = createBdd();
 
@@ -17,35 +18,14 @@ When(
             throw new Error(`Pack "${packName}" not found in shared state`);
         }
 
-        // Click the packs multiselect dropdown (first one in filter bar)
-        const packsMultiselect = page
-            .locator(".filter-bar .p-multiselect")
-            .first();
-        await packsMultiselect.click();
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "visible", timeout: 5000 });
-
-        // Select the pack option in the dropdown panel
-        const packOption = page.locator(
-            `.p-multiselect-panel .p-multiselect-item:has-text("${packName}")`,
-        );
-        await packOption.click();
-
-        // Close the dropdown by pressing Escape
-        await page.keyboard.press("Escape");
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "hidden", timeout: 5000 });
+        const modelListPage = new ModelListPage(page);
+        await modelListPage.filterByPack(packName);
 
         // Wait for filtered results to load
         await page.waitForLoadState("domcontentloaded");
 
         // Assert filter was applied - check for filter token/chip
-        const packFilterToken = page.locator(
-            ".filter-bar .p-multiselect-token",
-        );
-        await expect(packFilterToken.first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
         console.log(`[Action] Filtered model list by pack "${packName}"`);
     },
 );
@@ -60,71 +40,20 @@ When(
             );
         }
 
-        // Click the projects multiselect dropdown (should be second in filter bar, or first if no packs)
-        // We'll use placeholder text to identify
-        const projectsMultiselect = page.locator(
-            '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
-        );
-        await projectsMultiselect.click();
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "visible", timeout: 5000 });
-
-        // Select the project option in the dropdown panel
-        const projectOption = page.locator(
-            `.p-multiselect-panel .p-multiselect-item:has-text("${projectName}")`,
-        );
-        await projectOption.click();
-
-        // Close the dropdown by pressing Escape
-        await page.keyboard.press("Escape");
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "hidden", timeout: 5000 });
+        const modelListPage = new ModelListPage(page);
+        await modelListPage.filterByProject(projectName);
 
         // Assert filter was applied - check for filter token/chip
-        const projectFilterToken = page.locator(
-            ".filter-bar .p-multiselect-token",
-        );
-        await expect(projectFilterToken.first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
         console.log(`[Action] Filtered model list by project "${projectName}"`);
     },
 );
 
 When("I clear the model list filter", async ({ page }) => {
-    // Click the clear filters button if visible
-    const clearButton = page.locator(".clear-filters-btn");
-    if (await clearButton.isVisible()) {
-        await clearButton.click();
-        await page.waitForLoadState("domcontentloaded");
-        const remainingTokens1 = page.locator(
-            ".filter-bar .p-multiselect-token",
-        );
-        expect(await remainingTokens1.count()).toBe(0);
-        console.log("[Action] Cleared model list filter via clear button");
-    } else {
-        // If no clear button, clear individual multiselects
-        const packsClear = page
-            .locator(".filter-bar .p-multiselect")
-            .first()
-            .locator(".p-multiselect-clear-icon");
-        if (await packsClear.isVisible()) {
-            await packsClear.click();
-        }
-        const projectsClear = page
-            .locator(".filter-bar .p-multiselect")
-            .nth(1)
-            .locator(".p-multiselect-clear-icon");
-        if (await projectsClear.isVisible()) {
-            await projectsClear.click();
-        }
-        await page.waitForLoadState("domcontentloaded");
-        const remainingTokens2 = page.locator(
-            ".filter-bar .p-multiselect-token",
-        );
-        expect(await remainingTokens2.count()).toBe(0);
-        console.log("[Action] Cleared model list filter");
-    }
+    const modelListPage = new ModelListPage(page);
+    await modelListPage.clearFilters();
+    expect(await modelListPage.getFilterTokens().count()).toBe(0);
+    console.log("[Action] Cleared model list filter");
 });
 
 // ============= Precondition Steps =============
@@ -215,28 +144,11 @@ Given(
             throw new Error(`Pack "${packName}" not found in shared state`);
         }
 
-        // Apply the filter using multiselect
-        const packsMultiselect = page
-            .locator(".filter-bar .p-multiselect")
-            .first();
-        await packsMultiselect.click();
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "visible", timeout: 5000 });
-
-        const packOption = page.locator(
-            `.p-multiselect-panel .p-multiselect-item:has-text("${packName}")`,
-        );
-        await packOption.click();
-
-        await page.keyboard.press("Escape");
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "hidden", timeout: 5000 });
+        const modelListPage = new ModelListPage(page);
+        await modelListPage.filterByPack(packName);
 
         // Assert filter chip is visible
-        const packChip = page.locator(".filter-bar .p-multiselect-token");
-        await expect(packChip.first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
         console.log(`[Precondition] Model list filtered by pack "${packName}"`);
     },
 );
@@ -251,28 +163,11 @@ Given(
             );
         }
 
-        // Apply the filter using multiselect
-        const projectsMultiselect = page.locator(
-            '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
-        );
-        await projectsMultiselect.click();
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "visible", timeout: 5000 });
-
-        const projectOption = page.locator(
-            `.p-multiselect-panel .p-multiselect-item:has-text("${projectName}")`,
-        );
-        await projectOption.click();
-
-        await page.keyboard.press("Escape");
-        await page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "hidden", timeout: 5000 });
+        const modelListPage = new ModelListPage(page);
+        await modelListPage.filterByProject(projectName);
 
         // Assert filter chip is visible
-        const projectChip = page.locator(".filter-bar .p-multiselect-token");
-        await expect(projectChip.first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
         console.log(
             `[Precondition] Model list filtered by project "${projectName}"`,
         );
@@ -297,9 +192,8 @@ Then(
             `[Debug] Looking for model card with name: "${model.name}" (state name: "${modelStateName}")`,
         );
 
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        const modelListPage = new ModelListPage(page);
+        const modelCard = modelListPage.getModelCard(model.name);
         await expect(modelCard).toBeVisible({ timeout: 10000 });
         console.log(`[UI] Model "${model.name}" is visible in model list ✓`);
     },
@@ -310,8 +204,8 @@ Then("the model list should show all models", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
 
     // Verify no filter chips are visible (filters are cleared)
-    const filterChips = page.locator(".filter-bar .p-multiselect-token");
-    const chipCount = await filterChips.count();
+    const modelListPage = new ModelListPage(page);
+    const chipCount = await modelListPage.getFilterTokens().count();
     expect(chipCount).toBe(0);
     console.log("[UI] Model list is showing all models (no filters active) ✓");
 });

@@ -169,7 +169,9 @@ export class SettingsPage {
 
     async isSuccessVisible(): Promise<boolean> {
         try {
-            await this.page.locator(this.successBanner).waitFor({ state: "visible", timeout: 10000 });
+            await this.page
+                .locator(this.successBanner)
+                .waitFor({ state: "visible", timeout: 10000 });
             return true;
         } catch {
             return false;

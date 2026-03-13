@@ -1,4 +1,4 @@
-@blend @timeout:720000
+@blend @timeout:720000 @slow
 Feature: Blend File Upload and Processing
   Tests for uploading .blend files via WebDAV and frontend API paths.
   Verifies .glb extraction by the asset-processor and thumbnail generation.

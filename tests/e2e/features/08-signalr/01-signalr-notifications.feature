@@ -1,4 +1,4 @@
-@depends-on:setup
+@depends-on:setup @slow
 Feature: SignalR Real-Time Notifications
   Tests that SignalR WebSocket connections deliver real-time updates
   for thumbnail generation and model CRUD operations.

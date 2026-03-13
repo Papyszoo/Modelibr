@@ -250,42 +250,30 @@ When(
 );
 
 When("I delete version {int}", async ({ page }, versionIndex: number) => {
-    // Determine which version to delete (1-based index from bottom/top?)
-    // Assuming we want to delete a specific version item from the list
-    // The list selector needs to match VersionStrip implementation
-    const versionItems = page.locator(".version-dropdown-item");
-    const count = await versionItems.count();
+    const modelViewer = new ModelViewerPage(page);
+    const count = await modelViewer.versionItems.count();
 
     // Safety check
     if (count <= 1) {
         throw new Error("Cannot delete version: only 1 version exists");
     }
 
-    // Find the trash button on the specified item (or just the first one that isn't active/latest if index logic is complex)
-    // For simplicity, let's delete the first available non-active version or just the 2nd item
-    const targetItem = versionItems.nth(count - 1); // Delete the oldest version (last in list?) or just use index
+    const targetItem = modelViewer.versionItems.nth(count - 1);
 
     // Click the recycle/trash button
-    // Selector from VersionStrip.tsx: .version-recycle-btn
     const deleteBtn = targetItem.locator(".version-recycle-btn");
     await deleteBtn.click();
 
-    // Handle toast/confirmation implicitly via shared state update or UI check
     console.log(`[Action] Deleted version (index: ${versionIndex})`);
 });
 
 Then(
     "the model should have {int} version remaining",
     async ({ page }, expectedCount: number) => {
-        // Re-open dropdown to check count if needed, or check header
-        // Actually, checking the dropdown items count is better
-        const dropdown = page.locator(".version-dropdown-trigger");
-        if (!(await page.locator(".version-dropdown-menu").isVisible())) {
-            await dropdown.click();
-        }
+        const modelViewer = new ModelViewerPage(page);
+        await modelViewer.openVersionDropdown();
 
-        const versionItems = page.locator(".version-dropdown-item");
-        await expect(versionItems).toHaveCount(expectedCount);
+        await expect(modelViewer.versionItems).toHaveCount(expectedCount);
 
         console.log(
             `[Verify] Model has ${expectedCount} version(s) remaining ✓`,

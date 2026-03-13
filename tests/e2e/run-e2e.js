@@ -164,18 +164,27 @@ async function main() {
         { env: chromiumEnv },
     );
 
+    console.log(`\n📋 Phase 3: Slow tests (workers=1)\n`);
+    const slowEnv = { ...testEnv, PW_WORKERS: "1" };
+    const slowResult = run(
+        `npx playwright test --project=slow --no-deps ${args}`,
+        { env: slowEnv },
+    );
+
     // Cleanup
     cleanup();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
-    if (testResult === 0) {
+    const exitCode = testResult !== 0 ? testResult : slowResult;
+
+    if (exitCode === 0) {
         console.log(`\n✅ All tests passed in ${duration}s\n`);
     } else {
         console.log(`\n❌ Tests failed after ${duration}s\n`);
     }
 
-    process.exit(testResult);
+    process.exit(exitCode);
 }
 
 main().catch((err) => {

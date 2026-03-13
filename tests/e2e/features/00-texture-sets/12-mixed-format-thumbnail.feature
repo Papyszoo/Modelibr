@@ -1,4 +1,4 @@
-@mixed-format-thumbnail
+@mixed-format-thumbnail @slow
 Feature: Texture Set Thumbnail with Mixed Image Formats
   Verifies that texture set thumbnail generation succeeds when the
   set contains a mix of standard images (JPEG, PNG) and EXR files.

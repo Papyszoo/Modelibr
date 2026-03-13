@@ -28,7 +28,10 @@ Given("texture set {string} exists", async ({ page }, name: string) => {
     // Create texture set via API with unique name
     const uniqueName = `${name}_${runId}`;
     const textureSet = await apiHelper.createTextureSet(uniqueName);
-    getScenarioState(page).saveTextureSet(name, { id: textureSet.id, name: uniqueName });
+    getScenarioState(page).saveTextureSet(name, {
+        id: textureSet.id,
+        name: uniqueName,
+    });
     console.log(
         `[API] Created texture set "${uniqueName}" with ID ${textureSet.id}`,
     );

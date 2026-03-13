@@ -51,8 +51,18 @@ export default defineConfig({
         {
             name: "chromium",
             testDir,
-            grepInvert: /@setup/,
+            grepInvert: /@setup|@slow/,
             dependencies: ["setup"], // Wait for all setup features to finish
+            use: { ...devices["Desktop Chrome"] },
+        },
+        {
+            name: "slow",
+            testDir,
+            grep: /@slow/,
+            grepInvert: /@setup/,
+            dependencies: ["setup"],
+            fullyParallel: false, // Slow tests run sequentially to avoid asset-processor contention
+            timeout: 720000, // 12 min for Blender rendering
             use: { ...devices["Desktop Chrome"] },
         },
     ],

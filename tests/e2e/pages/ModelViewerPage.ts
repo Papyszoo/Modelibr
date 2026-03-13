@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { Page, expect, Locator } from "@playwright/test";
 
 export class ModelViewerPage {
     constructor(private page: Page) {}
@@ -10,6 +10,32 @@ export class ModelViewerPage {
         // Also wait for the canvas to be present
         await expect(this.page.locator("canvas")).toBeVisible({
             timeout: 30000,
+        });
+    }
+
+    /** Version dropdown trigger button */
+    get versionDropdownTrigger(): Locator {
+        return this.page.locator(".version-dropdown-trigger");
+    }
+
+    /** Version dropdown menu container */
+    get versionDropdownMenu(): Locator {
+        return this.page.locator(".version-dropdown-menu");
+    }
+
+    /** All version dropdown items */
+    get versionItems(): Locator {
+        return this.page.locator(".version-dropdown-item");
+    }
+
+    /** Open the version dropdown menu if not already open */
+    async openVersionDropdown(): Promise<void> {
+        if (!(await this.versionDropdownMenu.isVisible())) {
+            await this.versionDropdownTrigger.click();
+        }
+        await this.versionDropdownMenu.waitFor({
+            state: "visible",
+            timeout: 5000,
         });
     }
 

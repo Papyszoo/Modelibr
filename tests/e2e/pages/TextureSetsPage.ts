@@ -194,6 +194,26 @@ export class TextureSetsPage {
     }
 
     /**
+     * Get a texture set card locator filtered by name
+     */
+    getCardByName(name: string): Locator {
+        return this.textureSetCards.filter({
+            has: this.page.locator(
+                `.texture-set-card-name:has-text("${name}")`,
+            ),
+        });
+    }
+
+    /**
+     * Wait for the texture set list container to be visible
+     */
+    async waitForList(): Promise<void> {
+        await this.page.waitForSelector(".texture-set-list", {
+            timeout: 10000,
+        });
+    }
+
+    /**
      * Right-click on a texture set to open context menu
      * @param name - Name of the texture set
      */
