@@ -47,11 +47,22 @@ Given("I open the model info panel", async ({ page }) => {
 
 Given("the model has at least one tag", async ({ page }) => {
     const infoPanel = page.locator('[data-testid="model-info-panel"]');
-    const existingTags = infoPanel.locator(".p-chip");
-    const count = await existingTags.count();
 
-    if (count === 0) {
-        // Add a tag so we have at least one to remove
+    // Wait for tags to finish loading — the ModelInfo component initialises
+    // from model.tags on mount, but render may lag behind the data fetch.
+    // Poll until the chip count stabilises (unchanged for 500 ms).
+    let stableCount = 0;
+    await expect(async () => {
+        const c = await infoPanel.locator(".p-chip").count();
+        // On the very first poll stableCount is 0; accept any positive value.
+        if (c > 0) {
+            stableCount = c;
+        }
+        expect(stableCount).toBeGreaterThan(0);
+    }).toPass({ timeout: 10000, intervals: [500, 500, 500] });
+
+    if (stableCount === 0) {
+        // Fallback: add a tag so we have at least one to remove
         console.log("[Setup] No tags found, adding one...");
         const tagInput = infoPanel.locator(
             'input[placeholder="Add new tag..."], .tag-input',
@@ -68,10 +79,10 @@ Given("the model has at least one tag", async ({ page }) => {
         await saveButton.click();
         await page.waitForTimeout(1000);
         console.log("[Setup] Added setup tag and saved ✓");
+        stableCount = await infoPanel.locator(".p-chip").count();
     }
 
-    // Record current tag count for later verification
-    tagCountBeforeRemove = await infoPanel.locator(".p-chip").count();
+    tagCountBeforeRemove = stableCount;
     console.log(`[State] Current tag count: ${tagCountBeforeRemove}`);
     expect(tagCountBeforeRemove).toBeGreaterThan(0);
 });
@@ -99,8 +110,15 @@ When("I add the tag {string}", async ({ page }, tag: string) => {
 When("I remove the first tag", async ({ page }) => {
     const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
-    // Record count before removal
-    tagCountBeforeRemove = await infoPanel.locator(".p-chip").count();
+    // Wait for tag count to stabilise before recording — the component may
+    // still be rendering chips from a fresh React Query fetch.
+    let initialCount = 0;
+    await expect(async () => {
+        initialCount = await infoPanel.locator(".p-chip").count();
+        expect(initialCount).toBeGreaterThan(0);
+    }).toPass({ timeout: 10000, intervals: [500, 500, 500] });
+
+    tagCountBeforeRemove = initialCount;
     console.log(`[State] Tags before removal: ${tagCountBeforeRemove}`);
 
     // Click the remove icon on the first tag chip
@@ -258,11 +276,17 @@ Then("the tag count should have decreased", async ({ page }) => {
     const infoPanel = page.locator('[data-testid="model-info-panel"]');
     await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
-    const currentCount = await infoPanel.locator(".p-chip").count();
-    console.log(
-        `[Verify] Tags before: ${tagCountBeforeRemove}, after reload: ${currentCount} (modelId: ${openedModelId})`,
-    );
-    expect(currentCount).toBeLessThan(tagCountBeforeRemove);
+    // Use a retrying assertion — the ModelInfo component initialises tags
+    // from the model prop, but the first render may use stale/cached data
+    // before React Query delivers the fresh payload.
+    await expect(async () => {
+        const currentCount = await infoPanel.locator(".p-chip").count();
+        console.log(
+            `[Verify] Tags before: ${tagCountBeforeRemove}, after reload: ${currentCount} (modelId: ${openedModelId})`,
+        );
+        expect(currentCount).toBeLessThan(tagCountBeforeRemove);
+    }).toPass({ timeout: 15000, intervals: [1000, 1000, 2000, 2000] });
+
     console.log("[Verify] Tag count decreased after reload ✓");
 });
 

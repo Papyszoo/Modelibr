@@ -5,7 +5,7 @@ import { Button } from 'primereact/button'
 import { Chip } from 'primereact/chip'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { updateModelTags } from '@/features/models/api/modelApi'
 import { getModelFileFormat } from '@/utils/fileUtils'
@@ -17,6 +17,12 @@ export function ModelInfo({ model, onModelUpdated }) {
   const [description, setDescription] = useState(model.description || '')
   const [newTag, setNewTag] = useState('')
   const queryClient = useQueryClient()
+
+  // Sync local state when the model prop updates (e.g. after React Query refetch)
+  useEffect(() => {
+    setTags(model.tags ? model.tags.split(', ').filter(t => t.trim()) : [])
+    setDescription(model.description || '')
+  }, [model.id, model.tags, model.description])
 
   const invalidateModelQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['models'] })

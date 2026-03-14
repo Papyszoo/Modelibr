@@ -35,14 +35,36 @@ export class ProjectsPage {
     async navigateToProjectList(): Promise<void> {
         for (let attempt = 1; attempt <= 3; attempt++) {
             await navigateToAppClean(this.page);
+
+            // Set up response listener BEFORE opening the tab so we don't
+            // miss the GET /projects call that fires when the component mounts.
+            const projectsResponsePromise = this.page.waitForResponse(
+                (resp) =>
+                    resp.url().includes("/projects") &&
+                    resp.request().method() === "GET" &&
+                    resp.status() === 200,
+                { timeout: 30000 },
+            );
+
             await openTabViaMenu(this.page, "projects", "left");
 
-            // Wait for project list content (cards or empty state) with 20s timeout.
-            // This covers lazy chunk loading, component mount, and API data fetch.
+            // Wait for the API response to confirm data has been fetched
+            const apiResolved = await projectsResponsePromise
+                .then(() => true)
+                .catch(() => false);
+
+            if (!apiResolved) {
+                console.log(
+                    `[Navigation] GET /projects response not received (attempt ${attempt})`,
+                );
+                continue;
+            }
+
+            // Now wait for the DOM to render either cards or empty state
             const contentFound = await this.page
                 .waitForSelector(
                     ".project-grid-card, .project-list-empty",
-                    { timeout: 20000 },
+                    { timeout: 10000 },
                 )
                 .then(() => true)
                 .catch(() => false);
@@ -62,7 +84,7 @@ export class ProjectsPage {
                 .isVisible()
                 .catch(() => false);
             console.log(
-                `[Navigation] Project list content not found (attempt ${attempt}): header=${hasHeader}, loading=${isLoading}`,
+                `[Navigation] Project list content not found after API response (attempt ${attempt}): header=${hasHeader}, loading=${isLoading}`,
             );
         }
         throw new Error(
@@ -190,35 +212,10 @@ export class ProjectsPage {
 
     async openProject(projectName: string): Promise<void> {
         const projectCard = this.getProjectCard(projectName);
-        // Log all visible project cards for debugging
-        const allCards = this.page.locator(".project-grid-card");
-        const count = await allCards.count();
-        if (count === 0) {
-            console.log(
-                "[Debug] No project cards visible. Checking for empty/loading state...",
-            );
-            const isEmpty = await this.page
-                .locator(".project-list-empty")
-                .isVisible()
-                .catch(() => false);
-            const isLoading = await this.page
-                .locator(".project-list-loading")
-                .isVisible()
-                .catch(() => false);
-            console.log(
-                `[Debug] Empty state: ${isEmpty}, Loading state: ${isLoading}`,
-            );
-        } else {
-            const cardTexts: string[] = [];
-            for (let i = 0; i < Math.min(count, 10); i++) {
-                const text = await allCards.nth(i).textContent();
-                cardTexts.push(text?.substring(0, 50) ?? "");
-            }
-            console.log(
-                `[Debug] Found ${count} project cards: ${cardTexts.join(" | ")}`,
-            );
-        }
-        await projectCard.click({ timeout: 30000 });
+
+        // Wait for the specific card to be visible before clicking
+        await projectCard.waitFor({ state: "visible", timeout: 30000 });
+        await projectCard.click();
         await this.page.waitForLoadState("domcontentloaded");
         console.log(`[Navigation] Opened project: ${projectName}`);
     }
