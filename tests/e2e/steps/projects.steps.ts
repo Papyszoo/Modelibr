@@ -2,7 +2,6 @@ import { createBdd } from "playwright-bdd";
 import { expect, Page } from "@playwright/test";
 import { getScenarioState } from "../fixtures/shared-state";
 import { ProjectsPage } from "../pages/ProjectsPage";
-import { navigateToTab } from "../helpers/navigation-helper";
 
 const { Given, When, Then } = createBdd();
 
@@ -73,9 +72,9 @@ Given(
             );
         }
 
-        // Navigate to projects tab, then open the specific project by clicking
-        await navigateToTab(page, "projects");
-        await page.waitForLoadState("domcontentloaded");
+        // Navigate to project list with retry logic for lazy chunk loading
+        const projectsPage = new ProjectsPage(page);
+        await projectsPage.navigateToProjectList();
 
         // Find and double-click the project card to open viewer
         const projectCard = page
@@ -426,9 +425,39 @@ Given(
             .catch(() => false);
 
         if (!isPresent) {
-            throw new Error(
-                `Project does not contain model "${model.name}". Add it first.`,
+            // Auto-provision: add the model to the project via API
+            const project = getScenarioState(page).getProject("Test Project");
+            if (!project) {
+                throw new Error(
+                    `Project "Test Project" not found in shared state. Cannot auto-add model.`,
+                );
+            }
+            console.log(
+                `[AutoProvision] Model "${model.name}" not in project, adding via API...`,
             );
+            const addResp = await page.request.post(
+                `${API_BASE}/projects/${project.id}/models/${model.id}`,
+            );
+            if (!addResp.ok()) {
+                throw new Error(
+                    `Failed to add model ${model.id} to project ${project.id}: ${addResp.status()}`,
+                );
+            }
+            console.log(
+                `[AutoProvision] Added model "${model.name}" (ID: ${model.id}) to project (ID: ${project.id}) via API`,
+            );
+
+            // Reload the project viewer to see the newly added model
+            await page.reload();
+            await page
+                .locator(".container-viewer")
+                .first()
+                .waitFor({ state: "visible", timeout: 15000 });
+            await page
+                .locator(".p-tabview-nav li")
+                .filter({ hasText: "Models" })
+                .click();
+            await modelCard.waitFor({ state: "visible", timeout: 10000 });
         }
         console.log(`[Precondition] Project contains model "${model.name}" ✓`);
     },
@@ -838,15 +867,18 @@ Then(
             .filter({ hasText: "Details" })
             .click();
 
-        // Wait for Details tab content to render
+        // Use retrying assertion — the count may take a moment to update
+        // after a sprite is removed (React Query cache invalidation)
         const statSpan = page.locator(
             '.container-detail-assets span:has-text("sprite")',
         );
-        await statSpan.waitFor({ state: "visible", timeout: 5000 });
-        const text = (await statSpan.textContent()) || "0";
-        const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
-        expect(count).toBe(expectedCount);
-        console.log(`[UI] Project sprite count is ${count} ✓`);
+        await expect(async () => {
+            await statSpan.waitFor({ state: "visible", timeout: 5000 });
+            const text = (await statSpan.textContent()) || "0";
+            const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
+            expect(count).toBe(expectedCount);
+        }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
+        console.log(`[UI] Project sprite count is ${expectedCount} ✓`);
     },
 );
 

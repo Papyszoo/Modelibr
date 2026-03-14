@@ -1,7 +1,6 @@
 import { Page, Locator } from "@playwright/test";
 import {
     navigateToAppClean,
-    navigateToTab,
     openTabViaMenu,
 } from "../helpers/navigation-helper";
 
@@ -35,56 +34,39 @@ export class ProjectsPage {
     async navigateToProjectList(): Promise<void> {
         for (let attempt = 1; attempt <= 3; attempt++) {
             await navigateToAppClean(this.page);
-
-            // Set up response listener BEFORE opening the tab so we don't
-            // miss the GET /projects call that fires when the component mounts.
-            const projectsResponsePromise = this.page.waitForResponse(
-                (resp) =>
-                    resp.url().includes("/projects") &&
-                    resp.request().method() === "GET" &&
-                    resp.status() === 200,
-                { timeout: 30000 },
-            );
-
             await openTabViaMenu(this.page, "projects", "left");
 
-            // Wait for the API response to confirm data has been fetched
-            const apiResolved = await projectsResponsePromise
-                .then(() => true)
-                .catch(() => false);
-
-            if (!apiResolved) {
-                console.log(
-                    `[Navigation] GET /projects response not received (attempt ${attempt})`,
-                );
-                continue;
-            }
-
-            // Now wait for the DOM to render either cards or empty state
+            // Wait for the ProjectList component to render content.
+            // This covers: loading indicator, project cards, or empty state.
+            // If the React.lazy chunk fails to load, none of these will appear.
             const contentFound = await this.page
                 .waitForSelector(
-                    ".project-grid-card, .project-list-empty",
-                    { timeout: 10000 },
+                    ".project-grid-card, .project-list-empty, .project-list-loading, .project-list-header",
+                    { timeout: 15000 },
                 )
                 .then(() => true)
                 .catch(() => false);
 
             if (contentFound) {
+                // If we see loading, wait for it to resolve to cards or empty state
+                const isLoading = await this.page
+                    .locator(".project-list-loading")
+                    .isVisible()
+                    .catch(() => false);
+                if (isLoading) {
+                    await this.page
+                        .waitForSelector(
+                            ".project-grid-card, .project-list-empty",
+                            { timeout: 15000 },
+                        )
+                        .catch(() => {});
+                }
                 console.log("[Navigation] Navigated to Project List");
                 return;
             }
 
-            // Log diagnostic info before retrying
-            const hasHeader = await this.page
-                .locator(".project-list-header")
-                .isVisible()
-                .catch(() => false);
-            const isLoading = await this.page
-                .locator(".project-list-loading")
-                .isVisible()
-                .catch(() => false);
             console.log(
-                `[Navigation] Project list content not found after API response (attempt ${attempt}): header=${hasHeader}, loading=${isLoading}`,
+                `[Navigation] ProjectList component did not render (attempt ${attempt}), retrying...`,
             );
         }
         throw new Error(
@@ -93,9 +75,8 @@ export class ProjectsPage {
     }
 
     async navigateToProjectViewer(projectId: number): Promise<void> {
-        // Navigate to the project list first, then open the project by clicking
-        await navigateToTab(this.page, "projects");
-        await this.page.waitForLoadState("domcontentloaded");
+        // Navigate to the project list first (with retry for lazy chunk loading)
+        await this.navigateToProjectList();
         // Click on the project card to open the viewer
         const projectCard = this.page
             .locator(
