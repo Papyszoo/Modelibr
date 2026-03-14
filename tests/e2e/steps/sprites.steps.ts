@@ -1026,6 +1026,7 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
     // Click the edit (pencil) button on the category tab
     const editButton = targetTab.locator("button:has(.pi-pencil)");
     await editButton.waitFor({ state: "visible", timeout: 5000 });
+    await editButton.click();
 
     // Wait for dialog using data-testid
     const dialog = page.locator('[data-testid="category-dialog"], .p-dialog');
