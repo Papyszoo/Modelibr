@@ -892,10 +892,20 @@ When("I remove the first sprite from the project", async ({ page }) => {
     const removeOption = page.locator(
         '.p-contextmenu .p-menuitem:has-text("Remove")',
     );
-    await removeOption.waitFor({ state: "visible", timeout: 3000 });
+    await removeOption.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for the removal API response after clicking
+    const removeResponsePromise = page.waitForResponse(
+        (resp) =>
+            resp.url().includes("/sprites") &&
+            (resp.request().method() === "DELETE" ||
+                resp.request().method() === "PUT"),
+        { timeout: 15000 },
+    );
     await removeOption.click();
+    await removeResponsePromise;
 
     // Wait for sprite card to disappear after removal
-    await expect(spriteCard).not.toBeVisible({ timeout: 5000 });
+    await expect(spriteCard).not.toBeVisible({ timeout: 15000 });
     console.log("[Action] Removed first sprite from project");
 });

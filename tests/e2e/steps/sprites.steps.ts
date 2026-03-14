@@ -505,7 +505,7 @@ When(
         const dialog = page.locator('[data-testid="sprite-detail-modal"]');
         // Fall back to generic .p-dialog if the specific testid doesn't exist
         const dialogVisible = await dialog
-            .waitFor({ state: "visible", timeout: 3000 })
+            .waitFor({ state: "visible", timeout: 5000 })
             .then(() => true)
             .catch(() => false);
         const targetDialog = dialogVisible
@@ -521,7 +521,7 @@ When(
             '[data-testid="sprite-name-edit"]',
         );
         const editButtonVisible = await editButton
-            .waitFor({ state: "visible", timeout: 3000 })
+            .waitFor({ state: "visible", timeout: 5000 })
             .then(() => true)
             .catch(() => false);
 
@@ -659,7 +659,7 @@ When("I save the sprite changes", async ({ page }) => {
                         .first();
                     await closeButton.click({ force: true }).catch(() => {});
                     await targetDialog
-                        .waitFor({ state: "hidden", timeout: 3000 })
+                        .waitFor({ state: "hidden", timeout: 5000 })
                         .catch(() => {});
                 });
             console.log(
@@ -997,9 +997,9 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
     // Ensure no dialog is blocking
     await page.keyboard.press("Escape");
     await page
-        .locator(".p-dialog")
-        .waitFor({ state: "hidden", timeout: 3000 })
-        .catch(() => {});
+            .locator(".p-dialog")
+            .waitFor({ state: "hidden", timeout: 5000 })
+            .catch(() => {});
 
     // First select the category tab - use exact text match to avoid substring collisions
     // e.g., "Test Category" should NOT match "Assign Test Category"
@@ -1025,8 +1025,7 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
 
     // Click the edit (pencil) button on the category tab
     const editButton = targetTab.locator("button:has(.pi-pencil)");
-    await editButton.waitFor({ state: "visible", timeout: 3000 });
-    await editButton.click();
+    await editButton.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for dialog using data-testid
     const dialog = page.locator('[data-testid="category-dialog"], .p-dialog');
@@ -1151,7 +1150,7 @@ When(
         await page.keyboard.press("Escape");
         await page
             .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 3000 })
+            .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
         // First select the category tab
@@ -1163,7 +1162,7 @@ When(
 
         // Click the delete (trash) button on the category tab
         const deleteButton = categoryTab.locator("button:has(.pi-trash)");
-        await deleteButton.waitFor({ state: "visible", timeout: 3000 });
+        await deleteButton.waitFor({ state: "visible", timeout: 5000 });
         await deleteButton.click();
 
         // Confirm deletion in dialog

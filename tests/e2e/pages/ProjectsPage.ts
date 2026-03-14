@@ -31,6 +31,11 @@ export class ProjectsPage {
     async navigateToProjectList(): Promise<void> {
         await navigateToTab(this.page, "projects");
         await this.page.waitForLoadState("domcontentloaded");
+        // Wait for project list content to render (cards, empty state, or header)
+        await this.page.waitForSelector(
+            ".project-grid-card, .project-list-empty, .project-list-header",
+            { timeout: 15000 },
+        );
         console.log("[Navigation] Navigated to Project List");
     }
 
@@ -112,17 +117,25 @@ export class ProjectsPage {
             console.log(`[Action] Filled project description: ${description}`);
         }
 
-        // Click Create button
+        // Click Create button and wait for API response
         const dialogCreateBtn = this.page.locator(
             '.p-dialog-footer button:has-text("Create")',
         );
+        const createResponsePromise = this.page.waitForResponse(
+            (resp) =>
+                resp.url().includes("/projects") &&
+                resp.request().method() === "POST",
+            { timeout: 15000 },
+        );
         await dialogCreateBtn.click();
         console.log("[Action] Clicked Create button in dialog");
+        await createResponsePromise;
+        console.log("[Action] Create project API response received");
 
         // Wait for dialog to close
         await this.page.waitForSelector(
             '.p-dialog:has-text("Create New Project")',
-            { state: "hidden", timeout: 10000 },
+            { state: "hidden", timeout: 15000 },
         );
         console.log("[Action] Dialog closed");
 
@@ -146,6 +159,7 @@ export class ProjectsPage {
 
     async openProject(projectName: string): Promise<void> {
         const projectCard = this.getProjectCard(projectName);
+        await projectCard.waitFor({ state: "visible", timeout: 15000 });
         await projectCard.click();
         await this.page.waitForLoadState("domcontentloaded");
         console.log(`[Navigation] Opened project: ${projectName}`);

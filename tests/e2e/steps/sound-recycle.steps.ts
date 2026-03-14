@@ -235,10 +235,11 @@ Then(
             await expect(soundCardWithName).toHaveCount(0, { timeout: 15000 });
         } else {
             // Generic check: sounds section should be gone or empty
-            await page.waitForTimeout(2000);
             const soundsSection = page.locator(
                 '.recycled-section[data-section="sounds"]',
             );
+            // Wait for the section to either disappear or have zero cards
+            await page.waitForLoadState("domcontentloaded");
             const sectionVisible = await soundsSection
                 .isVisible()
                 .catch(() => false);

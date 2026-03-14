@@ -189,9 +189,7 @@ export class ModelListPage {
      * Get a model card locator by name
      */
     getModelCard(name: string): Locator {
-        return this.page
-            .locator(`.model-card:has-text("${name}")`)
-            .first();
+        return this.page.locator(`.model-card:has-text("${name}")`).first();
     }
 
     /**

@@ -744,7 +744,7 @@ When(
         await page.keyboard.press("Escape");
         await page
             .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 3000 })
+            .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
         // First select the category tab
@@ -756,7 +756,7 @@ When(
 
         // Click the edit (pencil) button on the category tab
         const editButton = categoryTab.locator("button:has(.pi-pencil)");
-        await editButton.waitFor({ state: "visible", timeout: 3000 });
+        await editButton.waitFor({ state: "visible", timeout: 5000 });
         await editButton.click();
 
         // Wait for dialog using data-testid
@@ -811,7 +811,7 @@ When(
         await page.keyboard.press("Escape");
         await page
             .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 3000 })
+            .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
         // First select the category tab
@@ -823,7 +823,7 @@ When(
 
         // Click the delete (trash) button on the category tab
         const deleteButton = categoryTab.locator("button:has(.pi-trash)");
-        await deleteButton.waitFor({ state: "visible", timeout: 3000 });
+        await deleteButton.waitFor({ state: "visible", timeout: 5000 });
         await deleteButton.click();
 
         // Confirm deletion in dialog

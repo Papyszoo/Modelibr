@@ -25,7 +25,9 @@ When(
         await page.waitForLoadState("domcontentloaded");
 
         // Assert filter was applied - check for filter token/chip
-        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({
+            timeout: 5000,
+        });
         console.log(`[Action] Filtered model list by pack "${packName}"`);
     },
 );
@@ -44,7 +46,9 @@ When(
         await modelListPage.filterByProject(projectName);
 
         // Assert filter was applied - check for filter token/chip
-        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({
+            timeout: 5000,
+        });
         console.log(`[Action] Filtered model list by project "${projectName}"`);
     },
 );
@@ -148,7 +152,9 @@ Given(
         await modelListPage.filterByPack(packName);
 
         // Assert filter chip is visible
-        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({
+            timeout: 5000,
+        });
         console.log(`[Precondition] Model list filtered by pack "${packName}"`);
     },
 );
@@ -167,7 +173,9 @@ Given(
         await modelListPage.filterByProject(projectName);
 
         // Assert filter chip is visible
-        await expect(modelListPage.getFilterTokens().first()).toBeVisible({ timeout: 5000 });
+        await expect(modelListPage.getFilterTokens().first()).toBeVisible({
+            timeout: 5000,
+        });
         console.log(
             `[Precondition] Model list filtered by project "${projectName}"`,
         );
@@ -278,7 +286,10 @@ Given(
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
         expect(data.id).toBeTruthy();
-        getScenarioState(page).savePack(packName, { id: data.id, name: packName });
+        getScenarioState(page).savePack(packName, {
+            id: data.id,
+            name: packName,
+        });
         console.log(`[API] Created pack "${packName}" (ID: ${data.id})`);
     },
 );
@@ -572,11 +583,14 @@ Given(
                     ).find((c: any) => c.name === categoryName);
                     if (existing) {
                         expect(existing.id).toBeTruthy();
-                        getScenarioState(page).saveSpriteCategory(categoryName, {
-                            id: existing.id,
-                            name: categoryName,
-                            description: existing.description,
-                        });
+                        getScenarioState(page).saveSpriteCategory(
+                            categoryName,
+                            {
+                                id: existing.id,
+                                name: categoryName,
+                                description: existing.description,
+                            },
+                        );
                         console.log(
                             `[API] Found existing sprite category "${categoryName}" (ID: ${existing.id})`,
                         );

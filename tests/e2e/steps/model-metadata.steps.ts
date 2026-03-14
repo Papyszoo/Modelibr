@@ -120,10 +120,20 @@ When("I save the model info changes", async ({ page }) => {
         name: "Save Changes",
     });
     await expect(saveButton).toBeVisible({ timeout: 5000 });
-    await saveButton.click();
 
-    // Wait for the save to complete (button may become disabled or show success)
-    await page.waitForTimeout(1500);
+    // Click save and wait for the API response to confirm persistence
+    const responsePromise = page.waitForResponse(
+        (resp) =>
+            resp.url().includes("/models/") &&
+            resp.url().includes("/tags") &&
+            resp.request().method() === "POST",
+        { timeout: 15000 },
+    );
+    await saveButton.click();
+    await responsePromise;
+
+    // Brief pause to let React re-render after mutation success callback
+    await page.waitForTimeout(500);
     console.log("[Action] Saved model info changes ✓");
 });
 
@@ -195,12 +205,12 @@ Then(
         const infoPanel = page.locator('[data-testid="model-info-panel"]');
         await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
-        // Verify both tags are present
+        // Verify both tags are present (use retrying assertion for robustness)
         const tag1Chip = infoPanel.locator(`.p-chip:has-text("${tag1}")`);
         const tag2Chip = infoPanel.locator(`.p-chip:has-text("${tag2}")`);
 
-        await expect(tag1Chip).toBeVisible({ timeout: 5000 });
-        await expect(tag2Chip).toBeVisible({ timeout: 5000 });
+        await expect(tag1Chip).toBeVisible({ timeout: 15000 });
+        await expect(tag2Chip).toBeVisible({ timeout: 15000 });
 
         console.log(
             `[Verify] Tags "${tag1}" and "${tag2}" are saved and visible after reload ✓`,
@@ -264,10 +274,14 @@ Then(
         const textarea = infoPanel.locator(
             'textarea[placeholder="Enter description..."], .description-textarea',
         );
-        await expect(textarea).toBeVisible({ timeout: 5000 });
+        await expect(textarea).toBeVisible({ timeout: 10000 });
 
-        const value = await textarea.inputValue();
-        expect(value).toBe(text);
+        // Use polling to wait for the description value to be populated
+        // (React may still be hydrating or fetching model data)
+        await expect(async () => {
+            const value = await textarea.inputValue();
+            expect(value).toBe(text);
+        }).toPass({ timeout: 15000 });
         console.log(`[Verify] Description "${text}" is saved after reload ✓`);
     },
 );

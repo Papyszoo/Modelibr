@@ -803,14 +803,20 @@ Then("the version dropdown should be open", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
 
     // Wait for dropdown trigger to be visible with longer timeout
-    await modelViewer.versionDropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
+    await modelViewer.versionDropdownTrigger.waitFor({
+        state: "visible",
+        timeout: 15000,
+    });
 
     // Click with retry logic
     try {
         await modelViewer.versionDropdownTrigger.click();
     } catch (e) {
         console.log("[Screenshot] First click failed, retrying...");
-        await modelViewer.versionDropdownTrigger.waitFor({ state: "visible", timeout: 2000 });
+        await modelViewer.versionDropdownTrigger.waitFor({
+            state: "visible",
+            timeout: 2000,
+        });
         await modelViewer.versionDropdownTrigger.click({ force: true });
     }
 
