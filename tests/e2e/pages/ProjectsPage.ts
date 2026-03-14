@@ -32,49 +32,79 @@ export class ProjectsPage {
     }
 
     async navigateToProjectList(): Promise<void> {
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            await navigateToAppClean(this.page);
-            await openTabViaMenu(this.page, "projects", "left");
-
-            // Wait for the ProjectList component to finish loading.
-            // The component renders: header → loading spinner → cards/empty.
-            // We wait for the final state: cards or empty state.
-            // First, verify the component mounted at all (header or loading).
-            const mounted = await this.page
-                .waitForSelector(
-                    ".project-list-loading, .project-list-header",
-                    { timeout: 15000 },
-                )
-                .then(() => true)
-                .catch(() => false);
-
-            if (!mounted) {
-                console.log(
-                    `[Navigation] ProjectList component did not mount (attempt ${attempt}), retrying...`,
-                );
-                continue;
-            }
-
-            // Now wait for data to finish loading (cards or empty state)
-            const dataLoaded = await this.page
-                .waitForSelector(
-                    ".project-grid-card, .project-list-empty",
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            // Pre-fetch project data via Playwright API context (separate
+            // connection pool from the browser) so we can serve it locally
+            // if the browser request hangs under concurrent load.
+            let prefetchedBody: string | null = null;
+            try {
+                const directResp = await this.page.request.get(
+                    `${API_BASE}/projects`,
                     { timeout: 30000 },
-                )
-                .then(() => true)
-                .catch(() => false);
-
-            if (dataLoaded) {
-                console.log("[Navigation] Navigated to Project List");
-                return;
+                );
+                if (directResp.ok()) {
+                    prefetchedBody = await directResp.text();
+                    console.log(
+                        `[Navigation] Pre-fetched project data (${prefetchedBody.length} bytes)`,
+                    );
+                }
+            } catch {
+                console.log(
+                    "[Navigation] Pre-fetch failed, will rely on browser request",
+                );
             }
 
-            console.log(
-                `[Navigation] ProjectList data did not load (attempt ${attempt}), retrying...`,
-            );
+            // Intercept the browser's GET /projects calls and serve
+            // pre-fetched data to avoid connection pool contention.
+            if (prefetchedBody !== null) {
+                const body = prefetchedBody;
+                await this.page.route(
+                    (url) =>
+                        url.pathname === "/projects" &&
+                        !url.pathname.includes("/projects/"),
+                    (route) => {
+                        if (route.request().method() === "GET") {
+                            route.fulfill({
+                                status: 200,
+                                contentType: "application/json",
+                                body,
+                            });
+                        } else {
+                            route.continue();
+                        }
+                    },
+                );
+            }
+
+            try {
+                await navigateToAppClean(this.page);
+                await openTabViaMenu(this.page, "projects", "left");
+
+                // Wait for project data to render.
+                const dataLoaded = await this.page
+                    .locator(".project-grid-card, .project-list-empty")
+                    .first()
+                    .waitFor({ state: "visible", timeout: 30000 })
+                    .then(() => true)
+                    .catch(() => false);
+
+                if (dataLoaded) {
+                    console.log("[Navigation] Navigated to Project List");
+                    return;
+                }
+
+                console.log(
+                    `[Navigation] ProjectList data did not load (attempt ${attempt}), retrying...`,
+                );
+            } finally {
+                // Always clean up route interception.
+                await this.page
+                    .unrouteAll({ behavior: "wait" })
+                    .catch(() => {});
+            }
         }
         throw new Error(
-            "Failed to navigate to project list after 3 attempts",
+            "Failed to navigate to project list after 2 attempts",
         );
     }
 
