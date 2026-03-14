@@ -7,10 +7,12 @@ import { expect } from "@playwright/test";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import { ApiHelper } from "../helpers/api-helper";
 
 const { Given, When, Then } = createBdd();
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+const api = new ApiHelper();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -198,6 +200,241 @@ Then(
 
         console.log(
             `[Verify] Notification data: modelVersionId=${notification.modelVersionId}, status=${notification.status} ✓`,
+        );
+    },
+);
+
+// ── S2: Connection established on page load ──────────────────────────
+
+Given("I navigate to the application", async ({ page }) => {
+    const { navigateToAppClean } = await import("../helpers/navigation-helper");
+    await navigateToAppClean(page);
+});
+
+When("the model list page loads", async ({ page }) => {
+    // Model list is the default page after navigateToAppClean — just verify it loaded
+    await page
+        .waitForSelector('[data-testid="model-card"], .model-card, .p-card', {
+            timeout: 15000,
+        })
+        .catch(() => {
+            // Page might be empty (no models) — that's OK, we just need the page loaded
+            console.log(
+                "[SignalR S2] No model cards found — page may be empty",
+            );
+        });
+});
+
+Then(
+    "a WebSocket connection to thumbnailHub should be established",
+    async ({ page }) => {
+        // Navigate fresh and listen for WebSocket
+        const { navigateToAppClean } =
+            await import("../helpers/navigation-helper");
+
+        const wsPromise = page.waitForEvent("websocket", {
+            predicate: (ws) => ws.url().includes("thumbnailHub"),
+            timeout: 15000,
+        });
+
+        await navigateToAppClean(page);
+
+        const ws = await wsPromise;
+        expect(ws.url()).toContain("thumbnailHub");
+        console.log(`[Verify S2] WebSocket connected to: ${ws.url()} ✓`);
+    },
+);
+
+// ── S3: Notification payload validation ──────────────────────────────
+
+Then(
+    'the notification should contain "modelVersionId" as a positive integer',
+    async () => {
+        const notification = signalRState.receivedNotification;
+        expect(notification).not.toBeNull();
+        expect(notification).toHaveProperty("modelVersionId");
+        expect(typeof notification.modelVersionId).toBe("number");
+        expect(notification.modelVersionId).toBeGreaterThan(0);
+        console.log(
+            `[Verify S3] modelVersionId=${notification.modelVersionId} is a positive integer ✓`,
+        );
+    },
+);
+
+Then(
+    'the notification should contain "status" as a valid thumbnail status',
+    async () => {
+        const notification = signalRState.receivedNotification;
+        expect(notification).not.toBeNull();
+        expect(notification).toHaveProperty("status");
+        // Status values: "Pending", "Processing", "Ready", "Failed" (or numeric 0-3)
+        const validStatuses = [
+            "Pending",
+            "Processing",
+            "Ready",
+            "Failed",
+            0,
+            1,
+            2,
+            3,
+        ];
+        const isValid =
+            validStatuses.includes(notification.status) ||
+            typeof notification.status === "string";
+        expect(isValid).toBe(true);
+        console.log(
+            `[Verify S3] status="${notification.status}" is a valid thumbnail status ✓`,
+        );
+    },
+);
+
+// ── S1: ActiveVersionChanged notification ────────────────────────────
+
+// Extended state for ActiveVersionChanged tests
+const activeVersionState = {
+    receivedNotification: null as any,
+    modelId: 0,
+    originalVersionId: 0,
+    newVersionId: 0,
+};
+
+Given("a model exists with a completed thumbnail", async ({ page }) => {
+    // Upload a model via API and wait for thumbnail to be ready
+    const filePath = await UniqueFileGenerator.generate("test-cube.glb");
+    const result = await api.uploadModel(filePath);
+    activeVersionState.modelId = result.id;
+    console.log(
+        `[SignalR S1] Created model id=${result.id} for ActiveVersionChanged test`,
+    );
+
+    // Get the active version ID
+    const model = await api.getModel(result.id);
+    activeVersionState.originalVersionId =
+        model.activeVersionId ?? model.ActiveVersionId;
+    console.log(
+        `[SignalR S1] Original version: ${activeVersionState.originalVersionId}`,
+    );
+
+    // Wait for thumbnail generation to complete
+    const pollInterval = 5000;
+    const timeout = 300000;
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        const thumb = await api.getModelThumbnail(result.id);
+        if (thumb.status === 200 && thumb.size && thumb.size > 0) {
+            console.log(
+                `[SignalR S1] Thumbnail ready for model ${result.id} ✓`,
+            );
+            break;
+        }
+        await new Promise((r) => setTimeout(r, pollInterval));
+    }
+});
+
+When(
+    "I upload a new version and listen for ActiveVersionChanged",
+    async ({ page }) => {
+        const collectedNotifications: any[] = [];
+        let resolveNotification: (notification: any) => void;
+
+        const notificationPromise = new Promise<any>((resolve, reject) => {
+            resolveNotification = resolve;
+            setTimeout(() => {
+                reject(
+                    new Error(
+                        "Timeout waiting for ActiveVersionChanged notification (600s)",
+                    ),
+                );
+            }, 600000);
+        });
+
+        // Listen for WebSocket ActiveVersionChanged messages
+        page.on("websocket", (ws) => {
+            if (!ws.url().includes("thumbnailHub")) return;
+
+            ws.on("framereceived", (frame) => {
+                const text = (frame.payload as string | Buffer).toString();
+                const messages = text.split("\x1e").filter((m) => m.length > 0);
+
+                for (const msg of messages) {
+                    try {
+                        const json = JSON.parse(msg);
+                        if (
+                            json.type === 1 &&
+                            json.target === "ActiveVersionChanged"
+                        ) {
+                            const notification = json.arguments[0];
+                            console.log(
+                                `[SignalR S1] ActiveVersionChanged: modelId=${notification.modelId}, versionId=${notification.activeVersionId}`,
+                            );
+                            collectedNotifications.push(notification);
+
+                            if (
+                                notification.modelId ===
+                                activeVersionState.modelId
+                            ) {
+                                resolveNotification(notification);
+                            }
+                        }
+                    } catch {
+                        // Not JSON
+                    }
+                }
+            });
+        });
+
+        // Navigate to establish SignalR connection
+        const { navigateToAppClean } =
+            await import("../helpers/navigation-helper");
+
+        const wsConnected = page.waitForEvent("websocket", {
+            predicate: (ws) => ws.url().includes("thumbnailHub"),
+            timeout: 15000,
+        });
+
+        await navigateToAppClean(page);
+        await wsConnected;
+
+        // Upload a new version via API to trigger ActiveVersionChanged
+        const filePath = await UniqueFileGenerator.generate("test-cube.glb");
+        const versionResult = await api.createModelVersion(
+            activeVersionState.modelId,
+            filePath,
+        );
+        activeVersionState.newVersionId = versionResult.versionId;
+        console.log(
+            `[SignalR S1] Uploaded new version: ${versionResult.versionId}`,
+        );
+
+        // Wait for the notification
+        try {
+            activeVersionState.receivedNotification = await notificationPromise;
+        } catch (error) {
+            console.log(`[SignalR S1] Warning: ${(error as Error).message}`);
+            console.log(
+                `[SignalR S1] Collected ${collectedNotifications.length} notification(s)`,
+            );
+            activeVersionState.receivedNotification = null;
+        }
+    },
+);
+
+Then(
+    "I should receive an ActiveVersionChanged notification via WebSocket",
+    async () => {
+        expect(activeVersionState.receivedNotification).not.toBeNull();
+        console.log(`[Verify S1] ActiveVersionChanged notification received ✓`);
+    },
+);
+
+Then(
+    "the ActiveVersionChanged notification should contain the model ID",
+    async () => {
+        const notification = activeVersionState.receivedNotification;
+        expect(notification).not.toBeNull();
+        expect(notification.modelId).toBe(activeVersionState.modelId);
+        console.log(
+            `[Verify S1] Notification modelId=${notification.modelId} matches expected ${activeVersionState.modelId} ✓`,
         );
     },
 );

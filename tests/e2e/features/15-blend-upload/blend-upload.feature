@@ -70,3 +70,44 @@ Feature: Blend File Upload and Processing
     And the model "BlendMultiA" should eventually have a thumbnail
     And the model "BlendMultiB" should eventually have a thumbnail
     And the model "BlendMultiC" should eventually have a thumbnail
+
+  # ── Edge cases: zero-byte, AppleDouble, LOCK/UNLOCK, .blend1 ───────
+
+  @blend-zero-byte
+  Scenario: Zero-byte .blend file does not create a model
+    Given the backend has Blender integration enabled
+    When I upload an empty .blend file as "ZeroByteModel" via WebDAV PUT
+    Then no model named "ZeroByteModel" should exist in the API
+
+  @blend-appledouble
+  Scenario: macOS AppleDouble ._filename files are silently ignored
+    Given the backend has Blender integration enabled
+    When I upload a file as "._test.blend" via WebDAV PUT
+    Then no model named "._test" should exist in the API
+
+  @blend-lock-unlock
+  Scenario: WebDAV LOCK and UNLOCK are handled correctly
+    Given the backend has Blender integration enabled
+    When I send a LOCK request for "/modelibr/Models/LockTest.blend"
+    Then the LOCK response should return a success status
+    When I send an UNLOCK request for "/modelibr/Models/LockTest.blend"
+    Then the UNLOCK response should return a success status
+
+  @blend-blend1-operations
+  Scenario: Blender .blend1 backup operations are silently ignored
+    Given the backend has Blender integration enabled
+    When I send a DELETE request for "/modelibr/Models/BackupTest.blend1"
+    Then the DELETE response should be successful
+    When I send a MOVE request to rename a file to .blend1
+    Then the MOVE response should be successful
+
+  # ── Temp file lifecycle ─────────────────────────────────────────────
+
+  @blend-temp-lifecycle
+  Scenario: Full Blender Safe Save temp file lifecycle
+    Given the backend has Blender integration enabled
+    And a model "TempLifecycle" was created via WebDAV with "test.blend"
+    When I PUT a temp file for model "TempLifecycle"
+    Then a HEAD request for the temp file should return HTTP 200
+    When I MOVE the temp file to create a new version of "TempLifecycle"
+    Then the model "TempLifecycle" should have 2 versions

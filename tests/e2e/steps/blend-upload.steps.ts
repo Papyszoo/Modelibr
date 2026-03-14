@@ -7,6 +7,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -445,5 +446,179 @@ Then(
                 `[Verify Multi] Model "${name}" (id=${model.id}) has 1 version with .blend ✓`,
             );
         }
+    },
+);
+
+// ── B1: Zero-byte .blend file guard ──────────────────────────────────
+
+When(
+    "I upload an empty .blend file as {string} via WebDAV PUT",
+    async ({}, modelName: string) => {
+        // Clean up any pre-existing model with this name
+        await api.softDeleteModelsByName(modelName);
+
+        const result = await api.webdavPut(
+            `/modelibr/Models/${encodeURIComponent(modelName)}.blend`,
+            Buffer.alloc(0),
+        );
+        ctx.webdavPutStatus = result.status;
+        ctx.modelName = modelName;
+        console.log(
+            `[Blend B1] Zero-byte PUT for "${modelName}" returned status=${result.status}`,
+        );
+    },
+);
+
+Then(
+    "no model named {string} should exist in the API",
+    async ({}, modelName: string) => {
+        const model = await api.findModelByName(modelName);
+        expect(model).toBeNull();
+        console.log(`[Verify B1] No model named "${modelName}" exists ✓`);
+    },
+);
+
+// ── B2: AppleDouble file filtering ───────────────────────────────────
+
+When(
+    "I upload a file as {string} via WebDAV PUT",
+    async ({}, fileName: string) => {
+        const content = Buffer.from("fake AppleDouble content");
+        const result = await api.webdavPut(
+            `/modelibr/Models/${encodeURIComponent(fileName)}`,
+            content,
+        );
+        ctx.webdavPutStatus = result.status;
+        console.log(
+            `[Blend B2] AppleDouble PUT for "${fileName}" returned status=${result.status}`,
+        );
+    },
+);
+
+// ── B3: LOCK/UNLOCK flow ─────────────────────────────────────────────
+
+let lockState = {
+    lockStatus: 0,
+    unlockStatus: 0,
+    lockToken: "",
+};
+
+When("I send a LOCK request for {string}", async ({}, path: string) => {
+    const result = await api.webdavLock(path);
+    lockState.lockStatus = result.status;
+    // Try to extract lock token from response
+    lockState.lockToken =
+        result.headers?.["lock-token"] || "<opaquelocktoken:e2e-test>";
+    console.log(
+        `[Blend B3] LOCK for "${path}" returned status=${result.status}`,
+    );
+});
+
+Then("the LOCK response should return a success status", async () => {
+    // LOCK should return 200 or 201 (Created)
+    expect(lockState.lockStatus).toBeGreaterThanOrEqual(200);
+    expect(lockState.lockStatus).toBeLessThan(300);
+    console.log(`[Verify B3] LOCK status=${lockState.lockStatus} is success ✓`);
+});
+
+When("I send an UNLOCK request for {string}", async ({}, path: string) => {
+    const result = await api.webdavUnlock(path, lockState.lockToken);
+    lockState.unlockStatus = result.status;
+    console.log(
+        `[Blend B3] UNLOCK for "${path}" returned status=${result.status}`,
+    );
+});
+
+Then("the UNLOCK response should return a success status", async () => {
+    // UNLOCK should return 204 (No Content) or 200
+    expect(lockState.unlockStatus).toBeGreaterThanOrEqual(200);
+    expect(lockState.unlockStatus).toBeLessThan(300);
+    console.log(
+        `[Verify B3] UNLOCK status=${lockState.unlockStatus} is success ✓`,
+    );
+});
+
+// ── B4: .blend1 backup operations ────────────────────────────────────
+
+let blend1State = {
+    deleteStatus: 0,
+    moveStatus: 0,
+};
+
+When("I send a DELETE request for {string}", async ({}, path: string) => {
+    const result = await api.webdavDelete(path);
+    blend1State.deleteStatus = result.status;
+    console.log(
+        `[Blend B4] DELETE for "${path}" returned status=${result.status}`,
+    );
+});
+
+Then("the DELETE response should be successful", async () => {
+    // Should return 204 (No Content) or 200 — the middleware silences .blend1 operations
+    expect(blend1State.deleteStatus).toBeGreaterThanOrEqual(200);
+    expect(blend1State.deleteStatus).toBeLessThan(300);
+    console.log(
+        `[Verify B4] DELETE status=${blend1State.deleteStatus} is success ✓`,
+    );
+});
+
+When("I send a MOVE request to rename a file to .blend1", async () => {
+    const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+    const result = await api.webdavMove(
+        "/modelibr/Models/SomeModel/backup.blend",
+        "/modelibr/Models/SomeModel/backup.blend1",
+    );
+    blend1State.moveStatus = result.status;
+    console.log(`[Blend B4] MOVE to .blend1 returned status=${result.status}`);
+});
+
+Then("the MOVE response should be successful", async () => {
+    expect(blend1State.moveStatus).toBeGreaterThanOrEqual(200);
+    expect(blend1State.moveStatus).toBeLessThan(300);
+    console.log(
+        `[Verify B4] MOVE status=${blend1State.moveStatus} is success ✓`,
+    );
+});
+
+// ── B5: Temp file lifecycle ──────────────────────────────────────────
+
+let tempFileState = {
+    tempPath: "",
+    headStatus: 0,
+};
+
+When("I PUT a temp file for model {string}", async ({}, modelName: string) => {
+    const filePath = await UniqueFileGenerator.generate("test.blend");
+    const fileBuffer = fs.readFileSync(filePath);
+    const encodedName = encodeURIComponent(modelName);
+    tempFileState.tempPath = `/modelibr/Models/${encodedName}/newestVersion.blend@`;
+
+    const result = await api.webdavPut(tempFileState.tempPath, fileBuffer);
+    console.log(`[Blend B5] PUT temp file returned status=${result.status}`);
+    expect(result.status).toBeGreaterThanOrEqual(200);
+    expect(result.status).toBeLessThan(300);
+});
+
+Then("a HEAD request for the temp file should return HTTP 200", async () => {
+    const result = await api.webdavHead(tempFileState.tempPath);
+    tempFileState.headStatus = result.status;
+    expect(result.status).toBe(200);
+    console.log(
+        `[Verify B5] HEAD for temp file returned status=${result.status} ✓`,
+    );
+});
+
+When(
+    "I MOVE the temp file to create a new version of {string}",
+    async ({}, modelName: string) => {
+        const encodedName = encodeURIComponent(modelName);
+        const result = await api.webdavMove(
+            tempFileState.tempPath,
+            `/modelibr/Models/${encodedName}/newestVersion.blend`,
+        );
+        console.log(
+            `[Blend B5] MOVE temp file returned status=${result.status}`,
+        );
+        expect(result.status).toBe(204);
     },
 );

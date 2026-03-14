@@ -730,4 +730,120 @@ export class ApiHelper {
         }
         return response.data.files || [];
     }
+
+    // ── WebDAV verb helpers ──────────────────────────────────────────────
+
+    /**
+     * Send a raw WebDAV PUT with arbitrary content (or empty buffer for zero-byte tests).
+     */
+    async webdavPut(
+        path: string,
+        content: Buffer,
+    ): Promise<{ status: number; data: any }> {
+        const response = await this.client.put(path, content, {
+            headers: { "Content-Type": "application/octet-stream" },
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+        });
+        return { status: response.status, data: response.data };
+    }
+
+    /**
+     * Send a WebDAV LOCK request.
+     */
+    async webdavLock(
+        path: string,
+    ): Promise<{ status: number; data: any; headers: any }> {
+        const lockBody = `<?xml version="1.0" encoding="utf-8"?>
+<D:lockinfo xmlns:D="DAV:">
+  <D:lockscope><D:exclusive/></D:lockscope>
+  <D:locktype><D:write/></D:locktype>
+  <D:owner><D:href>e2e-test</D:href></D:owner>
+</D:lockinfo>`;
+        const response = await this.client.request({
+            method: "LOCK",
+            url: path,
+            data: lockBody,
+            headers: { "Content-Type": "application/xml" },
+        });
+        return {
+            status: response.status,
+            data: response.data,
+            headers: response.headers,
+        };
+    }
+
+    /**
+     * Send a WebDAV UNLOCK request.
+     */
+    async webdavUnlock(
+        path: string,
+        lockToken?: string,
+    ): Promise<{ status: number }> {
+        const response = await this.client.request({
+            method: "UNLOCK",
+            url: path,
+            headers: {
+                "Lock-Token": lockToken || "<opaquelocktoken:e2e-test>",
+            },
+        });
+        return { status: response.status };
+    }
+
+    /**
+     * Send a WebDAV HEAD request.
+     */
+    async webdavHead(path: string): Promise<{ status: number; headers: any }> {
+        const response = await this.client.head(path);
+        return { status: response.status, headers: response.headers };
+    }
+
+    /**
+     * Send a WebDAV PROPFIND request.
+     */
+    async webdavPropfind(path: string): Promise<{ status: number; data: any }> {
+        const response = await this.client.request({
+            method: "PROPFIND",
+            url: path,
+            headers: { Depth: "0", "Content-Type": "application/xml" },
+        });
+        return { status: response.status, data: response.data };
+    }
+
+    /**
+     * Send a WebDAV DELETE request.
+     */
+    async webdavDelete(path: string): Promise<{ status: number }> {
+        const response = await this.client.delete(path);
+        return { status: response.status };
+    }
+
+    /**
+     * Send a WebDAV MOVE request.
+     */
+    async webdavMove(
+        sourcePath: string,
+        destinationPath: string,
+    ): Promise<{ status: number }> {
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+        const response = await this.client.request({
+            method: "MOVE",
+            url: sourcePath,
+            headers: {
+                Destination: `${baseUrl}${destinationPath}`,
+                Overwrite: "T",
+            },
+        });
+        return { status: response.status };
+    }
+
+    /**
+     * Send a WebDAV GET request (for temp file existence checks).
+     */
+    async webdavGet(path: string): Promise<{ status: number; data: any }> {
+        const response = await this.client.get(path, {
+            responseType: "arraybuffer",
+        });
+        return { status: response.status, data: response.data };
+    }
 }
