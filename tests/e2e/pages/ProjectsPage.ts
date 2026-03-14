@@ -33,31 +33,40 @@ export class ProjectsPage {
     }
 
     async navigateToProjectList(): Promise<void> {
-        await navigateToAppClean(this.page);
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await navigateToAppClean(this.page);
+            await openTabViaMenu(this.page, "projects", "left");
 
-        // Listen for the GET /projects API response BEFORE opening the tab
-        const projectsResponsePromise = this.page.waitForResponse(
-            (resp) =>
-                resp.url().includes("/projects") &&
-                resp.request().method() === "GET" &&
-                !resp.url().includes("/projects/"),
-            { timeout: 15000 },
-        );
+            // Wait for the ProjectList component to mount (header is always rendered)
+            const mounted = await this.page
+                .waitForSelector(".project-list-header", { timeout: 15000 })
+                .then(() => true)
+                .catch(() => false);
 
-        await openTabViaMenu(this.page, "projects", "left");
+            if (!mounted) {
+                console.log(
+                    `[Navigation] ProjectList component did not mount (attempt ${attempt})`,
+                );
+                if (attempt < 2) continue;
+                throw new Error(
+                    "ProjectList component failed to mount after 2 attempts",
+                );
+            }
 
-        // Wait for the actual API response to arrive
-        const apiResponse = await projectsResponsePromise;
-        console.log(
-            `[Navigation] GET /projects responded: ${apiResponse.status()}`,
-        );
+            // Wait for loading to complete (data loaded from API)
+            await this.page
+                .locator(".project-list-loading")
+                .waitFor({ state: "hidden", timeout: 30000 })
+                .catch(() => {});
 
-        // Now wait for content to render from the response data
-        await this.page.waitForSelector(
-            ".project-grid-card, .project-list-empty",
-            { timeout: 15000 },
-        );
-        console.log("[Navigation] Navigated to Project List");
+            // Ensure content is rendered (cards or empty state)
+            await this.page.waitForSelector(
+                ".project-grid-card, .project-list-empty",
+                { timeout: 15000 },
+            );
+            console.log("[Navigation] Navigated to Project List");
+            return;
+        }
     }
 
     async navigateToProjectViewer(projectId: number): Promise<void> {
