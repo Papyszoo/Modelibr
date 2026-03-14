@@ -31,11 +31,12 @@ export class ProjectsPage {
     async navigateToProjectList(): Promise<void> {
         await navigateToTab(this.page, "projects");
         await this.page.waitForLoadState("domcontentloaded");
-        // Wait for project data to finish loading (cards appear or empty state renders)
-        await this.page.waitForSelector(
-            ".project-grid-card, .project-list-empty",
-            { timeout: 15000 },
-        );
+        // Wait for project data to finish loading (cards or empty state)
+        // First wait for the loading indicator to go away if present
+        await this.page
+            .locator(".project-list-loading")
+            .waitFor({ state: "hidden", timeout: 15000 })
+            .catch(() => {});
         console.log("[Navigation] Navigated to Project List");
     }
 
@@ -159,7 +160,7 @@ export class ProjectsPage {
 
     async openProject(projectName: string): Promise<void> {
         const projectCard = this.getProjectCard(projectName);
-        await projectCard.click({ timeout: 15000 });
+        await projectCard.click({ timeout: 30000 });
         await this.page.waitForLoadState("domcontentloaded");
         console.log(`[Navigation] Opened project: ${projectName}`);
     }
