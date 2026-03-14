@@ -31,12 +31,15 @@ export class ProjectsPage {
     async navigateToProjectList(): Promise<void> {
         await navigateToTab(this.page, "projects");
         await this.page.waitForLoadState("domcontentloaded");
-        // Wait for project data to finish loading (cards or empty state)
-        // First wait for the loading indicator to go away if present
+        // Wait for loading to complete and then for actual content to appear
         await this.page
             .locator(".project-list-loading")
             .waitFor({ state: "hidden", timeout: 15000 })
             .catch(() => {});
+        await this.page.waitForSelector(
+            ".project-grid-card, .project-list-empty",
+            { timeout: 15000 },
+        );
         console.log("[Navigation] Navigated to Project List");
     }
 
@@ -160,6 +163,34 @@ export class ProjectsPage {
 
     async openProject(projectName: string): Promise<void> {
         const projectCard = this.getProjectCard(projectName);
+        // Log all visible project cards for debugging
+        const allCards = this.page.locator(".project-grid-card");
+        const count = await allCards.count();
+        if (count === 0) {
+            console.log(
+                "[Debug] No project cards visible. Checking for empty/loading state...",
+            );
+            const isEmpty = await this.page
+                .locator(".project-list-empty")
+                .isVisible()
+                .catch(() => false);
+            const isLoading = await this.page
+                .locator(".project-list-loading")
+                .isVisible()
+                .catch(() => false);
+            console.log(
+                `[Debug] Empty state: ${isEmpty}, Loading state: ${isLoading}`,
+            );
+        } else {
+            const cardTexts: string[] = [];
+            for (let i = 0; i < Math.min(count, 10); i++) {
+                const text = await allCards.nth(i).textContent();
+                cardTexts.push(text?.substring(0, 50) ?? "");
+            }
+            console.log(
+                `[Debug] Found ${count} project cards: ${cardTexts.join(" | ")}`,
+            );
+        }
         await projectCard.click({ timeout: 30000 });
         await this.page.waitForLoadState("domcontentloaded");
         console.log(`[Navigation] Opened project: ${projectName}`);
