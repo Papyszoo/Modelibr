@@ -1,5 +1,9 @@
 import { Page, Locator } from "@playwright/test";
-import { navigateToTab } from "../helpers/navigation-helper";
+import {
+    navigateToAppClean,
+    navigateToTab,
+    openTabViaMenu,
+} from "../helpers/navigation-helper";
 
 const API_BASE = "http://localhost:8090";
 
@@ -29,13 +33,26 @@ export class ProjectsPage {
     }
 
     async navigateToProjectList(): Promise<void> {
-        await navigateToTab(this.page, "projects");
-        await this.page.waitForLoadState("domcontentloaded");
-        // Wait for loading to complete and then for actual content to appear
-        await this.page
-            .locator(".project-list-loading")
-            .waitFor({ state: "hidden", timeout: 15000 })
-            .catch(() => {});
+        await navigateToAppClean(this.page);
+
+        // Listen for the GET /projects API response BEFORE opening the tab
+        const projectsResponsePromise = this.page.waitForResponse(
+            (resp) =>
+                resp.url().includes("/projects") &&
+                resp.request().method() === "GET" &&
+                !resp.url().includes("/projects/"),
+            { timeout: 15000 },
+        );
+
+        await openTabViaMenu(this.page, "projects", "left");
+
+        // Wait for the actual API response to arrive
+        const apiResponse = await projectsResponsePromise;
+        console.log(
+            `[Navigation] GET /projects responded: ${apiResponse.status()}`,
+        );
+
+        // Now wait for content to render from the response data
         await this.page.waitForSelector(
             ".project-grid-card, .project-list-empty",
             { timeout: 15000 },
