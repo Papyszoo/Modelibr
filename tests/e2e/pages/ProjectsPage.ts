@@ -36,37 +36,41 @@ export class ProjectsPage {
             await navigateToAppClean(this.page);
             await openTabViaMenu(this.page, "projects", "left");
 
-            // Wait for the ProjectList component to render content.
-            // This covers: loading indicator, project cards, or empty state.
-            // If the React.lazy chunk fails to load, none of these will appear.
-            const contentFound = await this.page
+            // Wait for the ProjectList component to finish loading.
+            // The component renders: header → loading spinner → cards/empty.
+            // We wait for the final state: cards or empty state.
+            // First, verify the component mounted at all (header or loading).
+            const mounted = await this.page
                 .waitForSelector(
-                    ".project-grid-card, .project-list-empty, .project-list-loading, .project-list-header",
+                    ".project-list-loading, .project-list-header",
                     { timeout: 15000 },
                 )
                 .then(() => true)
                 .catch(() => false);
 
-            if (contentFound) {
-                // If we see loading, wait for it to resolve to cards or empty state
-                const isLoading = await this.page
-                    .locator(".project-list-loading")
-                    .isVisible()
-                    .catch(() => false);
-                if (isLoading) {
-                    await this.page
-                        .waitForSelector(
-                            ".project-grid-card, .project-list-empty",
-                            { timeout: 15000 },
-                        )
-                        .catch(() => {});
-                }
+            if (!mounted) {
+                console.log(
+                    `[Navigation] ProjectList component did not mount (attempt ${attempt}), retrying...`,
+                );
+                continue;
+            }
+
+            // Now wait for data to finish loading (cards or empty state)
+            const dataLoaded = await this.page
+                .waitForSelector(
+                    ".project-grid-card, .project-list-empty",
+                    { timeout: 30000 },
+                )
+                .then(() => true)
+                .catch(() => false);
+
+            if (dataLoaded) {
                 console.log("[Navigation] Navigated to Project List");
                 return;
             }
 
             console.log(
-                `[Navigation] ProjectList component did not render (attempt ${attempt}), retrying...`,
+                `[Navigation] ProjectList data did not load (attempt ${attempt}), retrying...`,
             );
         }
         throw new Error(
