@@ -48,22 +48,18 @@ Given("I open the model info panel", async ({ page }) => {
 Given("the model has at least one tag", async ({ page }) => {
     const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
-    // Wait for tags to finish loading — the ModelInfo component initialises
-    // from model.tags on mount, but render may lag behind the data fetch.
-    // Poll until the chip count stabilises (unchanged for 500 ms).
-    let stableCount = 0;
-    await expect(async () => {
-        const c = await infoPanel.locator(".p-chip").count();
-        // On the very first poll stableCount is 0; accept any positive value.
-        if (c > 0) {
-            stableCount = c;
-        }
-        expect(stableCount).toBeGreaterThan(0);
-    }).toPass({ timeout: 10000, intervals: [500, 500, 500] });
+    // Wait for tags to render — give the useEffect + React Query time to
+    // deliver fresh model data after the component mounts.
+    const firstChip = infoPanel.locator(".p-chip").first();
+    const hasChips = await firstChip
+        .waitFor({ state: "visible", timeout: 10000 })
+        .then(() => true)
+        .catch(() => false);
 
-    if (stableCount === 0) {
-        // Fallback: add a tag so we have at least one to remove
-        console.log("[Setup] No tags found, adding one...");
+    if (!hasChips) {
+        // No tags exist on this model — add one so the "remove" step has
+        // something to work with.
+        console.log("[Setup] No tags found on model, adding one...");
         const tagInput = infoPanel.locator(
             'input[placeholder="Add new tag..."], .tag-input',
         );
@@ -72,17 +68,25 @@ Given("the model has at least one tag", async ({ page }) => {
         const addButton = infoPanel.getByRole("button", { name: "Add" });
         await addButton.click();
 
-        // Save to persist
+        // Save and wait for API confirmation
         const saveButton = infoPanel.getByRole("button", {
             name: "Save Changes",
         });
+        const saveResponse = page.waitForResponse(
+            (resp) =>
+                resp.url().includes("/models/") &&
+                resp.url().includes("/tags") &&
+                resp.request().method() === "POST",
+            { timeout: 10000 },
+        );
         await saveButton.click();
-        await page.waitForTimeout(1000);
+        await saveResponse;
+        await page.waitForTimeout(500);
         console.log("[Setup] Added setup tag and saved ✓");
-        stableCount = await infoPanel.locator(".p-chip").count();
     }
 
-    tagCountBeforeRemove = stableCount;
+    // Record current tag count for later verification
+    tagCountBeforeRemove = await infoPanel.locator(".p-chip").count();
     console.log(`[State] Current tag count: ${tagCountBeforeRemove}`);
     expect(tagCountBeforeRemove).toBeGreaterThan(0);
 });
