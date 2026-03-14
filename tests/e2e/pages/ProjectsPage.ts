@@ -33,40 +33,41 @@ export class ProjectsPage {
     }
 
     async navigateToProjectList(): Promise<void> {
-        for (let attempt = 1; attempt <= 2; attempt++) {
+        for (let attempt = 1; attempt <= 3; attempt++) {
             await navigateToAppClean(this.page);
             await openTabViaMenu(this.page, "projects", "left");
 
-            // Wait for the ProjectList component to mount (header is always rendered)
-            const mounted = await this.page
-                .waitForSelector(".project-list-header", { timeout: 15000 })
+            // Wait for project list content (cards or empty state) with 20s timeout.
+            // This covers lazy chunk loading, component mount, and API data fetch.
+            const contentFound = await this.page
+                .waitForSelector(
+                    ".project-grid-card, .project-list-empty",
+                    { timeout: 20000 },
+                )
                 .then(() => true)
                 .catch(() => false);
 
-            if (!mounted) {
-                console.log(
-                    `[Navigation] ProjectList component did not mount (attempt ${attempt})`,
-                );
-                if (attempt < 2) continue;
-                throw new Error(
-                    "ProjectList component failed to mount after 2 attempts",
-                );
+            if (contentFound) {
+                console.log("[Navigation] Navigated to Project List");
+                return;
             }
 
-            // Wait for loading to complete (data loaded from API)
-            await this.page
+            // Log diagnostic info before retrying
+            const hasHeader = await this.page
+                .locator(".project-list-header")
+                .isVisible()
+                .catch(() => false);
+            const isLoading = await this.page
                 .locator(".project-list-loading")
-                .waitFor({ state: "hidden", timeout: 30000 })
-                .catch(() => {});
-
-            // Ensure content is rendered (cards or empty state)
-            await this.page.waitForSelector(
-                ".project-grid-card, .project-list-empty",
-                { timeout: 15000 },
+                .isVisible()
+                .catch(() => false);
+            console.log(
+                `[Navigation] Project list content not found (attempt ${attempt}): header=${hasHeader}, loading=${isLoading}`,
             );
-            console.log("[Navigation] Navigated to Project List");
-            return;
         }
+        throw new Error(
+            "Failed to navigate to project list after 3 attempts",
+        );
     }
 
     async navigateToProjectViewer(projectId: number): Promise<void> {

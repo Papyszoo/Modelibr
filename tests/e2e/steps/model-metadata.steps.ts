@@ -13,6 +13,7 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 // Track state across steps within a scenario
 let tagCountBeforeRemove = 0;
 let cardCountBeforeSearch = 0;
+let openedModelId: string | null = null;
 
 // ============= Given Steps =============
 
@@ -20,8 +21,13 @@ Given("I open a model in the viewer", async ({ page }) => {
     // Click the first model card to open it in the viewer
     const firstCard = page.locator(".model-card").first();
     await expect(firstCard).toBeVisible({ timeout: 10000 });
+    // Store the model ID so we can re-open the same model later
+    openedModelId =
+        (await firstCard.getAttribute("data-model-id")) ?? null;
     await firstCard.click();
-    console.log("[Action] Clicked first model card");
+    console.log(
+        `[Action] Clicked first model card (model ID: ${openedModelId})`,
+    );
 
     // Wait for the viewer canvas to appear
     const canvas = page.locator("canvas");
@@ -186,10 +192,17 @@ Then(
         const { navigateToTab } = await import("../helpers/navigation-helper");
         await navigateToTab(page, "modelList");
 
-        // Re-open the model (click first card again)
-        const firstCard = page.locator(".model-card").first();
-        await expect(firstCard).toBeVisible({ timeout: 10000 });
-        await firstCard.click();
+        // Re-open the SAME model by ID to avoid parallel test interference
+        let targetCard;
+        if (openedModelId) {
+            targetCard = page.locator(
+                `.model-card[data-model-id="${openedModelId}"]`,
+            );
+        } else {
+            targetCard = page.locator(".model-card").first();
+        }
+        await expect(targetCard).toBeVisible({ timeout: 10000 });
+        await targetCard.click();
 
         // Wait for viewer canvas
         const canvas = page.locator("canvas");
@@ -223,10 +236,17 @@ Then("the tag count should have decreased", async ({ page }) => {
     const { navigateToTab } = await import("../helpers/navigation-helper");
     await navigateToTab(page, "modelList");
 
-    // Re-open the model
-    const firstCard = page.locator(".model-card").first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
-    await firstCard.click();
+    // Re-open the SAME model by ID to avoid parallel test interference
+    let targetCard;
+    if (openedModelId) {
+        targetCard = page.locator(
+            `.model-card[data-model-id="${openedModelId}"]`,
+        );
+    } else {
+        targetCard = page.locator(".model-card").first();
+    }
+    await expect(targetCard).toBeVisible({ timeout: 10000 });
+    await targetCard.click();
 
     const canvas = page.locator("canvas");
     await expect(canvas).toBeVisible({ timeout: 15000 });
@@ -240,7 +260,7 @@ Then("the tag count should have decreased", async ({ page }) => {
 
     const currentCount = await infoPanel.locator(".p-chip").count();
     console.log(
-        `[Verify] Tags before: ${tagCountBeforeRemove}, after reload: ${currentCount}`,
+        `[Verify] Tags before: ${tagCountBeforeRemove}, after reload: ${currentCount} (modelId: ${openedModelId})`,
     );
     expect(currentCount).toBeLessThan(tagCountBeforeRemove);
     console.log("[Verify] Tag count decreased after reload ✓");
@@ -253,10 +273,17 @@ Then(
         const { navigateToTab } = await import("../helpers/navigation-helper");
         await navigateToTab(page, "modelList");
 
-        // Re-open the model
-        const firstCard = page.locator(".model-card").first();
-        await expect(firstCard).toBeVisible({ timeout: 10000 });
-        await firstCard.click();
+        // Re-open the SAME model by ID to avoid parallel test interference
+        let targetCard;
+        if (openedModelId) {
+            targetCard = page.locator(
+                `.model-card[data-model-id="${openedModelId}"]`,
+            );
+        } else {
+            targetCard = page.locator(".model-card").first();
+        }
+        await expect(targetCard).toBeVisible({ timeout: 10000 });
+        await targetCard.click();
 
         const canvas = page.locator("canvas");
         await expect(canvas).toBeVisible({ timeout: 15000 });
