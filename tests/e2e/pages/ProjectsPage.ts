@@ -32,79 +32,31 @@ export class ProjectsPage {
     }
 
     async navigateToProjectList(): Promise<void> {
-        for (let attempt = 1; attempt <= 2; attempt++) {
-            // Pre-fetch project data via Playwright API context (separate
-            // connection pool from the browser) so we can serve it locally
-            // if the browser request hangs under concurrent load.
-            let prefetchedBody: string | null = null;
-            try {
-                const directResp = await this.page.request.get(
-                    `${API_BASE}/projects`,
-                    { timeout: 30000 },
-                );
-                if (directResp.ok()) {
-                    prefetchedBody = await directResp.text();
-                    console.log(
-                        `[Navigation] Pre-fetched project data (${prefetchedBody.length} bytes)`,
-                    );
-                }
-            } catch {
-                console.log(
-                    "[Navigation] Pre-fetch failed, will rely on browser request",
-                );
-            }
-
-            // Intercept the browser's GET /projects calls and serve
-            // pre-fetched data to avoid connection pool contention.
-            if (prefetchedBody !== null) {
-                const body = prefetchedBody;
-                await this.page.route(
-                    (url) =>
-                        url.pathname === "/projects" &&
-                        !url.pathname.includes("/projects/"),
-                    (route) => {
-                        if (route.request().method() === "GET") {
-                            route.fulfill({
-                                status: 200,
-                                contentType: "application/json",
-                                body,
-                            });
-                        } else {
-                            route.continue();
-                        }
-                    },
-                );
-            }
-
+        for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 await navigateToAppClean(this.page);
                 await openTabViaMenu(this.page, "projects", "left");
 
-                // Wait for project data to render.
-                const dataLoaded = await this.page
+                // Wait for project data to render (cards or empty state).
+                await this.page
                     .locator(".project-grid-card, .project-list-empty")
                     .first()
-                    .waitFor({ state: "visible", timeout: 30000 })
-                    .then(() => true)
-                    .catch(() => false);
+                    .waitFor({ state: "visible", timeout: 30000 });
 
-                if (dataLoaded) {
-                    console.log("[Navigation] Navigated to Project List");
-                    return;
-                }
-
+                console.log("[Navigation] Navigated to Project List");
+                return;
+            } catch (error) {
                 console.log(
-                    `[Navigation] ProjectList data did not load (attempt ${attempt}), retrying...`,
+                    `[Navigation] Project list navigation failed (attempt ${attempt}/3): ${error instanceof Error ? error.message.split("\n")[0] : error}`,
                 );
-            } finally {
-                // Always clean up route interception.
-                await this.page
-                    .unrouteAll({ behavior: "wait" })
-                    .catch(() => {});
+                if (attempt < 3) {
+                    // Brief pause before retrying to let the system recover.
+                    await this.page.waitForTimeout(2000);
+                }
             }
         }
         throw new Error(
-            "Failed to navigate to project list after 2 attempts",
+            "Failed to navigate to project list after 3 attempts",
         );
     }
 
