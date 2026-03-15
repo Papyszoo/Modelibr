@@ -2,7 +2,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { ApiHelper } from "../helpers/api-helper";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { TextureType } from "../../../src/frontend/src/types/index.js";
 import path from "path";
@@ -28,7 +28,10 @@ Given("texture set {string} exists", async ({ page }, name: string) => {
     // Create texture set via API with unique name
     const uniqueName = `${name}_${runId}`;
     const textureSet = await apiHelper.createTextureSet(uniqueName);
-    sharedState.saveTextureSet(name, { id: textureSet.id, name: uniqueName });
+    getScenarioState(page).saveTextureSet(name, {
+        id: textureSet.id,
+        name: uniqueName,
+    });
     console.log(
         `[API] Created texture set "${uniqueName}" with ID ${textureSet.id}`,
     );
@@ -45,7 +48,7 @@ Given(
             filePath,
             TextureType.Albedo,
         );
-        sharedState.saveTextureSet(setName, {
+        getScenarioState(page).saveTextureSet(setName, {
             id: result.textureSetId,
             name: uniqueName,
         });
@@ -71,7 +74,7 @@ Given(
             filePath,
             typeValue,
         );
-        sharedState.saveTextureSet(setName, {
+        getScenarioState(page).saveTextureSet(setName, {
             id: result.textureSetId,
             name: uniqueName,
         });
@@ -87,8 +90,8 @@ When(
     "I drag {string} onto {string}",
     async ({ page }, sourceName: string, targetName: string) => {
         // Get stored names from shared state
-        const sourceSet = sharedState.getTextureSet(sourceName);
-        const targetSet = sharedState.getTextureSet(targetName);
+        const sourceSet = getScenarioState(page).getTextureSet(sourceName);
+        const targetSet = getScenarioState(page).getTextureSet(targetName);
         const sourceDisplayName = sourceSet?.name || sourceName;
         const targetDisplayName = targetSet?.name || targetName;
 
@@ -356,7 +359,7 @@ Then(
     "{string} should have AO, Roughness, and Metallic textures",
     async ({ page }, setName: string) => {
         // Get stored unique name from shared state
-        const set = sharedState.getTextureSet(setName);
+        const set = getScenarioState(page).getTextureSet(setName);
         const displayName = set?.name || setName;
 
         const card = page
@@ -373,10 +376,18 @@ Then(
         );
         const oldTab = page.locator('.p-tabview-nav-link:has-text("Textures")');
 
-        if (await newTab.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (
+            await newTab
+                .waitFor({ state: "visible", timeout: 1000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await newTab.click();
         } else if (
-            await oldTab.isVisible({ timeout: 1000 }).catch(() => false)
+            await oldTab
+                .waitFor({ state: "visible", timeout: 1000 })
+                .then(() => true)
+                .catch(() => false)
         ) {
             await oldTab.click();
         }
@@ -406,7 +417,7 @@ Then(
     "{string} should have an {string} texture",
     async ({ page }, setName: string, type: string) => {
         // Get stored unique name from shared state
-        const set = sharedState.getTextureSet(setName);
+        const set = getScenarioState(page).getTextureSet(setName);
         const displayName = set?.name || setName;
 
         const card = page

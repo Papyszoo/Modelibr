@@ -41,18 +41,23 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
                     new Error("ModelVersionNotFound", $"Model version with ID {command.ModelVersionId} was not found."));
             }
 
-            // Check if already associated
-            if (textureSet.HasModelVersion(command.ModelVersionId))
+            var materialName = command.MaterialName ?? string.Empty;
+            var variantName = command.VariantName ?? string.Empty;
+
+            // Check if this exact mapping already exists
+            if (modelVersion.TextureMappings.Any(m => m.TextureSetId == command.TextureSetId && m.MaterialName == materialName && m.VariantName == variantName))
+                return Result.Success();
+
+            // For named materials within the same variant, remove existing mapping for that material+variant
+            if (!string.IsNullOrEmpty(materialName))
             {
-                return Result.Failure(
-                    new Error("AssociationAlreadyExists", $"Texture set '{textureSet.Name}' is already associated with model version {modelVersion.VersionNumber}."));
+                await _modelVersionRepository.RemoveTextureMappingByMaterialAndVariantAsync(
+                    modelVersion.Id, materialName, variantName, cancellationToken);
             }
 
-            // Associate the model version with the texture set
-            textureSet.AddModelVersion(modelVersion, _dateTimeProvider.UtcNow);
-
-            // Update the texture set
-            await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            // Add the texture mapping directly via repository (avoids EF Core composite key tracking issues)
+            await _modelVersionRepository.AddTextureMappingAsync(
+                modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
 
             return Result.Success();
         }
@@ -64,4 +69,4 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
     }
 }
 
-public record AssociateTextureSetWithModelVersionCommand(int TextureSetId, int ModelVersionId) : ICommand;
+public record AssociateTextureSetWithModelVersionCommand(int TextureSetId, int ModelVersionId, string? MaterialName = null, string? VariantName = null) : ICommand;

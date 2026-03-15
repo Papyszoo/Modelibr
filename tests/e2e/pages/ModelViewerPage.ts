@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { Page, expect, Locator } from "@playwright/test";
 
 export class ModelViewerPage {
     constructor(private page: Page) {}
@@ -13,29 +13,55 @@ export class ModelViewerPage {
         });
     }
 
-    async openTextureSetSelector() {
-        await this.waitForModelLoaded();
-        // Click the Texture Sets button with pi-palette icon
-        await this.page
-            .locator(".viewer-controls button:has(.pi-palette)")
-            .click();
+    /** Version dropdown trigger button */
+    get versionDropdownTrigger(): Locator {
+        return this.page.locator(".version-dropdown-trigger");
     }
 
+    /** Version dropdown menu container */
+    get versionDropdownMenu(): Locator {
+        return this.page.locator(".version-dropdown-menu");
+    }
+
+    /** All version dropdown items */
+    get versionItems(): Locator {
+        return this.page.locator(".version-dropdown-item");
+    }
+
+    /** Open the version dropdown menu if not already open */
+    async openVersionDropdown(): Promise<void> {
+        if (!(await this.versionDropdownMenu.isVisible())) {
+            await this.versionDropdownTrigger.click();
+        }
+        await this.versionDropdownMenu.waitFor({
+            state: "visible",
+            timeout: 5000,
+        });
+    }
+
+    /**
+     * Open a panel via the Menubar dropdown.
+     * Panels are accessed via "Left Panel" or "Right Panel" menu items.
+     */
     async openTab(tabName: string, expectedSelector?: string) {
-        // Map tab names to icon classes
-        const buttonMap: Record<string, string> = {
-            "Add Version": "pi-plus",
-            "Viewer Settings": "pi-cog",
-            "Model Info": "pi-info-circle",
-            "Texture Sets": "pi-palette",
-            "Model Hierarchy": "pi-sitemap",
-            "Thumbnail Details": "pi-image",
-            "UV Map": "pi-map",
-            "Open in Blender": "pi-box",
+        // Map tab names to menubar submenu labels
+        const tabToMenuLabel: Record<string, string> = {
+            "Model Info": "Model Info",
+            "Texture Sets": "Materials",
+            Materials: "Materials",
+            "Model Hierarchy": "Hierarchy",
+            Hierarchy: "Hierarchy",
+            "Thumbnail Details": "Thumbnail Details",
+            "UV Map": "UV Map",
         };
 
-        const iconClass = buttonMap[tabName];
-        if (!iconClass) {
+        const menuLabel = tabToMenuLabel[tabName];
+        if (!menuLabel) {
+            // Special cases
+            if (tabName === "Add Version") {
+                await this.openMenubarItem("File", "Add New Version");
+                return;
+            }
             throw new Error(`Unknown tab: ${tabName}`);
         }
 
@@ -52,65 +78,69 @@ export class ModelViewerPage {
             }
         }
 
-        // Wait for the model viewer controls to be ready
-        await this.page.waitForSelector(".viewer-controls", {
-            state: "visible",
-            timeout: 10000,
-        });
+        // Open via Left Panel menu
+        await this.openMenubarItem("Left Panel", menuLabel);
 
-        // Find button by icon class
-        const button = this.page.locator(
-            `.viewer-controls button:has(.${iconClass})`,
-        );
-        await expect(button).toBeVisible({ timeout: 10000 });
-
-        // Fallback: Check button class if no selector provided
-        // This helps if we don't know the window selector but know the button behavior
-        const classAttribute = await button.getAttribute("class");
-        if (
-            !expectedSelector &&
-            classAttribute &&
-            (classAttribute.includes("active") ||
-                classAttribute.includes("p-highlight"))
-        ) {
-            console.log(
-                `[UI] Tab "${tabName}" appears active (button class). Skipping click.`,
-            );
-            return;
+        // Wait for panel to actually appear if selector provided
+        if (expectedSelector) {
+            await this.page.waitForSelector(expectedSelector, {
+                state: "visible",
+                timeout: 10000,
+            });
         }
-
-        await button.click();
     }
 
     /**
-     * Closes the specified tab if it is currently open
+     * Opens a specific item from the Menubar dropdown.
+     */
+    async openMenubarItem(menuName: string, itemLabel: string) {
+        // Click the top-level menu item
+        const menubar = this.page.locator(".p-menubar");
+        await expect(menubar).toBeVisible({ timeout: 10000 });
+
+        const menuItem = menubar
+            .locator(
+                `.p-menuitem-link:has(.p-menuitem-text:text-is("${menuName}"))`,
+            )
+            .first();
+        await expect(menuItem).toBeVisible({ timeout: 5000 });
+        await menuItem.click();
+
+        // Wait for submenu to appear
+        const submenuItem = this.page
+            .locator(
+                `.p-submenu-list .p-menuitem-link:has(.p-menuitem-text:text-is("${itemLabel}"))`,
+            )
+            .first();
+        await expect(submenuItem).toBeVisible({ timeout: 5000 });
+        await submenuItem.click();
+
+        // Small delay to let React process the state change
+        await this.page.waitForTimeout(100);
+    }
+
+    /**
+     * Closes the specified tab if it is currently open.
+     * In the new layout, clicking the same panel option again closes it.
      */
     async closeTab(tabName: string, expectedSelector?: string) {
-        // Map tab names to icon classes
-        const buttonMap: Record<string, string> = {
-            "Add Version": "pi-plus",
-            "Viewer Settings": "pi-cog",
-            "Model Info": "pi-info-circle",
-            "Texture Sets": "pi-palette",
-            "Model Hierarchy": "pi-sitemap",
-            "Thumbnail Details": "pi-image",
-            "UV Map": "pi-map",
-            "Open in Blender": "pi-box",
+        const tabToMenuLabel: Record<string, string> = {
+            "Model Info": "Model Info",
+            "Texture Sets": "Materials",
+            Materials: "Materials",
+            "Model Hierarchy": "Hierarchy",
+            Hierarchy: "Hierarchy",
+            "Thumbnail Details": "Thumbnail Details",
+            "UV Map": "UV Map",
         };
 
-        const iconClass = buttonMap[tabName];
-        if (!iconClass) {
-            throw new Error(`Unknown tab: ${tabName}`);
-        }
-
-        // Check availability of controls
-        const controls = this.page.locator(".viewer-controls");
-        if (!(await controls.isVisible())) {
-            console.log("[UI] Viewer controls not visible, cannot close tab.");
+        const menuLabel = tabToMenuLabel[tabName];
+        if (!menuLabel) {
+            console.log(`[UI] Unknown tab "${tabName}", cannot close.`);
             return;
         }
 
-        // If selector provided, check if visible. If NOT visible, we are already closed.
+        // If selector provided, check if visible. If NOT visible, already closed.
         if (expectedSelector) {
             const isVisible = await this.page
                 .locator(expectedSelector)
@@ -121,36 +151,15 @@ export class ModelViewerPage {
             }
         }
 
-        const button = this.page.locator(
-            `.viewer-controls button:has(.${iconClass})`,
-        );
-
-        // If selector NOT provided, check button class.
-        // If button is NOT active, assume closed.
-        if (!expectedSelector) {
-            const classAttribute = await button.getAttribute("class");
-            const isActive =
-                classAttribute &&
-                (classAttribute.includes("active") ||
-                    classAttribute.includes("p-highlight"));
-            if (!isActive) {
-                console.log(
-                    `[UI] Tab "${tabName}" button is not active. Assuming closed.`,
-                );
-                return;
-            }
-        }
-
-        // Click to close
-        await button.click();
-
-        // Wait for it to disappear if selector known
-        if (expectedSelector) {
-            await expect(this.page.locator(expectedSelector)).toBeHidden({
-                timeout: 5000,
-            });
-        }
+        // Click "None" in Left Panel to close, or toggle the same option
+        await this.openMenubarItem("Left Panel", "None");
         console.log(`[UI] Closed tab "${tabName}"`);
+    }
+
+    async openTextureSetSelector() {
+        await this.waitForModelLoaded();
+        // Open Materials panel in the left side panel
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
     }
 
     async createTextureSet(name: string) {
@@ -167,22 +176,20 @@ export class ModelViewerPage {
     }
 
     async linkTextureSetToModel(setName: string) {
-        // 1. Open Model Info
-        await this.openTab("Model Info");
+        // 1. Open Materials panel (texture set linking is now per-material in the Materials panel)
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        // Wait for the Model Information window to be visible
-        await this.page.waitForSelector(
-            '.floating-window:has-text("Model Information")',
-            {
-                state: "visible",
-                timeout: 10000,
-            },
-        );
+        // Wait for the Materials panel to be visible
+        await this.page.waitForSelector('[data-testid="materials-panel"]', {
+            state: "visible",
+            timeout: 10000,
+        });
 
-        // 2. Click Link Texture Sets button
-        await this.page
-            .getByRole("button", { name: /link texture sets/i })
-            .click();
+        // 2. Click Link Texture Set button on the first unlinked material
+        const linkButton = this.page
+            .getByRole("button", { name: /link texture set/i })
+            .first();
+        await linkButton.click();
 
         // 3. Wait for dialog and select the set
         await this.page.waitForSelector(".texture-set-association-card", {
@@ -198,7 +205,6 @@ export class ModelViewerPage {
         await this.page.getByRole("button", { name: /save changes/i }).click();
 
         // Wait for dialog to close
-        // Optional: association card may already be hidden
         await this.page
             .locator(".texture-set-association-card")
             .first()
@@ -207,49 +213,75 @@ export class ModelViewerPage {
     }
 
     async setDefaultTextureSet(name: string) {
-        await this.openTab("Texture Sets", ".tswindow-content");
+        // Ensure viewer is loaded before trying to open panels
+        await this.waitForModelLoaded();
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        // Wait for texture set window to be visible
-        await this.page.waitForSelector(".tswindow-content", {
+        // Wait for materials panel to be visible
+        await this.page.waitForSelector('[data-testid="materials-panel"]', {
             state: "visible",
-            timeout: 10000,
+            timeout: 15000,
         });
 
-        // Find the texture set item and click the "Set as default" button
-        const item = this.page.locator(".tswindow-item", { hasText: name });
-        await expect(item).toBeVisible({ timeout: 10000 });
+        // Wait for material items to render
+        await this.page.waitForSelector(".materials-item", {
+            state: "visible",
+            timeout: 15000,
+        });
 
-        // Click the star button to set as default
-        await item.locator(".tswindow-btn-default").click();
+        // Find the material item that has this texture set linked (via data-texture-set attribute)
+        const item = this.page.locator(
+            `.materials-item[data-texture-set*="${name}"]`,
+        );
+        // Fall back to looking for the texture set name as text inside a materials-item
+        const fallbackItem = this.page.locator(".materials-item", {
+            hasText: name,
+        });
+        const targetItem =
+            (await item.count()) > 0 ? item.first() : fallbackItem.first();
+        await expect(targetItem).toBeVisible({ timeout: 15000 });
 
-        // Wait for the default badge to appear
-        await expect(item.locator(".tswindow-badge")).toBeVisible({
+        // The default texture set is set via API in the step definitions.
+        // Verify the Default badge is visible.
+        await expect(targetItem.locator(".p-badge")).toBeVisible({
             timeout: 10000,
         });
     }
 
     async expectDefaultTextureSet(name: string) {
-        await this.openTab("Texture Sets");
+        // Ensure viewer is loaded before trying to open panels
+        await this.waitForModelLoaded();
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        // Wait for texture set window to be visible
-        await this.page.waitForSelector(".tswindow-content", {
+        // Wait for materials panel to be visible
+        await this.page.waitForSelector('[data-testid="materials-panel"]', {
             state: "visible",
-            timeout: 10000,
+            timeout: 15000,
         });
 
-        const item = this.page.locator(".tswindow-item", { hasText: name });
-        await expect(item).toBeVisible({ timeout: 10000 });
-        await expect(item.locator(".tswindow-badge")).toHaveText("Default");
+        // Wait for material items to render (they load async via React Query)
+        await this.page.waitForSelector(".materials-item", {
+            state: "visible",
+            timeout: 15000,
+        });
+
+        // Find the material item that has this texture set linked
+        const item = this.page.locator(
+            `.materials-item[data-texture-set*="${name}"]`,
+        );
+        const fallbackItem = this.page.locator(".materials-item", {
+            hasText: name,
+        });
+        const targetItem =
+            (await item.count()) > 0 ? item.first() : fallbackItem.first();
+        await expect(targetItem).toBeVisible({ timeout: 15000 });
+        await expect(targetItem.locator(".p-badge")).toHaveText("Default");
     }
 
     async uploadNewVersion(filePath: string) {
-        // Click the Add Version button and wait for file chooser
+        // Click File > Add New Version in the menubar and wait for file chooser
         const fileChooserPromise = this.page.waitForEvent("filechooser");
-        const addVersionButton = this.page.locator(
-            '.viewer-controls button[aria-label="Add Version"]',
-        );
-        await expect(addVersionButton).toBeVisible({ timeout: 10000 });
-        await addVersionButton.click();
+        await this.openMenubarItem("File", "Add New Version");
         const fileChooser = await fileChooserPromise;
         await fileChooser.setFiles(filePath);
 
@@ -322,7 +354,10 @@ export class ModelViewerPage {
                 'button[aria-label="Close"], .p-dialog-header-close',
             );
             if (
-                await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)
+                await closeBtn
+                    .waitFor({ state: "visible", timeout: 2000 })
+                    .then(() => true)
+                    .catch(() => false)
             ) {
                 await closeBtn.click();
             }
@@ -425,43 +460,30 @@ export class ModelViewerPage {
     }
 
     async selectVersion(versionNumber: number) {
-        // Close any open floating windows that might block clicks
-        const closeButtons = this.page.locator(
-            '.floating-window .pi-times, .floating-window button[aria-label="Close"]',
-        );
-        const closeButtonCount = await closeButtons.count();
-        for (let i = 0; i < closeButtonCount; i++) {
-            try {
-                await closeButtons.nth(i).click({ timeout: 1000 });
-            } catch {
-                // Ignore if already closed
-            }
-        }
-
-        // Also press Escape to close any remaining modals/dropdowns
+        // Press Escape to close any remaining dropdowns/menus
         await this.page.keyboard.press("Escape");
 
         // Click on the version dropdown trigger
         const dropdownTrigger = this.page.locator(".version-dropdown-trigger");
-        await expect(dropdownTrigger).toBeVisible({ timeout: 10000 });
+        await expect(dropdownTrigger).toBeVisible({ timeout: 30000 });
         await dropdownTrigger.click();
 
         // Wait for dropdown menu to appear
         await this.page.waitForSelector(".version-dropdown-menu", {
             state: "visible",
-            timeout: 5000,
+            timeout: 15000,
         });
 
         // Click on the version item
         const versionItem = this.page.locator(".version-dropdown-item", {
             hasText: `v${versionNumber}`,
         });
-        await expect(versionItem).toBeVisible({ timeout: 5000 });
+        await expect(versionItem).toBeVisible({ timeout: 10000 });
         try {
-            await versionItem.click({ timeout: 5000 });
+            await versionItem.click({ timeout: 10000 });
         } catch {
             // Fallback for intermittent overlay interception from floating windows
-            await versionItem.click({ force: true, timeout: 5000 });
+            await versionItem.click({ force: true, timeout: 10000 });
         }
 
         // Wait for version to load
@@ -487,10 +509,19 @@ export class ModelViewerPage {
             `[getVersionThumbnailSrc] Looking for version ${versionNumber} thumbnail...`,
         );
 
+        // Ensure dropdown is open first
+        if (!(await dropdownMenu.isVisible())) {
+            await expect(dropdownTrigger).toBeVisible({ timeout: 10000 });
+            await dropdownTrigger.click();
+            await this.page.waitForSelector(".version-dropdown-menu", {
+                state: "visible",
+                timeout: 5000,
+            });
+        }
+
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            // Ensure dropdown is open
+            // Ensure dropdown is still open
             if (!(await dropdownMenu.isVisible())) {
-                await expect(dropdownTrigger).toBeVisible({ timeout: 10000 });
                 await dropdownTrigger.click();
                 await this.page.waitForSelector(".version-dropdown-menu", {
                     state: "visible",
@@ -529,10 +560,7 @@ export class ModelViewerPage {
                 `[getVersionThumbnailSrc] Thumbnail not ready for v${versionNumber}, retrying... (${attempt + 1}/${maxAttempts})`,
             );
 
-            // Close dropdown for retry
-            if (await dropdownMenu.isVisible()) {
-                await dropdownTrigger.click();
-            }
+            // Keep dropdown open — just wait for re-render
             await this.page.waitForTimeout(pollInterval);
         }
 
@@ -608,39 +636,59 @@ export class ModelViewerPage {
      * This triggers the texture to be applied to the 3D model immediately
      */
     async selectTextureSet(name: string) {
-        await this.openTab("Texture Sets", ".tswindow-content");
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        // Wait for texture set window to be visible
-        await this.page.waitForSelector(".tswindow-content", {
+        // Wait for materials panel to be visible
+        await this.page.waitForSelector('[data-testid="materials-panel"]', {
             state: "visible",
             timeout: 10000,
         });
 
-        // Find and click the texture set item to select it
-        const item = this.page.locator(".tswindow-item", { hasText: name });
-        await expect(item).toBeVisible({ timeout: 10000 });
-        await item.click();
+        // Find the material item with this texture set linked and click the preview to select it
+        const item = this.page.locator(
+            `.materials-item[data-texture-set*="${name}"]`,
+        );
+        const fallbackItem = this.page.locator(".materials-item", {
+            hasText: name,
+        });
+        const targetItem =
+            (await item.count()) > 0 ? item.first() : fallbackItem.first();
+        await expect(targetItem).toBeVisible({ timeout: 10000 });
 
-        // Wait for texture set to be selected
-        await expect(item).toHaveClass(/tswindow-selected/, { timeout: 10000 });
+        // Click the preview to select this texture set
+        const preview = targetItem.locator(".materials-item-preview");
+        if (
+            await preview
+                .waitFor({ state: "visible", timeout: 2000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
+            await preview.click();
+        } else {
+            await targetItem.click();
+        }
 
         console.log(`[UI] Selected texture set "${name}" ✓`);
     }
 
     /**
-     * Check if a texture set is currently selected (highlighted in the selector)
+     * Check if a texture set is currently linked to any material
      */
     async isTextureSetSelected(name: string): Promise<boolean> {
-        await this.openTab("Texture Sets");
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        await this.page.waitForSelector(".tswindow-content", {
+        await this.page.waitForSelector('[data-testid="materials-panel"]', {
             state: "visible",
             timeout: 10000,
         });
 
-        const item = this.page.locator(".tswindow-item.tswindow-selected", {
-            hasText: name,
-        });
-        return await item.isVisible({ timeout: 2000 }).catch(() => false);
+        const item = this.page.locator(
+            `.materials-item[data-texture-set*="${name}"]`,
+        );
+        return await item
+            .first()
+            .waitFor({ state: "visible", timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
     }
 }

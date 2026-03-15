@@ -75,6 +75,14 @@ export class SoundListPage {
      */
     async clickSoundById(soundId: number): Promise<void> {
         const card = this.page.locator(`[data-sound-id="${soundId}"]`);
+        // Sounds use infinite scroll (50/page); load more pages until card appears.
+        const loadMoreSelector = 'button:has-text("Load More")';
+        while (!(await card.isVisible().catch(() => false))) {
+            const loadMoreBtn = this.page.locator(loadMoreSelector).first();
+            if (!(await loadMoreBtn.isVisible().catch(() => false))) break;
+            await loadMoreBtn.click();
+            await this.page.waitForTimeout(500);
+        }
         await expect(card).toBeVisible({ timeout: 10000 });
         await card.scrollIntoViewIfNeeded();
         await card.click();

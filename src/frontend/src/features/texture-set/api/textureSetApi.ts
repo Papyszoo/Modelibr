@@ -177,23 +177,45 @@ export async function changeTextureChannel(
 
 export async function associateTextureSetWithModelVersion(
   setId: number,
-  modelVersionId: number
+  modelVersionId: number,
+  materialName?: string,
+  variantName?: string
 ): Promise<void> {
-  await client.post(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
+  const params = new URLSearchParams()
+  if (materialName) params.append('materialName', materialName)
+  if (variantName) params.append('variantName', variantName)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  await client.post(
+    `/texture-sets/${setId}/model-versions/${modelVersionId}${qs}`
+  )
 }
 
 export async function disassociateTextureSetFromModelVersion(
   setId: number,
-  modelVersionId: number
+  modelVersionId: number,
+  materialName?: string,
+  variantName?: string
 ): Promise<void> {
-  await client.delete(`/texture-sets/${setId}/model-versions/${modelVersionId}`)
+  const params = new URLSearchParams()
+  if (materialName) params.append('materialName', materialName)
+  if (variantName) params.append('variantName', variantName)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  await client.delete(
+    `/texture-sets/${setId}/model-versions/${modelVersionId}${qs}`
+  )
 }
 
 export async function associateTextureSetWithAllModelVersions(
   setId: number,
-  modelId: number
+  modelId: number,
+  materialName?: string
 ): Promise<void> {
-  await client.post(`/texture-sets/${setId}/models/${modelId}/all-versions`)
+  const params = materialName
+    ? `?materialName=${encodeURIComponent(materialName)}`
+    : ''
+  await client.post(
+    `/texture-sets/${setId}/models/${modelId}/all-versions${params}`
+  )
 }
 
 export async function softDeleteTextureSet(

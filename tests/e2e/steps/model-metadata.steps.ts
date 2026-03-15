@@ -13,6 +13,7 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 // Track state across steps within a scenario
 let tagCountBeforeRemove = 0;
 let cardCountBeforeSearch = 0;
+let openedModelId: string | null = null;
 
 // ============= Given Steps =============
 
@@ -20,8 +21,13 @@ Given("I open a model in the viewer", async ({ page }) => {
     // Click the first model card to open it in the viewer
     const firstCard = page.locator(".model-card").first();
     await expect(firstCard).toBeVisible({ timeout: 10000 });
+    // Store the model ID so we can re-open the same model later
+    openedModelId =
+        (await firstCard.getAttribute("data-model-id")) ?? null;
     await firstCard.click();
-    console.log("[Action] Clicked first model card");
+    console.log(
+        `[Action] Clicked first model card (model ID: ${openedModelId})`,
+    );
 
     // Wait for the viewer canvas to appear
     const canvas = page.locator("canvas");
@@ -31,22 +37,29 @@ Given("I open a model in the viewer", async ({ page }) => {
 
 Given("I open the model info panel", async ({ page }) => {
     const viewerPage = new ModelViewerPage(page);
-    await viewerPage.openTab("Model Info", "#info");
+    await viewerPage.openTab("Model Info", '[data-testid="model-info-panel"]');
 
     // Wait for the info panel to be visible
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
     await expect(infoPanel).toBeVisible({ timeout: 10000 });
     console.log("[UI] Model info panel is visible ✓");
 });
 
 Given("the model has at least one tag", async ({ page }) => {
-    const infoPanel = page.locator("#info");
-    const existingTags = infoPanel.locator(".p-chip");
-    const count = await existingTags.count();
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
-    if (count === 0) {
-        // Add a tag so we have at least one to remove
-        console.log("[Setup] No tags found, adding one...");
+    // Wait for tags to render — give the useEffect + React Query time to
+    // deliver fresh model data after the component mounts.
+    const firstChip = infoPanel.locator(".p-chip").first();
+    const hasChips = await firstChip
+        .waitFor({ state: "visible", timeout: 10000 })
+        .then(() => true)
+        .catch(() => false);
+
+    if (!hasChips) {
+        // No tags exist on this model — add one so the "remove" step has
+        // something to work with.
+        console.log("[Setup] No tags found on model, adding one...");
         const tagInput = infoPanel.locator(
             'input[placeholder="Add new tag..."], .tag-input',
         );
@@ -55,12 +68,20 @@ Given("the model has at least one tag", async ({ page }) => {
         const addButton = infoPanel.getByRole("button", { name: "Add" });
         await addButton.click();
 
-        // Save to persist
+        // Save and wait for API confirmation
         const saveButton = infoPanel.getByRole("button", {
             name: "Save Changes",
         });
+        const saveResponse = page.waitForResponse(
+            (resp) =>
+                resp.url().includes("/models/") &&
+                resp.url().includes("/tags") &&
+                resp.request().method() === "POST",
+            { timeout: 10000 },
+        );
         await saveButton.click();
-        await page.waitForTimeout(1000);
+        await saveResponse;
+        await page.waitForTimeout(500);
         console.log("[Setup] Added setup tag and saved ✓");
     }
 
@@ -73,7 +94,7 @@ Given("the model has at least one tag", async ({ page }) => {
 // ============= When Steps =============
 
 When("I add the tag {string}", async ({ page }, tag: string) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
     const tagInput = infoPanel.locator(
         'input[placeholder="Add new tag..."], .tag-input',
@@ -91,10 +112,17 @@ When("I add the tag {string}", async ({ page }, tag: string) => {
 });
 
 When("I remove the first tag", async ({ page }) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
-    // Record count before removal
-    tagCountBeforeRemove = await infoPanel.locator(".p-chip").count();
+    // Wait for tag count to stabilise before recording — the component may
+    // still be rendering chips from a fresh React Query fetch.
+    let initialCount = 0;
+    await expect(async () => {
+        initialCount = await infoPanel.locator(".p-chip").count();
+        expect(initialCount).toBeGreaterThan(0);
+    }).toPass({ timeout: 10000, intervals: [500, 500, 500] });
+
+    tagCountBeforeRemove = initialCount;
     console.log(`[State] Tags before removal: ${tagCountBeforeRemove}`);
 
     // Click the remove icon on the first tag chip
@@ -114,21 +142,31 @@ When("I remove the first tag", async ({ page }) => {
 });
 
 When("I save the model info changes", async ({ page }) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
     const saveButton = infoPanel.getByRole("button", {
         name: "Save Changes",
     });
     await expect(saveButton).toBeVisible({ timeout: 5000 });
-    await saveButton.click();
 
-    // Wait for the save to complete (button may become disabled or show success)
-    await page.waitForTimeout(1500);
+    // Click save and wait for the API response to confirm persistence
+    const responsePromise = page.waitForResponse(
+        (resp) =>
+            resp.url().includes("/models/") &&
+            resp.url().includes("/tags") &&
+            resp.request().method() === "POST",
+        { timeout: 15000 },
+    );
+    await saveButton.click();
+    await responsePromise;
+
+    // Brief pause to let React re-render after mutation success callback
+    await page.waitForTimeout(500);
     console.log("[Action] Saved model info changes ✓");
 });
 
 When("I set the description to {string}", async ({ page }, text: string) => {
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
     const textarea = infoPanel.locator(
         'textarea[placeholder="Enter description..."], .description-textarea',
@@ -176,10 +214,17 @@ Then(
         const { navigateToTab } = await import("../helpers/navigation-helper");
         await navigateToTab(page, "modelList");
 
-        // Re-open the model (click first card again)
-        const firstCard = page.locator(".model-card").first();
-        await expect(firstCard).toBeVisible({ timeout: 10000 });
-        await firstCard.click();
+        // Re-open the SAME model by ID to avoid parallel test interference
+        let targetCard;
+        if (openedModelId) {
+            targetCard = page.locator(
+                `.model-card[data-model-id="${openedModelId}"]`,
+            );
+        } else {
+            targetCard = page.locator(".model-card").first();
+        }
+        await expect(targetCard).toBeVisible({ timeout: 10000 });
+        await targetCard.click();
 
         // Wait for viewer canvas
         const canvas = page.locator("canvas");
@@ -187,17 +232,20 @@ Then(
 
         // Re-open the info panel
         const viewerPage = new ModelViewerPage(page);
-        await viewerPage.openTab("Model Info", "#info");
+        await viewerPage.openTab(
+            "Model Info",
+            '[data-testid="model-info-panel"]',
+        );
 
-        const infoPanel = page.locator("#info");
+        const infoPanel = page.locator('[data-testid="model-info-panel"]');
         await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
-        // Verify both tags are present
+        // Verify both tags are present (use retrying assertion for robustness)
         const tag1Chip = infoPanel.locator(`.p-chip:has-text("${tag1}")`);
         const tag2Chip = infoPanel.locator(`.p-chip:has-text("${tag2}")`);
 
-        await expect(tag1Chip).toBeVisible({ timeout: 5000 });
-        await expect(tag2Chip).toBeVisible({ timeout: 5000 });
+        await expect(tag1Chip).toBeVisible({ timeout: 15000 });
+        await expect(tag2Chip).toBeVisible({ timeout: 15000 });
 
         console.log(
             `[Verify] Tags "${tag1}" and "${tag2}" are saved and visible after reload ✓`,
@@ -210,26 +258,39 @@ Then("the tag count should have decreased", async ({ page }) => {
     const { navigateToTab } = await import("../helpers/navigation-helper");
     await navigateToTab(page, "modelList");
 
-    // Re-open the model
-    const firstCard = page.locator(".model-card").first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
-    await firstCard.click();
+    // Re-open the SAME model by ID to avoid parallel test interference
+    let targetCard;
+    if (openedModelId) {
+        targetCard = page.locator(
+            `.model-card[data-model-id="${openedModelId}"]`,
+        );
+    } else {
+        targetCard = page.locator(".model-card").first();
+    }
+    await expect(targetCard).toBeVisible({ timeout: 10000 });
+    await targetCard.click();
 
     const canvas = page.locator("canvas");
     await expect(canvas).toBeVisible({ timeout: 15000 });
 
     // Re-open the info panel
     const viewerPage = new ModelViewerPage(page);
-    await viewerPage.openTab("Model Info", "#info");
+    await viewerPage.openTab("Model Info", '[data-testid="model-info-panel"]');
 
-    const infoPanel = page.locator("#info");
+    const infoPanel = page.locator('[data-testid="model-info-panel"]');
     await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
-    const currentCount = await infoPanel.locator(".p-chip").count();
-    console.log(
-        `[Verify] Tags before: ${tagCountBeforeRemove}, after reload: ${currentCount}`,
-    );
-    expect(currentCount).toBeLessThan(tagCountBeforeRemove);
+    // Use a retrying assertion — the ModelInfo component initialises tags
+    // from the model prop, but the first render may use stale/cached data
+    // before React Query delivers the fresh payload.
+    await expect(async () => {
+        const currentCount = await infoPanel.locator(".p-chip").count();
+        console.log(
+            `[Verify] Tags before: ${tagCountBeforeRemove}, after reload: ${currentCount} (modelId: ${openedModelId})`,
+        );
+        expect(currentCount).toBeLessThan(tagCountBeforeRemove);
+    }).toPass({ timeout: 15000, intervals: [1000, 1000, 2000, 2000] });
+
     console.log("[Verify] Tag count decreased after reload ✓");
 });
 
@@ -240,28 +301,42 @@ Then(
         const { navigateToTab } = await import("../helpers/navigation-helper");
         await navigateToTab(page, "modelList");
 
-        // Re-open the model
-        const firstCard = page.locator(".model-card").first();
-        await expect(firstCard).toBeVisible({ timeout: 10000 });
-        await firstCard.click();
+        // Re-open the SAME model by ID to avoid parallel test interference
+        let targetCard;
+        if (openedModelId) {
+            targetCard = page.locator(
+                `.model-card[data-model-id="${openedModelId}"]`,
+            );
+        } else {
+            targetCard = page.locator(".model-card").first();
+        }
+        await expect(targetCard).toBeVisible({ timeout: 10000 });
+        await targetCard.click();
 
         const canvas = page.locator("canvas");
         await expect(canvas).toBeVisible({ timeout: 15000 });
 
         // Re-open the info panel
         const viewerPage = new ModelViewerPage(page);
-        await viewerPage.openTab("Model Info", "#info");
+        await viewerPage.openTab(
+            "Model Info",
+            '[data-testid="model-info-panel"]',
+        );
 
-        const infoPanel = page.locator("#info");
+        const infoPanel = page.locator('[data-testid="model-info-panel"]');
         await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
         const textarea = infoPanel.locator(
             'textarea[placeholder="Enter description..."], .description-textarea',
         );
-        await expect(textarea).toBeVisible({ timeout: 5000 });
+        await expect(textarea).toBeVisible({ timeout: 10000 });
 
-        const value = await textarea.inputValue();
-        expect(value).toBe(text);
+        // Use polling to wait for the description value to be populated
+        // (React may still be hydrating or fetching model data)
+        await expect(async () => {
+            const value = await textarea.inputValue();
+            expect(value).toBe(text);
+        }).toPass({ timeout: 15000 });
         console.log(`[Verify] Description "${text}" is saved after reload ✓`);
     },
 );

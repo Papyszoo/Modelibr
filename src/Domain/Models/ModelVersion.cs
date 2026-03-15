@@ -3,7 +3,7 @@ namespace Domain.Models;
 public class ModelVersion
 {
     private readonly List<File> _files = new();
-    private readonly List<TextureSet> _textureSets = new();
+    private readonly List<ModelVersionTextureSet> _textureMappings = new();
 
     public int Id { get; private set; }
     public int ModelId { get; private set; }
@@ -15,6 +15,17 @@ public class ModelVersion
     public DateTime? DeletedAt { get; private set; }
     public int? DefaultTextureSetId { get; private set; }
     public int? ThumbnailId { get; private set; }
+    
+    /// <summary>
+    /// Material names extracted from the 3D model file (e.g. from GLB/GLTF materials).
+    /// </summary>
+    public List<string> MaterialNames { get; private set; } = new();
+    
+    /// <summary>
+    /// The name of the main (default) variant for this model version.
+    /// When empty/null, the first variant or "" variant is considered main.
+    /// </summary>
+    public string? MainVariantName { get; private set; }
     
     // Navigation properties
     public Model Model { get; set; } = null!;
@@ -30,15 +41,17 @@ public class ModelVersion
         }
     }
 
-    // Navigation property for many-to-many relationship with TextureSets - EF Core requires this to be settable
-    public ICollection<TextureSet> TextureSets 
+    /// <summary>
+    /// Explicit join entities linking this version's material slots to texture sets.
+    /// </summary>
+    public ICollection<ModelVersionTextureSet> TextureMappings 
     { 
-        get => _textureSets; 
+        get => _textureMappings; 
         set 
         {
-            _textureSets.Clear();
+            _textureMappings.Clear();
             if (value != null)
-                _textureSets.AddRange(value);
+                _textureMappings.AddRange(value);
         }
     }
 
@@ -95,57 +108,102 @@ public class ModelVersion
     }
 
     /// <summary>
-    /// Associates a texture set with this model version.
+    /// Sets the material names extracted from the 3D model file.
     /// </summary>
-    /// <param name="textureSet">The texture set to associate</param>
-    /// <param name="updatedAt">When the association was made</param>
-    /// <exception cref="ArgumentNullException">Thrown when textureSet is null</exception>
-    public void AddTextureSet(TextureSet textureSet, DateTime updatedAt)
+    public void SetMaterialNames(List<string> materialNames, DateTime updatedAt)
     {
-        if (textureSet == null)
-            throw new ArgumentNullException(nameof(textureSet));
-
-        if (_textureSets.Any(tp => tp.Id == textureSet.Id))
-            return; // Texture set already associated
-
-        _textureSets.Add(textureSet);
+        MaterialNames = materialNames ?? new List<string>();
         UpdatedAt = updatedAt;
     }
 
     /// <summary>
-    /// Removes a texture set association from this model version.
+    /// Adds a texture mapping for a specific material slot within a variant.
     /// </summary>
-    /// <param name="textureSet">The texture set to remove</param>
-    /// <param name="updatedAt">When the association was removed</param>
-    /// <exception cref="ArgumentNullException">Thrown when textureSet is null</exception>
-    public void RemoveTextureSet(TextureSet textureSet, DateTime updatedAt)
+    /// <param name="textureSetId">The texture set to assign</param>
+    /// <param name="materialName">The material name (empty string for default/all)</param>
+    /// <param name="updatedAt">When the mapping was made</param>
+    /// <param name="variantName">The variant name (empty string for default variant)</param>
+    public void AddTextureMapping(int textureSetId, string materialName, DateTime updatedAt, string variantName = "")
     {
-        if (textureSet == null)
-            throw new ArgumentNullException(nameof(textureSet));
+        materialName ??= string.Empty;
+        variantName ??= string.Empty;
 
-        if (_textureSets.Remove(textureSet))
+        // Check if this exact mapping already exists
+        if (_textureMappings.Any(m => m.TextureSetId == textureSetId && m.MaterialName == materialName && m.VariantName == variantName))
+            return;
+
+        // For named materials within the same variant, enforce one texture set per material per variant
+        if (!string.IsNullOrEmpty(materialName))
         {
+            var existing = _textureMappings.FirstOrDefault(m => m.MaterialName == materialName && m.VariantName == variantName);
+            if (existing != null)
+            {
+                _textureMappings.Remove(existing);
+            }
+        }
+
+        _textureMappings.Add(ModelVersionTextureSet.Create(Id, textureSetId, materialName, variantName));
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a texture mapping by material name within a specific variant.
+    /// </summary>
+    public void RemoveTextureMappingByMaterial(string materialName, DateTime updatedAt, string variantName = "")
+    {
+        materialName ??= string.Empty;
+        variantName ??= string.Empty;
+        var mapping = _textureMappings.FirstOrDefault(m => m.MaterialName == materialName && m.VariantName == variantName);
+        if (mapping != null)
+        {
+            _textureMappings.Remove(mapping);
             UpdatedAt = updatedAt;
         }
     }
 
     /// <summary>
-    /// Checks if this model version has an associated texture set with the specified ID.
+    /// Removes all texture mappings for a specific texture set (across all variants).
     /// </summary>
-    /// <param name="textureSetId">The texture set ID to check</param>
-    /// <returns>True if the texture set is associated with this model version</returns>
-    public bool HasTextureSet(int textureSetId)
+    public void RemoveTextureMappingsByTextureSetId(int textureSetId, DateTime updatedAt)
     {
-        return _textureSets.Any(tp => tp.Id == textureSetId);
+        var toRemove = _textureMappings.Where(m => m.TextureSetId == textureSetId).ToList();
+        foreach (var mapping in toRemove)
+        {
+            _textureMappings.Remove(mapping);
+        }
+        if (toRemove.Count > 0)
+            UpdatedAt = updatedAt;
     }
 
     /// <summary>
-    /// Gets all texture sets associated with this model version.
+    /// Removes all texture mappings for a specific variant.
     /// </summary>
-    /// <returns>Read-only list of associated texture sets</returns>
-    public IReadOnlyList<TextureSet> GetTextureSets()
+    public void RemoveTextureMappingsByVariant(string variantName, DateTime updatedAt)
     {
-        return _textureSets.AsReadOnly();
+        variantName ??= string.Empty;
+        var toRemove = _textureMappings.Where(m => m.VariantName == variantName).ToList();
+        foreach (var mapping in toRemove)
+        {
+            _textureMappings.Remove(mapping);
+        }
+        if (toRemove.Count > 0)
+            UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Checks if this model version has any texture mapping for the specified texture set.
+    /// </summary>
+    public bool HasTextureSet(int textureSetId)
+    {
+        return _textureMappings.Any(m => m.TextureSetId == textureSetId);
+    }
+
+    /// <summary>
+    /// Gets all texture mappings for this model version.
+    /// </summary>
+    public IReadOnlyList<ModelVersionTextureSet> GetTextureMappings()
+    {
+        return _textureMappings.AsReadOnly();
     }
 
     /// <summary>
@@ -156,13 +214,36 @@ public class ModelVersion
     /// <exception cref="InvalidOperationException">Thrown when the texture set is not associated with this model version</exception>
     public void SetDefaultTextureSet(int? textureSetId, DateTime updatedAt)
     {
-        if (textureSetId.HasValue && !_textureSets.Any(ts => ts.Id == textureSetId.Value))
+        if (textureSetId.HasValue && !_textureMappings.Any(m => m.TextureSetId == textureSetId.Value))
         {
             throw new InvalidOperationException($"Texture set {textureSetId.Value} is not associated with this model version.");
         }
 
         DefaultTextureSetId = textureSetId;
         UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Sets the main variant name for this model version.
+    /// </summary>
+    public void SetMainVariant(string variantName, DateTime updatedAt)
+    {
+        variantName ??= string.Empty;
+        if (!string.IsNullOrEmpty(variantName) && !_textureMappings.Any(m => m.VariantName == variantName))
+        {
+            throw new InvalidOperationException($"Variant '{variantName}' does not exist on this model version.");
+        }
+
+        MainVariantName = variantName;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Gets all distinct variant names in this model version's texture mappings.
+    /// </summary>
+    public IReadOnlyList<string> GetVariantNames()
+    {
+        return _textureMappings.Select(m => m.VariantName).Distinct().OrderBy(v => v).ToList().AsReadOnly();
     }
 
     /// <summary>

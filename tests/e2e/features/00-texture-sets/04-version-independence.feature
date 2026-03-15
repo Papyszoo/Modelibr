@@ -9,6 +9,7 @@ Feature: Version Thumbnail Independence
       | name       |
       | red_color  |
 
+  @timeout:300000
   Scenario: Version 1 thumbnail remains unchanged when modifying version 2
     Given I am on the model viewer page for "multi-version-model"
     And I have version 1 and version 2

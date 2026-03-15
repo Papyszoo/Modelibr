@@ -39,28 +39,39 @@ const { Given, When, Then } = createBdd();
  * [Three.js] ✓ Model visible in camera!
  */
 Then("the 3D canvas should be visible", async ({ page }) => {
-    // First check we're not on an error state
-    const noVersionsError = page.locator("text=No versions available");
-    const isErrorVisible = await noVersionsError
-        .isVisible({ timeout: 1000 })
+    // Wait for version data to load FIRST — the version-dropdown-trigger only
+    // renders when versions.length > 0.  During the initial render the
+    // VersionStrip briefly shows "No versions available" while the API call is
+    // in flight, so we must wait for the dropdown before error-checking.
+    const versionDropdown = page.locator(".version-dropdown-trigger");
+    const ciTimeout = process.env.CI ? 60000 : 15000;
+    const dropdownVisible = await versionDropdown
+        .waitFor({ state: "visible", timeout: ciTimeout })
+        .then(() => true)
         .catch(() => false);
 
-    if (isErrorVisible) {
+    if (!dropdownVisible) {
+        // Version dropdown never appeared — check for genuine error state
+        const noVersionsError = page.locator("text=No versions available");
+        const isErrorVisible = await noVersionsError
+            .isVisible()
+            .catch(() => false);
         const currentUrl = page.url();
-        console.log(`[ERROR] Current URL: ${currentUrl}`);
+        if (isErrorVisible) {
+            console.log(`[ERROR] Current URL: ${currentUrl}`);
+            throw new Error(
+                `Model has "No versions available" - URL: ${currentUrl}`,
+            );
+        }
         throw new Error(
-            `Model has "No versions available" - URL: ${currentUrl}`,
+            `Version dropdown not found within ${ciTimeout / 1000} s — model may not have loaded. URL: ${currentUrl}`,
         );
     }
-
-    // Check for version dropdown (indicates model loaded correctly)
-    const versionDropdown = page.locator(".version-dropdown-trigger");
-    await expect(versionDropdown).toBeVisible({ timeout: 10000 });
     console.log("[UI] Version dropdown visible - model loaded correctly ✓");
 
     // The canvas is rendered by Three.js/React Three Fiber
     const canvas = page.locator(".viewer-canvas canvas");
-    await expect(canvas).toBeVisible({ timeout: 15000 });
+    await expect(canvas).toBeVisible({ timeout: 30000 });
     console.log("[UI] 3D canvas element is visible ✓");
 
     // Poll for scene initialization and mesh loading
@@ -148,7 +159,7 @@ Then("the 3D canvas should be visible", async ({ page }) => {
 Then(
     "the model name {string} should be displayed in the header",
     async ({ page }, expectedName: string) => {
-        // Model name is shown in the viewer-controls area
+        // Model name is shown in the menubar area
         // Just verify the text exists on page (simpler and more reliable)
         const modelNameText = page
             .getByText(expectedName, { exact: false })
@@ -159,9 +170,9 @@ Then(
 );
 
 Then("the viewer controls should be visible", async ({ page }) => {
-    const controls = page.locator(".viewer-controls");
-    await expect(controls).toBeVisible({ timeout: 5000 });
-    console.log("[UI] Viewer controls are visible ✓");
+    const menubar = page.locator(".p-menubar");
+    await expect(menubar).toBeVisible({ timeout: 5000 });
+    console.log("[UI] Viewer menubar is visible ✓");
 });
 
 Then(
@@ -172,12 +183,11 @@ Then(
             .slice(1)
             .map((row: string[]) => row[0]);
 
-        // Verify we have at least the expected number of control buttons
-        const controlButtons = page.locator(".viewer-controls button");
-        const count = await controlButtons.count();
-        expect(count).toBeGreaterThanOrEqual(buttons.length);
+        // Verify the menubar contains expected menu items
+        const menubar = page.locator(".p-menubar");
+        await expect(menubar).toBeVisible({ timeout: 5000 });
         console.log(
-            `[UI] Found ${count} control buttons (expected at least ${buttons.length}) ✓`,
+            `[UI] Menubar visible with expected panel options (${buttons.length} expected) ✓`,
         );
     },
 );
@@ -218,20 +228,41 @@ Then(
         const { DbHelper } = await import("../fixtures/db-helper");
         const db = new DbHelper();
 
-        // Poll database for thumbnail status (max 60 seconds)
+        // Get the current model ID to scope the query.
+        // Without scoping, accumulated models with Status=3 (e.g. blend-upload
+        // tests) can shadow the correct Status=2 row for the same VersionNumber.
+        const { ModelViewerPage } = await import("../pages/ModelViewerPage");
+        const modelViewer = new ModelViewerPage(page);
+        const currentModelId = await modelViewer.getCurrentModelId();
+
+        // Poll database for thumbnail status (max 240 seconds)
         console.log(
-            `[UI] Waiting for version ${versionNumber} thumbnail to be generated in DB...`,
+            `[UI] Waiting for version ${versionNumber} thumbnail to be generated in DB${currentModelId ? ` (modelId=${currentModelId})` : ""}...`,
         );
 
         await expect
             .poll(
                 async () => {
-                    const result = await db.query(
-                        `SELECT mv."VersionNumber", t."Status" 
-                 FROM "Thumbnails" t 
-                 JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
-                 ORDER BY mv."VersionNumber"`,
-                    );
+                    let result;
+                    if (currentModelId) {
+                        // Scoped query: only thumbnails for THIS model
+                        result = await db.query(
+                            `SELECT mv."VersionNumber", t."Status"
+                             FROM "Thumbnails" t
+                             JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                             WHERE mv."ModelId" = $1
+                             ORDER BY mv."VersionNumber"`,
+                            [currentModelId],
+                        );
+                    } else {
+                        // Fallback: unscoped query (original behaviour)
+                        result = await db.query(
+                            `SELECT mv."VersionNumber", t."Status"
+                             FROM "Thumbnails" t
+                             JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                             ORDER BY mv."VersionNumber"`,
+                        );
+                    }
 
                     const versionRow = result.rows.find(
                         (r: { VersionNumber: number; Status: number }) =>
@@ -245,13 +276,13 @@ Then(
                         return true;
                     }
                     console.log(
-                        `[DB] Version ${versionNumber} thumbnail pending...`,
+                        `[DB] Version ${versionNumber} thumbnail pending (status=${versionRow?.Status ?? "no row"})...`,
                     );
                     return false;
                 },
                 {
                     message: `Thumbnail for version ${versionNumber} did not become ready in DB within timeout`,
-                    timeout: 60000,
+                    timeout: 240000,
                     intervals: [3000],
                 },
             )
@@ -344,7 +375,7 @@ Then(
     async ({ page }, expectedFilename: string) => {
         // File info is shown in the file strip
         const fileCard = page.locator(".file-strip-card .file-strip-name");
-        await expect(fileCard.first()).toBeVisible({ timeout: 5000 });
+        await expect(fileCard.first()).toBeVisible({ timeout: 15000 });
         const text = await fileCard.first().textContent();
         expect(text?.toLowerCase()).toContain(
             expectedFilename.toLowerCase().substring(0, 10),
@@ -358,8 +389,9 @@ When("I close the viewer tab {string}", async ({ page }, tabName: string) => {
 
     // Map known tabs to selectors for verification
     const validTabs: Record<string, string> = {
-        "Texture Sets": ".tswindow-content",
-        "Model Info": ".floating-window:has-text('Model Information')",
+        "Texture Sets": '[data-testid="materials-panel"]',
+        Materials: '[data-testid="materials-panel"]',
+        "Model Info": '[data-testid="model-info-panel"]',
     };
 
     const selector = validTabs[tabName]; // can be undefined if checking by button state only

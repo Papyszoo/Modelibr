@@ -1,6 +1,6 @@
 import { createBdd } from "playwright-bdd";
 import { expect, test } from "@playwright/test";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import {
     openTabViaMenu,
     clickTab,
@@ -18,16 +18,21 @@ When(
     "I click on the model {string} to open it",
     async ({ page }, modelName: string) => {
         const modelData =
-            sharedState.getModel(modelName) ||
-            sharedState.getModel(modelName + ".glb") ||
-            sharedState.getModel(modelName + ".fbx");
+            getScenarioState(page).getModel(modelName) ||
+            getScenarioState(page).getModel(modelName + ".glb") ||
+            getScenarioState(page).getModel(modelName + ".fbx");
         if (!modelData) {
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
 
         // Find and double-click on the model in the grid
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
-        if (await clickTarget.isVisible({ timeout: 5000 })) {
+        if (
+            await clickTarget
+                .waitFor({ state: "visible", timeout: 5000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await clickTarget.dblclick();
         } else {
             // Fall back to model card locator
@@ -41,7 +46,7 @@ When(
 
         // Wait for model viewer to load
         await page.waitForSelector(
-            ".model-viewer, .viewer-canvas, .viewer-controls",
+            ".model-viewer, .viewer-canvas, .p-menubar",
             {
                 state: "visible",
                 timeout: 10000,
@@ -68,7 +73,12 @@ Then("the Texture Sets content should be visible", async ({ page }) => {
         .locator(".dock-bar-left")
         .locator(".draggable-tab:has(.pi-folder)")
         .first();
-    if (await textureSetsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (
+        await textureSetsTab
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await textureSetsTab.click();
     }
 
@@ -125,7 +135,12 @@ When("I open the Texture Sets tab in the left panel", async ({ page }) => {
     const existingTab = page
         .locator(".dock-bar-left")
         .locator(".draggable-tab:has(.pi-folder)");
-    if (await existingTab.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (
+        await existingTab
+            .waitFor({ state: "visible", timeout: 1000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await existingTab.click();
         await expect(existingTab).toHaveClass(/active/, { timeout: 3000 });
         console.log("[UI] Switched to existing Texture Sets tab ✓");
@@ -147,7 +162,7 @@ When("I go back to the model list", async ({ page }) => {
 When(
     "I click on the model {string} to open it again",
     async ({ page }, modelName: string) => {
-        const modelData = sharedState.getModel(modelName);
+        const modelData = getScenarioState(page).getModel(modelName);
         if (!modelData) {
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
@@ -155,7 +170,7 @@ When(
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
         await clickTarget.dblclick();
         await page.waitForSelector(
-            ".model-viewer, .viewer-canvas, .viewer-controls",
+            ".model-viewer, .viewer-canvas, .p-menubar",
             { state: "visible", timeout: 10000 },
         );
         console.log(`[UI] Clicked on model "${modelName}" again ✓`);
@@ -199,7 +214,12 @@ When("I switch to {string} tab", async ({ page }, tabName: string) => {
     const tab = page
         .locator(`.draggable-tab[data-pr-tooltip*="${tabName}"]`)
         .first();
-    if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (
+        await tab
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await tab.click();
         await expect(tab).toHaveClass(/active/, { timeout: 3000 });
     }
@@ -214,7 +234,7 @@ When("I close the Settings tab", async ({ page }) => {
 });
 
 When("I close the {string} tab", async ({ page }, modelName: string) => {
-    const modelData = sharedState.getModel(modelName);
+    const modelData = getScenarioState(page).getModel(modelName);
     const tooltipText = modelData ? modelData.name : modelName;
     await closeTabByTooltip(page, tooltipText);
     console.log(`[UI] Closed "${modelName}" tab ✓`);

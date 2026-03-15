@@ -1227,6 +1227,59 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Extract material names from the currently loaded model.
+   * Traverses all meshes and collects unique material names.
+   * @returns {Promise<string[]>} Array of unique material names
+   */
+  async extractMaterialNames() {
+    if (!this.page || this.page.isClosed()) {
+      logger.warn('Cannot extract material names — page not available')
+      return []
+    }
+
+    try {
+      const result = await this.page.evaluate(() => {
+        const model = window.modelRenderer?.model
+        if (!model) return { success: false, error: 'No model loaded' }
+
+        const materialNames = new Set()
+        model.traverse(child => {
+          if (child.isMesh && child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach(m => {
+                if (m.name) materialNames.add(m.name)
+              })
+            } else if (child.material.name) {
+              materialNames.add(child.material.name)
+            }
+          }
+        })
+
+        return { success: true, materialNames: [...materialNames] }
+      })
+
+      if (!result.success) {
+        logger.warn('Failed to extract material names', {
+          error: result.error,
+        })
+        return []
+      }
+
+      logger.info('Extracted material names from model', {
+        count: result.materialNames.length,
+        materialNames: result.materialNames,
+      })
+
+      return result.materialNames
+    } catch (error) {
+      logger.warn('Error extracting material names', {
+        error: error.message,
+      })
+      return []
+    }
+  }
+
+  /**
    * Clean up resources
    */
   async dispose() {

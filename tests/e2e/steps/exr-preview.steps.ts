@@ -2,6 +2,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import { TextureSetsPage } from "../pages/TextureSetsPage";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -60,7 +61,7 @@ When(
 
         // Reload to see new data
         await page.reload();
-        await page.waitForSelector(".texture-set-list", { timeout: 10000 });
+        await new TextureSetsPage(page).waitForList();
     },
 );
 
@@ -105,7 +106,7 @@ When(
 
         // Reload to see new data
         await page.reload();
-        await page.waitForSelector(".texture-set-list", { timeout: 10000 });
+        await new TextureSetsPage(page).waitForList();
     },
 );
 
@@ -122,14 +123,7 @@ When(
         }
 
         // Find the card by the unique name
-        const card = page
-            .locator(`.texture-set-card`)
-            .filter({
-                has: page.locator(
-                    `.texture-set-card-name:has-text("${set.name}")`,
-                ),
-            })
-            .first();
+        const card = new TextureSetsPage(page).getCardByName(set.name).first();
 
         await expect(card).toBeVisible({ timeout: 10000 });
         await card.dblclick();
@@ -172,9 +166,7 @@ Then("no console errors should be present", async ({ page }) => {
     const errorOverlay = page.locator(
         "#webpack-dev-server-client-overlay, .error-boundary, .react-error-overlay",
     );
-    const hasError = await errorOverlay
-        .isVisible({ timeout: 1000 })
-        .catch(() => false);
+    const hasError = await errorOverlay.isVisible().catch(() => false);
     expect(hasError).toBe(false);
     console.log("[UI] No console errors or error overlays detected ✓");
 });
@@ -202,11 +194,11 @@ Then("the 3D preview should have textures applied", async ({ page }) => {
 
     // Verify no error boundary is showing
     const errorOverlay = page.locator(".error-boundary, [class*='error']");
-    const hasError = await errorOverlay
+    const hasError2 = await errorOverlay
         .filter({ hasText: "Something went wrong" })
-        .isVisible({ timeout: 1000 })
+        .isVisible()
         .catch(() => false);
-    expect(hasError).toBe(false);
+    expect(hasError2).toBe(false);
 
     console.log(
         "[UI] 3D preview has textures applied including EXR (canvas rendered with valid dimensions) ✓",

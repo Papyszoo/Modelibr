@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { Page, expect, Locator } from "@playwright/test";
 import { navigateToAppClean } from "../helpers/navigation-helper";
 
 export class ModelListPage {
@@ -86,7 +86,12 @@ export class ModelListPage {
                     '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times',
                 )
                 .first();
-            if (await closeButton.isVisible({ timeout: 1000 })) {
+            if (
+                await closeButton
+                    .waitFor({ state: "visible", timeout: 1000 })
+                    .then(() => true)
+                    .catch(() => false)
+            ) {
                 await closeButton.click();
                 // Wait for window to disappear
                 await expect(
@@ -178,5 +183,92 @@ export class ModelListPage {
             state: "visible",
             timeout: 30000,
         });
+    }
+
+    /**
+     * Get a model card locator by name
+     */
+    getModelCard(name: string): Locator {
+        return this.page.locator(`.model-card:has-text("${name}")`).first();
+    }
+
+    /**
+     * Get the filter token/chip locators in the filter bar
+     */
+    getFilterTokens(): Locator {
+        return this.page.locator(".filter-bar .p-multiselect-token");
+    }
+
+    /**
+     * Filter the model list by pack name using the filter bar multiselect
+     */
+    async filterByPack(packName: string): Promise<void> {
+        const packsMultiselect = this.page
+            .locator(".filter-bar .p-multiselect")
+            .first();
+        await packsMultiselect.click();
+        await this.page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "visible", timeout: 5000 });
+
+        const packOption = this.page.locator(
+            `.p-multiselect-panel .p-multiselect-item:has-text("${packName}")`,
+        );
+        await packOption.click();
+
+        await this.page.keyboard.press("Escape");
+        await this.page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "hidden", timeout: 5000 });
+    }
+
+    /**
+     * Filter the model list by project name using the filter bar multiselect
+     */
+    async filterByProject(projectName: string): Promise<void> {
+        const projectsMultiselect = this.page.locator(
+            '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
+        );
+        await projectsMultiselect.click();
+        await this.page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "visible", timeout: 5000 });
+
+        const projectOption = this.page.locator(
+            `.p-multiselect-panel .p-multiselect-item:has-text("${projectName}")`,
+        );
+        await projectOption.click();
+
+        await this.page.keyboard.press("Escape");
+        await this.page
+            .locator(".p-multiselect-panel")
+            .waitFor({ state: "hidden", timeout: 5000 });
+    }
+
+    /**
+     * Clear all active filters in the filter bar
+     */
+    async clearFilters(): Promise<void> {
+        const clearButton = this.page.locator(".clear-filters-btn");
+        if (await clearButton.isVisible()) {
+            await clearButton.click();
+            await this.page.waitForLoadState("domcontentloaded");
+        } else {
+            const packsClear = this.page
+                .locator(".filter-bar .p-multiselect")
+                .first()
+                .locator(".p-multiselect-clear-icon");
+            if (await packsClear.isVisible()) {
+                await packsClear.click();
+            }
+            const projectsClear = this.page
+                .locator(".filter-bar .p-multiselect")
+                .nth(1)
+                .locator(".p-multiselect-clear-icon");
+            if (await projectsClear.isVisible()) {
+                await projectsClear.click();
+            }
+            await this.page.waitForLoadState("domcontentloaded");
+        }
     }
 }

@@ -18,7 +18,8 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     {
         return await _context.ModelVersions
             .Include(v => v.Files)
-            .Include(v => v.TextureSets)
+            .Include(v => v.TextureMappings)
+                .ThenInclude(m => m.TextureSet)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
@@ -29,7 +30,8 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     {
         return await _context.ModelVersions
             .Include(v => v.Files)
-            .Include(v => v.TextureSets)
+            .Include(v => v.TextureMappings)
+                .ThenInclude(m => m.TextureSet)
             .FirstOrDefaultAsync(v => v.ModelId == modelId && v.VersionNumber == versionNumber, cancellationToken);
     }
 
@@ -41,7 +43,8 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             .AsNoTracking()
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
-            .Include(v => v.TextureSets)
+            .Include(v => v.TextureMappings)
+                .ThenInclude(m => m.TextureSet)
             .Where(v => v.ModelId == modelId)
             .OrderBy(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
@@ -54,7 +57,8 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             .AsNoTracking()
             .Where(v => v.IsDeleted)
             .Include(v => v.Files)
-            .Include(v => v.TextureSets)
+            .Include(v => v.TextureMappings)
+                .ThenInclude(m => m.TextureSet)
             .OrderBy(v => v.ModelId)
             .ThenBy(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
@@ -66,7 +70,8 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             .IgnoreQueryFilters()
             .Where(v => v.IsDeleted)
             .Include(v => v.Files)
-            .Include(v => v.TextureSets)
+            .Include(v => v.TextureMappings)
+                .ThenInclude(m => m.TextureSet)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
@@ -82,6 +87,97 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         _context.ModelVersions.Update(version);
         await _context.SaveChangesAsync(cancellationToken);
         return version;
+    }
+
+    public async Task AddTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default)
+    {
+        var mapping = ModelVersionTextureSet.Create(modelVersionId, textureSetId, materialName);
+        _context.Set<ModelVersionTextureSet>().Add(mapping);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, string variantName, CancellationToken cancellationToken = default)
+    {
+        var mapping = ModelVersionTextureSet.Create(modelVersionId, textureSetId, materialName, variantName);
+        _context.Set<ModelVersionTextureSet>().Add(mapping);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default)
+    {
+        var mapping = await _context.Set<ModelVersionTextureSet>()
+            .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId 
+                && m.TextureSetId == textureSetId 
+                && m.MaterialName == materialName
+                && m.VariantName == string.Empty, cancellationToken);
+        if (mapping != null)
+        {
+            _context.Set<ModelVersionTextureSet>().Remove(mapping);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, string variantName, CancellationToken cancellationToken = default)
+    {
+        variantName ??= string.Empty;
+        var mapping = await _context.Set<ModelVersionTextureSet>()
+            .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId 
+                && m.TextureSetId == textureSetId 
+                && m.MaterialName == materialName
+                && m.VariantName == variantName, cancellationToken);
+        if (mapping != null)
+        {
+            _context.Set<ModelVersionTextureSet>().Remove(mapping);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RemoveTextureMappingsByTextureSetIdAsync(int modelVersionId, int textureSetId, CancellationToken cancellationToken = default)
+    {
+        var mappings = await _context.Set<ModelVersionTextureSet>()
+            .Where(m => m.ModelVersionId == modelVersionId && m.TextureSetId == textureSetId)
+            .ToListAsync(cancellationToken);
+        if (mappings.Any())
+        {
+            _context.Set<ModelVersionTextureSet>().RemoveRange(mappings);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RemoveTextureMappingByMaterialAsync(int modelVersionId, string materialName, CancellationToken cancellationToken = default)
+    {
+        var mapping = await _context.Set<ModelVersionTextureSet>()
+            .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId && m.MaterialName == materialName, cancellationToken);
+        if (mapping != null)
+        {
+            _context.Set<ModelVersionTextureSet>().Remove(mapping);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RemoveTextureMappingByMaterialAndVariantAsync(int modelVersionId, string materialName, string variantName, CancellationToken cancellationToken = default)
+    {
+        variantName ??= string.Empty;
+        var mapping = await _context.Set<ModelVersionTextureSet>()
+            .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId && m.MaterialName == materialName && m.VariantName == variantName, cancellationToken);
+        if (mapping != null)
+        {
+            _context.Set<ModelVersionTextureSet>().Remove(mapping);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RemoveTextureMappingsByVariantAsync(int modelVersionId, string variantName, CancellationToken cancellationToken = default)
+    {
+        variantName ??= string.Empty;
+        var mappings = await _context.Set<ModelVersionTextureSet>()
+            .Where(m => m.ModelVersionId == modelVersionId && m.VariantName == variantName)
+            .ToListAsync(cancellationToken);
+        if (mappings.Any())
+        {
+            _context.Set<ModelVersionTextureSet>().RemoveRange(mappings);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task DeleteAsync(ModelVersion version, CancellationToken cancellationToken = default)

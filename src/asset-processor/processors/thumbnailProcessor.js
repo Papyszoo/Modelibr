@@ -158,6 +158,25 @@ export class ThumbnailProcessor extends BaseProcessor {
         fileInfo.fileType
       )
 
+      // Step 3.2: Extract and save material names from the loaded model
+      try {
+        const materialNames =
+          await this.puppeteerRenderer.extractMaterialNames()
+        if (materialNames.length > 0) {
+          jobLogger.info('Extracted material names from model', {
+            materialNames,
+          })
+          await this.modelDataService.saveMaterialNames(
+            job.modelVersionId,
+            materialNames
+          )
+        }
+      } catch (matError) {
+        jobLogger.warn('Failed to extract/save material names, continuing', {
+          error: matError.message,
+        })
+      }
+
       // Step 3.5: Apply textures if configured
       texturePaths = await this._applyTextures(job, jobLogger)
 

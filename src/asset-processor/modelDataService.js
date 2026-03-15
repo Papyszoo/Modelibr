@@ -346,4 +346,47 @@ export class ModelDataService {
       })
     }
   }
+
+  /**
+   * Save extracted material names to the API for a model version.
+   * Calls PUT /model-versions/{versionId}/material-names (worker-authenticated).
+   * @param {number} modelVersionId - The model version ID
+   * @param {string[]} materialNames - Array of material names
+   * @returns {Promise<boolean>} True if saved successfully
+   */
+  async saveMaterialNames(modelVersionId, materialNames) {
+    try {
+      logger.info('Saving material names for model version', {
+        modelVersionId,
+        materialNames,
+        count: materialNames.length,
+      })
+
+      await this.apiClient.put(
+        `/model-versions/${modelVersionId}/material-names`,
+        { materialNames },
+        {
+          headers: {
+            ...(config.workerApiKey
+              ? { 'X-Api-Key': config.workerApiKey }
+              : {}),
+          },
+        }
+      )
+
+      logger.info('Material names saved successfully', {
+        modelVersionId,
+        count: materialNames.length,
+      })
+
+      return true
+    } catch (error) {
+      logger.warn('Failed to save material names', {
+        modelVersionId,
+        error: error.message,
+        status: error.response?.status,
+      })
+      return false
+    }
+  }
 }

@@ -168,7 +168,14 @@ export class SettingsPage {
     }
 
     async isSuccessVisible(): Promise<boolean> {
-        return await this.page.locator(this.successBanner).isVisible();
+        try {
+            await this.page
+                .locator(this.successBanner)
+                .waitFor({ state: "visible", timeout: 10000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async getSuccessMessage(): Promise<string | null> {

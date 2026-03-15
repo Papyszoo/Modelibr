@@ -100,3 +100,10 @@ export async function softDeleteModelVersion(
 ): Promise<void> {
   await client.delete(`/models/${modelId}/versions/${versionId}`)
 }
+
+export async function setMainVariant(
+  versionId: number,
+  variantName: string
+): Promise<void> {
+  await client.put(`/model-versions/${versionId}/main-variant`, { variantName })
+}
