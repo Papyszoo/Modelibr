@@ -4,6 +4,7 @@ import * as THREE from 'three'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { useEnvironmentPresets } from '@/features/model-viewer/hooks/useEnvironmentPresets'
 import { type TextureSetDto } from '@/types'
 import { type Model as ModelType } from '@/utils/fileUtils'
 
@@ -107,20 +108,11 @@ export function Scene({
   const ambientIntensity = settings?.ambientIntensity ?? 0.3
   const directionalIntensity = settings?.directionalIntensity ?? 1.0
   const showLightHelpers = settings?.showLightHelpers ?? false
-  const environmentPreset = (settings?.environmentPreset ?? 'city') as
-    | 'apartment'
-    | 'city'
-    | 'dawn'
-    | 'forest'
-    | 'lobby'
-    | 'night'
-    | 'park'
-    | 'studio'
-    | 'sunset'
-    | 'warehouse'
+  const environmentPreset = settings?.environmentPreset ?? 'city'
   const showEnvironmentBackground = settings?.showEnvironmentBackground ?? false
   const backgroundIntensity = settings?.backgroundIntensity ?? 1.0
   const environmentIntensity = settings?.environmentIntensity ?? 1.0
+  const { hdrUrl } = useEnvironmentPresets(environmentPreset)
 
   return (
     <>
@@ -128,7 +120,7 @@ export function Scene({
       <Stage
         key={`stage-${modelUrl}`}
         intensity={directionalIntensity}
-        environment={environmentPreset}
+        environment={null}
         shadows={
           showShadows ? { type: 'contact', opacity: 0.4, blur: 2 } : false
         }
@@ -156,7 +148,7 @@ export function Scene({
 
       {/* Environment map for reflections and optional background */}
       <Environment
-        preset={environmentPreset}
+        files={hdrUrl}
         background={showEnvironmentBackground}
         backgroundIntensity={backgroundIntensity}
         environmentIntensity={environmentIntensity}

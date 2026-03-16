@@ -313,8 +313,17 @@ Then(
     "the project {string} should not be visible",
     async ({ page }, projectName: string) => {
         const projectsPage = new ProjectsPage(page);
-        const isVisible = await projectsPage.isProjectVisible(projectName);
-        expect(isVisible).toBe(false);
+        // Poll for visibility since deletion may take time to propagate
+        await expect
+            .poll(
+                async () => await projectsPage.isProjectVisible(projectName),
+                {
+                    message: `Waiting for project "${projectName}" to disappear`,
+                    timeout: 15000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toBe(false);
         console.log(`[UI] Project "${projectName}" is not visible ✓`);
     },
 );

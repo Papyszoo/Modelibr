@@ -12,17 +12,15 @@ export default defineConfig({
     timeout: 90000, // 90s to allow for thumbnail generation (Puppeteer cold start + rendering takes 30-40s)
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
-    retries: process.env.CI ? 1 : 0,
+    retries: 1,
     // Workers are controlled per-phase by run-e2e.js:
     //   setup    → --workers=1  (sequential, avoids asset-processor overload)
-    //   chromium → --workers=3  (local) / --workers=4  (CI)
+    //   chromium → --workers=2  (local) / --workers=4  (CI)
     //
-    // 3 workers locally ensures the two slow test files (mixed-format-thumbnail
-    // ~10min, signalr-notifications ~6min) each get a dedicated worker while a
-    // third worker handles all remaining fast tests, reducing total time from
-    // ~13min (workers=2) to ~10.5min bounded by the slowest thumbnail job.
-    // When running manually, default to 3.
-    workers: parseInt(process.env.PW_WORKERS || "3", 10),
+    // 2 workers locally reduces database and asset-processor contention,
+    // eliminating most parallel timing issues while keeping run time reasonable.
+    // When running manually, default to 2.
+    workers: parseInt(process.env.PW_WORKERS || "2", 10),
     reporter: [["html", { open: "never" }]],
     use: {
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
@@ -51,8 +49,17 @@ export default defineConfig({
         {
             name: "chromium",
             testDir,
-            grepInvert: /@setup|@slow/,
+            grepInvert: /@setup|@slow|@serial/,
             dependencies: ["setup"], // Wait for all setup features to finish
+            use: { ...devices["Desktop Chrome"] },
+        },
+        {
+            name: "serial",
+            testDir,
+            grep: /@serial/,
+            grepInvert: /@setup/,
+            dependencies: ["setup", "chromium"], // Run after chromium to avoid asset-processor contention
+            fullyParallel: false,
             use: { ...devices["Desktop Chrome"] },
         },
         {
@@ -60,7 +67,7 @@ export default defineConfig({
             testDir,
             grep: /@slow/,
             grepInvert: /@setup/,
-            dependencies: ["setup"],
+            dependencies: ["setup", "chromium", "serial"], // Run last to avoid asset-processor contention with other projects
             fullyParallel: false, // Slow tests run sequentially to avoid asset-processor contention
             timeout: 720000, // 12 min for Blender rendering
             use: { ...devices["Desktop Chrome"] },

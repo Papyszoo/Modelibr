@@ -122,7 +122,11 @@ export class SettingsPage {
     // ===== Field Setters =====
 
     async setMaxFileSize(value: string): Promise<void> {
-        await this.page.locator(this.maxFileSizeInput).fill(value);
+        const input = this.page.locator(this.maxFileSizeInput);
+        await input.click();
+        await this.page.keyboard.press("Meta+a");
+        await this.page.keyboard.type(value, { delay: 30 });
+        await input.press("Tab");
     }
 
     async setMaxThumbnailSize(value: string): Promise<void> {
@@ -138,7 +142,11 @@ export class SettingsPage {
     }
 
     async setThumbnailWidth(value: string): Promise<void> {
-        await this.page.locator(this.thumbnailWidthInput).fill(value);
+        const input = this.page.locator(this.thumbnailWidthInput);
+        await input.click();
+        await this.page.keyboard.press("Meta+a");
+        await this.page.keyboard.type(value, { delay: 30 });
+        await input.press("Tab");
     }
 
     async setThumbnailHeight(value: string): Promise<void> {

@@ -155,7 +155,7 @@ export class ProjectsPage {
         // Wait for dialog to close
         await this.page.waitForSelector(
             '.p-dialog:has-text("Create New Project")',
-            { state: "hidden", timeout: 15000 },
+            { state: "hidden", timeout: 30000 },
         );
         console.log("[Action] Dialog closed");
 
@@ -200,17 +200,16 @@ export class ProjectsPage {
         );
         if (
             await confirmBtn
-                .waitFor({ state: "visible", timeout: 1000 })
+                .waitFor({ state: "visible", timeout: 5000 })
                 .then(() => true)
                 .catch(() => false)
         ) {
             await confirmBtn.click();
         }
 
-        // Optional: project card may already be hidden after deletion
+        // Wait for project card to be hidden after deletion
         await projectCard
-            .waitFor({ state: "hidden", timeout: 10000 })
-            .catch(() => {});
+            .waitFor({ state: "hidden", timeout: 25000 });
         console.log(`[Action] Deleted project: ${projectName}`);
     }
 

@@ -164,7 +164,14 @@ async function main() {
         { env: chromiumEnv },
     );
 
-    console.log(`\n📋 Phase 3: Slow tests (workers=1)\n`);
+    console.log(`\n📋 Phase 3: Serial tests (workers=1)\n`);
+    const serialEnv = { ...testEnv, PW_WORKERS: "1" };
+    const serialResult = run(
+        `npx playwright test --project=serial --no-deps ${args}`,
+        { env: serialEnv },
+    );
+
+    console.log(`\n📋 Phase 4: Slow tests (workers=1)\n`);
     const slowEnv = { ...testEnv, PW_WORKERS: "1" };
     const slowResult = run(
         `npx playwright test --project=slow --no-deps ${args}`,
@@ -176,7 +183,12 @@ async function main() {
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
-    const exitCode = testResult !== 0 ? testResult : slowResult;
+    const exitCode =
+        testResult !== 0
+            ? testResult
+            : serialResult !== 0
+              ? serialResult
+              : slowResult;
 
     if (exitCode === 0) {
         console.log(`\n✅ All tests passed in ${duration}s\n`);

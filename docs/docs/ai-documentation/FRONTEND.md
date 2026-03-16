@@ -112,7 +112,8 @@ src/frontend/src/
 - `variantName` field: identifies the preset/variant for the mapping. Empty string = Default preset.
 - `textureSetApi.ts` association/disassociation functions accept optional `variantName` parameter
 - **Presets (Variants):** Implicit entities derived from `variantName` field. No separate Variant table — presets exist when at least one texture mapping references that name. Composite PK: `(ModelVersionId, TextureSetId, MaterialName, VariantName)`
-- `MaterialsPanel.tsx` always shows the preset dropdown, with Add/Delete buttons and "Set as Main" action. Setting main triggers thumbnail regeneration.
+- `MaterialsPanel.tsx` always shows the preset dropdown, with Add/Delete buttons on the same row, and "Set as Main" button/badge on a separate row below. Setting main triggers thumbnail regeneration.
+- `TextureSetAssociationDialog.tsx` uses `textureMappings` prop (when provided) for variant-aware association detection — only texture sets linked to the current variant/preset are shown as associated. Falls back to `associatedModels` when `textureMappings` is not provided (backward compatibility for `TextureSetSelectorWindow`).
 
 **Where to look:**
 | Layer | Location |
@@ -186,7 +187,7 @@ Key rendering features:
 - **Split-channel texture handling**: `TexturedGeometry.tsx`'s `buildTextureUrls` includes `sourceChannel` in `TextureUrlInfo` for split-channel textures (R/G/B/A). At original quality, channel extraction is done client-side via `extractChannelFromBitmap()` (canvas-based). When using proxies, channel extraction was already done server-side during proxy generation. Texture fetches are deduplicated by URL — multiple texture types sharing the same source file (e.g., AO/Roughness/Metallic from a packed ARM map) fetch the file only once, with each type extracting its specific channel.
 - **Proxy size badges**: Displayed in three locations: (1) `TexturesTable` ("Textures" tab in TextureSetDetailDialog) — per-texture row badges, (2) `FilesTab` ("Files" tab in TextureSetViewer) — aggregated per-file badges after the "Used as" section, (3) `TextureSetGrid` — small green badges in the top-right corner of card thumbnails showing available proxy sizes. All use PrimeReact `Tag` components with `severity="success"` for available sizes.
 - **Context menu proxy generation**: `TextureSetGrid` right-click context menu includes a "Generate Proxies" submenu (visible for Universal sets) with 256/512/1024/2048 px options, each triggering `regenerateTextureSetThumbnail` with the corresponding `proxySize`.
-- **IBL lighting**: The preview uses `<Stage environment="city">` from `@react-three/drei` for Image-Based Lighting, providing realistic reflections and depth.
+- **IBL lighting**: Only the "city" environment HDR file is bundled locally (`public/hdri/potsdamer_platz_1k.hdr`, ~1.5 MB). All other 9 presets are fetched on demand from the drei assets CDN and cached via the Cache API (`modelibr-hdri` cache) for offline use. The `useEnvironmentPresets` hook (in `hooks/useEnvironmentPresets.ts`) manages online/offline detection, cache status, and async HDR URL resolution. The `environmentPresets.ts` utility provides `resolveHdrUrl()` which returns a local path for city, a blob URL from cache for cached presets, or fetches+caches from CDN for online presets — falling back to city when offline and uncached. In `ViewerMenubar.tsx`, unavailable presets are disabled with "(offline)" label when the browser is offline. The `<Stage>` component uses `environment={null}` since lighting comes from the separate `<Environment>` component.
 
 The component loads textures (standard + EXR) asynchronously, sets correct color spaces (sRGB for color textures, linear for data textures), and applies `RepeatWrapping`.
 
@@ -204,6 +205,7 @@ Universal (Global Material) texture sets get auto-generated preview thumbnails. 
 | Layer | Location |
 |-------|----------|
 | Main viewer | `features/model-viewer/components/ModelViewer.tsx` (26KB - main orchestrator) |
+| Canvas error boundary | `features/model-viewer/components/CanvasErrorBoundary.tsx` — catches React 19 Error #310 (cross-component state update during R3F render) and auto-retries up to 3 times |
 | 3D rendering | `features/model-viewer/components/Model.tsx`, `TexturedModel.tsx` |
 | Version strip | `features/model-viewer/components/VersionStrip.tsx` |
 | Viewer settings | `features/model-viewer/components/ViewerSettings.tsx` |

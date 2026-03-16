@@ -28,6 +28,7 @@ import { type Model } from '@/utils/fileUtils'
 import { FileUploadModal } from './FileUploadModal'
 import { Scene as ModelPreviewScene } from './ModelPreviewScene'
 import { PanelWrapper, type ExpandAction } from './PanelWrapper'
+import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { VersionStrip } from './VersionStrip'
 import { type PanelContent, ViewerMenubar } from './ViewerMenubar'
 import { ViewerSidePanel } from './ViewerSidePanel'
@@ -633,42 +634,44 @@ export function ModelViewer({
                 </div>
               ) : (
                 <>
-                  <Canvas
-                    key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                    shadows
-                    className="viewer-canvas"
-                    data-testid="model-viewer-canvas"
-                    gl={{
-                      antialias: true,
-                      alpha: true,
-                      powerPreference: 'high-performance',
-                    }}
-                    dpr={Math.min(window.devicePixelRatio, 2)}
-                    onCreated={state => {
-                      if (typeof window !== 'undefined') {
-                        ;(
-                          window as Window & {
-                            __THREE_SCENE__?: THREE.Scene
-                            __THREE_STATE__?: typeof state
-                          }
-                        ).__THREE_SCENE__ = state.scene
-                        ;(
-                          window as Window & {
-                            __THREE_SCENE__?: THREE.Scene
-                            __THREE_STATE__?: typeof state
-                          }
-                        ).__THREE_STATE__ = state
-                      }
-                    }}
-                  >
-                    <ModelPreviewScene
-                      key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                      model={versionModel || model}
-                      settings={viewerSettings}
-                      textureSet={selectedTextureSet}
-                      defaultFileId={defaultFileId}
-                    />
-                  </Canvas>
+                  <CanvasErrorBoundary>
+                    <Canvas
+                      key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                      shadows
+                      className="viewer-canvas"
+                      data-testid="model-viewer-canvas"
+                      gl={{
+                        antialias: true,
+                        alpha: true,
+                        powerPreference: 'high-performance',
+                      }}
+                      dpr={Math.min(window.devicePixelRatio, 2)}
+                      onCreated={state => {
+                        if (typeof window !== 'undefined') {
+                          ;(
+                            window as Window & {
+                              __THREE_SCENE__?: THREE.Scene
+                              __THREE_STATE__?: typeof state
+                            }
+                          ).__THREE_SCENE__ = state.scene
+                          ;(
+                            window as Window & {
+                              __THREE_SCENE__?: THREE.Scene
+                              __THREE_STATE__?: typeof state
+                            }
+                          ).__THREE_STATE__ = state
+                        }
+                      }}
+                    >
+                      <ModelPreviewScene
+                        key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                        model={versionModel || model}
+                        settings={viewerSettings}
+                        textureSet={selectedTextureSet}
+                        defaultFileId={defaultFileId}
+                      />
+                    </Canvas>
+                  </CanvasErrorBoundary>
                   <div ref={statsContainerRef} className="stats-container" />
                   {viewerSettings.showStats && statsContainerRef.current && (
                     <Stats

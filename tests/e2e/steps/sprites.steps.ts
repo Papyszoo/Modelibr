@@ -1001,21 +1001,35 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
             .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
-    // First select the category tab - use exact text match to avoid substring collisions
-    // e.g., "Test Category" should NOT match "Assign Test Category"
-    const allTabs = page.locator(".category-tab");
-    const tabCount = await allTabs.count();
+    // Wait for category tabs to be rendered
+    await page.waitForSelector(".category-tab", { state: "visible", timeout: 10000 });
+
+    // Use polling to wait for the specific category tab to appear (may need re-render)
     let targetTab = null;
-    for (let i = 0; i < tabCount; i++) {
-        const tab = allTabs.nth(i);
-        const tabText = await tab.textContent();
-        // Category tabs show "Name(count)" format, extract just the name
-        const rawName = tabText?.replace(/\(\d+\)\s*$/, "").trim();
-        if (rawName === categoryName) {
-            targetTab = tab;
-            break;
-        }
-    }
+    await expect
+        .poll(
+            async () => {
+                const allTabs = page.locator(".category-tab");
+                const tabCount = await allTabs.count();
+                for (let i = 0; i < tabCount; i++) {
+                    const tab = allTabs.nth(i);
+                    const tabText = await tab.textContent();
+                    const rawName = tabText?.replace(/\(\d+\)\s*$/, "").trim();
+                    if (rawName === categoryName) {
+                        targetTab = tab;
+                        return true;
+                    }
+                }
+                return false;
+            },
+            {
+                message: `Waiting for category tab "${categoryName}" to appear`,
+                timeout: 15000,
+                intervals: [500, 1000, 2000],
+            },
+        )
+        .toBe(true);
+
     if (!targetTab) {
         throw new Error(
             `Category tab "${categoryName}" not found (exact match)`,

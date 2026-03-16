@@ -15,7 +15,6 @@ import {
   getFileUrl,
   setDefaultTextureSet,
 } from '@/features/models/api/modelApi'
-import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
 import { type TextureSetDto } from '@/types'
@@ -68,6 +67,7 @@ export function MaterialsPanel({
   const [addingPreset, setAddingPreset] = useState(false)
   const [newPresetName, setNewPresetName] = useState('')
   const [deletingPreset, setDeletingPreset] = useState(false)
+  const [localPresets, setLocalPresets] = useState<string[]>([])
   const newPresetInputRef = useRef<HTMLInputElement>(null)
 
   // Sync selectedVariant to mainVariantName when version changes
@@ -75,6 +75,11 @@ export function MaterialsPanel({
     const mainVariant = selectedVersion?.mainVariantName ?? ''
     setSelectedVariant(mainVariant)
   }, [selectedVersion?.id, selectedVersion?.mainVariantName])
+
+  // Reset local presets when switching to a different version
+  useEffect(() => {
+    setLocalPresets([])
+  }, [selectedVersion?.id])
 
   const { modelObject } = useModelObject()
 
@@ -149,7 +154,13 @@ export function MaterialsPanel({
 
   const handleVariantChange = (variantName: string) => {
     setSelectedVariant(variantName)
-    onVariantChange?.(variantName)
+    // Defer the cross-component state update to avoid React Error #310:
+    // PrimeReact Dropdown can call onChange synchronously during its own render
+    // phase when the controlled value changes. Calling setState for a *different*
+    // component (ModelViewer's selectedTextureSetId) during another component's render
+    // triggers React's "Cannot update a component while rendering a different component"
+    // invariant. queueMicrotask schedules the call after the current render cycle ends.
+    queueMicrotask(() => onVariantChange?.(variantName))
   }
 
   const handleSetMainVariant = async () => {
@@ -157,8 +168,7 @@ export function MaterialsPanel({
     try {
       setSettingMainVariant(true)
       await setMainVariant(modelVersionId, selectedVariant)
-      // Trigger thumbnail regeneration when setting main preset
-      await regenerateThumbnail(modelId, modelVersionId)
+      // Thumbnail regeneration is handled by the backend when setting main variant
       onModelUpdated()
     } catch (error) {
       console.error('Failed to set main variant:', error)
@@ -176,7 +186,8 @@ export function MaterialsPanel({
   const handleConfirmAddPreset = useCallback(() => {
     const name = newPresetName.trim()
     if (!name) return
-    // Switch to the new preset name — it becomes available when texture sets are linked
+    // Track locally so it survives selection changes until backend knows about it
+    setLocalPresets(prev => prev.includes(name) ? prev : [...prev, name])
     setSelectedVariant(name)
     onVariantChange?.(name)
     setAddingPreset(false)
@@ -211,7 +222,8 @@ export function MaterialsPanel({
               presetName
             )
           }
-          // Switch back to Default preset
+          // Remove from local presets and switch back to Default
+          setLocalPresets(prev => prev.filter(p => p !== presetName))
           setSelectedVariant('')
           onVariantChange?.('')
           await textureSetsQuery.refetch()
@@ -299,10 +311,16 @@ export function MaterialsPanel({
     }
   }
 
-  // Variant dropdown options
+  // Merge backend variant names with locally-created presets (dedup)
+  const allPresetNames = useMemo(() => {
+    const backendNames = variantNames.filter(v => v !== '')
+    const merged = new Set([...backendNames, ...localPresets])
+    return Array.from(merged).sort()
+  }, [variantNames, localPresets])
+
   const variantOptions = [
     { label: 'Default', value: '' },
-    ...variantNames.filter(v => v !== '').map(v => ({ label: v, value: v })),
+    ...allPresetNames.map(v => ({ label: v, value: v })),
   ]
 
   return (
@@ -316,22 +334,12 @@ export function MaterialsPanel({
           <Dropdown
             value={selectedVariant}
             options={variantOptions}
+            optionLabel="label"
+            optionValue="value"
             onChange={e => handleVariantChange(e.value)}
             className="materials-variant-dropdown"
             data-testid="variant-dropdown"
           />
-          {isMainVariant ? (
-            <Badge value="Main" severity="success" />
-          ) : (
-            <Button
-              label="Set as Main"
-              className="p-button-sm p-button-outlined"
-              onClick={handleSetMainVariant}
-              loading={settingMainVariant}
-              data-testid="set-main-variant-btn"
-              size="small"
-            />
-          )}
           <Button
             icon="pi pi-plus"
             className="p-button-sm p-button-text"
@@ -351,6 +359,20 @@ export function MaterialsPanel({
               tooltipOptions={{ position: 'top' }}
               size="small"
               data-testid="delete-preset-btn"
+            />
+          )}
+        </div>
+        <div className="materials-variant-main-row">
+          {isMainVariant ? (
+            <Badge value="Main" severity="success" />
+          ) : (
+            <Button
+              label="Set as Main"
+              className="p-button-sm p-button-outlined"
+              onClick={handleSetMainVariant}
+              loading={settingMainVariant}
+              data-testid="set-main-variant-btn"
+              size="small"
             />
           )}
         </div>
@@ -377,6 +399,7 @@ export function MaterialsPanel({
             onClick={handleConfirmAddPreset}
             disabled={!newPresetName.trim()}
             size="small"
+            data-testid="confirm-preset-btn"
           />
           <Button
             icon="pi pi-times"
@@ -483,6 +506,7 @@ export function MaterialsPanel({
           modelVersionId={modelVersionId}
           materialName={_linkingMaterial ?? undefined}
           variantName={selectedVariant || undefined}
+          textureMappings={textureMappings}
           onHide={handleLinkDialogClose}
           onAssociationsChanged={handleLinkDialogClose}
         />

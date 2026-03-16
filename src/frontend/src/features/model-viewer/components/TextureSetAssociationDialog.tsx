@@ -27,6 +27,11 @@ interface TextureSetAssociationDialogProps {
   modelVersionId: number
   materialName?: string
   variantName?: string
+  textureMappings?: Array<{
+    materialName: string
+    textureSetId: number
+    variantName: string
+  }>
   onHide: () => void
   onAssociationsChanged: () => void
 }
@@ -43,6 +48,7 @@ export function TextureSetAssociationDialog({
   modelVersionId,
   materialName,
   variantName,
+  textureMappings,
   onHide,
   onAssociationsChanged,
 }: TextureSetAssociationDialogProps) {
@@ -75,13 +81,25 @@ export function TextureSetAssociationDialog({
       return
     }
 
-    const associatedTextureSetIds = new Set(
-      allTextureSetsQuery.data
-        .filter(ts =>
-          ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
-        )
-        .map(ts => ts.id)
-    )
+    // Use textureMappings for variant-aware association detection when available,
+    // otherwise fall back to associatedModels for backward compatibility
+    let associatedTextureSetIds: Set<number>
+    if (textureMappings && textureMappings.length > 0) {
+      const variantMappings = textureMappings.filter(
+        m => m.variantName === (variantName ?? '')
+      )
+      associatedTextureSetIds = new Set(
+        variantMappings.map(m => m.textureSetId)
+      )
+    } else {
+      associatedTextureSetIds = new Set(
+        allTextureSetsQuery.data
+          .filter(ts =>
+            ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
+          )
+          .map(ts => ts.id)
+      )
+    }
 
     const associations: TextureSetAssociation[] = allTextureSetsQuery.data.map(
       textureSet => ({
@@ -92,7 +110,7 @@ export function TextureSetAssociationDialog({
     )
 
     setTextureSetAssociations(associations)
-  }, [visible, allTextureSetsQuery.data, modelVersionId])
+  }, [visible, allTextureSetsQuery.data, modelVersionId, textureMappings, variantName])
 
   useEffect(() => {
     if (!visible) {

@@ -5,6 +5,11 @@ import { type MenuItem } from 'primereact/menuitem'
 import { Slider } from 'primereact/slider'
 import { useMemo } from 'react'
 
+import { useEnvironmentPresets } from '@/features/model-viewer/hooks/useEnvironmentPresets'
+import {
+  BUNDLED_PRESET,
+  ENVIRONMENT_PRESETS,
+} from '@/features/model-viewer/utils/environmentPresets'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 
 export type PanelContent =
@@ -35,19 +40,6 @@ const PANEL_OPTIONS: { label: string; value: PanelContent; icon: string }[] = [
   { label: 'Thumbnail Details', value: 'thumbnail', icon: 'pi pi-image' },
 ]
 
-const ENVIRONMENT_PRESETS = [
-  'apartment',
-  'city',
-  'dawn',
-  'forest',
-  'lobby',
-  'night',
-  'park',
-  'studio',
-  'sunset',
-  'warehouse',
-]
-
 export function ViewerMenubar({
   leftPanel,
   rightPanel,
@@ -61,6 +53,9 @@ export function ViewerMenubar({
 }: ViewerMenubarProps) {
   const settings = useViewerSettingsStore(s => s.settings)
   const setSettings = useViewerSettingsStore(s => s.setSettings)
+  const { isOnline, availablePresets } = useEnvironmentPresets(
+    settings.environmentPreset,
+  )
 
   const menuItems: MenuItem[] = useMemo(
     () => [
@@ -279,11 +274,23 @@ export function ViewerMenubar({
                       }
                       className="viewer-option-select"
                     >
-                      {ENVIRONMENT_PRESETS.map(preset => (
-                        <option key={preset} value={preset}>
-                          {preset}
-                        </option>
-                      ))}
+                      {ENVIRONMENT_PRESETS.map(preset => {
+                        const isAvailable = availablePresets.has(preset)
+                        const isBundled = preset === BUNDLED_PRESET
+                        let label = preset
+                        if (!isOnline && !isAvailable && !isBundled) {
+                          label = `${preset} (offline)`
+                        }
+                        return (
+                          <option
+                            key={preset}
+                            value={preset}
+                            disabled={!isAvailable}
+                          >
+                            {label}
+                          </option>
+                        )
+                      })}
                     </select>
                   </div>
 
@@ -428,6 +435,8 @@ export function ViewerMenubar({
       topPanel,
       bottomPanel,
       settings,
+      isOnline,
+      availablePresets,
       onLeftPanelChange,
       onRightPanelChange,
       onTopPanelChange,

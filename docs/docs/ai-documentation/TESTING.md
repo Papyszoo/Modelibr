@@ -16,7 +16,7 @@ Testing philosophy: Tests should be readable documentation, not just coverage me
 
 | Directory                              | What it tests                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `features/00-texture-sets/`            | Texture set creation, linking, defaults, EXR preview (2 scenarios), auto-generated thumbnail previews — API (RGB, per-channel for PNG & EXR, sprite) and UI (grid, texture types tab, files tab, sprites page) (9 scenarios)                                                                                                                                                                                        |
+| `features/00-texture-sets/`            | Texture set creation, linking, defaults, EXR preview (2 scenarios), auto-generated thumbnail previews — API (RGB, per-channel for PNG & EXR, sprite) and UI (grid, texture types tab, files tab, sprites page) (9 scenarios), preset workflow (add preset, link texture, set as main)                                                                                                                                |
 | `features/01-model-viewer/`            | 3D rendering, version switching                                                                                                                                                                                                                                                                                                                                                                                     |
 | `features/02-dock-system/`             | Tab state management, deduplication, persistence, cross-panel tab independence (2 scenarios)                                                                                                                                                                                                                                                                                                                        |
 | `features/03-upload-window/`           | Progress tracking, batch uploads                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -28,16 +28,17 @@ Testing philosophy: Tests should be readable documentation, not just coverage me
 ```bash
 cd tests/e2e
 node run-e2e.js          # Full run (setup + teardown Docker containers)
-npm run test:quick       # Quick run (existing containers, two-phase execution)
+npm run test:quick       # Quick run (existing containers, four-phase execution)
 ```
 
-**Two-phase execution:**
+**Four-project execution:**
 
-E2E tests use a two-phase approach for reliable parallel execution:
+E2E tests use a four-project approach for reliable execution:
 
-1. **Phase 1 — Setup** (`workers=1`, `PW_PHASE=setup`): Creates shared test data (models, texture sets) sequentially to avoid asset processor overload. State is persisted to `.setup-state.json` via the setup-state-bridge.
-2. **Phase 2 — Chromium** (`workers=N`, no `PW_PHASE`): Runs fast test features in parallel using `N` workers. Tests tagged `@slow` are excluded.
-3. **Phase 3 — Slow** (`workers=1`): Runs `@slow`-tagged tests sequentially to avoid asset-processor contention. Includes mixed-format-thumbnail, SignalR, blend-upload, and thumbnail auto-gen scenarios.
+1. **Setup** (`workers=1`, `@setup` tag): Creates shared test data (models, texture sets) sequentially to avoid asset processor overload. State is persisted to `.setup-state.json` via the setup-state-bridge.
+2. **Chromium** (`workers=2`, excludes `@setup|@slow|@serial`): Runs fast test features in parallel. Tests tagged `@slow` or `@serial` are excluded.
+3. **Serial** (`fullyParallel=false`, `@serial` tag, depends on setup + chromium): Runs contention-sensitive tests sequentially AFTER all parallel tests complete. Includes pack CRUD, project CRUD, model metadata, permanent delete, presets, version independence, and recycled model versions.
+4. **Slow** (`workers=1`, `@slow` tag, depends on setup + chromium + serial): Runs `@slow`-tagged tests sequentially LAST to avoid asset-processor contention. Includes mixed-format-thumbnail, SignalR, blend-upload, and thumbnail auto-gen scenarios.
 
 **Key files:**
 
@@ -62,7 +63,7 @@ E2E tests use a two-phase approach for reliable parallel execution:
 
 **E2E common pitfalls:**
 
-- **Two-phase execution**: Setup must run with `PW_PHASE=setup` and `PW_WORKERS=1` before chromium tests. The setup phase creates data and persists IDs to `.setup-state.json`. Without this, auto-provisioning falls back to DB queries that may pick the wrong model.
+- **Four-project execution**: Setup must run first (creates data, persists IDs to `.setup-state.json`). Chromium runs parallel tests with 2 workers. Serial runs contention-sensitive tests (pack/project CRUD, model metadata, recycled files, presets) sequentially after chromium completes, to avoid database contention. Slow runs last for heavy asset-processor tests.
 - **Always add a `Background:` section** to every feature file. Without it, the page starts at `about:blank` and UI steps will timeout. Minimum background: `Given I am on the model list page`.
 - **Pagination: use search before finding a card** — Texture sets are sorted alphabetically (A-Z), and each kind tab shows max 50 per page. As test data accumulates across runs, newly created sets may fall beyond page 50. Always fill the `.search-input` box before asserting card visibility:
     ```typescript
@@ -259,7 +260,7 @@ Slow tests are tagged `@slow` and run in a dedicated `slow` Playwright project (
 | `15-blend-upload/blend-upload.feature`              | @slow | ~8 min           | Blender .blend → .glb conversion + thumbnail             |
 | `10-texture-set-kind.feature` (scenario 5)          | @slow | ~4 min           | Thumbnail auto-gen on kind change to Universal           |
 
-**Three Playwright projects**: `setup` (workers=1, sequential), `chromium` (workers=3, fast tests), `slow` (workers=1, sequential). The `chromium` project excludes `@slow` tests via `grepInvert`.
+**Three Playwright projects**: `setup` (workers=1, sequential), `chromium` (workers=3, fast tests), `serial` (fullyParallel=false, for tests sharing global state like settings), `slow` (workers=1, sequential). The `chromium` project excludes `@slow` and `@serial` tests via `grepInvert`. All projects use `retries: 1` to handle parallel-execution flakiness from shared database state.
 
 ```
 workers: 3  # chromium project — run-e2e.js, package.json test:quick

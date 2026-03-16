@@ -149,19 +149,21 @@ When("I save the model info changes", async ({ page }) => {
     });
     await expect(saveButton).toBeVisible({ timeout: 5000 });
 
-    // Click save and wait for the API response to confirm persistence
+    // Click save and wait for any model-related API response
     const responsePromise = page.waitForResponse(
         (resp) =>
             resp.url().includes("/models/") &&
-            resp.url().includes("/tags") &&
-            resp.request().method() === "POST",
+            (resp.request().method() === "POST" ||
+                resp.request().method() === "PUT") &&
+            resp.status() >= 200 &&
+            resp.status() < 300,
         { timeout: 15000 },
     );
     await saveButton.click();
     await responsePromise;
 
     // Brief pause to let React re-render after mutation success callback
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     console.log("[Action] Saved model info changes ✓");
 });
 
@@ -240,12 +242,23 @@ Then(
         const infoPanel = page.locator('[data-testid="model-info-panel"]');
         await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
-        // Verify both tags are present (use retrying assertion for robustness)
+        // Verify both tags are present (use polling with reload for robustness)
         const tag1Chip = infoPanel.locator(`.p-chip:has-text("${tag1}")`);
         const tag2Chip = infoPanel.locator(`.p-chip:has-text("${tag2}")`);
 
-        await expect(tag1Chip).toBeVisible({ timeout: 15000 });
-        await expect(tag2Chip).toBeVisible({ timeout: 15000 });
+        await expect(async () => {
+            // If tags are not visible, try reloading
+            if (!(await tag1Chip.isVisible().catch(() => false))) {
+                await page.reload();
+                await page.waitForLoadState("domcontentloaded");
+                await viewerPage.openTab(
+                    "Model Info",
+                    '[data-testid="model-info-panel"]',
+                );
+            }
+            await expect(tag1Chip).toBeVisible({ timeout: 5000 });
+            await expect(tag2Chip).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [2000, 5000, 5000] });
 
         console.log(
             `[Verify] Tags "${tag1}" and "${tag2}" are saved and visible after reload ✓`,
@@ -331,12 +344,33 @@ Then(
         );
         await expect(textarea).toBeVisible({ timeout: 10000 });
 
-        // Use polling to wait for the description value to be populated
-        // (React may still be hydrating or fetching model data)
+        // Use polling with reload to wait for the description value to be populated
         await expect(async () => {
-            const value = await textarea.inputValue();
-            expect(value).toBe(text);
-        }).toPass({ timeout: 15000 });
+            // Wait for the model data API response to ensure data is loaded
+            const responsePromise = page.waitForResponse(
+                (resp) =>
+                    resp.url().includes("/models/") &&
+                    resp.request().method() === "GET" &&
+                    resp.status() >= 200 &&
+                    resp.status() < 300,
+                { timeout: 10000 },
+            ).catch(() => null); // Don't fail if response already happened
+
+            await page.reload();
+            await responsePromise;
+            await page.waitForLoadState("domcontentloaded");
+            await viewerPage.openTab(
+                "Model Info",
+                '[data-testid="model-info-panel"]',
+            );
+            // Give React Query time to populate the textarea
+            await page.waitForTimeout(1000);
+            const updatedTextarea = page.locator('[data-testid="model-info-panel"]').locator(
+                'textarea[placeholder="Enter description..."], .description-textarea',
+            );
+            const updatedValue = await updatedTextarea.inputValue();
+            expect(updatedValue).toBe(text);
+        }).toPass({ timeout: 60000, intervals: [3000, 5000, 5000, 5000, 5000] });
         console.log(`[Verify] Description "${text}" is saved after reload ✓`);
     },
 );

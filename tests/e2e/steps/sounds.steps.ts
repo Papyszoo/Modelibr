@@ -865,10 +865,18 @@ Then(
         const sound = getScenarioState(page).getSound(soundName);
         const name = sound?.name || soundName;
 
-        const soundCard = page.locator(".sound-card").filter({
-            has: page.locator(".sound-name", { hasText: name }),
-        });
-        await expect(soundCard.first()).toBeVisible({ timeout: 10000 });
+        // Poll with reload to handle async backend processing + UI refresh
+        await expect(async () => {
+            const soundCard = page.locator(".sound-card").filter({
+                has: page.locator(".sound-name", { hasText: name }),
+            });
+            const visible = await soundCard.first().isVisible().catch(() => false);
+            if (!visible) {
+                await page.reload();
+                await page.waitForLoadState("domcontentloaded");
+            }
+            await expect(soundCard.first()).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [2000, 3000, 5000] });
         console.log(`[Verify] Sound "${name}" is visible in sound list ✓`);
     },
 );

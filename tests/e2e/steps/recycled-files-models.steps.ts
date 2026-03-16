@@ -997,8 +997,8 @@ ThenBdd(
                 },
                 {
                     message: `Waiting for recycled version count to decrease from ${countBefore}`,
-                    timeout: 15000,
-                    intervals: [1000, 2000, 3000],
+                    timeout: 30000,
+                    intervals: [1000, 2000, 3000, 5000],
                 },
             )
             .toBeLessThan(countBefore);

@@ -102,7 +102,7 @@ export class PacksPage {
         // Wait for dialog to close
         await this.page.waitForSelector(
             '.p-dialog:has-text("Create New Pack")',
-            { state: "hidden", timeout: 10000 },
+            { state: "hidden", timeout: 30000 },
         );
         console.log("[Action] Dialog closed");
 

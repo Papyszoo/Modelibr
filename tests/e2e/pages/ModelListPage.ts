@@ -200,49 +200,115 @@ export class ModelListPage {
     }
 
     /**
-     * Filter the model list by pack name using the filter bar multiselect
+     * Filter the model list by pack name using the filter bar multiselect.
+     * Waits for the "Filter by Packs" dropdown to appear (packs query may be slow),
+     * then retries with reload if the specific pack isn't listed.
      */
     async filterByPack(packName: string): Promise<void> {
-        const packsMultiselect = this.page
-            .locator(".filter-bar .p-multiselect")
-            .first();
-        await packsMultiselect.click();
-        await this.page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "visible", timeout: 5000 });
+        for (let attempt = 0; attempt < 3; attempt++) {
+            // Wait for the Packs multiselect to appear (packs query must complete)
+            const packsMultiselect = this.page.locator(
+                '.filter-bar .p-multiselect:has(.p-placeholder:has-text("Packs"))',
+            );
+            try {
+                await packsMultiselect.waitFor({
+                    state: "visible",
+                    timeout: 10000,
+                });
+            } catch {
+                console.log(
+                    `[Retry] Packs multiselect not visible (attempt ${attempt + 1}/3), reloading...`,
+                );
+                await this.page.reload({ waitUntil: "domcontentloaded" });
+                await this.page.waitForSelector(
+                    ".model-card, .no-results, .empty-state",
+                    { state: "visible", timeout: 10000 },
+                );
+                continue;
+            }
 
-        const packOption = this.page.locator(
-            `.p-multiselect-panel .p-multiselect-item:has-text("${packName}")`,
+            await packsMultiselect.click();
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "visible", timeout: 5000 });
+
+            const packOption = this.page.locator(
+                `.p-multiselect-panel .p-multiselect-item:has-text("${packName}")`,
+            );
+
+            if (await packOption.isVisible().catch(() => false)) {
+                await packOption.click();
+                await this.page.keyboard.press("Escape");
+                await this.page
+                    .locator(".p-multiselect-panel")
+                    .waitFor({ state: "hidden", timeout: 5000 });
+                return;
+            }
+
+            // Pack not in dropdown yet — close panel, reload page, retry
+            await this.page.keyboard.press("Escape");
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "hidden", timeout: 5000 });
+            console.log(
+                `[Retry] Pack "${packName}" not in dropdown (attempt ${attempt + 1}/3), reloading...`,
+            );
+            await this.page.reload({ waitUntil: "domcontentloaded" });
+            await this.page.waitForSelector(
+                ".model-card, .no-results, .empty-state",
+                { state: "visible", timeout: 10000 },
+            );
+        }
+
+        throw new Error(
+            `Pack "${packName}" not found in filter dropdown after 3 attempts`,
         );
-        await packOption.click();
-
-        await this.page.keyboard.press("Escape");
-        await this.page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "hidden", timeout: 5000 });
     }
 
     /**
-     * Filter the model list by project name using the filter bar multiselect
+     * Filter the model list by project name using the filter bar multiselect.
+     * Retries with a page reload if the project isn't in the dropdown yet.
      */
     async filterByProject(projectName: string): Promise<void> {
-        const projectsMultiselect = this.page.locator(
-            '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
-        );
-        await projectsMultiselect.click();
-        await this.page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "visible", timeout: 5000 });
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const projectsMultiselect = this.page.locator(
+                '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
+            );
+            await projectsMultiselect.click();
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "visible", timeout: 5000 });
 
-        const projectOption = this.page.locator(
-            `.p-multiselect-panel .p-multiselect-item:has-text("${projectName}")`,
-        );
-        await projectOption.click();
+            const projectOption = this.page.locator(
+                `.p-multiselect-panel .p-multiselect-item:has-text("${projectName}")`,
+            );
 
-        await this.page.keyboard.press("Escape");
-        await this.page
-            .locator(".p-multiselect-panel")
-            .waitFor({ state: "hidden", timeout: 5000 });
+            if (await projectOption.isVisible().catch(() => false)) {
+                await projectOption.click();
+                await this.page.keyboard.press("Escape");
+                await this.page
+                    .locator(".p-multiselect-panel")
+                    .waitFor({ state: "hidden", timeout: 5000 });
+                return;
+            }
+
+            await this.page.keyboard.press("Escape");
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "hidden", timeout: 5000 });
+            console.log(
+                `[Retry] Project "${projectName}" not in dropdown (attempt ${attempt + 1}/3), reloading...`,
+            );
+            await this.page.reload({ waitUntil: "domcontentloaded" });
+            await this.page.waitForSelector(
+                ".model-card, .no-results, .empty-state",
+                { state: "visible", timeout: 10000 },
+            );
+        }
+
+        throw new Error(
+            `Project "${projectName}" not found in filter dropdown after 3 attempts`,
+        );
     }
 
     /**

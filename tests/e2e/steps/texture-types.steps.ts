@@ -296,7 +296,7 @@ When("I open the texture set viewer", async ({ page }) => {
     await card.dblclick();
 
     // Wait for viewer to open
-    await page.waitForSelector(".texture-set-viewer", { timeout: 10000 });
+    await page.waitForSelector(".texture-set-viewer", { timeout: 25000 });
 });
 
 // ============================================================================

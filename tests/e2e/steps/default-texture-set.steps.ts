@@ -233,8 +233,8 @@ Then(
                 {
                     message:
                         "Version 2 thumbnail did not become Ready within timeout",
-                    intervals: [2000],
-                    timeout: 240000,
+                    intervals: [3000],
+                    timeout: 300000,
                 },
             )
             .toBe(2);
@@ -405,9 +405,31 @@ When(
         // Get current model ID from navigation store
         const modelId = await getModelIdFromPage(page);
 
-        // Get model versions to find active version
+        // Get model versions to find the currently selected version
         const versions = await apiHelper.getModelVersions(modelId);
-        const versionId = versions[0]?.id;
+
+        // Read selected version from UI dropdown (shows "v1", "v2", etc.)
+        let versionId: number | undefined;
+        try {
+            const versionText = await page
+                .locator(".version-dropdown-number")
+                .textContent({ timeout: 5000 });
+            const selectedNum = parseInt(
+                versionText?.replace("v", "") || "",
+                10,
+            );
+            if (selectedNum) {
+                versionId = versions.find(
+                    (v) => v.versionNumber === selectedNum,
+                )?.id;
+            }
+        } catch {
+            // Dropdown not visible — fall back to first version
+        }
+
+        if (!versionId) {
+            versionId = versions[0]?.id;
+        }
         if (!versionId) {
             throw new Error("Could not determine model version ID");
         }

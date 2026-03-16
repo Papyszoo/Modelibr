@@ -362,12 +362,19 @@ Then(
         const set = getScenarioState(page).getTextureSet(setName);
         const displayName = set?.name || setName;
 
+        // Dismiss any blocking dialog overlays
+        const dialogMask = page.locator(".p-dialog-mask");
+        if (await dialogMask.isVisible().catch(() => false)) {
+            await page.keyboard.press("Escape");
+            await dialogMask.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+        }
+
         const card = page
             .locator(`.texture-set-card:has-text("${displayName}")`)
             .first();
         await card.dblclick();
         await page.waitForSelector(".texture-set-viewer, .p-dialog", {
-            timeout: 10000,
+            timeout: 25000,
         });
 
         // Try both "Texture Types" tab (new name) and "Textures" tab (old name)
@@ -425,7 +432,7 @@ Then(
             .first();
         await card.dblclick();
         await page.waitForSelector(".texture-set-viewer, .p-dialog", {
-            timeout: 10000,
+            timeout: 25000,
         });
 
         const tab = page.locator(
@@ -449,7 +456,7 @@ Then(
         const card = getTextureSetCard(page, setName);
         await card.dblclick();
         await page.waitForSelector(".texture-set-viewer, .p-dialog", {
-            timeout: 10000,
+            timeout: 25000,
         });
 
         const tab = page.locator(

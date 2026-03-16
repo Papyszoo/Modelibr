@@ -199,7 +199,7 @@ export class ModelViewerPage {
         const card = this.page.locator(".texture-set-association-card", {
             hasText: setName,
         });
-        await card.click();
+        await card.first().click();
 
         // 4. Save changes
         await this.page.getByRole("button", { name: /save changes/i }).click();
@@ -690,5 +690,111 @@ export class ModelViewerPage {
             .waitFor({ state: "visible", timeout: 2000 })
             .then(() => true)
             .catch(() => false);
+    }
+
+    /**
+     * Add a new preset (variant) via the Materials panel UI
+     */
+    async addPreset(name: string): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const addBtn = this.page.locator('[data-testid="add-preset-btn"]');
+        await expect(addBtn).toBeVisible({ timeout: 5000 });
+        await addBtn.click();
+
+        // Wait for the input field to appear
+        const input = this.page.locator('[data-testid="new-preset-name-input"]');
+        await expect(input).toBeVisible({ timeout: 5000 });
+        await input.fill(name);
+
+        // Confirm the preset
+        const confirmBtn = this.page.locator(
+            '[data-testid="confirm-preset-btn"]',
+        );
+        await confirmBtn.click();
+
+        // Wait for the preset to be created (dropdown should update)
+        await this.page.waitForTimeout(1000);
+        console.log(`[UI] Added preset "${name}" ✓`);
+    }
+
+    /**
+     * Select a preset (variant) from the dropdown in the Materials panel
+     */
+    async selectPreset(name: string): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const dropdown = this.page.locator(
+            '[data-testid="variant-dropdown"]',
+        );
+        await expect(dropdown).toBeVisible({ timeout: 5000 });
+        await dropdown.click();
+
+        // Select the option from the PrimeReact dropdown overlay
+        const option = this.page.locator(".p-dropdown-item", {
+            hasText: name,
+        });
+        await expect(option).toBeVisible({ timeout: 5000 });
+        await option.click();
+
+        console.log(`[UI] Selected preset "${name}" ✓`);
+    }
+
+    /**
+     * Click "Set as Main" button for the currently selected preset
+     */
+    async setAsMainPreset(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const setMainBtn = this.page.locator(
+            '[data-testid="set-main-variant-btn"]',
+        );
+        await expect(setMainBtn).toBeVisible({ timeout: 5000 });
+        await setMainBtn.click();
+
+        // Wait for the badge to appear confirming it's now main
+        const badge = this.page.locator(
+            '[data-testid="materials-panel"] .p-badge',
+            { hasText: "Main" },
+        );
+        await expect(badge).toBeVisible({ timeout: 10000 });
+        console.log(`[UI] Set current preset as main ✓`);
+    }
+
+    /**
+     * Verify the currently selected preset shows the "Main" badge
+     */
+    async expectMainBadgeVisible(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const badge = this.page.locator(
+            '[data-testid="materials-panel"] .p-badge',
+            { hasText: "Main" },
+        );
+        await expect(badge).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify no texture sets are linked in the current preset's material list
+     */
+    async expectNoTexturesLinked(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        // Check that no material items have texture set data
+        const materialsWithTextures = this.page.locator(
+            '.materials-item[data-texture-set]',
+        );
+        const count = await materialsWithTextures.count();
+        // All items should have empty data-texture-set or "No texture set"
+        for (let i = 0; i < count; i++) {
+            const attr = await materialsWithTextures
+                .nth(i)
+                .getAttribute("data-texture-set");
+            if (attr && attr !== "") {
+                throw new Error(
+                    `Expected no textures linked but found: ${attr}`,
+                );
+            }
+        }
     }
 }

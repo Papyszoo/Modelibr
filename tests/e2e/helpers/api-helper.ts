@@ -846,4 +846,74 @@ export class ApiHelper {
         });
         return { status: response.status, data: response.data };
     }
+
+    /**
+     * Associate a texture set with a model version for a specific material and variant (preset)
+     */
+    async linkTextureSetToModelWithVariant(
+        textureSetId: number,
+        modelVersionId: number,
+        materialName: string,
+        variantName: string,
+    ): Promise<void> {
+        const params = new URLSearchParams();
+        if (materialName) params.append("materialName", materialName);
+        if (variantName) params.append("variantName", variantName);
+
+        const url = `/texture-sets/${textureSetId}/model-versions/${modelVersionId}${params.toString() ? `?${params.toString()}` : ""}`;
+        const response = await this.client.post(url);
+
+        if (
+            response.status !== 200 &&
+            response.status !== 201 &&
+            response.status !== 204
+        ) {
+            if (
+                response.status === 400 &&
+                response.data?.error === "AssociationAlreadyExists"
+            ) {
+                return;
+            }
+            throw new Error(
+                `Failed to link texture set with variant: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
+     * Set the main variant (preset) for a model version
+     */
+    async setMainVariant(
+        modelVersionId: number,
+        variantName: string,
+    ): Promise<void> {
+        const response = await this.client.put(
+            `/model-versions/${modelVersionId}/main-variant`,
+            { variantName },
+        );
+
+        if (response.status !== 200 && response.status !== 204) {
+            throw new Error(
+                `Failed to set main variant: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
+     * Regenerate thumbnail for a model
+     */
+    async regenerateThumbnail(
+        modelId: number,
+        modelVersionId: number,
+    ): Promise<void> {
+        const response = await this.client.post(
+            `/models/${modelId}/thumbnail/regenerate?versionId=${modelVersionId}`,
+        );
+
+        if (response.status !== 200 && response.status !== 202) {
+            throw new Error(
+                `Failed to regenerate thumbnail: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
 }

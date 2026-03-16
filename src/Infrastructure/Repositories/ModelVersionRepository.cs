@@ -18,6 +18,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     {
         return await _context.ModelVersions
             .Include(v => v.Files)
+            .Include(v => v.Thumbnail)
             .Include(v => v.TextureMappings)
                 .ThenInclude(m => m.TextureSet)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);

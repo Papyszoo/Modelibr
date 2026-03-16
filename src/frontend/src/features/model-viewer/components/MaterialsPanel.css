@@ -34,6 +34,12 @@
   font-size: 0.85rem;
 }
 
+.materials-variant-main-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .materials-preset-add-form {
   display: flex;
   align-items: center;
