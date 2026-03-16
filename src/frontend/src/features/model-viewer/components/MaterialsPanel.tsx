@@ -187,7 +187,7 @@ export function MaterialsPanel({
     const name = newPresetName.trim()
     if (!name) return
     // Track locally so it survives selection changes until backend knows about it
-    setLocalPresets(prev => prev.includes(name) ? prev : [...prev, name])
+    setLocalPresets(prev => (prev.includes(name) ? prev : [...prev, name]))
     setSelectedVariant(name)
     onVariantChange?.(name)
     setAddingPreset(false)

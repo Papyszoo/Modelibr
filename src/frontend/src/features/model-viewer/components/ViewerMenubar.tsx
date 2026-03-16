@@ -54,7 +54,7 @@ export function ViewerMenubar({
   const settings = useViewerSettingsStore(s => s.settings)
   const setSettings = useViewerSettingsStore(s => s.setSettings)
   const { isOnline, availablePresets } = useEnvironmentPresets(
-    settings.environmentPreset,
+    settings.environmentPreset
   )
 
   const menuItems: MenuItem[] = useMemo(

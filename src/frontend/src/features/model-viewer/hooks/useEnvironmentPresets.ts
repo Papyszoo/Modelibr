@@ -26,11 +26,11 @@ export interface EnvironmentAvailability {
  * and Cache API state. Returns the resolved HDR URL and availability info.
  */
 export function useEnvironmentPresets(
-  requestedPreset: string,
+  requestedPreset: string
 ): EnvironmentAvailability {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [availablePresets, setAvailablePresets] = useState<Set<string>>(
-    () => new Set([BUNDLED_PRESET]),
+    () => new Set([BUNDLED_PRESET])
   )
   const [hdrUrl, setHdrUrl] = useState(BUNDLED_HDR_PATH)
   const [loading, setLoading] = useState(false)

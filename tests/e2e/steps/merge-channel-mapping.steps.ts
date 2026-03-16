@@ -366,7 +366,9 @@ Then(
         const dialogMask = page.locator(".p-dialog-mask");
         if (await dialogMask.isVisible().catch(() => false)) {
             await page.keyboard.press("Escape");
-            await dialogMask.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+            await dialogMask
+                .waitFor({ state: "hidden", timeout: 5000 })
+                .catch(() => {});
         }
 
         const card = page

@@ -55,9 +55,7 @@ export class ProjectsPage {
                 }
             }
         }
-        throw new Error(
-            "Failed to navigate to project list after 3 attempts",
-        );
+        throw new Error("Failed to navigate to project list after 3 attempts");
     }
 
     async navigateToProjectViewer(projectId: number): Promise<void> {
@@ -208,8 +206,7 @@ export class ProjectsPage {
         }
 
         // Wait for project card to be hidden after deletion
-        await projectCard
-            .waitFor({ state: "hidden", timeout: 25000 });
+        await projectCard.waitFor({ state: "hidden", timeout: 25000 });
         console.log(`[Action] Deleted project: ${projectName}`);
     }
 

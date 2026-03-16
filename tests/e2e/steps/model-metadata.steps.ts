@@ -22,8 +22,7 @@ Given("I open a model in the viewer", async ({ page }) => {
     const firstCard = page.locator(".model-card").first();
     await expect(firstCard).toBeVisible({ timeout: 10000 });
     // Store the model ID so we can re-open the same model later
-    openedModelId =
-        (await firstCard.getAttribute("data-model-id")) ?? null;
+    openedModelId = (await firstCard.getAttribute("data-model-id")) ?? null;
     await firstCard.click();
     console.log(
         `[Action] Clicked first model card (model ID: ${openedModelId})`,
@@ -347,14 +346,16 @@ Then(
         // Use polling with reload to wait for the description value to be populated
         await expect(async () => {
             // Wait for the model data API response to ensure data is loaded
-            const responsePromise = page.waitForResponse(
-                (resp) =>
-                    resp.url().includes("/models/") &&
-                    resp.request().method() === "GET" &&
-                    resp.status() >= 200 &&
-                    resp.status() < 300,
-                { timeout: 10000 },
-            ).catch(() => null); // Don't fail if response already happened
+            const responsePromise = page
+                .waitForResponse(
+                    (resp) =>
+                        resp.url().includes("/models/") &&
+                        resp.request().method() === "GET" &&
+                        resp.status() >= 200 &&
+                        resp.status() < 300,
+                    { timeout: 10000 },
+                )
+                .catch(() => null); // Don't fail if response already happened
 
             await page.reload();
             await responsePromise;
@@ -365,12 +366,17 @@ Then(
             );
             // Give React Query time to populate the textarea
             await page.waitForTimeout(1000);
-            const updatedTextarea = page.locator('[data-testid="model-info-panel"]').locator(
-                'textarea[placeholder="Enter description..."], .description-textarea',
-            );
+            const updatedTextarea = page
+                .locator('[data-testid="model-info-panel"]')
+                .locator(
+                    'textarea[placeholder="Enter description..."], .description-textarea',
+                );
             const updatedValue = await updatedTextarea.inputValue();
             expect(updatedValue).toBe(text);
-        }).toPass({ timeout: 60000, intervals: [3000, 5000, 5000, 5000, 5000] });
+        }).toPass({
+            timeout: 60000,
+            intervals: [3000, 5000, 5000, 5000, 5000],
+        });
         console.log(`[Verify] Description "${text}" is saved after reload ✓`);
     },
 );

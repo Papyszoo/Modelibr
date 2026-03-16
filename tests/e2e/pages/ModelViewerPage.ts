@@ -703,7 +703,9 @@ export class ModelViewerPage {
         await addBtn.click();
 
         // Wait for the input field to appear
-        const input = this.page.locator('[data-testid="new-preset-name-input"]');
+        const input = this.page.locator(
+            '[data-testid="new-preset-name-input"]',
+        );
         await expect(input).toBeVisible({ timeout: 5000 });
         await input.fill(name);
 
@@ -724,9 +726,7 @@ export class ModelViewerPage {
     async selectPreset(name: string): Promise<void> {
         await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        const dropdown = this.page.locator(
-            '[data-testid="variant-dropdown"]',
-        );
+        const dropdown = this.page.locator('[data-testid="variant-dropdown"]');
         await expect(dropdown).toBeVisible({ timeout: 5000 });
         await dropdown.click();
 
@@ -782,7 +782,7 @@ export class ModelViewerPage {
 
         // Check that no material items have texture set data
         const materialsWithTextures = this.page.locator(
-            '.materials-item[data-texture-set]',
+            ".materials-item[data-texture-set]",
         );
         const count = await materialsWithTextures.count();
         // All items should have empty data-texture-set or "No texture set"

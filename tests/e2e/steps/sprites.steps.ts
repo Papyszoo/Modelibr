@@ -997,12 +997,15 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
     // Ensure no dialog is blocking
     await page.keyboard.press("Escape");
     await page
-            .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 5000 })
-            .catch(() => {});
+        .locator(".p-dialog")
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
 
     // Wait for category tabs to be rendered
-    await page.waitForSelector(".category-tab", { state: "visible", timeout: 10000 });
+    await page.waitForSelector(".category-tab", {
+        state: "visible",
+        timeout: 10000,
+    });
 
     // Use polling to wait for the specific category tab to appear (may need re-render)
     let targetTab = null;

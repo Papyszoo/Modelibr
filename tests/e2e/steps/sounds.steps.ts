@@ -870,7 +870,10 @@ Then(
             const soundCard = page.locator(".sound-card").filter({
                 has: page.locator(".sound-name", { hasText: name }),
             });
-            const visible = await soundCard.first().isVisible().catch(() => false);
+            const visible = await soundCard
+                .first()
+                .isVisible()
+                .catch(() => false);
             if (!visible) {
                 await page.reload();
                 await page.waitForLoadState("domcontentloaded");

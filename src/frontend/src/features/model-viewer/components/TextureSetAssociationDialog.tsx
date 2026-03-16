@@ -110,7 +110,13 @@ export function TextureSetAssociationDialog({
     )
 
     setTextureSetAssociations(associations)
-  }, [visible, allTextureSetsQuery.data, modelVersionId, textureMappings, variantName])
+  }, [
+    visible,
+    allTextureSetsQuery.data,
+    modelVersionId,
+    textureMappings,
+    variantName,
+  ])
 
   useEffect(() => {
     if (!visible) {

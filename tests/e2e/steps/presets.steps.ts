@@ -43,13 +43,10 @@ Then(
     },
 );
 
-Then(
-    'the current preset should show the "Main" badge',
-    async ({ page }) => {
-        const viewer = new ModelViewerPage(page);
-        await viewer.expectMainBadgeVisible();
-    },
-);
+Then('the current preset should show the "Main" badge', async ({ page }) => {
+    const viewer = new ModelViewerPage(page);
+    await viewer.expectMainBadgeVisible();
+});
 
 Then(
     "the texture set {string} should be linked in materials",
