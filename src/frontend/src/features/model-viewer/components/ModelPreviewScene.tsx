@@ -5,12 +5,11 @@ import * as THREE from 'three'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { useEnvironmentPresets } from '@/features/model-viewer/hooks/useEnvironmentPresets'
-import { type TextureSetDto } from '@/types'
 import { type Model as ModelType } from '@/utils/fileUtils'
 
 import { MeshHighlighter } from './MeshHighlighter'
 import { Model } from './Model'
-import { TexturedModel } from './TexturedModel'
+import { type MaterialTextureSets, TexturedModel } from './TexturedModel'
 import { type ViewerSettingsType } from './ViewerSettings'
 
 // Directional light with visual helper indicator
@@ -56,14 +55,14 @@ function FillLight({
 interface SceneProps {
   model: ModelType
   settings?: ViewerSettingsType
-  textureSet?: TextureSetDto | null
+  materialTextureSets?: MaterialTextureSets
   defaultFileId?: number | null
 }
 
 export function Scene({
   model,
   settings,
-  textureSet,
+  materialTextureSets,
   defaultFileId,
 }: SceneProps): JSX.Element {
   // Find the renderable file - prioritize defaultFileId if set
@@ -127,13 +126,14 @@ export function Scene({
         adjustCamera={false}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
-          {textureSet !== undefined && textureSet !== null ? (
+          {materialTextureSets &&
+          Object.keys(materialTextureSets).length > 0 ? (
             <TexturedModel
-              key={`${modelUrl}-${textureSet?.id || 'none'}`}
+              key={`${modelUrl}-${JSON.stringify(Object.keys(materialTextureSets))}`}
               modelUrl={modelUrl}
               fileExtension={fileExtension}
               rotationSpeed={modelRotationSpeed}
-              textureSet={textureSet}
+              materialTextureSets={materialTextureSets}
             />
           ) : (
             <Model

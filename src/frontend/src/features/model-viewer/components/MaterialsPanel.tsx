@@ -11,10 +11,7 @@ import * as THREE from 'three'
 import { setMainVariant } from '@/features/model-viewer/api/modelVersionApi'
 import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
-import {
-  getFileUrl,
-  setDefaultTextureSet,
-} from '@/features/models/api/modelApi'
+import { getFileUrl } from '@/features/models/api/modelApi'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
 import { type TextureSetDto } from '@/types'
@@ -27,7 +24,6 @@ interface MaterialsPanelProps {
   modelVersionId: number | null
   selectedVersion: {
     id: number
-    defaultTextureSetId?: number
     materialNames?: string[]
     variantNames?: string[]
     mainVariantName?: string
@@ -57,7 +53,6 @@ export function MaterialsPanel({
     queryConfig: { enabled: !!modelId },
   })
   const model = modelQuery.data ?? null
-  const numericModelId = modelId ? parseInt(modelId) : null
 
   const [selectedVariant, setSelectedVariant] = useState<string>('')
   const [settingMainVariant, setSettingMainVariant] = useState(false)
@@ -114,7 +109,6 @@ export function MaterialsPanel({
   }, [modelObject])
 
   const textureMappings = selectedVersion?.textureMappings ?? []
-  const defaultTextureSetId = selectedVersion?.defaultTextureSetId ?? null
 
   // Merge API material names with runtime ones, dedup, fallback to 'Default'
   const materialNames = useMemo(() => {
@@ -285,19 +279,6 @@ export function MaterialsPanel({
         selectedVariant || undefined
       )
 
-      if (selectedVersion?.defaultTextureSetId === mapping.textureSetId) {
-        const remainingTextureSets = textureSets.filter(
-          ts => ts.id !== mapping.textureSetId
-        )
-        const newDefaultId =
-          remainingTextureSets.length > 0 ? remainingTextureSets[0].id : null
-        await setDefaultTextureSet(
-          numericModelId!,
-          newDefaultId,
-          modelVersionId
-        )
-      }
-
       if (selectedTextureSetId === mapping.textureSetId) {
         onTextureSetSelect(null)
       }
@@ -436,21 +417,13 @@ export function MaterialsPanel({
                 </div>
                 {linkedSets.map(linkedTs => {
                   const previewUrl = getPreviewUrl(linkedTs)
-                  const isDefault = linkedTs.id === defaultTextureSetId
                   return (
                     <div
                       key={`${materialName}-${linkedTs.id}`}
-                      className={`materials-item${isDefault ? ' materials-item-default' : ''}`}
+                      className="materials-item"
                       data-testid={`material-item-${materialName}`}
                       data-texture-set={linkedTs.name}
                     >
-                      {isDefault && (
-                        <Badge
-                          value="Default"
-                          severity="info"
-                          className="materials-badge"
-                        />
-                      )}
                       <div className="materials-item-linked">
                         <div
                           className="materials-item-preview"

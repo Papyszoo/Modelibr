@@ -113,7 +113,9 @@ src/frontend/src/
 - `textureSetApi.ts` association/disassociation functions accept optional `variantName` parameter
 - **Presets (Variants):** Implicit entities derived from `variantName` field. No separate Variant table — presets exist when at least one texture mapping references that name. Composite PK: `(ModelVersionId, TextureSetId, MaterialName, VariantName)`
 - `MaterialsPanel.tsx` always shows the preset dropdown, with Add/Delete buttons on the same row, and "Set as Main" button/badge on a separate row below. Setting main triggers thumbnail regeneration.
-- `TextureSetAssociationDialog.tsx` uses `textureMappings` prop (when provided) for variant-aware association detection — only texture sets linked to the current variant/preset are shown as associated. Falls back to `associatedModels` when `textureMappings` is not provided (backward compatibility for `TextureSetSelectorWindow`).
+- `TextureSetAssociationDialog.tsx` is a single-select dialog — only one texture set can be linked per material per variant. It filters `textureMappings` by both `materialName` and `variantName` to show only the texture set currently linked to the specific material being edited. The dialog header shows the material name for clarity.
+- **Per-material texture rendering:** `TexturedModel.tsx` accepts `materialTextureSets: MaterialTextureSets` (a `Record<string, TextureSetDto>` mapping material names to texture sets). During mesh traversal, each mesh's `material.name` is matched against the map keys. A key of `""` acts as a wildcard for meshes with no specific mapping. `ModelViewer.tsx` builds this map from `textureMappings` filtered by the selected variant. Changing the variant dropdown updates the 3D preview in real-time.
+- **Variant selection wiring:** `ModelViewer.tsx` manages `selectedVariant` state (initialized to `mainVariantName`). `onVariantChange` handler is passed to `ViewerSidePanel` → `MaterialsPanel`. When the preset dropdown changes, the preview re-renders with the correct per-material textures.
 
 **Where to look:**
 | Layer | Location |

@@ -4,7 +4,7 @@ import { Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { useQueryClient } from '@tanstack/react-query'
 import { Toast } from 'primereact/toast'
-import { type JSX, useCallback, useRef, useState } from 'react'
+import { type JSX, useCallback, useMemo, useRef, useState } from 'react'
 import type * as THREE from 'three'
 
 import { ModelProvider } from '@/contexts/ModelContext'
@@ -19,11 +19,14 @@ import {
 import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
 import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
+import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 import { type ModelVersionDto, type TextureSetDto } from '@/types'
 import { type Model } from '@/utils/fileUtils'
+
+import { type MaterialTextureSets } from './TexturedModel'
 
 import { FileUploadModal } from './FileUploadModal'
 import { Scene as ModelPreviewScene } from './ModelPreviewScene'
@@ -211,6 +214,67 @@ export function ModelViewer({
   })
   const selectedTextureSet: TextureSetDto | null =
     selectedTextureSetId !== null ? (textureSetQuery.data ?? null) : null
+
+  // --- Variant selection + per-material texture sets ---
+  const [selectedVariant, setSelectedVariant] = useState<string>('')
+
+  // Sync selectedVariant when version changes
+  const currentVersionId = selectedVersion?.id
+  const currentMainVariant = selectedVersion?.mainVariantName ?? ''
+  const prevVersionIdRef = useRef<number | null>(null)
+  if (currentVersionId !== prevVersionIdRef.current) {
+    prevVersionIdRef.current = currentVersionId ?? null
+    if (currentMainVariant !== selectedVariant) {
+      setSelectedVariant(currentMainVariant)
+    }
+  }
+
+  const handleVariantChange = useCallback((variantName: string) => {
+    setSelectedVariant(variantName)
+  }, [])
+
+  // Fetch all texture sets for this version so we can build the material map
+  const versionTextureSetsQuery = useTextureSetsByModelVersionQuery({
+    modelVersionId: selectedVersion?.id ?? 0,
+    queryConfig: {
+      enabled: selectedVersion !== null,
+    },
+  })
+  const versionTextureSets = versionTextureSetsQuery.data ?? []
+
+  // Build materialTextureSets from textureMappings filtered by selected variant
+  const materialTextureSets = useMemo<MaterialTextureSets>(() => {
+    if (!selectedVersion) return {}
+
+    const mappings = selectedVersion.textureMappings ?? []
+    const variantMappings = mappings.filter(
+      m => m.variantName === selectedVariant || m.variantName === ''
+    )
+
+    // If no texture mappings exist, fall back to the single selectedTextureSet (legacy/simple case)
+    if (variantMappings.length === 0 && selectedTextureSet) {
+      return { '': selectedTextureSet }
+    }
+
+    // Build a lookup from textureSetId -> TextureSetDto
+    const tsById = new Map<number, TextureSetDto>()
+    for (const ts of versionTextureSets) {
+      tsById.set(ts.id, ts)
+    }
+    // Also include selectedTextureSet if loaded individually
+    if (selectedTextureSet) {
+      tsById.set(selectedTextureSet.id, selectedTextureSet)
+    }
+
+    const result: MaterialTextureSets = {}
+    for (const mapping of variantMappings) {
+      const ts = tsById.get(mapping.textureSetId)
+      if (ts) {
+        result[mapping.materialName] = ts
+      }
+    }
+    return result
+  }, [selectedVersion, selectedVariant, versionTextureSets, selectedTextureSet])
   const loading = !propModel && !!modelId && modelQuery.isLoading
   const error =
     modelQuery.error instanceof Error ? modelQuery.error.message : ''
@@ -485,6 +549,7 @@ export function ModelViewer({
     selectedVersion,
     selectedTextureSetId,
     onTextureSetSelect: handleTextureSetSelect,
+    onVariantChange: handleVariantChange,
     onModelUpdated: handleModelUpdated,
     onRegenerate: handleRegenerateThumbnail,
   }
@@ -664,10 +729,10 @@ export function ModelViewer({
                       }}
                     >
                       <ModelPreviewScene
-                        key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                        key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
                         model={versionModel || model}
                         settings={viewerSettings}
-                        textureSet={selectedTextureSet}
+                        materialTextureSets={materialTextureSets}
                         defaultFileId={defaultFileId}
                       />
                     </Canvas>

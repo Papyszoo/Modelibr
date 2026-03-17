@@ -241,10 +241,94 @@ export class ThumbnailProcessor extends BaseProcessor {
   }
 
   /**
-   * Apply textures if a default texture set is configured.
+   * Apply textures using per-material texture mappings from the main variant.
+   * Falls back to single defaultTextureSetId if no mappings exist.
    * @private
    */
   async _applyTextures(job, jobLogger) {
+    const textureMappings = job.textureMappings || []
+    const mainVariant = job.mainVariantName || ''
+
+    // Filter mappings to the main variant
+    const variantMappings = textureMappings.filter(
+      m => m.variantName === mainVariant || m.variantName === ''
+    )
+
+    // If we have per-material mappings, apply textures per-material
+    if (variantMappings.length > 0) {
+      jobLogger.info('Applying per-material textures', {
+        mainVariant,
+        mappingCount: variantMappings.length,
+      })
+
+      const allTexturePaths = []
+
+      // Group by textureSetId to avoid fetching the same set multiple times
+      const textureSetIds = [
+        ...new Set(variantMappings.map(m => m.textureSetId)),
+      ]
+
+      const textureSetCache = new Map()
+      for (const tsId of textureSetIds) {
+        try {
+          const ts = await this.modelDataService.getTextureSet(tsId)
+          if (ts?.textures?.length) {
+            textureSetCache.set(tsId, ts)
+          }
+        } catch (err) {
+          jobLogger.warn(`Failed to fetch texture set ${tsId}`, {
+            error: err.message,
+          })
+        }
+      }
+
+      for (const mapping of variantMappings) {
+        const ts = textureSetCache.get(mapping.textureSetId)
+        if (!ts) continue
+
+        try {
+          const texturePaths =
+            await this.modelDataService.downloadTextureSetFiles(ts)
+          if (Object.keys(texturePaths).length > 0) {
+            const applied = await this.puppeteerRenderer.applyTextures(
+              texturePaths,
+              undefined,
+              undefined,
+              mapping.materialName || null
+            )
+            if (applied) {
+              jobLogger.info(
+                `Applied textures for material "${mapping.materialName}"`,
+                {
+                  textureSetId: mapping.textureSetId,
+                }
+              )
+            }
+            allTexturePaths.push(texturePaths)
+          }
+        } catch (err) {
+          jobLogger.warn(
+            `Failed to apply textures for material "${mapping.materialName}"`,
+            {
+              error: err.message,
+            }
+          )
+        }
+      }
+
+      // Return all texture paths for cleanup
+      if (allTexturePaths.length > 0) {
+        // Merge all texture paths into one object for cleanup
+        const merged = {}
+        for (const paths of allTexturePaths) {
+          Object.assign(merged, paths)
+        }
+        return merged
+      }
+      return null
+    }
+
+    // Fallback: use single defaultTextureSetId (legacy behavior)
     if (!job.defaultTextureSetId) {
       jobLogger.debug('No default texture set configured')
       return null

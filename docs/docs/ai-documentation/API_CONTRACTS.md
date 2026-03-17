@@ -412,6 +412,16 @@ Called by the asset processor after extracting material names from the 3D model 
 
 ---
 
+## Worker - Dequeue Thumbnail Job
+
+```http
+POST /thumbnail-jobs/dequeue
+```
+
+Response includes `MainVariantName` (string) and `TextureMappings` (array of `{ MaterialName, TextureSetId, VariantName }`) for per-material texture application during thumbnail generation.
+
+---
+
 ## Thumbnails
 
 ### Get Model Thumbnail

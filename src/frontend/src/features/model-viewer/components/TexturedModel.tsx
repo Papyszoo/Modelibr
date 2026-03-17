@@ -13,63 +13,248 @@ import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 
+/** Map of material names to their texture sets. Key "" means apply to all meshes. */
+export type MaterialTextureSets = Record<string, TextureSetDto>
+
 interface TexturedModelProps {
   modelUrl: string
   fileExtension: string
   rotationSpeed: number
-  textureSet: TextureSetDto | null
+  materialTextureSets: MaterialTextureSets
 }
 
-// Build texture configs with channel information from texture set
-function buildTextureConfigs(
-  textureSet: TextureSetDto | null
-): Record<string, TextureConfig> {
-  if (!textureSet) return {}
+// Material property slot names used by MeshStandardMaterial
+const TEXTURE_SLOTS: Array<{
+  slot: string
+  type: TextureType
+  fallback?: TextureType
+}> = [
+  { slot: 'map', type: TextureType.Albedo },
+  { slot: 'normalMap', type: TextureType.Normal },
+  { slot: 'roughnessMap', type: TextureType.Roughness },
+  { slot: 'metalnessMap', type: TextureType.Metallic },
+  { slot: 'aoMap', type: TextureType.AO },
+  { slot: 'emissiveMap', type: TextureType.Emissive },
+  { slot: 'bumpMap', type: TextureType.Bump },
+  { slot: 'alphaMap', type: TextureType.Alpha },
+  {
+    slot: 'displacementMap',
+    type: TextureType.Displacement,
+    fallback: TextureType.Height,
+  },
+]
 
+const KEY_SEP = '::'
+
+/**
+ * Build a combined texture config map for all material→textureSet mappings.
+ * Keys are namespaced as "materialName::slotName" so the hook loads everything in one pass.
+ * Also returns the set of material names that have textures.
+ */
+function buildCombinedTextureConfigs(
+  materialTextureSets: MaterialTextureSets
+): Record<string, TextureConfig> {
   const configs: Record<string, TextureConfig> = {}
 
-  // Helper to add texture config
-  const addConfig = (
-    slotName: string,
-    textureType: TextureType,
-    fallbackType?: TextureType
-  ) => {
-    let texture = textureSet.textures?.find(t => t.textureType === textureType)
-    if (!texture && fallbackType) {
-      texture = textureSet.textures?.find(t => t.textureType === fallbackType)
-    }
-    if (texture) {
-      configs[slotName] = {
-        url: getFileUrl(texture.fileId.toString()),
-        sourceChannel: texture.sourceChannel ?? TextureChannel.RGB,
+  for (const [materialName, textureSet] of Object.entries(
+    materialTextureSets
+  )) {
+    if (!textureSet?.textures) continue
+    for (const { slot, type, fallback } of TEXTURE_SLOTS) {
+      let tex = textureSet.textures.find(t => t.textureType === type)
+      if (!tex && fallback) {
+        tex = textureSet.textures.find(t => t.textureType === fallback)
+      }
+      if (tex) {
+        configs[`${materialName}${KEY_SEP}${slot}`] = {
+          url: getFileUrl(tex.fileId.toString()),
+          sourceChannel: tex.sourceChannel ?? TextureChannel.RGB,
+        }
       }
     }
   }
 
-  // Add all texture types (Diffuse removed - use Albedo instead)
-  addConfig('map', TextureType.Albedo)
-  addConfig('normalMap', TextureType.Normal)
-  addConfig('roughnessMap', TextureType.Roughness)
-  addConfig('metalnessMap', TextureType.Metallic)
-  addConfig('aoMap', TextureType.AO)
-  addConfig('emissiveMap', TextureType.Emissive)
-  addConfig('bumpMap', TextureType.Bump)
-  addConfig('alphaMap', TextureType.Alpha)
-  addConfig('displacementMap', TextureType.Displacement, TextureType.Height)
-
   return configs
 }
 
-// OBJ Model with textures
+/** Get the material names from a mesh (handles arrays). */
+function getMeshMaterialNames(mesh: THREE.Mesh): string[] {
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+  return mats.map(m => m?.name ?? '').filter(Boolean)
+}
+
+/**
+ * Build a MeshStandardMaterial from loaded textures for a given material key prefix.
+ */
+function buildMaterialFromTextures(
+  loadedTextures: Record<string, THREE.Texture | null>,
+  materialPrefix: string
+): THREE.MeshStandardMaterial {
+  const get = (slot: string) =>
+    loadedTextures[`${materialPrefix}${KEY_SEP}${slot}`] ?? null
+  const hasMap = get('map') !== null
+
+  const material = new THREE.MeshStandardMaterial({
+    color: hasMap ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
+    metalness: hasMap ? 1 : 0.3,
+    roughness: hasMap ? 1 : 0.4,
+    envMapIntensity: 1.0,
+  })
+
+  if (get('map')) material.map = get('map')
+  if (get('normalMap')) material.normalMap = get('normalMap')
+  if (get('roughnessMap')) material.roughnessMap = get('roughnessMap')
+  if (get('metalnessMap')) material.metalnessMap = get('metalnessMap')
+  if (get('aoMap')) material.aoMap = get('aoMap')
+  if (get('emissiveMap')) {
+    material.emissiveMap = get('emissiveMap')
+    material.emissive = new THREE.Color(0xffffff)
+  }
+  if (get('bumpMap')) material.bumpMap = get('bumpMap')
+  if (get('alphaMap')) {
+    material.alphaMap = get('alphaMap')
+    material.transparent = true
+  }
+  if (get('displacementMap')) material.displacementMap = get('displacementMap')
+
+  return material
+}
+
+/**
+ * Apply per-material textures to a cloned model.
+ * If a material name matches a key in materialTextureSets, that mesh gets textured.
+ * A key of "" is a wildcard that applies to meshes with no specific mapping.
+ */
+function applyMaterialTextures(
+  clonedModel: THREE.Group | THREE.Object3D,
+  materialTextureSets: MaterialTextureSets,
+  loadedTextures: Record<string, THREE.Texture | null>,
+  texturesReady: boolean
+) {
+  const materialNames = Object.keys(materialTextureSets)
+  const hasWildcard = materialNames.includes('')
+
+  // Pre-build materials for each material name that has textures
+  const builtMaterials: Record<string, THREE.MeshStandardMaterial> = {}
+  if (texturesReady) {
+    for (const matName of materialNames) {
+      builtMaterials[matName] = buildMaterialFromTextures(
+        loadedTextures,
+        matName
+      )
+    }
+  }
+
+  // Default untextured material for meshes without a mapping
+  const defaultMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0.7, 0.7, 0.9),
+    metalness: 0.3,
+    roughness: 0.4,
+    envMapIntensity: 1.0,
+  })
+
+  clonedModel.traverse(child => {
+    if (!child.isMesh) return
+    child.castShadow = true
+    child.receiveShadow = true
+
+    const meshMatNames = getMeshMaterialNames(child as THREE.Mesh)
+
+    // Find matching material: check mesh material names against our map
+    let matched = false
+    for (const meshMatName of meshMatNames) {
+      if (meshMatName in builtMaterials) {
+        ;(child as THREE.Mesh).material = builtMaterials[meshMatName]
+        matched = true
+        break
+      }
+    }
+
+    // Fallback: use wildcard "" material (applies to all unmatched meshes)
+    if (!matched && hasWildcard && texturesReady) {
+      ;(child as THREE.Mesh).material = builtMaterials['']
+    } else if (!matched) {
+      ;(child as THREE.Mesh).material = defaultMaterial
+    }
+  })
+}
+
+// Shared props for per-format components
+interface FormatComponentProps {
+  modelUrl: string
+  rotationSpeed: number
+  materialTextureSets: MaterialTextureSets
+}
+
+/** Shared hook: build combined configs, load textures, return ready state */
+function usePerMaterialTextures(
+  materialTextureSets: MaterialTextureSets,
+  renderer: THREE.WebGLRenderer,
+  flipY: boolean
+) {
+  const textureConfigs = useMemo(
+    () => buildCombinedTextureConfigs(materialTextureSets),
+    [materialTextureSets]
+  )
+  const hasTextures = Object.keys(textureConfigs).length > 0
+  const loadedTextures = useChannelExtractedTextures(
+    textureConfigs,
+    renderer,
+    flipY
+  )
+  const texturesReady = hasTextures && Object.keys(loadedTextures).length > 0
+  return { loadedTextures, texturesReady }
+}
+
+/** Shared logic: clone model, apply per-material textures, scale and center */
+function setupModel(
+  model: THREE.Group | THREE.Object3D,
+  materialTextureSets: MaterialTextureSets,
+  loadedTextures: Record<string, THREE.Texture | null>,
+  texturesReady: boolean,
+  meshRef: React.RefObject<THREE.Group | null>,
+  scaledRef: React.MutableRefObject<boolean>
+) {
+  if (!model || scaledRef.current) return
+
+  const clonedModel = model.clone()
+
+  applyMaterialTextures(
+    clonedModel,
+    materialTextureSets,
+    loadedTextures,
+    texturesReady
+  )
+
+  // Scale and position
+  const box = new THREE.Box3().setFromObject(clonedModel)
+  const size = box.getSize(new THREE.Vector3())
+  const maxDim = Math.max(size.x, size.y, size.z)
+  const scale = 2 / maxDim
+
+  clonedModel.scale.setScalar(scale)
+
+  const scaledBox = new THREE.Box3().setFromObject(clonedModel)
+  const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
+
+  clonedModel.position.x = -scaledCenter.x
+  clonedModel.position.z = -scaledCenter.z
+  clonedModel.position.y = -scaledBox.min.y
+
+  if (meshRef.current) {
+    meshRef.current.clear()
+    meshRef.current.add(clonedModel)
+  }
+
+  scaledRef.current = true
+}
+
+// OBJ Model with per-material textures
 function OBJModelWithTextures({
   modelUrl,
   rotationSpeed,
-  textureSet,
-}: {
-  modelUrl: string
-  rotationSpeed: number
-  textureSet: TextureSetDto | null
-}) {
+  materialTextureSets,
+}: FormatComponentProps) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
@@ -82,112 +267,41 @@ function OBJModelWithTextures({
   })
 
   const model = useLoader(OBJLoader, modelUrl)
-
-  // Build texture configs with channel info
-  const textureConfigs = useMemo(
-    () => buildTextureConfigs(textureSet),
-    [textureSet]
-  )
-  const hasTextures = Object.keys(textureConfigs).length > 0
-
-  // Load textures with channel extraction
-  const loadedTextures = useChannelExtractedTextures(
-    textureConfigs,
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
     renderer,
     true
-  ) // OBJ uses flipY=true
-  const texturesReady = Object.keys(loadedTextures).length > 0
+  )
 
   useEffect(() => {
     scaledRef.current = false
-  }, [modelUrl, textureSet, texturesReady])
+  }, [modelUrl, materialTextureSets, texturesReady])
 
   useEffect(() => {
-    if (model && !scaledRef.current) {
-      const clonedModel = model.clone()
-
-      // Apply material with textures
-      const material = new THREE.MeshStandardMaterial({
-        color: hasTextures ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
-        metalness: hasTextures ? 1 : 0.3,
-        roughness: hasTextures ? 1 : 0.4,
-        envMapIntensity: 1.0,
-      })
-
-      if (hasTextures && texturesReady) {
-        if (loadedTextures.map) material.map = loadedTextures.map
-        if (loadedTextures.normalMap)
-          material.normalMap = loadedTextures.normalMap
-        if (loadedTextures.roughnessMap)
-          material.roughnessMap = loadedTextures.roughnessMap
-        if (loadedTextures.metalnessMap)
-          material.metalnessMap = loadedTextures.metalnessMap
-        if (loadedTextures.aoMap) material.aoMap = loadedTextures.aoMap
-        if (loadedTextures.emissiveMap) {
-          material.emissiveMap = loadedTextures.emissiveMap
-          material.emissive = new THREE.Color(0xffffff)
-        }
-        if (loadedTextures.bumpMap) material.bumpMap = loadedTextures.bumpMap
-        if (loadedTextures.alphaMap) {
-          material.alphaMap = loadedTextures.alphaMap
-          material.transparent = true
-        }
-        if (loadedTextures.displacementMap)
-          material.displacementMap = loadedTextures.displacementMap
-      }
-
-      clonedModel.traverse(child => {
-        if (child.isMesh) {
-          child.material = material
-          child.castShadow = true
-          child.receiveShadow = true
-        }
-      })
-
-      // Scale and position
-      const box = new THREE.Box3().setFromObject(clonedModel)
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
-
-      clonedModel.scale.setScalar(scale)
-
-      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
-      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
-
-      clonedModel.position.x = -scaledCenter.x
-      clonedModel.position.z = -scaledCenter.z
-      clonedModel.position.y = -scaledBox.min.y
-
-      if (meshRef.current) {
-        meshRef.current.clear()
-        meshRef.current.add(clonedModel)
-      }
-
-      scaledRef.current = true
-    }
-  }, [model, loadedTextures, hasTextures, texturesReady])
+    setupModel(
+      model,
+      materialTextureSets,
+      loadedTextures,
+      texturesReady,
+      meshRef,
+      scaledRef
+    )
+  }, [model, materialTextureSets, loadedTextures, texturesReady])
 
   useEffect(() => {
-    if (model) {
-      setModelObject(model)
-    }
+    if (model) setModelObject(model)
     return () => setModelObject(null)
   }, [model, setModelObject])
 
   return <group ref={meshRef} />
 }
 
-// GLTF Model with textures
+// GLTF Model with per-material textures
 function GLTFModelWithTextures({
   modelUrl,
   rotationSpeed,
-  textureSet,
-}: {
-  modelUrl: string
-  rotationSpeed: number
-  textureSet: TextureSetDto | null
-}) {
+  materialTextureSets,
+}: FormatComponentProps) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
@@ -201,112 +315,42 @@ function GLTFModelWithTextures({
 
   const gltf = useLoader(GLTFLoader, modelUrl)
   const model = gltf?.scene
-
-  // Build texture configs with channel info
-  const textureConfigs = useMemo(
-    () => buildTextureConfigs(textureSet),
-    [textureSet]
-  )
-  const hasTextures = Object.keys(textureConfigs).length > 0
-
-  // Load textures with channel extraction
-  const loadedTextures = useChannelExtractedTextures(
-    textureConfigs,
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
     renderer,
     false
-  ) // GLTF uses flipY=false
-  const texturesReady = Object.keys(loadedTextures).length > 0
+  )
 
   useEffect(() => {
     scaledRef.current = false
-  }, [modelUrl, textureSet, texturesReady])
+  }, [modelUrl, materialTextureSets, texturesReady])
 
   useEffect(() => {
-    if (model && !scaledRef.current) {
-      const clonedModel = model.clone()
-
-      // Apply material with textures
-      const material = new THREE.MeshStandardMaterial({
-        color: hasTextures ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
-        metalness: hasTextures ? 1 : 0.3,
-        roughness: hasTextures ? 1 : 0.4,
-        envMapIntensity: 1.0,
-      })
-
-      if (hasTextures && texturesReady) {
-        if (loadedTextures.map) material.map = loadedTextures.map
-        if (loadedTextures.normalMap)
-          material.normalMap = loadedTextures.normalMap
-        if (loadedTextures.roughnessMap)
-          material.roughnessMap = loadedTextures.roughnessMap
-        if (loadedTextures.metalnessMap)
-          material.metalnessMap = loadedTextures.metalnessMap
-        if (loadedTextures.aoMap) material.aoMap = loadedTextures.aoMap
-        if (loadedTextures.emissiveMap) {
-          material.emissiveMap = loadedTextures.emissiveMap
-          material.emissive = new THREE.Color(0xffffff)
-        }
-        if (loadedTextures.bumpMap) material.bumpMap = loadedTextures.bumpMap
-        if (loadedTextures.alphaMap) {
-          material.alphaMap = loadedTextures.alphaMap
-          material.transparent = true
-        }
-        if (loadedTextures.displacementMap)
-          material.displacementMap = loadedTextures.displacementMap
-      }
-
-      clonedModel.traverse(child => {
-        if (child.isMesh) {
-          child.material = material
-          child.castShadow = true
-          child.receiveShadow = true
-        }
-      })
-
-      // Scale and position
-      const box = new THREE.Box3().setFromObject(clonedModel)
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
-
-      clonedModel.scale.setScalar(scale)
-
-      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
-      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
-
-      clonedModel.position.x = -scaledCenter.x
-      clonedModel.position.z = -scaledCenter.z
-      clonedModel.position.y = -scaledBox.min.y
-
-      if (meshRef.current) {
-        meshRef.current.clear()
-        meshRef.current.add(clonedModel)
-      }
-
-      scaledRef.current = true
-    }
-  }, [model, loadedTextures, hasTextures, texturesReady])
+    if (model)
+      setupModel(
+        model,
+        materialTextureSets,
+        loadedTextures,
+        texturesReady,
+        meshRef,
+        scaledRef
+      )
+  }, [model, materialTextureSets, loadedTextures, texturesReady])
 
   useEffect(() => {
-    if (model) {
-      setModelObject(model)
-    }
+    if (model) setModelObject(model)
     return () => setModelObject(null)
   }, [model, setModelObject])
 
   return <group ref={meshRef} />
 }
 
-// FBX Model with textures
+// FBX Model with per-material textures
 function FBXModelWithTextures({
   modelUrl,
   rotationSpeed,
-  textureSet,
-}: {
-  modelUrl: string
-  rotationSpeed: number
-  textureSet: TextureSetDto | null
-}) {
+  materialTextureSets,
+}: FormatComponentProps) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
   const scaledRef = useRef(false)
@@ -319,96 +363,29 @@ function FBXModelWithTextures({
   })
 
   const model = useLoader(FBXLoader, modelUrl)
-
-  // Build texture configs with channel info
-  const textureConfigs = useMemo(
-    () => buildTextureConfigs(textureSet),
-    [textureSet]
-  )
-  const hasTextures = Object.keys(textureConfigs).length > 0
-
-  // Load textures with channel extraction
-  const loadedTextures = useChannelExtractedTextures(
-    textureConfigs,
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
     renderer,
     true
-  ) // FBX uses flipY=true
-  const texturesReady = Object.keys(loadedTextures).length > 0
+  )
 
   useEffect(() => {
     scaledRef.current = false
-  }, [modelUrl, textureSet, texturesReady])
+  }, [modelUrl, materialTextureSets, texturesReady])
 
   useEffect(() => {
-    if (model && !scaledRef.current) {
-      const clonedModel = model.clone()
-
-      // Apply material with textures
-      const material = new THREE.MeshStandardMaterial({
-        color: hasTextures ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
-        metalness: hasTextures ? 1 : 0.3,
-        roughness: hasTextures ? 1 : 0.4,
-        envMapIntensity: 1.0,
-      })
-
-      if (hasTextures && texturesReady) {
-        if (loadedTextures.map) material.map = loadedTextures.map
-        if (loadedTextures.normalMap)
-          material.normalMap = loadedTextures.normalMap
-        if (loadedTextures.roughnessMap)
-          material.roughnessMap = loadedTextures.roughnessMap
-        if (loadedTextures.metalnessMap)
-          material.metalnessMap = loadedTextures.metalnessMap
-        if (loadedTextures.aoMap) material.aoMap = loadedTextures.aoMap
-        if (loadedTextures.emissiveMap) {
-          material.emissiveMap = loadedTextures.emissiveMap
-          material.emissive = new THREE.Color(0xffffff)
-        }
-        if (loadedTextures.bumpMap) material.bumpMap = loadedTextures.bumpMap
-        if (loadedTextures.alphaMap) {
-          material.alphaMap = loadedTextures.alphaMap
-          material.transparent = true
-        }
-        if (loadedTextures.displacementMap)
-          material.displacementMap = loadedTextures.displacementMap
-      }
-
-      clonedModel.traverse(child => {
-        if (child.isMesh) {
-          child.material = material
-          child.castShadow = true
-          child.receiveShadow = true
-        }
-      })
-
-      // Scale and position
-      const box = new THREE.Box3().setFromObject(clonedModel)
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
-
-      clonedModel.scale.setScalar(scale)
-
-      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
-      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
-
-      clonedModel.position.x = -scaledCenter.x
-      clonedModel.position.z = -scaledCenter.z
-      clonedModel.position.y = -scaledBox.min.y
-
-      if (meshRef.current) {
-        meshRef.current.clear()
-        meshRef.current.add(clonedModel)
-      }
-
-      scaledRef.current = true
-    }
-  }, [model, loadedTextures, hasTextures, texturesReady])
+    setupModel(
+      model,
+      materialTextureSets,
+      loadedTextures,
+      texturesReady,
+      meshRef,
+      scaledRef
+    )
+  }, [model, materialTextureSets, loadedTextures, texturesReady])
 
   useEffect(() => {
-    if (model) {
-      setModelObject(model)
-    }
+    if (model) setModelObject(model)
     return () => setModelObject(null)
   }, [model, setModelObject])
 
@@ -419,14 +396,14 @@ export function TexturedModel({
   modelUrl,
   fileExtension,
   rotationSpeed,
-  textureSet,
+  materialTextureSets,
 }: TexturedModelProps) {
   if (fileExtension === 'obj') {
     return (
       <OBJModelWithTextures
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
-        textureSet={textureSet}
+        materialTextureSets={materialTextureSets}
       />
     )
   }
@@ -435,7 +412,7 @@ export function TexturedModel({
       <FBXModelWithTextures
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
-        textureSet={textureSet}
+        materialTextureSets={materialTextureSets}
       />
     )
   }
@@ -444,10 +421,9 @@ export function TexturedModel({
       <GLTFModelWithTextures
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
-        textureSet={textureSet}
+        materialTextureSets={materialTextureSets}
       />
     )
   }
-  // Fallback to basic model without textures
   return null
 }
