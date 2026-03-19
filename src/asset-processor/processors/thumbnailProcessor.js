@@ -178,7 +178,11 @@ export class ThumbnailProcessor extends BaseProcessor {
       }
 
       // Step 3.5: Apply textures if configured
-      texturePaths = await this._applyTextures(job, jobLogger, fileInfo.fileType)
+      texturePaths = await this._applyTextures(
+        job,
+        jobLogger,
+        fileInfo.fileType
+      )
 
       // Step 4: Render orbit frames
       if (!config.orbit.enabled) {
@@ -396,7 +400,10 @@ export class ThumbnailProcessor extends BaseProcessor {
         await this.modelDataService.downloadTextureSetFiles(textureSet)
 
       if (Object.keys(texturePaths).length > 0) {
-        const applied = await this.puppeteerRenderer.applyTextures(texturePaths, fileType)
+        const applied = await this.puppeteerRenderer.applyTextures(
+          texturePaths,
+          fileType
+        )
         if (applied) {
           await this.jobEventService.logEvent(
             job.id,
