@@ -992,10 +992,11 @@ Then(
 );
 
 /**
- * Captures the current texture UUID from the Three.js scene for comparison
+ * Captures the current texture UUID from the Three.js scene for comparison.
+ * Only looks at MeshStandardMaterial meshes to avoid picking up Stage shadow plane (MeshBasicMaterial).
  */
 When("I capture the current texture state", async ({ page }) => {
-    // Poll until the Three.js scene has a texture map loaded
+    // Poll until the Three.js scene has a texture map on a MeshStandardMaterial mesh
     await expect
         .poll(
             async () => {
@@ -1005,7 +1006,12 @@ When("I capture the current texture state", async ({ page }) => {
                     if (!scene) return false;
                     let hasMap = false;
                     scene.traverse((obj: any) => {
-                        if (obj.isMesh && obj.material && obj.material.map) {
+                        if (
+                            obj.isMesh &&
+                            obj.material &&
+                            obj.material.isMeshStandardMaterial &&
+                            obj.material.map
+                        ) {
                             hasMap = true;
                         }
                     });
@@ -1026,11 +1032,16 @@ When("I capture the current texture state", async ({ page }) => {
         if (!scene) return null;
 
         let mapUuid = null;
+        // Only look at MeshStandardMaterial (our app's materials) to avoid
+        // picking up Stage shadow plane which uses MeshBasicMaterial
         scene.traverse((obj: any) => {
-            if (obj.isMesh && obj.material && obj.material.map) {
+            if (
+                obj.isMesh &&
+                obj.material &&
+                obj.material.isMeshStandardMaterial &&
+                obj.material.map
+            ) {
                 mapUuid = obj.material.map.uuid;
-                // Found one, good enough
-                return;
             }
         });
         return mapUuid;
@@ -1053,7 +1064,7 @@ When("I capture the current texture state", async ({ page }) => {
 Then(
     "the applied texture should be different from the captured state",
     async ({ page }) => {
-        // Poll for the texture UUID to change
+        // Poll for the texture UUID to change (only MeshStandardMaterial, not Stage shadow plane)
         await expect
             .poll(
                 async () => {
@@ -1067,10 +1078,10 @@ Then(
                             if (
                                 obj.isMesh &&
                                 obj.material &&
+                                obj.material.isMeshStandardMaterial &&
                                 obj.material.map
                             ) {
                                 mapUuid = obj.material.map.uuid;
-                                return;
                             }
                         });
                         return mapUuid;
@@ -1093,7 +1104,12 @@ Then(
             const scene = window.__THREE_SCENE__;
             let mapUuid = null;
             scene.traverse((obj: any) => {
-                if (obj.isMesh && obj.material && obj.material.map) {
+                if (
+                    obj.isMesh &&
+                    obj.material &&
+                    obj.material.isMeshStandardMaterial &&
+                    obj.material.map
+                ) {
                     mapUuid = obj.material.map.uuid;
                 }
             });
@@ -1109,7 +1125,7 @@ Then(
 Then(
     "the applied texture should be different from the previous state",
     async ({ page }) => {
-        // Poll for the texture UUID to change
+        // Poll for the texture UUID to change (only MeshStandardMaterial, not Stage shadow plane)
         await expect
             .poll(
                 async () => {
@@ -1123,10 +1139,10 @@ Then(
                             if (
                                 obj.isMesh &&
                                 obj.material &&
+                                obj.material.isMeshStandardMaterial &&
                                 obj.material.map
                             ) {
                                 mapUuid = obj.material.map.uuid;
-                                return;
                             }
                         });
                         return mapUuid;
@@ -1149,7 +1165,12 @@ Then(
             const scene = window.__THREE_SCENE__;
             let mapUuid = null;
             scene.traverse((obj: any) => {
-                if (obj.isMesh && obj.material && obj.material.map) {
+                if (
+                    obj.isMesh &&
+                    obj.material &&
+                    obj.material.isMeshStandardMaterial &&
+                    obj.material.map
+                ) {
                     mapUuid = obj.material.map.uuid;
                 }
             });

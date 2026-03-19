@@ -22,6 +22,12 @@ public class ModelVersion
     public List<string> MaterialNames { get; private set; } = new();
     
     /// <summary>
+    /// Persisted variant (preset) names for this model version.
+    /// Stored independently of texture mappings so empty presets survive.
+    /// </summary>
+    public List<string> VariantNames { get; private set; } = new();
+    
+    /// <summary>
     /// The name of the main (default) variant for this model version.
     /// When empty/null, the first variant or "" variant is considered main.
     /// </summary>
@@ -229,7 +235,7 @@ public class ModelVersion
     public void SetMainVariant(string variantName, DateTime updatedAt)
     {
         variantName ??= string.Empty;
-        if (!string.IsNullOrEmpty(variantName) && !_textureMappings.Any(m => m.VariantName == variantName))
+        if (!string.IsNullOrEmpty(variantName) && !VariantNames.Contains(variantName))
         {
             throw new InvalidOperationException($"Variant '{variantName}' does not exist on this model version.");
         }
@@ -239,11 +245,40 @@ public class ModelVersion
     }
 
     /// <summary>
-    /// Gets all distinct variant names in this model version's texture mappings.
+    /// Gets all distinct variant names in this model version.
+    /// Returns the persisted VariantNames list.
     /// </summary>
     public IReadOnlyList<string> GetVariantNames()
     {
-        return _textureMappings.Select(m => m.VariantName).Distinct().OrderBy(v => v).ToList().AsReadOnly();
+        return VariantNames.Distinct().OrderBy(v => v).ToList().AsReadOnly();
+    }
+
+    /// <summary>
+    /// Adds a variant name to the persisted list.
+    /// </summary>
+    public void AddVariantName(string variantName, DateTime updatedAt)
+    {
+        variantName ??= string.Empty;
+        if (string.IsNullOrEmpty(variantName)) return;
+        if (VariantNames.Contains(variantName)) return;
+        VariantNames.Add(variantName);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a variant name and all its texture mappings.
+    /// </summary>
+    public void RemoveVariantName(string variantName, DateTime updatedAt)
+    {
+        variantName ??= string.Empty;
+        if (string.IsNullOrEmpty(variantName)) return;
+        VariantNames.Remove(variantName);
+        RemoveTextureMappingsByVariant(variantName, updatedAt);
+        if (MainVariantName == variantName)
+        {
+            MainVariantName = null;
+        }
+        UpdatedAt = updatedAt;
     }
 
     /// <summary>

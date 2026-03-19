@@ -880,8 +880,14 @@ export class PuppeteerRenderer {
                   }
                 }
 
+                // Preserve original material name for subsequent per-material calls
+                const originalName = Array.isArray(child.material)
+                  ? child.material[0]?.name || ''
+                  : child.material?.name || ''
+
                 // Create new material with white base color for textures
                 child.material = new THREE.MeshStandardMaterial({
+                  name: originalName,
                   color: loadedTextures.map
                     ? 0xffffff
                     : new THREE.Color(0.7, 0.7, 0.9),

@@ -916,4 +916,52 @@ export class ApiHelper {
             );
         }
     }
+
+    /**
+     * Add a variant (preset) name to a model version
+     */
+    async addVariantName(
+        modelVersionId: number,
+        variantName: string,
+    ): Promise<void> {
+        const response = await this.client.post(
+            `/model-versions/${modelVersionId}/variants`,
+            { variantName },
+        );
+
+        if (response.status !== 204 && response.status !== 200) {
+            throw new Error(
+                `Failed to add variant name: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
+     * Remove a variant (preset) name from a model version
+     */
+    async removeVariantName(
+        modelVersionId: number,
+        variantName: string,
+    ): Promise<void> {
+        const response = await this.client.delete(
+            `/model-versions/${modelVersionId}/variants/${encodeURIComponent(variantName)}`,
+        );
+
+        if (response.status !== 204 && response.status !== 200) {
+            throw new Error(
+                `Failed to remove variant name: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
+     * Get a single model version's details (including variantNames, mainVariantName, textureMappings)
+     */
+    async getModelVersionDetail(
+        modelId: number,
+        modelVersionId: number,
+    ): Promise<any> {
+        const versions = await this.getModelVersions(modelId);
+        return versions.find((v: any) => v.id === modelVersionId) ?? null;
+    }
 }

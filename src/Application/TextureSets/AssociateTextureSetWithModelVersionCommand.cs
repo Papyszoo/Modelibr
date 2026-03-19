@@ -62,6 +62,14 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
                     modelVersion.Id, materialName, variantName, cancellationToken);
             }
 
+            // Auto-register the variant name if it's new
+            if (!string.IsNullOrEmpty(variantName))
+            {
+                var now = _dateTimeProvider.UtcNow;
+                modelVersion.AddVariantName(variantName, now);
+                await _modelVersionRepository.UpdateAsync(modelVersion, cancellationToken);
+            }
+
             // Add the texture mapping directly via repository (avoids EF Core composite key tracking issues)
             await _modelVersionRepository.AddTextureMappingAsync(
                 modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);

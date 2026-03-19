@@ -45,7 +45,7 @@ internal class GetModelVersionsQueryHandler : IQueryHandler<GetModelVersionsQuer
             TextureSetIds = v.TextureMappings.Select(m => m.TextureSetId).Distinct().ToList(),
             MaterialNames = v.MaterialNames,
             MainVariantName = v.MainVariantName,
-            VariantNames = v.TextureMappings.Select(m => m.VariantName).Distinct().OrderBy(n => n).ToList(),
+            VariantNames = v.VariantNames.OrderBy(n => n).ToList(),
             TextureMappings = v.TextureMappings.Select(m => new TextureMappingDto
             {
                 MaterialName = m.MaterialName,

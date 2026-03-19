@@ -129,7 +129,10 @@ export function Scene({
           {materialTextureSets &&
           Object.keys(materialTextureSets).length > 0 ? (
             <TexturedModel
-              key={`${modelUrl}-${JSON.stringify(Object.keys(materialTextureSets))}`}
+              key={`${modelUrl}-${Object.entries(materialTextureSets)
+                .map(([m, ts]) => `${m}:${ts.id}`)
+                .sort()
+                .join(',')}`}
               modelUrl={modelUrl}
               fileExtension={fileExtension}
               rotationSpeed={modelRotationSpeed}

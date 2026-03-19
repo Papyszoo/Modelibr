@@ -248,11 +248,18 @@ export function ModelViewer({
 
     const mappings = selectedVersion.textureMappings ?? []
     const variantMappings = mappings.filter(
-      m => m.variantName === selectedVariant || m.variantName === ''
+      m => m.variantName === selectedVariant
     )
 
-    // If no texture mappings exist, fall back to the single selectedTextureSet (legacy/simple case)
-    if (variantMappings.length === 0 && selectedTextureSet) {
+    // Only use selectedTextureSet fallback for legacy (no variant system).
+    // When variants exist, an empty mapping means "no textures for this preset".
+    const hasVariants = (selectedVersion.variantNames ?? []).length > 0
+    if (
+      variantMappings.length === 0 &&
+      selectedTextureSet &&
+      !hasVariants &&
+      selectedVariant === ''
+    ) {
       return { '': selectedTextureSet }
     }
 
@@ -273,8 +280,28 @@ export function ModelViewer({
         result[mapping.materialName] = ts
       }
     }
+    // When user explicitly selects a texture set for preview, prefer it over
+    // last-wins ordering for any material slot it's mapped to.
+    // Use selectedTextureSetId (not selectedTextureSet) so the override applies
+    // immediately, even before the individual texture set query resolves.
+    if (selectedTextureSetId !== null) {
+      const selectedTs = tsById.get(selectedTextureSetId)
+      if (selectedTs) {
+        for (const mapping of variantMappings) {
+          if (mapping.textureSetId === selectedTextureSetId) {
+            result[mapping.materialName] = selectedTs
+          }
+        }
+      }
+    }
     return result
-  }, [selectedVersion, selectedVariant, versionTextureSets, selectedTextureSet])
+  }, [
+    selectedVersion,
+    selectedVariant,
+    versionTextureSets,
+    selectedTextureSet,
+    selectedTextureSetId,
+  ])
   const loading = !propModel && !!modelId && modelQuery.isLoading
   const error =
     modelQuery.error instanceof Error ? modelQuery.error.message : ''

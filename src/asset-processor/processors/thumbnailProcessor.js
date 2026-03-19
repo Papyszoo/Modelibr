@@ -178,7 +178,7 @@ export class ThumbnailProcessor extends BaseProcessor {
       }
 
       // Step 3.5: Apply textures if configured
-      texturePaths = await this._applyTextures(job, jobLogger)
+      texturePaths = await this._applyTextures(job, jobLogger, fileInfo.fileType)
 
       // Step 4: Render orbit frames
       if (!config.orbit.enabled) {
@@ -245,14 +245,52 @@ export class ThumbnailProcessor extends BaseProcessor {
    * Falls back to single defaultTextureSetId if no mappings exist.
    * @private
    */
-  async _applyTextures(job, jobLogger) {
+  async _applyTextures(job, jobLogger, fileType = 'gltf') {
     const textureMappings = job.textureMappings || []
     const mainVariant = job.mainVariantName || ''
 
-    // Filter mappings to the main variant
-    const variantMappings = textureMappings.filter(
-      m => m.variantName === mainVariant || m.variantName === ''
+    // Filter mappings to the main variant (exact match only)
+    let variantMappings = textureMappings.filter(
+      m => m.variantName === mainVariant
     )
+
+    // Fallback 1: if main variant has no mappings, try the Default variant ("")
+    if (variantMappings.length === 0 && mainVariant !== '') {
+      variantMappings = textureMappings.filter(m => m.variantName === '')
+      if (variantMappings.length > 0) {
+        jobLogger.info(
+          'Main variant has no mappings, falling back to Default variant',
+          {
+            mainVariant,
+            mappingCount: variantMappings.length,
+          }
+        )
+      }
+    }
+
+    // Fallback 2: if mainVariant is empty and no default-variant mappings exist,
+    // use the first available named variant's mappings
+    if (
+      variantMappings.length === 0 &&
+      mainVariant === '' &&
+      textureMappings.length > 0
+    ) {
+      const firstVariant = textureMappings.find(
+        m => m.variantName !== ''
+      )?.variantName
+      if (firstVariant) {
+        variantMappings = textureMappings.filter(
+          m => m.variantName === firstVariant
+        )
+        jobLogger.info(
+          'MainVariantName not set, falling back to first named variant',
+          {
+            fallbackVariant: firstVariant,
+            mappingCount: variantMappings.length,
+          }
+        )
+      }
+    }
 
     // If we have per-material mappings, apply textures per-material
     if (variantMappings.length > 0) {
@@ -292,7 +330,7 @@ export class ThumbnailProcessor extends BaseProcessor {
           if (Object.keys(texturePaths).length > 0) {
             const applied = await this.puppeteerRenderer.applyTextures(
               texturePaths,
-              undefined,
+              fileType,
               undefined,
               mapping.materialName || null
             )
@@ -358,7 +396,7 @@ export class ThumbnailProcessor extends BaseProcessor {
         await this.modelDataService.downloadTextureSetFiles(textureSet)
 
       if (Object.keys(texturePaths).length > 0) {
-        const applied = await this.puppeteerRenderer.applyTextures(texturePaths)
+        const applied = await this.puppeteerRenderer.applyTextures(texturePaths, fileType)
         if (applied) {
           await this.jobEventService.logEvent(
             job.id,

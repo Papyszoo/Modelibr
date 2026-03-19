@@ -135,8 +135,8 @@ export function TextureSetAssociationDialog({
         await disassociateTextureSetFromModelVersion(
           originalId,
           modelVersionId,
-          materialName === 'Default' ? undefined : materialName,
-          variantName
+          apiMaterialName,
+          variantName ?? ''
         )
       }
 
@@ -145,8 +145,8 @@ export function TextureSetAssociationDialog({
         await associateTextureSetWithModelVersion(
           selectedId,
           modelVersionId,
-          materialName === 'Default' ? undefined : materialName,
-          variantName
+          apiMaterialName,
+          variantName ?? ''
         )
       }
 

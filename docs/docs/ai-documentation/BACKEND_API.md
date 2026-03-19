@@ -47,6 +47,16 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 **Material Names:** The `PUT /model-versions/{versionId}/material-names` endpoint accepts `{ materialNames: string[] }` and is called by the asset processor after extracting material names from the 3D model file. Material names are stored as a PostgreSQL `text[]` column.
 
+### Variant (Preset) Management (3 endpoints)
+
+| Method   | Endpoint                                             | Description                                        |
+| -------- | ---------------------------------------------------- | -------------------------------------------------- |
+| `PUT`    | `/model-versions/{versionId}/main-variant`           | Set main variant for thumbnail generation          |
+| `POST`   | `/model-versions/{versionId}/variants`               | Add a variant (preset) name                        |
+| `DELETE` | `/model-versions/{versionId}/variants/{variantName}` | Remove a variant name and all its texture mappings |
+
+**Variant Names:** Variant (preset) names are now persisted as a `text[]` column (`VariantNames`) on `ModelVersion`, independent of texture mappings. This means empty presets (with no linked texture sets) survive. When a texture mapping is created with a new variant name, it is auto-registered. The `mainVariantName` is also auto-set to the first named variant when it hasn't been set yet.
+
 ### Files (5 endpoints)
 
 | Method   | Endpoint                     | Description                                       | Auth        |
@@ -102,7 +112,7 @@ This documentation is designed for AI agents to quickly understand the backend s
 
 #### Material Slot Mapping
 
-Texture set association endpoints accept optional `?materialName` and `?variantName` query parameters to link a texture set to a specific material slot and preset/variant. When omitted, both default to empty string (applies to all materials / Default preset). Each `(ModelVersionId, TextureSetId, MaterialName, VariantName)` combination forms a unique mapping via the `ModelVersionTextureSets` join table with a composite primary key. For named materials, only one texture set can be assigned per material name per variant. Variants (presets) are implicit — they exist when at least one mapping references that `variantName`. The `mainVariantName` on `ModelVersion` tracks which preset is active for thumbnail generation.
+Texture set association endpoints accept optional `?materialName` and `?variantName` query parameters to link a texture set to a specific material slot and preset/variant. When omitted, both default to empty string (applies to all materials / Default preset). Each `(ModelVersionId, TextureSetId, MaterialName, VariantName)` combination forms a unique mapping via the `ModelVersionTextureSets` join table with a composite primary key. For named materials, only one texture set can be assigned per material name per variant. Variant names are persisted in the `VariantNames` text[] column on `ModelVersion` and are auto-registered when creating texture mappings with a new variant name. The `mainVariantName` on `ModelVersion` tracks which preset is active for thumbnail generation and is auto-set to the first named variant when not yet configured.
 
 ### Recycled Files (4 endpoints)
 

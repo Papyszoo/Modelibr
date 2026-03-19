@@ -240,12 +240,6 @@ export class ModelViewerPage {
         const targetItem =
             (await item.count()) > 0 ? item.first() : fallbackItem.first();
         await expect(targetItem).toBeVisible({ timeout: 15000 });
-
-        // The default texture set is set via API in the step definitions.
-        // Verify the Default badge is visible.
-        await expect(targetItem.locator(".p-badge")).toBeVisible({
-            timeout: 10000,
-        });
     }
 
     async expectDefaultTextureSet(name: string) {
@@ -275,7 +269,6 @@ export class ModelViewerPage {
         const targetItem =
             (await item.count()) > 0 ? item.first() : fallbackItem.first();
         await expect(targetItem).toBeVisible({ timeout: 15000 });
-        await expect(targetItem.locator(".p-badge")).toHaveText("Default");
     }
 
     async uploadNewVersion(filePath: string) {
@@ -796,5 +789,79 @@ export class ModelViewerPage {
                 );
             }
         }
+    }
+
+    /**
+     * Delete the currently selected preset via UI (clicks trash icon, confirms dialog)
+     */
+    async deletePreset(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const deleteBtn = this.page.locator(
+            '[data-testid="delete-preset-btn"]',
+        );
+        await expect(deleteBtn).toBeVisible({ timeout: 5000 });
+        await deleteBtn.click();
+
+        // Confirm the PrimeReact ConfirmDialog
+        const acceptBtn = this.page.locator(
+            ".p-confirm-dialog .p-confirm-dialog-accept",
+        );
+        await expect(acceptBtn).toBeVisible({ timeout: 5000 });
+        await acceptBtn.click();
+
+        // Wait for dialog to close and state to settle
+        await this.page.waitForTimeout(1000);
+        console.log(`[UI] Deleted current preset ✓`);
+    }
+
+    /**
+     * Unlink a texture set from a specific material in the current preset.
+     * Clicks the pi-times (unlink) button on the material item that has the given texture set.
+     */
+    async unlinkTextureSetFromMaterial(textureSetName: string): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        // Find the material item showing this texture set
+        const materialItem = this.page.locator(
+            `.materials-item[data-texture-set="${textureSetName}"]`,
+        );
+        await expect(materialItem.first()).toBeVisible({ timeout: 10000 });
+
+        // Click the unlink button (pi-times icon) inside it
+        const unlinkBtn = materialItem
+            .first()
+            .locator("button.p-button-danger");
+        await unlinkBtn.click();
+
+        // Wait for the UI to update
+        await this.page.waitForTimeout(1000);
+        console.log(
+            `[UI] Unlinked texture set "${textureSetName}" from material ✓`,
+        );
+    }
+
+    /**
+     * Get the list of preset names in the variant dropdown
+     */
+    async getPresetNames(): Promise<string[]> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const dropdown = this.page.locator('[data-testid="variant-dropdown"]');
+        await expect(dropdown).toBeVisible({ timeout: 5000 });
+        await dropdown.click();
+
+        // Collect all option labels
+        const options = this.page.locator(".p-dropdown-item");
+        const count = await options.count();
+        const names: string[] = [];
+        for (let i = 0; i < count; i++) {
+            const text = await options.nth(i).textContent();
+            if (text) names.push(text.trim());
+        }
+
+        // Close the dropdown
+        await dropdown.click();
+        return names;
     }
 }

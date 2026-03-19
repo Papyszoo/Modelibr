@@ -182,8 +182,9 @@ export async function associateTextureSetWithModelVersion(
   variantName?: string
 ): Promise<void> {
   const params = new URLSearchParams()
-  if (materialName) params.append('materialName', materialName)
-  if (variantName) params.append('variantName', variantName)
+  // Always send materialName and variantName (even empty strings represent Default)
+  if (materialName !== undefined) params.append('materialName', materialName)
+  if (variantName !== undefined) params.append('variantName', variantName)
   const qs = params.toString() ? `?${params.toString()}` : ''
   await client.post(
     `/texture-sets/${setId}/model-versions/${modelVersionId}${qs}`
@@ -197,8 +198,9 @@ export async function disassociateTextureSetFromModelVersion(
   variantName?: string
 ): Promise<void> {
   const params = new URLSearchParams()
-  if (materialName) params.append('materialName', materialName)
-  if (variantName) params.append('variantName', variantName)
+  // Always send materialName and variantName (even empty strings represent Default)
+  if (materialName !== undefined) params.append('materialName', materialName)
+  if (variantName !== undefined) params.append('variantName', variantName)
   const qs = params.toString() ? `?${params.toString()}` : ''
   await client.delete(
     `/texture-sets/${setId}/model-versions/${modelVersionId}${qs}`

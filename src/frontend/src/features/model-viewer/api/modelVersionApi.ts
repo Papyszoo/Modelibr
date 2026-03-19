@@ -107,3 +107,19 @@ export async function setMainVariant(
 ): Promise<void> {
   await client.put(`/model-versions/${versionId}/main-variant`, { variantName })
 }
+
+export async function addVariantName(
+  versionId: number,
+  variantName: string
+): Promise<void> {
+  await client.post(`/model-versions/${versionId}/variants`, { variantName })
+}
+
+export async function removeVariantName(
+  versionId: number,
+  variantName: string
+): Promise<void> {
+  await client.delete(
+    `/model-versions/${versionId}/variants/${encodeURIComponent(variantName)}`
+  )
+}

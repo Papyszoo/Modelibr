@@ -8,7 +8,11 @@ import { InputText } from 'primereact/inputtext'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 
-import { setMainVariant } from '@/features/model-viewer/api/modelVersionApi'
+import {
+  addVariantName,
+  removeVariantName,
+  setMainVariant,
+} from '@/features/model-viewer/api/modelVersionApi'
 import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
@@ -62,7 +66,6 @@ export function MaterialsPanel({
   const [addingPreset, setAddingPreset] = useState(false)
   const [newPresetName, setNewPresetName] = useState('')
   const [deletingPreset, setDeletingPreset] = useState(false)
-  const [localPresets, setLocalPresets] = useState<string[]>([])
   const newPresetInputRef = useRef<HTMLInputElement>(null)
 
   // Sync selectedVariant to mainVariantName when version changes
@@ -70,11 +73,6 @@ export function MaterialsPanel({
     const mainVariant = selectedVersion?.mainVariantName ?? ''
     setSelectedVariant(mainVariant)
   }, [selectedVersion?.id, selectedVersion?.mainVariantName])
-
-  // Reset local presets when switching to a different version
-  useEffect(() => {
-    setLocalPresets([])
-  }, [selectedVersion?.id])
 
   const { modelObject } = useModelObject()
 
@@ -148,13 +146,7 @@ export function MaterialsPanel({
 
   const handleVariantChange = (variantName: string) => {
     setSelectedVariant(variantName)
-    // Defer the cross-component state update to avoid React Error #310:
-    // PrimeReact Dropdown can call onChange synchronously during its own render
-    // phase when the controlled value changes. Calling setState for a *different*
-    // component (ModelViewer's selectedTextureSetId) during another component's render
-    // triggers React's "Cannot update a component while rendering a different component"
-    // invariant. queueMicrotask schedules the call after the current render cycle ends.
-    queueMicrotask(() => onVariantChange?.(variantName))
+    onVariantChange?.(variantName)
   }
 
   const handleSetMainVariant = async () => {
@@ -177,16 +169,21 @@ export function MaterialsPanel({
     setTimeout(() => newPresetInputRef.current?.focus(), 50)
   }, [])
 
-  const handleConfirmAddPreset = useCallback(() => {
+  const handleConfirmAddPreset = useCallback(async () => {
     const name = newPresetName.trim()
-    if (!name) return
-    // Track locally so it survives selection changes until backend knows about it
-    setLocalPresets(prev => (prev.includes(name) ? prev : [...prev, name]))
-    setSelectedVariant(name)
-    onVariantChange?.(name)
-    setAddingPreset(false)
-    setNewPresetName('')
-  }, [newPresetName, onVariantChange])
+    if (!name || !modelVersionId) return
+    try {
+      await addVariantName(modelVersionId, name)
+      setSelectedVariant(name)
+      onVariantChange?.(name)
+      onModelUpdated()
+    } catch (error) {
+      console.error('Failed to add preset:', error)
+    } finally {
+      setAddingPreset(false)
+      setNewPresetName('')
+    }
+  }, [newPresetName, modelVersionId, onVariantChange, onModelUpdated])
 
   const handleCancelAddPreset = useCallback(() => {
     setAddingPreset(false)
@@ -204,20 +201,7 @@ export function MaterialsPanel({
       accept: async () => {
         try {
           setDeletingPreset(true)
-          // Remove all mappings for this variant
-          const mappingsToRemove = textureMappings.filter(
-            m => m.variantName === presetName
-          )
-          for (const mapping of mappingsToRemove) {
-            await disassociateTextureSetFromModelVersion(
-              mapping.textureSetId,
-              modelVersionId,
-              mapping.materialName,
-              presetName
-            )
-          }
-          // Remove from local presets and switch back to Default
-          setLocalPresets(prev => prev.filter(p => p !== presetName))
+          await removeVariantName(modelVersionId, presetName)
           setSelectedVariant('')
           onVariantChange?.('')
           await textureSetsQuery.refetch()
@@ -232,7 +216,6 @@ export function MaterialsPanel({
   }, [
     modelVersionId,
     selectedVariant,
-    textureMappings,
     textureSetsQuery,
     onModelUpdated,
     onVariantChange,
@@ -275,8 +258,8 @@ export function MaterialsPanel({
       await disassociateTextureSetFromModelVersion(
         mapping.textureSetId,
         modelVersionId,
-        mapping.materialName || undefined,
-        selectedVariant || undefined
+        mapping.materialName,
+        selectedVariant
       )
 
       if (selectedTextureSetId === mapping.textureSetId) {
@@ -292,12 +275,10 @@ export function MaterialsPanel({
     }
   }
 
-  // Merge backend variant names with locally-created presets (dedup)
+  // Use persisted variant names from backend (no longer need localPresets)
   const allPresetNames = useMemo(() => {
-    const backendNames = variantNames.filter(v => v !== '')
-    const merged = new Set([...backendNames, ...localPresets])
-    return Array.from(merged).sort()
-  }, [variantNames, localPresets])
+    return variantNames.filter(v => v !== '').sort()
+  }, [variantNames])
 
   const variantOptions = [
     { label: 'Default', value: '' },
@@ -478,7 +459,7 @@ export function MaterialsPanel({
           model={model}
           modelVersionId={modelVersionId}
           materialName={_linkingMaterial ?? undefined}
-          variantName={selectedVariant || undefined}
+          variantName={selectedVariant}
           textureMappings={textureMappings}
           onHide={handleLinkDialogClose}
           onAssociationsChanged={handleLinkDialogClose}

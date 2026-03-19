@@ -153,6 +153,11 @@ namespace Infrastructure.Persistence
                     .HasColumnType("text[]")
                     .HasDefaultValueSql("'{}'::text[]");
 
+                // Map VariantNames as a PostgreSQL text array column
+                entity.Property(v => v.VariantNames)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+
                 // Map MainVariantName
                 entity.Property(v => v.MainVariantName)
                     .HasMaxLength(200);

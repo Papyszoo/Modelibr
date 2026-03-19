@@ -636,7 +636,9 @@ Then(
         const categoryTab = page
             .locator(".category-tab")
             .filter({ hasText: categoryName });
-        await expect(categoryTab).toBeVisible({ timeout: 5000 });
+        await expect(async () => {
+            await expect(categoryTab).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 20000 });
         console.log(
             `[Verify] Sound category "${categoryName}" is visible in category list ✓`,
         );

@@ -41,6 +41,16 @@ public static class ModelVersionEndpoints
             .WithName("Set Main Variant")
             .WithSummary("Sets the main variant for a model version")
             .WithOpenApi();
+
+        app.MapPost("/model-versions/{versionId}/variants", AddVariantName)
+            .WithName("Add Variant Name")
+            .WithSummary("Adds a variant (preset) name to a model version")
+            .WithOpenApi();
+
+        app.MapDelete("/model-versions/{versionId}/variants/{variantName}", RemoveVariantName)
+            .WithName("Remove Variant Name")
+            .WithSummary("Removes a variant (preset) name and its texture mappings from a model version")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> CreateModelVersion(
@@ -202,7 +212,44 @@ public static class ModelVersionEndpoints
 
         return Results.NoContent();
     }
+
+    private static async Task<IResult> AddVariantName(
+        int versionId,
+        [FromBody] AddVariantNameRequest request,
+        ICommandHandler<AddVariantNameCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new AddVariantNameCommand(versionId, request.VariantName),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RemoveVariantName(
+        int versionId,
+        string variantName,
+        ICommandHandler<RemoveVariantNameCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new RemoveVariantNameCommand(versionId, variantName),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
 }
 
 public record UpdateMaterialNamesRequest(List<string> MaterialNames);
 public record SetMainVariantRequest(string VariantName);
+public record AddVariantNameRequest(string VariantName);
