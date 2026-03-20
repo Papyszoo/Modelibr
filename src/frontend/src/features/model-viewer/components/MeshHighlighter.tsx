@@ -52,11 +52,23 @@ export function MeshHighlighter() {
 
   // Track which meshes we've modified so we can restore them
   const modifiedMeshes = useRef<Map<string, OriginalMaterialState>>(new Map())
+  const prevHoveredRef = useRef<string | null>(null)
+  const prevSelectedRef = useRef<string | null>(null)
 
   useFrame(() => {
     if (!context) return
 
     const { hoveredNodeId, selectedNodeId } = context
+
+    // Skip if nothing changed
+    if (
+      hoveredNodeId === prevHoveredRef.current &&
+      selectedNodeId === prevSelectedRef.current
+    )
+      return
+
+    prevHoveredRef.current = hoveredNodeId
+    prevSelectedRef.current = selectedNodeId
 
     // First, restore all previously modified meshes
     modifiedMeshes.current.forEach((original, uuid) => {

@@ -135,8 +135,9 @@ public class WebDavMiddleware
         // Handle all other WebDAV requests normally.
         // NWebDav's handlers (e.g. PropFindHandler) call Response.Write synchronously.
         // Kestrel blocks sync I/O by default, so we opt-in per-request here.
-        context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>()
-            !.AllowSynchronousIO = true;
+        var bodyControlFeature = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>();
+        if (bodyControlFeature != null)
+            bodyControlFeature.AllowSynchronousIO = true;
 
         var httpContext = new AspNetCoreContext(context);
         await _dispatcher.DispatchRequestAsync(httpContext);

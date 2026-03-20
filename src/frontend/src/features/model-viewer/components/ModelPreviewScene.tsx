@@ -78,6 +78,21 @@ export function Scene({
     }
   }
 
+  // Default settings if not provided
+  const orbitSpeed = settings?.orbitSpeed ?? 1
+  const zoomSpeed = settings?.zoomSpeed ?? 1
+  const panSpeed = settings?.panSpeed ?? 1
+  const modelRotationSpeed = settings?.modelRotationSpeed ?? 0.002
+  const showShadows = settings?.showShadows ?? true
+  const ambientIntensity = settings?.ambientIntensity ?? 0.3
+  const directionalIntensity = settings?.directionalIntensity ?? 1.0
+  const showLightHelpers = settings?.showLightHelpers ?? false
+  const environmentPreset = settings?.environmentPreset ?? 'city'
+  const showEnvironmentBackground = settings?.showEnvironmentBackground ?? false
+  const backgroundIntensity = settings?.backgroundIntensity ?? 1.0
+  const environmentIntensity = settings?.environmentIntensity ?? 1.0
+  const { hdrUrl } = useEnvironmentPresets(environmentPreset)
+
   // Fallback to first file if no renderable found
   if (!renderableFile) {
     renderableFile = model.files?.[0]
@@ -97,21 +112,6 @@ export function Scene({
     .pop()
     .toLowerCase()
   const modelUrl = getFileUrl(renderableFile.id)
-
-  // Default settings if not provided
-  const orbitSpeed = settings?.orbitSpeed ?? 1
-  const zoomSpeed = settings?.zoomSpeed ?? 1
-  const panSpeed = settings?.panSpeed ?? 1
-  const modelRotationSpeed = settings?.modelRotationSpeed ?? 0.002
-  const showShadows = settings?.showShadows ?? true
-  const ambientIntensity = settings?.ambientIntensity ?? 0.3
-  const directionalIntensity = settings?.directionalIntensity ?? 1.0
-  const showLightHelpers = settings?.showLightHelpers ?? false
-  const environmentPreset = settings?.environmentPreset ?? 'city'
-  const showEnvironmentBackground = settings?.showEnvironmentBackground ?? false
-  const backgroundIntensity = settings?.backgroundIntensity ?? 1.0
-  const environmentIntensity = settings?.environmentIntensity ?? 1.0
-  const { hdrUrl } = useEnvironmentPresets(environmentPreset)
 
   return (
     <>

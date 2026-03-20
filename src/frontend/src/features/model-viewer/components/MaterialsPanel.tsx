@@ -402,7 +402,7 @@ export function MaterialsPanel({
                     <div
                       key={`${materialName}-${linkedTs.id}`}
                       className="materials-item"
-                      data-testid={`material-item-${materialName}`}
+                      data-testid={`material-item-${materialName}-${linkedTs.id}`}
                       data-texture-set={linkedTs.name}
                     >
                       <div className="materials-item-linked">

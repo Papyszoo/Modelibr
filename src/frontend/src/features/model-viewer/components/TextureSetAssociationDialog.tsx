@@ -38,7 +38,7 @@ interface TextureSetAssociationDialogProps {
 
 export function TextureSetAssociationDialog({
   visible,
-  model,
+  model: _model,
   modelVersionId,
   materialName,
   variantName,

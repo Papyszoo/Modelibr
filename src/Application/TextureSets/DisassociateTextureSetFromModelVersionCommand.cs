@@ -30,14 +30,19 @@ internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHa
                     new Error("ModelVersionNotFound", $"Model version with ID {command.ModelVersionId} was not found."));
             }
 
-            var materialName = command.MaterialName ?? string.Empty;
-            var variantName = command.VariantName ?? string.Empty;
-
-            // Always use exact composite key removal to avoid cross-variant data loss.
-            // RemoveTextureMappingsByTextureSetIdAsync removes across ALL variants which is wrong
-            // when the user only wants to unlink from one specific material+variant.
-            await _modelVersionRepository.RemoveTextureMappingAsync(
-                modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
+            // When MaterialName is not specified, remove ALL mappings for this texture set
+            if (command.MaterialName == null)
+            {
+                await _modelVersionRepository.RemoveTextureMappingsByTextureSetIdAsync(
+                    modelVersion.Id, command.TextureSetId, cancellationToken);
+            }
+            else
+            {
+                var materialName = command.MaterialName ?? string.Empty;
+                var variantName = command.VariantName ?? string.Empty;
+                await _modelVersionRepository.RemoveTextureMappingAsync(
+                    modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
+            }
 
             return Result.Success();
         }

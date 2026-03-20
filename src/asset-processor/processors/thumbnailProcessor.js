@@ -324,13 +324,18 @@ export class ThumbnailProcessor extends BaseProcessor {
         }
       }
 
+      const downloadedFilesCache = new Map()
       for (const mapping of variantMappings) {
         const ts = textureSetCache.get(mapping.textureSetId)
         if (!ts) continue
 
         try {
-          const texturePaths =
-            await this.modelDataService.downloadTextureSetFiles(ts)
+          let texturePaths = downloadedFilesCache.get(mapping.textureSetId)
+          if (!texturePaths) {
+            texturePaths =
+              await this.modelDataService.downloadTextureSetFiles(ts)
+            downloadedFilesCache.set(mapping.textureSetId, texturePaths)
+          }
           if (Object.keys(texturePaths).length > 0) {
             const applied = await this.puppeteerRenderer.applyTextures(
               texturePaths,

@@ -494,13 +494,15 @@ public class TextureSet : AggregateRoot
     /// <summary>
     /// Removes a model version association for a specific material from this texture set.
     /// </summary>
-    public void RemoveModelVersionForMaterial(ModelVersion modelVersion, string materialName, DateTime updatedAt)
+    public void RemoveModelVersionForMaterial(ModelVersion modelVersion, string materialName, string variantName, DateTime updatedAt)
     {
         if (modelVersion == null)
             throw new ArgumentNullException(nameof(modelVersion));
 
         materialName ??= string.Empty;
-        var mapping = _modelVersionMappings.FirstOrDefault(m => m.ModelVersionId == modelVersion.Id && m.MaterialName == materialName);
+        variantName ??= string.Empty;
+        var mapping = _modelVersionMappings.FirstOrDefault(
+            m => m.ModelVersionId == modelVersion.Id && m.MaterialName == materialName && m.VariantName == variantName);
         if (mapping != null)
         {
             _modelVersionMappings.Remove(mapping);
