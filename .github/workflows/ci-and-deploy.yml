@@ -431,7 +431,7 @@ jobs:
         name: E2E Tests
         runs-on: ubuntu-latest
         needs: [detect-changes]
-        if: github.event_name == 'workflow_dispatch'
+        if: needs.detect-changes.outputs.e2e-relevant == 'true' || github.event_name == 'workflow_dispatch'
 
         steps:
             - name: Checkout code
@@ -482,7 +482,7 @@ jobs:
               id: e2e
               continue-on-error: true
               working-directory: tests/e2e
-              run: npm run test:quick
+              run: npm run test:ci
               env:
                   FRONTEND_URL: http://localhost:3002
                   PW_WORKERS: "3"
@@ -532,6 +532,7 @@ jobs:
                 frontend-tests,
                 blender-addon-tests,
                 asset-processor-tests,
+                e2e-tests,
             ]
         if: always()
 
