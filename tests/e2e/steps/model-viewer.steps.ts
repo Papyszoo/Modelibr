@@ -183,11 +183,18 @@ Then(
             .slice(1)
             .map((row: string[]) => row[0]);
 
-        // Verify the menubar contains expected menu items
+        // Verify the menubar is visible
         const menubar = page.locator(".p-menubar");
-        await expect(menubar).toBeVisible({ timeout: 5000 });
+        await expect(menubar).toBeVisible({ timeout: 10000 });
+
+        // Verify each expected button/menu item is visible individually
+        for (const buttonLabel of buttons) {
+            const button = menubar.getByText(buttonLabel, { exact: true }).first();
+            await expect(button).toBeVisible({ timeout: 10000 });
+            console.log(`[UI] Button "${buttonLabel}" visible ✓`);
+        }
         console.log(
-            `[UI] Menubar visible with expected panel options (${buttons.length} expected) ✓`,
+            `[UI] All ${buttons.length} menubar controls verified ✓`,
         );
     },
 );

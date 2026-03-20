@@ -22,6 +22,6 @@ Feature: Model 3D Viewer Rendering
       | button            |
       | Left Panel        |
       | File              |
-      | View              |
+      | Viewer            |
       | Right Panel       |
     And I take a screenshot of the control buttons

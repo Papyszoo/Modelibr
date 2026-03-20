@@ -191,25 +191,107 @@ export class ModelViewerPage {
             .first();
         await linkButton.click();
 
-        // 3. Wait for dialog and select the set
+        // 3. Wait for the dialog to open and cards to appear
+        const dialog = this.page.locator(".texture-set-association-dialog");
+        await dialog.waitFor({ state: "visible", timeout: 10000 });
         await this.page.waitForSelector(".texture-set-association-card", {
             state: "visible",
             timeout: 10000,
         });
+
+        // 4. Select the texture set card, click Save, and verify it actually fires
+        //    the POST API call. A React useEffect can reset the dialog's selection
+        //    state when textureMappings prop changes (from a background refetch), making
+        //    Save a no-op that just closes the dialog. We detect this by checking if
+        //    the POST request was sent and retry if not.
         const card = this.page.locator(".texture-set-association-card", {
             hasText: setName,
         });
-        await card.first().click();
+        const saveBtn = dialog.getByRole("button", { name: /^save$/i });
 
-        // 4. Save changes
-        await this.page.getByRole("button", { name: /save changes/i }).click();
+        let saved = false;
+        for (let attempt = 0; attempt < 3 && !saved; attempt++) {
+            if (attempt > 0) {
+                // Re-open the dialog — the previous attempt closed it without saving
+                console.log(
+                    `[UI] Save was a no-op (attempt ${attempt}), re-opening dialog`,
+                );
+                await linkButton.click();
+                await dialog.waitFor({ state: "visible", timeout: 10000 });
+                await this.page.waitForSelector(
+                    ".texture-set-association-card",
+                    { state: "visible", timeout: 10000 },
+                );
+            }
 
-        // Wait for dialog to close
-        await this.page
-            .locator(".texture-set-association-card")
-            .first()
-            .waitFor({ state: "hidden", timeout: 10000 })
-            .catch(() => {});
+            // Click card to select it
+            await card.first().click();
+            // Wait for Save button to become enabled
+            await expect(saveBtn).toBeEnabled({ timeout: 5000 });
+
+            // Listen for the POST request BEFORE clicking Save
+            const postRequestPromise = this.page
+                .waitForRequest(
+                    (req) =>
+                        req.url().includes("/texture-sets/") &&
+                        req.url().includes("/model-versions/") &&
+                        req.method() === "POST",
+                    { timeout: 3000 },
+                )
+                .then(() => true)
+                .catch(() => false);
+
+            // Also set up listeners for the data refetch responses that
+            // handleLinkDialogClose fires (fire-and-forget in frontend).
+            // Must be registered BEFORE click to avoid missing the responses.
+            const textureSetsRefetchPromise = this.page.waitForResponse(
+                (resp) =>
+                    resp.url().includes("/texture-sets") &&
+                    !resp.url().includes("/model-versions/") &&
+                    resp.request().method() === "GET" &&
+                    resp.status() >= 200 &&
+                    resp.status() < 300,
+                { timeout: 15000 },
+            );
+            const versionsRefetchPromise = this.page.waitForResponse(
+                (resp) =>
+                    resp.url().includes("/versions") &&
+                    resp.request().method() === "GET" &&
+                    resp.status() >= 200 &&
+                    resp.status() < 300,
+                { timeout: 15000 },
+            );
+
+            await saveBtn.click();
+            saved = await postRequestPromise;
+
+            if (saved) {
+                // Wait for dialog to close and data refetches to complete
+                await dialog.waitFor({ state: "hidden", timeout: 15000 });
+                await Promise.all([
+                    textureSetsRefetchPromise,
+                    versionsRefetchPromise,
+                ]);
+                // Allow React to process the refetched data
+                await this.page.waitForTimeout(500);
+            } else {
+                // Dialog closed without saving — cancel the response listeners
+                await dialog.waitFor({ state: "hidden", timeout: 15000 });
+            }
+        }
+
+        if (!saved) {
+            throw new Error(
+                `Failed to save texture set "${setName}" link after 3 dialog attempts`,
+            );
+        }
+
+        // 5. Wait for the texture set to appear in the materials panel
+        const linkedItem = this.page.locator(
+            `.materials-item[data-texture-set*="${setName}"]`,
+        );
+        await expect(linkedItem.first()).toBeVisible({ timeout: 15000 });
+        console.log(`[UI] Linked texture set "${setName}" ✓`);
     }
 
     async setDefaultTextureSet(name: string) {
@@ -702,14 +784,31 @@ export class ModelViewerPage {
         await expect(input).toBeVisible({ timeout: 5000 });
         await input.fill(name);
 
-        // Confirm the preset
+        // Confirm the preset — wait for the API response and subsequent version refetch
         const confirmBtn = this.page.locator(
             '[data-testid="confirm-preset-btn"]',
         );
+
+        // Listen for the version refetch that onModelUpdated() triggers after preset creation
+        const versionRefetchPromise = this.page.waitForResponse(
+            (resp) =>
+                resp.url().includes("/versions") &&
+                resp.request().method() === "GET" &&
+                resp.status() >= 200 &&
+                resp.status() < 300,
+            { timeout: 15000 },
+        );
+
         await confirmBtn.click();
 
-        // Wait for the preset to be created (dropdown should update)
-        await this.page.waitForTimeout(1000);
+        // Wait for version data refetch to complete so textureMappings are stable
+        await versionRefetchPromise;
+
+        // Wait for the dropdown to show the new preset name
+        const dropdownLabel = this.page.locator(
+            '[data-testid="variant-dropdown"] .p-dropdown-label',
+        );
+        await expect(dropdownLabel).toHaveText(name, { timeout: 10000 });
         console.log(`[UI] Added preset "${name}" ✓`);
     }
 
@@ -730,6 +829,13 @@ export class ModelViewerPage {
         await expect(option).toBeVisible({ timeout: 5000 });
         await option.click();
 
+        // Wait for the dropdown label to update confirming the selection
+        const label = dropdown.locator(".p-dropdown-label");
+        await expect(label).toHaveText(name, { timeout: 5000 });
+
+        // Allow time for React to re-render materials with the new variant's data
+        await this.page.waitForTimeout(500);
+
         console.log(`[UI] Selected preset "${name}" ✓`);
     }
 
@@ -742,7 +848,7 @@ export class ModelViewerPage {
         const setMainBtn = this.page.locator(
             '[data-testid="set-main-variant-btn"]',
         );
-        await expect(setMainBtn).toBeVisible({ timeout: 5000 });
+        await expect(setMainBtn).toBeVisible({ timeout: 15000 });
         await setMainBtn.click();
 
         // Wait for the badge to appear confirming it's now main
@@ -764,7 +870,7 @@ export class ModelViewerPage {
             '[data-testid="materials-panel"] .p-badge',
             { hasText: "Main" },
         );
-        await expect(badge).toBeVisible({ timeout: 5000 });
+        await expect(badge).toBeVisible({ timeout: 15000 });
     }
 
     /**

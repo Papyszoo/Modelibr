@@ -131,12 +131,8 @@ When(
         );
         await fileInput.setInputFiles(filePath);
 
-        // Wait for upload API response instead of arbitrary timeout
-        await uploadResponsePromise.catch(() => {
-            console.log(
-                "[Upload] Upload response wait timed out, continuing...",
-            );
-        });
+        // Wait for upload API response — must succeed before proceeding
+        await uploadResponsePromise;
         await page.waitForLoadState("domcontentloaded");
 
         // Get sounds AFTER upload and find the new one
@@ -199,13 +195,10 @@ When(
         }
 
         // Wait for UI to reflect changes reactively (sound card should appear)
+        // After API rename, the UI may not update reactively — reload to ensure fresh state
         const soundListPage = new SoundListPage(page);
-        await soundListPage
-            .waitForSoundByName(soundName, 10000)
-            .catch(async () => {
-                // Fallback: navigate to sounds page if card not visible yet
-                await soundListPage.goto();
-            });
+        await soundListPage.goto();
+        await waitForSoundsUiReady(page);
 
         console.log(
             `[Upload] Uploaded sound "${soundName}" from "${filename}"`,

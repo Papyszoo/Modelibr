@@ -180,10 +180,13 @@ When(
 Then(
     "there should be exactly {int} model viewer tab visible",
     async ({ page }, expectedCount: number) => {
-        const count = await countTabsByType(page, "modelViewer");
-        expect(count).toBe(expectedCount);
+        // Wait for React state to settle after tab deduplication
+        await expect(async () => {
+            const count = await countTabsByType(page, "modelViewer");
+            expect(count).toBe(expectedCount);
+        }).toPass({ timeout: 10000, intervals: [500, 1000, 2000] });
         console.log(
-            `[UI] Found ${count} model viewer tab(s) (expected ${expectedCount}) ✓`,
+            `[UI] Found ${expectedCount} model viewer tab(s) ✓`,
         );
     },
 );

@@ -996,12 +996,13 @@ Given(
 
 When("I edit the category {string}", async ({ page }, categoryName: string) => {
     getScenarioState(page).setCustom("editingCategoryName", categoryName);
-    // Ensure no dialog is blocking
-    await page.keyboard.press("Escape");
-    await page
-        .locator(".p-dialog")
-        .waitFor({ state: "hidden", timeout: 5000 })
-        .catch(() => {});
+    // Ensure no dialog is blocking — wait for any existing dialog to fully close
+    const existingDialog = page.locator(".p-dialog");
+    const dialogVisible = await existingDialog.first().isVisible().catch(() => false);
+    if (dialogVisible) {
+        await page.keyboard.press("Escape");
+        await existingDialog.first().waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    }
 
     // Wait for category tabs to be rendered
     await page.waitForSelector(".category-tab", {
