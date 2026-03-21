@@ -2041,7 +2041,9 @@ export const dynamicDemoHandlers = [
         negotiateVersion: 1,
         connectionId: 'demo-connection-id',
         connectionToken: 'demo-token',
-        availableTransports: [],
+        availableTransports: [
+          { transport: 'LongPolling', transferFormats: ['Text'] },
+        ],
       },
       { status: 200 }
     )
@@ -2049,5 +2051,22 @@ export const dynamicDemoHandlers = [
 
   http.options('*/thumbnailHub/negotiate', async () => {
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  // Long polling: the GET hangs until there's data (we never send any)
+  http.get('*/thumbnailHub', async () => {
+    // Return empty 200 after a delay to simulate an idle long-poll cycle
+    await new Promise(resolve => setTimeout(resolve, 30000))
+    return new HttpResponse(null, { status: 200 })
+  }),
+
+  // SignalR sends messages via POST on the hub URL
+  http.post('*/thumbnailHub', async () => {
+    return new HttpResponse(null, { status: 200 })
+  }),
+
+  // Connection cleanup
+  http.delete('*/thumbnailHub', async () => {
+    return new HttpResponse(null, { status: 202 })
   }),
 ]
