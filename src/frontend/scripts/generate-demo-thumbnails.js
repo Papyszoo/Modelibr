@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Generates thumbnail PNG images for demo model assets (.glb, .fbx)
- * and a placeholder for global material thumbnails.
+ * Generates static placeholder thumbnail assets for the demo.
  *
- * Uses a simple color-coded approach per model type since we can't
- * easily run a full 3D render pipeline in a build script.
- * For production-quality thumbnails, run the asset-processor instead.
+ * Model thumbnails are now generated at runtime in the browser via
+ * Three.js (GLTFLoader / FBXLoader) and cached in IndexedDB, so we no
+ * longer pre-generate solid-color squares for individual models here.
+ *
+ * Only the texture-set global-material placeholder is generated here
+ * because that is still served as a static asset fallback.
  *
  * Usage: node scripts/generate-demo-thumbnails.js
  */
@@ -28,8 +30,6 @@ function ensureDir(dir) {
 
 /**
  * Creates a minimal valid PNG file with a solid color.
- * This generates a 64x64 uncompressed PNG (IHDR + single IDAT + IEND).
- * Keeps the build dependency-free (no sharp/canvas needed).
  */
 function createColorPng(r, g, b, size = 64) {
   // PNG signature
@@ -37,22 +37,20 @@ function createColorPng(r, g, b, size = 64) {
 
   // IHDR chunk
   const ihdrData = Buffer.alloc(13)
-  ihdrData.writeUInt32BE(size, 0) // width
-  ihdrData.writeUInt32BE(size, 4) // height
-  ihdrData.writeUInt8(8, 8) // bit depth
-  ihdrData.writeUInt8(2, 9) // color type (RGB)
-  ihdrData.writeUInt8(0, 10) // compression
-  ihdrData.writeUInt8(0, 11) // filter
-  ihdrData.writeUInt8(0, 12) // interlace
+  ihdrData.writeUInt32BE(size, 0)
+  ihdrData.writeUInt32BE(size, 4)
+  ihdrData.writeUInt8(8, 8)
+  ihdrData.writeUInt8(2, 9) // RGB
+  ihdrData.writeUInt8(0, 10)
+  ihdrData.writeUInt8(0, 11)
+  ihdrData.writeUInt8(0, 12)
   const ihdr = createChunk('IHDR', ihdrData)
 
-  // IDAT — build raw scanlines, then deflate
-  // Each row: filter byte (0 = None) + RGB pixels
   const rowSize = 1 + size * 3
   const rawData = Buffer.alloc(rowSize * size)
   for (let y = 0; y < size; y++) {
     const offset = y * rowSize
-    rawData[offset] = 0 // filter byte
+    rawData[offset] = 0
     for (let x = 0; x < size; x++) {
       const px = offset + 1 + x * 3
       rawData[px] = r
@@ -63,8 +61,6 @@ function createColorPng(r, g, b, size = 64) {
 
   const deflated = zlib.deflateSync(rawData)
   const idat = createChunk('IDAT', deflated)
-
-  // IEND
   const iend = createChunk('IEND', Buffer.alloc(0))
 
   return Buffer.concat([signature, ihdr, idat, iend])
@@ -91,30 +87,15 @@ function crc32(buf) {
   return (crc ^ 0xffffffff) >>> 0
 }
 
-// Color palette for each model type
-const modelThumbnails = [
-  { name: 'test-cube', r: 70, g: 130, b: 180 }, // Steel blue
-  { name: 'test-cone', r: 210, g: 105, b: 30 }, // Chocolate
-  { name: 'test-cylinder', r: 60, g: 179, b: 113 }, // Medium sea green
-  { name: 'test-icosphere', r: 186, g: 85, b: 211 }, // Medium orchid
-  { name: 'test-torus', r: 220, g: 20, b: 60 }, // Crimson
-]
-
 // Main
 ensureDir(THUMBNAILS_DIR)
 
 console.log('Generating demo thumbnails...')
 
-for (const { name, r, g, b } of modelThumbnails) {
-  const png = createColorPng(r, g, b, 64)
-  const outPath = path.join(THUMBNAILS_DIR, `${name}.png`)
-  fs.writeFileSync(outPath, png)
-  console.log(`  Generated: thumbnails/${name}.png`)
-}
-
-// Global material thumbnail
+// Global material texture-set placeholder (still used as a static fallback
+// while the user hasn't uploaded an albedo texture for a new texture set)
 const globalPng = createColorPng(139, 119, 101, 64) // Earthy brown
 fs.writeFileSync(path.join(THUMBNAILS_DIR, 'global-material.png'), globalPng)
 console.log('  Generated: thumbnails/global-material.png')
 
-console.log(`\nGenerated ${modelThumbnails.length + 1} thumbnails.`)
+console.log('\nDone. Model thumbnails are generated at runtime via Three.js.')

@@ -28,6 +28,8 @@ import {
   storeThumbnail,
 } from './db/demoDb'
 import {
+  generateExrChannelPreview,
+  generateImageChannelPreview,
   generateModelThumbnail,
   generatePlaceholderThumbnail,
   generateWaveformThumbnail,
@@ -151,16 +153,24 @@ function recomputeProjectCounts(project: DemoProject) {
 }
 
 // Background thumbnail generation — fire and forget
-function generateModelThumbnailAsync(modelId: number, fileBlob: Blob) {
-  generateModelThumbnail(fileBlob)
+function generateModelThumbnailAsync(
+  modelId: number,
+  fileBlob: Blob,
+  fileName?: string
+) {
+  generateModelThumbnail(fileBlob, 256, 256, fileName)
     .then(thumb => storeThumbnail(`model:${modelId}`, thumb))
     .catch(() => {
       // Silently ignore — thumbnail will just be missing
     })
 }
 
-function generateVersionThumbnailAsync(versionId: number, fileBlob: Blob) {
-  generateModelThumbnail(fileBlob)
+function generateVersionThumbnailAsync(
+  versionId: number,
+  fileBlob: Blob,
+  fileName?: string
+) {
+  generateModelThumbnail(fileBlob, 256, 256, fileName)
     .then(thumb => storeThumbnail(`version:${versionId}`, thumb))
     .catch(() => {})
 }
@@ -231,11 +241,40 @@ export const dynamicDemoHandlers = [
         headers: { 'Content-Type': 'image/png' },
       })
     }
-    // Fall back to seed thumbnail
+    // Generate a real thumbnail for seed models on first request
     const model = await getById('models', id)
-    if (model && id <= 5) {
-      const name = model.name.toLowerCase().replace('test ', '')
-      return fetchStaticAsset(thumbnailUrl(`test-${name}.png`), 'image/png')
+    if (model?.files[0]) {
+      const fileId = model.files[0].id
+      const fileName = model.files[0].originalFileName
+      try {
+        let blob: Blob | undefined
+        const stored = await getFileBlob(fileId)
+        if (stored) {
+          blob = stored.blob
+        } else {
+          const seedPath = seedFileAssets[fileId]
+          if (seedPath) {
+            const res = await fetch(assetUrl(seedPath), {
+              cache: 'force-cache',
+            })
+            if (res.ok) blob = await res.blob()
+          }
+        }
+        if (blob) {
+          const thumbnail = await generateModelThumbnail(
+            blob,
+            256,
+            256,
+            fileName
+          )
+          await storeThumbnail(`model:${id}`, thumbnail)
+          return new HttpResponse(thumbnail, {
+            headers: { 'Content-Type': 'image/png' },
+          })
+        }
+      } catch {
+        // fall through to placeholder
+      }
     }
     // Generate placeholder
     const placeholder = await generatePlaceholderThumbnail()
@@ -330,7 +369,7 @@ export const dynamicDemoHandlers = [
       ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
-      variantNames: ['Default'],
+      variantNames: [],
       textureMappings: [],
       textureSetIds: [],
     }
@@ -341,9 +380,9 @@ export const dynamicDemoHandlers = [
     await put('modelVersions', version)
 
     // Generate thumbnail in background
-    if (isRenderable && ext.toLowerCase() === 'glb') {
-      generateModelThumbnailAsync(modelId, file)
-      generateVersionThumbnailAsync(versionId, file)
+    if (isRenderable && ['glb', 'fbx'].includes(ext.toLowerCase())) {
+      generateModelThumbnailAsync(modelId, file, file.name)
+      generateVersionThumbnailAsync(versionId, file, file.name)
     }
 
     return HttpResponse.json(
@@ -397,7 +436,7 @@ export const dynamicDemoHandlers = [
     if (!model?.files[0]) return new HttpResponse(null, { status: 404 })
     const fileBlob = await getFileBlob(model.files[0].id)
     if (fileBlob) {
-      generateModelThumbnailAsync(model.id, fileBlob.blob)
+      generateModelThumbnailAsync(model.id, fileBlob.blob, fileBlob.fileName)
     }
     return HttpResponse.json({ status: 'Processing' })
   }),
@@ -455,7 +494,7 @@ export const dynamicDemoHandlers = [
       ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
-      variantNames: ['Default'],
+      variantNames: [],
       textureMappings: [],
       textureSetIds: [],
     }
@@ -473,8 +512,8 @@ export const dynamicDemoHandlers = [
     model.updatedAt = ts
     await put('models', model)
 
-    if (isRenderable && ext.toLowerCase() === 'glb') {
-      generateVersionThumbnailAsync(versionId, file)
+    if (isRenderable && ['glb', 'fbx'].includes(ext.toLowerCase())) {
+      generateVersionThumbnailAsync(versionId, file, file.name)
     }
 
     return HttpResponse.json(
@@ -518,14 +557,40 @@ export const dynamicDemoHandlers = [
         headers: { 'Content-Type': 'image/png' },
       })
     }
-    // Fall back to seed thumbnails
+    // Generate a real thumbnail for seed versions on first request
     const allVersions = await getAll('modelVersions')
     const version = allVersions.find(v => v.id === versionId)
-    if (version && version.modelId <= 5) {
-      const model = await getById('models', version.modelId)
-      if (model) {
-        const name = model.name.toLowerCase().replace('test ', '')
-        return fetchStaticAsset(thumbnailUrl(`test-${name}.png`), 'image/png')
+    if (version?.files[0]) {
+      const fileId = version.files[0].id
+      const fileName = version.files[0].originalFileName
+      try {
+        let blob: Blob | undefined
+        const stored = await getFileBlob(fileId)
+        if (stored) {
+          blob = stored.blob
+        } else {
+          const seedPath = seedFileAssets[fileId]
+          if (seedPath) {
+            const res = await fetch(assetUrl(seedPath), {
+              cache: 'force-cache',
+            })
+            if (res.ok) blob = await res.blob()
+          }
+        }
+        if (blob) {
+          const thumbnail = await generateModelThumbnail(
+            blob,
+            256,
+            256,
+            fileName
+          )
+          await storeThumbnail(`version:${versionId}`, thumbnail)
+          return new HttpResponse(thumbnail, {
+            headers: { 'Content-Type': 'image/png' },
+          })
+        }
+      } catch {
+        // fall through to placeholder
       }
     }
     const placeholder = await generatePlaceholderThumbnail()
@@ -578,8 +643,54 @@ export const dynamicDemoHandlers = [
     return serveFile(Number(params.id))
   }),
 
-  http.get('*/files/:id/preview', async ({ params }) => {
-    return serveFile(Number(params.id))
+  http.get('*/files/:id/preview', async ({ params, request }) => {
+    const fileId = Number(params.id)
+    const url = new URL(request.url)
+    const channel = url.searchParams.get('channel') || 'rgb'
+
+    // Determine the file name to detect EXR
+    let fileName: string | undefined
+    const stored = await getFileBlob(fileId)
+    if (stored) {
+      fileName = stored.fileName
+    } else {
+      const seedPath = seedFileAssets[fileId]
+      if (seedPath) {
+        fileName = seedPath.split('/').pop()
+      }
+    }
+
+    const isExr = fileName?.toLowerCase().endsWith('.exr')
+    const isImage =
+      !isExr && /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(fileName ?? '')
+
+    if (isExr || (isImage && channel !== 'rgb')) {
+      try {
+        // Get the raw file blob
+        let blob: Blob
+        if (stored) {
+          blob = stored.blob
+        } else {
+          const seedPath = seedFileAssets[fileId]
+          if (!seedPath) return new HttpResponse(null, { status: 404 })
+          const res = await fetch(assetUrl(seedPath), { cache: 'force-cache' })
+          if (!res.ok) return new HttpResponse(null, { status: 404 })
+          blob = await res.blob()
+        }
+
+        const preview = isExr
+          ? await generateExrChannelPreview(blob, channel)
+          : await generateImageChannelPreview(blob, channel)
+        return new HttpResponse(preview, {
+          headers: { 'Content-Type': 'image/png' },
+        })
+      } catch {
+        return new HttpResponse(null, { status: 404 })
+      }
+    }
+
+    // For standard images with channel=rgb, serve the raw file
+    return serveFile(fileId)
   }),
 
   http.post('*/files', async ({ request }) => {
@@ -2070,3 +2181,43 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 202 })
   }),
 ]
+
+// ─── Seed Thumbnail Pre-warming ──────────────────────────────────────────
+
+/**
+ * Eagerly generates and caches Three.js thumbnails for all seed models
+ * into IndexedDB, so they are available immediately on first page load.
+ *
+ * Called once at demo startup (fire-and-forget). Safe to call multiple
+ * times — skips models that already have a cached thumbnail.
+ */
+export async function prewarmSeedThumbnails(): Promise<void> {
+  const seedItems = [
+    { modelId: 1, versionId: 1, fileId: 101, fileName: 'test-cube.glb' },
+    { modelId: 2, versionId: 2, fileId: 102, fileName: 'test-cone.fbx' },
+    { modelId: 3, versionId: 3, fileId: 103, fileName: 'test-cylinder.fbx' },
+    { modelId: 4, versionId: 4, fileId: 104, fileName: 'test-icosphere.fbx' },
+    { modelId: 5, versionId: 5, fileId: 105, fileName: 'test-torus.fbx' },
+  ]
+
+  for (const { modelId, versionId, fileId, fileName } of seedItems) {
+    const modelKey = `model:${modelId}`
+    // Skip if already cached
+    const existing = await getThumbnail(modelKey)
+    if (existing) continue
+
+    const seedPath = seedFileAssets[fileId]
+    if (!seedPath) continue
+
+    try {
+      const res = await fetch(assetUrl(seedPath), { cache: 'force-cache' })
+      if (!res.ok) continue
+      const blob = await res.blob()
+      const thumbnail = await generateModelThumbnail(blob, 256, 256, fileName)
+      await storeThumbnail(modelKey, thumbnail)
+      await storeThumbnail(`version:${versionId}`, thumbnail)
+    } catch {
+      // Silently ignore — thumbnail requests will still generate on demand
+    }
+  }
+}
