@@ -27,7 +27,7 @@ export const ENVIRONMENT_PRESETS = Object.keys(HDR_FILENAMES)
 
 /** The only preset that ships with the app bundle. */
 export const BUNDLED_PRESET = 'city'
-export const BUNDLED_HDR_PATH = '/hdri/potsdamer_platz_1k.hdr'
+export const BUNDLED_HDR_PATH = `${import.meta.env.BASE_URL}hdri/potsdamer_platz_1k.hdr`
 
 const CACHE_NAME = 'modelibr-hdri'
 
