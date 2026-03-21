@@ -82,6 +82,30 @@ function now() {
 }
 
 /**
+ * Fetch a static asset from the public directory and return it as an
+ * HttpResponse. This avoids using HttpResponse.redirect() which does not
+ * work reliably inside a ServiceWorker for sub-resource requests (images).
+ */
+async function fetchStaticAsset(
+  url: string,
+  contentType?: string
+): Promise<Response> {
+  try {
+    const res = await fetch(url, { cache: 'force-cache' })
+    if (!res.ok) return new HttpResponse(null, { status: 404 })
+    const blob = await res.blob()
+    return new HttpResponse(blob, {
+      headers: {
+        'Content-Type':
+          contentType ?? (blob.type || 'application/octet-stream'),
+      },
+    })
+  } catch {
+    return new HttpResponse(null, { status: 404 })
+  }
+}
+
+/**
  * Serve a file by ID — check IndexedDB first (user uploads), fall back to
  * seed static assets.
  */
@@ -94,7 +118,7 @@ async function serveFile(fileId: number): Promise<Response> {
   }
   const seedPath = seedFileAssets[fileId]
   if (seedPath) {
-    return HttpResponse.redirect(assetUrl(seedPath))
+    return fetchStaticAsset(assetUrl(seedPath))
   }
   return new HttpResponse(null, { status: 404 })
 }
@@ -211,7 +235,7 @@ export const dynamicDemoHandlers = [
     const model = await getById('models', id)
     if (model && id <= 5) {
       const name = model.name.toLowerCase().replace('test ', '')
-      return HttpResponse.redirect(thumbnailUrl(`test-${name}.png`))
+      return fetchStaticAsset(thumbnailUrl(`test-${name}.png`), 'image/png')
     }
     // Generate placeholder
     const placeholder = await generatePlaceholderThumbnail()
@@ -384,7 +408,7 @@ export const dynamicDemoHandlers = [
 
   http.get('*/models/:modelId/versions', async ({ params }) => {
     const versions = await getVersionsByModelId(Number(params.modelId))
-    return HttpResponse.json({ versions })
+    return HttpResponse.json(versions)
   }),
 
   http.post('*/models/:modelId/versions', async ({ params, request }) => {
@@ -501,7 +525,7 @@ export const dynamicDemoHandlers = [
       const model = await getById('models', version.modelId)
       if (model) {
         const name = model.name.toLowerCase().replace('test ', '')
-        return HttpResponse.redirect(thumbnailUrl(`test-${name}.png`))
+        return fetchStaticAsset(thumbnailUrl(`test-${name}.png`), 'image/png')
       }
     }
     const placeholder = await generatePlaceholderThumbnail()
@@ -634,7 +658,7 @@ export const dynamicDemoHandlers = [
         headers: { 'Content-Type': 'image/png' },
       })
     }
-    return HttpResponse.redirect(thumbnailUrl('global-material.png'))
+    return fetchStaticAsset(thumbnailUrl('global-material.png'), 'image/png')
   }),
 
   http.get('*/texture-sets/:id', async ({ params }) => {
@@ -2004,6 +2028,26 @@ export const dynamicDemoHandlers = [
   }),
 
   http.post('*/batch-uploads/*', async () => {
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  SIGNALR (thumbnailHub) — no-op stubs to prevent 405 errors
+  // ════════════════════════════════════════════════════════════════════════
+
+  http.post('*/thumbnailHub/negotiate', async () => {
+    return HttpResponse.json(
+      {
+        negotiateVersion: 1,
+        connectionId: 'demo-connection-id',
+        connectionToken: 'demo-token',
+        availableTransports: [],
+      },
+      { status: 200 }
+    )
+  }),
+
+  http.options('*/thumbnailHub/negotiate', async () => {
     return new HttpResponse(null, { status: 204 })
   }),
 ]
