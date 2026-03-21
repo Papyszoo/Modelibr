@@ -5,34 +5,36 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const isDemo = process.env.VITE_DEMO_MODE === 'true'
-
 // https://vite.dev/config/
-export default defineConfig({
-  base: isDemo ? '/Modelibr/demo/' : '/',
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
+export default defineConfig(({ mode }) => {
+  const isDemo = mode === 'demo'
+
+  return {
+    base: isDemo ? '/Modelibr/demo/' : '/',
+    plugins: [react()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+      },
     },
-  },
-  server: {
-    host: '0.0.0.0',
-    port: 3000,
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
+    server: {
+      host: '0.0.0.0',
+      port: 3000,
+      headers: {
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+      },
     },
-  },
-  preview: {
-    host: '0.0.0.0',
-    port: 3000,
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
+    preview: {
+      host: '0.0.0.0',
+      port: 3000,
+      headers: {
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+      },
     },
-  },
-  optimizeDeps: {
-    include: ['three'],
-  },
+    optimizeDeps: {
+      include: ['three'],
+    },
+  }
 })
