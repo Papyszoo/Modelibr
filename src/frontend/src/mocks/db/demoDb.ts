@@ -484,9 +484,6 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]
 
-  const DEMO_BASE = import.meta.env.BASE_URL ?? '/Modelibr/demo/'
-  const thumb = (f: string) => `${DEMO_BASE}demo-assets/thumbnails/${f}`
-
   const seedVersions: DemoModelVersion[] = [
     {
       id: 1,
@@ -495,8 +492,8 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
-      thumbnailUrl: thumb('test-cube.png'),
-      pngThumbnailUrl: thumb('test-cube.png'),
+      thumbnailUrl: null,
+      pngThumbnailUrl: null,
       files: [
         {
           id: 101,
@@ -509,7 +506,7 @@ export async function seedIfEmpty(): Promise<void> {
       ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
-      variantNames: ['Default'],
+      variantNames: [],
       textureMappings: [],
       textureSetIds: [],
     },
@@ -520,8 +517,8 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
-      thumbnailUrl: thumb('test-cone.png'),
-      pngThumbnailUrl: thumb('test-cone.png'),
+      thumbnailUrl: null,
+      pngThumbnailUrl: null,
       files: [
         {
           id: 102,
@@ -534,7 +531,7 @@ export async function seedIfEmpty(): Promise<void> {
       ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
-      variantNames: ['Default'],
+      variantNames: [],
       textureMappings: [],
       textureSetIds: [],
     },
@@ -545,8 +542,8 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
-      thumbnailUrl: thumb('test-cylinder.png'),
-      pngThumbnailUrl: thumb('test-cylinder.png'),
+      thumbnailUrl: null,
+      pngThumbnailUrl: null,
       files: [
         {
           id: 103,
@@ -559,7 +556,7 @@ export async function seedIfEmpty(): Promise<void> {
       ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
-      variantNames: ['Default'],
+      variantNames: [],
       textureMappings: [],
       textureSetIds: [1],
     },
@@ -570,8 +567,8 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
-      thumbnailUrl: thumb('test-icosphere.png'),
-      pngThumbnailUrl: thumb('test-icosphere.png'),
+      thumbnailUrl: null,
+      pngThumbnailUrl: null,
       files: [
         {
           id: 104,
@@ -584,7 +581,7 @@ export async function seedIfEmpty(): Promise<void> {
       ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
-      variantNames: ['Default'],
+      variantNames: [],
       textureMappings: [],
       textureSetIds: [],
     },
@@ -595,8 +592,8 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: 2,
-      thumbnailUrl: thumb('test-torus.png'),
-      pngThumbnailUrl: thumb('test-torus.png'),
+      thumbnailUrl: null,
+      pngThumbnailUrl: null,
       files: [
         {
           id: 105,
@@ -609,9 +606,9 @@ export async function seedIfEmpty(): Promise<void> {
       ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
-      variantNames: ['Default'],
+      variantNames: [],
       textureMappings: [
-        { materialName: 'Material', textureSetId: 2, variantName: 'Default' },
+        { materialName: 'Material', textureSetId: 2, variantName: '' },
       ],
       textureSetIds: [2],
     },

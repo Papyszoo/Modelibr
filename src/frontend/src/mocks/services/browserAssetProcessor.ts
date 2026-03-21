@@ -11,7 +11,7 @@ import {
   AmbientLight,
   Box3,
   DirectionalLight,
-  Group,
+  type Group,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -20,22 +20,28 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three'
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
 // ─── Model Thumbnails ───────────────────────────────────────────────────
 
 /**
- * Render a GLTF/GLB blob to a PNG thumbnail blob.
+ * Render a GLTF/GLB or FBX blob to a PNG thumbnail blob.
  * Falls back to a colored placeholder on any error.
  */
 export async function generateModelThumbnail(
   blob: Blob,
   width = 256,
-  height = 256
+  height = 256,
+  fileName?: string
 ): Promise<Blob> {
   try {
     const url = URL.createObjectURL(blob)
     try {
+      const ext = (fileName ?? '').split('.').pop()?.toLowerCase()
+      if (ext === 'fbx') {
+        return await renderFbxThumbnail(url, width, height)
+      }
       return await renderGltfThumbnail(url, width, height)
     } finally {
       URL.revokeObjectURL(url)
@@ -82,6 +88,66 @@ async function renderGltfThumbnail(
 
   // Frame the model
   const box = new Box3().setFromObject(gltf.scene)
+  const center = box.getCenter(new Vector3())
+  const size = box.getSize(new Vector3())
+  const maxDim = Math.max(size.x, size.y, size.z)
+  const fov = camera.fov * (Math.PI / 180)
+  const distance = (maxDim / (2 * Math.tan(fov / 2))) * 1.5
+
+  camera.position.set(
+    center.x + distance * 0.5,
+    center.y + distance * 0.3,
+    center.z + distance
+  )
+  camera.lookAt(center)
+
+  renderer.render(scene, camera)
+
+  const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
+  })
+
+  renderer.dispose()
+  return thumbnailBlob
+}
+
+async function renderFbxThumbnail(
+  url: string,
+  width: number,
+  height: number
+): Promise<Blob> {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const renderer = new WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true,
+  })
+  renderer.setSize(width, height)
+  renderer.setClearColor(0x2a2a2e, 1)
+
+  const scene = new Scene()
+  const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
+
+  scene.add(new AmbientLight(0xffffff, 0.6))
+  const dirLight = new DirectionalLight(0xffffff, 0.8)
+  dirLight.position.set(5, 10, 7)
+  scene.add(dirLight)
+
+  const loader = new FBXLoader()
+  const fbxScene = await new Promise<Group>((resolve, reject) => {
+    loader.load(url, resolve, undefined, reject)
+  })
+
+  scene.add(fbxScene)
+
+  const box = new Box3().setFromObject(fbxScene)
   const center = box.getCenter(new Vector3())
   const size = box.getSize(new Vector3())
   const maxDim = Math.max(size.x, size.y, size.z)
@@ -279,4 +345,133 @@ export async function generateWaveformThumbnail(
   })
 
   return { thumbnail, peaks, duration: Math.round(duration * 1000) }
+}
+
+// ─── EXR Channel Previews ───────────────────────────────────────────────
+
+/**
+ * Reinhard tone-mapping for HDR → LDR conversion.
+ * Mirrors the worker's imagePreviewGenerator.js implementation.
+ */
+function toneMapReinhard(value: number): number {
+  if (value <= 0) return 0
+  const mapped = value / (1 + value)
+  const srgb = Math.pow(mapped, 1 / 2.2)
+  return Math.min(255, Math.round(srgb * 255))
+}
+
+/**
+ * Parse an EXR blob and render a specific channel as a PNG blob.
+ * @param exrBlob - The raw EXR file blob
+ * @param channel - 'rgb' | 'r' | 'g' | 'b'
+ */
+export async function generateExrChannelPreview(
+  exrBlob: Blob,
+  channel: string = 'rgb'
+): Promise<Blob> {
+  const { EXRLoader } = await import('three/addons/loaders/EXRLoader.js')
+  const loader = new EXRLoader()
+
+  const arrayBuffer = await exrBlob.arrayBuffer()
+  const exrData = loader.parse(arrayBuffer)
+  const { width, height, data } = exrData
+  // THREE.RGBAFormat = 1023
+  const isRGBA = exrData.format === 1023
+  const pixelStride = isRGBA ? 4 : 1
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')!
+  const imageData = ctx.createImageData(width, height)
+  const pixels = imageData.data
+
+  for (let i = 0; i < width * height; i++) {
+    const srcIdx = i * pixelStride
+    const dstIdx = i * 4
+
+    if (isRGBA) {
+      const r = toneMapReinhard(data[srcIdx])
+      const g = toneMapReinhard(data[srcIdx + 1])
+      const b = toneMapReinhard(data[srcIdx + 2])
+
+      switch (channel) {
+        case 'r':
+          pixels[dstIdx] = r
+          pixels[dstIdx + 1] = r
+          pixels[dstIdx + 2] = r
+          break
+        case 'g':
+          pixels[dstIdx] = g
+          pixels[dstIdx + 1] = g
+          pixels[dstIdx + 2] = g
+          break
+        case 'b':
+          pixels[dstIdx] = b
+          pixels[dstIdx + 1] = b
+          pixels[dstIdx + 2] = b
+          break
+        default: // 'rgb'
+          pixels[dstIdx] = r
+          pixels[dstIdx + 1] = g
+          pixels[dstIdx + 2] = b
+          break
+      }
+    } else {
+      const val = toneMapReinhard(data[srcIdx])
+      pixels[dstIdx] = val
+      pixels[dstIdx + 1] = val
+      pixels[dstIdx + 2] = val
+    }
+    pixels[dstIdx + 3] = 255
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
+  })
+}
+
+/**
+ * Generate a channel-specific preview for a standard image (PNG/JPG).
+ * For 'rgb', just returns the original blob. For 'r'/'g'/'b', extracts
+ * the single channel as a grayscale PNG.
+ */
+export async function generateImageChannelPreview(
+  imageBlob: Blob,
+  channel: string = 'rgb'
+): Promise<Blob> {
+  if (channel === 'rgb') return imageBlob
+
+  const bitmap = await createImageBitmap(imageBlob)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(bitmap, 0, 0)
+  const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+  const pixels = imageData.data
+
+  const channelOffset = channel === 'r' ? 0 : channel === 'g' ? 1 : 2
+
+  for (let i = 0; i < pixels.length; i += 4) {
+    const val = pixels[i + channelOffset]
+    pixels[i] = val
+    pixels[i + 1] = val
+    pixels[i + 2] = val
+    // alpha stays unchanged
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
+  })
 }
