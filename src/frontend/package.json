@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:demo": "node scripts/prepare-demo-assets.js && node scripts/generate-demo-thumbnails.js && vite build --mode demo",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

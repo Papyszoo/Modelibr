@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+const isDemo = process.env.VITE_DEMO_MODE === 'true'
+
 // https://vite.dev/config/
 export default defineConfig({
+  base: isDemo ? '/Modelibr/demo/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
