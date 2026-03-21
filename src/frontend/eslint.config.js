@@ -202,6 +202,15 @@ export default defineConfig([
     },
   },
   ...featureBoundaryConfigs,
+  // Node.js scripts: vite config and build scripts need Node globals
+  {
+    files: ['vite.config.{js,ts}', 'scripts/**/*.{js,ts}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
   // Configuration for test files and Storybook (must come after architectural rules)
   {
     files: [
