@@ -106,7 +106,11 @@ function recomputePackCounts(pack: DemoPack) {
   pack.spriteCount = pack.sprites.length
   pack.soundCount = pack.sounds.length
   pack.isEmpty =
-    pack.modelCount + pack.textureSetCount + pack.spriteCount + pack.soundCount === 0
+    pack.modelCount +
+      pack.textureSetCount +
+      pack.spriteCount +
+      pack.soundCount ===
+    0
 }
 
 function recomputeProjectCounts(project: DemoProject) {
@@ -115,7 +119,11 @@ function recomputeProjectCounts(project: DemoProject) {
   project.spriteCount = project.sprites.length
   project.soundCount = project.sounds.length
   project.isEmpty =
-    project.modelCount + project.textureSetCount + project.spriteCount + project.soundCount === 0
+    project.modelCount +
+      project.textureSetCount +
+      project.spriteCount +
+      project.soundCount ===
+    0
 }
 
 // Background thumbnail generation — fire and forget
@@ -167,7 +175,7 @@ export const dynamicDemoHandlers = [
     }
     if (textureSetId) {
       models = models.filter(m =>
-        m.textureSets?.some(ts => ts.id === Number(textureSetId)),
+        m.textureSets?.some(ts => ts.id === Number(textureSetId))
       )
     }
 
@@ -195,7 +203,9 @@ export const dynamicDemoHandlers = [
     const id = Number(params.id)
     const thumb = await getThumbnail(`model:${id}`)
     if (thumb) {
-      return new HttpResponse(thumb, { headers: { 'Content-Type': 'image/png' } })
+      return new HttpResponse(thumb, {
+        headers: { 'Content-Type': 'image/png' },
+      })
     }
     // Fall back to seed thumbnail
     const model = await getById('models', id)
@@ -205,7 +215,9 @@ export const dynamicDemoHandlers = [
     }
     // Generate placeholder
     const placeholder = await generatePlaceholderThumbnail()
-    return new HttpResponse(placeholder, { headers: { 'Content-Type': 'image/png' } })
+    return new HttpResponse(placeholder, {
+      headers: { 'Content-Type': 'image/png' },
+    })
   }),
 
   http.get('*/models/:id/thumbnail', async ({ params }) => {
@@ -233,13 +245,16 @@ export const dynamicDemoHandlers = [
   http.post('*/models', async ({ request }) => {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
-    if (!file) return HttpResponse.json({ error: 'No file provided' }, { status: 400 })
+    if (!file)
+      return HttpResponse.json({ error: 'No file provided' }, { status: 400 })
 
     const modelId = await nextId('models')
     const fileId = await nextId('files')
     const versionId = await nextId('modelVersions')
     const ext = file.name.split('.').pop() ?? ''
-    const isRenderable = ['glb', 'gltf', 'fbx', 'obj'].includes(ext.toLowerCase())
+    const isRenderable = ['glb', 'gltf', 'fbx', 'obj'].includes(
+      ext.toLowerCase()
+    )
     const ts = now()
 
     const demoFile = {
@@ -279,14 +294,16 @@ export const dynamicDemoHandlers = [
       defaultTextureSetId: null,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
-      files: [{
-        id: fileId,
-        originalFileName: file.name,
-        mimeType: demoFile.mimeType,
-        fileType: demoFile.fileType,
-        sizeBytes: file.size,
-        isRenderable,
-      }],
+      files: [
+        {
+          id: fileId,
+          originalFileName: file.name,
+          mimeType: demoFile.mimeType,
+          fileType: demoFile.fileType,
+          sizeBytes: file.size,
+          isRenderable,
+        },
+      ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
       variantNames: ['Default'],
@@ -305,19 +322,29 @@ export const dynamicDemoHandlers = [
       generateVersionThumbnailAsync(versionId, file)
     }
 
-    return HttpResponse.json({ id: modelId, alreadyExists: false }, { status: 201 })
+    return HttpResponse.json(
+      { id: modelId, alreadyExists: false },
+      { status: 201 }
+    )
   }),
 
   // Update model (tags/description)
   http.post('*/models/:id/tags', async ({ params, request }) => {
     const model = await getById('models', Number(params.id))
     if (!model) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { tags?: string; description?: string }
+    const body = (await request.json()) as {
+      tags?: string
+      description?: string
+    }
     model.tags = body.tags ?? model.tags
     model.description = body.description ?? model.description
     model.updatedAt = now()
     await put('models', model)
-    return HttpResponse.json({ modelId: model.id, tags: model.tags, description: model.description })
+    return HttpResponse.json({
+      modelId: model.id,
+      tags: model.tags,
+      description: model.description,
+    })
   }),
 
   // Delete model (soft)
@@ -330,11 +357,14 @@ export const dynamicDemoHandlers = [
   http.put('*/models/:id/default-texture-set', async ({ params, request }) => {
     const model = await getById('models', Number(params.id))
     if (!model) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { TextureSetId: number | null }
+    const body = (await request.json()) as { TextureSetId: number | null }
     model.defaultTextureSetId = body.TextureSetId
     model.updatedAt = now()
     await put('models', model)
-    return HttpResponse.json({ modelId: model.id, defaultTextureSetId: model.defaultTextureSetId })
+    return HttpResponse.json({
+      modelId: model.id,
+      defaultTextureSetId: model.defaultTextureSetId,
+    })
   }),
 
   // Regenerate thumbnail
@@ -369,11 +399,16 @@ export const dynamicDemoHandlers = [
     const fileId = await nextId('files')
     const versionId = await nextId('modelVersions')
     const ext = file.name.split('.').pop() ?? ''
-    const isRenderable = ['glb', 'gltf', 'fbx', 'obj'].includes(ext.toLowerCase())
+    const isRenderable = ['glb', 'gltf', 'fbx', 'obj'].includes(
+      ext.toLowerCase()
+    )
     const ts = now()
 
     const existing = await getVersionsByModelId(modelId)
-    const nextVersionNum = existing.length > 0 ? Math.max(...existing.map(v => v.versionNumber)) + 1 : 1
+    const nextVersionNum =
+      existing.length > 0
+        ? Math.max(...existing.map(v => v.versionNumber)) + 1
+        : 1
 
     const version: DemoModelVersion = {
       id: versionId,
@@ -384,7 +419,16 @@ export const dynamicDemoHandlers = [
       defaultTextureSetId: null,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
-      files: [{ id: fileId, originalFileName: file.name, mimeType: file.type || 'application/octet-stream', fileType: ext.toLowerCase(), sizeBytes: file.size, isRenderable }],
+      files: [
+        {
+          id: fileId,
+          originalFileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          fileType: ext.toLowerCase(),
+          sizeBytes: file.size,
+          isRenderable,
+        },
+      ],
       materialNames: ['Material'],
       mainVariantName: 'Default',
       variantNames: ['Default'],
@@ -392,7 +436,12 @@ export const dynamicDemoHandlers = [
       textureSetIds: [],
     }
 
-    await storeFileBlob(fileId, file, file.name, file.type || 'application/octet-stream')
+    await storeFileBlob(
+      fileId,
+      file,
+      file.name,
+      file.type || 'application/octet-stream'
+    )
     await put('modelVersions', version)
 
     // Update model active version
@@ -404,17 +453,23 @@ export const dynamicDemoHandlers = [
       generateVersionThumbnailAsync(versionId, file)
     }
 
-    return HttpResponse.json({ versionId, versionNumber: nextVersionNum, fileId }, { status: 201 })
+    return HttpResponse.json(
+      { versionId, versionNumber: nextVersionNum, fileId },
+      { status: 201 }
+    )
   }),
 
-  http.post('*/models/:modelId/active-version/:versionId', async ({ params }) => {
-    const model = await getById('models', Number(params.modelId))
-    if (!model) return new HttpResponse(null, { status: 404 })
-    model.activeVersionId = Number(params.versionId)
-    model.updatedAt = now()
-    await put('models', model)
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.post(
+    '*/models/:modelId/active-version/:versionId',
+    async ({ params }) => {
+      const model = await getById('models', Number(params.modelId))
+      if (!model) return new HttpResponse(null, { status: 404 })
+      model.activeVersionId = Number(params.versionId)
+      model.updatedAt = now()
+      await put('models', model)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
 
   http.delete('*/models/:modelId/versions/:versionId', async ({ params }) => {
     await remove('modelVersions', Number(params.versionId))
@@ -423,14 +478,21 @@ export const dynamicDemoHandlers = [
 
   // Version thumbnail
   http.get('*/model-versions/:id/thumbnail', async () => {
-    return HttpResponse.json({ status: 'Ready', sizeBytes: 4096, width: 256, height: 256 })
+    return HttpResponse.json({
+      status: 'Ready',
+      sizeBytes: 4096,
+      width: 256,
+      height: 256,
+    })
   }),
 
   http.get('*/model-versions/:id/thumbnail/file', async ({ params }) => {
     const versionId = Number(params.id)
     const thumb = await getThumbnail(`version:${versionId}`)
     if (thumb) {
-      return new HttpResponse(thumb, { headers: { 'Content-Type': 'image/png' } })
+      return new HttpResponse(thumb, {
+        headers: { 'Content-Type': 'image/png' },
+      })
     }
     // Fall back to seed thumbnails
     const allVersions = await getAll('modelVersions')
@@ -443,7 +505,9 @@ export const dynamicDemoHandlers = [
       }
     }
     const placeholder = await generatePlaceholderThumbnail()
-    return new HttpResponse(placeholder, { headers: { 'Content-Type': 'image/png' } })
+    return new HttpResponse(placeholder, {
+      headers: { 'Content-Type': 'image/png' },
+    })
   }),
 
   // Version file URL
@@ -455,7 +519,7 @@ export const dynamicDemoHandlers = [
   http.put('*/model-versions/:id/main-variant', async ({ params, request }) => {
     const version = await getById('modelVersions', Number(params.id))
     if (!version) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { variantName: string }
+    const body = (await request.json()) as { variantName: string }
     version.mainVariantName = body.variantName
     await put('modelVersions', version)
     return new HttpResponse(null, { status: 204 })
@@ -464,7 +528,7 @@ export const dynamicDemoHandlers = [
   http.post('*/model-versions/:id/variants', async ({ params, request }) => {
     const version = await getById('modelVersions', Number(params.id))
     if (!version) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { variantName: string }
+    const body = (await request.json()) as { variantName: string }
     if (!version.variantNames.includes(body.variantName)) {
       version.variantNames.push(body.variantName)
       await put('modelVersions', version)
@@ -475,7 +539,9 @@ export const dynamicDemoHandlers = [
   http.delete('*/model-versions/:id/variants/:name', async ({ params }) => {
     const version = await getById('modelVersions', Number(params.id))
     if (!version) return new HttpResponse(null, { status: 404 })
-    version.variantNames = version.variantNames.filter(v => v !== String(params.name))
+    version.variantNames = version.variantNames.filter(
+      v => v !== String(params.name)
+    )
     await put('modelVersions', version)
     return new HttpResponse(null, { status: 204 })
   }),
@@ -498,7 +564,12 @@ export const dynamicDemoHandlers = [
     if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
 
     const fileId = await nextId('files')
-    await storeFileBlob(fileId, file, file.name, file.type || 'application/octet-stream')
+    await storeFileBlob(
+      fileId,
+      file,
+      file.name,
+      file.type || 'application/octet-stream'
+    )
     return HttpResponse.json({ fileId, alreadyExists: false }, { status: 201 })
   }),
 
@@ -559,7 +630,9 @@ export const dynamicDemoHandlers = [
     const id = Number(params.id)
     const thumb = await getThumbnail(`textureSet:${id}`)
     if (thumb) {
-      return new HttpResponse(thumb, { headers: { 'Content-Type': 'image/png' } })
+      return new HttpResponse(thumb, {
+        headers: { 'Content-Type': 'image/png' },
+      })
     }
     return HttpResponse.redirect(thumbnailUrl('global-material.png'))
   }),
@@ -580,56 +653,114 @@ export const dynamicDemoHandlers = [
     const fileId = await nextId('files')
     const textureId = await nextId('textures')
     const ts = now()
-    const name = url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
+    const name =
+      url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
     const textureType = Number(url.searchParams.get('textureType') || '1')
     const kind = Number(url.searchParams.get('kind') || '0')
 
     await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
 
     const textureSet: DemoTextureSet = {
-      id: tsId, name, kind, tilingScaleX: 1, tilingScaleY: 1, uvMappingMode: 0, uvScale: 1,
-      createdAt: ts, updatedAt: ts, textureCount: 1, isEmpty: false,
-      thumbnailPath: null, pngThumbnailPath: null,
-      textures: [{ id: textureId, textureType, sourceChannel: 5, fileId, fileName: file.name, createdAt: ts, proxies: [] }],
-      associatedModels: [], packs: [],
+      id: tsId,
+      name,
+      kind,
+      tilingScaleX: 1,
+      tilingScaleY: 1,
+      uvMappingMode: 0,
+      uvScale: 1,
+      createdAt: ts,
+      updatedAt: ts,
+      textureCount: 1,
+      isEmpty: false,
+      thumbnailPath: null,
+      pngThumbnailPath: null,
+      textures: [
+        {
+          id: textureId,
+          textureType,
+          sourceChannel: 5,
+          fileId,
+          fileName: file.name,
+          createdAt: ts,
+          proxies: [],
+        },
+      ],
+      associatedModels: [],
+      packs: [],
     }
     await put('textureSets', textureSet)
 
-    return HttpResponse.json({ textureSetId: tsId, name, fileId, textureId, textureType: String(textureType) }, { status: 201 })
+    return HttpResponse.json(
+      {
+        textureSetId: tsId,
+        name,
+        fileId,
+        textureId,
+        textureType: String(textureType),
+      },
+      { status: 201 }
+    )
   }),
 
   http.post('*/texture-sets', async ({ request }) => {
-    const body = await request.json() as { name: string; kind?: number }
+    const body = (await request.json()) as { name: string; kind?: number }
     const tsId = await nextId('textureSets')
     const ts = now()
     const kind = body.kind ?? 0
 
     const textureSet: DemoTextureSet = {
-      id: tsId, name: body.name, kind, tilingScaleX: 1, tilingScaleY: 1, uvMappingMode: 0, uvScale: 1,
-      createdAt: ts, updatedAt: ts, textureCount: 0, isEmpty: true,
-      thumbnailPath: null, pngThumbnailPath: null, textures: [], associatedModels: [], packs: [],
+      id: tsId,
+      name: body.name,
+      kind,
+      tilingScaleX: 1,
+      tilingScaleY: 1,
+      uvMappingMode: 0,
+      uvScale: 1,
+      createdAt: ts,
+      updatedAt: ts,
+      textureCount: 0,
+      isEmpty: true,
+      thumbnailPath: null,
+      pngThumbnailPath: null,
+      textures: [],
+      associatedModels: [],
+      packs: [],
     }
     await put('textureSets', textureSet)
-    return HttpResponse.json({ id: tsId, name: body.name, kind }, { status: 201 })
+    return HttpResponse.json(
+      { id: tsId, name: body.name, kind },
+      { status: 201 }
+    )
   }),
 
   http.put('*/texture-sets/:id/tiling-scale', async ({ params, request }) => {
     const ts = await getById('textureSets', Number(params.id))
     if (!ts) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { tilingScaleX: number; tilingScaleY: number; uvMappingMode?: number; uvScale?: number }
+    const body = (await request.json()) as {
+      tilingScaleX: number
+      tilingScaleY: number
+      uvMappingMode?: number
+      uvScale?: number
+    }
     ts.tilingScaleX = body.tilingScaleX
     ts.tilingScaleY = body.tilingScaleY
     if (body.uvMappingMode !== undefined) ts.uvMappingMode = body.uvMappingMode
     if (body.uvScale !== undefined) ts.uvScale = body.uvScale
     ts.updatedAt = now()
     await put('textureSets', ts)
-    return HttpResponse.json({ id: ts.id, tilingScaleX: ts.tilingScaleX, tilingScaleY: ts.tilingScaleY, uvMappingMode: ts.uvMappingMode, uvScale: ts.uvScale })
+    return HttpResponse.json({
+      id: ts.id,
+      tilingScaleX: ts.tilingScaleX,
+      tilingScaleY: ts.tilingScaleY,
+      uvMappingMode: ts.uvMappingMode,
+      uvScale: ts.uvScale,
+    })
   }),
 
   http.put('*/texture-sets/:id/kind', async ({ params, request }) => {
     const ts = await getById('textureSets', Number(params.id))
     if (!ts) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { kind: number }
+    const body = (await request.json()) as { kind: number }
     ts.kind = body.kind
     ts.updatedAt = now()
     await put('textureSets', ts)
@@ -639,7 +770,7 @@ export const dynamicDemoHandlers = [
   http.put('*/texture-sets/:id', async ({ params, request }) => {
     const ts = await getById('textureSets', Number(params.id))
     if (!ts) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { name: string }
+    const body = (await request.json()) as { name: string }
     ts.name = body.name
     ts.updatedAt = now()
     await put('textureSets', ts)
@@ -660,7 +791,11 @@ export const dynamicDemoHandlers = [
   http.post('*/texture-sets/:setId/textures', async ({ params, request }) => {
     const ts = await getById('textureSets', Number(params.setId))
     if (!ts) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { fileId: number; textureType: number; sourceChannel?: number }
+    const body = (await request.json()) as {
+      fileId: number
+      textureType: number
+      sourceChannel?: number
+    }
     const textureId = await nextId('textures')
     const fileBlob = await getFileBlob(body.fileId)
     ts.textures.push({
@@ -676,139 +811,203 @@ export const dynamicDemoHandlers = [
     ts.isEmpty = ts.textures.length === 0
     ts.updatedAt = now()
     await put('textureSets', ts)
-    return HttpResponse.json({ textureId, setId: ts.id, sourceChannel: body.sourceChannel ?? 5 }, { status: 201 })
+    return HttpResponse.json(
+      { textureId, setId: ts.id, sourceChannel: body.sourceChannel ?? 5 },
+      { status: 201 }
+    )
   }),
 
   // Remove texture from set
-  http.delete('*/texture-sets/:setId/textures/:textureId', async ({ params }) => {
-    const ts = await getById('textureSets', Number(params.setId))
-    if (!ts) return new HttpResponse(null, { status: 404 })
-    ts.textures = ts.textures.filter(t => t.id !== Number(params.textureId))
-    ts.textureCount = ts.textures.length
-    ts.isEmpty = ts.textures.length === 0
-    ts.updatedAt = now()
-    await put('textureSets', ts)
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.delete(
+    '*/texture-sets/:setId/textures/:textureId',
+    async ({ params }) => {
+      const ts = await getById('textureSets', Number(params.setId))
+      if (!ts) return new HttpResponse(null, { status: 404 })
+      ts.textures = ts.textures.filter(t => t.id !== Number(params.textureId))
+      ts.textureCount = ts.textures.length
+      ts.isEmpty = ts.textures.length === 0
+      ts.updatedAt = now()
+      await put('textureSets', ts)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
 
   // Change texture type / channel
-  http.put('*/texture-sets/:setId/textures/:textureId/type', async ({ params, request }) => {
-    const ts = await getById('textureSets', Number(params.setId))
-    if (!ts) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { textureType: number }
-    const tex = ts.textures.find(t => t.id === Number(params.textureId))
-    if (tex) tex.textureType = body.textureType
-    ts.updatedAt = now()
-    await put('textureSets', ts)
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.put(
+    '*/texture-sets/:setId/textures/:textureId/type',
+    async ({ params, request }) => {
+      const ts = await getById('textureSets', Number(params.setId))
+      if (!ts) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as { textureType: number }
+      const tex = ts.textures.find(t => t.id === Number(params.textureId))
+      if (tex) tex.textureType = body.textureType
+      ts.updatedAt = now()
+      await put('textureSets', ts)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
 
-  http.put('*/texture-sets/:setId/textures/:textureId/channel', async ({ params, request }) => {
-    const ts = await getById('textureSets', Number(params.setId))
-    if (!ts) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { sourceChannel: number }
-    const tex = ts.textures.find(t => t.id === Number(params.textureId))
-    if (tex) tex.sourceChannel = body.sourceChannel
-    ts.updatedAt = now()
-    await put('textureSets', ts)
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.put(
+    '*/texture-sets/:setId/textures/:textureId/channel',
+    async ({ params, request }) => {
+      const ts = await getById('textureSets', Number(params.setId))
+      if (!ts) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as { sourceChannel: number }
+      const tex = ts.textures.find(t => t.id === Number(params.textureId))
+      if (tex) tex.sourceChannel = body.sourceChannel
+      ts.updatedAt = now()
+      await put('textureSets', ts)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
 
   // Associate texture set with model version
-  http.post('*/texture-sets/:setId/model-versions/:versionId', async ({ params, request }) => {
-    const url = new URL(request.url)
-    const setId = Number(params.setId)
-    const versionId = Number(params.versionId)
-    const materialName = url.searchParams.get('materialName') || 'Material'
-    const variantName = url.searchParams.get('variantName') || 'Default'
+  http.post(
+    '*/texture-sets/:setId/model-versions/:versionId',
+    async ({ params, request }) => {
+      const url = new URL(request.url)
+      const setId = Number(params.setId)
+      const versionId = Number(params.versionId)
+      const materialName = url.searchParams.get('materialName') || 'Material'
+      const variantName = url.searchParams.get('variantName') || 'Default'
 
-    const ts = await getById('textureSets', setId)
-    const version = await getById('modelVersions', versionId)
-    if (!ts || !version) return new HttpResponse(null, { status: 404 })
+      const ts = await getById('textureSets', setId)
+      const version = await getById('modelVersions', versionId)
+      if (!ts || !version) return new HttpResponse(null, { status: 404 })
 
-    // Add mapping to version
-    const existIdx = version.textureMappings.findIndex(
-      m => m.materialName === materialName && m.variantName === variantName,
-    )
-    if (existIdx >= 0) {
-      version.textureMappings[existIdx].textureSetId = setId
-    } else {
-      version.textureMappings.push({ materialName, textureSetId: setId, variantName })
+      // Add mapping to version
+      const existIdx = version.textureMappings.findIndex(
+        m => m.materialName === materialName && m.variantName === variantName
+      )
+      if (existIdx >= 0) {
+        version.textureMappings[existIdx].textureSetId = setId
+      } else {
+        version.textureMappings.push({
+          materialName,
+          textureSetId: setId,
+          variantName,
+        })
+      }
+      if (!version.textureSetIds.includes(setId))
+        version.textureSetIds.push(setId)
+      await put('modelVersions', version)
+
+      // Update texture set's associated models
+      const model = await getById('models', version.modelId)
+      if (
+        model &&
+        !ts.associatedModels.some(
+          am =>
+            am.modelVersionId === versionId && am.materialName === materialName
+        )
+      ) {
+        ts.associatedModels.push({
+          id: model.id,
+          name: model.name,
+          versionNumber: version.versionNumber,
+          modelVersionId: versionId,
+          materialName,
+        })
+        await put('textureSets', ts)
+      }
+
+      // Update model's textureSets ref
+      if (model && !model.textureSets.some(r => r.id === setId)) {
+        model.textureSets.push({ id: setId, name: ts.name })
+        await put('models', model)
+      }
+
+      return new HttpResponse(null, { status: 204 })
     }
-    if (!version.textureSetIds.includes(setId)) version.textureSetIds.push(setId)
-    await put('modelVersions', version)
+  ),
 
-    // Update texture set's associated models
-    const model = await getById('models', version.modelId)
-    if (model && !ts.associatedModels.some(am => am.modelVersionId === versionId && am.materialName === materialName)) {
-      ts.associatedModels.push({ id: model.id, name: model.name, versionNumber: version.versionNumber, modelVersionId: versionId, materialName })
+  http.delete(
+    '*/texture-sets/:setId/model-versions/:versionId',
+    async ({ params, request }) => {
+      const url = new URL(request.url)
+      const setId = Number(params.setId)
+      const versionId = Number(params.versionId)
+      const materialName = url.searchParams.get('materialName') || 'Material'
+      const variantName = url.searchParams.get('variantName') || 'Default'
+
+      const ts = await getById('textureSets', setId)
+      const version = await getById('modelVersions', versionId)
+      if (!ts || !version) return new HttpResponse(null, { status: 404 })
+
+      version.textureMappings = version.textureMappings.filter(
+        m =>
+          !(
+            m.materialName === materialName &&
+            m.variantName === variantName &&
+            m.textureSetId === setId
+          )
+      )
+      version.textureSetIds = [
+        ...new Set(version.textureMappings.map(m => m.textureSetId)),
+      ]
+      await put('modelVersions', version)
+
+      ts.associatedModels = ts.associatedModels.filter(
+        am =>
+          !(am.modelVersionId === versionId && am.materialName === materialName)
+      )
       await put('textureSets', ts)
+
+      return new HttpResponse(null, { status: 204 })
     }
+  ),
 
-    // Update model's textureSets ref
-    if (model && !model.textureSets.some(r => r.id === setId)) {
-      model.textureSets.push({ id: setId, name: ts.name })
-      await put('models', model)
-    }
+  http.post(
+    '*/texture-sets/:setId/models/:modelId/all-versions',
+    async ({ params, request }) => {
+      const setId = Number(params.setId)
+      const modelId = Number(params.modelId)
+      const url = new URL(request.url)
+      const materialName = url.searchParams.get('materialName') || 'Material'
 
-    return new HttpResponse(null, { status: 204 })
-  }),
+      const ts = await getById('textureSets', setId)
+      const model = await getById('models', modelId)
+      if (!ts || !model) return new HttpResponse(null, { status: 404 })
 
-  http.delete('*/texture-sets/:setId/model-versions/:versionId', async ({ params, request }) => {
-    const url = new URL(request.url)
-    const setId = Number(params.setId)
-    const versionId = Number(params.versionId)
-    const materialName = url.searchParams.get('materialName') || 'Material'
-    const variantName = url.searchParams.get('variantName') || 'Default'
-
-    const ts = await getById('textureSets', setId)
-    const version = await getById('modelVersions', versionId)
-    if (!ts || !version) return new HttpResponse(null, { status: 404 })
-
-    version.textureMappings = version.textureMappings.filter(
-      m => !(m.materialName === materialName && m.variantName === variantName && m.textureSetId === setId),
-    )
-    version.textureSetIds = [...new Set(version.textureMappings.map(m => m.textureSetId))]
-    await put('modelVersions', version)
-
-    ts.associatedModels = ts.associatedModels.filter(
-      am => !(am.modelVersionId === versionId && am.materialName === materialName),
-    )
-    await put('textureSets', ts)
-
-    return new HttpResponse(null, { status: 204 })
-  }),
-
-  http.post('*/texture-sets/:setId/models/:modelId/all-versions', async ({ params, request }) => {
-    const setId = Number(params.setId)
-    const modelId = Number(params.modelId)
-    const url = new URL(request.url)
-    const materialName = url.searchParams.get('materialName') || 'Material'
-
-    const ts = await getById('textureSets', setId)
-    const model = await getById('models', modelId)
-    if (!ts || !model) return new HttpResponse(null, { status: 404 })
-
-    const versions = await getVersionsByModelId(modelId)
-    for (const v of versions) {
-      if (!v.textureMappings.some(m => m.materialName === materialName && m.textureSetId === setId)) {
-        v.textureMappings.push({ materialName, textureSetId: setId, variantName: 'Default' })
-        if (!v.textureSetIds.includes(setId)) v.textureSetIds.push(setId)
-        await put('modelVersions', v)
+      const versions = await getVersionsByModelId(modelId)
+      for (const v of versions) {
+        if (
+          !v.textureMappings.some(
+            m => m.materialName === materialName && m.textureSetId === setId
+          )
+        ) {
+          v.textureMappings.push({
+            materialName,
+            textureSetId: setId,
+            variantName: 'Default',
+          })
+          if (!v.textureSetIds.includes(setId)) v.textureSetIds.push(setId)
+          await put('modelVersions', v)
+        }
+        if (
+          !ts.associatedModels.some(
+            am => am.modelVersionId === v.id && am.materialName === materialName
+          )
+        ) {
+          ts.associatedModels.push({
+            id: model.id,
+            name: model.name,
+            versionNumber: v.versionNumber,
+            modelVersionId: v.id,
+            materialName,
+          })
+        }
       }
-      if (!ts.associatedModels.some(am => am.modelVersionId === v.id && am.materialName === materialName)) {
-        ts.associatedModels.push({ id: model.id, name: model.name, versionNumber: v.versionNumber, modelVersionId: v.id, materialName })
+      await put('textureSets', ts)
+
+      if (!model.textureSets.some(r => r.id === setId)) {
+        model.textureSets.push({ id: setId, name: ts.name })
+        await put('models', model)
       }
-    }
-    await put('textureSets', ts)
 
-    if (!model.textureSets.some(r => r.id === setId)) {
-      model.textureSets.push({ id: setId, name: ts.name })
-      await put('models', model)
+      return new HttpResponse(null, { status: 204 })
     }
-
-    return new HttpResponse(null, { status: 204 })
-  }),
+  ),
 
   // Texture set thumbnail regenerate
   http.post('*/texture-sets/:id/thumbnail/regenerate', async () => {
@@ -875,9 +1074,12 @@ export const dynamicDemoHandlers = [
     const spriteId = await nextId('sprites')
     const fileId = await nextId('files')
     const ts = now()
-    const name = url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
+    const name =
+      url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
     const spriteType = Number(url.searchParams.get('spriteType') || '0')
-    const categoryId = url.searchParams.get('categoryId') ? Number(url.searchParams.get('categoryId')) : null
+    const categoryId = url.searchParams.get('categoryId')
+      ? Number(url.searchParams.get('categoryId'))
+      : null
 
     await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
 
@@ -888,8 +1090,16 @@ export const dynamicDemoHandlers = [
     }
 
     const sprite: DemoSprite = {
-      id: spriteId, name, fileId, spriteType, categoryId, categoryName,
-      fileName: file.name, fileSizeBytes: file.size, createdAt: ts, updatedAt: ts,
+      id: spriteId,
+      name,
+      fileId,
+      spriteType,
+      categoryId,
+      categoryName,
+      fileName: file.name,
+      fileSizeBytes: file.size,
+      createdAt: ts,
+      updatedAt: ts,
     }
     await put('sprites', sprite)
 
@@ -913,13 +1123,20 @@ export const dynamicDemoHandlers = [
       }
     }
 
-    return HttpResponse.json({ spriteId, name, fileId, spriteType, fileSizeBytes: file.size }, { status: 201 })
+    return HttpResponse.json(
+      { spriteId, name, fileId, spriteType, fileSizeBytes: file.size },
+      { status: 201 }
+    )
   }),
 
   http.put('*/sprites/:id', async ({ params, request }) => {
     const sprite = await getById('sprites', Number(params.id))
     if (!sprite) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { name?: string; spriteType?: number; categoryId?: number | null }
+    const body = (await request.json()) as {
+      name?: string
+      spriteType?: number
+      categoryId?: number | null
+    }
     if (body.name !== undefined) sprite.name = body.name
     if (body.spriteType !== undefined) sprite.spriteType = body.spriteType
     if (body.categoryId !== undefined) {
@@ -933,7 +1150,12 @@ export const dynamicDemoHandlers = [
     }
     sprite.updatedAt = now()
     await put('sprites', sprite)
-    return HttpResponse.json({ id: sprite.id, name: sprite.name, spriteType: sprite.spriteType, categoryId: sprite.categoryId })
+    return HttpResponse.json({
+      id: sprite.id,
+      name: sprite.name,
+      spriteType: sprite.spriteType,
+      categoryId: sprite.categoryId,
+    })
   }),
 
   http.delete('*/sprites/:id/soft', async ({ params }) => {
@@ -953,10 +1175,19 @@ export const dynamicDemoHandlers = [
   }),
 
   http.post('*/sprite-categories', async ({ request }) => {
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     const id = await nextId('spriteCategories')
     const ts = now()
-    const cat = { id, name: body.name, description: body.description ?? null, createdAt: ts, updatedAt: ts }
+    const cat = {
+      id,
+      name: body.name,
+      description: body.description ?? null,
+      createdAt: ts,
+      updatedAt: ts,
+    }
     await put('spriteCategories', cat)
     return HttpResponse.json(cat, { status: 201 })
   }),
@@ -964,7 +1195,10 @@ export const dynamicDemoHandlers = [
   http.put('*/sprite-categories/:id', async ({ params, request }) => {
     const cat = await getById('spriteCategories', Number(params.id))
     if (!cat) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     cat.name = body.name
     if (body.description !== undefined) cat.description = body.description
     cat.updatedAt = now()
@@ -1038,7 +1272,9 @@ export const dynamicDemoHandlers = [
     const id = Number(params.id)
     const thumb = await getThumbnail(`waveform:${id}`)
     if (thumb) {
-      return new HttpResponse(thumb, { headers: { 'Content-Type': 'image/png' } })
+      return new HttpResponse(thumb, {
+        headers: { 'Content-Type': 'image/png' },
+      })
     }
     return new HttpResponse(null, { status: 404 })
   }),
@@ -1052,8 +1288,11 @@ export const dynamicDemoHandlers = [
     const soundId = await nextId('sounds')
     const fileId = await nextId('files')
     const ts = now()
-    const name = url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
-    const categoryId = url.searchParams.get('categoryId') ? Number(url.searchParams.get('categoryId')) : null
+    const name =
+      url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
+    const categoryId = url.searchParams.get('categoryId')
+      ? Number(url.searchParams.get('categoryId'))
+      : null
 
     await storeFileBlob(fileId, file, file.name, file.type || 'audio/wav')
 
@@ -1068,21 +1307,33 @@ export const dynamicDemoHandlers = [
     const peaksParam = url.searchParams.get('peaks')
 
     const sound: DemoSound = {
-      id: soundId, name, fileId, categoryId, categoryName, duration, peaks: peaksParam,
-      fileName: file.name, fileSizeBytes: file.size, createdAt: ts, updatedAt: ts, waveformUrl: null,
+      id: soundId,
+      name,
+      fileId,
+      categoryId,
+      categoryName,
+      duration,
+      peaks: peaksParam,
+      fileName: file.name,
+      fileSizeBytes: file.size,
+      createdAt: ts,
+      updatedAt: ts,
+      waveformUrl: null,
     }
     await put('sounds', sound)
 
     // Generate waveform asynchronously
-    generateWaveformThumbnail(file).then(async result => {
-      sound.duration = result.duration
-      sound.peaks = JSON.stringify(result.peaks)
-      sound.waveformUrl = `__demo_waveform_${soundId}__`
-      await put('sounds', sound)
-      await storeThumbnail(`waveform:${soundId}`, result.thumbnail)
-    }).catch(() => {
-      // Waveform generation failed, leave as-is
-    })
+    generateWaveformThumbnail(file)
+      .then(async result => {
+        sound.duration = result.duration
+        sound.peaks = JSON.stringify(result.peaks)
+        sound.waveformUrl = `__demo_waveform_${soundId}__`
+        await put('sounds', sound)
+        await storeThumbnail(`waveform:${soundId}`, result.thumbnail)
+      })
+      .catch(() => {
+        // Waveform generation failed, leave as-is
+      })
 
     // Auto-add to pack/project if specified
     const packId = url.searchParams.get('packId')
@@ -1104,13 +1355,19 @@ export const dynamicDemoHandlers = [
       }
     }
 
-    return HttpResponse.json({ soundId, name, fileId, duration, fileSizeBytes: file.size }, { status: 201 })
+    return HttpResponse.json(
+      { soundId, name, fileId, duration, fileSizeBytes: file.size },
+      { status: 201 }
+    )
   }),
 
   http.put('*/sounds/:id', async ({ params, request }) => {
     const sound = await getById('sounds', Number(params.id))
     if (!sound) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { name?: string; categoryId?: number | null }
+    const body = (await request.json()) as {
+      name?: string
+      categoryId?: number | null
+    }
     if (body.name !== undefined) sound.name = body.name
     if (body.categoryId !== undefined) {
       sound.categoryId = body.categoryId
@@ -1143,10 +1400,19 @@ export const dynamicDemoHandlers = [
   }),
 
   http.post('*/sound-categories', async ({ request }) => {
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     const id = await nextId('soundCategories')
     const ts = now()
-    const cat = { id, name: body.name, description: body.description ?? null, createdAt: ts, updatedAt: ts }
+    const cat = {
+      id,
+      name: body.name,
+      description: body.description ?? null,
+      createdAt: ts,
+      updatedAt: ts,
+    }
     await put('soundCategories', cat)
     return HttpResponse.json(cat, { status: 201 })
   }),
@@ -1154,7 +1420,10 @@ export const dynamicDemoHandlers = [
   http.put('*/sound-categories/:id', async ({ params, request }) => {
     const cat = await getById('soundCategories', Number(params.id))
     if (!cat) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     cat.name = body.name
     if (body.description !== undefined) cat.description = body.description
     cat.updatedAt = now()
@@ -1183,22 +1452,42 @@ export const dynamicDemoHandlers = [
   }),
 
   http.post('*/packs', async ({ request }) => {
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     const id = await nextId('packs')
     const ts = now()
     const pack: DemoPack = {
-      id, name: body.name, description: body.description ?? '', createdAt: ts, updatedAt: ts,
-      modelCount: 0, textureSetCount: 0, spriteCount: 0, soundCount: 0, isEmpty: true,
-      models: [], textureSets: [], sprites: [], sounds: [],
+      id,
+      name: body.name,
+      description: body.description ?? '',
+      createdAt: ts,
+      updatedAt: ts,
+      modelCount: 0,
+      textureSetCount: 0,
+      spriteCount: 0,
+      soundCount: 0,
+      isEmpty: true,
+      models: [],
+      textureSets: [],
+      sprites: [],
+      sounds: [],
     }
     await put('packs', pack)
-    return HttpResponse.json({ id, name: body.name, description: body.description }, { status: 201 })
+    return HttpResponse.json(
+      { id, name: body.name, description: body.description },
+      { status: 201 }
+    )
   }),
 
   http.put('*/packs/:id', async ({ params, request }) => {
     const pack = await getById('packs', Number(params.id))
     if (!pack) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     pack.name = body.name
     if (body.description !== undefined) pack.description = body.description
     pack.updatedAt = now()
@@ -1265,7 +1554,9 @@ export const dynamicDemoHandlers = [
   http.delete('*/packs/:packId/texture-sets/:tsId', async ({ params }) => {
     const pack = await getById('packs', Number(params.packId))
     if (!pack) return new HttpResponse(null, { status: 404 })
-    pack.textureSets = pack.textureSets.filter(t => t.id !== Number(params.tsId))
+    pack.textureSets = pack.textureSets.filter(
+      t => t.id !== Number(params.tsId)
+    )
     recomputePackCounts(pack)
     pack.updatedAt = now()
     await put('packs', pack)
@@ -1326,40 +1617,65 @@ export const dynamicDemoHandlers = [
   }),
 
   // Pack texture with file upload
-  http.post('*/packs/:packId/textures/with-file', async ({ params, request }) => {
-    const packId = Number(params.packId)
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-    if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
+  http.post(
+    '*/packs/:packId/textures/with-file',
+    async ({ params, request }) => {
+      const packId = Number(params.packId)
+      const formData = await request.formData()
+      const file = formData.get('file') as File | null
+      if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
 
-    const name = formData.get('name') as string || file.name.replace(/\.[^.]+$/, '')
-    const textureType = Number(formData.get('textureType') || '1')
-    const tsId = await nextId('textureSets')
-    const fileId = await nextId('files')
-    const textureId = await nextId('textures')
-    const ts = now()
+      const name =
+        (formData.get('name') as string) || file.name.replace(/\.[^.]+$/, '')
+      const textureType = Number(formData.get('textureType') || '1')
+      const tsId = await nextId('textureSets')
+      const fileId = await nextId('files')
+      const textureId = await nextId('textures')
+      const ts = now()
 
-    await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
+      await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
 
-    const textureSet: DemoTextureSet = {
-      id: tsId, name, kind: 0, tilingScaleX: 1, tilingScaleY: 1, uvMappingMode: 0, uvScale: 1,
-      createdAt: ts, updatedAt: ts, textureCount: 1, isEmpty: false,
-      thumbnailPath: null, pngThumbnailPath: null,
-      textures: [{ id: textureId, textureType, sourceChannel: 5, fileId, fileName: file.name, createdAt: ts, proxies: [] }],
-      associatedModels: [], packs: [{ id: packId, name: '' }],
+      const textureSet: DemoTextureSet = {
+        id: tsId,
+        name,
+        kind: 0,
+        tilingScaleX: 1,
+        tilingScaleY: 1,
+        uvMappingMode: 0,
+        uvScale: 1,
+        createdAt: ts,
+        updatedAt: ts,
+        textureCount: 1,
+        isEmpty: false,
+        thumbnailPath: null,
+        pngThumbnailPath: null,
+        textures: [
+          {
+            id: textureId,
+            textureType,
+            sourceChannel: 5,
+            fileId,
+            fileName: file.name,
+            createdAt: ts,
+            proxies: [],
+          },
+        ],
+        associatedModels: [],
+        packs: [{ id: packId, name: '' }],
+      }
+      const pack = await getById('packs', packId)
+      if (pack) {
+        textureSet.packs = [{ id: packId, name: pack.name }]
+        pack.textureSets.push({ id: tsId, name })
+        recomputePackCounts(pack)
+        pack.updatedAt = ts
+        await put('packs', pack)
+      }
+      await put('textureSets', textureSet)
+
+      return HttpResponse.json({ textureSetId: tsId }, { status: 201 })
     }
-    const pack = await getById('packs', packId)
-    if (pack) {
-      textureSet.packs = [{ id: packId, name: pack.name }]
-      pack.textureSets.push({ id: tsId, name })
-      recomputePackCounts(pack)
-      pack.updatedAt = ts
-      await put('packs', pack)
-    }
-    await put('textureSets', textureSet)
-
-    return HttpResponse.json({ textureSetId: tsId }, { status: 201 })
-  }),
+  ),
 
   // ════════════════════════════════════════════════════════════════════════
   //  PROJECTS
@@ -1377,22 +1693,42 @@ export const dynamicDemoHandlers = [
   }),
 
   http.post('*/projects', async ({ request }) => {
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     const id = await nextId('projects')
     const ts = now()
     const project: DemoProject = {
-      id, name: body.name, description: body.description ?? '', createdAt: ts, updatedAt: ts,
-      modelCount: 0, textureSetCount: 0, spriteCount: 0, soundCount: 0, isEmpty: true,
-      models: [], textureSets: [], sprites: [], sounds: [],
+      id,
+      name: body.name,
+      description: body.description ?? '',
+      createdAt: ts,
+      updatedAt: ts,
+      modelCount: 0,
+      textureSetCount: 0,
+      spriteCount: 0,
+      soundCount: 0,
+      isEmpty: true,
+      models: [],
+      textureSets: [],
+      sprites: [],
+      sounds: [],
     }
     await put('projects', project)
-    return HttpResponse.json({ id, name: body.name, description: body.description }, { status: 201 })
+    return HttpResponse.json(
+      { id, name: body.name, description: body.description },
+      { status: 201 }
+    )
   }),
 
   http.put('*/projects/:id', async ({ params, request }) => {
     const project = await getById('projects', Number(params.id))
     if (!project) return new HttpResponse(null, { status: 404 })
-    const body = await request.json() as { name: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
     project.name = body.name
     if (body.description !== undefined) project.description = body.description
     project.updatedAt = now()
@@ -1443,15 +1779,20 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*/projects/:projectId/texture-sets/:tsId', async ({ params }) => {
-    const project = await getById('projects', Number(params.projectId))
-    if (!project) return new HttpResponse(null, { status: 404 })
-    project.textureSets = project.textureSets.filter(t => t.id !== Number(params.tsId))
-    recomputeProjectCounts(project)
-    project.updatedAt = now()
-    await put('projects', project)
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.delete(
+    '*/projects/:projectId/texture-sets/:tsId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.projectId))
+      if (!project) return new HttpResponse(null, { status: 404 })
+      project.textureSets = project.textureSets.filter(
+        t => t.id !== Number(params.tsId)
+      )
+      recomputeProjectCounts(project)
+      project.updatedAt = now()
+      await put('projects', project)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
 
   // Project ↔ Sprite
   http.post('*/projects/:projectId/sprites/:spriteId', async ({ params }) => {
@@ -1470,7 +1811,9 @@ export const dynamicDemoHandlers = [
   http.delete('*/projects/:projectId/sprites/:spriteId', async ({ params }) => {
     const project = await getById('projects', Number(params.projectId))
     if (!project) return new HttpResponse(null, { status: 404 })
-    project.sprites = project.sprites.filter(s => s.id !== Number(params.spriteId))
+    project.sprites = project.sprites.filter(
+      s => s.id !== Number(params.spriteId)
+    )
     recomputeProjectCounts(project)
     project.updatedAt = now()
     await put('projects', project)
@@ -1502,39 +1845,64 @@ export const dynamicDemoHandlers = [
   }),
 
   // Project texture with file upload
-  http.post('*/projects/:projectId/textures/with-file', async ({ params, request }) => {
-    const projectId = Number(params.projectId)
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-    if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
+  http.post(
+    '*/projects/:projectId/textures/with-file',
+    async ({ params, request }) => {
+      const projectId = Number(params.projectId)
+      const formData = await request.formData()
+      const file = formData.get('file') as File | null
+      if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
 
-    const name = formData.get('name') as string || file.name.replace(/\.[^.]+$/, '')
-    const textureType = Number(formData.get('textureType') || '1')
-    const tsId = await nextId('textureSets')
-    const fileId = await nextId('files')
-    const textureId = await nextId('textures')
-    const ts = now()
+      const name =
+        (formData.get('name') as string) || file.name.replace(/\.[^.]+$/, '')
+      const textureType = Number(formData.get('textureType') || '1')
+      const tsId = await nextId('textureSets')
+      const fileId = await nextId('files')
+      const textureId = await nextId('textures')
+      const ts = now()
 
-    await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
+      await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
 
-    const textureSet: DemoTextureSet = {
-      id: tsId, name, kind: 0, tilingScaleX: 1, tilingScaleY: 1, uvMappingMode: 0, uvScale: 1,
-      createdAt: ts, updatedAt: ts, textureCount: 1, isEmpty: false,
-      thumbnailPath: null, pngThumbnailPath: null,
-      textures: [{ id: textureId, textureType, sourceChannel: 5, fileId, fileName: file.name, createdAt: ts, proxies: [] }],
-      associatedModels: [], packs: [],
+      const textureSet: DemoTextureSet = {
+        id: tsId,
+        name,
+        kind: 0,
+        tilingScaleX: 1,
+        tilingScaleY: 1,
+        uvMappingMode: 0,
+        uvScale: 1,
+        createdAt: ts,
+        updatedAt: ts,
+        textureCount: 1,
+        isEmpty: false,
+        thumbnailPath: null,
+        pngThumbnailPath: null,
+        textures: [
+          {
+            id: textureId,
+            textureType,
+            sourceChannel: 5,
+            fileId,
+            fileName: file.name,
+            createdAt: ts,
+            proxies: [],
+          },
+        ],
+        associatedModels: [],
+        packs: [],
+      }
+      const project = await getById('projects', projectId)
+      if (project) {
+        project.textureSets.push({ id: tsId, name })
+        recomputeProjectCounts(project)
+        project.updatedAt = ts
+        await put('projects', project)
+      }
+      await put('textureSets', textureSet)
+
+      return HttpResponse.json({ textureSetId: tsId }, { status: 201 })
     }
-    const project = await getById('projects', projectId)
-    if (project) {
-      project.textureSets.push({ id: tsId, name })
-      recomputeProjectCounts(project)
-      project.updatedAt = ts
-      await put('projects', project)
-    }
-    await put('textureSets', textureSet)
-
-    return HttpResponse.json({ textureSetId: tsId }, { status: 201 })
-  }),
+  ),
 
   // ════════════════════════════════════════════════════════════════════════
   //  STAGES
@@ -1545,16 +1913,25 @@ export const dynamicDemoHandlers = [
   }),
 
   http.get('*/stages/:id', async () => {
-    return HttpResponse.json({ id: 1, name: 'Default', configurationJson: '{}', createdAt: now(), updatedAt: now() })
+    return HttpResponse.json({
+      id: 1,
+      name: 'Default',
+      configurationJson: '{}',
+      createdAt: now(),
+      updatedAt: now(),
+    })
   }),
 
   http.post('*/stages', async ({ request }) => {
-    const body = await request.json() as { name: string }
-    return HttpResponse.json({ id: Date.now(), name: body.name }, { status: 201 })
+    const body = (await request.json()) as { name: string }
+    return HttpResponse.json(
+      { id: Date.now(), name: body.name },
+      { status: 201 }
+    )
   }),
 
   http.put('*/stages/:id', async ({ request }) => {
-    const body = await request.json() as { configurationJson: string }
+    const body = (await request.json()) as { configurationJson: string }
     return HttpResponse.json({ id: Number('1'), name: 'Stage', ...body })
   }),
 
@@ -1583,7 +1960,7 @@ export const dynamicDemoHandlers = [
 
   http.put('*/settings', async ({ request }) => {
     const body = await request.json()
-    return HttpResponse.json({ ...body as object, updatedAt: now() })
+    return HttpResponse.json({ ...(body as object), updatedAt: now() })
   }),
 
   // ════════════════════════════════════════════════════════════════════════
@@ -1592,7 +1969,13 @@ export const dynamicDemoHandlers = [
 
   http.get('*/recycled', async () => {
     return HttpResponse.json({
-      models: [], modelVersions: [], files: [], textureSets: [], textures: [], sprites: [], sounds: [],
+      models: [],
+      modelVersions: [],
+      files: [],
+      textureSets: [],
+      textures: [],
+      sprites: [],
+      sounds: [],
     })
   }),
 
@@ -1601,7 +1984,11 @@ export const dynamicDemoHandlers = [
   }),
 
   http.get('*/recycled/:type/:id/preview', async () => {
-    return HttpResponse.json({ entityName: 'Unknown', filesToDelete: [], relatedEntities: [] })
+    return HttpResponse.json({
+      entityName: 'Unknown',
+      filesToDelete: [],
+      relatedEntities: [],
+    })
   }),
 
   http.delete('*/recycled/:type/:id/permanent', async () => {
