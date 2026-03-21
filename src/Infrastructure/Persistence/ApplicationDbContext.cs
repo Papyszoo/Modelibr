@@ -25,6 +25,7 @@ namespace Infrastructure.Persistence
         public DbSet<Sound> Sounds => Set<Sound>();
         public DbSet<SoundCategory> SoundCategories => Set<SoundCategory>();
         public DbSet<TextureProxy> TextureProxies => Set<TextureProxy>();
+        public DbSet<ModelVersionTextureSet> ModelVersionTextureSets => Set<ModelVersionTextureSet>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,11 +35,30 @@ namespace Infrastructure.Persistence
                 .WithMany(tp => tp.Models)
                 .UsingEntity(j => j.ToTable("ModelTextureSets"));
 
-            // Configure many-to-many relationship between ModelVersion and TextureSet
-            modelBuilder.Entity<ModelVersion>()
-                .HasMany(mv => mv.TextureSets)
-                .WithMany(ts => ts.ModelVersions)
-                .UsingEntity(j => j.ToTable("ModelVersionTextureSets"));
+            // Configure many-to-many relationship between ModelVersion and TextureSet via explicit join entity
+            modelBuilder.Entity<ModelVersionTextureSet>(entity =>
+            {
+                entity.HasKey(mvts => new { mvts.ModelVersionId, mvts.TextureSetId, mvts.MaterialName, mvts.VariantName });
+                entity.ToTable("ModelVersionTextureSets");
+
+                entity.Property(mvts => mvts.MaterialName)
+                    .HasMaxLength(200)
+                    .HasDefaultValue(string.Empty);
+
+                entity.Property(mvts => mvts.VariantName)
+                    .HasMaxLength(200)
+                    .HasDefaultValue(string.Empty);
+
+                entity.HasOne(mvts => mvts.ModelVersion)
+                    .WithMany(mv => mv.TextureMappings)
+                    .HasForeignKey(mvts => mvts.ModelVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(mvts => mvts.TextureSet)
+                    .WithMany(ts => ts.ModelVersionMappings)
+                    .HasForeignKey(mvts => mvts.TextureSetId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             // Configure many-to-many relationship between Model and Pack
             modelBuilder.Entity<Model>()
@@ -127,6 +147,20 @@ namespace Infrastructure.Persistence
                 entity.Property(v => v.CreatedAt).IsRequired();
                 entity.Property(v => v.IsDeleted).IsRequired();
                 entity.Property(v => v.DeletedAt);
+
+                // Map MaterialNames as a PostgreSQL text array column
+                entity.Property(v => v.MaterialNames)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+
+                // Map VariantNames as a PostgreSQL text array column
+                entity.Property(v => v.VariantNames)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+
+                // Map MainVariantName
+                entity.Property(v => v.MainVariantName)
+                    .HasMaxLength(200);
 
                 // Create unique index on ModelId and VersionNumber
                 entity.HasIndex(v => new { v.ModelId, v.VersionNumber }).IsUnique();

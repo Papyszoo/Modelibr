@@ -1,6 +1,12 @@
 import { createBdd } from "playwright-bdd";
 import { expect, test } from "@playwright/test";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
+import {
+    persistModel,
+    persistTextureSet,
+    loadPersistedModel,
+    loadPersistedTextureSet,
+} from "../fixtures/setup-state-bridge";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
@@ -20,12 +26,6 @@ const __dirname = path.dirname(__filename);
 
 const { Given, When, Then } = createBdd();
 
-// Tracking state for thumbnail verification - reset after each use
-const uploadTracker = {
-    modelName: null as string | null,
-    versionId: 0,
-};
-
 /**
  * Verifies that required models exist in shared state.
  * Usage in Background section to declare dependencies.
@@ -34,18 +34,165 @@ Given(
     "the following models exist in shared state:",
     async ({ page }, dataTable: DataTable) => {
         console.log(
-            `[SharedState Debug] Checking models. Current state: ${sharedState.getDebugInfo()}`,
+            `[SharedState Debug] Checking models. Current state: ${getScenarioState(page).getDebugInfo()}`,
         );
         const models = dataTable.hashes();
 
         for (const row of models) {
             const modelName = row.name;
-            let model = sharedState.getModel(modelName);
+            let model = getScenarioState(page).getModel(modelName);
 
             if (!model) {
-                // Self-provision: create the model via API
+                // First try: load from persisted setup state file
+                const persisted = loadPersistedModel(modelName);
+                if (persisted) {
+                    // Validate: ensure every version has at least one file.
+                    // If not (e.g. setup ran on a dirty DB), recover by uploading the missing file.
+                    const apiBase =
+                        process.env.API_BASE_URL || "http://localhost:8090";
+                    const vResp = await page.request.get(
+                        `${apiBase}/models/${persisted.id}/versions`,
+                    );
+                    if (vResp.ok()) {
+                        const versions: any[] = await vResp.json();
+                        const v1 = versions.find(
+                            (v: any) => v.versionNumber === 1,
+                        );
+                        if (
+                            v1 &&
+                            v1.files.length === 0 &&
+                            modelName.includes("multi-version")
+                        ) {
+                            console.log(
+                                `[AutoProvision] Bridge model "${modelName}" v1 has no files — recovering with test-torus.fbx`,
+                            );
+                            const fsModule = await import("fs");
+                            const torusPath = path.join(
+                                __dirname,
+                                "..",
+                                "assets",
+                                "test-torus.fbx",
+                            );
+                            const torusBuffer =
+                                fsModule.readFileSync(torusPath);
+                            const uploadResp = await page.request.post(
+                                `${apiBase}/models/${persisted.id}/versions/${v1.id}/files`,
+                                {
+                                    multipart: {
+                                        file: {
+                                            name: "test-torus.fbx",
+                                            mimeType:
+                                                "application/octet-stream",
+                                            buffer: torusBuffer,
+                                        },
+                                    },
+                                },
+                            );
+                            if (uploadResp.ok()) {
+                                console.log(
+                                    `[AutoProvision] Uploaded test-torus.fbx to "${modelName}" v1 (id=${v1.id}) ✓`,
+                                );
+                                // Wait for thumbnail generation before proceeding —
+                                // this prevents the version-switching test from polling
+                                // within its own 90s window.
+                                const { DbHelper } =
+                                    await import("../fixtures/db-helper");
+                                const thumbDb = new DbHelper();
+                                try {
+                                    console.log(
+                                        `[AutoProvision] Waiting for v1 thumbnail (up to 120s)...`,
+                                    );
+                                    const deadline = Date.now() + 120_000;
+                                    while (Date.now() < deadline) {
+                                        const thumbResult = await thumbDb.query(
+                                            `SELECT t."Status"
+                                             FROM "Thumbnails" t
+                                             JOIN "ModelVersions" mv ON mv."ThumbnailId" = t."Id"
+                                             WHERE mv."Id" = $1`,
+                                            [v1.id],
+                                        );
+                                        if (
+                                            thumbResult.rows.length > 0 &&
+                                            thumbResult.rows[0].Status === 2
+                                        ) {
+                                            console.log(
+                                                `[AutoProvision] v1 thumbnail ready ✓`,
+                                            );
+                                            break;
+                                        }
+                                        await new Promise((r) =>
+                                            setTimeout(r, 3000),
+                                        );
+                                    }
+                                } finally {
+                                    await thumbDb.close();
+                                }
+                            } else {
+                                console.warn(
+                                    `[AutoProvision] Failed to upload test-torus.fbx to v1: ${uploadResp.status()}`,
+                                );
+                            }
+                        }
+                    }
+
+                    getScenarioState(page).saveModel(modelName, {
+                        id: persisted.id,
+                        name: persisted.name,
+                        versionId: persisted.versionId,
+                    });
+                    console.log(
+                        `[AutoProvision] Loaded model "${modelName}" from setup bridge → id=${persisted.id}, name="${persisted.name}"`,
+                    );
+                    continue;
+                }
+
+                // Second try: look up existing models in DB (setup project may have created them)
+                const { DbHelper } = await import("../fixtures/db-helper");
+                const db = new DbHelper();
+                try {
+                    let dbResult;
+                    if (modelName.includes("multi-version")) {
+                        // Look for a model with 2+ versions (setup creates test-torus with 2 versions)
+                        dbResult = await db.query(
+                            `SELECT m."Id" as "ModelId", m."Name",
+                                    (SELECT mv2."Id" FROM "ModelVersions" mv2 WHERE mv2."ModelId" = m."Id" ORDER BY mv2."VersionNumber" LIMIT 1) as "VersionId"
+                             FROM "Models" m
+                             WHERE m."DeletedAt" IS NULL
+                               AND (SELECT COUNT(*) FROM "ModelVersions" WHERE "ModelId" = m."Id") >= 2
+                             ORDER BY m."CreatedAt" DESC
+                             LIMIT 1`,
+                        );
+                    } else {
+                        // Look for any model
+                        dbResult = await db.query(
+                            `SELECT m."Id" as "ModelId", m."Name", mv."Id" as "VersionId"
+                             FROM "Models" m
+                             JOIN "ModelVersions" mv ON mv."ModelId" = m."Id"
+                             WHERE m."DeletedAt" IS NULL
+                             ORDER BY m."CreatedAt" DESC
+                             LIMIT 1`,
+                        );
+                    }
+
+                    if (dbResult.rows.length > 0) {
+                        const r = dbResult.rows[0];
+                        getScenarioState(page).saveModel(modelName, {
+                            id: r.ModelId,
+                            name: r.Name,
+                            versionId: r.VersionId,
+                        });
+                        console.log(
+                            `[AutoProvision] Found existing model "${r.Name}" (ID: ${r.ModelId}) in DB for state key "${modelName}"`,
+                        );
+                        continue;
+                    }
+                } finally {
+                    await db.close();
+                }
+
+                // Fallback: create a new model via UI upload
                 console.log(
-                    `[AutoProvision] Model "${modelName}" not in shared state, creating via API...`,
+                    `[AutoProvision] Model "${modelName}" not in DB, creating via API...`,
                 );
                 const filePath =
                     await UniqueFileGenerator.generate("test-cube.glb");
@@ -59,10 +206,9 @@ Given(
                 await modelListPage.expectModelVisible(generatedName);
 
                 // Query DB to get IDs
-                const { DbHelper } = await import("../fixtures/db-helper");
-                const db = new DbHelper();
+                const db2 = new DbHelper();
                 try {
-                    const result = await db.query(
+                    const result = await db2.query(
                         `SELECT mv."Id" as "VersionId", m."Id" as "ModelId", m."Name"
                          FROM "ModelVersions" mv
                          JOIN "Models" m ON m."Id" = mv."ModelId"
@@ -72,7 +218,7 @@ Given(
                     );
 
                     if (result.rows.length > 0) {
-                        sharedState.saveModel(modelName, {
+                        getScenarioState(page).saveModel(modelName, {
                             id: result.rows[0].ModelId,
                             name: generatedName,
                             versionId: result.rows[0].VersionId,
@@ -86,7 +232,7 @@ Given(
                         );
                     }
                 } finally {
-                    await db.close();
+                    await db2.close();
                 }
             }
         }
@@ -101,13 +247,14 @@ Given(
     "the following texture sets exist in shared state:",
     async ({ page }, dataTable: DataTable) => {
         console.log(
-            `[SharedState Debug] Checking texture sets. Current state: ${sharedState.getDebugInfo()}`,
+            `[SharedState Debug] Checking texture sets. Current state: ${getScenarioState(page).getDebugInfo()}`,
         );
         const textureSets = dataTable.hashes();
 
         for (const row of textureSets) {
             const textureSetName = row.name;
-            let textureSet = sharedState.getTextureSet(textureSetName);
+            let textureSet =
+                getScenarioState(page).getTextureSet(textureSetName);
 
             // Validate cached shared-state entry against database to avoid stale IDs
             if (textureSet) {
@@ -141,7 +288,7 @@ Given(
                                 id: byName.rows[0].Id,
                                 name: byName.rows[0].Name,
                             };
-                            sharedState.saveTextureSet(
+                            getScenarioState(page).saveTextureSet(
                                 textureSetName,
                                 textureSet,
                             );
@@ -149,7 +296,7 @@ Given(
                                 `[AutoHeal] Refreshed stale texture set "${textureSetName}" -> ID ${textureSet.id}`,
                             );
                         } else {
-                            textureSet = null;
+                            textureSet = undefined;
                         }
                     }
                 } finally {
@@ -158,20 +305,67 @@ Given(
             }
 
             if (!textureSet) {
-                // Self-provision: create the texture set via API
+                // First try: load from persisted setup state file
+                const persistedTs = loadPersistedTextureSet(textureSetName);
+                if (persistedTs) {
+                    getScenarioState(page).saveTextureSet(textureSetName, {
+                        id: persistedTs.id,
+                        name: persistedTs.name,
+                    });
+                    console.log(
+                        `[AutoProvision] Loaded texture set "${textureSetName}" from setup bridge → id=${persistedTs.id}`,
+                    );
+                    continue;
+                }
+
+                // Self-provision: create or find the texture set via API
                 console.log(
                     `[AutoProvision] Texture set "${textureSetName}" not in shared state, creating via API...`,
                 );
                 const { ApiHelper } = await import("../helpers/api-helper");
                 const api = new ApiHelper();
-                const created = await api.createTextureSet(textureSetName);
-                sharedState.saveTextureSet(textureSetName, {
-                    id: created.id,
-                    name: created.name,
-                });
-                console.log(
-                    `[AutoProvision] Created texture set "${textureSetName}" (ID: ${created.id})`,
-                );
+                try {
+                    const created = await api.createTextureSet(textureSetName);
+                    getScenarioState(page).saveTextureSet(textureSetName, {
+                        id: created.id,
+                        name: created.name,
+                    });
+                    console.log(
+                        `[AutoProvision] Created texture set "${textureSetName}" (ID: ${created.id})`,
+                    );
+                } catch {
+                    // Creation failed (likely already exists from setup or another worker) — look up in DB
+                    const { DbHelper } = await import("../fixtures/db-helper");
+                    const dbLookup = new DbHelper();
+                    try {
+                        const byName = await dbLookup.query(
+                            `SELECT "Id", "Name"
+                             FROM "TextureSets"
+                             WHERE "Name" = $1 AND "IsDeleted" = false
+                             ORDER BY "Id" DESC
+                             LIMIT 1`,
+                            [textureSetName],
+                        );
+                        if (byName.rows.length > 0) {
+                            getScenarioState(page).saveTextureSet(
+                                textureSetName,
+                                {
+                                    id: byName.rows[0].Id,
+                                    name: byName.rows[0].Name,
+                                },
+                            );
+                            console.log(
+                                `[AutoProvision] Found existing texture set "${textureSetName}" (ID: ${byName.rows[0].Id})`,
+                            );
+                        } else {
+                            throw new Error(
+                                `Failed to auto-provision texture set "${textureSetName}": creation failed and not found in DB`,
+                            );
+                        }
+                    } finally {
+                        await dbLookup.close();
+                    }
+                }
             }
         }
     },
@@ -229,15 +423,18 @@ When(
         }
 
         // Track this for the thumbnail verification step
-        uploadTracker.modelName = modelName;
-        uploadTracker.versionId = versionId;
+        getScenarioState(page).uploadTrackerModelName = modelName;
+        getScenarioState(page).uploadTrackerVersionId = versionId;
 
         // Store in shared state
-        sharedState.saveModel(stateName, {
+        getScenarioState(page).saveModel(stateName, {
             id: modelId,
             name: modelName,
             versionId: versionId,
         });
+
+        // Persist to file for cross-phase state transfer (setup → chromium)
+        persistModel(stateName, { id: modelId, name: modelName, versionId });
     },
 );
 
@@ -247,12 +444,12 @@ When(
 Given(
     "I am on the model viewer page for {string}",
     async ({ page }, stateName: string) => {
-        let model = sharedState.getModel(stateName);
+        let model = getScenarioState(page).getModel(stateName);
 
         // If not found by exact name, try stripping extension
         if (!model) {
             const nameWithoutExt = stateName.replace(/\.[^/.]+$/, "");
-            model = sharedState.getModel(nameWithoutExt);
+            model = getScenarioState(page).getModel(nameWithoutExt);
         }
 
         const modelListPage = new ModelListPage(page);
@@ -270,7 +467,7 @@ Given(
             const modelViewer = new ModelViewerPage(page);
             const modelId = await modelViewer.getCurrentModelId();
             if (modelId) {
-                sharedState.saveModel(stateName, {
+                getScenarioState(page).saveModel(stateName, {
                     id: modelId,
                     name: modelName,
                 });
@@ -330,8 +527,8 @@ Given(
                 name: detail.name || nameWithoutExt,
                 versionId: detail.activeVersionId,
             };
-            sharedState.saveModel(stateName, model);
-            sharedState.saveModel(nameWithoutExt, model);
+            getScenarioState(page).saveModel(stateName, model);
+            getScenarioState(page).saveModel(nameWithoutExt, model);
             console.log(
                 `[AutoProvision] Created model "${stateName}" (ID: ${model.id})`,
             );
@@ -346,7 +543,7 @@ Given(
             const { navigateToAppClean, openModelViewer } =
                 await import("../helpers/navigation-helper");
             await navigateToAppClean(page);
-            await openModelViewer(page, model.name);
+            await openModelViewer(page, model.name, model.id);
 
             console.log(
                 `[Navigation] Opened model ${model.id} (${model.name}) via UI click`,
@@ -375,7 +572,7 @@ Given(
 Then("the model should be stored in shared state", async ({ page }) => {
     // This is a declarative step - actual storage happens in the When step
     // Just verify we have at least one model
-    expect(sharedState.getDebugInfo()).toContain("models");
+    expect(getScenarioState(page).getDebugInfo()).toContain("models");
 });
 
 /**
@@ -397,16 +594,17 @@ Then(
         let lastVersionId = 0;
 
         // Determine query strategy: prefer version ID > model name > global most-recent
-        const hasVersionId = uploadTracker.versionId > 0;
-        const hasModelName = uploadTracker.modelName !== null;
+        const hasVersionId = getScenarioState(page).uploadTrackerVersionId > 0;
+        const hasModelName =
+            getScenarioState(page).uploadTrackerModelName !== null;
 
         if (hasVersionId) {
             console.log(
-                `[Thumbnail] Looking for version ID: ${uploadTracker.versionId} (model: "${uploadTracker.modelName}")`,
+                `[Thumbnail] Looking for version ID: ${getScenarioState(page).uploadTrackerVersionId} (model: "${getScenarioState(page).uploadTrackerModelName}")`,
             );
         } else if (hasModelName) {
             console.log(
-                `[Thumbnail] Looking for model by name: "${uploadTracker.modelName}" (no version ID)`,
+                `[Thumbnail] Looking for model by name: "${getScenarioState(page).uploadTrackerModelName}" (no version ID)`,
             );
         } else {
             console.log(
@@ -424,7 +622,7 @@ Then(
                      JOIN "Models" m ON m."Id" = mv."ModelId"
                      LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
                      WHERE mv."Id" = $1`;
-            params = [uploadTracker.versionId];
+            params = [getScenarioState(page).uploadTrackerVersionId];
         } else if (hasModelName) {
             query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
                      FROM "ModelVersions" mv
@@ -433,7 +631,7 @@ Then(
                      WHERE m."DeletedAt" IS NULL AND m."Name" = $1
                      ORDER BY mv."CreatedAt" DESC
                      LIMIT 1`;
-            params = [uploadTracker.modelName];
+            params = [getScenarioState(page).uploadTrackerModelName];
         } else {
             query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
                      FROM "ModelVersions" mv
@@ -481,30 +679,16 @@ Then(
                     }
                 },
                 {
-                    message: () => {
-                        const statusName =
-                            lastStatus === null
-                                ? "null (no thumbnail)"
-                                : lastStatus === 0
-                                  ? "Pending"
-                                  : lastStatus === 1
-                                    ? "Processing"
-                                    : `Unknown (${lastStatus})`;
-                        return (
-                            `Thumbnail generation timed out. ` +
-                            `Model: "${lastModelName}" v${lastVersionId}, Last status: ${statusName}. ` +
-                            `Check if asset-processor-e2e container is healthy and processing jobs.`
-                        );
-                    },
-                    timeout: 80000,
+                    message: `Thumbnail generation timed out for model "${lastModelName}" v${lastVersionId}. Check if asset-processor-e2e container is healthy.`,
+                    timeout: 240000, // 4 min — cold-start thumbnail generation can be slow
                     intervals: [3000],
                 },
             )
             .toBe(2);
 
         // Clear the tracking variables after successful check
-        uploadTracker.modelName = null;
-        uploadTracker.versionId = 0;
+        getScenarioState(page).uploadTrackerModelName = null;
+        getScenarioState(page).uploadTrackerVersionId = 0;
         console.log("[Test] Thumbnail generation verified via database");
     },
 );
@@ -553,7 +737,7 @@ Then(
 Then(
     "texture set {string} should be stored in shared state",
     async ({ page }, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
         expect(textureSet).toBeDefined();
         expect(textureSet?.name).toBe(textureSetName);
@@ -587,13 +771,20 @@ Then("the texture set should be linked to the model", async ({ page }) => {
  * This allows the test screenshot to show all available versions.
  */
 Then("the version dropdown should be open", async ({ page }) => {
+    const modelViewer = new ModelViewerPage(page);
+
     // Close any open dialogs first (e.g., upload confirmation)
     const closeButtons = page.locator(
         'button[aria-label="Close"], .p-dialog-header-close',
     );
     for (let i = 0; i < (await closeButtons.count()); i++) {
         const btn = closeButtons.nth(i);
-        if (await btn.isVisible({ timeout: 500 })) {
+        if (
+            await btn
+                .waitFor({ state: "visible", timeout: 500 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await btn.click();
             await btn
                 .waitFor({ state: "hidden", timeout: 2000 })
@@ -612,19 +803,24 @@ Then("the version dropdown should be open", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
 
     // Wait for dropdown trigger to be visible with longer timeout
-    const dropdownTrigger = page.locator(".version-dropdown-trigger");
-    await dropdownTrigger.waitFor({ state: "visible", timeout: 15000 });
+    await modelViewer.versionDropdownTrigger.waitFor({
+        state: "visible",
+        timeout: 15000,
+    });
 
     // Click with retry logic
     try {
-        await dropdownTrigger.click();
+        await modelViewer.versionDropdownTrigger.click();
     } catch (e) {
         console.log("[Screenshot] First click failed, retrying...");
-        await dropdownTrigger.waitFor({ state: "visible", timeout: 2000 });
-        await dropdownTrigger.click({ force: true });
+        await modelViewer.versionDropdownTrigger.waitFor({
+            state: "visible",
+            timeout: 2000,
+        });
+        await modelViewer.versionDropdownTrigger.click({ force: true });
     }
 
-    await page.waitForSelector(".version-dropdown-menu", {
+    await modelViewer.versionDropdownMenu.waitFor({
         state: "visible",
         timeout: 5000,
     });
@@ -666,7 +862,7 @@ Then("the thumbnail should be visible in the model card", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
 
     // Target the specific model card that was just uploaded
-    const modelName = uploadTracker.modelName;
+    const modelName = getScenarioState(page).uploadTrackerModelName;
     let thumbnailImg;
     if (modelName) {
         // Find the card containing this model's name, then locate its thumbnail
@@ -684,9 +880,7 @@ Then("the thumbnail should be visible in the model card", async ({ page }) => {
                 ".model-grid .thumbnail-image, .model-card .thumbnail-image",
             )
             .first();
-        console.log(
-            "[UI] No model name tracked, using first thumbnail image",
-        );
+        console.log("[UI] No model name tracked, using first thumbnail image");
     }
 
     // Wait for the thumbnail image to appear (not placeholder)

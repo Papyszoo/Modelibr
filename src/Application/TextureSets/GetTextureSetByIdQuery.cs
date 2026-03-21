@@ -54,12 +54,13 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
                     Size = p.Size
                 }).ToList()
             }).ToList(),
-            AssociatedModels = textureSet.ModelVersions.Select(mv => new ModelSummaryDto
+            AssociatedModels = textureSet.ModelVersionMappings.Select(m => new ModelSummaryDto
             {
-                Id = mv.Model.Id,
-                Name = mv.Model.Name,
-                VersionNumber = mv.VersionNumber,
-                ModelVersionId = mv.Id
+                Id = m.ModelVersion.Model.Id,
+                Name = m.ModelVersion.Model.Name,
+                VersionNumber = m.ModelVersion.VersionNumber,
+                ModelVersionId = m.ModelVersionId,
+                MaterialName = m.MaterialName
             }).ToList(),
             Packs = textureSet.Packs.Select(p => new PackSummaryDto
             {
@@ -135,6 +136,7 @@ public record ModelSummaryDto
     public string Name { get; init; } = string.Empty;
     public int? VersionNumber { get; init; }
     public int ModelVersionId { get; init; }
+    public string MaterialName { get; init; } = string.Empty;
 }
 
 public record PackSummaryDto

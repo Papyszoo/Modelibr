@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -9,15 +10,21 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
+    private readonly IThumbnailRepository _thumbnailRepository;
+    private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public AssociateTextureSetWithModelVersionCommandHandler(
         ITextureSetRepository textureSetRepository,
         IModelVersionRepository modelVersionRepository,
+        IThumbnailRepository thumbnailRepository,
+        IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider)
     {
         _textureSetRepository = textureSetRepository;
         _modelVersionRepository = modelVersionRepository;
+        _thumbnailRepository = thumbnailRepository;
+        _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -41,18 +48,58 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
                     new Error("ModelVersionNotFound", $"Model version with ID {command.ModelVersionId} was not found."));
             }
 
-            // Check if already associated
-            if (textureSet.HasModelVersion(command.ModelVersionId))
+            var materialName = command.MaterialName ?? string.Empty;
+            var variantName = command.VariantName ?? string.Empty;
+
+            // Check if this exact mapping already exists
+            if (modelVersion.TextureMappings.Any(m => m.TextureSetId == command.TextureSetId && m.MaterialName == materialName && m.VariantName == variantName))
+                return Result.Success();
+
+            // For named materials within the same variant, remove existing mapping for that material+variant
+            if (!string.IsNullOrEmpty(materialName))
             {
-                return Result.Failure(
-                    new Error("AssociationAlreadyExists", $"Texture set '{textureSet.Name}' is already associated with model version {modelVersion.VersionNumber}."));
+                await _modelVersionRepository.RemoveTextureMappingByMaterialAndVariantAsync(
+                    modelVersion.Id, materialName, variantName, cancellationToken);
             }
 
-            // Associate the model version with the texture set
-            textureSet.AddModelVersion(modelVersion, _dateTimeProvider.UtcNow);
+            // Auto-register the variant name if it's new
+            if (!string.IsNullOrEmpty(variantName))
+            {
+                var now = _dateTimeProvider.UtcNow;
+                modelVersion.AddVariantName(variantName, now);
+                await _modelVersionRepository.UpdateAsync(modelVersion, cancellationToken);
+            }
 
-            // Update the texture set
-            await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            // Add the texture mapping directly via repository (avoids EF Core composite key tracking issues)
+            await _modelVersionRepository.AddTextureMappingAsync(
+                modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
+
+            // If the linked variant is the main variant, update DefaultTextureSetId and regenerate thumbnail.
+            // After AddTextureMappingAsync + SaveChanges, EF Core relationship fixup adds the new mapping
+            // to the tracked modelVersion entity, so SetDefaultTextureSet validation will pass.
+            var mainVariant = modelVersion.MainVariantName ?? string.Empty;
+            if (variantName == mainVariant)
+            {
+                var now = _dateTimeProvider.UtcNow;
+                modelVersion.SetDefaultTextureSet(command.TextureSetId, now);
+                await _modelVersionRepository.UpdateAsync(modelVersion, cancellationToken);
+
+                var primaryFile = modelVersion.Files.FirstOrDefault();
+                if (primaryFile != null)
+                {
+                    if (modelVersion.Thumbnail != null)
+                    {
+                        modelVersion.Thumbnail.Reset(now);
+                        await _thumbnailRepository.UpdateAsync(modelVersion.Thumbnail, cancellationToken);
+                    }
+
+                    await _thumbnailQueue.EnqueueAsync(
+                        modelVersion.ModelId,
+                        modelVersion.Id,
+                        primaryFile.Sha256Hash,
+                        cancellationToken: cancellationToken);
+                }
+            }
 
             return Result.Success();
         }
@@ -64,4 +111,4 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
     }
 }
 
-public record AssociateTextureSetWithModelVersionCommand(int TextureSetId, int ModelVersionId) : ICommand;
+public record AssociateTextureSetWithModelVersionCommand(int TextureSetId, int ModelVersionId, string? MaterialName = null, string? VariantName = null) : ICommand;

@@ -38,6 +38,13 @@ public static class ThumbnailJobEndpoints
                 SoundHash = response.Job.SoundHash,
                 TextureSetId = response.Job.TextureSetId,
                 DefaultTextureSetId = response.Job.ModelVersion?.DefaultTextureSetId,
+                MainVariantName = response.Job.ModelVersion?.MainVariantName ?? "",
+                TextureMappings = response.Job.ModelVersion?.TextureMappings?.Select(tm => new
+                {
+                    tm.MaterialName,
+                    tm.TextureSetId,
+                    tm.VariantName,
+                }).ToArray() ?? Array.Empty<object>(),
                 Status = response.Job.Status.ToString(),
                 AttemptCount = response.Job.AttemptCount,
                 CreatedAt = response.Job.CreatedAt,

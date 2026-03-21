@@ -6,76 +6,8 @@ import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
 import { createTab } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
-interface TabLabelOptions {
-  modelId?: string
-  setId?: string
-  packId?: string
-  projectId?: string
-  stageId?: string
-  modelName?: string
-  setName?: string
-  packName?: string
-  projectName?: string
-  stageName?: string
-}
-
-// Helper function to generate tab labels
-export function getTabLabel(
-  type: Tab['type'],
-  options: TabLabelOptions = {}
-): string {
-  const {
-    modelId,
-    setId,
-    packId,
-    projectId,
-    stageId,
-    modelName,
-    setName,
-    packName,
-    projectName,
-    stageName,
-  } = options
-  switch (type) {
-    case 'modelList':
-      return 'Models'
-    case 'modelViewer':
-      if (modelName) return modelName
-      return modelId ? `Model ${modelId}` : 'Model Viewer'
-    case 'textureSets':
-      return 'Texture Sets'
-    case 'textureSetViewer':
-      if (setName) return setName
-      return setId ? `Set ${setId}` : 'Texture Set'
-    case 'packs':
-      return 'Packs'
-    case 'packViewer':
-      if (packName) return packName
-      return packId ? `Pack ${packId}` : 'Pack Viewer'
-    case 'projects':
-      return 'Projects'
-    case 'projectViewer':
-      if (projectName) return projectName
-      return projectId ? `Project ${projectId}` : 'Project Viewer'
-    case 'sprites':
-      return 'Sprites'
-    case 'sounds':
-      return 'Sounds'
-    case 'stageList':
-      return 'Stages'
-    case 'stageEditor':
-      if (stageName) return stageName
-      return stageId ? `Stage ${stageId}` : 'Stage Editor'
-    case 'history':
-      return 'History'
-    case 'settings':
-      return 'Settings'
-    case 'recycledFiles':
-      return 'Recycled Files'
-    default:
-      return 'Unknown'
-  }
-}
+// Re-export getTabLabel from its canonical location for backward compatibility
+export { getTabLabel } from '@/stores/navigationStore'
 
 // Helper function to parse compact tab format
 export function parseCompactTabFormat(

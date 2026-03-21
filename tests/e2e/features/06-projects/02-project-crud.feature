@@ -1,4 +1,4 @@
-@depends-on:projects-setup @projects
+@depends-on:projects-setup @projects @serial
 Feature: Project CRUD Operations
   Tests for creating, reading, updating, and deleting projects.
 

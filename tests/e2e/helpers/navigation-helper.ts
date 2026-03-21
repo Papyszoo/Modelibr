@@ -280,12 +280,14 @@ export async function isTabActive(
         return page
             .locator(`.dock-bar-${side}`)
             .locator(selector)
-            .isVisible({ timeout: 2000 })
+            .waitFor({ state: "visible", timeout: 2000 })
+            .then(() => true)
             .catch(() => false);
     }
     return page
         .locator(selector)
-        .isVisible({ timeout: 2000 })
+        .waitFor({ state: "visible", timeout: 2000 })
+        .then(() => true)
         .catch(() => false);
 }
 
@@ -315,25 +317,36 @@ export async function navigateToTab(
 }
 
 /**
- * Open a model viewer by navigating to the model list and double-clicking
+ * Open a model viewer by navigating to the model list and clicking
  * on the model card. This simulates real user interaction.
  *
+ * When a `modelId` is provided the card is located via its `data-model-id`
+ * attribute for deterministic selection (important when parallel workers
+ * create multiple models with the same display name).
+ *
  * @param modelName  Display name of the model to find in the grid
+ * @param modelId    Optional numeric model ID for precise card targeting
  */
 export async function openModelViewer(
     page: Page,
     modelName: string,
+    modelId?: number,
 ): Promise<void> {
     // Ensure we're on the model list
     const modelListTab = page.locator(
         ".dock-bar-left .draggable-tab:has(.pi-list)",
     );
-    if (await modelListTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (
+        await modelListTab
+            .waitFor({ state: "visible", timeout: 5000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
         await modelListTab.click();
         // Wait for model list content to load
         await page.waitForSelector(".model-card, .no-results, .empty-state", {
             state: "visible",
-            timeout: 10000,
+            timeout: 15000,
         });
     }
 
@@ -343,22 +356,51 @@ export async function openModelViewer(
         timeout: 10000,
     });
 
-    // Find and double-click the model card
-    const clickTarget = page.locator(`text="${modelName}"`).first();
-    if (await clickTarget.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await clickTarget.dblclick();
+    // Find and click the model card — prefer ID-based selector when available
+    if (modelId) {
+        const cardById = page.locator(`[data-model-id="${modelId}"]`).first();
+        if (
+            await cardById
+                .waitFor({ state: "visible", timeout: 10000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
+            await cardById.click();
+        } else {
+            console.warn(
+                `[Nav] data-model-id="${modelId}" not found, falling back to name match`,
+            );
+            await page
+                .locator(`.model-card:has-text("${modelName}")`)
+                .first()
+                .click();
+        }
     } else {
-        // Fall back to partial match
-        const card = page
-            .locator(`.model-card:has-text("${modelName}")`)
-            .first();
-        await card.dblclick();
+        const clickTarget = page.locator(`text="${modelName}"`).first();
+        if (
+            await clickTarget
+                .waitFor({ state: "visible", timeout: 10000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
+            await clickTarget.dblclick();
+        } else {
+            // Fall back to partial match
+            const card = page
+                .locator(`.model-card:has-text("${modelName}")`)
+                .first();
+            await card.dblclick();
+        }
     }
 
-    // Wait for the model viewer to load
-    await page.waitForSelector(
-        ".viewer-canvas canvas, .version-dropdown-trigger",
-        { state: "visible", timeout: 30000 },
+    // Wait for the model viewer to load WITH version data.
+    // The .version-dropdown-trigger only renders when versions.length > 0,
+    // so this guarantees the API responded with version info.
+    await page.waitForSelector(".version-dropdown-trigger", {
+        state: "visible",
+        timeout: 60000,
+    });
+    console.log(
+        `[Nav] Opened model viewer for "${modelName}"${modelId ? ` (id=${modelId})` : ""} ✓`,
     );
-    console.log(`[Nav] Opened model viewer for "${modelName}" ✓`);
 }

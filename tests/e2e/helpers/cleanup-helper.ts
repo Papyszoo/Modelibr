@@ -14,9 +14,13 @@ let modelCleanupDone = false;
  * Keeps at most 1 copy of each model name. Soft-deletes duplicates
  * then permanently deletes them from the recycle bin.
  *
+ * @param protectedIds - Model IDs that must NOT be deleted (e.g. setup-created models)
+ *
  * Safe to call multiple times per run — only executes once.
  */
-export async function cleanupStaleModels(): Promise<void> {
+export async function cleanupStaleModels(
+    protectedIds: Set<number> = new Set(),
+): Promise<void> {
     if (modelCleanupDone) return;
     modelCleanupDone = true;
 
@@ -35,35 +39,38 @@ export async function cleanupStaleModels(): Promise<void> {
         }>;
         console.log(`[Model Cleanup] Found ${models.length} models total`);
 
-        if (models.length <= 10) {
+        if (protectedIds.size > 0) {
+            console.log(
+                `[Model Cleanup] Protecting ${protectedIds.size} bridge model IDs: ${[...protectedIds].join(", ")}`,
+            );
+        }
+
+        if (models.length <= 5) {
             console.log(
                 `[Model Cleanup] Count is manageable, skipping cleanup`,
             );
             return;
         }
 
-        // Group by name, keep only the first of each
-        const seen = new Map<string, number>(); // name -> kept id
-        const toDelete: number[] = [];
-
-        for (const m of models) {
-            if (seen.has(m.name)) {
-                toDelete.push(m.id);
-            } else {
-                seen.set(m.name, m.id);
-            }
-        }
+        // Delete ALL unprotected models (not just duplicates).
+        // Without this, models with unique names (e.g. blend-upload test
+        // artifacts: BlendDedupA, BlendWebDavModel…) accumulate indefinitely.
+        // Their Status=3 thumbnail rows (failed renders) can shadow the
+        // Status=2 thumbnail rows for setup-created models in unscoped DB
+        // queries inside test steps.
+        const toDelete = models
+            .filter((m) => !protectedIds.has(m.id))
+            .map((m) => m.id);
 
         if (toDelete.length === 0) {
-            console.log(`[Model Cleanup] No duplicates found`);
+            console.log(`[Model Cleanup] Nothing to delete`);
             return;
         }
-
         console.log(
-            `[Model Cleanup] Removing ${toDelete.length} duplicate models...`,
+            `[Model Cleanup] Removing ${toDelete.length} unprotected models...`,
         );
 
-        // Step 1: Soft-delete duplicates
+        // Step 1: Soft-delete
         let softDeleted = 0;
         for (const id of toDelete) {
             const delRes = await fetch(`${API_BASE}/models/${id}`, {
@@ -93,6 +100,195 @@ export async function cleanupStaleModels(): Promise<void> {
         );
     } catch (e) {
         console.log(`[Model Cleanup] Warning: cleanup failed: ${e}`);
+    }
+}
+
+/**
+ * Remove ALL texture sets accumulated from previous test runs,
+ * keeping only setup-bridge-protected IDs (e.g. blue_color, red_color).
+ *
+ * With hundreds of texture sets, the first paginated page (50 items) fills
+ * with alphabetically-early items, making freshly-created test items invisible.
+ */
+export async function cleanupStaleTextureSets(
+    protectedIds: Set<number> = new Set(),
+): Promise<void> {
+    try {
+        const response = await fetch(
+            `${API_BASE}/texture-sets?pageSize=500&page=1`,
+        );
+        if (!response.ok) {
+            console.log(
+                `[TS Cleanup] GET /texture-sets returned ${response.status}, skipping`,
+            );
+            return;
+        }
+        const data = (await response.json()) as {
+            textureSets: Array<{ id: number; name: string }>;
+        };
+        const all = data.textureSets || [];
+        console.log(
+            `[TS Cleanup] Found ${all.length} texture sets (protecting ${protectedIds.size} IDs)`,
+        );
+
+        if (all.length <= 5) {
+            console.log(`[TS Cleanup] Count is manageable, skipping`);
+            return;
+        }
+
+        const toDelete = all
+            .filter((ts) => !protectedIds.has(ts.id))
+            .map((ts) => ts.id);
+
+        let deleted = 0;
+        for (const id of toDelete) {
+            // Soft-delete (moves to recycle bin)
+            const r = await fetch(`${API_BASE}/texture-sets/${id}`, {
+                method: "DELETE",
+            });
+            if (r.ok || r.status === 204) deleted++;
+        }
+        console.log(
+            `[TS Cleanup] Soft-deleted ${deleted}/${toDelete.length} texture sets`,
+        );
+
+        // Also permanently delete ALL recycled texture sets
+        const recycledResp = await fetch(`${API_BASE}/recycled`);
+        if (recycledResp.ok) {
+            const recycled = (await recycledResp.json()) as {
+                textureSets?: Array<{ id: number }>;
+            };
+            const recycledTs = recycled.textureSets || [];
+            let permDeleted = 0;
+            for (const ts of recycledTs) {
+                const r = await fetch(
+                    `${API_BASE}/recycled/texture-set/${ts.id}/permanent`,
+                    { method: "DELETE" },
+                );
+                if (r.ok || r.status === 204) permDeleted++;
+            }
+            if (permDeleted > 0) {
+                console.log(
+                    `[TS Cleanup] Permanently deleted ${permDeleted} recycled texture sets ✓`,
+                );
+            }
+        }
+    } catch (e) {
+        console.log(`[TS Cleanup] Warning: cleanup failed: ${e}`);
+    }
+}
+
+/**
+ * Remove ALL sprites accumulated from previous test runs.
+ * 73+ sprites causes "Load More" pagination — freshly uploaded sprites
+ * land alphabetically in the middle, invisible without scrolling.
+ */
+export async function cleanupStaleSprites(): Promise<void> {
+    try {
+        const response = await fetch(`${API_BASE}/sprites?pageSize=500&page=1`);
+        if (!response.ok) {
+            console.log(
+                `[Sprite Cleanup] GET /sprites returned ${response.status}, skipping`,
+            );
+            return;
+        }
+        const data = (await response.json()) as {
+            sprites: Array<{ id: number; name: string }>;
+        };
+        const all = data.sprites || [];
+        console.log(`[Sprite Cleanup] Found ${all.length} sprites`);
+
+        if (all.length <= 5) {
+            console.log(`[Sprite Cleanup] Count is manageable, skipping`);
+            return;
+        }
+
+        let deleted = 0;
+        for (const sprite of all) {
+            const r = await fetch(`${API_BASE}/sprites/${sprite.id}`, {
+                method: "DELETE",
+            });
+            if (r.ok || r.status === 204) deleted++;
+        }
+        console.log(
+            `[Sprite Cleanup] Soft-deleted ${deleted}/${all.length} sprites`,
+        );
+
+        // Permanently delete ALL recycled sprites
+        const recycledResp = await fetch(`${API_BASE}/recycled`);
+        if (recycledResp.ok) {
+            const recycled = (await recycledResp.json()) as {
+                sprites?: Array<{ id: number }>;
+            };
+            const recycledSprites = recycled.sprites || [];
+            let permDeleted = 0;
+            for (const s of recycledSprites) {
+                const r = await fetch(
+                    `${API_BASE}/recycled/sprite/${s.id}/permanent`,
+                    { method: "DELETE" },
+                );
+                if (r.ok || r.status === 204) permDeleted++;
+            }
+            if (permDeleted > 0) {
+                console.log(
+                    `[Sprite Cleanup] Permanently deleted ${permDeleted} recycled sprites ✓`,
+                );
+            }
+        }
+    } catch (e) {
+        console.log(`[Sprite Cleanup] Warning: cleanup failed: ${e}`);
+    }
+}
+
+/**
+ * Remove accumulated sounds from previous test runs.
+ */
+export async function cleanupStaleSounds(): Promise<void> {
+    try {
+        const response = await fetch(`${API_BASE}/sounds?pageSize=500&page=1`);
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+            sounds: Array<{ id: number; name: string }>;
+        };
+        const all = data.sounds || [];
+        console.log(`[Sound Cleanup] Found ${all.length} sounds`);
+
+        if (all.length <= 5) return;
+
+        let deleted = 0;
+        for (const sound of all) {
+            const r = await fetch(`${API_BASE}/sounds/${sound.id}`, {
+                method: "DELETE",
+            });
+            if (r.ok || r.status === 204) deleted++;
+        }
+        console.log(
+            `[Sound Cleanup] Soft-deleted ${deleted}/${all.length} sounds`,
+        );
+
+        // Permanently delete ALL recycled sounds
+        const recycledResp = await fetch(`${API_BASE}/recycled`);
+        if (recycledResp.ok) {
+            const recycled = (await recycledResp.json()) as {
+                sounds?: Array<{ id: number }>;
+            };
+            const recycledSounds = recycled.sounds || [];
+            let permDeleted = 0;
+            for (const s of recycledSounds) {
+                const r = await fetch(
+                    `${API_BASE}/recycled/sound/${s.id}/permanent`,
+                    { method: "DELETE" },
+                );
+                if (r.ok || r.status === 204) permDeleted++;
+            }
+            if (permDeleted > 0) {
+                console.log(
+                    `[Sound Cleanup] Permanently deleted ${permDeleted} recycled sounds ✓`,
+                );
+            }
+        }
+    } catch (e) {
+        console.log(`[Sound Cleanup] Warning: cleanup failed: ${e}`);
     }
 }
 

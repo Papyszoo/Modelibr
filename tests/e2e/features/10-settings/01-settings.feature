@@ -1,10 +1,11 @@
-@settings
+@settings @serial
 Feature: Application Settings
   Tests that application settings can be viewed, modified, validated, and saved.
   Settings control file upload limits, thumbnail generation parameters, and appearance.
 
   Background:
-    Given I am on the settings page
+    Given settings are reset to defaults via API
+    And I am on the settings page
 
   @settings-display
   Scenario: Settings page displays all configuration fields
@@ -31,7 +32,7 @@ Feature: Application Settings
     When I reload the settings page
     Then the thumbnail width should be "512"
     # Restore original value
-    When I change the thumbnail width to "384"
+    When I change the thumbnail width to "256"
     And I save the settings
 
   @settings-validation

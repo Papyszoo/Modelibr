@@ -1,144 +1,149 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
-import type * as Preset from '@docusaurus/preset-classic';
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: 'Modelibr',
-  tagline: 'Self-hosted 3D Model Library',
-  favicon: 'img/favicon.ico',
+    title: "Modelibr",
+    tagline: "Self-hosted 3D Model Library",
+    favicon: "img/favicon.ico",
 
-  future: {
-    v4: true,
-  },
-
-  // GitHub Pages deployment
-  url: 'https://Papyszoo.github.io',
-  baseUrl: '/Modelibr/',
-  organizationName: 'Papyszoo',
-  projectName: 'Modelibr',
-  deploymentBranch: 'gh-pages',
-  trailingSlash: false,
-
-  onBrokenLinks: 'throw',
-  
-  markdown: {
-    hooks: {
-      onBrokenMarkdownLinks: 'warn',
+    future: {
+        v4: true,
     },
-  },
-  
-  // Custom fields for static paths that will exist after build
-  staticDirectories: ['static'],
 
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
-  },
+    // GitHub Pages deployment
+    url: "https://Papyszoo.github.io",
+    baseUrl: "/Modelibr/",
+    organizationName: "Papyszoo",
+    projectName: "Modelibr",
+    deploymentBranch: "gh-pages",
+    trailingSlash: false,
 
-  presets: [
-    [
-      'classic',
-      {
-        docs: {
-          sidebarPath: './sidebars.ts',
-          routeBasePath: '/docs', // Docs at /docs, landing page at root
+    onBrokenLinks: "throw",
+
+    markdown: {
+        hooks: {
+            onBrokenMarkdownLinks: "warn",
         },
-        blog: false, // Disable blog
-        theme: {
-          customCss: './src/css/custom.css',
-        },
-      } satisfies Preset.Options,
+    },
+
+    // Custom fields for static paths that will exist after build
+    staticDirectories: ["static"],
+
+    i18n: {
+        defaultLocale: "en",
+        locales: ["en"],
+    },
+
+    presets: [
+        [
+            "classic",
+            {
+                docs: {
+                    sidebarPath: "./sidebars.ts",
+                    routeBasePath: "/docs", // Docs at /docs, landing page at root
+                },
+                blog: false, // Disable blog
+                theme: {
+                    customCss: "./src/css/custom.css",
+                },
+            } satisfies Preset.Options,
+        ],
     ],
-  ],
 
-  themeConfig: {
-    image: 'img/screenshots/model-viewer.png',
-    colorMode: {
-      defaultMode: 'dark',
-      disableSwitch: false,
-      respectPrefersColorScheme: false,
-    },
-    navbar: {
-      title: 'Modelibr',
-      items: [
-        {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
-          position: 'left',
-          label: 'Documentation',
+    themeConfig: {
+        image: "img/screenshots/model-viewer.png",
+        colorMode: {
+            defaultMode: "dark",
+            disableSwitch: false,
+            respectPrefersColorScheme: false,
         },
-        {
-          to: '/test-reports',
-          label: 'Test Reports',
-          position: 'left',
-        },
+        navbar: {
+            title: "Modelibr",
+            items: [
+                {
+                    type: "docSidebar",
+                    sidebarId: "tutorialSidebar",
+                    position: "left",
+                    label: "Documentation",
+                },
+                {
+                    to: "/test-reports",
+                    label: "Test Reports",
+                    position: "left",
+                },
+                {
+                    href: "https://Papyszoo.github.io/Modelibr/storybook/index.html",
+                    label: "Storybook",
+                    position: "left",
+                },
 
-        {
-          href: 'https://github.com/Papyszoo/Modelibr',
-          label: 'GitHub',
-          position: 'right',
+                {
+                    href: "https://github.com/Papyszoo/Modelibr",
+                    label: "GitHub",
+                    position: "right",
+                },
+                {
+                    href: "https://discord.gg/KgwgTDVP3F",
+                    label: "Discord",
+                    position: "right",
+                },
+            ],
         },
-        {
-          href: 'https://discord.gg/KgwgTDVP3F',
-          label: 'Discord',
-          position: 'right',
+        footer: {
+            style: "dark",
+            links: [
+                {
+                    title: "Documentation",
+                    items: [
+                        {
+                            label: "Getting Started",
+                            to: "/docs",
+                        },
+                        {
+                            label: "Features",
+                            to: "/docs/category/features",
+                        },
+                    ],
+                },
+                {
+                    title: "AI Documentation",
+                    items: [
+                        {
+                            label: "Backend API",
+                            href: "/docs/ai-documentation/BACKEND_API",
+                        },
+                        {
+                            label: "Frontend",
+                            href: "/docs/ai-documentation/FRONTEND",
+                        },
+                        {
+                            label: "Worker",
+                            href: "/docs/ai-documentation/WORKER",
+                        },
+                    ],
+                },
+                {
+                    title: "Community",
+                    items: [
+                        {
+                            label: "GitHub",
+                            href: "https://github.com/Papyszoo/Modelibr",
+                        },
+                        {
+                            label: "Discord",
+                            href: "https://discord.gg/KgwgTDVP3F",
+                        },
+                    ],
+                },
+            ],
+            copyright: `Copyright © ${new Date().getFullYear()} Modelibr. Built with Docusaurus.`,
         },
-      ],
-    },
-    footer: {
-      style: 'dark',
-      links: [
-        {
-          title: 'Documentation',
-          items: [
-            {
-              label: 'Getting Started',
-              to: '/docs',
-            },
-            {
-              label: 'Features',
-              to: '/docs/category/features',
-            },
-          ],
+        prism: {
+            theme: prismThemes.github,
+            darkTheme: prismThemes.dracula,
         },
-        {
-          title: 'AI Documentation',
-          items: [
-            {
-              label: 'Backend API',
-              href: '/docs/ai-documentation/BACKEND_API',
-            },
-            {
-              label: 'Frontend',
-              href: '/docs/ai-documentation/FRONTEND',
-            },
-            {
-              label: 'Worker',
-              href: '/docs/ai-documentation/WORKER',
-            },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
-            {
-              label: 'GitHub',
-              href: 'https://github.com/Papyszoo/Modelibr',
-            },
-            {
-              label: 'Discord',
-              href: 'https://discord.gg/KgwgTDVP3F',
-            },
-          ],
-        },
-      ],
-      copyright: `Copyright © ${new Date().getFullYear()} Modelibr. Built with Docusaurus.`,
-    },
-    prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
-    },
-  } satisfies Preset.ThemeConfig,
+    } satisfies Preset.ThemeConfig,
 };
 
 export default config;

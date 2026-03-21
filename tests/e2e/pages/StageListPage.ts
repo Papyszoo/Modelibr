@@ -81,11 +81,9 @@ export class StageListPage {
     }
 
     async isStageVisible(name: string): Promise<boolean> {
-        const card = this.page
-            .locator(this.stageCard)
-            .filter({
-                has: this.page.locator(this.stageName, { hasText: name }),
-            });
+        const card = this.page.locator(this.stageCard).filter({
+            has: this.page.locator(this.stageName, { hasText: name }),
+        });
         return (await card.count()) > 0;
     }
 
@@ -94,7 +92,8 @@ export class StageListPage {
             .locator(this.stageCard)
             .filter({
                 has: this.page.locator(this.stageName, { hasText: name }),
-            });
+            })
+            .first();
         await card.locator(this.cardContent).click();
     }
 
@@ -123,11 +122,9 @@ export class StageListPage {
     // ===== Delete =====
 
     async deleteStage(name: string): Promise<void> {
-        const card = this.page
-            .locator(this.stageCard)
-            .filter({
-                has: this.page.locator(this.stageName, { hasText: name }),
-            });
+        const card = this.page.locator(this.stageCard).filter({
+            has: this.page.locator(this.stageName, { hasText: name }),
+        });
         await card.hover();
         await card.locator(this.deleteButton).click();
         // Wait for confirm dialog

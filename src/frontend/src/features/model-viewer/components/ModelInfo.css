@@ -49,14 +49,12 @@
 }
 
 .tags-section,
-.description-section,
-.texture-sets-section {
+.description-section {
   margin-bottom: 0.75rem;
 }
 
 .tags-section:last-child,
-.description-section:last-child,
-.texture-sets-section:last-child {
+.description-section:last-child {
   margin-bottom: 0;
 }
 
@@ -97,27 +95,6 @@
   resize: vertical;
 }
 
-.save-button,
-.link-button {
+.save-button {
   width: 100%;
-}
-
-.controls-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.controls-list li {
-  color: var(--text-color);
-  font-size: 0.875rem;
-  padding: 0.25rem 0;
-}
-
-.controls-list strong {
-  color: var(--text-color);
-  font-weight: 600;
 }

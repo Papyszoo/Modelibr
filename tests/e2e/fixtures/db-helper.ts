@@ -1,7 +1,36 @@
 import pg from "pg";
 
+/**
+ * Resolves the database name for the current worker.
+ * When PARALLEL_DB=true and TEST_WORKER_INDEX is set, appends a suffix
+ * (e.g., Modelibr_0, Modelibr_1) so each Playwright worker gets its own database.
+ * Falls back to the base DB name for single-worker / non-parallel runs.
+ */
+function resolveDatabaseName(workerIndex?: number): string {
+    const baseDb = process.env.POSTGRES_DB || "Modelibr";
+    const useParallelDb = process.env.PARALLEL_DB === "true";
+
+    if (useParallelDb && workerIndex !== undefined) {
+        return `${baseDb}_${workerIndex}`;
+    }
+    // Also check the env var Playwright sets via globalSetup
+    if (useParallelDb && process.env.TEST_WORKER_INDEX) {
+        return `${baseDb}_${process.env.TEST_WORKER_INDEX}`;
+    }
+    return baseDb;
+}
+
 export class DbHelper {
     private pool: pg.Pool | null = null;
+    private readonly dbName: string;
+
+    /**
+     * @param workerIndex Optional Playwright workerIndex for per-worker DB isolation.
+     *                    Pass `test.info().workerIndex` when PARALLEL_DB=true.
+     */
+    constructor(workerIndex?: number) {
+        this.dbName = resolveDatabaseName(workerIndex);
+    }
 
     private getPool(): pg.Pool {
         // Lazily create pool, and recreate if needed
@@ -9,7 +38,7 @@ export class DbHelper {
             this.pool = new pg.Pool({
                 user: process.env.POSTGRES_USER || "modelibr",
                 host: process.env.POSTGRES_HOST || "localhost",
-                database: process.env.POSTGRES_DB || "Modelibr",
+                database: this.dbName,
                 password: process.env.POSTGRES_PASSWORD || "e2e_password",
                 port: parseInt(process.env.POSTGRES_PORT || "5433"),
                 // Keep connections alive and limit pool size

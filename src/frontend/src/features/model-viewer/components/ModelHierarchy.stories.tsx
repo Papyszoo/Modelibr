@@ -1,11 +1,14 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import * as THREE from 'three'
+
+import { ModelProvider } from '@/contexts/ModelContext'
 
 import { ModelHierarchy } from './ModelHierarchy'
 
 /**
  * ModelHierarchy displays the structure of a 3D model,
  * showing meshes, materials, and their properties in a tree view.
+ * Supports selection and hover highlighting via ModelContext.
  */
 const meta = {
   title: 'Components/ModelHierarchy',
@@ -14,6 +17,15 @@ const meta = {
     layout: 'centered',
   },
   tags: ['autodocs'],
+  decorators: [
+    Story => (
+      <ModelProvider>
+        <div style={{ width: 350, height: 500 }}>
+          <Story />
+        </div>
+      </ModelProvider>
+    ),
+  ],
 } satisfies Meta<typeof ModelHierarchy>
 
 export default meta

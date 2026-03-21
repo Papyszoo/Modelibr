@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using NWebDav.Server;
+using NWebDav.Server.Handlers;
 using NWebDav.Server.Http;
 using NWebDav.Server.Stores;
 
@@ -141,60 +142,61 @@ public class CustomWebDavHandler : IRequestHandler
 
     private async Task<bool> HandlePropFindAsync(IHttpContext httpContext, IStore store)
     {
-        var request = httpContext.Request;
         var response = httpContext.Response;
 
         try
         {
-            // 1. Get Item
-            var item = await store.GetItemAsync(request.Url, httpContext).ConfigureAwait(false);
-            if (item == null)
+            // Buffer the native PropFindHandler output into a MemoryStream for two reasons:
+            //   1. Kestrel blocks synchronous writes; buffering avoids that exception.
+            //   2. We need to post-process the XML to append trailing slashes on collection
+            //      <href> values, which macOS Finder requires to distinguish folders from files.
+            //      Without them Finder treats child folders as the parent and loops infinitely,
+            //      exhausting file descriptors and crashing with malloc/too_many_files_open.
+            using var buffer = new MemoryStream();
+            var macOsResponse = new MacOsHttpResponse(response, buffer);
+            var macOsContext = new MacOsHttpContext(httpContext, macOsResponse);
+
+            var nativeHandler = new PropFindHandler();
+            var handled = await nativeHandler.HandleRequestAsync(macOsContext, store).ConfigureAwait(false);
+
+            // Only patch 207 Multi-Status responses that have XML body content.
+            if (response.Status == 207 && buffer.Length > 0)
             {
-                _logger.LogDebug("PROPFIND item not found");
-                response.Status = 404;
-                return true;
-            }
+                buffer.Position = 0;
+                var doc = XDocument.Load(buffer);
 
-            // 2. Determine Depth
-            var depthHeader = request.GetHeaderValue("Depth");
-            int depth = 1; 
-            if (depthHeader == "0") depth = 0;
-            else if (depthHeader == "1") depth = 1;
-
-            // 3. Multistatus XML
-            var multistatus = new XElement(DavNs + "multistatus");
-            
-            // Add self
-            await AddResponseAsync(multistatus, item, request.Url);
-
-            // Add children if collection and depth > 0
-            if (depth > 0 && item is IStoreCollection collection)
-            {
-                foreach (var child in await collection.GetItemsAsync(httpContext).ConfigureAwait(false))
+                // Ensure every collection <href> ends with '/' so macOS Finder can
+                // distinguish folders from files without re-issuing a PROPFIND on the same URL.
+                foreach (var responseEl in doc.Descendants(DavNs + "response"))
                 {
-                     // Use proper URI construction
-                     var baseUri = request.Url.ToString().TrimEnd('/');
-                     // Encode path segments
-                     var childName = Uri.EscapeDataString(child.Name); 
-                     var childUri = new Uri(baseUri + "/" + childName);
-                     await AddResponseAsync(multistatus, child, childUri);
+                    var isCollection = responseEl
+                        .Descendants(DavNs + "resourcetype")
+                        .Any(rt => rt.Element(DavNs + "collection") != null);
+
+                    if (!isCollection)
+                        continue;
+
+                    var hrefEl = responseEl.Element(DavNs + "href");
+                    if (hrefEl != null && !hrefEl.Value.EndsWith("/"))
+                        hrefEl.Value += "/";
                 }
+
+                using var patched = new MemoryStream();
+                patched.Position = 0;
+                doc.Save(patched);
+
+                response.SetHeaderValue("Content-Length", patched.Length.ToString());
+                patched.Position = 0;
+                await patched.CopyToAsync(response.Stream, 81920, CancellationToken.None).ConfigureAwait(false);
             }
-
-            var doc = new XDocument(new XDeclaration("1.0", "utf-8", null), multistatus);
-
-            response.Status = 207; // Multi-Status
-            response.SetHeaderValue("Content-Type", "text/xml; charset=\"utf-8\"");
-            
-            // Buffer to MemoryStream to avoid Sync I/O Kestrel errors
-            using (var ms = new MemoryStream())
+            else if (buffer.Length > 0)
             {
-                doc.Save(ms);
-                ms.Position = 0;
-                await ms.CopyToAsync(response.Stream, 81920, CancellationToken.None);
+                // Non-207 response (e.g. 404) — pass through as-is.
+                buffer.Position = 0;
+                await buffer.CopyToAsync(response.Stream, 81920, CancellationToken.None).ConfigureAwait(false);
             }
-            
-            return true;
+
+            return handled;
         }
         catch (Exception ex)
         {
@@ -204,27 +206,31 @@ public class CustomWebDavHandler : IRequestHandler
         }
     }
 
-    private async Task AddResponseAsync(XElement multistatus, IStoreItem item, Uri uri)
+    private class MacOsHttpResponse : IHttpResponse
     {
-        var href = new XElement(DavNs + "href", uri.AbsoluteUri);
-        
-        var prop = new XElement(DavNs + "prop");
-        
-        // ResourceType
-        if (item is IStoreCollection)
-            prop.Add(new XElement(DavNs + "resourcetype", new XElement(DavNs + "collection")));
-        else
-            prop.Add(new XElement(DavNs + "resourcetype"));
+        private readonly IHttpResponse _inner;
+        public MacOsHttpResponse(IHttpResponse inner, Stream stream)
+        {
+            _inner = inner;
+            Stream = stream;
+        }
+        public int Status { get => _inner.Status; set => _inner.Status = value; }
+        public string StatusDescription { get => _inner.StatusDescription; set => _inner.StatusDescription = value; }
+        public Stream Stream { get; }
+        public void SetHeaderValue(string header, string value) => _inner.SetHeaderValue(header, value);
+    }
 
-        // DisplayName
-        prop.Add(new XElement(DavNs + "displayname", item.Name));
-        
-        var propstat = new XElement(DavNs + "propstat",
-            prop,
-            new XElement(DavNs + "status", "HTTP/1.1 200 OK")
-        );
-
-        var response = new XElement(DavNs + "response", href, propstat);
-        multistatus.Add(response);
+    private class MacOsHttpContext : IHttpContext
+    {
+        private readonly IHttpContext _inner;
+        public MacOsHttpContext(IHttpContext inner, IHttpResponse response)
+        {
+            _inner = inner;
+            Response = response;
+        }
+        public IHttpRequest Request => _inner.Request;
+        public IHttpResponse Response { get; }
+        public NWebDav.Server.Http.IHttpSession Session => _inner.Session;
+        public Task CloseAsync() => _inner.CloseAsync();
     }
 }

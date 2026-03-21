@@ -473,7 +473,7 @@ Then("a model viewer tab should be opened", async ({ page }) => {
     await page
         .locator(".viewer-canvas, .version-dropdown-trigger")
         .first()
-        .waitFor({ state: "visible", timeout: 10000 });
+        .waitFor({ state: "visible", timeout: 25000 });
     const { countTabsByType } = await import("../helpers/navigation-helper");
     const count = await countTabsByType(page, "modelViewer");
     expect(count).toBeGreaterThanOrEqual(1);

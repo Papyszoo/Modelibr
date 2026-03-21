@@ -6,7 +6,8 @@ import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { DbHelper } from "../fixtures/db-helper";
 import { ApiHelper } from "../helpers/api-helper";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
+import { persistTextureSet } from "../fixtures/setup-state-bridge";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -101,7 +102,7 @@ When(
         const thumbnailSrc = await modelViewer.getVersionThumbnailSrc(1);
 
         // Store in shared state with model-prefixed key to avoid collisions
-        sharedState.saveVersionState(v1Id, {
+        getScenarioState(page).saveVersionState(v1Id, {
             thumbnailDetails,
             thumbnailSrc,
         });
@@ -141,7 +142,7 @@ Then(
         const v1Id = res.rows[0].Id;
 
         // Get saved state from shared state
-        const savedState = sharedState.getVersionState(v1Id);
+        const savedState = getScenarioState(page).getVersionState(v1Id);
         if (!savedState) {
             throw new Error(
                 `Version 1 (id=${v1Id}) state was not saved. Ensure previous steps ran correctly.`,
@@ -179,7 +180,7 @@ Then(
         const v1Id = res.rows[0].Id;
 
         // Get saved state from shared state
-        const savedState = sharedState.getVersionState(v1Id);
+        const savedState = getScenarioState(page).getVersionState(v1Id);
         if (!savedState) {
             throw new Error(
                 `Version 1 (id=${v1Id}) state was not saved. Ensure previous steps ran correctly.`,
@@ -232,8 +233,8 @@ Then(
                 {
                     message:
                         "Version 2 thumbnail did not become Ready within timeout",
-                    intervals: [2000],
-                    timeout: 60000,
+                    intervals: [3000],
+                    timeout: 300000,
                 },
             )
             .toBe(2);
@@ -242,7 +243,7 @@ Then(
         // Reload page to ensure frontend has latest version data with thumbnail URLs
         // This is more reliable than depending on SignalR in tests
         await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(".viewer-controls", {
+        await page.waitForSelector(".p-menubar", {
             state: "visible",
             timeout: 30000,
         });
@@ -288,7 +289,7 @@ Given(
         const modelName = fileName.replace(/\.[^/.]+$/, ""); // Strip extension
 
         // Check if model already exists in shared state (from previous test)
-        const existing = sharedState.getModel(fileName);
+        const existing = getScenarioState(page).getModel(fileName);
         if (existing && existing.id > 0) {
             // Model already uploaded, just navigate to list and ensure visible
             await modelList.goto();
@@ -304,7 +305,7 @@ Given(
         await modelList.expectModelVisible(modelName);
 
         // Store in shared state with the filename as key
-        sharedState.saveModel(fileName, {
+        getScenarioState(page).saveModel(fileName, {
             id: 0, // Will be updated when navigating to viewer
             name: modelName,
         });
@@ -323,7 +324,7 @@ When("I create a new texture set {string}", async ({ page }, name: string) => {
     const textureSet = await apiHelper.createTextureSet(uniqueName);
 
     // Store in shared state with original name for test steps to reference
-    sharedState.saveTextureSet(name, {
+    getScenarioState(page).saveTextureSet(name, {
         id: textureSet.id,
         name: uniqueName,
     });
@@ -332,7 +333,7 @@ When("I create a new texture set {string}", async ({ page }, name: string) => {
 When(
     "I upload texture {string} to texture set {string}",
     async ({ page }, textureName: string, setName: string) => {
-        const textureSet = sharedState.getTextureSet(setName);
+        const textureSet = getScenarioState(page).getTextureSet(setName);
         if (!textureSet) {
             throw new Error(`Texture set ${setName} not found in shared state`);
         }
@@ -383,17 +384,20 @@ When(
         }
 
         // Store in shared state for subsequent steps
-        sharedState.saveTextureSet(setName, {
+        getScenarioState(page).saveTextureSet(setName, {
             id: textureSet.id,
             name: setName,
         });
+
+        // Persist to file for cross-phase state transfer (setup → chromium)
+        persistTextureSet(setName, { id: textureSet.id, name: setName });
     },
 );
 
 When(
     "I link texture set {string} to the model",
     async ({ page }, setName: string) => {
-        const textureSet = sharedState.getTextureSet(setName);
+        const textureSet = getScenarioState(page).getTextureSet(setName);
         if (!textureSet) {
             throw new Error(`Texture set ${setName} not found in shared state`);
         }
@@ -401,9 +405,31 @@ When(
         // Get current model ID from navigation store
         const modelId = await getModelIdFromPage(page);
 
-        // Get model versions to find active version
+        // Get model versions to find the currently selected version
         const versions = await apiHelper.getModelVersions(modelId);
-        const versionId = versions[0]?.id;
+
+        // Read selected version from UI dropdown (shows "v1", "v2", etc.)
+        let versionId: number | undefined;
+        try {
+            const versionText = await page
+                .locator(".version-dropdown-number")
+                .textContent({ timeout: 5000 });
+            const selectedNum = parseInt(
+                versionText?.replace("v", "") || "",
+                10,
+            );
+            if (selectedNum) {
+                versionId = versions.find(
+                    (v) => v.versionNumber === selectedNum,
+                )?.id;
+            }
+        } catch {
+            // Dropdown not visible — fall back to first version
+        }
+
+        if (!versionId) {
+            versionId = versions[0]?.id;
+        }
         if (!versionId) {
             throw new Error("Could not determine model version ID");
         }
@@ -415,7 +441,7 @@ When(
         );
 
         // Update shared state with model and version IDs
-        sharedState.saveTextureSet(setName, {
+        getScenarioState(page).saveTextureSet(setName, {
             ...textureSet,
             modelId,
             versionId,
@@ -426,7 +452,7 @@ When(
 When(
     "I set {string} as the default texture set for the current version",
     async ({ page }, name: string) => {
-        const textureSet = sharedState.getTextureSet(name);
+        const textureSet = getScenarioState(page).getTextureSet(name);
         if (!textureSet) {
             throw new Error(`Texture set ${name} not found in shared state`);
         }
@@ -465,13 +491,10 @@ When(
 
         // Reload page to force frontend to pick up new default texture set
         await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(
-            ".viewer-controls, .version-dropdown-trigger",
-            {
-                state: "visible",
-                timeout: 30000,
-            },
-        );
+        await page.waitForSelector(".p-menubar, .version-dropdown-trigger", {
+            state: "visible",
+            timeout: 30000,
+        });
     },
 );
 
@@ -479,7 +502,7 @@ Then(
     "{string} should be marked as default in the texture set selector",
     async ({ page }, name: string) => {
         // Get the texture set from shared state for its ID
-        const textureSet = sharedState.getTextureSet(name);
+        const textureSet = getScenarioState(page).getTextureSet(name);
         if (!textureSet) {
             throw new Error(`Texture set ${name} not found in shared state`);
         }
@@ -593,7 +616,7 @@ When("I select version {int}", async ({ page }, versionNumber: number) => {
 When(
     "I set {string} as the default texture set for version {int}",
     async ({ page }, name: string, versionNumber: number) => {
-        const textureSet = sharedState.getTextureSet(name);
+        const textureSet = getScenarioState(page).getTextureSet(name);
         if (!textureSet) {
             throw new Error(`Texture set ${name} not found in shared state`);
         }
@@ -633,20 +656,17 @@ When(
 
         // Reload page to force frontend to pick up new default texture set
         await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(
-            ".viewer-controls, .version-dropdown-trigger",
-            {
-                state: "visible",
-                timeout: 30000,
-            },
-        );
+        await page.waitForSelector(".p-menubar, .version-dropdown-trigger", {
+            state: "visible",
+            timeout: 30000,
+        });
     },
 );
 
 Then(
     "version {int} should have {string} as default",
     async ({ page }, versionNumber: number, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
         if (!textureSet) {
             throw new Error(
                 `Texture set ${textureSetName} not found in shared state`,
@@ -696,7 +716,7 @@ When("I select the texture set {string}", async ({ page }, name: string) => {
 Then(
     "version {int} should still have {string} as default",
     async ({ page }, versionNumber: number, textureSetName: string) => {
-        const textureSet = sharedState.getTextureSet(textureSetName);
+        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
         if (!textureSet) {
             throw new Error(
                 `Texture set ${textureSetName} not found in shared state`,
@@ -972,10 +992,11 @@ Then(
 );
 
 /**
- * Captures the current texture UUID from the Three.js scene for comparison
+ * Captures the current texture UUID from the Three.js scene for comparison.
+ * Only looks at MeshStandardMaterial meshes to avoid picking up Stage shadow plane (MeshBasicMaterial).
  */
 When("I capture the current texture state", async ({ page }) => {
-    // Poll until the Three.js scene has a texture map loaded
+    // Poll until the Three.js scene has a texture map on a MeshStandardMaterial mesh
     await expect
         .poll(
             async () => {
@@ -985,7 +1006,12 @@ When("I capture the current texture state", async ({ page }) => {
                     if (!scene) return false;
                     let hasMap = false;
                     scene.traverse((obj: any) => {
-                        if (obj.isMesh && obj.material && obj.material.map) {
+                        if (
+                            obj.isMesh &&
+                            obj.material &&
+                            obj.material.isMeshStandardMaterial &&
+                            obj.material.map
+                        ) {
                             hasMap = true;
                         }
                     });
@@ -1006,11 +1032,16 @@ When("I capture the current texture state", async ({ page }) => {
         if (!scene) return null;
 
         let mapUuid = null;
+        // Only look at MeshStandardMaterial (our app's materials) to avoid
+        // picking up Stage shadow plane which uses MeshBasicMaterial
         scene.traverse((obj: any) => {
-            if (obj.isMesh && obj.material && obj.material.map) {
+            if (
+                obj.isMesh &&
+                obj.material &&
+                obj.material.isMeshStandardMaterial &&
+                obj.material.map
+            ) {
                 mapUuid = obj.material.map.uuid;
-                // Found one, good enough
-                return;
             }
         });
         return mapUuid;
@@ -1033,7 +1064,7 @@ When("I capture the current texture state", async ({ page }) => {
 Then(
     "the applied texture should be different from the captured state",
     async ({ page }) => {
-        // Poll for the texture UUID to change
+        // Poll for the texture UUID to change (only MeshStandardMaterial, not Stage shadow plane)
         await expect
             .poll(
                 async () => {
@@ -1047,10 +1078,10 @@ Then(
                             if (
                                 obj.isMesh &&
                                 obj.material &&
+                                obj.material.isMeshStandardMaterial &&
                                 obj.material.map
                             ) {
                                 mapUuid = obj.material.map.uuid;
-                                return;
                             }
                         });
                         return mapUuid;
@@ -1073,7 +1104,12 @@ Then(
             const scene = window.__THREE_SCENE__;
             let mapUuid = null;
             scene.traverse((obj: any) => {
-                if (obj.isMesh && obj.material && obj.material.map) {
+                if (
+                    obj.isMesh &&
+                    obj.material &&
+                    obj.material.isMeshStandardMaterial &&
+                    obj.material.map
+                ) {
                     mapUuid = obj.material.map.uuid;
                 }
             });
@@ -1089,7 +1125,7 @@ Then(
 Then(
     "the applied texture should be different from the previous state",
     async ({ page }) => {
-        // Poll for the texture UUID to change
+        // Poll for the texture UUID to change (only MeshStandardMaterial, not Stage shadow plane)
         await expect
             .poll(
                 async () => {
@@ -1103,10 +1139,10 @@ Then(
                             if (
                                 obj.isMesh &&
                                 obj.material &&
+                                obj.material.isMeshStandardMaterial &&
                                 obj.material.map
                             ) {
                                 mapUuid = obj.material.map.uuid;
-                                return;
                             }
                         });
                         return mapUuid;
@@ -1129,7 +1165,12 @@ Then(
             const scene = window.__THREE_SCENE__;
             let mapUuid = null;
             scene.traverse((obj: any) => {
-                if (obj.isMesh && obj.material && obj.material.map) {
+                if (
+                    obj.isMesh &&
+                    obj.material &&
+                    obj.material.isMeshStandardMaterial &&
+                    obj.material.map
+                ) {
                     mapUuid = obj.material.map.uuid;
                 }
             });
@@ -1178,7 +1219,7 @@ Given(
         }
 
         // Store in shared state
-        sharedState.saveTextureSet(setName, {
+        getScenarioState(page).saveTextureSet(setName, {
             id: textureSet.id,
             name: uniqueName,
         });

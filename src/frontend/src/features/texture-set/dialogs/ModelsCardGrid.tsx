@@ -22,6 +22,7 @@ interface GroupedModel {
   versions: Array<{
     versionNumber: number
     modelVersionId: number
+    materialName?: string
   }>
 }
 
@@ -57,6 +58,7 @@ export function ModelsCardGrid({
         group.versions.push({
           versionNumber: model.versionNumber,
           modelVersionId: model.modelVersionId,
+          materialName: model.materialName,
         })
       }
     })
@@ -83,6 +85,7 @@ export function ModelsCardGrid({
           name: model.name,
           versionNumber: version.versionNumber,
           modelVersionId: version.modelVersionId,
+          materialName: version.materialName ?? '',
         }
         onDisassociateModel(modelDto)
       },

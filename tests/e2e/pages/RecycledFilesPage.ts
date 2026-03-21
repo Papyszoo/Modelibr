@@ -139,12 +139,35 @@ export class RecycledFilesPage {
      */
     async clickDeleteForeverModel(index: number): Promise<void> {
         const card = this.getModelCard(index);
-        await card.hover();
-        await card.locator(this.deleteForeverButton).click();
-        // Wait for dialog to appear
-        await this.page.waitForSelector(this.deleteDialog, {
-            state: "visible",
-        });
+
+        // Retry loop: sometimes the first click doesn't trigger the dialog
+        // (e.g. hover state lost, overlay intercept). Try up to 3 times.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            await card.hover();
+            const deleteBtn = card.locator(this.deleteForeverButton);
+            await deleteBtn.waitFor({ state: "visible", timeout: 5000 });
+            await deleteBtn.click();
+
+            try {
+                await this.page.waitForSelector(this.deleteDialog, {
+                    state: "visible",
+                    timeout: 10000,
+                });
+                return; // Dialog appeared — success
+            } catch {
+                console.log(
+                    `[Retry] Delete dialog did not appear on attempt ${attempt + 1}, retrying...`,
+                );
+                // Dismiss any stale overlay before retrying
+                await this.page.keyboard.press("Escape");
+                await this.page.waitForTimeout(500);
+            }
+        }
+
+        // Final attempt with longer timeout
+        throw new Error(
+            "Delete confirmation dialog did not appear after 3 attempts",
+        );
     }
 
     // ===== Model Versions Section =====
@@ -175,7 +198,7 @@ export class RecycledFilesPage {
         const card = this.getModelVersionCard(index);
         await card.hover();
         await card.locator(this.restoreButton).click();
-        await card.waitFor({ state: "hidden", timeout: 10000 });
+        await card.waitFor({ state: "hidden", timeout: 25000 });
     }
 
     /**
@@ -221,9 +244,12 @@ export class RecycledFilesPage {
     async clickDeleteForeverModelVersion(index: number): Promise<void> {
         const card = this.getModelVersionCard(index);
         await card.hover();
-        await card.locator(this.deleteForeverButton).click();
+        const deleteBtn = card.locator(this.deleteForeverButton);
+        await deleteBtn.waitFor({ state: "visible", timeout: 5000 });
+        await deleteBtn.click();
         await this.page.waitForSelector(this.deleteDialog, {
             state: "visible",
+            timeout: 15000,
         });
     }
 

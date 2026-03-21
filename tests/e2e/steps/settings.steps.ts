@@ -7,7 +7,26 @@ import { SettingsPage } from "../pages/SettingsPage";
 
 const { Given, When, Then } = createBdd();
 
+const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+
 // Background
+
+Given("settings are reset to defaults via API", async ({ page }) => {
+    const response = await page.request.put(`${API_BASE}/settings`, {
+        data: {
+            maxFileSizeBytes: 1073741824,
+            maxThumbnailSizeBytes: 10485760,
+            thumbnailFrameCount: 30,
+            thumbnailCameraVerticalAngle: 0.75,
+            thumbnailWidth: 256,
+            thumbnailHeight: 256,
+            generateThumbnailOnUpload: true,
+            textureProxySize: 512,
+        },
+    });
+    expect(response.ok()).toBeTruthy();
+    console.log("[API] Settings reset to defaults");
+});
 
 Given("I am on the settings page", async ({ page }) => {
     console.log("Navigating to settings page...");

@@ -3,9 +3,8 @@ import './ModelViewer.css'
 import { Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { useQueryClient } from '@tanstack/react-query'
-import { Button } from 'primereact/button'
 import { Toast } from 'primereact/toast'
-import { type JSX, useCallback, useRef } from 'react'
+import { type JSX, useCallback, useMemo, useRef, useState } from 'react'
 import type * as THREE from 'three'
 
 import { ModelProvider } from '@/contexts/ModelContext'
@@ -18,25 +17,24 @@ import {
   useModelVersionsQuery,
 } from '@/features/model-viewer/api/queries'
 import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
-import { useModelViewerWindows } from '@/features/model-viewer/hooks/useModelViewerWindows'
 import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
+import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 import { type ModelVersionDto, type TextureSetDto } from '@/types'
 import { type Model } from '@/utils/fileUtils'
 
+import { type MaterialTextureSets } from './TexturedModel'
+
 import { FileUploadModal } from './FileUploadModal'
-import { ModelHierarchyWindow } from './ModelHierarchyWindow'
-import { ModelInfoWindow } from './ModelInfoWindow'
 import { Scene as ModelPreviewScene } from './ModelPreviewScene'
-import { ModelVersionWindow } from './ModelVersionWindow'
-import { TextureSetSelectorWindow } from './TextureSetSelectorWindow'
-import { ThumbnailWindow } from './ThumbnailWindow'
-import { UVMapWindow } from './UVMapWindow'
+import { PanelWrapper, type ExpandAction } from './PanelWrapper'
+import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { VersionStrip } from './VersionStrip'
-import { ViewerSettingsWindow } from './ViewerSettingsWindow'
+import { type PanelContent, ViewerMenubar } from './ViewerMenubar'
+import { ViewerSidePanel } from './ViewerSidePanel'
 
 interface ModelViewerProps {
   model?: Model
@@ -53,6 +51,131 @@ export function ModelViewer({
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+
+  // --- Panel state ---
+  const [leftPanel, setLeftPanel] = useState<PanelContent>(null)
+  const [rightPanel, setRightPanel] = useState<PanelContent>(null)
+  const [topPanel, setTopPanel] = useState<PanelContent>(null)
+  const [bottomPanel, setBottomPanel] = useState<PanelContent>(null)
+
+  // Panel open order tracking (for corner ownership defaults)
+  const panelOpenOrder = useRef<string[]>([])
+
+  // Corner ownership: which panel owns each corner
+  // 'vertical' means the side panel (left/right) owns the corner
+  // 'horizontal' means the top/bottom panel owns the corner
+  const [corners, setCorners] = useState({
+    topLeft: 'vertical' as 'vertical' | 'horizontal',
+    topRight: 'vertical' as 'vertical' | 'horizontal',
+    bottomLeft: 'vertical' as 'vertical' | 'horizontal',
+    bottomRight: 'vertical' as 'vertical' | 'horizontal',
+  })
+
+  // Panel sizes (pixels)
+  const [panelSizes, setPanelSizes] = useState({
+    left: 250,
+    right: 280,
+    top: 200,
+    bottom: 200,
+  })
+  const [resizing, setResizing] = useState<string | null>(null)
+  const resizeStart = useRef({ pos: 0, size: 0 })
+
+  // Panel open/close handlers with corner ownership tracking
+  const handlePanelChange = useCallback(
+    (side: 'left' | 'right' | 'top' | 'bottom', value: PanelContent) => {
+      const setters = {
+        left: setLeftPanel,
+        right: setRightPanel,
+        top: setTopPanel,
+        bottom: setBottomPanel,
+      }
+      const getters = {
+        left: leftPanel,
+        right: rightPanel,
+        top: topPanel,
+        bottom: bottomPanel,
+      }
+
+      if (value === null) {
+        // Closing panel - remove from order
+        panelOpenOrder.current = panelOpenOrder.current.filter(s => s !== side)
+      } else if (getters[side] === null) {
+        // Opening new panel - add to order, set corner defaults
+        panelOpenOrder.current.push(side)
+
+        // When opening horizontal panel (top/bottom), side panels get corners by default
+        // because they were (likely) opened first
+        if (side === 'top') {
+          setCorners(prev => ({
+            ...prev,
+            topLeft: leftPanel ? 'vertical' : 'horizontal',
+            topRight: rightPanel ? 'vertical' : 'horizontal',
+          }))
+        } else if (side === 'bottom') {
+          setCorners(prev => ({
+            ...prev,
+            bottomLeft: leftPanel ? 'vertical' : 'horizontal',
+            bottomRight: rightPanel ? 'vertical' : 'horizontal',
+          }))
+        } else if (side === 'left') {
+          setCorners(prev => ({
+            ...prev,
+            topLeft: topPanel ? 'horizontal' : 'vertical',
+            bottomLeft: bottomPanel ? 'horizontal' : 'vertical',
+          }))
+        } else if (side === 'right') {
+          setCorners(prev => ({
+            ...prev,
+            topRight: topPanel ? 'horizontal' : 'vertical',
+            bottomRight: bottomPanel ? 'horizontal' : 'vertical',
+          }))
+        }
+      }
+
+      setters[side](value)
+    },
+    [leftPanel, rightPanel, topPanel, bottomPanel]
+  )
+
+  // Resize divider mouse handlers
+  const startResize = useCallback(
+    (side: string, e: React.MouseEvent) => {
+      e.preventDefault()
+      const isHorizontal = side === 'left' || side === 'right'
+      resizeStart.current = {
+        pos: isHorizontal ? e.clientX : e.clientY,
+        size: panelSizes[side as keyof typeof panelSizes],
+      }
+      setResizing(side)
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const currentPos = isHorizontal ? moveEvent.clientX : moveEvent.clientY
+        const rawDelta = currentPos - resizeStart.current.pos
+        const reverse = side === 'right' || side === 'bottom'
+        const delta = reverse ? -rawDelta : rawDelta
+        const newSize = Math.max(
+          150,
+          Math.min(600, resizeStart.current.size + delta)
+        )
+        setPanelSizes(prev => ({ ...prev, [side]: newSize }))
+      }
+
+      const handleMouseUp = () => {
+        setResizing(null)
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize'
+      document.body.style.userSelect = 'none'
+    },
+    [panelSizes]
+  )
 
   // --- Data queries ---
   const modelQuery = useModelByIdQuery({
@@ -72,7 +195,6 @@ export function ModelViewer({
   const versions: ModelVersionDto[] = versionsQuery.data ?? []
 
   // --- Extracted hooks ---
-  const windows = useModelViewerWindows()
   const versionSelection = useVersionSelection(model, versions)
   const {
     selectedVersion,
@@ -92,10 +214,97 @@ export function ModelViewer({
   })
   const selectedTextureSet: TextureSetDto | null =
     selectedTextureSetId !== null ? (textureSetQuery.data ?? null) : null
+
+  // --- Variant selection + per-material texture sets ---
+  const [selectedVariant, setSelectedVariant] = useState<string>('')
+
+  // Sync selectedVariant when version changes
+  const currentVersionId = selectedVersion?.id
+  const currentMainVariant = selectedVersion?.mainVariantName ?? ''
+  const prevVersionIdRef = useRef<number | null>(null)
+  if (currentVersionId !== prevVersionIdRef.current) {
+    prevVersionIdRef.current = currentVersionId ?? null
+    if (currentMainVariant !== selectedVariant) {
+      setSelectedVariant(currentMainVariant)
+    }
+  }
+
+  const handleVariantChange = useCallback((variantName: string) => {
+    setSelectedVariant(variantName)
+  }, [])
+
+  // Fetch all texture sets for this version so we can build the material map
+  const versionTextureSetsQuery = useTextureSetsByModelVersionQuery({
+    modelVersionId: selectedVersion?.id ?? 0,
+    queryConfig: {
+      enabled: selectedVersion !== null,
+    },
+  })
+  const versionTextureSets = versionTextureSetsQuery.data ?? []
+
+  // Build materialTextureSets from textureMappings filtered by selected variant
+  const materialTextureSets = useMemo<MaterialTextureSets>(() => {
+    if (!selectedVersion) return {}
+
+    const mappings = selectedVersion.textureMappings ?? []
+    const variantMappings = mappings.filter(
+      m => m.variantName === selectedVariant
+    )
+
+    // Only use selectedTextureSet fallback for legacy (no variant system).
+    // When variants exist, an empty mapping means "no textures for this preset".
+    const hasVariants = (selectedVersion.variantNames ?? []).length > 0
+    if (
+      variantMappings.length === 0 &&
+      selectedTextureSet &&
+      !hasVariants &&
+      selectedVariant === ''
+    ) {
+      return { '': selectedTextureSet }
+    }
+
+    // Build a lookup from textureSetId -> TextureSetDto
+    const tsById = new Map<number, TextureSetDto>()
+    for (const ts of versionTextureSets) {
+      tsById.set(ts.id, ts)
+    }
+    // Also include selectedTextureSet if loaded individually
+    if (selectedTextureSet) {
+      tsById.set(selectedTextureSet.id, selectedTextureSet)
+    }
+
+    const result: MaterialTextureSets = {}
+    for (const mapping of variantMappings) {
+      const ts = tsById.get(mapping.textureSetId)
+      if (ts) {
+        result[mapping.materialName] = ts
+      }
+    }
+    // When user explicitly selects a texture set for preview, prefer it over
+    // last-wins ordering for any material slot it's mapped to.
+    // Use selectedTextureSetId (not selectedTextureSet) so the override applies
+    // immediately, even before the individual texture set query resolves.
+    if (selectedTextureSetId !== null) {
+      const selectedTs = tsById.get(selectedTextureSetId)
+      if (selectedTs) {
+        for (const mapping of variantMappings) {
+          if (mapping.textureSetId === selectedTextureSetId) {
+            result[mapping.materialName] = selectedTs
+          }
+        }
+      }
+    }
+    return result
+  }, [
+    selectedVersion,
+    selectedVariant,
+    versionTextureSets,
+    selectedTextureSet,
+    selectedTextureSetId,
+  ])
   const loading = !propModel && !!modelId && modelQuery.isLoading
   const error =
     modelQuery.error instanceof Error ? modelQuery.error.message : ''
-  const buttonPosition = side === 'left' ? 'right' : 'left'
 
   // --- Thumbnail subscription ---
   useModelThumbnailUpdates(
@@ -207,7 +416,9 @@ export function ModelViewer({
       detail: string
       life: number
     }) => {
-      toast.current?.show(opts)
+      toast.current?.show(
+        opts as Parameters<NonNullable<typeof toast.current>['show']>[0]
+      )
     },
     []
   )
@@ -240,6 +451,136 @@ export function ModelViewer({
     return <div className="model-viewer-error">No model data available</div>
   }
 
+  // --- Grid layout computation ---
+  const hasLeft = leftPanel !== null
+  const hasRight = rightPanel !== null
+  const hasTop = topPanel !== null
+  const hasBottom = bottomPanel !== null
+
+  // Compute grid row/column for each panel based on corner ownership
+  // Grid: 5 cols x 5 rows
+  // Col indices: 1=left, 2=leftDiv, 3=center, 4=rightDiv, 5=right
+  // Row indices: 1=top, 2=topDiv, 3=center, 4=bottomDiv, 5=bottom
+  const leftRowStart = hasTop && corners.topLeft === 'horizontal' ? 3 : 1
+  const leftRowEnd = hasBottom && corners.bottomLeft === 'horizontal' ? 4 : 6
+  const rightRowStart = hasTop && corners.topRight === 'horizontal' ? 3 : 1
+  const rightRowEnd = hasBottom && corners.bottomRight === 'horizontal' ? 4 : 6
+  const topColStart = hasLeft && corners.topLeft === 'vertical' ? 3 : 1
+  const topColEnd = hasRight && corners.topRight === 'vertical' ? 4 : 6
+  const bottomColStart = hasLeft && corners.bottomLeft === 'vertical' ? 3 : 1
+  const bottomColEnd = hasRight && corners.bottomRight === 'vertical' ? 4 : 6
+
+  const gridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: `${hasLeft ? panelSizes.left + 'px' : '0px'} ${hasLeft ? '4px' : '0px'} 1fr ${hasRight ? '4px' : '0px'} ${hasRight ? panelSizes.right + 'px' : '0px'}`,
+    gridTemplateRows: `${hasTop ? panelSizes.top + 'px' : '0px'} ${hasTop ? '4px' : '0px'} 1fr ${hasBottom ? '4px' : '0px'} ${hasBottom ? panelSizes.bottom + 'px' : '0px'}`,
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  }
+
+  // Panel title map
+  const panelTitles: Record<string, string> = {
+    hierarchy: 'Hierarchy',
+    materials: 'Materials',
+    modelInfo: 'Model Info',
+    uvMap: 'UV Map',
+    thumbnail: 'Thumbnail Details',
+  }
+
+  // Expand actions for panels
+  const getLeftExpandActions = (): ExpandAction[] => {
+    const actions: ExpandAction[] = []
+    if (hasTop && corners.topLeft === 'horizontal') {
+      actions.push({
+        direction: 'up',
+        tooltip: 'Expand to top-left corner',
+        onClick: () => setCorners(prev => ({ ...prev, topLeft: 'vertical' })),
+      })
+    }
+    if (hasBottom && corners.bottomLeft === 'horizontal') {
+      actions.push({
+        direction: 'down',
+        tooltip: 'Expand to bottom-left corner',
+        onClick: () =>
+          setCorners(prev => ({ ...prev, bottomLeft: 'vertical' })),
+      })
+    }
+    return actions
+  }
+
+  const getRightExpandActions = (): ExpandAction[] => {
+    const actions: ExpandAction[] = []
+    if (hasTop && corners.topRight === 'horizontal') {
+      actions.push({
+        direction: 'up',
+        tooltip: 'Expand to top-right corner',
+        onClick: () => setCorners(prev => ({ ...prev, topRight: 'vertical' })),
+      })
+    }
+    if (hasBottom && corners.bottomRight === 'horizontal') {
+      actions.push({
+        direction: 'down',
+        tooltip: 'Expand to bottom-right corner',
+        onClick: () =>
+          setCorners(prev => ({ ...prev, bottomRight: 'vertical' })),
+      })
+    }
+    return actions
+  }
+
+  const getTopExpandActions = (): ExpandAction[] => {
+    const actions: ExpandAction[] = []
+    if (hasLeft && corners.topLeft === 'vertical') {
+      actions.push({
+        direction: 'left',
+        tooltip: 'Expand to top-left corner',
+        onClick: () => setCorners(prev => ({ ...prev, topLeft: 'horizontal' })),
+      })
+    }
+    if (hasRight && corners.topRight === 'vertical') {
+      actions.push({
+        direction: 'right',
+        tooltip: 'Expand to top-right corner',
+        onClick: () =>
+          setCorners(prev => ({ ...prev, topRight: 'horizontal' })),
+      })
+    }
+    return actions
+  }
+
+  const getBottomExpandActions = (): ExpandAction[] => {
+    const actions: ExpandAction[] = []
+    if (hasLeft && corners.bottomLeft === 'vertical') {
+      actions.push({
+        direction: 'left',
+        tooltip: 'Expand to bottom-left corner',
+        onClick: () =>
+          setCorners(prev => ({ ...prev, bottomLeft: 'horizontal' })),
+      })
+    }
+    if (hasRight && corners.bottomRight === 'vertical') {
+      actions.push({
+        direction: 'right',
+        tooltip: 'Expand to bottom-right corner',
+        onClick: () =>
+          setCorners(prev => ({ ...prev, bottomRight: 'horizontal' })),
+      })
+    }
+    return actions
+  }
+
+  const sidePanelProps = {
+    model,
+    modelVersionId: selectedVersion?.id ?? null,
+    selectedVersion,
+    selectedTextureSetId,
+    onTextureSetSelect: handleTextureSetSelect,
+    onVariantChange: handleVariantChange,
+    onModelUpdated: handleModelUpdated,
+    onRegenerate: handleRegenerateThumbnail,
+  }
+
   return (
     <div
       className="model-viewer model-viewer-tab"
@@ -250,36 +591,8 @@ export function ModelViewer({
       <Toast ref={toast} />
 
       {fileUpload.dragOver && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '3px dashed #3b82f6',
-            borderRadius: '8px',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-          }}
-        >
-          <div
-            style={{
-              background: '#3b82f6',
-              color: 'white',
-              padding: '2rem 3rem',
-              borderRadius: '8px',
-              fontSize: '1.5rem',
-              fontWeight: 'bold',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-            }}
-          >
-            Drop file to upload
-          </div>
+        <div className="viewer-drag-overlay">
+          <div className="viewer-drag-message">Drop file to upload</div>
         </div>
       )}
 
@@ -296,6 +609,18 @@ export function ModelViewer({
         />
       </header>
 
+      <ViewerMenubar
+        leftPanel={leftPanel}
+        rightPanel={rightPanel}
+        topPanel={topPanel}
+        bottomPanel={bottomPanel}
+        onLeftPanelChange={v => handlePanelChange('left', v)}
+        onRightPanelChange={v => handlePanelChange('right', v)}
+        onTopPanelChange={v => handlePanelChange('top', v)}
+        onBottomPanelChange={v => handlePanelChange('bottom', v)}
+        onAddVersion={fileUpload.handleUploadClick}
+      />
+
       <ModelProvider>
         <input
           type="file"
@@ -304,205 +629,219 @@ export function ModelViewer({
           onChange={fileUpload.handleFileSelect}
           accept=".obj,.fbx,.gltf,.glb,.blend"
         />
-        <div className="viewer-container">
-          {/* Model name overlay */}
-          <div className="viewer-model-name-overlay">
-            <span>{model.name}</span>
-          </div>
-          {/* Floating action buttons for sidebar controls */}
-          <div className={`viewer-controls viewer-controls-${buttonPosition}`}>
-            <Button
-              icon="pi pi-plus"
-              className="p-button-rounded viewer-control-btn"
-              onClick={fileUpload.handleUploadClick}
-              tooltip="Add Version"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
+
+        <div className="viewer-layout" style={gridStyle}>
+          {/* Left Panel */}
+          {hasLeft && (
+            <div
+              className="viewer-panel"
+              style={{
+                gridColumn: '1 / 2',
+                gridRow: `${leftRowStart} / ${leftRowEnd}`,
               }}
-              aria-label="Add Version"
-            />
-            <Button
-              icon="pi pi-cog"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => windows.toggle('settings')}
-              tooltip="Viewer Settings"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
+            >
+              <PanelWrapper
+                title={panelTitles[leftPanel!] ?? 'Panel'}
+                side="left"
+                onClose={() => handlePanelChange('left', null)}
+                expandActions={getLeftExpandActions()}
+              >
+                <ViewerSidePanel content={leftPanel} {...sidePanelProps} />
+              </PanelWrapper>
+            </div>
+          )}
+
+          {/* Left divider */}
+          {hasLeft && (
+            <div
+              className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'left' ? 'resizing' : ''}`}
+              style={{
+                gridColumn: '2 / 3',
+                gridRow: `${leftRowStart} / ${leftRowEnd}`,
               }}
+              onMouseDown={e => startResize('left', e)}
             />
-            <Button
-              icon="pi pi-info-circle"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => windows.toggle('info')}
-              tooltip="Model Information"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
+          )}
+
+          {/* Top Panel */}
+          {hasTop && (
+            <div
+              className="viewer-panel"
+              style={{
+                gridColumn: `${topColStart} / ${topColEnd}`,
+                gridRow: '1 / 2',
               }}
-            />
-            <Button
-              icon="pi pi-palette"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => windows.toggle('textureSet')}
-              tooltip="Texture Sets"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
+            >
+              <PanelWrapper
+                title={panelTitles[topPanel!] ?? 'Panel'}
+                side="top"
+                onClose={() => handlePanelChange('top', null)}
+                expandActions={getTopExpandActions()}
+              >
+                <ViewerSidePanel content={topPanel} {...sidePanelProps} />
+              </PanelWrapper>
+            </div>
+          )}
+
+          {/* Top divider */}
+          {hasTop && (
+            <div
+              className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'top' ? 'resizing' : ''}`}
+              style={{
+                gridColumn: `${topColStart} / ${topColEnd}`,
+                gridRow: '2 / 3',
               }}
+              onMouseDown={e => startResize('top', e)}
             />
-            <Button
-              icon="pi pi-sitemap"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => windows.toggle('hierarchy')}
-              tooltip="Model Hierarchy"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
-            <Button
-              icon="pi pi-image"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => windows.toggle('thumbnail')}
-              tooltip="Thumbnail Details"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
-            <Button
-              icon="pi pi-map"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => windows.toggle('uvMap')}
-              tooltip="UV Map"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
-            <Button
-              icon="pi pi-box"
-              className="p-button-rounded viewer-control-btn"
-              onClick={() => {
-                if (model?.id) {
-                  const versionParam = selectedVersion?.id
-                    ? `&versionId=${selectedVersion.id}`
-                    : ''
-                  window.location.href = `modelibr://open?modelId=${model.id}${versionParam}`
+          )}
+
+          {/* Canvas (always center cell: col 3, row 3) */}
+          <div
+            className="viewer-canvas-panel"
+            style={{ gridColumn: '3 / 4', gridRow: '3 / 4' }}
+          >
+            <div className="viewer-container">
+              <div className="viewer-model-name-overlay">
+                <span>{model.name}</span>
+              </div>
+              <div
+                className="viewer-controls-info"
+                title={
+                  'Mouse: Rotate view\nScroll: Zoom in/out\nRight-click + drag: Pan view'
                 }
-              }}
-              tooltip="Open in Blender"
-              tooltipOptions={{
-                position: buttonPosition === 'left' ? 'right' : 'left',
-              }}
-            />
+              >
+                <i className="pi pi-info-circle" />
+              </div>
+
+              {error ? (
+                <div className="viewer-error">
+                  <h3>Failed to load model</h3>
+                  <p>{error}</p>
+                  <button
+                    onClick={() => void modelQuery.refetch()}
+                    className="retry-button"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <CanvasErrorBoundary>
+                    <Canvas
+                      key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                      shadows
+                      className="viewer-canvas"
+                      data-testid="model-viewer-canvas"
+                      gl={{
+                        antialias: true,
+                        alpha: true,
+                        powerPreference: 'high-performance',
+                      }}
+                      dpr={Math.min(window.devicePixelRatio, 2)}
+                      onCreated={state => {
+                        if (typeof window !== 'undefined') {
+                          ;(
+                            window as Window & {
+                              __THREE_SCENE__?: THREE.Scene
+                              __THREE_STATE__?: typeof state
+                            }
+                          ).__THREE_SCENE__ = state.scene
+                          ;(
+                            window as Window & {
+                              __THREE_SCENE__?: THREE.Scene
+                              __THREE_STATE__?: typeof state
+                            }
+                          ).__THREE_STATE__ = state
+                        }
+                      }}
+                    >
+                      <ModelPreviewScene
+                        key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                        model={versionModel || model}
+                        settings={viewerSettings}
+                        materialTextureSets={materialTextureSets}
+                        defaultFileId={defaultFileId}
+                      />
+                    </Canvas>
+                  </CanvasErrorBoundary>
+                  <div ref={statsContainerRef} className="stats-container" />
+                  {viewerSettings.showStats && statsContainerRef.current && (
+                    <Stats
+                      showPanel={0}
+                      parent={
+                        statsContainerRef as unknown as React.RefObject<HTMLElement>
+                      }
+                    />
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
-          {error ? (
-            <div className="viewer-error">
-              <h3>Failed to load model</h3>
-              <p>{error}</p>
-              <button
-                onClick={() => void modelQuery.refetch()}
-                className="retry-button"
+          {/* Bottom divider */}
+          {hasBottom && (
+            <div
+              className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'bottom' ? 'resizing' : ''}`}
+              style={{
+                gridColumn: `${bottomColStart} / ${bottomColEnd}`,
+                gridRow: '4 / 5',
+              }}
+              onMouseDown={e => startResize('bottom', e)}
+            />
+          )}
+
+          {/* Bottom Panel */}
+          {hasBottom && (
+            <div
+              className="viewer-panel"
+              style={{
+                gridColumn: `${bottomColStart} / ${bottomColEnd}`,
+                gridRow: '5 / 6',
+              }}
+            >
+              <PanelWrapper
+                title={panelTitles[bottomPanel!] ?? 'Panel'}
+                side="bottom"
+                onClose={() => handlePanelChange('bottom', null)}
+                expandActions={getBottomExpandActions()}
               >
-                Retry
-              </button>
+                <ViewerSidePanel content={bottomPanel} {...sidePanelProps} />
+              </PanelWrapper>
             </div>
-          ) : (
-            <>
-              <Canvas
-                key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                shadows
-                className="viewer-canvas"
-                data-testid="model-viewer-canvas"
-                gl={{
-                  antialias: true,
-                  alpha: true,
-                  powerPreference: 'high-performance',
-                }}
-                dpr={Math.min(window.devicePixelRatio, 2)}
-                onCreated={state => {
-                  if (typeof window !== 'undefined') {
-                    ;(
-                      window as Window & {
-                        __THREE_SCENE__?: THREE.Scene
-                        __THREE_STATE__?: typeof state
-                      }
-                    ).__THREE_SCENE__ = state.scene
-                    ;(
-                      window as Window & {
-                        __THREE_SCENE__?: THREE.Scene
-                        __THREE_STATE__?: typeof state
-                      }
-                    ).__THREE_STATE__ = state
-                  }
-                }}
+          )}
+
+          {/* Right divider */}
+          {hasRight && (
+            <div
+              className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'right' ? 'resizing' : ''}`}
+              style={{
+                gridColumn: '4 / 5',
+                gridRow: `${rightRowStart} / ${rightRowEnd}`,
+              }}
+              onMouseDown={e => startResize('right', e)}
+            />
+          )}
+
+          {/* Right Panel */}
+          {hasRight && (
+            <div
+              className="viewer-panel"
+              style={{
+                gridColumn: '5 / 6',
+                gridRow: `${rightRowStart} / ${rightRowEnd}`,
+              }}
+            >
+              <PanelWrapper
+                title={panelTitles[rightPanel!] ?? 'Panel'}
+                side="right"
+                onClose={() => handlePanelChange('right', null)}
+                expandActions={getRightExpandActions()}
               >
-                <ModelPreviewScene
-                  key={`scene-${model.id}-${side}-${selectedTextureSetId || 'none'}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                  model={versionModel || model}
-                  settings={viewerSettings}
-                  textureSet={selectedTextureSet}
-                  defaultFileId={defaultFileId}
-                />
-              </Canvas>
-              <div ref={statsContainerRef} className="stats-container" />
-              {viewerSettings.showStats && statsContainerRef.current && (
-                <Stats showPanel={0} parent={statsContainerRef} />
-              )}
-            </>
+                <ViewerSidePanel content={rightPanel} {...sidePanelProps} />
+              </PanelWrapper>
+            </div>
           )}
         </div>
-
-        {/* Floating Windows */}
-        <ViewerSettingsWindow
-          visible={windows.visibility.settings}
-          onClose={() => windows.close('settings')}
-          side={side}
-        />
-        <ModelInfoWindow
-          visible={windows.visibility.info}
-          onClose={() => windows.close('info')}
-          side={side}
-          modelId={model.id}
-          onModelUpdated={handleModelUpdated}
-        />
-        <TextureSetSelectorWindow
-          visible={windows.visibility.textureSet}
-          onClose={() => windows.close('textureSet')}
-          side={side}
-          modelId={model.id}
-          modelVersionId={selectedVersion?.id || model.activeVersionId || null}
-          selectedVersion={selectedVersion}
-          selectedTextureSetId={selectedTextureSetId}
-          onTextureSetSelect={handleTextureSetSelect}
-          onModelUpdated={handleModelUpdated}
-        />
-        <ThumbnailWindow
-          visible={windows.visibility.thumbnail}
-          onClose={() => windows.close('thumbnail')}
-          side={side}
-          modelId={model.id}
-          selectedVersion={selectedVersion}
-          onRegenerate={handleRegenerateThumbnail}
-        />
-        <ModelHierarchyWindow
-          visible={windows.visibility.hierarchy}
-          onClose={() => windows.close('hierarchy')}
-          side={side}
-        />
-        <UVMapWindow
-          visible={windows.visibility.uvMap}
-          onClose={() => windows.close('uvMap')}
-          side={side}
-          modelId={model.id}
-        />
-        <ModelVersionWindow
-          visible={windows.visibility.version}
-          onClose={() => windows.close('version')}
-          side={side}
-          modelId={model.id}
-          onVersionSelect={handleVersionSelect}
-          onDefaultFileChange={handleDefaultFileChange}
-          onModelUpdate={handleModelUpdated}
-          onRecycleVersion={handleRecycleVersion}
-        />
       </ModelProvider>
 
       {/* File Upload Modal */}

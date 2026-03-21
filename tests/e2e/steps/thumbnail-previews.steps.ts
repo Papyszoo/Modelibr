@@ -144,7 +144,12 @@ async function switchToModelSpecificKind(page: any, searchText?: string) {
     // If a search text is provided, filter the grid so the card appears on the first page
     if (searchText) {
         const searchInput = page.locator(".search-input");
-        if (await searchInput.isVisible({ timeout: 3000 })) {
+        if (
+            await searchInput
+                .waitFor({ state: "visible", timeout: 3000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
             await searchInput.clear();
             await searchInput.fill(searchText);
             await page.waitForTimeout(500);

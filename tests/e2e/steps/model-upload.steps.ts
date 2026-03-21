@@ -3,10 +3,6 @@ import { expect } from "@playwright/test";
 import { ModelListPage } from "../pages/ModelListPage";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
-import {
-    cleanupStaleModels,
-    cleanupStaleRecycledModels,
-} from "../helpers/cleanup-helper";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -16,10 +12,7 @@ const __dirname = path.dirname(__filename);
 const { Given, When, Then } = createBdd();
 
 Given("I am on the model list page", async ({ page }) => {
-    // Clean up accumulated models from previous test runs
-    await cleanupStaleModels();
-    await cleanupStaleRecycledModels();
-
+    // Cleanup now runs once in global-setup.ts (before any workers start)
     const modelList = new ModelListPage(page);
     await modelList.goto();
 });

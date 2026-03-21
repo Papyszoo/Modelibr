@@ -1,3 +1,9 @@
+export interface TextureMappingDto {
+  materialName: string
+  textureSetId: number
+  variantName: string
+}
+
 export interface ModelVersionDto {
   id: number
   modelId: number
@@ -8,6 +14,11 @@ export interface ModelVersionDto {
   thumbnailUrl?: string
   pngThumbnailUrl?: string
   files: VersionFileDto[]
+  materialNames: string[]
+  mainVariantName?: string
+  variantNames: string[]
+  textureMappings: TextureMappingDto[]
+  textureSetIds: number[]
 }
 
 export interface VersionFileDto {

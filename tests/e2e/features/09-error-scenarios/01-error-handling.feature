@@ -10,12 +10,12 @@ Feature: Error Scenarios
     Then an error indicator should be displayed
     And the model list should remain unchanged
 
-  @error-nonexistent-resource
+  @error-nonexistent-resource @api-only
   Scenario: Requesting a non-existent model via API returns 404
     When I request model with ID 999999 via API
     Then the API should return a 404 status
 
-  @error-nonexistent-delete
+  @error-nonexistent-delete @api-only
   Scenario: Deleting a non-existent model via API returns error
     When I attempt to delete model with ID 999999 via API
     Then the API should return a non-success status

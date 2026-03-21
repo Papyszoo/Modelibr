@@ -120,7 +120,8 @@ export function TextureSetDetailDialog({
           }
           await textureSetsApi.disassociateTextureSetFromModelVersion(
             currentSet.id,
-            model.modelVersionId
+            model.modelVersionId,
+            model.materialName || undefined
           )
           toast.current?.show({
             severity: 'success',

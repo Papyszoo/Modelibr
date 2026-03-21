@@ -40,8 +40,12 @@ When("I create a stage named {string}", async ({ page }, name: string) => {
 Given("a stage named {string} exists", async ({ page }, name: string) => {
     console.log(`[Stages] Ensuring stage "${name}" exists...`);
 
-    // Check if the stage already exists via the stages page
+    // Always navigate to stages page first so isStageVisible has the correct context
     const stageListPage = new StageListPage(page);
+    await stageListPage.navigateToStageList();
+    await stageListPage.waitForLoaded();
+
+    // Check if the stage already exists via the stages page
     const isVisible = await stageListPage.isStageVisible(name);
 
     if (isVisible) {
@@ -72,11 +76,14 @@ Given("a stage named {string} exists", async ({ page }, name: string) => {
     await stageListPage.navigateToStageList();
     await stageListPage.waitForLoaded();
 
-    // Verify the stage is now visible
+    // Verify the stage is now visible (use .first() in case prior runs left duplicates)
     await expect(
-        page.locator(".stage-card").filter({
-            has: page.locator(".stage-card-name", { hasText: name }),
-        }),
+        page
+            .locator(".stage-card")
+            .filter({
+                has: page.locator(".stage-card-name", { hasText: name }),
+            })
+            .first(),
     ).toBeVisible({ timeout: 10000 });
 
     console.log(

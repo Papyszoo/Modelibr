@@ -2,28 +2,31 @@ import './ModelHierarchy.css'
 
 import { Tree } from 'primereact/tree'
 import { type TreeNode } from 'primereact/treenode'
-import { useState } from 'react'
+import { useCallback, type JSX } from 'react'
 
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { type HierarchyNode } from '@/features/model-viewer/hooks/useModelHierarchy'
 
 interface ModelHierarchyProps {
   hierarchy: HierarchyNode | null
 }
 
+function getNodeTypeClass(type: string): string {
+  const t = type.toLowerCase()
+  if (t === 'mesh' || t === 'skinnedmesh') return 'node-type-mesh'
+  if (t === 'group') return 'node-type-group'
+  if (t === 'scene') return 'node-type-scene'
+  if (t === 'object3d' || t === 'bone') return 'node-type-object3d'
+  return ''
+}
+
 /**
  * Convert HierarchyNode to PrimeReact TreeNode format
  */
 function convertToTreeNode(node: HierarchyNode): TreeNode {
-  const label = (
-    <div className="hierarchy-node-label">
-      <span className="node-name">{node.name}</span>
-      <span className="node-type">{node.type}</span>
-    </div>
-  )
-
   const treeNode: TreeNode = {
     key: node.id,
-    label,
+    label: node.name,
     children: node.children.map(child => convertToTreeNode(child)),
     data: node,
   }
@@ -32,8 +35,44 @@ function convertToTreeNode(node: HierarchyNode): TreeNode {
 }
 
 export function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
-  const [selectedKeys, setSelectedKeys] = useState<{ [key: string]: boolean }>(
-    {}
+  const { selectedNodeId, setSelectedNodeId, setHoveredNodeId } =
+    useModelObject()
+
+  const selectedKeys = selectedNodeId ? { [selectedNodeId]: true } : {}
+
+  const handleSelectionChange = useCallback(
+    (e: { value: string | { [key: string]: boolean } | null }) => {
+      const value = e.value
+      const clickedKey =
+        typeof value === 'string' ? value : Object.keys(value || {})[0]
+      if (clickedKey && clickedKey === selectedNodeId) {
+        setSelectedNodeId(null)
+      } else if (clickedKey) {
+        setSelectedNodeId(clickedKey)
+      } else {
+        setSelectedNodeId(null)
+      }
+    },
+    [selectedNodeId, setSelectedNodeId]
+  )
+
+  const nodeTemplate = useCallback(
+    (node: TreeNode): JSX.Element => {
+      const data = node.data as HierarchyNode
+      return (
+        <div
+          className="hierarchy-node-label"
+          onMouseEnter={() => setHoveredNodeId(data.id)}
+          onMouseLeave={() => setHoveredNodeId(null)}
+        >
+          <span className="node-name">{data.name}</span>
+          <span className={`node-type ${getNodeTypeClass(data.type)}`}>
+            {data.type}
+          </span>
+        </div>
+      )
+    },
+    [setHoveredNodeId]
   )
 
   if (!hierarchy) {
@@ -45,8 +84,9 @@ export function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
   }
 
   const treeData = [convertToTreeNode(hierarchy)]
-  const selectedKey = Object.keys(selectedKeys)[0] || null
-  const selectedNode = selectedKey ? findNodeById(hierarchy, selectedKey) : null
+  const selectedNode = selectedNodeId
+    ? findNodeById(hierarchy, selectedNodeId)
+    : null
 
   return (
     <div className="model-hierarchy">
@@ -55,23 +95,8 @@ export function ModelHierarchy({ hierarchy }: ModelHierarchyProps) {
           value={treeData}
           selectionMode="single"
           selectionKeys={selectedKeys}
-          onSelectionChange={e => {
-            // PrimeReact Tree returns the value as either an object or the key itself
-            // Normalize it to always be an object
-            const value = e.value
-
-            // Check if clicking on already selected node to deselect
-            const clickedKey =
-              typeof value === 'string' ? value : Object.keys(value || {})[0]
-            if (clickedKey && selectedKeys[clickedKey]) {
-              // Deselect if already selected
-              setSelectedKeys({})
-            } else if (typeof value === 'string') {
-              setSelectedKeys({ [value]: true })
-            } else {
-              setSelectedKeys(value || {})
-            }
-          }}
+          onSelectionChange={handleSelectionChange}
+          nodeTemplate={nodeTemplate}
           className="hierarchy-tree-component"
         />
       </div>

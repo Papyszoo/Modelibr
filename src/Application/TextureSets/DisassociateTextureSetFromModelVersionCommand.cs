@@ -7,16 +7,13 @@ namespace Application.TextureSets;
 
 internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHandler<DisassociateTextureSetFromModelVersionCommand>
 {
-    private readonly ITextureSetRepository _textureSetRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public DisassociateTextureSetFromModelVersionCommandHandler(
-        ITextureSetRepository textureSetRepository,
         IModelVersionRepository modelVersionRepository,
         IDateTimeProvider dateTimeProvider)
     {
-        _textureSetRepository = textureSetRepository;
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -25,14 +22,6 @@ internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHa
     {
         try
         {
-            // Get the texture set
-            var textureSet = await _textureSetRepository.GetByIdAsync(command.TextureSetId, cancellationToken);
-            if (textureSet == null)
-            {
-                return Result.Failure(
-                    new Error("TextureSetNotFound", $"Texture set with ID {command.TextureSetId} was not found."));
-            }
-
             // Get the model version
             var modelVersion = await _modelVersionRepository.GetByIdAsync(command.ModelVersionId, cancellationToken);
             if (modelVersion == null)
@@ -41,18 +30,19 @@ internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHa
                     new Error("ModelVersionNotFound", $"Model version with ID {command.ModelVersionId} was not found."));
             }
 
-            // Check if association exists
-            if (!textureSet.HasModelVersion(command.ModelVersionId))
+            // When MaterialName is not specified, remove ALL mappings for this texture set
+            if (command.MaterialName == null)
             {
-                return Result.Failure(
-                    new Error("AssociationNotFound", $"Texture set '{textureSet.Name}' is not associated with model version {modelVersion.VersionNumber}."));
+                await _modelVersionRepository.RemoveTextureMappingsByTextureSetIdAsync(
+                    modelVersion.Id, command.TextureSetId, cancellationToken);
             }
-
-            // Remove the model version association
-            textureSet.RemoveModelVersion(modelVersion, _dateTimeProvider.UtcNow);
-
-            // Update the texture set
-            await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            else
+            {
+                var materialName = command.MaterialName ?? string.Empty;
+                var variantName = command.VariantName ?? string.Empty;
+                await _modelVersionRepository.RemoveTextureMappingAsync(
+                    modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
+            }
 
             return Result.Success();
         }
@@ -64,4 +54,4 @@ internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHa
     }
 }
 
-public record DisassociateTextureSetFromModelVersionCommand(int TextureSetId, int ModelVersionId) : ICommand;
+public record DisassociateTextureSetFromModelVersionCommand(int TextureSetId, int ModelVersionId, string? MaterialName = null, string? VariantName = null) : ICommand;

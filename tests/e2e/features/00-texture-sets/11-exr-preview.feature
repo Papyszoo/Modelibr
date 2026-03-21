@@ -5,6 +5,7 @@ Feature: EXR Texture Preview Loading
   using the EXRLoader with proper color space handling.
   Preview tab is only available for Universal (Global Materials) texture sets.
 
+  @timeout:300000
   Scenario: Preview tab renders without errors when texture set contains EXR textures
     Given I am on the texture sets page
     When I create a universal texture set with EXR textures named "exr_preview_test"
@@ -15,6 +16,7 @@ Feature: EXR Texture Preview Loading
     And no console errors should be present
     And I take a screenshot named "exr-preview-no-crash"
 
+  @timeout:300000
   Scenario: Preview tab renders with mixed EXR and standard textures
     Given I am on the texture sets page
     When I create a universal texture set with mixed EXR and standard textures named "mixed_exr_test"

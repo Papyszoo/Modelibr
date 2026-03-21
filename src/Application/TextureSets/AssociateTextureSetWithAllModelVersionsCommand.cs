@@ -44,7 +44,7 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
                     new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
             }
 
-            // Get all versions of the model
+            // Get all versions of the model (AsNoTracking, for ID/mapping info only)
             var modelVersions = await _modelVersionRepository.GetByModelIdAsync(command.ModelId, cancellationToken);
             if (!modelVersions.Any())
             {
@@ -52,18 +52,25 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
                     new Error("NoVersionsFound", $"No versions found for model '{model.Name}'."));
             }
 
-            // Associate texture set with all versions
-            var now = _dateTimeProvider.UtcNow;
+            var materialName = command.MaterialName ?? string.Empty;
+
+            // Associate texture set with all versions directly via repository
             foreach (var version in modelVersions)
             {
-                if (!textureSet.HasModelVersion(version.Id))
-                {
-                    textureSet.AddModelVersion(version, now);
-                }
-            }
+                // Skip if already mapped
+                if (version.TextureMappings.Any(m => m.TextureSetId == command.TextureSetId && m.MaterialName == materialName))
+                    continue;
 
-            // Update the texture set
-            await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+                // For named materials, remove existing mapping for that material name
+                if (!string.IsNullOrEmpty(materialName))
+                {
+                    await _modelVersionRepository.RemoveTextureMappingByMaterialAsync(
+                        version.Id, materialName, cancellationToken);
+                }
+
+                await _modelVersionRepository.AddTextureMappingAsync(
+                    version.Id, command.TextureSetId, materialName, cancellationToken);
+            }
 
             return Result.Success();
         }
@@ -75,4 +82,4 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
     }
 }
 
-public record AssociateTextureSetWithAllModelVersionsCommand(int TextureSetId, int ModelId) : ICommand;
+public record AssociateTextureSetWithAllModelVersionsCommand(int TextureSetId, int ModelId, string? MaterialName = null) : ICommand;

@@ -92,7 +92,7 @@ public class TextureSetPersistenceTests
     }
 
     [Fact]
-    public async Task TextureSetRepository_GetAllIncludesModelVersions()
+    public async Task TextureSetRepository_GetAllIncludesModelVersionMappings()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -117,9 +117,11 @@ public class TextureSetPersistenceTests
         context.ModelVersions.Add(version);
         await context.SaveChangesAsync();
 
-        // Associate model version with both texture sets
-        textureSet1.AddModelVersion(version, DateTime.UtcNow);
-        textureSet2.AddModelVersion(version, DateTime.UtcNow);
+        // Associate model version with both texture sets via explicit join entities
+        var mapping1 = ModelVersionTextureSet.Create(version.Id, textureSet1.Id, "");
+        var mapping2 = ModelVersionTextureSet.Create(version.Id, textureSet2.Id, "");
+        context.ModelVersionTextureSets.Add(mapping1);
+        context.ModelVersionTextureSets.Add(mapping2);
         await context.SaveChangesAsync();
 
         // Use a fresh context to verify includes work without change tracker
@@ -133,8 +135,8 @@ public class TextureSetPersistenceTests
         Assert.Equal(2, allTextureSets.Count());
         Assert.All(allTextureSets, tp => 
         {
-            Assert.Single(tp.ModelVersions);
-            Assert.Equal("Shared Model", tp.ModelVersions.First().Model.Name);
+            Assert.Single(tp.ModelVersionMappings);
+            Assert.Equal(version.Id, tp.ModelVersionMappings.First().ModelVersionId);
         });
     }
 }

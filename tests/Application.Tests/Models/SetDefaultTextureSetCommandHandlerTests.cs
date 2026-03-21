@@ -59,8 +59,7 @@ public class SetDefaultTextureSetCommandHandlerTests
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
         
         var model = CreateModelWithActiveVersion(1, 1);
-        var textureSet = CreateTextureSet(1, "Test Texture Set");
-        model.ActiveVersion!.AddTextureSet(textureSet, now);
+        model.ActiveVersion!.AddTextureMapping(1, "", now);
         
         var command = new SetDefaultTextureSetCommand(1, 1);
         
@@ -111,8 +110,7 @@ public class SetDefaultTextureSetCommandHandlerTests
         
         var model = CreateModelWithActiveVersion(1, 1);
         var version = model.ActiveVersion!;
-        var textureSet = CreateTextureSet(1, "Test Texture Set");
-        version.AddTextureSet(textureSet, now);
+        version.AddTextureMapping(1, "", now);
         
         var command = new SetDefaultTextureSetCommand(1, 1, 1);
         
@@ -163,8 +161,7 @@ public class SetDefaultTextureSetCommandHandlerTests
         
         var model = CreateModelWithActiveVersion(1, 1);
         var version2 = CreateModelVersion(1, 2);
-        var textureSet = CreateTextureSet(1, "Test Texture Set");
-        version2.AddTextureSet(textureSet, now);
+        version2.AddTextureMapping(1, "", now);
         
         var command = new SetDefaultTextureSetCommand(1, 1, 2);
         
@@ -220,8 +217,7 @@ public class SetDefaultTextureSetCommandHandlerTests
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
         
         var model = CreateModelWithActiveVersion(1, 1);
-        var textureSet = CreateTextureSet(1, "Test Texture Set");
-        model.ActiveVersion!.AddTextureSet(textureSet, now);
+        model.ActiveVersion!.AddTextureMapping(1, "", now);
         model.ActiveVersion.SetDefaultTextureSet(1, now);
         
         var command = new SetDefaultTextureSetCommand(1, null); // Clear version default

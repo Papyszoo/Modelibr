@@ -70,7 +70,7 @@ public class WebDavMiddleware
             context.Response.StatusCode = method switch
             {
                 "DELETE" => 204,
-                "GET"    => 404,
+                "GET" or "HEAD" or "PROPFIND" => 404,
                 _        => 201, // PUT, LOCK, PROPFIND, etc. — appear to succeed
             };
             _logger.LogDebug("Ignored macOS AppleDouble file {FileName} ({Method})", requestFileName, method);
@@ -132,7 +132,13 @@ public class WebDavMiddleware
             return;
         }
 
-        // Handle all other WebDAV requests normally
+        // Handle all other WebDAV requests normally.
+        // NWebDav's handlers (e.g. PropFindHandler) call Response.Write synchronously.
+        // Kestrel blocks sync I/O by default, so we opt-in per-request here.
+        var bodyControlFeature = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>();
+        if (bodyControlFeature != null)
+            bodyControlFeature.AllowSynchronousIO = true;
+
         var httpContext = new AspNetCoreContext(context);
         await _dispatcher.DispatchRequestAsync(httpContext);
     }

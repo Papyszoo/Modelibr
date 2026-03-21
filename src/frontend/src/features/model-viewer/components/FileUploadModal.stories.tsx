@@ -11,6 +11,10 @@ const mockVersions: ModelVersionDto[] = [
     versionNumber: 1,
     description: 'Initial version',
     createdAt: '2025-01-10T10:00:00Z',
+    materialNames: [],
+    textureMappings: [],
+    textureSetIds: [],
+    variantNames: [],
     files: [
       {
         id: 10,
@@ -28,6 +32,10 @@ const mockVersions: ModelVersionDto[] = [
     versionNumber: 2,
     description: 'Added textures',
     createdAt: '2025-02-15T14:30:00Z',
+    materialNames: [],
+    textureMappings: [],
+    textureSetIds: [],
+    variantNames: [],
     files: [
       {
         id: 20,

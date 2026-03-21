@@ -13,6 +13,7 @@ jest.mock('../../api/modelVersionApi', () => ({
   addFileToVersion: jest.fn(),
   setActiveVersion: jest.fn(),
   softDeleteModelVersion: jest.fn(),
+  setMainVariant: jest.fn(),
 }))
 
 // Mock queries used by ModelViewer
@@ -27,6 +28,12 @@ jest.mock('../../api/queries', () => ({
 
 jest.mock('@/features/texture-set/api/queries', () => ({
   useTextureSetByIdQuery: () => ({ data: null }),
+  useTextureSetsByModelVersionQuery: () => ({
+    data: [],
+    isLoading: false,
+    isFetching: false,
+    refetch: jest.fn(),
+  }),
 }))
 
 jest.mock('@/shared/thumbnail', () => ({
@@ -66,45 +73,15 @@ jest.mock('../ModelPreviewScene', () => ({
   },
 }))
 
-jest.mock('../ModelInfoWindow', () => ({
-  ModelInfoWindow: function MockModelInfoWindow() {
-    return <div data-testid="model-info-window" />
+jest.mock('../ViewerMenubar', () => ({
+  ViewerMenubar: function MockViewerMenubar(props: any) {
+    return <div data-testid="viewer-menubar" />
   },
 }))
 
-jest.mock('../ThumbnailWindow', () => ({
-  ThumbnailWindow: function MockThumbnailWindow() {
-    return <div data-testid="thumbnail-window" />
-  },
-}))
-
-jest.mock('../ModelHierarchyWindow', () => ({
-  ModelHierarchyWindow: function MockModelHierarchyWindow() {
-    return <div data-testid="model-hierarchy-window" />
-  },
-}))
-
-jest.mock('../ViewerSettingsWindow', () => ({
-  ViewerSettingsWindow: function MockViewerSettingsWindow() {
-    return <div data-testid="viewer-settings-window" />
-  },
-}))
-
-jest.mock('../UVMapWindow', () => ({
-  UVMapWindow: function MockUVMapWindow() {
-    return <div data-testid="uv-map-window" />
-  },
-}))
-
-jest.mock('../TextureSetSelectorWindow', () => ({
-  TextureSetSelectorWindow: function MockTextureSetSelectorWindow() {
-    return <div data-testid="texture-set-selector-window" />
-  },
-}))
-
-jest.mock('../ModelVersionWindow', () => ({
-  ModelVersionWindow: function MockModelVersionWindow() {
-    return <div data-testid="model-version-window" />
+jest.mock('../ViewerSidePanel', () => ({
+  ViewerSidePanel: function MockViewerSidePanel(props: any) {
+    return <div data-testid="viewer-side-panel" />
   },
 }))
 
@@ -125,11 +102,9 @@ jest.mock('primereact/toast', () => ({
   Toast: () => <div data-testid="toast" />,
 }))
 
-// Mock Button
-jest.mock('primereact/button', () => ({
-  Button: ({ onClick, tooltip, ...props }: any) => (
-    <button onClick={onClick} {...props} data-testid="button" title={tooltip} />
-  ),
+// Mock @react-three/drei
+jest.mock('@react-three/drei', () => ({
+  Stats: () => null,
 }))
 
 describe('ModelViewer', () => {
@@ -168,19 +143,16 @@ describe('ModelViewer', () => {
     expect(screen.getByTestId('model-preview-scene')).toBeInTheDocument()
   })
 
-  it('should display model name in header', () => {
+  it('should display model name', () => {
     renderWithProviders(<ModelViewer model={mockModel} side="left" />)
 
     expect(screen.getByText('Test Model')).toBeInTheDocument()
   })
 
-  it('should render viewer control buttons', () => {
+  it('should render the menubar', () => {
     renderWithProviders(<ModelViewer model={mockModel} side="left" />)
 
-    const buttons = screen.getAllByTestId('button')
-    // There should be multiple control buttons (settings, info, texture, hierarchy, thumbnail, uv)
-    // Note: Version button was removed since versions are now in header strip
-    expect(buttons.length).toBeGreaterThanOrEqual(6)
+    expect(screen.getByTestId('viewer-menubar')).toBeInTheDocument()
   })
 
   it('should pass model to ModelPreviewScene', () => {

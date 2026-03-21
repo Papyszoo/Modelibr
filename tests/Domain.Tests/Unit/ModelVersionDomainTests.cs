@@ -200,78 +200,80 @@ public class ModelVersionDomainTests
     }
 
     [Fact]
-    public void AddTextureSet_AddsTextureSetToVersion()
+    public void AddTextureMapping_AddsTextureMappingToVersion()
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         var updatedAt = DateTime.UtcNow;
 
         // Act
-        version.AddTextureSet(textureSet, updatedAt);
+        version.AddTextureMapping(1, "", updatedAt);
 
         // Assert
-        Assert.Single(version.TextureSets);
-        Assert.Contains(textureSet, version.TextureSets);
+        Assert.Single(version.TextureMappings);
+        Assert.Equal(1, version.TextureMappings.First().TextureSetId);
         Assert.Equal(updatedAt, version.UpdatedAt);
     }
 
     [Fact]
-    public void AddTextureSet_WithDuplicateId_DoesNotAddTextureSet()
+    public void AddTextureMapping_WithDuplicateMapping_DoesNotAdd()
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         var updatedAt = DateTime.UtcNow;
 
         // Act
-        version.AddTextureSet(textureSet, updatedAt);
-        version.AddTextureSet(textureSet, updatedAt);
+        version.AddTextureMapping(1, "", updatedAt);
+        version.AddTextureMapping(1, "", updatedAt);
 
         // Assert
-        Assert.Single(version.TextureSets);
+        Assert.Single(version.TextureMappings);
     }
 
     [Fact]
-    public void AddTextureSet_WithNullTextureSet_ThrowsArgumentNullException()
+    public void AddTextureMapping_WithNamedMaterial_ReplacesExistingMapping()
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => version.AddTextureSet(null!, DateTime.UtcNow));
-    }
-
-    [Fact]
-    public void RemoveTextureSet_RemovesTextureSetFromVersion()
-    {
-        // Arrange
-        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
-        version.AddTextureSet(textureSet, DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow;
 
         // Act
-        version.RemoveTextureSet(textureSet, updatedAt);
+        version.AddTextureMapping(1, "Body", updatedAt);
+        version.AddTextureMapping(2, "Body", updatedAt);
+
+        // Assert - named materials enforce one texture set per material
+        Assert.Single(version.TextureMappings);
+        Assert.Equal(2, version.TextureMappings.First().TextureSetId);
+    }
+
+    [Fact]
+    public void RemoveTextureMappingsByTextureSetId_RemovesMappingFromVersion()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        version.AddTextureMapping(1, "", DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.RemoveTextureMappingsByTextureSetId(1, updatedAt);
 
         // Assert
-        Assert.Empty(version.TextureSets);
+        Assert.Empty(version.TextureMappings);
         Assert.Equal(updatedAt, version.UpdatedAt);
     }
 
     [Fact]
-    public void RemoveTextureSet_WithNonExistingTextureSet_DoesNothing()
+    public void RemoveTextureMappingsByTextureSetId_WithNonExisting_DoesNothing()
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
         var initialUpdatedAt = version.UpdatedAt;
 
         // Act
-        version.RemoveTextureSet(textureSet, DateTime.UtcNow);
+        version.RemoveTextureMappingsByTextureSetId(999, DateTime.UtcNow);
 
         // Assert
-        Assert.Empty(version.TextureSets);
+        Assert.Empty(version.TextureMappings);
         Assert.Equal(initialUpdatedAt, version.UpdatedAt);
     }
 
@@ -280,8 +282,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
-        version.AddTextureSet(textureSet, DateTime.UtcNow);
+        version.AddTextureMapping(1, "", DateTime.UtcNow);
 
         // Act
         var result = version.HasTextureSet(1);
@@ -304,19 +305,18 @@ public class ModelVersionDomainTests
     }
 
     [Fact]
-    public void GetTextureSets_ReturnsReadOnlyList()
+    public void GetTextureMappings_ReturnsReadOnlyList()
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
-        version.AddTextureSet(textureSet, DateTime.UtcNow);
+        version.AddTextureMapping(1, "", DateTime.UtcNow);
 
         // Act
-        var textureSets = version.GetTextureSets();
+        var mappings = version.GetTextureMappings();
 
         // Assert
-        Assert.IsAssignableFrom<IReadOnlyList<TextureSet>>(textureSets);
-        Assert.Single(textureSets);
+        Assert.IsAssignableFrom<IReadOnlyList<ModelVersionTextureSet>>(mappings);
+        Assert.Single(mappings);
     }
 
     [Fact]
@@ -324,8 +324,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
-        version.AddTextureSet(textureSet, DateTime.UtcNow);
+        version.AddTextureMapping(1, "", DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow;
 
         // Act
@@ -341,8 +340,7 @@ public class ModelVersionDomainTests
     {
         // Arrange
         var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
-        var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow).WithId(1);
-        version.AddTextureSet(textureSet, DateTime.UtcNow);
+        version.AddTextureMapping(1, "", DateTime.UtcNow);
         version.SetDefaultTextureSet(1, DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow;
 
@@ -363,6 +361,41 @@ public class ModelVersionDomainTests
         // Act & Assert
         Assert.Throws<InvalidOperationException>(() => 
             version.SetDefaultTextureSet(1, DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void SetMaterialNames_SetsMaterialNames()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var materialNames = new List<string> { "Body", "Head", "Eyes" };
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.SetMaterialNames(materialNames, updatedAt);
+
+        // Assert
+        Assert.Equal(3, version.MaterialNames.Count);
+        Assert.Contains("Body", version.MaterialNames);
+        Assert.Equal(updatedAt, version.UpdatedAt);
+    }
+
+    [Fact]
+    public void RemoveTextureMappingByMaterial_RemovesSpecificMaterialMapping()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        version.AddTextureMapping(1, "Body", DateTime.UtcNow);
+        version.AddTextureMapping(2, "Head", DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.RemoveTextureMappingByMaterial("Body", updatedAt);
+
+        // Assert
+        Assert.Single(version.TextureMappings);
+        Assert.Equal("Head", version.TextureMappings.First().MaterialName);
+        Assert.Equal(updatedAt, version.UpdatedAt);
     }
 
 }

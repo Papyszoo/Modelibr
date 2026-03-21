@@ -1,4 +1,4 @@
-@depends-on:setup @model-management @model-metadata
+@depends-on:setup @model-management @model-metadata @serial
 Feature: Model Tags and Description
   Tests that model tags and description can be edited and saved via the info panel.
 

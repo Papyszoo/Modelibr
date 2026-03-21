@@ -35,7 +35,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
             .Include(m => m.ActiveVersion)
-                .ThenInclude(v => v.TextureSets)
+                .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
@@ -70,7 +70,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
             .Include(m => m.ActiveVersion)
-                .ThenInclude(v => v.TextureSets)
+                .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
@@ -88,7 +88,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
             .Include(m => m.ActiveVersion)
-                .ThenInclude(v => v.TextureSets)
+                .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
@@ -111,7 +111,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
             .Include(m => m.ActiveVersion)
-                .ThenInclude(v => v.TextureSets)
+                .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)), cancellationToken);
@@ -136,7 +136,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
             .Include(m => m.ActiveVersion)
-                .ThenInclude(v => v.TextureSets)
+                .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .AsSplitQuery()
@@ -155,7 +155,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Thumbnail)
             .Include(m => m.ActiveVersion)
-                .ThenInclude(v => v.TextureSets)
+                .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .AsSplitQuery()
