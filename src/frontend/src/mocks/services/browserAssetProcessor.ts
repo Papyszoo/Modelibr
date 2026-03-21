@@ -31,7 +31,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 export async function generateModelThumbnail(
   blob: Blob,
   width = 256,
-  height = 256,
+  height = 256
 ): Promise<Blob> {
   try {
     const url = URL.createObjectURL(blob)
@@ -48,13 +48,18 @@ export async function generateModelThumbnail(
 async function renderGltfThumbnail(
   url: string,
   width: number,
-  height: number,
+  height: number
 ): Promise<Blob> {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
 
-  const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true })
+  const renderer = new WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true,
+  })
   renderer.setSize(width, height)
   renderer.setClearColor(0x2a2a2e, 1)
 
@@ -81,15 +86,22 @@ async function renderGltfThumbnail(
   const size = box.getSize(new Vector3())
   const maxDim = Math.max(size.x, size.y, size.z)
   const fov = camera.fov * (Math.PI / 180)
-  const distance = maxDim / (2 * Math.tan(fov / 2)) * 1.5
+  const distance = (maxDim / (2 * Math.tan(fov / 2))) * 1.5
 
-  camera.position.set(center.x + distance * 0.5, center.y + distance * 0.3, center.z + distance)
+  camera.position.set(
+    center.x + distance * 0.5,
+    center.y + distance * 0.3,
+    center.z + distance
+  )
   camera.lookAt(center)
 
   renderer.render(scene, camera)
 
   const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png')
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
   })
 
   renderer.dispose()
@@ -102,7 +114,7 @@ async function renderGltfThumbnail(
 export function generatePlaceholderThumbnail(
   width = 256,
   height = 256,
-  color = '#4a90d9',
+  color = '#4a90d9'
 ): Promise<Blob> {
   const canvas = document.createElement('canvas')
   canvas.width = width
@@ -133,7 +145,10 @@ export function generatePlaceholderThumbnail(
   ctx.fillText('3D', cx, cy)
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png')
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
   })
 }
 
@@ -147,7 +162,7 @@ export function generatePlaceholderThumbnail(
 export async function generateTextureSetThumbnail(
   albedoBlob: Blob | null,
   width = 256,
-  height = 256,
+  height = 256
 ): Promise<Blob> {
   if (!albedoBlob) {
     return generatePlaceholderThumbnail(width, height, '#7b5ea7')
@@ -158,7 +173,12 @@ export async function generateTextureSetThumbnail(
     canvas.width = width
     canvas.height = height
 
-    const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true })
+    const renderer = new WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: true,
+    })
     renderer.setSize(width, height)
     renderer.setClearColor(0x2a2a2e, 1)
 
@@ -174,7 +194,9 @@ export async function generateTextureSetThumbnail(
 
     // Load albedo as texture
     const imageBitmap = await createImageBitmap(albedoBlob)
-    const texture = new (await import('three')).CanvasTexture(imageBitmap as unknown as HTMLCanvasElement)
+    const texture = new (await import('three')).CanvasTexture(
+      imageBitmap as unknown as HTMLCanvasElement
+    )
 
     const geometry = new SphereGeometry(1, 32, 32)
     const material = new MeshStandardMaterial({ map: texture })
@@ -183,7 +205,10 @@ export async function generateTextureSetThumbnail(
     renderer.render(scene, camera)
 
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png')
+      canvas.toBlob(
+        b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+        'image/png'
+      )
     })
 
     renderer.dispose()
@@ -205,7 +230,7 @@ export async function generateTextureSetThumbnail(
 export async function generateWaveformThumbnail(
   audioBlob: Blob,
   width = 800,
-  height = 128,
+  height = 128
 ): Promise<{ thumbnail: Blob; peaks: number[]; duration: number }> {
   const arrayBuffer = await audioBlob.arrayBuffer()
 
@@ -247,7 +272,10 @@ export async function generateWaveformThumbnail(
   }
 
   const thumbnail = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png')
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
   })
 
   return { thumbnail, peaks, duration: Math.round(duration * 1000) }
