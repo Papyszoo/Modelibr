@@ -1,0 +1,113 @@
+.viewer-menubar {
+  border: none;
+  border-bottom: 1px solid var(--surface-border, #333);
+  border-radius: 0;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-ground, #1e1e1e);
+  font-size: 0.85rem;
+}
+
+.viewer-menubar .p-menuitem-text {
+  font-size: 0.85rem;
+}
+
+.viewer-options-menu {
+  padding: 0.75rem 1rem;
+  min-width: 280px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Fix View submenu dropdown width to fit content */
+.viewer-menubar .p-submenu-list {
+  min-width: 280px;
+  z-index: 1100 !important;
+}
+
+/* Ensure the submenu popup container is wide enough for View options */
+.viewer-menubar .p-menuitem-content:has(.viewer-options-menu) {
+  width: 100%;
+}
+
+.viewer-options-title {
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-color, #fff);
+  font-size: 0.9rem;
+}
+
+.viewer-option-group {
+  margin-bottom: 0.75rem;
+}
+
+.viewer-option-group .viewer-option-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-color-secondary, #aaa);
+  margin-bottom: 0.5rem;
+  display: block;
+  font-weight: 600;
+}
+
+.viewer-option-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.viewer-option-item label {
+  font-size: 0.8rem;
+  color: var(--text-color, #fff);
+}
+
+.viewer-option-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.viewer-option-control .p-slider {
+  flex: 1;
+}
+
+.viewer-option-value {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary, #aaa);
+  min-width: 40px;
+  text-align: right;
+}
+
+.viewer-option-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.viewer-option-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-color, #3b82f6);
+  cursor: pointer;
+}
+
+.viewer-option-select {
+  width: 100%;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--surface-card, #2a2a2a);
+  color: var(--text-color, #fff);
+  border: 1px solid var(--surface-border, #444);
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+.viewer-option-select:focus {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.viewer-option-select option {
+  background: var(--surface-card, #2a2a2a);
+  color: var(--text-color, #fff);
+}

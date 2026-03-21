@@ -97,10 +97,25 @@ src/frontend/src/
 
 ### Texture Sets
 
-**Purpose:** Manage PBR texture collections that can be applied to 3D models. Each model version can have independent default texture sets. Texture sets are distinguished by **kind**:
+**Purpose:** Manage PBR texture collections that can be applied to 3D models via **material-slot-based mapping**. Each model version has material names (extracted by the asset processor from the 3D file), and texture sets are linked to specific material slots. Each model version can have independent default texture sets. Texture sets are distinguished by **kind**:
 
 - **Model-Specific (Baked)** — default; textures baked for a specific model's UV layout.
 - **Universal (Tileable)** — seamless material textures (e.g., "Brick Wall", "Wood Floor") that can tile and be shared across models.
+
+**Material-Slot Mapping (Key Types):**
+
+- `TextureMappingDto` in `features/model-viewer/types/index.ts`: `{ materialName: string, textureSetId: number, variantName: string }`
+- `ModelVersionDto` includes: `materialNames: string[]`, `textureMappings: TextureMappingDto[]`, `textureSetIds: number[]`, `variantNames: string[]`, `mainVariantName: string | null`
+- `ModelSummaryDto` in `features/texture-set/types/index.ts` includes: `materialName: string`
+- `textureSetApi.ts` association functions accept optional `materialName` parameter
+- Empty string `materialName` = "default/all materials" (backward compatibility)
+- `variantName` field: identifies the preset/variant for the mapping. Empty string = Default preset.
+- `textureSetApi.ts` association/disassociation functions accept optional `variantName` parameter
+- **Presets (Variants):** Variant names are persisted in the `VariantNames` text[] column on `ModelVersion`, independent of texture mappings. Empty presets (with no linked texture sets) survive. New presets are created via `POST /model-versions/{versionId}/variants` and deleted via `DELETE /model-versions/{versionId}/variants/{variantName}`. Variant names are also auto-registered when creating texture mappings with a new variant name. `mainVariantName` is auto-set to the first named variant when not yet configured.
+- `MaterialsPanel.tsx` always shows the preset dropdown, with Add/Delete buttons on the same row, and "Set as Main" button/badge on a separate row below. Adding a preset calls the backend API directly (no more ephemeral `localPresets` state). Deleting a preset calls the backend which removes the variant name and all its texture mappings.
+- `TextureSetAssociationDialog.tsx` is a single-select dialog — only one texture set can be linked per material per variant. It filters `textureMappings` by both `materialName` and `variantName` to show only the texture set currently linked to the specific material being edited. The dialog header shows the material name for clarity.
+- **Per-material texture rendering:** `TexturedModel.tsx` accepts `materialTextureSets: MaterialTextureSets` (a `Record<string, TextureSetDto>` mapping material names to texture sets). During mesh traversal, each mesh's `material.name` is matched against the map keys. A key of `""` acts as a wildcard for meshes with no specific mapping. `ModelViewer.tsx` builds this map from `textureMappings` filtered by the selected variant. Changing the variant dropdown updates the 3D preview in real-time.
+- **Variant selection wiring:** `ModelViewer.tsx` manages `selectedVariant` state (initialized to `mainVariantName`). `onVariantChange` handler is passed to `ViewerSidePanel` → `MaterialsPanel`. When the preset dropdown changes, the preview re-renders with the correct per-material textures.
 
 **Where to look:**
 | Layer | Location |
@@ -108,9 +123,11 @@ src/frontend/src/
 | Frontend components | `features/texture-set/components/` (22 files) |
 | Frontend dialogs | `features/texture-set/dialogs/` (20 files) |
 | Frontend hooks | `features/texture-set/hooks/` |
-| Frontend types | `features/texture-set/types/index.ts` (`TextureSetKind`, `UvMappingMode` enums) |
+| Frontend types | `features/texture-set/types/index.ts` (`TextureSetKind`, `UvMappingMode` enums, `ModelSummaryDto.materialName`) |
+| Model viewer types | `features/model-viewer/types/index.ts` (`TextureMappingDto`, `ModelVersionDto.materialNames/textureMappings`) |
+| Texture set API | `features/texture-set/api/textureSetApi.ts` (association with optional `materialName`) |
 | Backend API | `WebApi/Endpoints/TextureSetEndpoints.cs` |
-| Backend domain | `Domain/Models/TextureSet.cs`, `Domain/ValueObjects/TextureSetKind.cs` |
+| Backend domain | `Domain/Models/TextureSet.cs`, `Domain/Models/ModelVersionTextureSet.cs` |
 | E2E tests | `tests/e2e/features/00-texture-sets/` |
 
 **Key behaviors (from E2E tests):**
@@ -132,7 +149,8 @@ src/frontend/src/
 **Effects of changes:**
 
 - Changing default texture set → triggers thumbnail worker job
-- Linking/unlinking → updates ModelVersion associations
+- Linking/unlinking → updates ModelVersion material-slot associations (via `ModelVersionTextureSet` join entity with composite PK: `ModelVersionId, TextureSetId, MaterialName, VariantName`)
+- Asset processor extracts material names from 3D files and saves them via `PUT /model-versions/{id}/material-names`
 - Deleting texture set → affects all linked model versions
 - Updating tiling scale / UV mapping → only allowed for Universal kind (API returns 400 for ModelSpecific)
 - Adding texture to Universal set → auto-enqueues thumbnail generation (sphere preview)
@@ -171,7 +189,7 @@ Key rendering features:
 - **Split-channel texture handling**: `TexturedGeometry.tsx`'s `buildTextureUrls` includes `sourceChannel` in `TextureUrlInfo` for split-channel textures (R/G/B/A). At original quality, channel extraction is done client-side via `extractChannelFromBitmap()` (canvas-based). When using proxies, channel extraction was already done server-side during proxy generation. Texture fetches are deduplicated by URL — multiple texture types sharing the same source file (e.g., AO/Roughness/Metallic from a packed ARM map) fetch the file only once, with each type extracting its specific channel.
 - **Proxy size badges**: Displayed in three locations: (1) `TexturesTable` ("Textures" tab in TextureSetDetailDialog) — per-texture row badges, (2) `FilesTab` ("Files" tab in TextureSetViewer) — aggregated per-file badges after the "Used as" section, (3) `TextureSetGrid` — small green badges in the top-right corner of card thumbnails showing available proxy sizes. All use PrimeReact `Tag` components with `severity="success"` for available sizes.
 - **Context menu proxy generation**: `TextureSetGrid` right-click context menu includes a "Generate Proxies" submenu (visible for Universal sets) with 256/512/1024/2048 px options, each triggering `regenerateTextureSetThumbnail` with the corresponding `proxySize`.
-- **IBL lighting**: The preview uses `<Stage environment="city">` from `@react-three/drei` for Image-Based Lighting, providing realistic reflections and depth.
+- **IBL lighting**: Only the "city" environment HDR file is bundled locally (`public/hdri/potsdamer_platz_1k.hdr`, ~1.5 MB). All other 9 presets are fetched on demand from the drei assets CDN and cached via the Cache API (`modelibr-hdri` cache) for offline use. The `useEnvironmentPresets` hook (in `hooks/useEnvironmentPresets.ts`) manages online/offline detection, cache status, and async HDR URL resolution. The `environmentPresets.ts` utility provides `resolveHdrUrl()` which returns a local path for city, a blob URL from cache for cached presets, or fetches+caches from CDN for online presets — falling back to city when offline and uncached. In `ViewerMenubar.tsx`, unavailable presets are disabled with "(offline)" label when the browser is offline. The `<Stage>` component uses `environment={null}` since lighting comes from the separate `<Environment>` component.
 
 The component loads textures (standard + EXR) asynchronously, sets correct color spaces (sRGB for color textures, linear for data textures), and applies `RepeatWrapping`.
 
@@ -189,6 +207,7 @@ Universal (Global Material) texture sets get auto-generated preview thumbnails. 
 | Layer | Location |
 |-------|----------|
 | Main viewer | `features/model-viewer/components/ModelViewer.tsx` (26KB - main orchestrator) |
+| Canvas error boundary | `features/model-viewer/components/CanvasErrorBoundary.tsx` — catches React 19 Error #310 (cross-component state update during R3F render) and auto-retries up to 3 times |
 | 3D rendering | `features/model-viewer/components/Model.tsx`, `TexturedModel.tsx` |
 | Version strip | `features/model-viewer/components/VersionStrip.tsx` |
 | Viewer settings | `features/model-viewer/components/ViewerSettings.tsx` |

@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { Page, expect, Locator } from "@playwright/test";
 import { navigateToAppClean } from "../helpers/navigation-helper";
 
 export class ModelListPage {
@@ -86,7 +86,12 @@ export class ModelListPage {
                     '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times',
                 )
                 .first();
-            if (await closeButton.isVisible({ timeout: 1000 })) {
+            if (
+                await closeButton
+                    .waitFor({ state: "visible", timeout: 1000 })
+                    .then(() => true)
+                    .catch(() => false)
+            ) {
                 await closeButton.click();
                 // Wait for window to disappear
                 await expect(
@@ -178,5 +183,158 @@ export class ModelListPage {
             state: "visible",
             timeout: 30000,
         });
+    }
+
+    /**
+     * Get a model card locator by name
+     */
+    getModelCard(name: string): Locator {
+        return this.page.locator(`.model-card:has-text("${name}")`).first();
+    }
+
+    /**
+     * Get the filter token/chip locators in the filter bar
+     */
+    getFilterTokens(): Locator {
+        return this.page.locator(".filter-bar .p-multiselect-token");
+    }
+
+    /**
+     * Filter the model list by pack name using the filter bar multiselect.
+     * Waits for the "Filter by Packs" dropdown to appear (packs query may be slow),
+     * then retries with reload if the specific pack isn't listed.
+     */
+    async filterByPack(packName: string): Promise<void> {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            // Wait for the Packs multiselect to appear (packs query must complete)
+            const packsMultiselect = this.page.locator(
+                '.filter-bar .p-multiselect:has(.p-placeholder:has-text("Packs"))',
+            );
+            try {
+                await packsMultiselect.waitFor({
+                    state: "visible",
+                    timeout: 10000,
+                });
+            } catch {
+                console.log(
+                    `[Retry] Packs multiselect not visible (attempt ${attempt + 1}/3), reloading...`,
+                );
+                await this.page.reload({ waitUntil: "domcontentloaded" });
+                await this.page.waitForSelector(
+                    ".model-card, .no-results, .empty-state",
+                    { state: "visible", timeout: 10000 },
+                );
+                continue;
+            }
+
+            await packsMultiselect.click();
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "visible", timeout: 5000 });
+
+            const packOption = this.page.locator(
+                `.p-multiselect-panel .p-multiselect-item:has-text("${packName}")`,
+            );
+
+            if (await packOption.isVisible().catch(() => false)) {
+                await packOption.click();
+                await this.page.keyboard.press("Escape");
+                await this.page
+                    .locator(".p-multiselect-panel")
+                    .waitFor({ state: "hidden", timeout: 5000 });
+                return;
+            }
+
+            // Pack not in dropdown yet — close panel, reload page, retry
+            await this.page.keyboard.press("Escape");
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "hidden", timeout: 5000 });
+            console.log(
+                `[Retry] Pack "${packName}" not in dropdown (attempt ${attempt + 1}/3), reloading...`,
+            );
+            await this.page.reload({ waitUntil: "domcontentloaded" });
+            await this.page.waitForSelector(
+                ".model-card, .no-results, .empty-state",
+                { state: "visible", timeout: 10000 },
+            );
+        }
+
+        throw new Error(
+            `Pack "${packName}" not found in filter dropdown after 3 attempts`,
+        );
+    }
+
+    /**
+     * Filter the model list by project name using the filter bar multiselect.
+     * Retries with a page reload if the project isn't in the dropdown yet.
+     */
+    async filterByProject(projectName: string): Promise<void> {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const projectsMultiselect = this.page.locator(
+                '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
+            );
+            await projectsMultiselect.click();
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "visible", timeout: 5000 });
+
+            const projectOption = this.page.locator(
+                `.p-multiselect-panel .p-multiselect-item:has-text("${projectName}")`,
+            );
+
+            if (await projectOption.isVisible().catch(() => false)) {
+                await projectOption.click();
+                await this.page.keyboard.press("Escape");
+                await this.page
+                    .locator(".p-multiselect-panel")
+                    .waitFor({ state: "hidden", timeout: 5000 });
+                return;
+            }
+
+            await this.page.keyboard.press("Escape");
+            await this.page
+                .locator(".p-multiselect-panel")
+                .waitFor({ state: "hidden", timeout: 5000 });
+            console.log(
+                `[Retry] Project "${projectName}" not in dropdown (attempt ${attempt + 1}/3), reloading...`,
+            );
+            await this.page.reload({ waitUntil: "domcontentloaded" });
+            await this.page.waitForSelector(
+                ".model-card, .no-results, .empty-state",
+                { state: "visible", timeout: 10000 },
+            );
+        }
+
+        throw new Error(
+            `Project "${projectName}" not found in filter dropdown after 3 attempts`,
+        );
+    }
+
+    /**
+     * Clear all active filters in the filter bar
+     */
+    async clearFilters(): Promise<void> {
+        const clearButton = this.page.locator(".clear-filters-btn");
+        if (await clearButton.isVisible()) {
+            await clearButton.click();
+            await this.page.waitForLoadState("domcontentloaded");
+        } else {
+            const packsClear = this.page
+                .locator(".filter-bar .p-multiselect")
+                .first()
+                .locator(".p-multiselect-clear-icon");
+            if (await packsClear.isVisible()) {
+                await packsClear.click();
+            }
+            const projectsClear = this.page
+                .locator(".filter-bar .p-multiselect")
+                .nth(1)
+                .locator(".p-multiselect-clear-icon");
+            if (await projectsClear.isVisible()) {
+                await projectsClear.click();
+            }
+            await this.page.waitForLoadState("domcontentloaded");
+        }
     }
 }

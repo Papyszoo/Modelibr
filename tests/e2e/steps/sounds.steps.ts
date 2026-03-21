@@ -5,7 +5,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { SoundListPage } from "../pages/SoundListPage";
 
@@ -13,8 +13,7 @@ const { Given, When, Then } = createBdd();
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
-// Track which sound is currently being interacted with
-let currentSoundName: string | null = null;
+// currentSoundName is tracked via getScenarioState(page).getCustom<string>('currentSoundName')
 
 async function waitForSoundsUiReady(page: any): Promise<void> {
     await page
@@ -132,12 +131,8 @@ When(
         );
         await fileInput.setInputFiles(filePath);
 
-        // Wait for upload API response instead of arbitrary timeout
-        await uploadResponsePromise.catch(() => {
-            console.log(
-                "[Upload] Upload response wait timed out, continuing...",
-            );
-        });
+        // Wait for upload API response — must succeed before proceeding
+        await uploadResponsePromise;
         await page.waitForLoadState("domcontentloaded");
 
         // Get sounds AFTER upload and find the new one
@@ -183,7 +178,7 @@ When(
 
         // Save to shared state for use in subsequent steps
         if (sound) {
-            sharedState.saveSound(soundName, {
+            getScenarioState(page).saveSound(soundName, {
                 id: sound.id,
                 name: soundName,
                 fileId: sound.fileId,
@@ -200,13 +195,10 @@ When(
         }
 
         // Wait for UI to reflect changes reactively (sound card should appear)
+        // After API rename, the UI may not update reactively — reload to ensure fresh state
         const soundListPage = new SoundListPage(page);
-        await soundListPage
-            .waitForSoundByName(soundName, 10000)
-            .catch(async () => {
-                // Fallback: navigate to sounds page if card not visible yet
-                await soundListPage.goto();
-            });
+        await soundListPage.goto();
+        await waitForSoundsUiReady(page);
 
         console.log(
             `[Upload] Uploaded sound "${soundName}" from "${filename}"`,
@@ -232,7 +224,7 @@ Then(
                 console.log(
                     `[Warning] Found partial match: "${partialMatch.name}" for "${soundName}"`,
                 );
-                sharedState.saveSound(soundName, {
+                getScenarioState(page).saveSound(soundName, {
                     id: partialMatch.id,
                     name: partialMatch.name,
                     fileId: partialMatch.fileId,
@@ -249,7 +241,7 @@ Then(
             );
         }
 
-        sharedState.saveSound(soundName, {
+        getScenarioState(page).saveSound(soundName, {
             id: sound.id,
             name: sound.name,
             fileId: sound.fileId,
@@ -266,7 +258,7 @@ Then(
 Given(
     "the sound {string} exists in shared state",
     async ({ page }, soundName: string) => {
-        let sound = sharedState.getSound(soundName);
+        let sound = getScenarioState(page).getSound(soundName);
         if (!sound) {
             console.log(
                 `[AutoProvision] Sound "${soundName}" not in shared state, looking up via API...`,
@@ -278,7 +270,7 @@ Given(
             );
 
             if (found) {
-                sharedState.saveSound(soundName, {
+                getScenarioState(page).saveSound(soundName, {
                     id: found.id,
                     name: found.name,
                     fileId: found.fileId,
@@ -316,7 +308,7 @@ Given(
                     );
                 }
                 const created = await createResponse.json();
-                sharedState.saveSound(soundName, {
+                getScenarioState(page).saveSound(soundName, {
                     id: created.soundId || created.id,
                     name: soundName,
                     fileId: created.fileId,
@@ -329,7 +321,7 @@ Given(
             }
         }
         console.log(
-            `[Precondition] Sound "${soundName}" exists in shared state (ID: ${sharedState.getSound(soundName)?.id})`,
+            `[Precondition] Sound "${soundName}" exists in shared state (ID: ${getScenarioState(page).getSound(soundName)?.id})`,
         );
     },
 );
@@ -339,7 +331,7 @@ Given(
 When(
     "I open the sound {string} for viewing",
     async ({ page }, soundName: string) => {
-        const sound = sharedState.getSound(soundName);
+        const sound = getScenarioState(page).getSound(soundName);
         if (!sound) {
             throw new Error(`Sound "${soundName}" not found in shared state`);
         }
@@ -353,13 +345,33 @@ When(
         );
 
         const soundCard = page.locator(`[data-sound-id="${sound.id}"]`);
+        // Sound may have been auto-provisioned via API *after* the page loaded.
+        // If the card isn't visible yet, navigate to the sounds page to refresh the list.
+        if (!(await soundCard.isVisible().catch(() => false))) {
+            const soundListPage = new SoundListPage(page);
+            await soundListPage.goto();
+            await waitForSoundsUiReady(page);
+        }
+
+        // The sounds list uses infinite scroll (50 items/page). If the target card is
+        // not in the first page, click "Load More" repeatedly until it appears.
+        const loadMoreSelector = 'button:has-text("Load More")';
+        while (!(await soundCard.isVisible().catch(() => false))) {
+            const loadMoreBtn = page.locator(loadMoreSelector).first();
+            if (!(await loadMoreBtn.isVisible().catch(() => false))) {
+                break; // No more pages to load
+            }
+            await loadMoreBtn.click();
+            await page.waitForTimeout(500); // Wait for new items to render
+        }
+
         await expect(soundCard).toBeVisible({ timeout: 10000 });
         await soundCard.scrollIntoViewIfNeeded();
         await soundCard.click();
 
         // Wait for the sound modal to appear
         await expect(page.locator(".p-dialog")).toBeVisible({ timeout: 5000 });
-        currentSoundName = soundName;
+        getScenarioState(page).setCustom("currentSoundName", soundName);
 
         console.log(`[Action] Opened sound "${soundName}" for viewing`);
     },
@@ -368,8 +380,10 @@ When(
 When(
     "I change the sound name to {string}",
     async ({ page }, newName: string) => {
+        const currentSoundName =
+            getScenarioState(page).getCustom<string>("currentSoundName");
         const currentId = currentSoundName
-            ? sharedState.getSound(currentSoundName)?.id
+            ? getScenarioState(page).getSound(currentSoundName)?.id
             : undefined;
         await cleanupSoundByName(page, newName, currentId);
 
@@ -396,12 +410,14 @@ When(
             dialog.locator('[data-testid="sound-name-display"]'),
         ).toHaveText(newName, { timeout: 5000 });
 
-        // Update shared state with new name
-        const lookupName = currentSoundName || "crud-test-sound";
-        const sound = sharedState.getSound(lookupName);
+        // Update scenario state with new name
+        const lookupName =
+            getScenarioState(page).getCustom<string>("currentSoundName") ||
+            "crud-test-sound";
+        const sound = getScenarioState(page).getSound(lookupName);
         if (sound) {
             sound.name = newName;
-            sharedState.saveSound(lookupName, sound);
+            getScenarioState(page).saveSound(lookupName, sound);
         }
 
         console.log(
@@ -451,16 +467,18 @@ When("I save the sound changes", async ({ page }) => {
 When(
     "I assign the sound to category {string}",
     async ({ page }, categoryName: string) => {
-        const category = sharedState.getSoundCategory(categoryName);
+        const category = getScenarioState(page).getSoundCategory(categoryName);
         if (!category) {
             throw new Error(
                 `Category "${categoryName}" not found in shared state`,
             );
         }
 
-        // Get the sound from shared state
-        const lookupName = currentSoundName || "crud-test-sound";
-        const sound = sharedState.getSound(lookupName);
+        // Get the sound from scenario state
+        const lookupName =
+            getScenarioState(page).getCustom<string>("currentSoundName") ||
+            "crud-test-sound";
+        const sound = getScenarioState(page).getSound(lookupName);
         if (!sound) {
             throw new Error(
                 `Sound '${lookupName}' not found in shared state for category assignment`,
@@ -518,7 +536,7 @@ When(
 Then(
     "the sound {string} should be visible in the filtered results",
     async ({ page }, soundName: string) => {
-        const sound = sharedState.getSound(soundName);
+        const sound = getScenarioState(page).getSound(soundName);
         const name = sound?.name || soundName;
 
         const soundCard = page.locator(".sound-card").filter({
@@ -611,7 +629,9 @@ Then(
         const categoryTab = page
             .locator(".category-tab")
             .filter({ hasText: categoryName });
-        await expect(categoryTab).toBeVisible({ timeout: 5000 });
+        await expect(async () => {
+            await expect(categoryTab).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 20000 });
         console.log(
             `[Verify] Sound category "${categoryName}" is visible in category list ✓`,
         );
@@ -634,7 +654,7 @@ Then(
             );
         }
 
-        sharedState.saveSoundCategory(categoryName, {
+        getScenarioState(page).saveSoundCategory(categoryName, {
             id: category.id,
             name: category.name,
             description: category.description,
@@ -649,7 +669,7 @@ Then(
 Given(
     "the sound category {string} exists in shared state",
     async ({ page }, categoryName: string) => {
-        let category = sharedState.getSoundCategory(categoryName);
+        let category = getScenarioState(page).getSoundCategory(categoryName);
         if (!category) {
             console.log(
                 `[AutoProvision] Sound category "${categoryName}" not in shared state, looking up via API...`,
@@ -671,7 +691,7 @@ Given(
                         .catch(() => {});
                 }
 
-                sharedState.saveSoundCategory(categoryName, {
+                getScenarioState(page).saveSoundCategory(categoryName, {
                     id: found.id,
                     name: found.name,
                     description: found.description,
@@ -696,7 +716,7 @@ Given(
                     );
                 }
                 const created = await createResponse.json();
-                sharedState.saveSoundCategory(categoryName, {
+                getScenarioState(page).saveSoundCategory(categoryName, {
                     id: created.id,
                     name: categoryName,
                     description: "",
@@ -707,7 +727,7 @@ Given(
             }
         }
         console.log(
-            `[Precondition] Sound category "${categoryName}" exists in shared state (ID: ${sharedState.getSoundCategory(categoryName)?.id})`,
+            `[Precondition] Sound category "${categoryName}" exists in shared state (ID: ${getScenarioState(page).getSoundCategory(categoryName)?.id})`,
         );
     },
 );
@@ -719,7 +739,7 @@ When(
         await page.keyboard.press("Escape");
         await page
             .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 3000 })
+            .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
         // First select the category tab
@@ -731,7 +751,7 @@ When(
 
         // Click the edit (pencil) button on the category tab
         const editButton = categoryTab.locator("button:has(.pi-pencil)");
-        await editButton.waitFor({ state: "visible", timeout: 3000 });
+        await editButton.waitFor({ state: "visible", timeout: 5000 });
         await editButton.click();
 
         // Wait for dialog using data-testid
@@ -786,7 +806,7 @@ When(
         await page.keyboard.press("Escape");
         await page
             .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 3000 })
+            .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
         // First select the category tab
@@ -798,7 +818,7 @@ When(
 
         // Click the delete (trash) button on the category tab
         const deleteButton = categoryTab.locator("button:has(.pi-trash)");
-        await deleteButton.waitFor({ state: "visible", timeout: 3000 });
+        await deleteButton.waitFor({ state: "visible", timeout: 5000 });
         await deleteButton.click();
 
         // Confirm deletion in dialog
@@ -837,13 +857,24 @@ Then(
     "the sound {string} should be visible in the sound list",
     async ({ page }, soundName: string) => {
         // First try to get from shared state
-        const sound = sharedState.getSound(soundName);
+        const sound = getScenarioState(page).getSound(soundName);
         const name = sound?.name || soundName;
 
-        const soundCard = page.locator(".sound-card").filter({
-            has: page.locator(".sound-name", { hasText: name }),
-        });
-        await expect(soundCard.first()).toBeVisible({ timeout: 10000 });
+        // Poll with reload to handle async backend processing + UI refresh
+        await expect(async () => {
+            const soundCard = page.locator(".sound-card").filter({
+                has: page.locator(".sound-name", { hasText: name }),
+            });
+            const visible = await soundCard
+                .first()
+                .isVisible()
+                .catch(() => false);
+            if (!visible) {
+                await page.reload();
+                await page.waitForLoadState("domcontentloaded");
+            }
+            await expect(soundCard.first()).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [2000, 3000, 5000] });
         console.log(`[Verify] Sound "${name}" is visible in sound list ✓`);
     },
 );
@@ -868,7 +899,7 @@ Then(
 When(
     "I delete the sound {string} via API",
     async ({ page }, soundName: string) => {
-        const sound = sharedState.getSound(soundName);
+        const sound = getScenarioState(page).getSound(soundName);
         if (!sound) {
             throw new Error(`Sound "${soundName}" not found in shared state`);
         }

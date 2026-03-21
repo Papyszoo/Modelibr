@@ -25,26 +25,29 @@ interface TextureSetAssociationDialogProps {
   visible: boolean
   model: Model
   modelVersionId: number
+  materialName?: string
+  variantName?: string
+  textureMappings?: Array<{
+    materialName: string
+    textureSetId: number
+    variantName: string
+  }>
   onHide: () => void
   onAssociationsChanged: () => void
 }
 
-interface TextureSetAssociation {
-  textureSet: TextureSetDto
-  isAssociated: boolean
-  originallyAssociated: boolean
-}
-
 export function TextureSetAssociationDialog({
   visible,
-  model,
+  model: _model,
   modelVersionId,
+  materialName,
+  variantName,
+  textureMappings,
   onHide,
   onAssociationsChanged,
 }: TextureSetAssociationDialogProps) {
-  const [textureSetAssociations, setTextureSetAssociations] = useState<
-    TextureSetAssociation[]
-  >([])
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [originalId, setOriginalId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>([])
@@ -66,29 +69,35 @@ export function TextureSetAssociationDialog({
     packsQuery.isLoading ||
     packsQuery.isFetching
 
+  // Map display name "Default" to empty string for API/mapping comparison
+  const apiMaterialName = materialName === 'Default' ? '' : (materialName ?? '')
+
   useEffect(() => {
     if (!visible || !allTextureSetsQuery.data) {
       return
     }
 
-    const associatedTextureSetIds = new Set(
-      allTextureSetsQuery.data
-        .filter(ts =>
-          ts.associatedModels.some(m => m.modelVersionId === modelVersionId)
-        )
-        .map(ts => ts.id)
-    )
+    // Find the texture set currently linked to THIS material in THIS variant
+    let currentId: number | null = null
+    if (textureMappings && textureMappings.length > 0) {
+      const mapping = textureMappings.find(
+        m =>
+          m.variantName === (variantName ?? '') &&
+          m.materialName === apiMaterialName
+      )
+      currentId = mapping?.textureSetId ?? null
+    }
 
-    const associations: TextureSetAssociation[] = allTextureSetsQuery.data.map(
-      textureSet => ({
-        textureSet,
-        isAssociated: associatedTextureSetIds.has(textureSet.id),
-        originallyAssociated: associatedTextureSetIds.has(textureSet.id),
-      })
-    )
-
-    setTextureSetAssociations(associations)
-  }, [visible, allTextureSetsQuery.data, modelVersionId])
+    setSelectedId(currentId)
+    setOriginalId(currentId)
+  }, [
+    visible,
+    allTextureSetsQuery.data,
+    modelVersionId,
+    textureMappings,
+    variantName,
+    apiMaterialName,
+  ])
 
   useEffect(() => {
     if (!visible) {
@@ -105,47 +114,15 @@ export function TextureSetAssociationDialog({
     }
   }, [visible, allTextureSetsQuery.error, packsQuery.error])
 
-  const handleToggleAssociation = (
-    textureSetId: number,
-    isAssociated: boolean
-  ) => {
-    setTextureSetAssociations(prev =>
-      prev.map(assoc => {
-        if (assoc.textureSet.id === textureSetId) {
-          return {
-            ...assoc,
-            isAssociated,
-          }
-        }
-        return assoc
-      })
-    )
+  const handleSelect = (textureSetId: number) => {
+    // Toggle: clicking the already-selected item deselects it
+    setSelectedId(prev => (prev === textureSetId ? null : textureSetId))
   }
 
-  const getChanges = () => {
-    const toAssociate: TextureSetDto[] = []
-    const toDisassociate: TextureSetDto[] = []
-
-    textureSetAssociations.forEach(assoc => {
-      if (assoc.isAssociated && !assoc.originallyAssociated) {
-        toAssociate.push(assoc.textureSet)
-      } else if (!assoc.isAssociated && assoc.originallyAssociated) {
-        toDisassociate.push(assoc.textureSet)
-      }
-    })
-
-    return { toAssociate, toDisassociate }
-  }
-
-  const hasChanges = () => {
-    const { toAssociate, toDisassociate } = getChanges()
-    return toAssociate.length > 0 || toDisassociate.length > 0
-  }
+  const hasChanges = selectedId !== originalId
 
   const handleSave = async () => {
-    const { toAssociate, toDisassociate } = getChanges()
-
-    if (!hasChanges()) {
+    if (!hasChanges) {
       onHide()
       return
     }
@@ -153,33 +130,40 @@ export function TextureSetAssociationDialog({
     try {
       setSaving(true)
 
-      // Process associations for the selected model version
-      for (const textureSet of toAssociate) {
-        await associateTextureSetWithModelVersion(textureSet.id, modelVersionId)
+      // Disassociate the previously linked texture set (if any)
+      if (originalId !== null) {
+        await disassociateTextureSetFromModelVersion(
+          originalId,
+          modelVersionId,
+          apiMaterialName,
+          variantName ?? ''
+        )
       }
 
-      // Process disassociations
-      for (const textureSet of toDisassociate) {
-        await disassociateTextureSetFromModelVersion(
-          textureSet.id,
-          modelVersionId
+      // Associate the newly selected texture set (if any)
+      if (selectedId !== null) {
+        await associateTextureSetWithModelVersion(
+          selectedId,
+          modelVersionId,
+          apiMaterialName,
+          variantName ?? ''
         )
       }
 
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Texture set associations updated successfully',
+        detail: 'Texture set linked successfully',
         life: 3000,
       })
 
       onAssociationsChanged()
     } catch (error) {
-      console.error('Failed to update texture set associations:', error)
+      console.error('Failed to update texture set association:', error)
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to update texture set associations',
+        detail: 'Failed to update texture set association',
         life: 3000,
       })
     } finally {
@@ -188,28 +172,22 @@ export function TextureSetAssociationDialog({
   }
 
   const handleCancel = () => {
-    // Reset changes
-    setTextureSetAssociations(prev =>
-      prev.map(assoc => ({
-        ...assoc,
-        isAssociated: assoc.originallyAssociated,
-      }))
-    )
+    setSelectedId(originalId)
     setSearchQuery('')
     setSelectedPackIds([])
     onHide()
   }
 
   // Filter texture sets
-  const filteredTextureSets = textureSetAssociations.filter(assoc => {
-    const matchesSearch = assoc.textureSet.name
+  const allTextureSets = allTextureSetsQuery.data ?? []
+  const filteredTextureSets = allTextureSets.filter(ts => {
+    const matchesSearch = ts.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
 
     const matchesPack =
       selectedPackIds.length === 0 ||
-      (assoc.textureSet.packs &&
-        assoc.textureSet.packs.some(pack => selectedPackIds.includes(pack.id)))
+      (ts.packs && ts.packs.some(pack => selectedPackIds.includes(pack.id)))
 
     return matchesSearch && matchesPack
   })
@@ -224,7 +202,7 @@ export function TextureSetAssociationDialog({
 
   return (
     <Dialog
-      header={`Link Texture Sets - "${model.name}"`}
+      header={`Link Texture Set — ${materialName ?? 'Material'}`}
       visible={visible}
       onHide={handleCancel}
       footer={
@@ -236,10 +214,10 @@ export function TextureSetAssociationDialog({
             className="p-button-text"
           />
           <Button
-            label={saving ? 'Saving...' : 'Save Changes'}
+            label={saving ? 'Saving...' : 'Save'}
             icon="pi pi-check"
             onClick={handleSave}
-            disabled={!hasChanges() || saving}
+            disabled={!hasChanges || saving}
           />
         </div>
       }
@@ -297,7 +275,7 @@ export function TextureSetAssociationDialog({
           <div className="association-section">
             <h4 className="section-header">
               <i className="pi pi-image" />
-              All Texture Sets ({filteredTextureSets.length})
+              Texture Sets ({filteredTextureSets.length})
             </h4>
             {filteredTextureSets.length === 0 ? (
               <div className="no-results">
@@ -306,12 +284,12 @@ export function TextureSetAssociationDialog({
               </div>
             ) : (
               <div className="texture-sets-card-grid">
-                {filteredTextureSets.map(assoc => (
+                {filteredTextureSets.map(ts => (
                   <TextureSetCard
-                    key={assoc.textureSet.id}
-                    textureSet={assoc.textureSet}
-                    isAssociated={assoc.isAssociated}
-                    onToggle={handleToggleAssociation}
+                    key={ts.id}
+                    textureSet={ts}
+                    isSelected={ts.id === selectedId}
+                    onSelect={handleSelect}
                   />
                 ))}
               </div>
@@ -325,14 +303,14 @@ export function TextureSetAssociationDialog({
 
 interface TextureSetCardProps {
   textureSet: TextureSetDto
-  isAssociated: boolean
-  onToggle: (textureSetId: number, isAssociated: boolean) => void
+  isSelected: boolean
+  onSelect: (textureSetId: number) => void
 }
 
 function TextureSetCard({
   textureSet,
-  isAssociated,
-  onToggle,
+  isSelected,
+  onSelect,
 }: TextureSetCardProps) {
   // Get albedo or diffuse texture for preview
   const getPreviewTexture = () => {
@@ -352,11 +330,11 @@ function TextureSetCard({
 
   return (
     <div
-      className={`texture-set-association-card ${isAssociated ? 'selected' : ''}`}
-      onClick={() => onToggle(textureSet.id, !isAssociated)}
+      className={`texture-set-association-card ${isSelected ? 'selected' : ''}`}
+      onClick={() => onSelect(textureSet.id)}
     >
       <div className="texture-set-association-checkbox">
-        <Checkbox checked={isAssociated} readOnly />
+        <Checkbox checked={isSelected} readOnly />
       </div>
       <div className="texture-set-card-thumbnail">
         {previewUrl ? (

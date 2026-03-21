@@ -33,16 +33,29 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `DELETE` | `/models/{id}`                            | Soft delete model                                                      |
 | `DELETE` | `/models/{modelId}/versions/{versionId}`  | Soft delete version                                                    |
 
-### Model Versions (6 endpoints)
+### Model Versions (7 endpoints)
 
-| Method | Endpoint                                                | Description                                                               |
-| ------ | ------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `POST` | `/models/{modelId}/versions`                            | Create new version                                                        |
-| `POST` | `/models/{modelId}/versions/{versionId}/files`          | Add file to version                                                       |
-| `GET`  | `/models/{modelId}/versions`                            | List all versions                                                         |
-| `GET`  | `/models/{modelId}/versions/{versionId}`                | Get version details                                                       |
-| `GET`  | `/models/{modelId}/versions/{versionId}/file`           | Download renderable file (falls back to any file if no renderable exists) |
-| `GET`  | `/models/{modelId}/versions/{versionId}/files/{fileId}` | Download specific file                                                    |
+| Method | Endpoint                                                | Description                                                               | Auth        |
+| ------ | ------------------------------------------------------- | ------------------------------------------------------------------------- | ----------- |
+| `POST` | `/models/{modelId}/versions`                            | Create new version                                                        | None        |
+| `POST` | `/models/{modelId}/versions/{versionId}/files`          | Add file to version                                                       | None        |
+| `GET`  | `/models/{modelId}/versions`                            | List all versions                                                         | None        |
+| `GET`  | `/models/{modelId}/versions/{versionId}`                | Get version details                                                       | None        |
+| `GET`  | `/models/{modelId}/versions/{versionId}/file`           | Download renderable file (falls back to any file if no renderable exists) | None        |
+| `GET`  | `/models/{modelId}/versions/{versionId}/files/{fileId}` | Download specific file                                                    | None        |
+| `PUT`  | `/model-versions/{versionId}/material-names`            | Set material names extracted from 3D model                                | `X-Api-Key` |
+
+**Material Names:** The `PUT /model-versions/{versionId}/material-names` endpoint accepts `{ materialNames: string[] }` and is called by the asset processor after extracting material names from the 3D model file. Material names are stored as a PostgreSQL `text[]` column.
+
+### Variant (Preset) Management (3 endpoints)
+
+| Method   | Endpoint                                             | Description                                        |
+| -------- | ---------------------------------------------------- | -------------------------------------------------- |
+| `PUT`    | `/model-versions/{versionId}/main-variant`           | Set main variant for thumbnail generation          |
+| `POST`   | `/model-versions/{versionId}/variants`               | Add a variant (preset) name                        |
+| `DELETE` | `/model-versions/{versionId}/variants/{variantName}` | Remove a variant name and all its texture mappings |
+
+**Variant Names:** Variant (preset) names are now persisted as a `text[]` column (`VariantNames`) on `ModelVersion`, independent of texture mappings. This means empty presets (with no linked texture sets) survive. When a texture mapping is created with a new variant name, it is auto-registered. The `mainVariantName` is also auto-set to the first named variant when it hasn't been set yet.
 
 ### Files (5 endpoints)
 
@@ -93,9 +106,13 @@ This documentation is designed for AI agents to quickly understand the backend s
 | `POST`   | `/texture-sets/{id}/textures`                            | Add texture to set                                                                                                   |
 | `DELETE` | `/texture-sets/{packId}/textures/{textureId}`            | Remove texture from set                                                                                              |
 | `PUT`    | `/texture-sets/{setId}/textures/{textureId}/type`        | Change texture type                                                                                                  |
-| `POST`   | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Associate with model version                                                                                         |
-| `DELETE` | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Disassociate from model version                                                                                      |
-| `POST`   | `/texture-sets/{packId}/models/{modelId}/all-versions`   | Associate with all model versions                                                                                    |
+| `POST`   | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Associate with model version (?materialName)                                                                         |
+| `DELETE` | `/texture-sets/{packId}/model-versions/{modelVersionId}` | Disassociate from model version (?materialName)                                                                      |
+| `POST`   | `/texture-sets/{packId}/models/{modelId}/all-versions`   | Associate with all model versions (?materialName)                                                                    |
+
+#### Material Slot Mapping
+
+Texture set association endpoints accept optional `?materialName` and `?variantName` query parameters to link a texture set to a specific material slot and preset/variant. When omitted, both default to empty string (applies to all materials / Default preset). Each `(ModelVersionId, TextureSetId, MaterialName, VariantName)` combination forms a unique mapping via the `ModelVersionTextureSets` join table with a composite primary key. For named materials, only one texture set can be assigned per material name per variant. Variant names are persisted in the `VariantNames` text[] column on `ModelVersion` and are auto-registered when creating texture mappings with a new variant name. The `mainVariantName` on `ModelVersion` tracks which preset is active for thumbnail generation and is auto-set to the first named variant when not yet configured.
 
 ### Recycled Files (4 endpoints)
 
@@ -142,7 +159,7 @@ Handled by `WebDavMiddleware` — not standard REST endpoints. Requires `ENABLE_
 
 **REST API .blend support:** `POST /models` and `POST /models/{modelId}/versions` also accept `.blend` files. The `ModelUploadedEvent` is dispatched for both renderable and project (`.blend`) file types, triggering the asset-processor pipeline.
 
-**Total:** 57 endpoints (52 REST + 5 WebDAV)
+**Total:** 58 endpoints (53 REST + 5 WebDAV)
 
 ## Pagination
 

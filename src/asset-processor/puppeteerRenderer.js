@@ -578,12 +578,15 @@ export class PuppeteerRenderer {
    * Apply textures to the loaded model
    * @param {Object} texturePaths - Map of texture types to texture info {filePath, sourceChannel}
    * @param {string} fileType - Model file type (gltf, glb, obj, fbx) for flipY setting
+   * @param {Object} tilingScale - Tiling scale {x, y}
+   * @param {string|null} materialName - If set, only apply to meshes whose material matches this name. Null/empty = all meshes.
    * @returns {Promise<boolean>} Success status
    */
   async applyTextures(
     texturePaths,
     fileType = 'gltf',
-    tilingScale = { x: 1, y: 1 }
+    tilingScale = { x: 1, y: 1 },
+    materialName = null
   ) {
     if (!texturePaths || Object.keys(texturePaths).length === 0) {
       logger.info('No textures to apply')
@@ -599,6 +602,7 @@ export class PuppeteerRenderer {
       fileType,
       flipY,
       tilingScale,
+      materialName: materialName || '(all meshes)',
     })
 
     // Start a local HTTP server to serve texture files — avoids base64 encoding and
@@ -656,7 +660,7 @@ export class PuppeteerRenderer {
       // Apply textures in the browser with channel extraction.
       // The browser fetches each texture via HTTP from the local server.
       const result = await this.page.evaluate(
-        async (textures, shouldFlipY, tiling) => {
+        async (textures, shouldFlipY, tiling, targetMaterialName) => {
           try {
             if (!window.modelRenderer.model) {
               return { success: false, error: 'No model loaded' }
@@ -852,10 +856,20 @@ export class PuppeteerRenderer {
               }
             }
 
-            // Apply textures to all meshes with proper material setup
+            // Apply textures to meshes with optional material name filtering
             let meshCount = 0
             model.traverse(child => {
               if (child.isMesh) {
+                // If targetMaterialName is set, only apply to meshes with matching material name
+                if (targetMaterialName) {
+                  const meshMats = Array.isArray(child.material)
+                    ? child.material
+                    : [child.material]
+                  const hasMatch = meshMats.some(
+                    m => m && m.name === targetMaterialName
+                  )
+                  if (!hasMatch) return
+                }
                 meshCount++
 
                 // AO maps require a second UV set — copy uv to uv2
@@ -866,8 +880,14 @@ export class PuppeteerRenderer {
                   }
                 }
 
+                // Preserve original material name for subsequent per-material calls
+                const originalName = Array.isArray(child.material)
+                  ? child.material[0]?.name || ''
+                  : child.material?.name || ''
+
                 // Create new material with white base color for textures
                 child.material = new THREE.MeshStandardMaterial({
+                  name: originalName,
                   color: loadedTextures.map
                     ? 0xffffff
                     : new THREE.Color(0.7, 0.7, 0.9),
@@ -925,7 +945,8 @@ export class PuppeteerRenderer {
         },
         textureData,
         flipY,
-        tilingScale
+        tilingScale,
+        materialName || null
       )
 
       if (!result.success) {
@@ -1224,6 +1245,59 @@ export class PuppeteerRenderer {
       glb: 'model/gltf-binary',
     }
     return mimeTypes[fileType.toLowerCase()] || 'application/octet-stream'
+  }
+
+  /**
+   * Extract material names from the currently loaded model.
+   * Traverses all meshes and collects unique material names.
+   * @returns {Promise<string[]>} Array of unique material names
+   */
+  async extractMaterialNames() {
+    if (!this.page || this.page.isClosed()) {
+      logger.warn('Cannot extract material names — page not available')
+      return []
+    }
+
+    try {
+      const result = await this.page.evaluate(() => {
+        const model = window.modelRenderer?.model
+        if (!model) return { success: false, error: 'No model loaded' }
+
+        const materialNames = new Set()
+        model.traverse(child => {
+          if (child.isMesh && child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach(m => {
+                if (m.name) materialNames.add(m.name)
+              })
+            } else if (child.material.name) {
+              materialNames.add(child.material.name)
+            }
+          }
+        })
+
+        return { success: true, materialNames: [...materialNames] }
+      })
+
+      if (!result.success) {
+        logger.warn('Failed to extract material names', {
+          error: result.error,
+        })
+        return []
+      }
+
+      logger.info('Extracted material names from model', {
+        count: result.materialNames.length,
+        materialNames: result.materialNames,
+      })
+
+      return result.materialNames
+    } catch (error) {
+      logger.warn('Error extracting material names', {
+        error: error.message,
+      })
+      return []
+    }
   }
 
   /**

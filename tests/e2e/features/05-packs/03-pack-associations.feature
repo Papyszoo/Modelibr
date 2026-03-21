@@ -1,4 +1,4 @@
-@depends-on:packs-setup @packs
+@depends-on:packs-setup @packs @serial
 Feature: Pack Associations
   Tests for adding and removing models to/from packs.
 

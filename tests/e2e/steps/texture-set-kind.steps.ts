@@ -3,6 +3,7 @@ import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { navigateToTab } from "../helpers/navigation-helper";
+import { TextureSetsPage } from "../pages/TextureSetsPage";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -24,19 +25,13 @@ function uniqueName(baseName: string): string {
     return `${baseName}_${runId}`;
 }
 
-// Helper to find a texture set card on the page
-function getCardLocator(page: any, name: string) {
-    return page.locator(`.texture-set-card`).filter({
-        has: page.locator(`.texture-set-card-name:has-text("${name}")`),
-    });
-}
-
 // ── Navigation ────────────────────────────────────────────────────────
 // Note: "Given I am on the texture sets page" is already defined in default-texture-set.steps.ts
 
 When("I reload the page", async ({ page }) => {
+    const textureSetsPage = new TextureSetsPage(page);
     await page.reload();
-    await page.waitForSelector(".texture-set-list", { timeout: 10000 });
+    await textureSetsPage.waitForList();
     // Wait for kind filter tabs to initialize (nuqs URL state sync)
     await page.waitForSelector(".kind-filter-select .p-button.p-highlight", {
         timeout: 5000,
@@ -48,7 +43,7 @@ When("I navigate away and return to texture sets", async ({ page }) => {
     await navigateToTab(page, "modelList");
     await page.waitForTimeout(500);
     await navigateToTab(page, "textureSets");
-    await page.waitForSelector(".texture-set-list", { timeout: 10000 });
+    await new TextureSetsPage(page).waitForList();
 });
 
 // ── Kind Tab Interactions ─────────────────────────────────────────────
@@ -104,7 +99,7 @@ When(
 
         // Reload to see new data
         await page.reload();
-        await page.waitForSelector(".texture-set-list", { timeout: 10000 });
+        await new TextureSetsPage(page).waitForList();
     },
 );
 
@@ -126,7 +121,7 @@ When(
 
         // Reload to see new data
         await page.reload();
-        await page.waitForSelector(".texture-set-list", { timeout: 10000 });
+        await new TextureSetsPage(page).waitForList();
     },
 );
 
@@ -173,23 +168,25 @@ Then(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
+        const textureSetsPage = new TextureSetsPage(page);
+
         // Use search to filter by name — avoids pagination issues when >50 sets exist
-        const searchInput = page.locator(".search-input");
-        const searchVisible = await searchInput
-            .isVisible({ timeout: 3000 })
+        const searchVisible = await textureSetsPage.searchInput
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
             .catch(() => false);
         if (searchVisible) {
-            await searchInput.clear();
-            await searchInput.fill(set.name);
+            await textureSetsPage.searchInput.clear();
+            await textureSetsPage.searchInput.fill(set.name);
             await page.waitForTimeout(300);
         }
 
-        const card = getCardLocator(page, set.name);
+        const card = textureSetsPage.getCardByName(set.name);
         await expect(card).toBeVisible({ timeout: 10000 });
 
         // Clear search so it doesn't affect subsequent steps
         if (searchVisible) {
-            await searchInput.clear();
+            await textureSetsPage.searchInput.clear();
             await page.waitForTimeout(300);
         }
     },
@@ -204,7 +201,7 @@ Then(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
-        const card = getCardLocator(page, set.name);
+        const card = new TextureSetsPage(page).getCardByName(set.name);
         await expect(card).toHaveCount(0, { timeout: 5000 });
     },
 );
@@ -221,7 +218,7 @@ When(
             );
 
         // Find the source card
-        const card = getCardLocator(page, set.name);
+        const card = new TextureSetsPage(page).getCardByName(set.name);
         await expect(card).toBeVisible({ timeout: 5000 });
 
         // Find the target tab button
@@ -320,7 +317,7 @@ When(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
-        const card = getCardLocator(page, set.name);
+        const card = new TextureSetsPage(page).getCardByName(set.name);
         await expect(card).toBeVisible({ timeout: 5000 });
 
         // Right-click to open context menu

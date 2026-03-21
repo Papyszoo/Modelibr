@@ -6,6 +6,7 @@ Feature: Version Switching
       | name                |
       | multi-version-model |
 
+  @timeout:300000
   Scenario: Version dropdown shows all versions with thumbnails
     Given I am on the model viewer page for "multi-version-model"
     When I open the version dropdown

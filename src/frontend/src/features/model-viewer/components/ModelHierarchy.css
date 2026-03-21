@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -25,6 +26,7 @@
   font-size: 0.875rem;
   padding: 0 !important;
   border-radius: 0 !important;
+  height: 100%;
 }
 
 .hierarchy-tree-component .p-tree-container {
@@ -37,6 +39,26 @@
 
 .hierarchy-tree-component .p-treenode-content {
   padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.hierarchy-tree-component .p-treenode-content:hover {
+  background: var(--surface-hover) !important;
+}
+
+.hierarchy-tree-component .p-treenode-content.p-highlight {
+  background: var(--primary-color) !important;
+  color: var(--primary-color-text) !important;
+}
+
+.hierarchy-tree-component .p-treenode-content.p-highlight .node-name {
+  color: var(--primary-color-text);
+}
+
+.hierarchy-tree-component .p-treenode-content.p-highlight .node-type {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--primary-color-text);
 }
 
 .hierarchy-node-label {
@@ -61,10 +83,32 @@
   text-transform: uppercase;
 }
 
+.node-type-mesh {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.node-type-group {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.node-type-object3d {
+  background: var(--orange-100);
+  color: var(--orange-700);
+}
+
+.node-type-scene {
+  background: var(--purple-100);
+  color: var(--purple-700);
+}
+
 .hierarchy-details {
   border-top: 1px solid var(--surface-border);
-  padding-top: 0.75rem;
-  margin-top: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  flex-shrink: 0;
+  overflow-y: auto;
+  max-height: 40%;
 }
 
 .hierarchy-details h4 {

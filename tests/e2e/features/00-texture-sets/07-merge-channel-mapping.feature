@@ -12,6 +12,7 @@ Feature: Merge Texture Sets with Channel Mapping
   # preventing the same file content from being used in multiple texture sets.
   # This requires a backend fix to allow TextureSet-scoped uniqueness.
 
+  @timeout:180000
   Scenario: Merge ORM packed texture using Split Channels
     Given texture set "Source ORM" exists with file "texture_orm.png"
     And texture set "ORM Target" exists

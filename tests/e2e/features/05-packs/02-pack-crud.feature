@@ -1,4 +1,4 @@
-@depends-on:packs-setup @packs
+@depends-on:packs-setup @packs @serial
 Feature: Pack CRUD Operations
   Tests for creating, reading, updating, and deleting packs.
 

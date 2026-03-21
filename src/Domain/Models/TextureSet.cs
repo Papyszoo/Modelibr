@@ -10,7 +10,7 @@ public class TextureSet : AggregateRoot
 {
     private readonly List<Texture> _textures = new();
     private readonly List<Model> _models = new();
-    private readonly List<ModelVersion> _modelVersions = new();
+    private readonly List<ModelVersionTextureSet> _modelVersionMappings = new();
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
 
@@ -81,15 +81,15 @@ public class TextureSet : AggregateRoot
         }
     }
 
-    // Navigation property for many-to-many relationship with ModelVersions - EF Core requires this to be settable
-    public ICollection<ModelVersion> ModelVersions
+    // Navigation property for many-to-many relationship with ModelVersions via explicit join entity
+    public ICollection<ModelVersionTextureSet> ModelVersionMappings
     {
-        get => _modelVersions;
+        get => _modelVersionMappings;
         set
         {
-            _modelVersions.Clear();
+            _modelVersionMappings.Clear();
             if (value != null)
-                _modelVersions.AddRange(value);
+                _modelVersionMappings.AddRange(value);
         }
     }
 
@@ -444,20 +444,30 @@ public class TextureSet : AggregateRoot
     }
 
     /// <summary>
-    /// Associates a model version with this texture set.
+    /// Associates a model version with this texture set (default/empty material name).
     /// </summary>
     /// <param name="modelVersion">The model version to associate</param>
     /// <param name="updatedAt">When the association was made</param>
     /// <exception cref="ArgumentNullException">Thrown when modelVersion is null</exception>
     public void AddModelVersion(ModelVersion modelVersion, DateTime updatedAt)
     {
+        AddModelVersionForMaterial(modelVersion, string.Empty, updatedAt);
+    }
+
+    /// <summary>
+    /// Associates a model version with this texture set for a specific material.
+    /// </summary>
+    public void AddModelVersionForMaterial(ModelVersion modelVersion, string materialName, DateTime updatedAt)
+    {
         if (modelVersion == null)
             throw new ArgumentNullException(nameof(modelVersion));
 
-        if (_modelVersions.Any(mv => mv.Id == modelVersion.Id))
-            return; // Model version already associated
+        materialName ??= string.Empty;
 
-        _modelVersions.Add(modelVersion);
+        if (_modelVersionMappings.Any(m => m.ModelVersionId == modelVersion.Id && m.MaterialName == materialName))
+            return; // Already associated for this material
+
+        _modelVersionMappings.Add(ModelVersionTextureSet.Create(modelVersion.Id, Id, materialName));
         UpdatedAt = updatedAt;
     }
 
@@ -472,8 +482,30 @@ public class TextureSet : AggregateRoot
         if (modelVersion == null)
             throw new ArgumentNullException(nameof(modelVersion));
 
-        if (_modelVersions.Remove(modelVersion))
+        var toRemove = _modelVersionMappings.Where(m => m.ModelVersionId == modelVersion.Id).ToList();
+        foreach (var mapping in toRemove)
         {
+            _modelVersionMappings.Remove(mapping);
+        }
+        if (toRemove.Count > 0)
+            UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Removes a model version association for a specific material from this texture set.
+    /// </summary>
+    public void RemoveModelVersionForMaterial(ModelVersion modelVersion, string materialName, string variantName, DateTime updatedAt)
+    {
+        if (modelVersion == null)
+            throw new ArgumentNullException(nameof(modelVersion));
+
+        materialName ??= string.Empty;
+        variantName ??= string.Empty;
+        var mapping = _modelVersionMappings.FirstOrDefault(
+            m => m.ModelVersionId == modelVersion.Id && m.MaterialName == materialName && m.VariantName == variantName);
+        if (mapping != null)
+        {
+            _modelVersionMappings.Remove(mapping);
             UpdatedAt = updatedAt;
         }
     }
@@ -485,16 +517,16 @@ public class TextureSet : AggregateRoot
     /// <returns>True if the model version is associated with this texture set</returns>
     public bool HasModelVersion(int modelVersionId)
     {
-        return _modelVersions.Any(mv => mv.Id == modelVersionId);
+        return _modelVersionMappings.Any(m => m.ModelVersionId == modelVersionId);
     }
 
     /// <summary>
-    /// Gets all model versions associated with this texture set.
+    /// Gets all model version mappings associated with this texture set.
     /// </summary>
-    /// <returns>Read-only list of associated model versions</returns>
-    public IReadOnlyList<ModelVersion> GetModelVersions()
+    /// <returns>Read-only list of associated model version texture set mappings</returns>
+    public IReadOnlyList<ModelVersionTextureSet> GetModelVersionMappings()
     {
-        return _modelVersions.AsReadOnly();
+        return _modelVersionMappings.AsReadOnly();
     }
 
     /// <summary>

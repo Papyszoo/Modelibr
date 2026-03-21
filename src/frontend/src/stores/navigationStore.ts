@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { type Tab, type TabType } from '@/types'
-import { getTabLabel } from '@/utils/tabSerialization'
 
 // ─── Constants ────────────────────────────────────────────────────────
 const STORAGE_KEY = 'modelibr_navigation'
@@ -91,6 +90,75 @@ export interface NavigationStore {
 }
 
 // ─── Tab factory helpers ──────────────────────────────────────────────
+
+// Helper function to generate tab labels
+export function getTabLabel(
+  type: Tab['type'],
+  options: {
+    modelId?: string
+    setId?: string
+    packId?: string
+    projectId?: string
+    stageId?: string
+    modelName?: string
+    setName?: string
+    packName?: string
+    projectName?: string
+    stageName?: string
+  } = {}
+): string {
+  const {
+    modelId,
+    setId,
+    packId,
+    projectId,
+    stageId,
+    modelName,
+    setName,
+    packName,
+    projectName,
+    stageName,
+  } = options
+  switch (type) {
+    case 'modelList':
+      return 'Models'
+    case 'modelViewer':
+      if (modelName) return modelName
+      return modelId ? `Model ${modelId}` : 'Model Viewer'
+    case 'textureSets':
+      return 'Texture Sets'
+    case 'textureSetViewer':
+      if (setName) return setName
+      return setId ? `Set ${setId}` : 'Texture Set'
+    case 'packs':
+      return 'Packs'
+    case 'packViewer':
+      if (packName) return packName
+      return packId ? `Pack ${packId}` : 'Pack Viewer'
+    case 'projects':
+      return 'Projects'
+    case 'projectViewer':
+      if (projectName) return projectName
+      return projectId ? `Project ${projectId}` : 'Project Viewer'
+    case 'sprites':
+      return 'Sprites'
+    case 'sounds':
+      return 'Sounds'
+    case 'stageList':
+      return 'Stages'
+    case 'stageEditor':
+      if (stageName) return stageName
+      return stageId ? `Stage ${stageId}` : 'Stage Editor'
+    case 'history':
+      return 'History'
+    case 'settings':
+      return 'Settings'
+    case 'recycledFiles':
+      return 'Recycled Files'
+    default:
+      return 'Unknown'
+  }
+}
 
 export function createTab(
   type: TabType,

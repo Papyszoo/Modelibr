@@ -1,4 +1,4 @@
-@depends-on:setup
+@depends-on:setup @serial
 Feature: Permanent Delete (Delete Forever)
   Tests that permanent delete removes items from recycle bin and file system
 

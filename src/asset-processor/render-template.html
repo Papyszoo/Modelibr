@@ -205,7 +205,12 @@
               // This overrides embedded GLTF textures - texture set will be applied later if configured
               model.traverse(child => {
                 if (child.isMesh) {
+                  // Preserve the original material name for per-material texture mapping
+                  const originalName = Array.isArray(child.material)
+                    ? child.material[0]?.name || ''
+                    : child.material?.name || ''
                   child.material = new THREE.MeshStandardMaterial({
+                    name: originalName,
                     color: new THREE.Color(0.7, 0.7, 0.9),
                     metalness: 0.3,
                     roughness: 0.4,

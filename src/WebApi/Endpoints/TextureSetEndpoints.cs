@@ -393,11 +393,13 @@ public static class TextureSetEndpoints
     private static async Task<IResult> AssociateTextureSetWithModelVersion(
         int packId,
         int modelVersionId,
+        string? materialName,
+        string? variantName,
         ICommandHandler<AssociateTextureSetWithModelVersionCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new AssociateTextureSetWithModelVersionCommand(packId, modelVersionId), 
+            new AssociateTextureSetWithModelVersionCommand(packId, modelVersionId, materialName, variantName), 
             cancellationToken);
 
         if (result.IsFailure)
@@ -411,11 +413,13 @@ public static class TextureSetEndpoints
     private static async Task<IResult> DisassociateTextureSetFromModelVersion(
         int packId,
         int modelVersionId,
+        string? materialName,
+        string? variantName,
         ICommandHandler<DisassociateTextureSetFromModelVersionCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new DisassociateTextureSetFromModelVersionCommand(packId, modelVersionId), 
+            new DisassociateTextureSetFromModelVersionCommand(packId, modelVersionId, materialName, variantName), 
             cancellationToken);
 
         if (result.IsFailure)
@@ -429,11 +433,12 @@ public static class TextureSetEndpoints
     private static async Task<IResult> AssociateTextureSetWithAllModelVersions(
         int packId,
         int modelId,
+        string? materialName,
         ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new AssociateTextureSetWithAllModelVersionsCommand(packId, modelId), 
+            new AssociateTextureSetWithAllModelVersionsCommand(packId, modelId, materialName), 
             cancellationToken);
 
         if (result.IsFailure)

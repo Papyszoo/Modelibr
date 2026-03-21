@@ -158,8 +158,31 @@ export class ThumbnailProcessor extends BaseProcessor {
         fileInfo.fileType
       )
 
+      // Step 3.2: Extract and save material names from the loaded model
+      try {
+        const materialNames =
+          await this.puppeteerRenderer.extractMaterialNames()
+        if (materialNames.length > 0) {
+          jobLogger.info('Extracted material names from model', {
+            materialNames,
+          })
+          await this.modelDataService.saveMaterialNames(
+            job.modelVersionId,
+            materialNames
+          )
+        }
+      } catch (matError) {
+        jobLogger.warn('Failed to extract/save material names, continuing', {
+          error: matError.message,
+        })
+      }
+
       // Step 3.5: Apply textures if configured
-      texturePaths = await this._applyTextures(job, jobLogger)
+      texturePaths = await this._applyTextures(
+        job,
+        jobLogger,
+        fileInfo.fileType
+      )
 
       // Step 4: Render orbit frames
       if (!config.orbit.enabled) {
@@ -222,10 +245,137 @@ export class ThumbnailProcessor extends BaseProcessor {
   }
 
   /**
-   * Apply textures if a default texture set is configured.
+   * Apply textures using per-material texture mappings from the main variant.
+   * Falls back to single defaultTextureSetId if no mappings exist.
    * @private
    */
-  async _applyTextures(job, jobLogger) {
+  async _applyTextures(job, jobLogger, fileType = 'gltf') {
+    const textureMappings = job.textureMappings || []
+    const mainVariant = job.mainVariantName || ''
+
+    // Filter mappings to the main variant (exact match only)
+    let variantMappings = textureMappings.filter(
+      m => m.variantName === mainVariant
+    )
+
+    // Fallback 1: if main variant has no mappings, try the Default variant ("")
+    if (variantMappings.length === 0 && mainVariant !== '') {
+      variantMappings = textureMappings.filter(m => m.variantName === '')
+      if (variantMappings.length > 0) {
+        jobLogger.info(
+          'Main variant has no mappings, falling back to Default variant',
+          {
+            mainVariant,
+            mappingCount: variantMappings.length,
+          }
+        )
+      }
+    }
+
+    // Fallback 2: if mainVariant is empty and no default-variant mappings exist,
+    // use the first available named variant's mappings
+    if (
+      variantMappings.length === 0 &&
+      mainVariant === '' &&
+      textureMappings.length > 0
+    ) {
+      const firstVariant = textureMappings.find(
+        m => m.variantName !== ''
+      )?.variantName
+      if (firstVariant) {
+        variantMappings = textureMappings.filter(
+          m => m.variantName === firstVariant
+        )
+        jobLogger.info(
+          'MainVariantName not set, falling back to first named variant',
+          {
+            fallbackVariant: firstVariant,
+            mappingCount: variantMappings.length,
+          }
+        )
+      }
+    }
+
+    // If we have per-material mappings, apply textures per-material
+    if (variantMappings.length > 0) {
+      jobLogger.info('Applying per-material textures', {
+        mainVariant,
+        mappingCount: variantMappings.length,
+      })
+
+      const allTexturePaths = []
+
+      // Group by textureSetId to avoid fetching the same set multiple times
+      const textureSetIds = [
+        ...new Set(variantMappings.map(m => m.textureSetId)),
+      ]
+
+      const textureSetCache = new Map()
+      for (const tsId of textureSetIds) {
+        try {
+          const ts = await this.modelDataService.getTextureSet(tsId)
+          if (ts?.textures?.length) {
+            textureSetCache.set(tsId, ts)
+          }
+        } catch (err) {
+          jobLogger.warn(`Failed to fetch texture set ${tsId}`, {
+            error: err.message,
+          })
+        }
+      }
+
+      const downloadedFilesCache = new Map()
+      for (const mapping of variantMappings) {
+        const ts = textureSetCache.get(mapping.textureSetId)
+        if (!ts) continue
+
+        try {
+          let texturePaths = downloadedFilesCache.get(mapping.textureSetId)
+          if (!texturePaths) {
+            texturePaths =
+              await this.modelDataService.downloadTextureSetFiles(ts)
+            downloadedFilesCache.set(mapping.textureSetId, texturePaths)
+          }
+          if (Object.keys(texturePaths).length > 0) {
+            const applied = await this.puppeteerRenderer.applyTextures(
+              texturePaths,
+              fileType,
+              undefined,
+              mapping.materialName || null
+            )
+            if (applied) {
+              jobLogger.info(
+                `Applied textures for material "${mapping.materialName}"`,
+                {
+                  textureSetId: mapping.textureSetId,
+                }
+              )
+            }
+            allTexturePaths.push(texturePaths)
+          }
+        } catch (err) {
+          jobLogger.warn(
+            `Failed to apply textures for material "${mapping.materialName}"`,
+            {
+              error: err.message,
+            }
+          )
+        }
+      }
+
+      // Return all texture paths for cleanup
+      if (allTexturePaths.length > 0) {
+        // Merge all texture paths into one object for cleanup
+        const merged = {}
+        for (const paths of allTexturePaths) {
+          Object.assign(merged, paths)
+        }
+        return merged
+      }
+      return null
+    }
+
+    // Fallback: use single defaultTextureSetId (legacy behavior)
     if (!job.defaultTextureSetId) {
       jobLogger.debug('No default texture set configured')
       return null
@@ -255,7 +405,10 @@ export class ThumbnailProcessor extends BaseProcessor {
         await this.modelDataService.downloadTextureSetFiles(textureSet)
 
       if (Object.keys(texturePaths).length > 0) {
-        const applied = await this.puppeteerRenderer.applyTextures(texturePaths)
+        const applied = await this.puppeteerRenderer.applyTextures(
+          texturePaths,
+          fileType
+        )
         if (applied) {
           await this.jobEventService.logEvent(
             job.id,

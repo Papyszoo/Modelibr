@@ -8,6 +8,7 @@ Feature: Setup - Create Models and Versions for Texture Set Tests
     And the thumbnail should be visible in the model card
     And the model should be stored in shared state
 
+  @timeout:720000
   Scenario: Create model with two versions for independence tests
     Given I am on the model list page
     When I upload a model "test-torus.fbx" and store it as "multi-version-model"

@@ -208,6 +208,7 @@ export function ModelGrid({
               <div
                 key={model.id}
                 className="model-card"
+                data-model-id={model.id}
                 onClick={() => handleModelSelect(model)}
                 onContextMenu={e => {
                   contextMenuRef.current?.show(e, model)

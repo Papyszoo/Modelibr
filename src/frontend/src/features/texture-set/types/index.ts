@@ -50,6 +50,7 @@ export interface ModelSummaryDto {
   name: string
   versionNumber?: number
   modelVersionId: number
+  materialName: string
 }
 
 export interface PackSummaryDto {

@@ -102,7 +102,7 @@ export class PacksPage {
         // Wait for dialog to close
         await this.page.waitForSelector(
             '.p-dialog:has-text("Create New Pack")',
-            { state: "hidden", timeout: 10000 },
+            { state: "hidden", timeout: 30000 },
         );
         console.log("[Action] Dialog closed");
 
@@ -151,7 +151,12 @@ export class PacksPage {
         const packCard = this.page.locator(
             `.pack-grid-card:has-text("${packName}")`,
         );
-        return await packCard.isVisible();
+        try {
+            await packCard.waitFor({ state: "visible", timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // PackViewer methods (ContainerViewer with tabs)

@@ -22,13 +22,23 @@ internal sealed class ApplicationSettingsRepository : IApplicationSettingsReposi
 
     public async Task<ApplicationSettings> SaveAsync(ApplicationSettings settings, CancellationToken cancellationToken = default)
     {
-        var existing = await GetAsync(cancellationToken);
-        
+        var allRows = await _context.ApplicationSettings
+            .OrderBy(s => s.Id)
+            .ToListAsync(cancellationToken);
+
+        var existing = allRows.FirstOrDefault();
+
+        // Clean up duplicate rows if any (can happen from concurrent initial requests)
+        if (allRows.Count > 1)
+        {
+            _context.ApplicationSettings.RemoveRange(allRows.Skip(1));
+        }
+
         if (existing == null)
         {
             _context.ApplicationSettings.Add(settings);
         }
-        else
+        else if (!ReferenceEquals(existing, settings))
         {
             _context.Entry(existing).CurrentValues.SetValues(settings);
         }

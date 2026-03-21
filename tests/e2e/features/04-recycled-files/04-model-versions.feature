@@ -1,4 +1,4 @@
-@depends-on:setup @independent
+@depends-on:setup @independent @serial
 Feature: Recycled Model Versions
   Tests that individual model versions can be recycled, restored, and permanently deleted
 

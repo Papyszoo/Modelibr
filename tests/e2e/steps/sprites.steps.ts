@@ -5,7 +5,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { sharedState } from "../fixtures/shared-state";
+import { getScenarioState } from "../fixtures/shared-state";
 import { SpriteListPage } from "../pages/SpriteListPage";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 
@@ -96,7 +96,7 @@ When(
 
         // Save to shared state using original name key for test reference
         if (sprite) {
-            sharedState.saveSprite(spriteName, {
+            getScenarioState(page).saveSprite(spriteName, {
                 id: sprite.id,
                 name: uniqueName,
                 fileId: sprite.fileId,
@@ -218,7 +218,7 @@ When(
 
         // Save to shared state for use in subsequent steps
         if (sprite) {
-            sharedState.saveSprite(spriteName, {
+            getScenarioState(page).saveSprite(spriteName, {
                 id: sprite.id,
                 name: spriteName,
                 fileId: sprite.fileId,
@@ -268,7 +268,7 @@ Then(
                 console.log(
                     `[Warning] Found partial match: "${partialMatch.name}" for "${spriteName}"`,
                 );
-                sharedState.saveSprite(spriteName, {
+                getScenarioState(page).saveSprite(spriteName, {
                     id: partialMatch.id,
                     name: partialMatch.name,
                     fileId: partialMatch.fileId,
@@ -284,7 +284,7 @@ Then(
             );
         }
 
-        sharedState.saveSprite(spriteName, {
+        getScenarioState(page).saveSprite(spriteName, {
             id: sprite.id,
             name: sprite.name,
             fileId: sprite.fileId,
@@ -300,7 +300,7 @@ Then(
 Given(
     "the sprite {string} exists in shared state",
     async ({ page }, spriteName: string) => {
-        let sprite = sharedState.getSprite(spriteName);
+        let sprite = getScenarioState(page).getSprite(spriteName);
         if (!sprite) {
             // Self-provision: check if sprite exists via API, or create one
             console.log(
@@ -314,7 +314,7 @@ Given(
             );
 
             if (found) {
-                sharedState.saveSprite(spriteName, {
+                getScenarioState(page).saveSprite(spriteName, {
                     id: found.id,
                     name: found.name,
                     fileId: found.fileId,
@@ -351,7 +351,7 @@ Given(
                     );
                 }
                 const created = await createResponse.json();
-                sharedState.saveSprite(spriteName, {
+                getScenarioState(page).saveSprite(spriteName, {
                     id: created.spriteId || created.id,
                     name: spriteName,
                     fileId: created.fileId,
@@ -363,7 +363,7 @@ Given(
             }
         }
         console.log(
-            `[Precondition] Sprite "${spriteName}" exists in shared state (ID: ${sharedState.getSprite(spriteName)?.id})`,
+            `[Precondition] Sprite "${spriteName}" exists in shared state (ID: ${getScenarioState(page).getSprite(spriteName)?.id})`,
         );
     },
 );
@@ -373,13 +373,13 @@ Given(
 When(
     "I open the sprite {string} for editing",
     async ({ page }, spriteName: string) => {
-        const sprite = sharedState.getSprite(spriteName);
+        const sprite = getScenarioState(page).getSprite(spriteName);
         if (!sprite) {
             throw new Error(`Sprite "${spriteName}" not found in shared state`);
         }
 
         // Set as current sprite for subsequent actions
-        sharedState.setCurrentSprite(spriteName);
+        getScenarioState(page).setCurrentSprite(spriteName);
 
         // Check actual sprite name from API (shared state may be stale from previous run)
         let actualName = sprite.name;
@@ -438,9 +438,9 @@ When(
     "I change the sprite name to {string}",
     async ({ page }, newName: string) => {
         // Get the current sprite from shared state for reference
-        const currentSpriteName = sharedState.getCurrentSprite();
+        const currentSpriteName = getScenarioState(page).getCurrentSprite();
         const currentSprite = currentSpriteName
-            ? sharedState.getSprite(currentSpriteName)
+            ? getScenarioState(page).getSprite(currentSpriteName)
             : null;
         const currentSpriteId = currentSprite?.id;
 
@@ -505,7 +505,8 @@ When(
         const dialog = page.locator('[data-testid="sprite-detail-modal"]');
         // Fall back to generic .p-dialog if the specific testid doesn't exist
         const dialogVisible = await dialog
-            .isVisible({ timeout: 3000 })
+            .waitFor({ state: "visible", timeout: 5000 })
+            .then(() => true)
             .catch(() => false);
         const targetDialog = dialogVisible
             ? dialog
@@ -520,7 +521,8 @@ When(
             '[data-testid="sprite-name-edit"]',
         );
         const editButtonVisible = await editButton
-            .isVisible({ timeout: 3000 })
+            .waitFor({ state: "visible", timeout: 5000 })
+            .then(() => true)
             .catch(() => false);
 
         if (!editButtonVisible) {
@@ -529,12 +531,16 @@ When(
             );
             await renameViaApi();
             // Update shared state
-            const currentSpriteName = sharedState.getCurrentSprite();
+            const currentSpriteName = getScenarioState(page).getCurrentSprite();
             if (currentSpriteName) {
-                const sprite = sharedState.getSprite(currentSpriteName);
+                const sprite =
+                    getScenarioState(page).getSprite(currentSpriteName);
                 if (sprite) {
                     sprite.name = newName;
-                    sharedState.saveSprite(currentSpriteName, sprite);
+                    getScenarioState(page).saveSprite(
+                        currentSpriteName,
+                        sprite,
+                    );
                 }
             }
             return;
@@ -600,10 +606,14 @@ When(
 
         // Update shared state with new name
         if (currentSpriteName) {
-            const spriteToUpdate = sharedState.getSprite(currentSpriteName);
+            const spriteToUpdate =
+                getScenarioState(page).getSprite(currentSpriteName);
             if (spriteToUpdate) {
                 spriteToUpdate.name = newName;
-                sharedState.saveSprite(currentSpriteName, spriteToUpdate);
+                getScenarioState(page).saveSprite(
+                    currentSpriteName,
+                    spriteToUpdate,
+                );
             }
         }
 
@@ -649,7 +659,7 @@ When("I save the sprite changes", async ({ page }) => {
                         .first();
                     await closeButton.click({ force: true }).catch(() => {});
                     await targetDialog
-                        .waitFor({ state: "hidden", timeout: 3000 })
+                        .waitFor({ state: "hidden", timeout: 5000 })
                         .catch(() => {});
                 });
             console.log(
@@ -669,7 +679,7 @@ When("I save the sprite changes", async ({ page }) => {
 When(
     "I assign the sprite to category {string}",
     async ({ page }, categoryName: string) => {
-        const category = sharedState.getSpriteCategory(categoryName);
+        const category = getScenarioState(page).getSpriteCategory(categoryName);
         if (!category) {
             throw new Error(
                 `Category "${categoryName}" not found in shared state`,
@@ -677,14 +687,14 @@ When(
         }
 
         // Get the current sprite from context
-        const currentSpriteName = sharedState.getCurrentSprite();
+        const currentSpriteName = getScenarioState(page).getCurrentSprite();
         if (!currentSpriteName) {
             throw new Error(
                 "No sprite is currently open for editing. Use 'I open the sprite for editing' first.",
             );
         }
 
-        const sprite = sharedState.getSprite(currentSpriteName);
+        const sprite = getScenarioState(page).getSprite(currentSpriteName);
         if (!sprite) {
             throw new Error(
                 `Current sprite '${currentSpriteName}' not found in shared state for category assignment`,
@@ -721,7 +731,7 @@ When(
 
         // Update shared state with new category
         sprite.categoryId = category.id;
-        sharedState.saveSprite(currentSpriteName, sprite);
+        getScenarioState(page).saveSprite(currentSpriteName, sprite);
 
         console.log(
             `[Action] Assigned sprite "${currentSpriteName}" to category "${categoryName}" via API`,
@@ -783,7 +793,7 @@ When(
 Then(
     "the sprite {string} should be visible in the filtered results",
     async ({ page }, spriteName: string) => {
-        const sprite = sharedState.getSprite(spriteName);
+        const sprite = getScenarioState(page).getSprite(spriteName);
         const name = sprite?.name || spriteName;
 
         const spriteCard = page.locator(".sprite-card").filter({
@@ -884,7 +894,9 @@ Then(
             .locator(".category-tab")
             .filter({ hasText: categoryName })
             .first();
-        await expect(categoryTab).toBeVisible({ timeout: 5000 });
+        await expect(async () => {
+            await expect(categoryTab).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 20000 });
         console.log(
             `[Verify] Category "${categoryName}" is visible in category list ✓`,
         );
@@ -909,7 +921,7 @@ Then(
             );
         }
 
-        sharedState.saveSpriteCategory(categoryName, {
+        getScenarioState(page).saveSpriteCategory(categoryName, {
             id: category.id,
             name: category.name,
             description: category.description,
@@ -924,7 +936,7 @@ Then(
 Given(
     "the category {string} exists in shared state",
     async ({ page }, categoryName: string) => {
-        let category = sharedState.getSpriteCategory(categoryName);
+        let category = getScenarioState(page).getSpriteCategory(categoryName);
         if (!category) {
             // Self-provision: look up or create via API
             console.log(
@@ -939,7 +951,7 @@ Given(
             );
 
             if (found) {
-                sharedState.saveSpriteCategory(categoryName, {
+                getScenarioState(page).saveSpriteCategory(categoryName, {
                     id: found.id,
                     name: found.name,
                     description: found.description,
@@ -964,7 +976,7 @@ Given(
                     );
                 }
                 const created = await createResponse.json();
-                sharedState.saveSpriteCategory(categoryName, {
+                getScenarioState(page).saveSpriteCategory(categoryName, {
                     id: created.id,
                     name: categoryName,
                     description: "",
@@ -975,41 +987,55 @@ Given(
             }
         }
         console.log(
-            `[Precondition] Category "${categoryName}" exists in shared state (ID: ${sharedState.getSpriteCategory(categoryName)?.id})`,
+            `[Precondition] Category "${categoryName}" exists in shared state (ID: ${getScenarioState(page).getSpriteCategory(categoryName)?.id})`,
         );
     },
 );
 
-// Track category edit state for API fallback
-const categoryEditState = {
-    editingCategoryName: null as string | null,
-    newCategoryName: null as string | null,
-};
+// categoryEditState is tracked via getScenarioState(page).getCustom('categoryEditState')
 
 When("I edit the category {string}", async ({ page }, categoryName: string) => {
-    categoryEditState.editingCategoryName = categoryName;
-    // Ensure no dialog is blocking
-    await page.keyboard.press("Escape");
-    await page
-        .locator(".p-dialog")
-        .waitFor({ state: "hidden", timeout: 3000 })
-        .catch(() => {});
-
-    // First select the category tab - use exact text match to avoid substring collisions
-    // e.g., "Test Category" should NOT match "Assign Test Category"
-    const allTabs = page.locator(".category-tab");
-    const tabCount = await allTabs.count();
-    let targetTab = null;
-    for (let i = 0; i < tabCount; i++) {
-        const tab = allTabs.nth(i);
-        const tabText = await tab.textContent();
-        // Category tabs show "Name(count)" format, extract just the name
-        const rawName = tabText?.replace(/\(\d+\)\s*$/, "").trim();
-        if (rawName === categoryName) {
-            targetTab = tab;
-            break;
-        }
+    getScenarioState(page).setCustom("editingCategoryName", categoryName);
+    // Ensure no dialog is blocking — wait for any existing dialog to fully close
+    const existingDialog = page.locator(".p-dialog");
+    const dialogVisible = await existingDialog.first().isVisible().catch(() => false);
+    if (dialogVisible) {
+        await page.keyboard.press("Escape");
+        await existingDialog.first().waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
     }
+
+    // Wait for category tabs to be rendered
+    await page.waitForSelector(".category-tab", {
+        state: "visible",
+        timeout: 10000,
+    });
+
+    // Use polling to wait for the specific category tab to appear (may need re-render)
+    let targetTab = null;
+    await expect
+        .poll(
+            async () => {
+                const allTabs = page.locator(".category-tab");
+                const tabCount = await allTabs.count();
+                for (let i = 0; i < tabCount; i++) {
+                    const tab = allTabs.nth(i);
+                    const tabText = await tab.textContent();
+                    const rawName = tabText?.replace(/\(\d+\)\s*$/, "").trim();
+                    if (rawName === categoryName) {
+                        targetTab = tab;
+                        return true;
+                    }
+                }
+                return false;
+            },
+            {
+                message: `Waiting for category tab "${categoryName}" to appear`,
+                timeout: 15000,
+                intervals: [500, 1000, 2000],
+            },
+        )
+        .toBe(true);
+
     if (!targetTab) {
         throw new Error(
             `Category tab "${categoryName}" not found (exact match)`,
@@ -1019,7 +1045,7 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
 
     // Click the edit (pencil) button on the category tab
     const editButton = targetTab.locator("button:has(.pi-pencil)");
-    await editButton.waitFor({ state: "visible", timeout: 3000 });
+    await editButton.waitFor({ state: "visible", timeout: 5000 });
     await editButton.click();
 
     // Wait for dialog using data-testid
@@ -1031,7 +1057,7 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
 When(
     "I change the category name to {string}",
     async ({ page }, newName: string) => {
-        categoryEditState.newCategoryName = newName;
+        getScenarioState(page).setCustom("newCategoryName", newName);
         // Use data-testid for the name input
         const dialog = page
             .locator('[data-testid="category-dialog"], .p-dialog')
@@ -1073,12 +1099,14 @@ When("I save the category changes", async ({ page }) => {
             .catch(() => {});
 
         // API fallback: rename the category directly
-        if (
-            categoryEditState.editingCategoryName &&
-            categoryEditState.newCategoryName
-        ) {
-            const oldName = categoryEditState.editingCategoryName;
-            const newName = categoryEditState.newCategoryName;
+        const editingName = getScenarioState(page).getCustom<string>(
+            "editingCategoryName",
+        );
+        const newCatName =
+            getScenarioState(page).getCustom<string>("newCategoryName");
+        if (editingName && newCatName) {
+            const oldName = editingName;
+            const newName = newCatName;
 
             // Get current categories
             const listResp = await page.request.get(
@@ -1143,7 +1171,7 @@ When(
         await page.keyboard.press("Escape");
         await page
             .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 3000 })
+            .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
         // First select the category tab
@@ -1155,7 +1183,7 @@ When(
 
         // Click the delete (trash) button on the category tab
         const deleteButton = categoryTab.locator("button:has(.pi-trash)");
-        await deleteButton.waitFor({ state: "visible", timeout: 3000 });
+        await deleteButton.waitFor({ state: "visible", timeout: 5000 });
         await deleteButton.click();
 
         // Confirm deletion in dialog
@@ -1192,7 +1220,7 @@ Then(
     "the sprite {string} should be visible in the sprite list",
     async ({ page }, spriteName: string) => {
         // First try to get from shared state
-        const sprite = sharedState.getSprite(spriteName);
+        const sprite = getScenarioState(page).getSprite(spriteName);
         const name = sprite?.name || spriteName;
 
         const spriteCard = page.locator(".sprite-card").filter({

@@ -9,6 +9,13 @@ const DEFAULT_SETTINGS = {
   modelRotationSpeed: 0.002,
   showShadows: true,
   showStats: false,
+  ambientIntensity: 0.3,
+  directionalIntensity: 1.0,
+  showLightHelpers: false,
+  environmentPreset: 'city',
+  showEnvironmentBackground: false,
+  backgroundIntensity: 1.0,
+  environmentIntensity: 1.0,
 }
 
 describe('viewerSettingsStore', () => {
@@ -82,6 +89,13 @@ describe('viewerSettingsStore', () => {
       modelRotationSpeed: 0.01,
       showShadows: false,
       showStats: true,
+      ambientIntensity: 0.5,
+      directionalIntensity: 2.0,
+      showLightHelpers: true,
+      environmentPreset: 'sunset',
+      showEnvironmentBackground: true,
+      backgroundIntensity: 0.8,
+      environmentIntensity: 1.5,
     }
 
     act(() => {
