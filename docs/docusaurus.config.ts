@@ -77,6 +77,11 @@ const config: Config = {
                     label: "Storybook",
                     position: "left",
                 },
+                {
+                    href: "https://Papyszoo.github.io/Modelibr/demo/",
+                    label: "Live Demo",
+                    position: "left",
+                },
 
                 {
                     href: "https://github.com/Papyszoo/Modelibr",

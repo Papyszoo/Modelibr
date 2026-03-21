@@ -753,6 +753,15 @@ jobs:
               working-directory: docs
               run: npm run build
 
+            - name: Build demo app
+              working-directory: src/frontend
+              run: npm ci && npm run build:demo
+
+            - name: Copy demo build into docs site
+              run: |
+                  mkdir -p docs/build/demo
+                  cp -r src/frontend/dist/* docs/build/demo/
+
             - name: Upload docs with reports (for preview)
               uses: actions/upload-artifact@v4
               with:

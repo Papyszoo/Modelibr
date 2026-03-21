@@ -29,6 +29,9 @@ coverage
 *storybook.log
 storybook-static
 
+# Generated demo assets (created by scripts/prepare-demo-assets.js)
+public/demo-assets
+
 # Visual regression test artifacts
 visual-tests/test-results/
 /test-results/
