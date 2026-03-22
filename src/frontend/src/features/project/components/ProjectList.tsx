@@ -137,7 +137,7 @@ export function ProjectList() {
                     <img src={thumbnail} alt={project.name} />
                   ) : (
                     <div className="project-grid-card-placeholder">
-                      <i className="pi pi-cube" />
+                      <i className="pi pi-box" />
                     </div>
                   )}
                 </div>
@@ -150,7 +150,7 @@ export function ProjectList() {
                   )}
                   <div className="project-grid-card-stats">
                     <span>
-                      <i className="pi pi-cube" /> {project.modelCount}
+                      <i className="pi pi-box" /> {project.modelCount}
                     </span>
                     <span>
                       <i className="pi pi-palette" /> {project.textureSetCount}
