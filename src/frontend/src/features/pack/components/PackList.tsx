@@ -8,10 +8,10 @@ import { useRef } from 'react'
 
 import { deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
+import { useTabContext } from '@/hooks/useTabContext'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type PackDto } from '@/types'
-import { openTabInPanel } from '@/utils/tabNavigation'
 
 import { CreatePackDialog } from './CreatePackDialog'
 
@@ -22,6 +22,7 @@ export function PackList() {
   const loading = packsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const toast = useRef<Toast>(null)
+  const { openPackDetailsTab } = useTabContext()
 
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.packs
@@ -126,12 +127,7 @@ export function PackList() {
                 key={pack.id}
                 className="pack-grid-card"
                 onClick={() => {
-                  openTabInPanel(
-                    'packViewer',
-                    'left',
-                    pack.id.toString(),
-                    pack.name
-                  )
+                  openPackDetailsTab(pack.id.toString())
                 }}
               >
                 <div className="pack-grid-card-image">
@@ -139,7 +135,7 @@ export function PackList() {
                     <img src={thumbnail} alt={pack.name} />
                   ) : (
                     <div className="pack-grid-card-placeholder">
-                      <i className="pi pi-box" />
+                      <i className="pi pi-cube" />
                     </div>
                   )}
                 </div>

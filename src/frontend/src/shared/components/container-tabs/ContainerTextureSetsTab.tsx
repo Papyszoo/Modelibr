@@ -193,10 +193,7 @@ export function ContainerTextureSetsTab({
                   onClick={() => ts.toggleSelection(textureSet.id)}
                 >
                   <div className="container-card-checkbox">
-                    <Checkbox
-                      checked={isSelected}
-                      onChange={() => ts.toggleSelection(textureSet.id)}
-                    />
+                    <Checkbox checked={isSelected} readOnly />
                   </div>
                   <div className="container-card-thumbnail">
                     {albedoUrl ? (

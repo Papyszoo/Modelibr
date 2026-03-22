@@ -156,10 +156,7 @@ export function AddModelDialog({
                   onClick={() => toggleSelection(Number(model.id))}
                 >
                   <div className="container-card-checkbox">
-                    <Checkbox
-                      checked={isSelected}
-                      onChange={() => toggleSelection(Number(model.id))}
-                    />
+                    <Checkbox checked={isSelected} readOnly />
                   </div>
                   <div className="container-card-thumbnail">
                     <ThumbnailDisplay

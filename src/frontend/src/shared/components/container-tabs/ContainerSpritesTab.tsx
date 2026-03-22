@@ -214,10 +214,7 @@ export function ContainerSpritesTab({
                   onClick={() => sp.toggleSelection(sprite.id)}
                 >
                   <div className="container-card-checkbox">
-                    <Checkbox
-                      checked={isSelected}
-                      onChange={() => sp.toggleSelection(sprite.id)}
-                    />
+                    <Checkbox checked={isSelected} readOnly />
                   </div>
                   <div className="container-card-thumbnail">
                     {spriteUrl ? (

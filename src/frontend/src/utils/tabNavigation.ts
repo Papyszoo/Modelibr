@@ -7,19 +7,16 @@ import { type Tab, type TabType } from '@/types'
 
 /**
  * Open a tab in the navigation store for the current window.
- *
- * This replaces the old URL-based openTabInPanel. The `panel` parameter
- * is kept for API compatibility but is no longer used to write URL params.
  */
 export function openTabInPanel(
   tabType: TabType,
-  _panel: 'left' | 'right' = 'left',
+  panel: 'left' | 'right' = 'left',
   id?: string,
   name?: string
 ): void {
   const windowId = getWindowId()
   const tab = createTab(tabType, id, name)
-  useNavigationStore.getState().openTab(windowId, 'left', tab)
+  useNavigationStore.getState().openTab(windowId, panel, tab)
 }
 
 /**

@@ -90,6 +90,9 @@ export function useContainerSounds(
       queryClient.invalidateQueries({
         queryKey: ['container-sounds', adapter.type, adapter.containerId],
       }),
+      queryClient.invalidateQueries({
+        queryKey: ['all-sounds-for-container', adapter.containerId],
+      }),
       refetchContainer(),
     ])
   }, [queryClient, adapter.type, adapter.containerId, refetchContainer])

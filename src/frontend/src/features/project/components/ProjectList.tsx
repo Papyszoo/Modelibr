@@ -8,10 +8,10 @@ import { useRef } from 'react'
 
 import { deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
+import { useTabContext } from '@/hooks/useTabContext'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ProjectDto } from '@/types'
-import { openTabInPanel } from '@/utils/tabNavigation'
 
 import { CreateProjectDialog } from './CreateProjectDialog'
 
@@ -22,6 +22,7 @@ export function ProjectList() {
   const loading = projectsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const toast = useRef<Toast>(null)
+  const { openProjectDetailsTab } = useTabContext()
 
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.projects
@@ -128,12 +129,7 @@ export function ProjectList() {
                 key={project.id}
                 className="project-grid-card"
                 onClick={() => {
-                  openTabInPanel(
-                    'projectViewer',
-                    'left',
-                    project.id.toString(),
-                    project.name
-                  )
+                  openProjectDetailsTab(project.id.toString())
                 }}
               >
                 <div className="project-grid-card-image">
@@ -141,7 +137,7 @@ export function ProjectList() {
                     <img src={thumbnail} alt={project.name} />
                   ) : (
                     <div className="project-grid-card-placeholder">
-                      <i className="pi pi-box" />
+                      <i className="pi pi-cube" />
                     </div>
                   )}
                 </div>

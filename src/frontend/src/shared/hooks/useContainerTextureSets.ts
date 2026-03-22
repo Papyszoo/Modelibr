@@ -90,6 +90,9 @@ export function useContainerTextureSets(
       queryClient.invalidateQueries({
         queryKey: ['container-textureSets', adapter.type, adapter.containerId],
       }),
+      queryClient.invalidateQueries({
+        queryKey: ['all-textureSets-for-container', adapter.containerId],
+      }),
       refetchContainer(),
     ])
   }, [queryClient, adapter.type, adapter.containerId, refetchContainer])
