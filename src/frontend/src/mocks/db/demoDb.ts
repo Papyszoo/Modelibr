@@ -204,6 +204,16 @@ export interface DemoUploadHistoryEntry {
   spriteName: string | null
 }
 
+export interface DemoRecycledItem {
+  id: number // unique key for IDB
+  type: string
+  entityId: number
+  name: string
+  deletedAt: string
+  entity?: Record<string, unknown>
+  extra?: Record<string, unknown>
+}
+
 interface DemoDbSchema extends DBSchema {
   models: { key: number; value: DemoModel }
   modelVersions: {
@@ -221,6 +231,7 @@ interface DemoDbSchema extends DBSchema {
   fileBlobs: { key: number; value: DemoFileBlob }
   thumbnails: { key: string; value: DemoThumbnail }
   uploadHistory: { key: number; value: DemoUploadHistoryEntry }
+  recycledItems: { key: number; value: DemoRecycledItem }
   meta: { key: string; value: { key: string; value: number } }
 }
 
@@ -230,7 +241,7 @@ let dbPromise: Promise<IDBPDatabase<DemoDbSchema>> | null = null
 
 export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 2, {
+    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 3, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('models', { keyPath: 'id' })
@@ -251,6 +262,9 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
         }
         if (oldVersion < 2) {
           db.createObjectStore('uploadHistory', { keyPath: 'id' })
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('recycledItems', { keyPath: 'id' })
         }
       },
     })
@@ -376,6 +390,31 @@ export async function getAllUploadHistory(): Promise<DemoUploadHistoryEntry[]> {
   const all = await db.getAll('uploadHistory')
   // Return sorted by id descending (newest first)
   return all.sort((a, b) => b.id - a.id)
+}
+
+// ─── Recycled Items helpers ─────────────────────────────────────────────
+
+export async function addRecycledItem(item: DemoRecycledItem): Promise<void> {
+  const db = await getDb()
+  await db.put('recycledItems', item)
+}
+
+export async function getAllRecycledItems(): Promise<DemoRecycledItem[]> {
+  const db = await getDb()
+  return db.getAll('recycledItems')
+}
+
+export async function removeRecycledItem(id: number): Promise<void> {
+  const db = await getDb()
+  await db.delete('recycledItems', id)
+}
+
+export async function findRecycledItem(
+  type: string,
+  entityId: number
+): Promise<DemoRecycledItem | undefined> {
+  const items = await getAllRecycledItems()
+  return items.find(r => r.type === type && r.entityId === entityId)
 }
 
 // ─── Seed Data ──────────────────────────────────────────────────────────

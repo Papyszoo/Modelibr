@@ -9,6 +9,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  addRecycledItem,
   addUploadHistory,
   type DemoModel,
   type DemoModelVersion,
@@ -17,7 +18,9 @@ import {
   type DemoSound,
   type DemoSprite,
   type DemoTextureSet,
+  findRecycledItem,
   getAll,
+  getAllRecycledItems,
   getAllUploadHistory,
   getById,
   getFileBlob,
@@ -26,6 +29,7 @@ import {
   nextId,
   put,
   remove,
+  removeRecycledItem,
   storeFileBlob,
   storeThumbnail,
 } from './db/demoDb'
@@ -151,18 +155,7 @@ function parseTextureType(raw: string | null | undefined): number {
   return textureTypeMap[raw.toLowerCase()] ?? 1
 }
 
-// ─── Recycled Items (in-memory, per session) ────────────────────────────
-
-interface RecycledItem {
-  type: string
-  id: number
-  name: string
-  deletedAt: string
-  entity?: Record<string, unknown>
-  extra?: Record<string, unknown>
-}
-
-const recycledItems: RecycledItem[] = []
+// ─── Recycled Items (persisted to IndexedDB) ────────────────────────────
 
 // ─── Upload History (persisted to IndexedDB) ─────────────────────────────
 
@@ -567,9 +560,11 @@ export const dynamicDemoHandlers = [
     const id = Number(params.id)
     const model = await getById('models', id)
     if (model) {
-      recycledItems.push({
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
         type: 'model',
-        id,
+        entityId: id,
         name: model.name,
         deletedAt: now(),
         entity: { ...model } as unknown as Record<string, unknown>,
@@ -1172,9 +1167,11 @@ export const dynamicDemoHandlers = [
     const id = Number(params.id)
     const ts = await getById('textureSets', id)
     if (ts) {
-      recycledItems.push({
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
         type: 'textureSet',
-        id,
+        entityId: id,
         name: ts.name,
         deletedAt: now(),
         entity: { ...ts } as unknown as Record<string, unknown>,
@@ -1685,9 +1682,11 @@ export const dynamicDemoHandlers = [
     const id = Number(params.id)
     const sprite = await getById('sprites', id)
     if (sprite) {
-      recycledItems.push({
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
         type: 'sprite',
-        id,
+        entityId: id,
         name: sprite.name,
         deletedAt: now(),
         entity: { ...sprite } as unknown as Record<string, unknown>,
@@ -1973,9 +1972,11 @@ export const dynamicDemoHandlers = [
     const id = Number(params.id)
     const sound = await getById('sounds', id)
     if (sound) {
-      recycledItems.push({
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
         type: 'sound',
-        id,
+        entityId: id,
         name: sound.name,
         deletedAt: now(),
         entity: { ...sound } as unknown as Record<string, unknown>,
@@ -2589,35 +2590,36 @@ export const dynamicDemoHandlers = [
   // ════════════════════════════════════════════════════════════════════════
 
   http.get('*/recycled', async () => {
-    const models = recycledItems
+    const allRecycled = await getAllRecycledItems()
+    const models = allRecycled
       .filter(r => r.type === 'model')
       .map(r => ({
-        id: r.id,
+        id: r.entityId,
         name: r.name,
         deletedAt: r.deletedAt,
         fileCount: (r.extra?.fileCount as number) ?? 0,
       }))
-    const textureSets = recycledItems
+    const textureSets = allRecycled
       .filter(r => r.type === 'textureSet')
       .map(r => ({
-        id: r.id,
+        id: r.entityId,
         name: r.name,
         deletedAt: r.deletedAt,
         textureCount: (r.extra?.textureCount as number) ?? 0,
         previewFileId: (r.extra?.previewFileId as number) ?? null,
       }))
-    const sprites = recycledItems
+    const sprites = allRecycled
       .filter(r => r.type === 'sprite')
       .map(r => ({
-        id: r.id,
+        id: r.entityId,
         name: r.name,
         fileId: (r.extra?.fileId as number) ?? 0,
         deletedAt: r.deletedAt,
       }))
-    const sounds = recycledItems
+    const sounds = allRecycled
       .filter(r => r.type === 'sound')
       .map(r => ({
-        id: r.id,
+        id: r.entityId,
         name: r.name,
         fileId: (r.extra?.fileId as number) ?? 0,
         duration: (r.extra?.duration as number) ?? 0,
@@ -2636,10 +2638,9 @@ export const dynamicDemoHandlers = [
 
   http.post('*/recycled/:type/:id/restore', async ({ params }) => {
     const type = String(params.type)
-    const id = Number(params.id)
-    const idx = recycledItems.findIndex(r => r.type === type && r.id === id)
-    if (idx !== -1) {
-      const item = recycledItems[idx]
+    const entityId = Number(params.id)
+    const item = await findRecycledItem(type, entityId)
+    if (item) {
       // Re-add entity to its IDB store from saved entity data
       if (item.entity) {
         if (type === 'model') {
@@ -2652,15 +2653,15 @@ export const dynamicDemoHandlers = [
           await put('sounds', item.entity as unknown as DemoSound)
         }
       }
-      recycledItems.splice(idx, 1)
+      await removeRecycledItem(item.id)
     }
     return new HttpResponse(null, { status: 204 })
   }),
 
   http.get('*/recycled/:type/:id/preview', async ({ params }) => {
     const type = String(params.type)
-    const id = Number(params.id)
-    const item = recycledItems.find(r => r.type === type && r.id === id)
+    const entityId = Number(params.id)
+    const item = await findRecycledItem(type, entityId)
 
     const filesToDelete: {
       filePath: string
@@ -2681,7 +2682,7 @@ export const dynamicDemoHandlers = [
         }
         // List versions as related
         const versions = await getAll('modelVersions')
-        const modelVersions = versions.filter(v => v.modelId === id)
+        const modelVersions = versions.filter(v => v.modelId === entityId)
         for (const v of modelVersions) {
           relatedEntities.push(`Version ${v.versionNumber}`)
           for (const f of v.files ?? []) {
@@ -2726,10 +2727,8 @@ export const dynamicDemoHandlers = [
   }),
 
   http.delete('*/recycled/:type/:id/permanent', async ({ params }) => {
-    const idx = recycledItems.findIndex(
-      r => r.type === String(params.type) && r.id === Number(params.id)
-    )
-    if (idx !== -1) recycledItems.splice(idx, 1)
+    const item = await findRecycledItem(String(params.type), Number(params.id))
+    if (item) await removeRecycledItem(item.id)
     return new HttpResponse(null, { status: 204 })
   }),
 

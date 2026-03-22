@@ -89,6 +89,9 @@ export function useContainerSprites(
       queryClient.invalidateQueries({
         queryKey: ['container-sprites', adapter.type, adapter.containerId],
       }),
+      queryClient.invalidateQueries({
+        queryKey: ['all-sprites-for-container', adapter.containerId],
+      }),
       refetchContainer(),
     ])
   }, [queryClient, adapter.type, adapter.containerId, refetchContainer])

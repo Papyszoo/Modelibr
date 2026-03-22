@@ -300,33 +300,47 @@ export const useNavigationStore = create<NavigationStore>()(
 
       // ── Tab management ──────────────────────────────────────────────
 
-      openTab: (windowId, _side, tab) => {
+      openTab: (windowId, side, tab) => {
         set(state => {
           const ws = state.activeWindows[windowId]
           if (!ws) return state
 
+          // Mark tab for right panel if needed
+          const markedTab =
+            side === 'right'
+              ? { ...tab, params: { ...tab.params, panel: 'right' } }
+              : tab
+
           // Dedup: if tab already exists, just activate it
-          const existing = ws.tabs.find(t => t.id === tab.id)
+          const existing = ws.tabs.find(t => t.id === markedTab.id)
           if (existing) {
+            const activeUpdate =
+              side === 'right'
+                ? { activeRightTabId: markedTab.id }
+                : { activeTabId: markedTab.id }
             return {
               activeWindows: {
                 ...state.activeWindows,
                 [windowId]: {
                   ...ws,
-                  activeTabId: tab.id,
+                  ...activeUpdate,
                   lastActiveAt: new Date().toISOString(),
                 },
               },
             }
           }
 
+          const activeUpdate =
+            side === 'right'
+              ? { activeRightTabId: markedTab.id }
+              : { activeTabId: markedTab.id }
           return {
             activeWindows: {
               ...state.activeWindows,
               [windowId]: {
                 ...ws,
-                tabs: [...ws.tabs, tab],
-                activeTabId: tab.id,
+                tabs: [...ws.tabs, markedTab],
+                ...activeUpdate,
                 lastActiveAt: new Date().toISOString(),
               },
             },
