@@ -264,6 +264,11 @@ When("I delete version {int}", async ({ page }, versionIndex: number) => {
     const deleteBtn = targetItem.locator(".version-recycle-btn");
     await deleteBtn.click();
 
+    // Wait for the deleted item to be removed from the DOM
+    await expect(modelViewer.versionItems).toHaveCount(count - 1, {
+        timeout: 10000,
+    });
+
     console.log(`[Action] Deleted version (index: ${versionIndex})`);
 });
 
