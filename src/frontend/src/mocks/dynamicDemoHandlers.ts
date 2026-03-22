@@ -125,6 +125,72 @@ async function serveFile(fileId: number): Promise<Response> {
   return new HttpResponse(null, { status: 404 })
 }
 
+/** Parse textureType from a string name (e.g. "Albedo") or numeric string to its enum number. */
+const textureTypeMap: Record<string, number> = {
+  albedo: 1,
+  normal: 2,
+  roughness: 5,
+  metallic: 6,
+  ao: 7,
+  ambientocclusion: 7,
+  emissive: 8,
+  opacity: 9,
+  height: 10,
+  specular: 11,
+  displacement: 12,
+  orm: 13,
+}
+function parseTextureType(raw: string | null | undefined): number {
+  if (!raw) return 1
+  const n = Number(raw)
+  if (!isNaN(n)) return n
+  return textureTypeMap[raw.toLowerCase()] ?? 1
+}
+
+// ─── Recycled Items (in-memory, per session) ────────────────────────────
+
+interface RecycledItem {
+  type: string
+  id: number
+  name: string
+  deletedAt: string
+  extra?: Record<string, unknown>
+}
+
+const recycledItems: RecycledItem[] = []
+
+// ─── Upload History (in-memory, per session) ─────────────────────────────
+
+interface UploadHistoryEntry {
+  id: number
+  batchId: string
+  uploadType: string
+  uploadedAt: string
+  fileId: number
+  fileName: string
+  packId: number | null
+  packName: string | null
+  projectId: number | null
+  projectName: string | null
+  modelId: number | null
+  modelName: string | null
+  textureSetId: number | null
+  textureSetName: string | null
+  spriteId: number | null
+  spriteName: string | null
+}
+
+const uploadHistory: UploadHistoryEntry[] = []
+let uploadHistoryNextId = 1
+
+function trackUpload(entry: Omit<UploadHistoryEntry, 'id' | 'uploadedAt'>) {
+  uploadHistory.unshift({
+    ...entry,
+    id: uploadHistoryNextId++,
+    uploadedAt: now(),
+  })
+}
+
 /** Recalculate pack counts from its association arrays. */
 function recomputePackCounts(pack: DemoPack) {
   pack.modelCount = pack.models.length
@@ -368,7 +434,7 @@ export const dynamicDemoHandlers = [
         },
       ],
       materialNames: ['Material'],
-      mainVariantName: 'Default',
+      mainVariantName: '',
       variantNames: [],
       textureMappings: [],
       textureSetIds: [],
@@ -378,6 +444,25 @@ export const dynamicDemoHandlers = [
     await storeFileBlob(fileId, file, file.name, demoFile.mimeType)
     await put('models', model)
     await put('modelVersions', version)
+
+    // Track upload
+    const batchId = `batch-${Date.now()}`
+    trackUpload({
+      batchId,
+      uploadType: 'Model',
+      fileId,
+      fileName: file.name,
+      packId: null,
+      packName: null,
+      projectId: null,
+      projectName: null,
+      modelId,
+      modelName: model.name,
+      textureSetId: null,
+      textureSetName: null,
+      spriteId: null,
+      spriteName: null,
+    })
 
     // Generate thumbnail in background
     if (isRenderable && ['glb', 'fbx'].includes(ext.toLowerCase())) {
@@ -410,9 +495,39 @@ export const dynamicDemoHandlers = [
     })
   }),
 
-  // Delete model (soft)
+  // Delete model (soft) → move to recycled
   http.delete('*/models/:id', async ({ params }) => {
-    await remove('models', Number(params.id))
+    const id = Number(params.id)
+    const model = await getById('models', id)
+    if (model) {
+      recycledItems.push({
+        type: 'model',
+        id,
+        name: model.name,
+        deletedAt: now(),
+        extra: { fileCount: model.files.length },
+      })
+      // Clean up pack/project associations
+      const packs = await getAll('packs')
+      for (const pack of packs) {
+        const before = pack.models.length
+        pack.models = pack.models.filter(m => m.id !== id)
+        if (pack.models.length !== before) {
+          recomputePackCounts(pack)
+          await put('packs', pack)
+        }
+      }
+      const projects = await getAll('projects')
+      for (const proj of projects) {
+        const before = proj.models.length
+        proj.models = proj.models.filter(m => m.id !== id)
+        if (proj.models.length !== before) {
+          recomputeProjectCounts(proj)
+          await put('projects', proj)
+        }
+      }
+    }
+    await remove('models', id)
     return new HttpResponse(null, { status: 204 })
   }),
 
@@ -611,6 +726,30 @@ export const dynamicDemoHandlers = [
     const body = (await request.json()) as { variantName: string }
     version.mainVariantName = body.variantName
     await put('modelVersions', version)
+    // Regenerate thumbnail when main variant changes
+    const fileId = version.files[0]?.id
+    if (fileId) {
+      const stored = await getFileBlob(fileId)
+      let blob: Blob | undefined = stored?.blob
+      if (!blob) {
+        const seedPath = seedFileAssets[fileId]
+        if (seedPath) {
+          try {
+            const res = await fetch(assetUrl(seedPath), {
+              cache: 'force-cache',
+            })
+            if (res.ok) blob = await res.blob()
+          } catch {
+            // ignore
+          }
+        }
+      }
+      if (blob) {
+        const fileName = version.files[0]?.originalFileName
+        generateModelThumbnailAsync(version.modelId, blob, fileName)
+        generateVersionThumbnailAsync(version.id, blob, fileName)
+      }
+    }
     return new HttpResponse(null, { status: 204 })
   }),
 
@@ -790,7 +929,7 @@ export const dynamicDemoHandlers = [
     const ts = now()
     const name =
       url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
-    const textureType = Number(url.searchParams.get('textureType') || '1')
+    const textureType = parseTextureType(url.searchParams.get('textureType'))
     const kind = Number(url.searchParams.get('kind') || '0')
 
     await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
@@ -824,6 +963,24 @@ export const dynamicDemoHandlers = [
       packs: [],
     }
     await put('textureSets', textureSet)
+
+    // Track upload
+    trackUpload({
+      batchId: `batch-${Date.now()}`,
+      uploadType: 'TextureSet',
+      fileId,
+      fileName: file.name,
+      packId: null,
+      packName: null,
+      projectId: null,
+      projectName: null,
+      modelId: null,
+      modelName: null,
+      textureSetId: tsId,
+      textureSetName: name,
+      spriteId: null,
+      spriteName: null,
+    })
 
     return HttpResponse.json(
       {
@@ -918,7 +1075,37 @@ export const dynamicDemoHandlers = [
   }),
 
   http.delete('*/texture-sets/:id', async ({ params }) => {
-    await remove('textureSets', Number(params.id))
+    const id = Number(params.id)
+    const ts = await getById('textureSets', id)
+    if (ts) {
+      recycledItems.push({
+        type: 'textureSet',
+        id,
+        name: ts.name,
+        deletedAt: now(),
+        extra: { textureCount: ts.textureCount },
+      })
+      // Clean up pack/project associations
+      const packs = await getAll('packs')
+      for (const pack of packs) {
+        const before = pack.textureSets.length
+        pack.textureSets = pack.textureSets.filter(t => t.id !== id)
+        if (pack.textureSets.length !== before) {
+          recomputePackCounts(pack)
+          await put('packs', pack)
+        }
+      }
+      const projects = await getAll('projects')
+      for (const proj of projects) {
+        const before = proj.textureSets.length
+        proj.textureSets = proj.textureSets.filter(t => t.id !== id)
+        if (proj.textureSets.length !== before) {
+          recomputeProjectCounts(proj)
+          await put('projects', proj)
+        }
+      }
+    }
+    await remove('textureSets', id)
     return new HttpResponse(null, { status: 204 })
   }),
 
@@ -1052,6 +1239,31 @@ export const dynamicDemoHandlers = [
         await put('models', model)
       }
 
+      // Regenerate thumbnail when texture mapping changes
+      const fileId = version.files[0]?.id
+      if (fileId) {
+        const stored = await getFileBlob(fileId)
+        let blob: Blob | undefined = stored?.blob
+        if (!blob) {
+          const seedPath = seedFileAssets[fileId]
+          if (seedPath) {
+            try {
+              const res = await fetch(assetUrl(seedPath), {
+                cache: 'force-cache',
+              })
+              if (res.ok) blob = await res.blob()
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        if (blob) {
+          const fileName = version.files[0]?.originalFileName
+          generateModelThumbnailAsync(version.modelId, blob, fileName)
+          generateVersionThumbnailAsync(version.id, blob, fileName)
+        }
+      }
+
       return new HttpResponse(null, { status: 204 })
     }
   ),
@@ -1087,6 +1299,31 @@ export const dynamicDemoHandlers = [
           !(am.modelVersionId === versionId && am.materialName === materialName)
       )
       await put('textureSets', ts)
+
+      // Regenerate thumbnail after removing texture mapping
+      const fileId = version.files[0]?.id
+      if (fileId) {
+        const stored = await getFileBlob(fileId)
+        let blob: Blob | undefined = stored?.blob
+        if (!blob) {
+          const seedPath = seedFileAssets[fileId]
+          if (seedPath) {
+            try {
+              const res = await fetch(assetUrl(seedPath), {
+                cache: 'force-cache',
+              })
+              if (res.ok) blob = await res.blob()
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        if (blob) {
+          const fileName = version.files[0]?.originalFileName
+          generateModelThumbnailAsync(version.modelId, blob, fileName)
+          generateVersionThumbnailAsync(version.id, blob, fileName)
+        }
+      }
 
       return new HttpResponse(null, { status: 204 })
     }
@@ -1238,6 +1475,36 @@ export const dynamicDemoHandlers = [
     }
     await put('sprites', sprite)
 
+    // Track upload
+    const packIdParam = url.searchParams.get('packId')
+    const projectIdParam = url.searchParams.get('projectId')
+    let trackPackName: string | null = null
+    let trackProjectName: string | null = null
+    if (packIdParam) {
+      const p = await getById('packs', Number(packIdParam))
+      trackPackName = p?.name ?? null
+    }
+    if (projectIdParam) {
+      const p = await getById('projects', Number(projectIdParam))
+      trackProjectName = p?.name ?? null
+    }
+    trackUpload({
+      batchId: `batch-${Date.now()}`,
+      uploadType: 'Sprite',
+      fileId,
+      fileName: file.name,
+      packId: packIdParam ? Number(packIdParam) : null,
+      packName: trackPackName,
+      projectId: projectIdParam ? Number(projectIdParam) : null,
+      projectName: trackProjectName,
+      modelId: null,
+      modelName: null,
+      textureSetId: null,
+      textureSetName: null,
+      spriteId,
+      spriteName: name,
+    })
+
     // Auto-add to pack/project if specified
     const packId = url.searchParams.get('packId')
     const projectId = url.searchParams.get('projectId')
@@ -1294,7 +1561,37 @@ export const dynamicDemoHandlers = [
   }),
 
   http.delete('*/sprites/:id/soft', async ({ params }) => {
-    await remove('sprites', Number(params.id))
+    const id = Number(params.id)
+    const sprite = await getById('sprites', id)
+    if (sprite) {
+      recycledItems.push({
+        type: 'sprite',
+        id,
+        name: sprite.name,
+        deletedAt: now(),
+        extra: { fileId: sprite.fileId },
+      })
+      // Clean up pack/project associations
+      const packs = await getAll('packs')
+      for (const pack of packs) {
+        const before = pack.sprites.length
+        pack.sprites = pack.sprites.filter(s => s.id !== id)
+        if (pack.sprites.length !== before) {
+          recomputePackCounts(pack)
+          await put('packs', pack)
+        }
+      }
+      const projects = await getAll('projects')
+      for (const proj of projects) {
+        const before = proj.sprites.length
+        proj.sprites = proj.sprites.filter(s => s.id !== id)
+        if (proj.sprites.length !== before) {
+          recomputeProjectCounts(proj)
+          await put('projects', proj)
+        }
+      }
+    }
+    await remove('sprites', id)
     return new HttpResponse(null, { status: 204 })
   }),
 
@@ -1457,6 +1754,38 @@ export const dynamicDemoHandlers = [
     }
     await put('sounds', sound)
 
+    // Track upload
+    {
+      const pId = url.searchParams.get('packId')
+      const prId = url.searchParams.get('projectId')
+      let pName: string | null = null
+      let prName: string | null = null
+      if (pId) {
+        const p = await getById('packs', Number(pId))
+        pName = p?.name ?? null
+      }
+      if (prId) {
+        const p = await getById('projects', Number(prId))
+        prName = p?.name ?? null
+      }
+      trackUpload({
+        batchId: `batch-${Date.now()}`,
+        uploadType: 'Sound',
+        fileId,
+        fileName: file.name,
+        packId: pId ? Number(pId) : null,
+        packName: pName,
+        projectId: prId ? Number(prId) : null,
+        projectName: prName,
+        modelId: null,
+        modelName: null,
+        textureSetId: null,
+        textureSetName: null,
+        spriteId: null,
+        spriteName: null,
+      })
+    }
+
     // Generate waveform asynchronously
     generateWaveformThumbnail(file)
       .then(async result => {
@@ -1519,7 +1848,37 @@ export const dynamicDemoHandlers = [
   }),
 
   http.delete('*/sounds/:id/soft', async ({ params }) => {
-    await remove('sounds', Number(params.id))
+    const id = Number(params.id)
+    const sound = await getById('sounds', id)
+    if (sound) {
+      recycledItems.push({
+        type: 'sound',
+        id,
+        name: sound.name,
+        deletedAt: now(),
+        extra: { fileId: sound.fileId, duration: sound.duration },
+      })
+      // Clean up pack/project associations
+      const packs = await getAll('packs')
+      for (const pack of packs) {
+        const before = pack.sounds.length
+        pack.sounds = pack.sounds.filter(s => s.id !== id)
+        if (pack.sounds.length !== before) {
+          recomputePackCounts(pack)
+          await put('packs', pack)
+        }
+      }
+      const projects = await getAll('projects')
+      for (const proj of projects) {
+        const before = proj.sounds.length
+        proj.sounds = proj.sounds.filter(s => s.id !== id)
+        if (proj.sounds.length !== before) {
+          recomputeProjectCounts(proj)
+          await put('projects', proj)
+        }
+      }
+    }
+    await remove('sounds', id)
     return new HttpResponse(null, { status: 204 })
   }),
 
@@ -1762,7 +2121,9 @@ export const dynamicDemoHandlers = [
 
       const name =
         (formData.get('name') as string) || file.name.replace(/\.[^.]+$/, '')
-      const textureType = Number(formData.get('textureType') || '1')
+      const textureType = parseTextureType(
+        formData.get('textureType') as string
+      )
       const tsId = await nextId('textureSets')
       const fileId = await nextId('files')
       const textureId = await nextId('textures')
@@ -1990,7 +2351,9 @@ export const dynamicDemoHandlers = [
 
       const name =
         (formData.get('name') as string) || file.name.replace(/\.[^.]+$/, '')
-      const textureType = Number(formData.get('textureType') || '1')
+      const textureType = parseTextureType(
+        formData.get('textureType') as string
+      )
       const tsId = await nextId('textureSets')
       const fileId = await nextId('files')
       const textureId = await nextId('textures')
@@ -2103,30 +2466,75 @@ export const dynamicDemoHandlers = [
   // ════════════════════════════════════════════════════════════════════════
 
   http.get('*/recycled', async () => {
+    const models = recycledItems
+      .filter(r => r.type === 'model')
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        deletedAt: r.deletedAt,
+        fileCount: (r.extra?.fileCount as number) ?? 0,
+      }))
+    const textureSets = recycledItems
+      .filter(r => r.type === 'textureSet')
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        deletedAt: r.deletedAt,
+        textureCount: (r.extra?.textureCount as number) ?? 0,
+        previewFileId: null,
+      }))
+    const sprites = recycledItems
+      .filter(r => r.type === 'sprite')
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        fileId: (r.extra?.fileId as number) ?? 0,
+        deletedAt: r.deletedAt,
+      }))
+    const sounds = recycledItems
+      .filter(r => r.type === 'sound')
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        fileId: (r.extra?.fileId as number) ?? 0,
+        duration: (r.extra?.duration as number) ?? 0,
+        deletedAt: r.deletedAt,
+      }))
     return HttpResponse.json({
-      models: [],
+      models,
       modelVersions: [],
       files: [],
-      textureSets: [],
+      textureSets,
       textures: [],
-      sprites: [],
-      sounds: [],
+      sprites,
+      sounds,
     })
   }),
 
-  http.post('*/recycled/:type/:id/restore', async () => {
+  http.post('*/recycled/:type/:id/restore', async ({ params }) => {
+    const idx = recycledItems.findIndex(
+      r => r.type === String(params.type) && r.id === Number(params.id)
+    )
+    if (idx !== -1) recycledItems.splice(idx, 1)
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.get('*/recycled/:type/:id/preview', async () => {
+  http.get('*/recycled/:type/:id/preview', async ({ params }) => {
+    const item = recycledItems.find(
+      r => r.type === String(params.type) && r.id === Number(params.id)
+    )
     return HttpResponse.json({
-      entityName: 'Unknown',
+      entityName: item?.name ?? 'Unknown',
       filesToDelete: [],
       relatedEntities: [],
     })
   }),
 
-  http.delete('*/recycled/:type/:id/permanent', async () => {
+  http.delete('*/recycled/:type/:id/permanent', async ({ params }) => {
+    const idx = recycledItems.findIndex(
+      r => r.type === String(params.type) && r.id === Number(params.id)
+    )
+    if (idx !== -1) recycledItems.splice(idx, 1)
     return new HttpResponse(null, { status: 204 })
   }),
 
@@ -2135,7 +2543,7 @@ export const dynamicDemoHandlers = [
   // ════════════════════════════════════════════════════════════════════════
 
   http.get('*/batch-uploads/history', async () => {
-    return HttpResponse.json({ uploads: [] })
+    return HttpResponse.json({ uploads: uploadHistory })
   }),
 
   http.post('*/batch-uploads/*', async () => {

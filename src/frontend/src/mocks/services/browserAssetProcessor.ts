@@ -46,6 +46,26 @@ function applyStandardMaterial(model: Object3D) {
 }
 
 /**
+ * Normalize a model to fit within a unit box centred at the origin.
+ * Matches the real worker's normalizeModel() approach.
+ */
+function normalizeModel(model: Object3D, targetScale = 2.0) {
+  const box = new Box3().setFromObject(model)
+  const size = box.getSize(new Vector3())
+  const maxDim = Math.max(size.x, size.y, size.z)
+  if (maxDim > 0) {
+    const scaleFactor = targetScale / maxDim
+    model.scale.setScalar(scaleFactor)
+  }
+  // Recalculate after scaling
+  const scaledBox = new Box3().setFromObject(model)
+  const scaledCenter = scaledBox.getCenter(new Vector3())
+  model.position.x = -scaledCenter.x
+  model.position.y = -scaledCenter.y
+  model.position.z = -scaledCenter.z
+}
+
+/**
  * Render a GLTF/GLB or FBX blob to a PNG thumbnail blob.
  * Falls back to a colored placeholder on any error.
  */
@@ -106,21 +126,13 @@ async function renderGltfThumbnail(
 
   scene.add(gltf.scene)
   applyStandardMaterial(gltf.scene)
+  normalizeModel(gltf.scene)
 
-  // Frame the model
-  const box = new Box3().setFromObject(gltf.scene)
-  const center = box.getCenter(new Vector3())
-  const size = box.getSize(new Vector3())
-  const maxDim = Math.max(size.x, size.y, size.z)
+  // Position camera to frame the normalized model (centred at origin, ~2 units)
   const fov = camera.fov * (Math.PI / 180)
-  const distance = (maxDim / (2 * Math.tan(fov / 2))) * 1.5
-
-  camera.position.set(
-    center.x + distance * 0.5,
-    center.y + distance * 0.3,
-    center.z + distance
-  )
-  camera.lookAt(center)
+  const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
+  camera.position.set(distance * 0.5, distance * 0.3, distance)
+  camera.lookAt(0, 0, 0)
 
   renderer.render(scene, camera)
 
@@ -168,20 +180,13 @@ async function renderFbxThumbnail(
 
   scene.add(fbxScene)
   applyStandardMaterial(fbxScene)
+  normalizeModel(fbxScene)
 
-  const box = new Box3().setFromObject(fbxScene)
-  const center = box.getCenter(new Vector3())
-  const size = box.getSize(new Vector3())
-  const maxDim = Math.max(size.x, size.y, size.z)
+  // Position camera to frame the normalized model (centred at origin, ~2 units)
   const fov = camera.fov * (Math.PI / 180)
-  const distance = (maxDim / (2 * Math.tan(fov / 2))) * 1.5
-
-  camera.position.set(
-    center.x + distance * 0.5,
-    center.y + distance * 0.3,
-    center.z + distance
-  )
-  camera.lookAt(center)
+  const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
+  camera.position.set(distance * 0.5, distance * 0.3, distance)
+  camera.lookAt(0, 0, 0)
 
   renderer.render(scene, camera)
 
