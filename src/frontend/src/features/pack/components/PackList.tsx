@@ -160,6 +160,9 @@ export function PackList() {
                     <span>
                       <i className="pi pi-image" /> {pack.spriteCount}
                     </span>
+                    <span>
+                      <i className="pi pi-volume-up" /> {pack.soundCount}
+                    </span>
                   </div>
                 </div>
                 <div className="pack-grid-card-actions">

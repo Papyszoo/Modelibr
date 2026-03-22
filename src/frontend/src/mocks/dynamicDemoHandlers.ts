@@ -9,6 +9,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  addUploadHistory,
   type DemoModel,
   type DemoModelVersion,
   type DemoPack,
@@ -17,6 +18,7 @@ import {
   type DemoSprite,
   type DemoTextureSet,
   getAll,
+  getAllUploadHistory,
   getById,
   getFileBlob,
   getThumbnail,
@@ -31,8 +33,10 @@ import {
   generateExrChannelPreview,
   generateImageChannelPreview,
   generateModelThumbnail,
+  generateModelThumbnailWithTextures,
   generatePlaceholderThumbnail,
   generateWaveformThumbnail,
+  type TextureMapData,
 } from './services/browserAssetProcessor'
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -154,12 +158,13 @@ interface RecycledItem {
   id: number
   name: string
   deletedAt: string
+  entity?: Record<string, unknown>
   extra?: Record<string, unknown>
 }
 
 const recycledItems: RecycledItem[] = []
 
-// ─── Upload History (in-memory, per session) ─────────────────────────────
+// ─── Upload History (persisted to IndexedDB) ─────────────────────────────
 
 interface UploadHistoryEntry {
   id: number
@@ -180,15 +185,16 @@ interface UploadHistoryEntry {
   spriteName: string | null
 }
 
-const uploadHistory: UploadHistoryEntry[] = []
-let uploadHistoryNextId = 1
-
-function trackUpload(entry: Omit<UploadHistoryEntry, 'id' | 'uploadedAt'>) {
-  uploadHistory.unshift({
+async function trackUpload(
+  entry: Omit<UploadHistoryEntry, 'id' | 'uploadedAt'>
+) {
+  const id = await nextId('uploadHistory')
+  const full: UploadHistoryEntry = {
     ...entry,
-    id: uploadHistoryNextId++,
+    id,
     uploadedAt: now(),
-  })
+  }
+  await addUploadHistory(full)
 }
 
 /** Recalculate pack counts from its association arrays. */
@@ -222,9 +228,20 @@ function recomputeProjectCounts(project: DemoProject) {
 function generateModelThumbnailAsync(
   modelId: number,
   fileBlob: Blob,
-  fileName?: string
+  fileName?: string,
+  textures?: TextureMapData[]
 ) {
-  generateModelThumbnail(fileBlob, 256, 256, fileName)
+  const gen =
+    textures && textures.length > 0
+      ? generateModelThumbnailWithTextures(
+          fileBlob,
+          textures,
+          256,
+          256,
+          fileName
+        )
+      : generateModelThumbnail(fileBlob, 256, 256, fileName)
+  gen
     .then(thumb => storeThumbnail(`model:${modelId}`, thumb))
     .catch(() => {
       // Silently ignore — thumbnail will just be missing
@@ -234,11 +251,49 @@ function generateModelThumbnailAsync(
 function generateVersionThumbnailAsync(
   versionId: number,
   fileBlob: Blob,
-  fileName?: string
+  fileName?: string,
+  textures?: TextureMapData[]
 ) {
-  generateModelThumbnail(fileBlob, 256, 256, fileName)
+  const gen =
+    textures && textures.length > 0
+      ? generateModelThumbnailWithTextures(
+          fileBlob,
+          textures,
+          256,
+          256,
+          fileName
+        )
+      : generateModelThumbnail(fileBlob, 256, 256, fileName)
+  gen
     .then(thumb => storeThumbnail(`version:${versionId}`, thumb))
     .catch(() => {})
+}
+
+/** Fetch texture blobs for a version's texture mappings (for the main variant). */
+async function getVersionTextureMaps(
+  version: DemoModelVersion
+): Promise<TextureMapData[]> {
+  const mainVariant = version.mainVariantName ?? ''
+  // Get mappings for the main variant (or empty variant name)
+  const mappings = version.textureMappings.filter(
+    m => m.variantName === mainVariant || m.variantName === ''
+  )
+  if (mappings.length === 0) return []
+
+  const results: TextureMapData[] = []
+  for (const mapping of mappings) {
+    const ts = await getById('textureSets', mapping.textureSetId)
+    if (!ts) continue
+    for (const tex of ts.textures) {
+      // Only include key texture types for thumbnails
+      if (![1, 2, 5, 6].includes(tex.textureType)) continue
+      const fileBlob = await getFileBlob(tex.fileId)
+      if (fileBlob) {
+        results.push({ textureType: tex.textureType, blob: fileBlob.blob })
+      }
+    }
+  }
+  return results
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────
@@ -352,7 +407,19 @@ export const dynamicDemoHandlers = [
   http.get('*/models/:id/thumbnail', async ({ params }) => {
     const id = Number(params.id)
     const model = await getById('models', id)
-    if (!model) return new HttpResponse(null, { status: 404 })
+    // Also check if a thumbnail exists (e.g. recycled models still have thumbnails)
+    if (!model) {
+      const thumb = await getThumbnail(`model:${id}`)
+      if (thumb) {
+        return HttpResponse.json({
+          status: 'Ready',
+          sizeBytes: thumb.size,
+          width: 256,
+          height: 256,
+        })
+      }
+      return new HttpResponse(null, { status: 404 })
+    }
     return HttpResponse.json({
       status: 'Ready',
       sizeBytes: 4096,
@@ -505,6 +572,7 @@ export const dynamicDemoHandlers = [
         id,
         name: model.name,
         deletedAt: now(),
+        entity: { ...model } as unknown as Record<string, unknown>,
         extra: { fileCount: model.files.length },
       })
       // Clean up pack/project associations
@@ -551,7 +619,27 @@ export const dynamicDemoHandlers = [
     if (!model?.files[0]) return new HttpResponse(null, { status: 404 })
     const fileBlob = await getFileBlob(model.files[0].id)
     if (fileBlob) {
-      generateModelThumbnailAsync(model.id, fileBlob.blob, fileBlob.fileName)
+      // Find the active version to get texture mappings
+      const versions = await getVersionsByModelId(model.id)
+      const activeVersion =
+        versions.find(v => v.id === model.activeVersionId) ?? versions[0]
+      const textureMaps = activeVersion
+        ? await getVersionTextureMaps(activeVersion)
+        : []
+      generateModelThumbnailAsync(
+        model.id,
+        fileBlob.blob,
+        fileBlob.fileName,
+        textureMaps
+      )
+      if (activeVersion) {
+        generateVersionThumbnailAsync(
+          activeVersion.id,
+          fileBlob.blob,
+          fileBlob.fileName,
+          textureMaps
+        )
+      }
     }
     return HttpResponse.json({ status: 'Processing' })
   }),
@@ -746,8 +834,14 @@ export const dynamicDemoHandlers = [
       }
       if (blob) {
         const fileName = version.files[0]?.originalFileName
-        generateModelThumbnailAsync(version.modelId, blob, fileName)
-        generateVersionThumbnailAsync(version.id, blob, fileName)
+        const textureMaps = await getVersionTextureMaps(version)
+        generateModelThumbnailAsync(
+          version.modelId,
+          blob,
+          fileName,
+          textureMaps
+        )
+        generateVersionThumbnailAsync(version.id, blob, fileName, textureMaps)
       }
     }
     return new HttpResponse(null, { status: 204 })
@@ -1083,7 +1177,14 @@ export const dynamicDemoHandlers = [
         id,
         name: ts.name,
         deletedAt: now(),
-        extra: { textureCount: ts.textureCount },
+        entity: { ...ts } as unknown as Record<string, unknown>,
+        extra: {
+          textureCount: ts.textureCount,
+          previewFileId:
+            ts.textures.find(t => t.textureType === 1)?.fileId ??
+            ts.textures[0]?.fileId ??
+            null,
+        },
       })
       // Clean up pack/project associations
       const packs = await getAll('packs')
@@ -1259,8 +1360,18 @@ export const dynamicDemoHandlers = [
         }
         if (blob) {
           const fileName = version.files[0]?.originalFileName
-          generateModelThumbnailAsync(version.modelId, blob, fileName)
-          generateVersionThumbnailAsync(version.id, blob, fileName)
+          // Re-read version to get updated texture mappings
+          const updatedVersion = await getById('modelVersions', version.id)
+          const textureMaps = updatedVersion
+            ? await getVersionTextureMaps(updatedVersion)
+            : []
+          generateModelThumbnailAsync(
+            version.modelId,
+            blob,
+            fileName,
+            textureMaps
+          )
+          generateVersionThumbnailAsync(version.id, blob, fileName, textureMaps)
         }
       }
 
@@ -1320,8 +1431,18 @@ export const dynamicDemoHandlers = [
         }
         if (blob) {
           const fileName = version.files[0]?.originalFileName
-          generateModelThumbnailAsync(version.modelId, blob, fileName)
-          generateVersionThumbnailAsync(version.id, blob, fileName)
+          // Re-read version to get updated texture mappings (after removal)
+          const updatedVersion = await getById('modelVersions', version.id)
+          const textureMaps = updatedVersion
+            ? await getVersionTextureMaps(updatedVersion)
+            : []
+          generateModelThumbnailAsync(
+            version.modelId,
+            blob,
+            fileName,
+            textureMaps
+          )
+          generateVersionThumbnailAsync(version.id, blob, fileName, textureMaps)
         }
       }
 
@@ -1569,6 +1690,7 @@ export const dynamicDemoHandlers = [
         id,
         name: sprite.name,
         deletedAt: now(),
+        entity: { ...sprite } as unknown as Record<string, unknown>,
         extra: { fileId: sprite.fileId },
       })
       // Clean up pack/project associations
@@ -1856,6 +1978,7 @@ export const dynamicDemoHandlers = [
         id,
         name: sound.name,
         deletedAt: now(),
+        entity: { ...sound } as unknown as Record<string, unknown>,
         extra: { fileId: sound.fileId, duration: sound.duration },
       })
       // Clean up pack/project associations
@@ -2481,7 +2604,7 @@ export const dynamicDemoHandlers = [
         name: r.name,
         deletedAt: r.deletedAt,
         textureCount: (r.extra?.textureCount as number) ?? 0,
-        previewFileId: null,
+        previewFileId: (r.extra?.previewFileId as number) ?? null,
       }))
     const sprites = recycledItems
       .filter(r => r.type === 'sprite')
@@ -2512,21 +2635,93 @@ export const dynamicDemoHandlers = [
   }),
 
   http.post('*/recycled/:type/:id/restore', async ({ params }) => {
-    const idx = recycledItems.findIndex(
-      r => r.type === String(params.type) && r.id === Number(params.id)
-    )
-    if (idx !== -1) recycledItems.splice(idx, 1)
+    const type = String(params.type)
+    const id = Number(params.id)
+    const idx = recycledItems.findIndex(r => r.type === type && r.id === id)
+    if (idx !== -1) {
+      const item = recycledItems[idx]
+      // Re-add entity to its IDB store from saved entity data
+      if (item.entity) {
+        if (type === 'model') {
+          await put('models', item.entity as unknown as DemoModel)
+        } else if (type === 'textureSet') {
+          await put('textureSets', item.entity as unknown as DemoTextureSet)
+        } else if (type === 'sprite') {
+          await put('sprites', item.entity as unknown as DemoSprite)
+        } else if (type === 'sound') {
+          await put('sounds', item.entity as unknown as DemoSound)
+        }
+      }
+      recycledItems.splice(idx, 1)
+    }
     return new HttpResponse(null, { status: 204 })
   }),
 
   http.get('*/recycled/:type/:id/preview', async ({ params }) => {
-    const item = recycledItems.find(
-      r => r.type === String(params.type) && r.id === Number(params.id)
-    )
+    const type = String(params.type)
+    const id = Number(params.id)
+    const item = recycledItems.find(r => r.type === type && r.id === id)
+
+    const filesToDelete: {
+      filePath: string
+      originalFileName: string
+      sizeBytes: number
+    }[] = []
+    const relatedEntities: string[] = []
+
+    if (item?.entity) {
+      if (type === 'model') {
+        const model = item.entity as unknown as DemoModel
+        for (const f of model.files ?? []) {
+          filesToDelete.push({
+            filePath: f.storedFileName ?? f.originalFileName,
+            originalFileName: f.originalFileName,
+            sizeBytes: f.sizeBytes ?? 0,
+          })
+        }
+        // List versions as related
+        const versions = await getAll('modelVersions')
+        const modelVersions = versions.filter(v => v.modelId === id)
+        for (const v of modelVersions) {
+          relatedEntities.push(`Version ${v.versionNumber}`)
+          for (const f of v.files ?? []) {
+            filesToDelete.push({
+              filePath: f.originalFileName,
+              originalFileName: f.originalFileName,
+              sizeBytes: f.sizeBytes ?? 0,
+            })
+          }
+        }
+      } else if (type === 'textureSet') {
+        const ts = item.entity as unknown as DemoTextureSet
+        for (const tex of ts.textures ?? []) {
+          filesToDelete.push({
+            filePath: tex.fileName,
+            originalFileName: tex.fileName,
+            sizeBytes: 0,
+          })
+        }
+      } else if (type === 'sprite') {
+        const sprite = item.entity as unknown as DemoSprite
+        filesToDelete.push({
+          filePath: sprite.fileName,
+          originalFileName: sprite.fileName,
+          sizeBytes: sprite.fileSizeBytes ?? 0,
+        })
+      } else if (type === 'sound') {
+        const sound = item.entity as unknown as DemoSound
+        filesToDelete.push({
+          filePath: sound.fileName,
+          originalFileName: sound.fileName,
+          sizeBytes: sound.fileSizeBytes ?? 0,
+        })
+      }
+    }
+
     return HttpResponse.json({
       entityName: item?.name ?? 'Unknown',
-      filesToDelete: [],
-      relatedEntities: [],
+      filesToDelete,
+      relatedEntities,
     })
   }),
 
@@ -2543,7 +2738,8 @@ export const dynamicDemoHandlers = [
   // ════════════════════════════════════════════════════════════════════════
 
   http.get('*/batch-uploads/history', async () => {
-    return HttpResponse.json({ uploads: uploadHistory })
+    const uploads = await getAllUploadHistory()
+    return HttpResponse.json({ uploads })
   }),
 
   http.post('*/batch-uploads/*', async () => {

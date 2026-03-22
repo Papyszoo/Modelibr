@@ -162,6 +162,9 @@ export function ProjectList() {
                     <span>
                       <i className="pi pi-image" /> {project.spriteCount}
                     </span>
+                    <span>
+                      <i className="pi pi-volume-up" /> {project.soundCount}
+                    </span>
                   </div>
                 </div>
                 <div className="project-grid-card-actions">
