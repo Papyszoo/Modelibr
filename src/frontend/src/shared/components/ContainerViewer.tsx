@@ -2,7 +2,7 @@ import './ContainerViewer.css'
 
 import { TabPanel, TabView } from 'primereact/tabview'
 import { Toast } from 'primereact/toast'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ModelGrid } from '@/features/models/components/ModelGrid'
 import { useTabUiState } from '@/hooks/useTabUiState'
@@ -44,6 +44,16 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
 
   const { container, refetchContainer } = useContainerData(adapter, showToast)
   const label = adapter.label
+
+  // Initialize tab counts from container data so they don't show 0 before grids mount
+  useEffect(() => {
+    if (container) {
+      setModelTotalCount(prev => prev || container.modelCount)
+      setTextureSetTotalCount(prev => prev || container.textureSetCount)
+      setSpriteTotalCount(prev => prev || container.spriteCount)
+      setSoundTotalCount(prev => prev || container.soundCount)
+    }
+  }, [container])
 
   if (!container) {
     return <div>Loading...</div>

@@ -10,6 +10,7 @@
 import {
   AmbientLight,
   Box3,
+  CanvasTexture,
   Color,
   DirectionalLight,
   type Group,
@@ -24,6 +25,7 @@ import {
 } from 'three'
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 
 // ─── Model Thumbnails ───────────────────────────────────────────────────
 
@@ -82,6 +84,9 @@ export async function generateModelThumbnail(
       if (ext === 'fbx') {
         return await renderFbxThumbnail(url, width, height)
       }
+      if (ext === 'obj') {
+        return await renderObjThumbnail(url, width, height)
+      }
       return await renderGltfThumbnail(url, width, height)
     } finally {
       URL.revokeObjectURL(url)
@@ -89,6 +94,161 @@ export async function generateModelThumbnail(
   } catch {
     return generatePlaceholderThumbnail(width, height, '#4a90d9')
   }
+}
+
+/**
+ * Texture map data for applying textures to model thumbnails.
+ * TextureType: 1=Albedo, 2=Normal, 5=Roughness, 6=Metallic
+ */
+export interface TextureMapData {
+  textureType: number
+  blob: Blob
+}
+
+/**
+ * Apply texture maps to all meshes in model.
+ * Uses albedo for map, normal for normalMap, roughness for roughnessMap, metallic for metalnessMap.
+ */
+async function applyTextureMaps(
+  model: Object3D,
+  textures: TextureMapData[]
+): Promise<void> {
+  const albedoTex = textures.find(t => t.textureType === 1)
+  const normalTex = textures.find(t => t.textureType === 2)
+  const roughnessTex = textures.find(t => t.textureType === 5)
+  const metallicTex = textures.find(t => t.textureType === 6)
+
+  const loadTexture = async (blob: Blob) => {
+    const bitmap = await createImageBitmap(blob)
+    return new CanvasTexture(bitmap as unknown as HTMLCanvasElement)
+  }
+
+  const [albedoMap, normalMap, roughnessMap, metalnessMap] = await Promise.all([
+    albedoTex ? loadTexture(albedoTex.blob) : Promise.resolve(null),
+    normalTex ? loadTexture(normalTex.blob) : Promise.resolve(null),
+    roughnessTex ? loadTexture(roughnessTex.blob) : Promise.resolve(null),
+    metallicTex ? loadTexture(metallicTex.blob) : Promise.resolve(null),
+  ])
+
+  model.traverse(child => {
+    if (child instanceof Mesh) {
+      child.material = new MeshStandardMaterial({
+        color: albedoMap ? new Color(1, 1, 1) : new Color(0.7, 0.7, 0.9),
+        map: albedoMap,
+        normalMap: normalMap,
+        roughnessMap: roughnessMap,
+        metalnessMap: metalnessMap,
+        metalness: metalnessMap ? 1.0 : 0.3,
+        roughness: roughnessMap ? 1.0 : 0.4,
+      })
+      child.castShadow = true
+      child.receiveShadow = true
+    }
+  })
+}
+
+/**
+ * Render a model thumbnail with optional texture maps applied.
+ */
+export async function generateModelThumbnailWithTextures(
+  modelBlob: Blob,
+  textures: TextureMapData[],
+  width = 256,
+  height = 256,
+  fileName?: string
+): Promise<Blob> {
+  try {
+    const url = URL.createObjectURL(modelBlob)
+    try {
+      const ext = (fileName ?? '').split('.').pop()?.toLowerCase()
+      return await renderModelWithTextures(
+        url,
+        ext ?? 'glb',
+        textures,
+        width,
+        height
+      )
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  } catch {
+    return generatePlaceholderThumbnail(width, height, '#4a90d9')
+  }
+}
+
+async function renderModelWithTextures(
+  url: string,
+  ext: string,
+  textures: TextureMapData[],
+  width: number,
+  height: number
+): Promise<Blob> {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const renderer = new WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true,
+  })
+  renderer.setSize(width, height)
+  renderer.setClearColor(0x2a2a2e, 1)
+
+  const scene = new Scene()
+  const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
+
+  scene.add(new AmbientLight(0xffffff, 0.6))
+  const dirLight = new DirectionalLight(0xffffff, 0.8)
+  dirLight.position.set(5, 10, 7)
+  scene.add(dirLight)
+
+  let model: Group
+  if (ext === 'fbx') {
+    const loader = new FBXLoader()
+    model = await new Promise<Group>((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject)
+    })
+  } else if (ext === 'obj') {
+    const loader = new OBJLoader()
+    model = await new Promise<Group>((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject)
+    })
+  } else {
+    const loader = new GLTFLoader()
+    const gltf = await new Promise<{ scene: Group }>((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject)
+    })
+    model = gltf.scene
+  }
+
+  scene.add(model)
+
+  if (textures.length > 0) {
+    await applyTextureMaps(model, textures)
+  } else {
+    applyStandardMaterial(model)
+  }
+
+  normalizeModel(model)
+
+  const fov = camera.fov * (Math.PI / 180)
+  const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
+  camera.position.set(distance * 0.5, distance * 0.3, distance)
+  camera.lookAt(0, 0, 0)
+
+  renderer.render(scene, camera)
+
+  const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
+  })
+
+  renderer.dispose()
+  return thumbnailBlob
 }
 
 async function renderGltfThumbnail(
@@ -183,6 +343,59 @@ async function renderFbxThumbnail(
   normalizeModel(fbxScene)
 
   // Position camera to frame the normalized model (centred at origin, ~2 units)
+  const fov = camera.fov * (Math.PI / 180)
+  const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
+  camera.position.set(distance * 0.5, distance * 0.3, distance)
+  camera.lookAt(0, 0, 0)
+
+  renderer.render(scene, camera)
+
+  const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
+  })
+
+  renderer.dispose()
+  return thumbnailBlob
+}
+
+async function renderObjThumbnail(
+  url: string,
+  width: number,
+  height: number
+): Promise<Blob> {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const renderer = new WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true,
+  })
+  renderer.setSize(width, height)
+  renderer.setClearColor(0x2a2a2e, 1)
+
+  const scene = new Scene()
+  const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
+
+  scene.add(new AmbientLight(0xffffff, 0.6))
+  const dirLight = new DirectionalLight(0xffffff, 0.8)
+  dirLight.position.set(5, 10, 7)
+  scene.add(dirLight)
+
+  const loader = new OBJLoader()
+  const objScene = await new Promise<Group>((resolve, reject) => {
+    loader.load(url, resolve, undefined, reject)
+  })
+
+  scene.add(objScene)
+  applyStandardMaterial(objScene)
+  normalizeModel(objScene)
+
   const fov = camera.fov * (Math.PI / 180)
   const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
   camera.position.set(distance * 0.5, distance * 0.3, distance)

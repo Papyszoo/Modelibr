@@ -185,6 +185,25 @@ export interface DemoThumbnail {
   blob: Blob
 }
 
+export interface DemoUploadHistoryEntry {
+  id: number
+  batchId: string
+  uploadType: string
+  uploadedAt: string
+  fileId: number
+  fileName: string
+  packId: number | null
+  packName: string | null
+  projectId: number | null
+  projectName: string | null
+  modelId: number | null
+  modelName: string | null
+  textureSetId: number | null
+  textureSetName: string | null
+  spriteId: number | null
+  spriteName: string | null
+}
+
 interface DemoDbSchema extends DBSchema {
   models: { key: number; value: DemoModel }
   modelVersions: {
@@ -201,6 +220,7 @@ interface DemoDbSchema extends DBSchema {
   soundCategories: { key: number; value: DemoCategory }
   fileBlobs: { key: number; value: DemoFileBlob }
   thumbnails: { key: string; value: DemoThumbnail }
+  uploadHistory: { key: number; value: DemoUploadHistoryEntry }
   meta: { key: string; value: { key: string; value: number } }
 }
 
@@ -210,23 +230,28 @@ let dbPromise: Promise<IDBPDatabase<DemoDbSchema>> | null = null
 
 export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 1, {
-      upgrade(db) {
-        db.createObjectStore('models', { keyPath: 'id' })
-        const versionStore = db.createObjectStore('modelVersions', {
-          keyPath: 'id',
-        })
-        versionStore.createIndex('byModelId', 'modelId')
-        db.createObjectStore('textureSets', { keyPath: 'id' })
-        db.createObjectStore('sprites', { keyPath: 'id' })
-        db.createObjectStore('sounds', { keyPath: 'id' })
-        db.createObjectStore('packs', { keyPath: 'id' })
-        db.createObjectStore('projects', { keyPath: 'id' })
-        db.createObjectStore('spriteCategories', { keyPath: 'id' })
-        db.createObjectStore('soundCategories', { keyPath: 'id' })
-        db.createObjectStore('fileBlobs', { keyPath: 'fileId' })
-        db.createObjectStore('thumbnails', { keyPath: 'entityKey' })
-        db.createObjectStore('meta', { keyPath: 'key' })
+    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('models', { keyPath: 'id' })
+          const versionStore = db.createObjectStore('modelVersions', {
+            keyPath: 'id',
+          })
+          versionStore.createIndex('byModelId', 'modelId')
+          db.createObjectStore('textureSets', { keyPath: 'id' })
+          db.createObjectStore('sprites', { keyPath: 'id' })
+          db.createObjectStore('sounds', { keyPath: 'id' })
+          db.createObjectStore('packs', { keyPath: 'id' })
+          db.createObjectStore('projects', { keyPath: 'id' })
+          db.createObjectStore('spriteCategories', { keyPath: 'id' })
+          db.createObjectStore('soundCategories', { keyPath: 'id' })
+          db.createObjectStore('fileBlobs', { keyPath: 'fileId' })
+          db.createObjectStore('thumbnails', { keyPath: 'entityKey' })
+          db.createObjectStore('meta', { keyPath: 'key' })
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore('uploadHistory', { keyPath: 'id' })
+        }
       },
     })
   }
@@ -335,6 +360,22 @@ export async function getThumbnail(
   const db = await getDb()
   const record = await db.get('thumbnails', entityKey)
   return record?.blob
+}
+
+// ─── Upload History helpers ─────────────────────────────────────────────
+
+export async function addUploadHistory(
+  entry: DemoUploadHistoryEntry
+): Promise<void> {
+  const db = await getDb()
+  await db.put('uploadHistory', entry)
+}
+
+export async function getAllUploadHistory(): Promise<DemoUploadHistoryEntry[]> {
+  const db = await getDb()
+  const all = await db.getAll('uploadHistory')
+  // Return sorted by id descending (newest first)
+  return all.sort((a, b) => b.id - a.id)
 }
 
 // ─── Seed Data ──────────────────────────────────────────────────────────
