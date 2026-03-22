@@ -2673,25 +2673,28 @@ export const dynamicDemoHandlers = [
     if (item?.entity) {
       if (type === 'model') {
         const model = item.entity as unknown as DemoModel
-        for (const f of model.files ?? []) {
+        const seenFiles = new Set<string>()
+        const addFile = (f: {
+          storedFileName?: string
+          originalFileName: string
+          sizeBytes?: number
+        }) => {
+          const key = f.storedFileName ?? f.originalFileName
+          if (seenFiles.has(key)) return
+          seenFiles.add(key)
           filesToDelete.push({
-            filePath: f.storedFileName ?? f.originalFileName,
+            filePath: key,
             originalFileName: f.originalFileName,
             sizeBytes: f.sizeBytes ?? 0,
           })
         }
+        for (const f of model.files ?? []) addFile(f)
         // List versions as related
         const versions = await getAll('modelVersions')
         const modelVersions = versions.filter(v => v.modelId === entityId)
         for (const v of modelVersions) {
           relatedEntities.push(`Version ${v.versionNumber}`)
-          for (const f of v.files ?? []) {
-            filesToDelete.push({
-              filePath: f.originalFileName,
-              originalFileName: f.originalFileName,
-              sizeBytes: f.sizeBytes ?? 0,
-            })
-          }
+          for (const f of v.files ?? []) addFile(f)
         }
       } else if (type === 'textureSet') {
         const ts = item.entity as unknown as DemoTextureSet

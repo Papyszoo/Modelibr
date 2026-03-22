@@ -135,7 +135,7 @@ export function PackList() {
                     <img src={thumbnail} alt={pack.name} />
                   ) : (
                     <div className="pack-grid-card-placeholder">
-                      <i className="pi pi-cube" />
+                      <i className="pi pi-box" />
                     </div>
                   )}
                 </div>
@@ -148,7 +148,7 @@ export function PackList() {
                   )}
                   <div className="pack-grid-card-stats">
                     <span>
-                      <i className="pi pi-cube" /> {pack.modelCount}
+                      <i className="pi pi-box" /> {pack.modelCount}
                     </span>
                     <span>
                       <i className="pi pi-palette" /> {pack.textureSetCount}

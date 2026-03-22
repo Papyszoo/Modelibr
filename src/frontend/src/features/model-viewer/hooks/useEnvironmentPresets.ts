@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { EquirectangularReflectionMapping } from 'three'
+import type { DataTexture } from 'three'
+import { RGBELoader } from 'three-stdlib'
+
 import {
   BUNDLED_HDR_PATH,
   BUNDLED_PRESET,
@@ -13,8 +17,8 @@ export interface EnvironmentAvailability {
   isOnline: boolean
   /** Set of presets that are available (bundled or cached). */
   availablePresets: Set<string>
-  /** The resolved HDR URL for the active preset. */
-  hdrUrl: string
+  /** The loaded HDR environment map texture, or null while loading. */
+  envMap: DataTexture | null
   /** Whether the HDR is still being fetched/resolved. */
   loading: boolean
   /** The effective preset name (may differ from requested if fallback occurred). */
@@ -23,7 +27,9 @@ export interface EnvironmentAvailability {
 
 /**
  * Manages environment preset availability based on online/offline status
- * and Cache API state. Returns the resolved HDR URL and availability info.
+ * and Cache API state. Loads the HDR texture via RGBELoader and returns
+ * it directly — this avoids drei's extension-detection which fails on
+ * blob URLs.
  */
 export function useEnvironmentPresets(
   requestedPreset: string
@@ -32,10 +38,10 @@ export function useEnvironmentPresets(
   const [availablePresets, setAvailablePresets] = useState<Set<string>>(
     () => new Set([BUNDLED_PRESET])
   )
-  const [hdrUrl, setHdrUrl] = useState(BUNDLED_HDR_PATH)
+  const [envMap, setEnvMap] = useState<DataTexture | null>(null)
   const [loading, setLoading] = useState(false)
   const [effectivePreset, setEffectivePreset] = useState(requestedPreset)
-  const prevBlobUrl = useRef<string | null>(null)
+  const prevTexture = useRef<DataTexture | null>(null)
 
   // Track online/offline status
   useEffect(() => {
@@ -64,43 +70,71 @@ export function useEnvironmentPresets(
     void refreshAvailability()
   }, [isOnline, refreshAvailability])
 
-  // Resolve HDR URL when preset changes
+  // Resolve and load HDR texture when preset changes
   useEffect(() => {
     let cancelled = false
 
     async function resolve() {
       setLoading(true)
 
-      // Revoke previous blob URL to avoid memory leaks
-      if (prevBlobUrl.current) {
-        URL.revokeObjectURL(prevBlobUrl.current)
-        prevBlobUrl.current = null
-      }
-
       const url = await resolveHdrUrl(requestedPreset)
-
       if (cancelled) {
-        // If we got a blob URL but the effect was cancelled, clean it up
         if (url.startsWith('blob:')) URL.revokeObjectURL(url)
         return
       }
 
-      setHdrUrl(url)
-      setLoading(false)
+      const loader = new RGBELoader()
+      loader.load(
+        url,
+        texture => {
+          if (cancelled) {
+            texture.dispose()
+            if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+            return
+          }
 
-      // Track if we fell back to city
-      if (url === BUNDLED_HDR_PATH && requestedPreset !== BUNDLED_PRESET) {
-        setEffectivePreset(BUNDLED_PRESET)
-      } else {
-        setEffectivePreset(requestedPreset)
-      }
+          texture.mapping = EquirectangularReflectionMapping
 
-      if (url.startsWith('blob:')) {
-        prevBlobUrl.current = url
-      }
+          // Dispose the previous texture
+          if (prevTexture.current) prevTexture.current.dispose()
+          prevTexture.current = texture
 
-      // After successful fetch, refresh availability (new preset may now be cached)
-      void refreshAvailability()
+          setEnvMap(texture)
+          setLoading(false)
+          setEffectivePreset(requestedPreset)
+
+          if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+          void refreshAvailability()
+        },
+        undefined,
+        () => {
+          // Loading failed — fall back to bundled city preset
+          if (cancelled) {
+            if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+            return
+          }
+
+          if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+
+          if (requestedPreset !== BUNDLED_PRESET) {
+            const fallbackLoader = new RGBELoader()
+            fallbackLoader.load(BUNDLED_HDR_PATH, texture => {
+              if (cancelled) {
+                texture.dispose()
+                return
+              }
+              texture.mapping = EquirectangularReflectionMapping
+              if (prevTexture.current) prevTexture.current.dispose()
+              prevTexture.current = texture
+              setEnvMap(texture)
+              setLoading(false)
+              setEffectivePreset(BUNDLED_PRESET)
+            })
+          } else {
+            setLoading(false)
+          }
+        }
+      )
     }
 
     void resolve()
@@ -110,14 +144,15 @@ export function useEnvironmentPresets(
     }
   }, [requestedPreset, refreshAvailability])
 
-  // Cleanup blob URL on unmount
+  // Cleanup texture on unmount
   useEffect(() => {
     return () => {
-      if (prevBlobUrl.current) {
-        URL.revokeObjectURL(prevBlobUrl.current)
+      if (prevTexture.current) {
+        prevTexture.current.dispose()
+        prevTexture.current = null
       }
     }
   }, [])
 
-  return { isOnline, availablePresets, hdrUrl, loading, effectivePreset }
+  return { isOnline, availablePresets, envMap, loading, effectivePreset }
 }

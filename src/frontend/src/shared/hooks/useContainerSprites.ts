@@ -119,8 +119,11 @@ export function useContainerSprites(
   })
 
   const addMutation = useMutation({
-    mutationFn: (ids: number[]) =>
-      Promise.all(ids.map(id => adapter.addSprite(adapter.containerId, id))),
+    mutationFn: async (ids: number[]) => {
+      for (const id of ids) {
+        await adapter.addSprite(adapter.containerId, id)
+      }
+    },
     onSuccess: (_data, ids) => {
       showToast({
         severity: 'success',

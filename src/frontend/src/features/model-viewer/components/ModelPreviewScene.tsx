@@ -91,7 +91,7 @@ export function Scene({
   const showEnvironmentBackground = settings?.showEnvironmentBackground ?? false
   const backgroundIntensity = settings?.backgroundIntensity ?? 1.0
   const environmentIntensity = settings?.environmentIntensity ?? 1.0
-  const { hdrUrl } = useEnvironmentPresets(environmentPreset)
+  const { envMap } = useEnvironmentPresets(environmentPreset)
 
   // Fallback to first file if no renderable found
   if (!renderableFile) {
@@ -150,12 +150,14 @@ export function Scene({
       </Stage>
 
       {/* Environment map for reflections and optional background */}
-      <Environment
-        files={hdrUrl}
-        background={showEnvironmentBackground}
-        backgroundIntensity={backgroundIntensity}
-        environmentIntensity={environmentIntensity}
-      />
+      {envMap && (
+        <Environment
+          map={envMap}
+          background={showEnvironmentBackground}
+          backgroundIntensity={backgroundIntensity}
+          environmentIntensity={environmentIntensity}
+        />
+      )}
 
       {/* 
         Three-Point Lighting System

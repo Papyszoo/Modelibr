@@ -220,7 +220,7 @@ export class PacksPage {
 
     async getModelCount(): Promise<number> {
         const stat = this.page.locator(
-            ".pack-grid-card-stats span:has(.pi-cube)",
+            ".pack-grid-card-stats span:has(.pi-box)",
         );
         const text = await stat.textContent();
         return parseInt(text?.trim() || "0", 10);

@@ -120,8 +120,11 @@ export function useContainerSounds(
   })
 
   const addMutation = useMutation({
-    mutationFn: (ids: number[]) =>
-      Promise.all(ids.map(id => adapter.addSound(adapter.containerId, id))),
+    mutationFn: async (ids: number[]) => {
+      for (const id of ids) {
+        await adapter.addSound(adapter.containerId, id)
+      }
+    },
     onSuccess: (_data, ids) => {
       showToast({
         severity: 'success',
