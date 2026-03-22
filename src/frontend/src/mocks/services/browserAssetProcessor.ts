@@ -10,10 +10,12 @@
 import {
   AmbientLight,
   Box3,
+  Color,
   DirectionalLight,
   type Group,
   Mesh,
   MeshStandardMaterial,
+  type Object3D,
   PerspectiveCamera,
   Scene,
   SphereGeometry,
@@ -24,6 +26,24 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
 // ─── Model Thumbnails ───────────────────────────────────────────────────
+
+/**
+ * Override all mesh materials with a neutral standard material
+ * for consistent thumbnail appearance (matches real worker behaviour).
+ */
+function applyStandardMaterial(model: Object3D) {
+  model.traverse(child => {
+    if (child instanceof Mesh) {
+      child.material = new MeshStandardMaterial({
+        color: new Color(0.7, 0.7, 0.9),
+        metalness: 0.3,
+        roughness: 0.4,
+      })
+      child.castShadow = true
+      child.receiveShadow = true
+    }
+  })
+}
 
 /**
  * Render a GLTF/GLB or FBX blob to a PNG thumbnail blob.
@@ -85,6 +105,7 @@ async function renderGltfThumbnail(
   })
 
   scene.add(gltf.scene)
+  applyStandardMaterial(gltf.scene)
 
   // Frame the model
   const box = new Box3().setFromObject(gltf.scene)
@@ -146,6 +167,7 @@ async function renderFbxThumbnail(
   })
 
   scene.add(fbxScene)
+  applyStandardMaterial(fbxScene)
 
   const box = new Box3().setFromObject(fbxScene)
   const center = box.getCenter(new Vector3())

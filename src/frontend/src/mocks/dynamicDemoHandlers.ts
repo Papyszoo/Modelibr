@@ -1004,7 +1004,7 @@ export const dynamicDemoHandlers = [
       const setId = Number(params.setId)
       const versionId = Number(params.versionId)
       const materialName = url.searchParams.get('materialName') || 'Material'
-      const variantName = url.searchParams.get('variantName') || 'Default'
+      const variantName = url.searchParams.get('variantName') ?? ''
 
       const ts = await getById('textureSets', setId)
       const version = await getById('modelVersions', versionId)
@@ -1063,7 +1063,7 @@ export const dynamicDemoHandlers = [
       const setId = Number(params.setId)
       const versionId = Number(params.versionId)
       const materialName = url.searchParams.get('materialName') || 'Material'
-      const variantName = url.searchParams.get('variantName') || 'Default'
+      const variantName = url.searchParams.get('variantName') ?? ''
 
       const ts = await getById('textureSets', setId)
       const version = await getById('modelVersions', versionId)
@@ -1114,7 +1114,7 @@ export const dynamicDemoHandlers = [
           v.textureMappings.push({
             materialName,
             textureSetId: setId,
-            variantName: 'Default',
+            variantName: '',
           })
           if (!v.textureSetIds.includes(setId)) v.textureSetIds.push(setId)
           await put('modelVersions', v)
