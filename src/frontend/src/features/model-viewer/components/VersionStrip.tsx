@@ -90,14 +90,26 @@ export function VersionStrip({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleDownloadFile = (file: VersionFileDto) => {
+  const handleDownloadFile = async (file: VersionFileDto) => {
     if (!selectedVersion || !model) return
     const url = getVersionFileUrl(
       parseInt(model.id),
       selectedVersion.id,
       file.id
     )
-    window.open(url, '_blank', 'noopener,noreferrer')
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Download failed')
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = file.originalFileName
+      link.click()
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
   }
 
   const handleFileSelect = (file: VersionFileDto) => {
