@@ -556,7 +556,7 @@ export const dynamicDemoHandlers = [
   }),
 
   // Delete model (soft) → move to recycled
-  http.delete('*/models/:id', async ({ params }) => {
+  http.delete('*//:host/models/:id', async ({ params }) => {
     const id = Number(params.id)
     const model = await getById('models', id)
     if (model) {
@@ -1166,12 +1166,12 @@ export const dynamicDemoHandlers = [
     return HttpResponse.json({ id: ts.id, name: ts.name })
   }),
 
-  http.delete('*/texture-sets/:id/hard', async ({ params }) => {
+  http.delete('*//:host/texture-sets/:id/hard', async ({ params }) => {
     await remove('textureSets', Number(params.id))
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*/texture-sets/:id', async ({ params }) => {
+  http.delete('*//:host/texture-sets/:id', async ({ params }) => {
     const id = Number(params.id)
     const ts = await getById('textureSets', id)
     if (ts) {
@@ -1724,7 +1724,7 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*/sprites/:id', async ({ params }) => {
+  http.delete('*//:host/sprites/:id', async ({ params }) => {
     await remove('sprites', Number(params.id))
     return new HttpResponse(null, { status: 204 })
   }),
@@ -2014,7 +2014,7 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*/sounds/:id', async ({ params }) => {
+  http.delete('*//:host/sounds/:id', async ({ params }) => {
     await remove('sounds', Number(params.id))
     return new HttpResponse(null, { status: 204 })
   }),
