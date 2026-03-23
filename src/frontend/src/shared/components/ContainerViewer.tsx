@@ -45,13 +45,13 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
   const { container, refetchContainer } = useContainerData(adapter, showToast)
   const label = adapter.label
 
-  // Initialize tab counts from container data so they don't show 0 before grids mount
+  // Sync tab counts from container data
   useEffect(() => {
     if (container) {
-      setModelTotalCount(prev => prev || container.modelCount)
-      setTextureSetTotalCount(prev => prev || container.textureSetCount)
-      setSpriteTotalCount(prev => prev || container.spriteCount)
-      setSoundTotalCount(prev => prev || container.soundCount)
+      setModelTotalCount(container.modelCount)
+      setTextureSetTotalCount(container.textureSetCount)
+      setSpriteTotalCount(container.spriteCount)
+      setSoundTotalCount(container.soundCount)
     }
   }, [container])
 

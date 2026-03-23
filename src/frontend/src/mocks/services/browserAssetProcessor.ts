@@ -67,8 +67,200 @@ function normalizeModel(model: Object3D, targetScale = 2.0) {
   model.position.z = -scaledCenter.z
 }
 
+// ─── Orbit Animation (matches real asset processor config.js) ───────────
+
+const ORBIT_ANGLE_STEP = 12 // degrees per frame
+const ORBIT_FRAME_COUNT = 30 // 360° / 12°
+const ORBIT_FRAMERATE = 10 // fps
+const ORBIT_FRAME_DURATION = Math.round(1000 / ORBIT_FRAMERATE) // 100ms
+const ORBIT_WEBP_QUALITY = 0.75
+const ORBIT_ELEVATION_DEG = 15 // slight elevation for nicer 3D perspective
+
 /**
- * Render a GLTF/GLB or FBX blob to a PNG thumbnail blob.
+ * Extract ALPH / VP8 / VP8L sub-chunks from a single-image WebP blob.
+ * These are the chunks that go inside an ANMF frame.
+ */
+function extractFrameChunks(data: Uint8Array): Uint8Array {
+  // RIFF <4B size> WEBP <chunks…>  →  skip first 12 bytes
+  const chunks: Uint8Array[] = []
+  let offset = 12
+  while (offset + 8 <= data.length) {
+    const fourCC =
+      String.fromCharCode(data[offset]) +
+      String.fromCharCode(data[offset + 1]) +
+      String.fromCharCode(data[offset + 2]) +
+      String.fromCharCode(data[offset + 3])
+    const chunkSize =
+      data[offset + 4] |
+      (data[offset + 5] << 8) |
+      (data[offset + 6] << 16) |
+      (data[offset + 7] << 24)
+    const paddedSize = chunkSize + (chunkSize & 1) // RIFF: pad to even
+    if (fourCC === 'VP8 ' || fourCC === 'VP8L' || fourCC === 'ALPH') {
+      chunks.push(data.slice(offset, offset + 8 + paddedSize))
+    }
+    offset += 8 + paddedSize
+  }
+  const totalLen = chunks.reduce((s, c) => s + c.length, 0)
+  const result = new Uint8Array(totalLen)
+  let pos = 0
+  for (const c of chunks) {
+    result.set(c, pos)
+    pos += c.length
+  }
+  return result
+}
+
+function writeTag(bytes: Uint8Array, offset: number, tag: string) {
+  for (let i = 0; i < tag.length; i++) bytes[offset + i] = tag.charCodeAt(i)
+}
+
+function write24LE(bytes: Uint8Array, offset: number, value: number) {
+  bytes[offset] = value & 0xff
+  bytes[offset + 1] = (value >> 8) & 0xff
+  bytes[offset + 2] = (value >> 16) & 0xff
+}
+
+/**
+ * Assemble individual WebP frame blobs into an animated WebP.
+ */
+async function assembleAnimatedWebP(
+  frames: Blob[],
+  width: number,
+  height: number,
+  frameDuration: number
+): Promise<Blob> {
+  const frameChunks: Uint8Array[] = []
+  for (const frame of frames) {
+    const buf = new Uint8Array(await frame.arrayBuffer())
+    frameChunks.push(extractFrameChunks(buf))
+  }
+
+  // Calculate total RIFF payload size ("WEBP" + VP8X + ANIM + ANMFs)
+  let riffPayload = 4 // "WEBP"
+  riffPayload += 8 + 10 // VP8X chunk
+  riffPayload += 8 + 6 // ANIM chunk
+  for (const fc of frameChunks) {
+    const payloadSize = 16 + fc.length
+    riffPayload += 8 + payloadSize + (payloadSize & 1)
+  }
+
+  const buffer = new ArrayBuffer(8 + riffPayload)
+  const view = new DataView(buffer)
+  const bytes = new Uint8Array(buffer)
+  let off = 0
+
+  // RIFF header
+  writeTag(bytes, off, 'RIFF')
+  off += 4
+  view.setUint32(off, riffPayload, true)
+  off += 4
+  writeTag(bytes, off, 'WEBP')
+  off += 4
+
+  // VP8X — extended features: animation flag (bit 1)
+  writeTag(bytes, off, 'VP8X')
+  off += 4
+  view.setUint32(off, 10, true)
+  off += 4
+  bytes[off] = 0x02 // animation
+  off += 1
+  bytes[off] = 0
+  bytes[off + 1] = 0
+  bytes[off + 2] = 0
+  off += 3
+  write24LE(bytes, off, width - 1)
+  off += 3
+  write24LE(bytes, off, height - 1)
+  off += 3
+
+  // ANIM — background colour (BGRA transparent), loop count 0 = infinite
+  writeTag(bytes, off, 'ANIM')
+  off += 4
+  view.setUint32(off, 6, true)
+  off += 4
+  view.setUint32(off, 0, true)
+  off += 4 // bg colour
+  view.setUint16(off, 0, true)
+  off += 2 // loop count
+
+  // ANMF chunks — one per frame
+  const w = width - 1
+  const h = height - 1
+  for (const fc of frameChunks) {
+    const payloadSize = 16 + fc.length
+    writeTag(bytes, off, 'ANMF')
+    off += 4
+    view.setUint32(off, payloadSize, true)
+    off += 4
+
+    write24LE(bytes, off, 0)
+    off += 3 // frame X
+    write24LE(bytes, off, 0)
+    off += 3 // frame Y
+    write24LE(bytes, off, w)
+    off += 3 // width-1
+    write24LE(bytes, off, h)
+    off += 3 // height-1
+    write24LE(bytes, off, frameDuration)
+    off += 3 // duration ms
+    bytes[off] = 0x00
+    off += 1 // flags: alpha-blend, no dispose
+
+    bytes.set(fc, off)
+    off += fc.length
+
+    if (payloadSize & 1) {
+      bytes[off] = 0
+      off += 1
+    }
+  }
+
+  return new Blob([buffer], { type: 'image/webp' })
+}
+
+/**
+ * Orbit the camera around the model and produce an animated WebP.
+ * Matches the real asset-processor's 30-frame 360° orbit.
+ */
+async function renderOrbitAnimation(
+  renderer: WebGLRenderer,
+  scene: Scene,
+  camera: PerspectiveCamera,
+  distance: number,
+  width: number,
+  height: number
+): Promise<Blob> {
+  const canvas = renderer.domElement as HTMLCanvasElement
+  const elevRad = (ORBIT_ELEVATION_DEG * Math.PI) / 180
+  const cosElev = Math.cos(elevRad)
+  const sinElev = Math.sin(elevRad)
+  const frames: Blob[] = []
+
+  for (let i = 0; i < ORBIT_FRAME_COUNT; i++) {
+    const angleRad = (i * ORBIT_ANGLE_STEP * Math.PI) / 180
+    camera.position.x = distance * cosElev * Math.sin(angleRad)
+    camera.position.y = distance * sinElev
+    camera.position.z = distance * cosElev * Math.cos(angleRad)
+    camera.lookAt(0, 0, 0)
+
+    renderer.render(scene, camera)
+
+    const frameBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+        'image/webp',
+        ORBIT_WEBP_QUALITY
+      )
+    })
+    frames.push(frameBlob)
+  }
+
+  return assembleAnimatedWebP(frames, width, height, ORBIT_FRAME_DURATION)
+}
+
+/**
+ * Render a GLTF/GLB or FBX blob to an animated WebP thumbnail.
  * Falls back to a colored placeholder on any error.
  */
 export async function generateModelThumbnail(
@@ -235,17 +427,15 @@ async function renderModelWithTextures(
 
   const fov = camera.fov * (Math.PI / 180)
   const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
-  camera.position.set(distance * 0.5, distance * 0.3, distance)
-  camera.lookAt(0, 0, 0)
 
-  renderer.render(scene, camera)
-
-  const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
-      'image/png'
-    )
-  })
+  const thumbnailBlob = await renderOrbitAnimation(
+    renderer,
+    scene,
+    camera,
+    distance,
+    width,
+    height
+  )
 
   renderer.dispose()
   return thumbnailBlob
@@ -291,17 +481,15 @@ async function renderGltfThumbnail(
   // Position camera to frame the normalized model (centred at origin, ~2 units)
   const fov = camera.fov * (Math.PI / 180)
   const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
-  camera.position.set(distance * 0.5, distance * 0.3, distance)
-  camera.lookAt(0, 0, 0)
 
-  renderer.render(scene, camera)
-
-  const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
-      'image/png'
-    )
-  })
+  const thumbnailBlob = await renderOrbitAnimation(
+    renderer,
+    scene,
+    camera,
+    distance,
+    width,
+    height
+  )
 
   renderer.dispose()
   return thumbnailBlob
@@ -345,17 +533,15 @@ async function renderFbxThumbnail(
   // Position camera to frame the normalized model (centred at origin, ~2 units)
   const fov = camera.fov * (Math.PI / 180)
   const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
-  camera.position.set(distance * 0.5, distance * 0.3, distance)
-  camera.lookAt(0, 0, 0)
 
-  renderer.render(scene, camera)
-
-  const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
-      'image/png'
-    )
-  })
+  const thumbnailBlob = await renderOrbitAnimation(
+    renderer,
+    scene,
+    camera,
+    distance,
+    width,
+    height
+  )
 
   renderer.dispose()
   return thumbnailBlob
@@ -398,17 +584,15 @@ async function renderObjThumbnail(
 
   const fov = camera.fov * (Math.PI / 180)
   const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
-  camera.position.set(distance * 0.5, distance * 0.3, distance)
-  camera.lookAt(0, 0, 0)
 
-  renderer.render(scene, camera)
-
-  const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
-      'image/png'
-    )
-  })
+  const thumbnailBlob = await renderOrbitAnimation(
+    renderer,
+    scene,
+    camera,
+    distance,
+    width,
+    height
+  )
 
   renderer.dispose()
   return thumbnailBlob

@@ -352,7 +352,7 @@ export const dynamicDemoHandlers = [
     const thumb = await getThumbnail(`model:${id}`)
     if (thumb) {
       return new HttpResponse(thumb, {
-        headers: { 'Content-Type': 'image/png' },
+        headers: { 'Content-Type': thumb.type || 'image/webp' },
       })
     }
     // Generate a real thumbnail for seed models on first request
@@ -383,7 +383,7 @@ export const dynamicDemoHandlers = [
           )
           await storeThumbnail(`model:${id}`, thumbnail)
           return new HttpResponse(thumbnail, {
-            headers: { 'Content-Type': 'image/png' },
+            headers: { 'Content-Type': thumbnail.type || 'image/webp' },
           })
         }
       } catch {
@@ -752,7 +752,7 @@ export const dynamicDemoHandlers = [
     const thumb = await getThumbnail(`version:${versionId}`)
     if (thumb) {
       return new HttpResponse(thumb, {
-        headers: { 'Content-Type': 'image/png' },
+        headers: { 'Content-Type': thumb.type || 'image/webp' },
       })
     }
     // Generate a real thumbnail for seed versions on first request
@@ -784,7 +784,7 @@ export const dynamicDemoHandlers = [
           )
           await storeThumbnail(`version:${versionId}`, thumbnail)
           return new HttpResponse(thumbnail, {
-            headers: { 'Content-Type': 'image/png' },
+            headers: { 'Content-Type': thumbnail.type || 'image/webp' },
           })
         }
       } catch {
@@ -801,6 +801,14 @@ export const dynamicDemoHandlers = [
   http.get('*/model-versions/:versionId/files/:fileId', async ({ params }) => {
     return serveFile(Number(params.fileId))
   }),
+
+  // Version file URL (alternative pattern used by frontend)
+  http.get(
+    '*/models/:modelId/versions/:versionId/files/:fileId',
+    async ({ params }) => {
+      return serveFile(Number(params.fileId))
+    }
+  ),
 
   // Variant management
   http.put('*/model-versions/:id/main-variant', async ({ params, request }) => {
