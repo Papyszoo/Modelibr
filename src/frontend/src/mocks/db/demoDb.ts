@@ -637,7 +637,9 @@ export async function seedIfEmpty(): Promise<void> {
       materialNames: ['Material'],
       mainVariantName: '',
       variantNames: [],
-      textureMappings: [],
+      textureMappings: [
+        { materialName: 'Material', textureSetId: 1, variantName: '' },
+      ],
       textureSetIds: [1],
     },
     {
