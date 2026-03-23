@@ -108,10 +108,22 @@ export function ModelVersionWindow({
     }
   }
 
-  const handleDownloadFile = (fileId: number, _fileName: string) => {
+  const handleDownloadFile = async (fileId: number, fileName: string) => {
     if (!selectedVersion || !numericModelId) return
     const url = getVersionFileUrl(numericModelId, selectedVersion.id, fileId)
-    window.open(url, '_blank', 'noopener,noreferrer')
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Download failed')
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = fileName
+      link.click()
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
   }
 
   const handleOpenInBlender = (fileId: number, _fileName: string) => {
