@@ -283,6 +283,22 @@ async function getVersionTextureMaps(
       const fileBlob = await getFileBlob(tex.fileId)
       if (fileBlob) {
         results.push({ textureType: tex.textureType, blob: fileBlob.blob })
+        continue
+      }
+      // Fall back to static seed assets (seed texture files are not stored in IDB)
+      const seedPath = seedFileAssets[tex.fileId]
+      if (seedPath) {
+        try {
+          const res = await fetch(assetUrl(seedPath), { cache: 'force-cache' })
+          if (res.ok) {
+            results.push({
+              textureType: tex.textureType,
+              blob: await res.blob(),
+            })
+          }
+        } catch {
+          // ignore
+        }
       }
     }
   }
