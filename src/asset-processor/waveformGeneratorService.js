@@ -1,12 +1,12 @@
 import { createCanvas } from 'canvas'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import fs from 'fs/promises'
 import path from 'path'
 import sharp from 'sharp'
 import logger from './logger.js'
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 /**
  * Service for generating waveform images from audio files
@@ -89,9 +89,15 @@ export class WaveformGeneratorService {
    */
   async getAudioDuration(audioFilePath) {
     try {
-      const { stdout } = await execAsync(
-        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioFilePath}"`
-      )
+      const { stdout } = await execFileAsync('ffprobe', [
+        '-v',
+        'error',
+        '-show_entries',
+        'format=duration',
+        '-of',
+        'default=noprint_wrappers=1:nokey=1',
+        audioFilePath,
+      ])
 
       const duration = parseFloat(stdout.trim())
       if (isNaN(duration) || duration <= 0) {
@@ -121,9 +127,18 @@ export class WaveformGeneratorService {
 
     try {
       // Extract mono PCM data at 8kHz (good for waveform visualization)
-      await execAsync(
-        `ffmpeg -i "${audioFilePath}" -f s16le -ac 1 -ar 8000 "${tempPcmFile}" -y`
-      )
+      await execFileAsync('ffmpeg', [
+        '-i',
+        audioFilePath,
+        '-f',
+        's16le',
+        '-ac',
+        '1',
+        '-ar',
+        '8000',
+        tempPcmFile,
+        '-y',
+      ])
 
       // Read PCM data
       const pcmData = await fs.readFile(tempPcmFile)
@@ -228,7 +243,7 @@ export class WaveformGeneratorService {
    */
   async checkFFmpegAvailable() {
     try {
-      await execAsync('ffmpeg -version')
+      await execFileAsync('ffmpeg', ['-version'])
       return true
     } catch {
       return false

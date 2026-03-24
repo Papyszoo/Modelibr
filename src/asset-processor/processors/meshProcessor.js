@@ -7,7 +7,7 @@ import { config } from '../config.js'
 const execFileAsync = promisify(execFile)
 
 function sanitizeBlenderPath(blenderPath) {
-  if (/[;&|`$(){}\[\]!#~]/.test(blenderPath)) {
+  if (/[;&|`$(){}[\]!#~]/.test(blenderPath)) {
     throw new Error('Invalid Blender path: contains disallowed characters')
   }
   return blenderPath
@@ -52,7 +52,10 @@ export class MeshAnalysisProcessor extends BaseProcessor {
       return false
     }
     try {
-      const { stdout } = await execFileAsync(sanitizeBlenderPath(config.blender.path), ['--version'])
+      const { stdout } = await execFileAsync(
+        sanitizeBlenderPath(config.blender.path),
+        ['--version']
+      )
       logger.info('Blender CLI detected', {
         version: stdout.split('\n')[0].trim(),
       })
