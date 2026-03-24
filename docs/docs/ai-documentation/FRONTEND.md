@@ -66,6 +66,8 @@ src/frontend/src/
     - `features/stage-editor/components/StageList.tsx` now uses `features/stage-editor/api/queries.ts` (`useStagesQuery`) for reads and invalidation-based refresh after create.
     - `features/models/components/ModelVersionHistory.tsx` now uses `features/model-viewer/api/queries.ts` (`useModelVersionsQuery`) for version list loading.
     - `components/tabs/Settings.tsx` now uses `features/settings/api/queries.ts` (`useSettingsQuery`) for initial settings load.
+    - `components/tabs/Settings.tsx` includes Blender version management (version selector, install/uninstall, download progress bar) via `features/settings/api/settingsApi.ts` (`getBlenderVersions`, `getBlenderStatus`, `installBlender`, `uninstallBlender`).
+    - `stores/blenderEnabledStore.ts` tracks `settingEnabled`, `installed`, and `installedVersion` in addition to effective `blenderEnabled`.
 
 ---
 

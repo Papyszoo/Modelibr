@@ -10,7 +10,8 @@ public record UpdateSettingsCommand(
     int ThumbnailWidth,
     int ThumbnailHeight,
     bool GenerateThumbnailOnUpload,
-    int TextureProxySize
+    int TextureProxySize,
+    string BlenderPath
 ) : ICommand<UpdateSettingsResponse>;
 
 public record UpdateSettingsResponse(
@@ -22,5 +23,6 @@ public record UpdateSettingsResponse(
     int ThumbnailHeight,
     bool GenerateThumbnailOnUpload,
     int TextureProxySize,
+    string BlenderPath,
     DateTime UpdatedAt
 );

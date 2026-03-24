@@ -7,9 +7,20 @@ import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
 import { useSettingsQuery } from '@/features/settings/api/queries'
-import { updateSettings } from '@/features/settings/api/settingsApi'
+import {
+  getBlenderStatus,
+  getBlenderVersions,
+  installBlender,
+  uninstallBlender,
+  updateSettings,
+} from '@/features/settings/api/settingsApi'
+import type {
+  BlenderInstallStatus,
+  BlenderVersionInfo,
+} from '@/features/settings/api/settingsApi'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
+import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
 
 interface SettingsData {
   maxFileSizeBytes: number
@@ -20,6 +31,7 @@ interface SettingsData {
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
   textureProxySize: number
+  blenderPath: string
 }
 
 type SettingsFormValues = z.input<typeof settingsFormSchema>
@@ -33,13 +45,32 @@ export function Settings(): JSX.Element {
   const queryClient = useQueryClient()
   const settingsQuery = useSettingsQuery()
   const isLoading = settingsQuery.isLoading
+  const isDemo = import.meta.env.VITE_DEMO_MODE === 'true'
 
   // Theme hook
   const { theme, setTheme } = useTheme()
 
+  // Blender version management state
+  const [blenderVersions, setBlenderVersions] = useState<BlenderVersionInfo[]>(
+    []
+  )
+  const fetchBlenderEnabled = useBlenderEnabledStore(s => s.fetchBlenderEnabled)
+  const [blenderStatus, setBlenderStatus] = useState<BlenderInstallStatus>({
+    state: 'none',
+    installedVersion: null,
+    installedPath: null,
+    progress: 0,
+    downloadedBytes: null,
+    totalBytes: null,
+    error: null,
+  })
+  const [selectedVersion, setSelectedVersion] = useState<string>('')
+  const [infoExpanded, setInfoExpanded] = useState(false)
+  const [blenderVersionsOffline, setBlenderVersionsOffline] = useState(false)
+
   // Accordion state
   const [activeIndex, setActiveIndex] = useState<number | number[]>([
-    0, 1, 2, 3,
+    0, 1, 2, 3, 4,
   ])
 
   const {
@@ -60,6 +91,7 @@ export function Settings(): JSX.Element {
       thumbnailHeight: 256,
       generateThumbnailOnUpload: true,
       textureProxySize: 512,
+      blenderPath: 'blender',
     },
   })
 
@@ -73,6 +105,7 @@ export function Settings(): JSX.Element {
     thumbnailHeight: number
     generateThumbnailOnUpload: boolean
     textureProxySize: number
+    blenderPath: string
   } | null>(null)
 
   const maxFileSizeMB = watch('maxFileSizeMB')
@@ -83,6 +116,7 @@ export function Settings(): JSX.Element {
   const thumbnailHeight = watch('thumbnailHeight')
   const generateThumbnailOnUpload = watch('generateThumbnailOnUpload')
   const textureProxySize = watch('textureProxySize')
+  const blenderPath = watch('blenderPath')
 
   // Check if field is dirty (changed from original)
   const isFieldDirty = (fieldName: string): boolean => {
@@ -107,6 +141,8 @@ export function Settings(): JSX.Element {
         )
       case 'textureProxySize':
         return textureProxySize !== originalValues.textureProxySize
+      case 'blenderPath':
+        return blenderPath !== originalValues.blenderPath
       default:
         return false
     }
@@ -122,7 +158,8 @@ export function Settings(): JSX.Element {
       isFieldDirty('thumbnailWidth') ||
       isFieldDirty('thumbnailHeight') ||
       isFieldDirty('generateThumbnailOnUpload') ||
-      isFieldDirty('textureProxySize')
+      isFieldDirty('textureProxySize') ||
+      isFieldDirty('blenderPath')
     )
   }
 
@@ -159,6 +196,7 @@ export function Settings(): JSX.Element {
       thumbnailHeight: data.thumbnailHeight,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
       textureProxySize: data.textureProxySize ?? 512,
+      blenderPath: data.blenderPath ?? 'blender',
     })
 
     setOriginalValues({
@@ -170,6 +208,7 @@ export function Settings(): JSX.Element {
       thumbnailHeight: data.thumbnailHeight,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
       textureProxySize: data.textureProxySize ?? 512,
+      blenderPath: data.blenderPath ?? 'blender',
     })
   }, [settingsQuery.data, reset])
 
@@ -193,6 +232,7 @@ export function Settings(): JSX.Element {
       thumbnailHeight: values.thumbnailHeight,
       generateThumbnailOnUpload: values.generateThumbnailOnUpload,
       textureProxySize: values.textureProxySize,
+      blenderPath: values.blenderPath,
     }
 
     try {
@@ -213,6 +253,7 @@ export function Settings(): JSX.Element {
         thumbnailHeight: data.thumbnailHeight,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
         textureProxySize: data.textureProxySize ?? 512,
+        blenderPath: data.blenderPath ?? 'blender',
       })
 
       reset({
@@ -224,6 +265,7 @@ export function Settings(): JSX.Element {
         thumbnailHeight: data.thumbnailHeight,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
         textureProxySize: data.textureProxySize ?? 512,
+        blenderPath: data.blenderPath ?? 'blender',
       })
 
       setSuccessMessage('Settings saved successfully!')
@@ -240,6 +282,98 @@ export function Settings(): JSX.Element {
   const handleInvalidSave = () => {
     setError('Please fix all validation errors before saving')
   }
+
+  // ── Blender version management effects ──────────────────────────────
+
+  useEffect(() => {
+    if (isDemo) return
+    getBlenderVersions()
+      .then(({ versions, isOffline }) => {
+        setBlenderVersions(versions)
+        setBlenderVersionsOffline(isOffline)
+        if (versions.length > 0 && !selectedVersion) {
+          setSelectedVersion(versions[0].version)
+        }
+      })
+      .catch(() => {
+        setBlenderVersionsOffline(true)
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo])
+
+  useEffect(() => {
+    if (isDemo) return
+    getBlenderStatus()
+      .then(status => {
+        setBlenderStatus(status)
+        if (status.installedVersion) {
+          setSelectedVersion(status.installedVersion)
+        }
+      })
+      .catch(() => {})
+  }, [isDemo])
+
+  // Poll for progress during download/extract
+  useEffect(() => {
+    if (isDemo) return
+    if (
+      blenderStatus.state !== 'downloading' &&
+      blenderStatus.state !== 'extracting'
+    )
+      return
+
+    const interval = setInterval(() => {
+      getBlenderStatus()
+        .then(status => {
+          setBlenderStatus(status)
+          // Auto-update path when installation completes
+          if (status.state === 'installed' && status.installedPath) {
+            reset(prev => ({
+              ...prev,
+              blenderPath: status.installedPath!,
+            }))
+            void fetchBlenderEnabled()
+          }
+        })
+        .catch(() => {})
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [blenderStatus.state, isDemo, reset])
+
+  const handleInstallBlender = async () => {
+    if (!selectedVersion || isDemo) return
+    try {
+      const status = await installBlender(selectedVersion)
+      setBlenderStatus(status)
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to start installation'
+      )
+    }
+  }
+
+  const handleUninstallBlender = async () => {
+    if (isDemo) return
+    try {
+      const status = await uninstallBlender()
+      setBlenderStatus(status)
+      void fetchBlenderEnabled()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to uninstall')
+    }
+  }
+
+  const formatBytes = (bytes: number | null): string => {
+    if (bytes == null) return '...'
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / 1048576).toFixed(1)} MB`
+  }
+
+  const isBlenderBusy =
+    blenderStatus.state === 'downloading' ||
+    blenderStatus.state === 'extracting'
 
   if (isLoading) {
     return (
@@ -616,6 +750,217 @@ export function Settings(): JSX.Element {
                     are generated on next texture set processing.
                   </span>
                   <span className="settings-default">Default: 512 px</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="settings-section">
+            <div
+              className="settings-section-header"
+              onClick={() =>
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(4)
+                      ? prev.filter(i => i !== 4)
+                      : [...prev, 4]
+                    : [4]
+                )
+              }
+            >
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(4)
+                  ? '▼'
+                  : '▶'}{' '}
+                Blender Settings
+              </span>
+            </div>
+            {Array.isArray(activeIndex) && activeIndex.includes(4) && (
+              <div className="settings-section-content">
+                {/* Collapsible Info Box */}
+                <div className="settings-field">
+                  <div className="settings-info-box">
+                    <div
+                      className="settings-info-toggle"
+                      onClick={() => setInfoExpanded(prev => !prev)}
+                    >
+                      <strong>
+                        {infoExpanded ? '▼' : '▶'} What is Blender CLI?
+                      </strong>
+                    </div>
+                    {infoExpanded && (
+                      <div>
+                        <p>
+                          Blender is an open-source 3D creation suite. When
+                          enabled, Modelibr uses Blender&apos;s command-line
+                          interface to:
+                        </p>
+                        <ul>
+                          <li>
+                            Upload <code>.blend</code> files directly to Models
+                            list or Model Version for model extraction
+                            (configurable format)
+                          </li>
+                          <li>
+                            Upload <code>.blend</code> files via WebDAV
+                          </li>
+                          <li>
+                            Modify existing models with <code>.blend</code>{' '}
+                            files
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isDemo && (
+                  <div className="settings-demo-warning">
+                    Blender settings are not available in demo mode.
+                  </div>
+                )}
+
+                {/* Version Management */}
+                <div className="settings-field">
+                  <label>Blender Version</label>
+                  <div className="blender-version-row">
+                    <select
+                      value={selectedVersion}
+                      onChange={e => setSelectedVersion(e.target.value)}
+                      disabled={isDemo || isBlenderBusy || blenderVersionsOffline}
+                      className="settings-select"
+                    >
+                      {blenderVersions.map(v => (
+                        <option key={v.version} value={v.version}>
+                          {v.label}
+                        </option>
+                      ))}
+                      {blenderVersionsOffline && blenderVersions.length === 0 && (
+                        <option value="">No internet connection</option>
+                      )}
+                      {!blenderVersionsOffline && blenderVersions.length === 0 && (
+                        <option value="">Loading versions...</option>
+                      )}
+                    </select>
+
+                    {!blenderVersionsOffline &&
+                      (blenderStatus.state === 'installed' &&
+                      selectedVersion !== blenderStatus.installedVersion ? (
+                        <button
+                          type="button"
+                          onClick={handleInstallBlender}
+                          disabled={isDemo || !selectedVersion}
+                          className="settings-button-small primary"
+                        >
+                          Switch Version
+                        </button>
+                      ) : blenderStatus.state !== 'installed' &&
+                        !isBlenderBusy ? (
+                        <button
+                          type="button"
+                          onClick={handleInstallBlender}
+                          disabled={isDemo || !selectedVersion}
+                          className="settings-button-small primary"
+                        >
+                          Install
+                        </button>
+                      ) : null)}
+
+                    {blenderStatus.state === 'installed' && (
+                      <button
+                        type="button"
+                        onClick={handleUninstallBlender}
+                        disabled={isDemo}
+                        className="settings-button-small danger"
+                      >
+                        Uninstall
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Offline notice */}
+                  {blenderVersionsOffline && (
+                    <span className="blender-status-none">
+                      No internet connection — version list unavailable.
+                      {blenderStatus.state === 'installed'
+                        ? ' Currently installed version can still be used.'
+                        : ' Connect to the internet to download Blender.'}
+                    </span>
+                  )}
+
+                  {/* Status */}
+                  {blenderStatus.state === 'installed' && (
+                    <span className="blender-status-installed">
+                      ✓ Installed (v{blenderStatus.installedVersion})
+                    </span>
+                  )}
+
+                  {blenderStatus.state === 'none' && !blenderVersionsOffline && (
+                    <span className="blender-status-none">
+                      Not installed — select a version and click Install
+                    </span>
+                  )}
+
+                  {blenderStatus.state === 'failed' && (
+                    <span className="blender-status-failed">
+                      ✗ Installation failed: {blenderStatus.error}
+                    </span>
+                  )}
+
+                  {/* Progress Bar */}
+                  {isBlenderBusy && (
+                    <div className="blender-progress-container">
+                      <div className="blender-progress-bar">
+                        <div
+                          className="blender-progress-fill"
+                          style={{ width: `${blenderStatus.progress}%` }}
+                        />
+                      </div>
+                      <span className="blender-progress-text">
+                        {blenderStatus.state === 'downloading'
+                          ? `Downloading... ${blenderStatus.progress}% (${formatBytes(blenderStatus.downloadedBytes)} / ${formatBytes(blenderStatus.totalBytes)})`
+                          : 'Extracting...'}
+                      </span>
+                    </div>
+                  )}
+
+                  <span className="settings-help">
+                    Select a Blender version to download and install on the
+                    server. Only one version can be installed at a time.
+                  </span>
+                </div>
+
+                {/* Blender Executable Path */}
+                <div className="settings-field">
+                  <label htmlFor="blenderPath">
+                    Blender Executable Path
+                    {isFieldDirty('blenderPath') && (
+                      <span className="settings-dirty-indicator"> ★</span>
+                    )}
+                  </label>
+                  <input
+                    id="blenderPath"
+                    type="text"
+                    placeholder="blender"
+                    {...register('blenderPath')}
+                    disabled={isSaving || isDemo || blenderStatus.state !== 'installed'}
+                    className={
+                      errors.blenderPath ? 'settings-input-error' : ''
+                    }
+                    style={{
+                      opacity: blenderStatus.state === 'installed' && !isDemo ? 1 : 0.5,
+                    }}
+                  />
+                  {errors.blenderPath && (
+                    <span className="settings-error-message">
+                      {errors.blenderPath.message}
+                    </span>
+                  )}
+                  <span className="settings-help">
+                    Auto-set when installed via version management above, or set
+                    manually for pre-installed Blender.
+                  </span>
+                  <span className="settings-default">Default: blender</span>
                 </div>
               </div>
             )}

@@ -65,6 +65,7 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
             await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailHeight, command.ThumbnailHeight.ToString(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.GenerateThumbnailOnUpload, command.GenerateThumbnailOnUpload.ToString().ToLower(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.TextureProxySize, command.TextureProxySize.ToString(), now, cancellationToken);
+            await UpdateOrCreateSettingAsync(SettingKeys.BlenderPath, command.BlenderPath, now, cancellationToken);
 
             return Result.Success(new UpdateSettingsResponse(
                 updatedSettings.MaxFileSizeBytes,
@@ -75,6 +76,7 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
                 updatedSettings.ThumbnailHeight,
                 updatedSettings.GenerateThumbnailOnUpload,
                 updatedSettings.TextureProxySize,
+                command.BlenderPath,
                 updatedSettings.UpdatedAt
             ));
         }

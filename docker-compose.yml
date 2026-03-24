@@ -36,6 +36,7 @@ services:
             # reduce verbosity: only warnings and above
             - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Warning
             - ASPNETCORE_LOGGING__LOGLEVEL__Microsoft=Warning
+            - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
         volumes:
@@ -43,6 +44,7 @@ services:
             - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro
             - ${HOME}/.aspnet/https:/home/app/.aspnet/https:ro
             - ./data/uploads:/var/lib/modelibr/uploads
+            - blender-data:/var/lib/modelibr/blender
         depends_on:
             postgres:
                 condition: service_healthy
@@ -80,11 +82,12 @@ services:
             - LOG_LEVEL=${LOG_LEVEL:-info}
             - NODE_TLS_REJECT_UNAUTHORIZED=0 # Required for self-signed cert; do NOT use in production with external TLS
             - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
-            - BLENDER_PATH=/opt/blender/blender
+            - BLENDER_PATH=${BLENDER_PATH:-/opt/blender/blender}
         ports:
             - "${WORKER_PORT:-3001}:3001"
         volumes:
             - ./data/thumbnails:/var/lib/modelibr/thumbnails
+            - blender-data:/var/lib/modelibr/blender
         depends_on:
             - webapi
         networks:
@@ -117,3 +120,8 @@ services:
 networks:
     modelibr:
         driver: bridge
+
+volumes:
+    # Shared volume for dynamically downloaded Blender binaries.
+    # Mounted in both webapi (writes) and asset-processor (reads/executes).
+    blender-data:

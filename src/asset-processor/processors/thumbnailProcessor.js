@@ -87,9 +87,14 @@ export class ThumbnailProcessor extends BaseProcessor {
 
       // Step 2.5: Convert .blend to .glb via headless Blender if needed
       if (fileInfo.fileType === 'blend') {
+        if (!config.blender.enabled) {
+          throw new Error(
+            'Cannot process .blend file: Blender is not installed. Install a Blender version via Settings.'
+          )
+        }
         jobLogger.info('Detected .blend file, converting to .glb via Blender')
 
-        const blenderPath = process.env.BLENDER_PATH || 'blender'
+        const blenderPath = config.blender.path
         const __dirname = path.dirname(fileURLToPath(import.meta.url))
         const scriptPath = path.resolve(__dirname, '..', 'export_glb.py')
         const candidateGlbPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')

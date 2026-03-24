@@ -929,13 +929,70 @@ export const demoHandlers = [
       thumbnailHeight: 256,
       generateThumbnailOnUpload: true,
       textureProxySize: 512,
+      blenderPath: 'blender',
+      blenderEnabled: false,
       createdAt: '2025-01-15T10:00:00Z',
       updatedAt: '2025-01-15T10:00:00Z',
     })
   }),
 
   http.get('*/settings/blender-enabled', () => {
-    return HttpResponse.json({ enableBlender: false })
+    return HttpResponse.json({
+      enableBlender: false,
+      blenderPath: 'blender',
+      settingEnabled: false,
+      installed: false,
+      installedVersion: null,
+    })
+  }),
+
+  http.get('*/settings/blender/versions', () => {
+    return HttpResponse.json({
+      versions: [
+        { version: '5.1.0', label: 'Blender 5.1.0', isLts: false },
+        { version: '5.0.0', label: 'Blender 5.0.0', isLts: false },
+        { version: '4.4.3', label: 'Blender 4.4.3', isLts: false },
+        { version: '4.2.9', label: 'Blender 4.2.9 LTS', isLts: true },
+        { version: '3.6.16', label: 'Blender 3.6.16 LTS', isLts: true },
+      ],
+      isOffline: false,
+    })
+  }),
+
+  http.get('*/settings/blender/status', () => {
+    return HttpResponse.json({
+      state: 'none',
+      installedVersion: null,
+      installedPath: null,
+      progress: 0,
+      downloadedBytes: null,
+      totalBytes: null,
+      error: null,
+    })
+  }),
+
+  http.post('*/settings/blender/install', () => {
+    return HttpResponse.json({
+      state: 'none',
+      installedVersion: null,
+      installedPath: null,
+      progress: 0,
+      downloadedBytes: null,
+      totalBytes: null,
+      error: 'Not available in demo mode',
+    })
+  }),
+
+  http.post('*/settings/blender/uninstall', () => {
+    return HttpResponse.json({
+      state: 'none',
+      installedVersion: null,
+      installedPath: null,
+      progress: 0,
+      downloadedBytes: null,
+      totalBytes: null,
+      error: null,
+    })
   }),
 
   // ── Recycled Files ────────────────────────────────────────────────────
