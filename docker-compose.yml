@@ -36,7 +36,7 @@ services:
             # reduce verbosity: only warnings and above
             - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Warning
             - ASPNETCORE_LOGGING__LOGLEVEL__Microsoft=Warning
-            - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
+            - BLENDER_INSTALL_PATH=${BLENDER_INSTALL_PATH:-/var/lib/modelibr/blender}
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
         volumes:

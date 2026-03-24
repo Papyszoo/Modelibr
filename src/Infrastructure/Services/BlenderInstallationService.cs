@@ -222,7 +222,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
             Directory.CreateDirectory(archiveDir);
             var archivePath = Path.Combine(archiveDir, archiveFileName);
 
-            _logger.LogInformation("Downloading Blender {Version} from {Url}", version, downloadUrl);
+            _logger.LogInformation("Downloading Blender {Version} from {Url}", SanitizeForLog(version), SanitizeForLog(downloadUrl));
 
             // Download with progress
             var httpClient = _httpClientFactory.CreateClient("BlenderDownload");
@@ -243,14 +243,16 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
                     await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
                     totalRead += bytesRead;
                     _downloadedBytes = totalRead;
-                    _progress = _totalBytes > 0 ? (int)(totalRead * 100 / _totalBytes.Value) : 0;
+                    _progress = _totalBytes.HasValue && _totalBytes.Value > 0
+                        ? (int)(totalRead * 100 / _totalBytes.Value)
+                        : 0;
                 }
             }
 
             // Extract
             _state = "extracting";
             _progress = 0;
-            _logger.LogInformation("Extracting Blender {Version}", version);
+            _logger.LogInformation("Extracting Blender {Version}", SanitizeForLog(version));
 
             var extractDir = Path.Combine(_installBasePath, $"blender-{version}");
             if (Directory.Exists(extractDir))
@@ -271,7 +273,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
             // Make binary executable on Unix
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                await RunProcessAsync("chmod", $"+x \"{blenderBinary}\"", ct);
+                await RunProcessAsync("chmod", ["+x", blenderBinary], ct);
             }
 
             // Verify it works
@@ -286,7 +288,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
                 _error = "Blender binary found but appears invalid (too small or missing).";
                 return;
             }
-            _logger.LogInformation("Blender binary found at {Path} ({Size:N0} bytes)", blenderBinary, binaryInfo.Length);
+            _logger.LogInformation("Blender binary found at {Path} ({Size:N0} bytes)", SanitizeForLog(blenderBinary), binaryInfo.Length);
 
             // Clean up archive
             try { System.IO.File.Delete(archivePath); } catch { /* ignore */ }
@@ -300,7 +302,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
 
             await PersistSettingsAsync(version, blenderBinary);
 
-            _logger.LogInformation("Blender {Version} installed at {Path}", version, blenderBinary);
+            _logger.LogInformation("Blender {Version} installed at {Path}", SanitizeForLog(version), SanitizeForLog(blenderBinary));
         }
         catch (OperationCanceledException)
         {
@@ -312,7 +314,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
         {
             _state = "failed";
             _error = ex.Message;
-            _logger.LogError(ex, "Failed to install Blender {Version}", version);
+            _logger.LogError(ex, "Failed to install Blender {Version}", SanitizeForLog(version));
             throw;
         }
         finally
@@ -378,7 +380,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
                 _installedPath = pathSetting.Value;
                 _state = "installed";
                 _progress = 100;
-                _logger.LogInformation("Detected existing Blender installation: {Version} at {Path}", versionSetting.Value, pathSetting.Value);
+                _logger.LogInformation("Detected existing Blender installation: {Version} at {Path}", SanitizeForLog(versionSetting.Value), SanitizeForLog(pathSetting.Value));
             }
         }
         catch (Exception ex)
@@ -463,7 +465,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            await RunProcessAsync("tar", $"-xf \"{archivePath}\" -C \"{extractDir}\" --strip-components=1", ct);
+            await RunProcessAsync("tar", ["-xf", archivePath, "-C", extractDir, "--strip-components=1"], ct);
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
@@ -483,7 +485,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
 
         try
         {
-            await RunProcessAsync("hdiutil", $"attach \"{dmgPath}\" -nobrowse -mountpoint \"{mountPoint}\"", ct);
+            await RunProcessAsync("hdiutil", ["attach", dmgPath, "-nobrowse", "-mountpoint", mountPoint], ct);
 
             // Find Blender.app in the mounted volume
             var appPath = Directory.GetDirectories(mountPoint, "Blender*.app").FirstOrDefault()
@@ -493,11 +495,11 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
                 throw new InvalidOperationException("Could not find Blender.app in the DMG.");
 
             // Copy the .app bundle
-            await RunProcessAsync("cp", $"-R \"{appPath}\" \"{extractDir}/\"", ct);
+            await RunProcessAsync("cp", ["-R", appPath, extractDir + "/"], ct);
         }
         finally
         {
-            try { await RunProcessAsync("hdiutil", $"detach \"{mountPoint}\" -quiet", CancellationToken.None); } catch { /* ignore */ }
+            try { await RunProcessAsync("hdiutil", ["detach", mountPoint, "-quiet"], CancellationToken.None); } catch { /* ignore */ }
             try { Directory.Delete(mountPoint, true); } catch { /* ignore */ }
         }
     }
@@ -540,20 +542,25 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
         return null;
     }
 
-    private static async Task<string> RunProcessAsync(string fileName, string arguments, CancellationToken ct)
+    private static string SanitizeForLog(string input) =>
+        input.Replace("\n", "").Replace("\r", "").Replace("\t", "");
+
+    private static async Task<string> RunProcessAsync(string fileName, string[] arguments, CancellationToken ct)
     {
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = fileName,
-                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
             }
         };
+
+        foreach (var arg in arguments)
+            process.StartInfo.ArgumentList.Add(arg);
 
         process.Start();
         var stdout = await process.StandardOutput.ReadToEndAsync(ct);

@@ -152,7 +152,7 @@ public static class SettingsEndpoints
                     {
                         // Error is captured in status; nothing to do here.
                     }
-                }, cancellationToken);
+                }, CancellationToken.None);
 
                 // Give the service a moment to flip to "downloading" state
                 await Task.Delay(100, cancellationToken);

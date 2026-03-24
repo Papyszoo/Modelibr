@@ -139,7 +139,7 @@ Texture set association endpoints accept optional `?materialName` and `?variantN
 | `GET`  | `/settings`                   | Get application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`)                                          |
 | `GET`  | `/settings/all`               | Get all settings (key-value)                                                                                                     |
 | `GET`  | `/settings/blender-enabled`   | Get effective Blender status (`{ enableBlender, blenderPath, settingEnabled, installed, installedVersion }`) — reads from DB + install service |
-| `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`)                                       |
+| `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`, `blenderPath`) — `blenderEnabled` is managed via install/uninstall service |
 | `PUT`  | `/settings/{key}`             | Update a single setting by key (e.g., `BlenderPath`, `BlenderEnabled`)                                                           |
 | `GET`  | `/settings/blender/versions`  | Get available Blender CLI versions for download                                                                                  |
 | `GET`  | `/settings/blender/status`    | Get Blender installation status (`{ state, installedVersion, installedPath, progress, downloadedBytes, totalBytes, error }`)      |

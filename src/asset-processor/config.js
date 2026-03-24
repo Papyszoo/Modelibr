@@ -164,13 +164,13 @@ export function validateConfig() {
  */
 export async function refreshBlenderConfigFromApi(apiClient) {
   try {
-    const response = await apiClient.apiClient.get('/settings')
+    const response = await apiClient.apiClient.get('/settings/blender-enabled')
     const data = response.data
     if (typeof data.blenderPath === 'string') {
       config.blender.path = data.blenderPath
     }
-    if (typeof data.blenderEnabled === 'boolean') {
-      config.blender.enabled = data.blenderEnabled
+    if (typeof data.enableBlender === 'boolean') {
+      config.blender.enabled = data.enableBlender
     }
   } catch {
     // Silently fall back to env-var / current config values

@@ -323,7 +323,7 @@ export function Settings(): JSX.Element {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [blenderStatus.state, isDemo, reset])
+  }, [blenderStatus.state, isDemo, reset, fetchBlenderEnabled])
 
   const handleInstallBlender = async () => {
     if (!selectedVersion || isDemo) return
@@ -343,6 +343,7 @@ export function Settings(): JSX.Element {
       const status = await uninstallBlender()
       setBlenderStatus(status)
       void fetchBlenderEnabled()
+      await queryClient.invalidateQueries({ queryKey: ['settings'] })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to uninstall')
     }
@@ -764,14 +765,16 @@ export function Settings(): JSX.Element {
                 {/* Collapsible Info Box */}
                 <div className="settings-field">
                   <div className="settings-info-box">
-                    <div
+                    <button
+                      type="button"
                       className="settings-info-toggle"
                       onClick={() => setInfoExpanded(prev => !prev)}
+                      aria-expanded={infoExpanded}
                     >
                       <strong>
                         {infoExpanded ? '▼' : '▶'} What is Blender CLI?
                       </strong>
-                    </div>
+                    </button>
                     {infoExpanded && (
                       <div>
                         <p>
