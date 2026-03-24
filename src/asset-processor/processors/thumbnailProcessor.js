@@ -5,7 +5,7 @@ import { PuppeteerRenderer } from '../puppeteerRenderer.js'
 import { FrameEncoderService } from '../frameEncoderService.js'
 import { ThumbnailStorageService } from '../thumbnailStorageService.js'
 import { ThumbnailApiService } from '../thumbnailApiService.js'
-import { config } from '../config.js'
+import { config, getBlenderPath } from '../config.js'
 import { execFileSync } from 'child_process'
 import path from 'path'
 import fs from 'fs'
@@ -94,7 +94,7 @@ export class ThumbnailProcessor extends BaseProcessor {
         }
         jobLogger.info('Detected .blend file, converting to .glb via Blender')
 
-        const blenderPath = config.blender.path
+        const blenderPath = getBlenderPath()
         const __dirname = path.dirname(fileURLToPath(import.meta.url))
         const scriptPath = path.resolve(__dirname, '..', 'export_glb.py')
         const candidateGlbPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')

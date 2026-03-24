@@ -1,3 +1,5 @@
+import path from 'path'
+
 // Configuration settings for the thumbnail worker service
 export const config = {
   // Server settings
@@ -79,6 +81,21 @@ export const config = {
     path: process.env.BLENDER_PATH || 'blender',
     enabled: process.env.BLENDER_ENABLED === 'true',
   },
+}
+
+/**
+ * Get a validated Blender executable path.
+ * Rejects paths with shell metacharacters and resolves to an absolute path.
+ * @returns {string} Validated blender path
+ */
+export function getBlenderPath() {
+  const raw = config.blender.path
+  if (raw === 'blender') return 'blender'
+  const resolved = path.resolve(raw)
+  if (!/^[/\\a-zA-Z0-9._: -]+$/.test(resolved)) {
+    throw new Error('Invalid Blender path: contains disallowed characters')
+  }
+  return resolved
 }
 
 // Validate configuration
