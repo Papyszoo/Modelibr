@@ -27,7 +27,6 @@ export async function updateSettings(settings: {
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
   textureProxySize: number
-  blenderPath: string
 }): Promise<{
   maxFileSizeBytes: number
   maxThumbnailSizeBytes: number
@@ -37,7 +36,6 @@ export async function updateSettings(settings: {
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
   textureProxySize: number
-  blenderPath: string
   updatedAt: string
 }> {
   const response = await client.put('/settings', settings)

@@ -111,10 +111,6 @@ export const settingsFormSchema = z.object({
         message: 'Must be 256, 512, 1024, or 2048',
       })
   ),
-  blenderPath: z
-    .string()
-    .min(1, 'Blender path cannot be empty')
-    .max(500, 'Path too long'),
 })
 
 export const soundCategoryFormSchema = z

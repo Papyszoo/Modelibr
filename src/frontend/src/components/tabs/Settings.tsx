@@ -7,16 +7,16 @@ import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
 import { useSettingsQuery } from '@/features/settings/api/queries'
+import type {
+  BlenderInstallStatus,
+  BlenderVersionInfo,
+} from '@/features/settings/api/settingsApi'
 import {
   getBlenderStatus,
   getBlenderVersions,
   installBlender,
   uninstallBlender,
   updateSettings,
-} from '@/features/settings/api/settingsApi'
-import type {
-  BlenderInstallStatus,
-  BlenderVersionInfo,
 } from '@/features/settings/api/settingsApi'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
@@ -31,7 +31,6 @@ interface SettingsData {
   thumbnailHeight: number
   generateThumbnailOnUpload: boolean
   textureProxySize: number
-  blenderPath: string
 }
 
 type SettingsFormValues = z.input<typeof settingsFormSchema>
@@ -91,7 +90,6 @@ export function Settings(): JSX.Element {
       thumbnailHeight: 256,
       generateThumbnailOnUpload: true,
       textureProxySize: 512,
-      blenderPath: 'blender',
     },
   })
 
@@ -105,7 +103,6 @@ export function Settings(): JSX.Element {
     thumbnailHeight: number
     generateThumbnailOnUpload: boolean
     textureProxySize: number
-    blenderPath: string
   } | null>(null)
 
   const maxFileSizeMB = watch('maxFileSizeMB')
@@ -116,7 +113,6 @@ export function Settings(): JSX.Element {
   const thumbnailHeight = watch('thumbnailHeight')
   const generateThumbnailOnUpload = watch('generateThumbnailOnUpload')
   const textureProxySize = watch('textureProxySize')
-  const blenderPath = watch('blenderPath')
 
   // Check if field is dirty (changed from original)
   const isFieldDirty = (fieldName: string): boolean => {
@@ -141,8 +137,6 @@ export function Settings(): JSX.Element {
         )
       case 'textureProxySize':
         return textureProxySize !== originalValues.textureProxySize
-      case 'blenderPath':
-        return blenderPath !== originalValues.blenderPath
       default:
         return false
     }
@@ -158,8 +152,7 @@ export function Settings(): JSX.Element {
       isFieldDirty('thumbnailWidth') ||
       isFieldDirty('thumbnailHeight') ||
       isFieldDirty('generateThumbnailOnUpload') ||
-      isFieldDirty('textureProxySize') ||
-      isFieldDirty('blenderPath')
+      isFieldDirty('textureProxySize')
     )
   }
 
@@ -196,7 +189,6 @@ export function Settings(): JSX.Element {
       thumbnailHeight: data.thumbnailHeight,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
       textureProxySize: data.textureProxySize ?? 512,
-      blenderPath: data.blenderPath ?? 'blender',
     })
 
     setOriginalValues({
@@ -208,7 +200,6 @@ export function Settings(): JSX.Element {
       thumbnailHeight: data.thumbnailHeight,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
       textureProxySize: data.textureProxySize ?? 512,
-      blenderPath: data.blenderPath ?? 'blender',
     })
   }, [settingsQuery.data, reset])
 
@@ -232,7 +223,6 @@ export function Settings(): JSX.Element {
       thumbnailHeight: values.thumbnailHeight,
       generateThumbnailOnUpload: values.generateThumbnailOnUpload,
       textureProxySize: values.textureProxySize,
-      blenderPath: values.blenderPath,
     }
 
     try {
@@ -253,7 +243,6 @@ export function Settings(): JSX.Element {
         thumbnailHeight: data.thumbnailHeight,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
         textureProxySize: data.textureProxySize ?? 512,
-        blenderPath: data.blenderPath ?? 'blender',
       })
 
       reset({
@@ -265,7 +254,6 @@ export function Settings(): JSX.Element {
         thumbnailHeight: data.thumbnailHeight,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
         textureProxySize: data.textureProxySize ?? 512,
-        blenderPath: data.blenderPath ?? 'blender',
       })
 
       setSuccessMessage('Settings saved successfully!')
@@ -326,12 +314,8 @@ export function Settings(): JSX.Element {
       getBlenderStatus()
         .then(status => {
           setBlenderStatus(status)
-          // Auto-update path when installation completes
+          // Refresh blender enabled state when installation completes
           if (status.state === 'installed' && status.installedPath) {
-            reset(prev => ({
-              ...prev,
-              blenderPath: status.installedPath!,
-            }))
             void fetchBlenderEnabled()
           }
         })
@@ -827,7 +811,9 @@ export function Settings(): JSX.Element {
                     <select
                       value={selectedVersion}
                       onChange={e => setSelectedVersion(e.target.value)}
-                      disabled={isDemo || isBlenderBusy || blenderVersionsOffline}
+                      disabled={
+                        isDemo || isBlenderBusy || blenderVersionsOffline
+                      }
                       className="settings-select"
                     >
                       {blenderVersions.map(v => (
@@ -835,12 +821,14 @@ export function Settings(): JSX.Element {
                           {v.label}
                         </option>
                       ))}
-                      {blenderVersionsOffline && blenderVersions.length === 0 && (
-                        <option value="">No internet connection</option>
-                      )}
-                      {!blenderVersionsOffline && blenderVersions.length === 0 && (
-                        <option value="">Loading versions...</option>
-                      )}
+                      {blenderVersionsOffline &&
+                        blenderVersions.length === 0 && (
+                          <option value="">No internet connection</option>
+                        )}
+                      {!blenderVersionsOffline &&
+                        blenderVersions.length === 0 && (
+                          <option value="">Loading versions...</option>
+                        )}
                     </select>
 
                     {!blenderVersionsOffline &&
@@ -895,11 +883,12 @@ export function Settings(): JSX.Element {
                     </span>
                   )}
 
-                  {blenderStatus.state === 'none' && !blenderVersionsOffline && (
-                    <span className="blender-status-none">
-                      Not installed — select a version and click Install
-                    </span>
-                  )}
+                  {blenderStatus.state === 'none' &&
+                    !blenderVersionsOffline && (
+                      <span className="blender-status-none">
+                        Not installed — select a version and click Install
+                      </span>
+                    )}
 
                   {blenderStatus.state === 'failed' && (
                     <span className="blender-status-failed">
@@ -928,39 +917,6 @@ export function Settings(): JSX.Element {
                     Select a Blender version to download and install on the
                     server. Only one version can be installed at a time.
                   </span>
-                </div>
-
-                {/* Blender Executable Path */}
-                <div className="settings-field">
-                  <label htmlFor="blenderPath">
-                    Blender Executable Path
-                    {isFieldDirty('blenderPath') && (
-                      <span className="settings-dirty-indicator"> ★</span>
-                    )}
-                  </label>
-                  <input
-                    id="blenderPath"
-                    type="text"
-                    placeholder="blender"
-                    {...register('blenderPath')}
-                    disabled={isSaving || isDemo || blenderStatus.state !== 'installed'}
-                    className={
-                      errors.blenderPath ? 'settings-input-error' : ''
-                    }
-                    style={{
-                      opacity: blenderStatus.state === 'installed' && !isDemo ? 1 : 0.5,
-                    }}
-                  />
-                  {errors.blenderPath && (
-                    <span className="settings-error-message">
-                      {errors.blenderPath.message}
-                    </span>
-                  )}
-                  <span className="settings-help">
-                    Auto-set when installed via version management above, or set
-                    manually for pre-installed Blender.
-                  </span>
-                  <span className="settings-default">Default: blender</span>
                 </div>
               </div>
             )}

@@ -72,8 +72,7 @@ public static class SettingsEndpoints
                 request.ThumbnailWidth,
                 request.ThumbnailHeight,
                 request.GenerateThumbnailOnUpload,
-                request.TextureProxySize,
-                request.BlenderPath
+                request.TextureProxySize
             );
 
             var result = await commandHandler.Handle(command, cancellationToken);
@@ -197,7 +196,6 @@ public record UpdateSettingsRequest(
     int ThumbnailWidth,
     int ThumbnailHeight,
     bool GenerateThumbnailOnUpload,
-    int TextureProxySize = 512,
-    string BlenderPath = "blender");
+    int TextureProxySize = 512);
 
 public record InstallBlenderRequest(string Version);
