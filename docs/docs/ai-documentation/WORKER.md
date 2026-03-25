@@ -93,6 +93,10 @@ ENCODING_FRAMERATE=10
 WEBP_QUALITY=75
 JPEG_QUALITY=85
 
+# Blender (env-var fallback; prefer configuring via Settings UI)
+BLENDER_PATH=blender         # Path to Blender executable (or 'blender' for system PATH)
+BLENDER_ENABLED=false        # Enable Blender CLI integration
+
 # Logging
 LOG_LEVEL=info              # debug, info, warn, error
 LOG_FORMAT=pretty           # pretty or json
@@ -100,6 +104,8 @@ LOG_FORMAT=pretty           # pretty or json
 # Cleanup
 CLEANUP_TEMP_FILES=true
 ```
+
+> **Note:** `BLENDER_PATH` and `BLENDER_ENABLED` are overridden at runtime by the database-backed settings configured via the Settings page. The env vars serve as fallback defaults for initial startup before the API is reachable.
 
 ## Docker Deployment
 

@@ -19,6 +19,8 @@ internal static class SettingValidator
             SettingKeys.ThumbnailHeight => ValidateThumbnailHeight(value),
             SettingKeys.GenerateThumbnailOnUpload => ValidateGenerateThumbnailOnUpload(value),
             SettingKeys.TextureProxySize => ValidateTextureProxySize(value),
+            SettingKeys.BlenderPath => ValidateBlenderPath(value),
+            SettingKeys.BlenderEnabled => ValidateBlenderEnabled(value),
             _ => Result.Success() // Unknown keys are allowed for extensibility
         };
     }
@@ -124,6 +126,25 @@ internal static class SettingValidator
 
         if (size is not (256 or 512 or 1024 or 2048))
             return Result.Failure(new Error("InvalidSetting", "TextureProxySize must be one of: 256, 512, 1024, 2048."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateBlenderPath(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Result.Failure(new Error("InvalidSetting", "BlenderPath cannot be empty."));
+
+        if (value.Length > 500)
+            return Result.Failure(new Error("InvalidSetting", "BlenderPath cannot exceed 500 characters."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateBlenderEnabled(string value)
+    {
+        if (!bool.TryParse(value, out _))
+            return Result.Failure(new Error("InvalidSetting", "BlenderEnabled must be 'true' or 'false'."));
 
         return Result.Success();
     }

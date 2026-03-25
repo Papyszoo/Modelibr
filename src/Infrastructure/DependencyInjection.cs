@@ -53,6 +53,13 @@ namespace Infrastructure
             // Add audio selection service for trimmed audio snippets
             services.AddSingleton<IAudioSelectionService, AudioSelectionService>();
 
+            // Add Blender installation management service
+            services.AddSingleton<IBlenderInstallationService, BlenderInstallationService>();
+            services.AddHttpClient("BlenderDownload", client =>
+            {
+                client.Timeout = TimeSpan.FromMinutes(30);
+            });
+
             // Add WebDAV virtual asset store services
             services.AddVirtualAssetStore();
 

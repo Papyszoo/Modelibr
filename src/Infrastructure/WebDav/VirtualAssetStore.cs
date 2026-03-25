@@ -250,11 +250,11 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
         }
 
-        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or newestVersion.blend
+        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or newest-updateable-{ModelName}.blend
         var segment4 = Uri.UnescapeDataString(segments[4]);
 
-        // /Projects/{P}/Models/{ModelName}/newestVersion.blend → shortcut to newest .blend file
-        if (segment4.Equals("newestVersion.blend", StringComparison.OrdinalIgnoreCase))
+        // /Projects/{P}/Models/{ModelName}/newest-updateable-{ModelName}.blend → shortcut to newest .blend file
+        if (segment4.Equals($"newest-updateable-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
         {
             var newestVersion = model.Versions
                 .Where(v => !v.IsDeleted)
@@ -270,7 +270,7 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
-                "newestVersion.blend",
+                $"newest-updateable-{model.Name}.blend",
                 blendFile.Sha256Hash,
                 blendFile.SizeBytes,
                 blendFile.MimeType,
@@ -814,8 +814,8 @@ public sealed class VirtualAssetStore : IStore
         // /Models/{ModelName}/v{N} or /Models/{ModelName}/newest
         var versionName = Uri.UnescapeDataString(segments[2]);
 
-        // /Models/{ModelName}/newestVersion.blend → shortcut to newest .blend file
-        if (versionName.Equals("newestVersion.blend", StringComparison.OrdinalIgnoreCase))
+        // /Models/{ModelName}/newest-updateable-{ModelName}.blend → shortcut to newest .blend file
+        if (versionName.Equals($"newest-updateable-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
         {
             var newestVer = model.Versions
                 .Where(v => !v.IsDeleted)
@@ -831,7 +831,7 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
-                "newestVersion.blend",
+                $"newest-updateable-{model.Name}.blend",
                 blendFile.Sha256Hash,
                 blendFile.SizeBytes,
                 blendFile.MimeType,
