@@ -1,3 +1,5 @@
+import path from 'path'
+
 // Configuration settings for the thumbnail worker service
 export const config = {
   // Server settings
@@ -73,6 +75,27 @@ export const config = {
     enabled: process.env.HEALTHCHECK_ENABLED !== 'false',
     endpoint: process.env.HEALTHCHECK_ENDPOINT || '/health',
   },
+
+  // Blender settings (env-var fallback for backward compatibility)
+  blender: {
+    path: process.env.BLENDER_PATH || 'blender',
+    enabled: process.env.BLENDER_ENABLED === 'true',
+  },
+}
+
+/**
+ * Get a validated Blender executable path.
+ * Rejects paths with shell metacharacters and resolves to an absolute path.
+ * @returns {string} Validated blender path
+ */
+export function getBlenderPath() {
+  const raw = config.blender.path
+  if (raw === 'blender') return 'blender'
+  const resolved = path.resolve(raw)
+  if (!/^[/\\a-zA-Z0-9._: -]+$/.test(resolved)) {
+    throw new Error('Invalid Blender path: contains disallowed characters')
+  }
+  return resolved
 }
 
 // Validate configuration
@@ -149,4 +172,24 @@ export function validateConfig() {
   }
 
   return true
+}
+
+/**
+ * Refresh blender configuration from the backend API settings.
+ * Falls back silently to existing config values on failure.
+ * @param {import('./jobApiClient.js').JobApiClient} apiClient
+ */
+export async function refreshBlenderConfigFromApi(apiClient) {
+  try {
+    const response = await apiClient.apiClient.get('/settings/blender-enabled')
+    const data = response.data
+    if (typeof data.blenderPath === 'string') {
+      config.blender.path = data.blenderPath
+    }
+    if (typeof data.enableBlender === 'boolean') {
+      config.blender.enabled = data.enableBlender
+    }
+  } catch {
+    // Silently fall back to env-var / current config values
+  }
 }

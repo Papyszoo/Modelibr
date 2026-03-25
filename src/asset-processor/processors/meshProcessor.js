@@ -2,6 +2,7 @@ import { BaseProcessor } from './baseProcessor.js'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import logger from '../logger.js'
+import { config, getBlenderPath } from '../config.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -28,8 +29,6 @@ const execFileAsync = promisify(execFile)
 export class MeshAnalysisProcessor extends BaseProcessor {
   constructor() {
     super()
-    this.blenderPath = process.env.BLENDER_PATH || 'blender'
-    this.blenderEnabled = process.env.BLENDER_ENABLED === 'true'
     this.extractScriptPath = null // Will be set to the bundled Python script path
   }
 
@@ -42,11 +41,11 @@ export class MeshAnalysisProcessor extends BaseProcessor {
    * @returns {Promise<boolean>}
    */
   async isBlenderAvailable() {
-    if (!this.blenderEnabled) {
+    if (!config.blender.enabled) {
       return false
     }
     try {
-      const { stdout } = await execFileAsync(this.blenderPath, ['--version'])
+      const { stdout } = await execFileAsync(getBlenderPath(), ['--version'])
       logger.info('Blender CLI detected', {
         version: stdout.split('\n')[0].trim(),
       })
@@ -85,7 +84,7 @@ export class MeshAnalysisProcessor extends BaseProcessor {
   // eslint-disable-next-line no-unused-vars
   async process(job, jobLogger) {
     // Guard: Blender must be installed
-    if (!this.blenderEnabled) {
+    if (!config.blender.enabled) {
       throw new Error(
         'Mesh analysis requires Blender. Rebuild the Docker image with ENABLE_BLENDER=true ' +
           '(set in .env or pass as build-arg). This adds ~500MB to the image.'
@@ -96,7 +95,7 @@ export class MeshAnalysisProcessor extends BaseProcessor {
     if (!available) {
       throw new Error(
         'BLENDER_ENABLED is true but Blender CLI was not found at: ' +
-          this.blenderPath
+          config.blender.path
       )
     }
 

@@ -13,4 +13,7 @@ public static class SettingKeys
     public const string ThumbnailHeight = "ThumbnailHeight";
     public const string GenerateThumbnailOnUpload = "GenerateThumbnailOnUpload";
     public const string TextureProxySize = "TextureProxySize";
+    public const string BlenderPath = "BlenderPath";
+    public const string BlenderEnabled = "BlenderEnabled";
+    public const string BlenderInstallVersion = "BlenderInstallVersion";
 }

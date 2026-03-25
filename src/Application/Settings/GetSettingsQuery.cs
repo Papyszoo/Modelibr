@@ -13,6 +13,8 @@ public record GetSettingsQueryResponse(
     int ThumbnailHeight,
     bool GenerateThumbnailOnUpload,
     int TextureProxySize,
+    string BlenderPath,
+    bool BlenderEnabled,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

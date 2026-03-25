@@ -265,3 +265,149 @@
   font-size: 0.9rem;
   font-weight: 500;
 }
+
+/* ── Info Box (dark mode safe) ─────────────────────────────────────────── */
+
+.settings-info-box {
+  padding: 12px 16px;
+  background-color: var(--surface-ground);
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-color);
+  margin-bottom: 16px;
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: var(--text-color);
+}
+
+.settings-info-box p {
+  margin: 8px 0 0;
+  color: var(--text-color);
+}
+
+.settings-info-box ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: var(--text-color);
+}
+
+.settings-info-box code {
+  background: var(--surface-border);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.settings-info-toggle {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-info-toggle:hover {
+  opacity: 0.8;
+}
+
+/* ── Blender Version Management ────────────────────────────────────────── */
+
+.blender-version-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.blender-version-row select {
+  flex: 1;
+  min-width: 200px;
+}
+
+.blender-progress-container {
+  margin-top: 8px;
+}
+
+.blender-progress-bar {
+  height: 8px;
+  background: var(--surface-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.blender-progress-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.blender-progress-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+}
+
+.blender-status-installed {
+  color: #4caf50;
+  font-size: 0.9rem;
+  margin-top: 6px;
+  display: block;
+}
+
+.blender-status-failed {
+  color: #ff6b6b;
+  font-size: 0.9rem;
+  margin-top: 6px;
+  display: block;
+}
+
+.blender-status-none {
+  color: var(--text-color-secondary);
+  font-size: 0.9rem;
+  margin-top: 6px;
+  display: block;
+}
+
+.settings-button-small {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.settings-button-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-button-small.primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+.settings-button-small.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.settings-button-small.danger {
+  background: #dc3545;
+  color: white;
+}
+
+.settings-button-small.danger:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.settings-demo-warning {
+  padding: 10px 14px;
+  background-color: var(--surface-ground);
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85em;
+  color: var(--text-color);
+  opacity: 0.8;
+}

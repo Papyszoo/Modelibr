@@ -132,14 +132,19 @@ Texture set association endpoints accept optional `?materialName` and `?variantN
 | `POST` | `/thumbnail-jobs/texture-sets/{jobId}/finish` | Mark texture set job complete/failed   |
 | `POST` | `/test/thumbnail-complete/{modelId}`          | Test completion notification (dev)     |
 
-### Settings (4 endpoints)
+### Settings (9 endpoints)
 
-| Method | Endpoint                    | Description                                                                  |
-| ------ | --------------------------- | ---------------------------------------------------------------------------- |
-| `GET`  | `/settings`                 | Get application settings (includes `textureProxySize`)                       |
-| `GET`  | `/settings/all`             | Get all settings (key-value)                                                 |
-| `GET`  | `/settings/blender-enabled` | Get Blender integration status (`{ enableBlender: bool }`)                   |
-| `PUT`  | `/settings`                 | Update application settings (includes `textureProxySize`: 256/512/1024/2048) |
+| Method | Endpoint                      | Description                                                                                                                      |
+| ------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/settings`                   | Get application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`)                                          |
+| `GET`  | `/settings/all`               | Get all settings (key-value)                                                                                                     |
+| `GET`  | `/settings/blender-enabled`   | Get effective Blender status (`{ enableBlender, blenderPath, settingEnabled, installed, installedVersion }`) — reads from DB + install service |
+| `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`, `blenderPath`) — `blenderEnabled` is managed via install/uninstall service |
+| `PUT`  | `/settings/{key}`             | Update a single setting by key (e.g., `BlenderPath`, `BlenderEnabled`)                                                           |
+| `GET`  | `/settings/blender/versions`  | Get available Blender CLI versions for download                                                                                  |
+| `GET`  | `/settings/blender/status`    | Get Blender installation status (`{ state, installedVersion, installedPath, progress, downloadedBytes, totalBytes, error }`)      |
+| `POST` | `/settings/blender/install`   | Start Blender download+install (body: `{ version }`) — fire-and-forget, poll status for progress                                 |
+| `POST` | `/settings/blender/uninstall` | Uninstall currently installed Blender version                                                                                    |
 
 ### Blender / WebDAV (5 virtual endpoints)
 

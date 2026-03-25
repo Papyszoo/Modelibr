@@ -10,7 +10,7 @@ import { ThumbnailStorageService } from './thumbnailStorageService.js'
 import { JobEventService } from './jobEventService.js'
 import { ThumbnailApiService } from './thumbnailApiService.js'
 import { ProcessorRegistry } from './processors/processorRegistry.js'
-import { config } from './config.js'
+import { config, refreshBlenderConfigFromApi } from './config.js'
 import logger, { withJobContext } from './logger.js'
 
 /**
@@ -52,6 +52,9 @@ export class JobProcessor {
     if (!isConnected) {
       logger.warn('API connection test failed, but continuing anyway')
     }
+
+    // Refresh blender config from API settings
+    await refreshBlenderConfigFromApi(this.jobService)
 
     // Start periodic cleanup of old temporary files
     this.startPeriodicCleanup()
@@ -270,6 +273,7 @@ export class JobProcessor {
 
     try {
       while (this.jobQueue.length > 0 && !this.isShuttingDown) {
+        await refreshBlenderConfigFromApi(this.jobService)
         const { job, processor } = this.jobQueue.shift()
         logger.info('Processing job from queue', {
           jobId: job.id,
