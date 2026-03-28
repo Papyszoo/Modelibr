@@ -183,6 +183,90 @@ public static class SettingsEndpoints
         })
         .WithName("Uninstall Blender")
         .WithTags("Settings");
+
+        // ── WebDAV URL Discovery ────────────────────────────────────────────
+
+        app.MapGet("/settings/webdav/urls", (HttpContext httpContext) =>
+        {
+            var hostname = httpContext.Request.Host.Host;
+            var entries = new List<object>();
+
+            var httpsPort = Environment.GetEnvironmentVariable("WEBDAV_HTTPS_PORT")?.Trim();
+            if (!string.IsNullOrEmpty(httpsPort))
+            {
+                var httpsUrl = httpsPort == "443" ? $"https://{hostname}/" : $"https://{hostname}:{httpsPort}/";
+                entries.Add(new { url = httpsUrl, label = $"HTTPS (port {httpsPort})", isHttps = true, port = httpsPort });
+            }
+
+            var httpPort = Environment.GetEnvironmentVariable("WEBDAV_HTTP_PORT")?.Trim();
+            if (!string.IsNullOrEmpty(httpPort))
+            {
+                var httpUrl = httpPort == "80" ? $"http://{hostname}/" : $"http://{hostname}:{httpPort}/";
+                entries.Add(new { url = httpUrl, label = $"HTTP (port {httpPort})", isHttps = false, port = httpPort });
+            }
+
+            return Results.Ok(new { urls = entries });
+        })
+        .WithName("Get WebDAV URLs")
+        .WithTags("Settings");
+
+        // ── WebDAV Connectivity Probe ───────────────────────────────────────
+
+        app.MapGet("/settings/webdav/probe", async (string url, CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(url) ||
+                (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                 !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                return Results.BadRequest(new { reachable = false, folderCount = 0, error = "Invalid URL" });
+            }
+
+            try
+            {
+                // Probe the internal WebDAV endpoint directly on localhost:8080
+                // to avoid TLS certificate issues with self-signed certs
+                var probeUrl = new Uri(new Uri("http://localhost:8080"), new Uri(url).PathAndQuery);
+
+                using var handler = new HttpClientHandler();
+                using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+                var request = new HttpRequestMessage(new HttpMethod("PROPFIND"), probeUrl);
+                request.Headers.Add("Depth", "1");
+                request.Content = new StringContent(
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?><D:propfind xmlns:D=\"DAV:\"><D:allprop/></D:propfind>",
+                    System.Text.Encoding.UTF8,
+                    "application/xml");
+
+                var response = await httpClient.SendAsync(request, cancellationToken);
+
+                if ((int)response.StatusCode == 207 || response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var doc = System.Xml.Linq.XDocument.Parse(body);
+                    System.Xml.Linq.XNamespace d = "DAV:";
+
+                    var folderCount = doc.Descendants(d + "response")
+                        .Count(r => r.Descendants(d + "collection").Any());
+
+                    return Results.Ok(new { reachable = true, folderCount });
+                }
+
+                return Results.Ok(new { reachable = false, folderCount = 0, error = $"HTTP {(int)response.StatusCode}" });
+            }
+            catch (TaskCanceledException)
+            {
+                return Results.Ok(new { reachable = false, folderCount = 0, error = "Request timed out" });
+            }
+            catch (HttpRequestException ex)
+            {
+                return Results.Ok(new { reachable = false, folderCount = 0, error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new { reachable = false, folderCount = 0, error = ex.Message });
+            }
+        })
+        .WithName("Probe WebDAV URL")
+        .WithTags("Settings");
     }
 }
 

@@ -137,7 +137,8 @@ export function getSoundCategoryPath(categoryName: string): WebDavPathInfo {
 export async function openInFileExplorer(
   virtualPath: string
 ): Promise<{ success: boolean; message: string }> {
-  const pathInfo = getWebDavPath(virtualPath)
+  const { buildWebDavPath } = await import('@/stores/webDavStore')
+  const pathInfo = buildWebDavPath(virtualPath)
 
   return {
     success: false,
@@ -194,11 +195,13 @@ export async function openInFileExplorer(
 
 /**
  * Copies the native path to clipboard.
+ * Uses buildWebDavPath from the store for URL resolution.
  */
 export async function copyPathToClipboard(
   virtualPath: string
 ): Promise<{ success: boolean; path: string }> {
-  const pathInfo = getWebDavPath(virtualPath)
+  const { buildWebDavPath } = await import('@/stores/webDavStore')
+  const pathInfo = buildWebDavPath(virtualPath)
 
   try {
     await navigator.clipboard.writeText(pathInfo.nativePath)

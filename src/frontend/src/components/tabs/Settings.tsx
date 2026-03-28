@@ -10,17 +10,21 @@ import { useSettingsQuery } from '@/features/settings/api/queries'
 import type {
   BlenderInstallStatus,
   BlenderVersionInfo,
+  WebDavUrlEntry,
 } from '@/features/settings/api/settingsApi'
 import {
   getBlenderStatus,
   getBlenderVersions,
+  getWebDavUrls,
   installBlender,
+  probeWebDavUrl,
   uninstallBlender,
   updateSettings,
 } from '@/features/settings/api/settingsApi'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
+import { WebDavInstructions } from './WebDavInstructions'
 
 interface SettingsData {
   maxFileSizeBytes: number
@@ -67,9 +71,18 @@ export function Settings(): JSX.Element {
   const [infoExpanded, setInfoExpanded] = useState(false)
   const [blenderVersionsOffline, setBlenderVersionsOffline] = useState(false)
 
+  // WebDAV state
+  const [webDavUrls, setWebDavUrls] = useState<WebDavUrlEntry[]>([])
+  const [probeResults, setProbeResults] = useState<
+    Record<string, { reachable: boolean; folderCount: number; error?: string }>
+  >({})
+  const [probeLoading, setProbeLoading] = useState(false)
+  const [webDavInstructionsExpanded, setWebDavInstructionsExpanded] =
+    useState(false)
+
   // Accordion state
   const [activeIndex, setActiveIndex] = useState<number | number[]>([
-    0, 1, 2, 3, 4,
+    0, 1, 2, 3, 4, 5, 6,
   ])
 
   const {
@@ -336,6 +349,45 @@ export function Settings(): JSX.Element {
       )
     }
   }
+
+  // ── WebDAV URL discovery ──────────────────────────────────────────────
+
+  const probeAllWebDavUrls = async (urls: WebDavUrlEntry[]) => {
+    if (urls.length === 0) return
+    setProbeLoading(true)
+    setProbeResults({})
+    try {
+      const results = await Promise.all(
+        urls.map(async entry => {
+          // Append /modelibr — the probe endpoint uses PathAndQuery to reach
+          // http://localhost:8080/<path>, so we must include the WebDAV mount path.
+          const probeUrl = entry.url.replace(/\/+$/, '') + '/modelibr'
+          try {
+            const result = await probeWebDavUrl(probeUrl)
+            return [entry.url, result] as const
+          } catch {
+            return [
+              entry.url,
+              { reachable: false, folderCount: 0, error: 'Request failed' },
+            ] as const
+          }
+        })
+      )
+      setProbeResults(Object.fromEntries(results))
+    } finally {
+      setProbeLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    getWebDavUrls()
+      .then(({ urls }) => {
+        setWebDavUrls(urls)
+        void probeAllWebDavUrls(urls)
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleUninstallBlender = async () => {
     if (isDemo) return
@@ -920,6 +972,215 @@ export function Settings(): JSX.Element {
                     Select a Blender version to download and install on the
                     server. Only one version can be installed at a time.
                   </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── SSL Certificate ───────────────────────────────────────── */}
+          <div className="settings-section">
+            <div
+              className="settings-section-header"
+              onClick={() =>
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(5)
+                      ? prev.filter(i => i !== 5)
+                      : [...prev, 5]
+                    : [5]
+                )
+              }
+            >
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(5)
+                  ? '▼'
+                  : '▶'}{' '}
+                SSL Certificate
+              </span>
+            </div>
+            {Array.isArray(activeIndex) && activeIndex.includes(5) && (
+              <div className="settings-section-content">
+                <div className="settings-field">
+                  {(() => {
+                    const httpEntry = webDavUrls.find(e => !e.isHttps)
+                    const httpsEntry = webDavUrls.find(e => e.isHttps)
+                    const baseEntry = httpEntry ?? httpsEntry
+                    const certUrl = baseEntry
+                      ? new URL('/modelibr-cert.crt', baseEntry.url).href
+                      : '/modelibr-cert.crt'
+                    const hostname = baseEntry
+                      ? new URL(baseEntry.url).hostname
+                      : window.location.hostname
+
+                    return (
+                      <>
+                        <div>
+                          <a
+                            href={certUrl}
+                            download="modelibr-selfsigned.crt"
+                            className="settings-button settings-button-secondary"
+                            style={{ display: 'inline-block' }}
+                          >
+                            ↓ Download SSL Certificate
+                          </a>
+                        </div>
+                        <span className="settings-help">
+                          Install this certificate to trust Modelibr's
+                          self-signed HTTPS certificate in your browser and OS.
+                          Required for the browser to stop showing the security
+                          warning, and for Windows WebDAV over HTTPS to work.
+                          <br />
+                          <strong>Windows:</strong> double-click →{' '}
+                          <em>Install Certificate</em> → <em>Local Machine</em>{' '}
+                          → <em>Trusted Root Certification Authorities</em>
+                          <br />
+                          <strong>macOS:</strong> double-click → open in{' '}
+                          <em>Keychain Access</em> → set to{' '}
+                          <em>Always Trust</em>
+                          <br />
+                          <strong>Firefox:</strong> Settings →{' '}
+                          <em>Privacy &amp; Security</em> →{' '}
+                          <em>Certificates</em> → <em>View Certificates…</em> →{' '}
+                          <em>Authorities</em> → Import the downloaded file
+                          {httpsEntry && (
+                            <>
+                              <br />
+                              After trusting,{' '}
+                              <code>\\{hostname}@SSL\modelibr</code> will work
+                              in Windows Explorer.
+                            </>
+                          )}
+                          {!baseEntry && (
+                            <>
+                              <br />
+                              Configure <code>WEBDAV_HTTPS_PORT</code> or{' '}
+                              <code>WEBDAV_HTTP_PORT</code> in <code>.env</code>{' '}
+                              to get the correct download URL.
+                            </>
+                          )}
+                        </span>
+                      </>
+                    )
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── WebDAV ───────────────────────────────────────────────── */}
+          <div className="settings-section">
+            <div
+              className="settings-section-header"
+              onClick={() =>
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(6)
+                      ? prev.filter(i => i !== 6)
+                      : [...prev, 6]
+                    : [6]
+                )
+              }
+            >
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(6)
+                  ? '▼'
+                  : '▶'}{' '}
+                WebDAV
+              </span>
+            </div>
+            {Array.isArray(activeIndex) && activeIndex.includes(6) && (
+              <div className="settings-section-content">
+                {/* WebDAV connectivity status */}
+                <div className="settings-field">
+                  <label>WebDAV Connectivity</label>
+                  {probeLoading ? (
+                    <span className="blender-status-none">
+                      Checking connectivity…
+                    </span>
+                  ) : webDavUrls.length === 0 ? (
+                    <span className="blender-status-none settings-help">
+                      No WebDAV ports configured. Set{' '}
+                      <code>WEBDAV_HTTP_PORT</code> or{' '}
+                      <code>WEBDAV_HTTPS_PORT</code> in <code>.env</code> and
+                      restart.
+                    </span>
+                  ) : (
+                    <div className="webdav-url-picker">
+                      {webDavUrls.map(entry => {
+                        const result = probeResults[entry.url]
+                        const isPreferred =
+                          !entry.isHttps || webDavUrls.every(e => e.isHttps)
+                        return (
+                          <div key={entry.url} className="webdav-url-row-label">
+                            <span className="webdav-url-row-text">
+                              <span className="webdav-url-row-label-text">
+                                <code>
+                                  {entry.url.replace(/\/$/, '')}/modelibr
+                                </code>
+                                <span className="webdav-url-row-tag">
+                                  {entry.label}
+                                </span>
+                                {isPreferred && (
+                                  <span
+                                    className="webdav-url-row-tag"
+                                    style={{
+                                      background:
+                                        'var(--color-accent, #0078d4)',
+                                      color: '#fff',
+                                    }}
+                                  >
+                                    preferred
+                                  </span>
+                                )}
+                              </span>
+                              {result ? (
+                                result.reachable ? (
+                                  <span className="blender-status-installed webdav-status-badge">
+                                    ✓ Reachable ({result.folderCount} folder
+                                    {result.folderCount !== 1 ? 's' : ''})
+                                  </span>
+                                ) : (
+                                  <span className="blender-status-failed webdav-status-badge">
+                                    ✗ {result.error ?? 'Not reachable'}
+                                  </span>
+                                )
+                              ) : (
+                                <span className="blender-status-none webdav-status-badge">
+                                  …
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <span className="settings-help">
+                    HTTP is preferred for local-network use. To change ports or
+                    disable a protocol, edit <code>WEBDAV_HTTP_PORT</code> /{' '}
+                    <code>WEBDAV_HTTPS_PORT</code> in <code>.env</code> and
+                    restart Docker.
+                  </span>
+                </div>
+
+                {/* Map as Network Drive Instructions */}
+                <div className="settings-field">
+                  <div className="settings-info-box">
+                    <button
+                      type="button"
+                      className="settings-info-toggle"
+                      onClick={() =>
+                        setWebDavInstructionsExpanded(prev => !prev)
+                      }
+                      aria-expanded={webDavInstructionsExpanded}
+                    >
+                      <strong>
+                        {webDavInstructionsExpanded ? '▼' : '▶'} How to map as
+                        network drive
+                      </strong>
+                    </button>
+                    {webDavInstructionsExpanded && <WebDavInstructions />}
+                  </div>
                 </div>
               </div>
             )}

@@ -90,3 +90,27 @@ export async function uninstallBlender(): Promise<BlenderInstallStatus> {
   const response = await client.post('/settings/blender/uninstall')
   return response.data
 }
+
+// ── WebDAV URL Discovery & Probe ──────────────────────────────────────
+
+export interface WebDavUrlEntry {
+  url: string
+  label: string
+  isHttps: boolean
+  /** Port number string matching the WEBDAV_PORT / WEBDAV_HTTP_PORT env var value, e.g. "443" or "80" */
+  port: string
+}
+
+export async function getWebDavUrls(): Promise<{ urls: WebDavUrlEntry[] }> {
+  const response = await client.get('/settings/webdav/urls')
+  return response.data
+}
+
+export async function probeWebDavUrl(
+  url: string
+): Promise<{ reachable: boolean; folderCount: number; error?: string }> {
+  const response = await client.get('/settings/webdav/probe', {
+    params: { url },
+  })
+  return response.data
+}
