@@ -9,12 +9,14 @@ KEY_FILE="$CERT_DIR/selfsigned.key"
 if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
     echo "Generating self-signed SSL certificate..."
     mkdir -p "$CERT_DIR"
-    openssl req -x509 -nodes -days 3650 \
+    openssl req -x509 -nodes -days 397 \
         -newkey rsa:2048 \
         -keyout "$KEY_FILE" \
         -out "$CERT_FILE" \
         -subj "/C=XX/ST=Local/L=Local/O=Modelibr/OU=Dev/CN=modelibr.local" \
-        -addext "subjectAltName=DNS:localhost,DNS:modelibr.local,IP:127.0.0.1"
+        -addext "subjectAltName=DNS:localhost,DNS:modelibr.local,IP:127.0.0.1,IP:::1" \
+        -addext "extendedKeyUsage=serverAuth" \
+        -addext "keyUsage=digitalSignature,keyEncipherment"
     echo "SSL certificate generated."
 else
     echo "SSL certificate already exists, skipping generation."
