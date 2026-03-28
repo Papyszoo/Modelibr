@@ -7,9 +7,9 @@ services:
         container_name: nginx-proxy
         ports:
             - "${FRONTEND_PORT:-3000}:443"
-            # Configure WEBDAV_HTTPS_PORT / WEBDAV_HTTP_PORT in .env to change these external ports.
-            - "${WEBDAV_HTTPS_PORT:-443}:443"
-            - "${WEBDAV_HTTP_PORT:-80}:80"
+            # Remove WEBDAV_HTTPS_PORT or WEBDAV_HTTP_PORT from .env to disable that port.
+            - "${WEBDAV_HTTPS_PORT}:443"
+            - "${WEBDAV_HTTP_PORT}:80"
         volumes:
             - ./data/certs:/etc/nginx/certs
         depends_on:
@@ -36,8 +36,8 @@ services:
             - DisableHttpsRedirection=true
             - HTTPS_PORT=${HTTPS_PORT:-8443}
             - EXPOSE_443_PORT=${EXPOSE_443_PORT:-true}
-            - WEBDAV_HTTPS_PORT=${WEBDAV_HTTPS_PORT:-443}
-            - WEBDAV_HTTP_PORT=${WEBDAV_HTTP_PORT:-80}
+            - WEBDAV_HTTPS_PORT=${WEBDAV_HTTPS_PORT}
+            - WEBDAV_HTTP_PORT=${WEBDAV_HTTP_PORT}
             # reduce verbosity: only warnings and above
             - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Warning
             - ASPNETCORE_LOGGING__LOGLEVEL__Microsoft=Warning
