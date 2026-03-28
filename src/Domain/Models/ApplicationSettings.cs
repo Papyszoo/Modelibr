@@ -153,4 +153,5 @@ public class ApplicationSettings : AggregateRoot
         TextureProxySize = size;
         UpdatedAt = updatedAt;
     }
+
 }

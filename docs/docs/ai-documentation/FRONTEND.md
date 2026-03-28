@@ -67,6 +67,8 @@ src/frontend/src/
     - `features/models/components/ModelVersionHistory.tsx` now uses `features/model-viewer/api/queries.ts` (`useModelVersionsQuery`) for version list loading.
     - `components/tabs/Settings.tsx` now uses `features/settings/api/queries.ts` (`useSettingsQuery`) for initial settings load.
     - `components/tabs/Settings.tsx` includes Blender version management (version selector, install/uninstall, download progress bar) via `features/settings/api/settingsApi.ts` (`getBlenderVersions`, `getBlenderStatus`, `installBlender`, `uninstallBlender`).
+    - `components/tabs/Settings.tsx` includes a WebDAV section that displays available base URLs (from `GET /settings/webdav/urls`), provides a connection probe button (`GET /settings/webdav/probe`), and shows OS-specific mount instructions (`WebDavInstructions`). The effective WebDAV URL is currently chosen automatically rather than via a persisted user-selected setting.
+    - `stores/webDavStore.ts` — Zustand store that derives an `activeUrl` from available WebDAV URLs (preferring HTTP when present) and exposes `buildWebDavPath(virtualPath)` to resolve platform-aware paths based on the active WebDAV base URL instead of `window.location`.
     - `stores/blenderEnabledStore.ts` tracks `settingEnabled`, `installed`, and `installedVersion` in addition to effective `blenderEnabled`.
 
 ---
@@ -478,6 +480,7 @@ List components use `PaginationState` from `types/index.ts` to track `page`, `to
 | **Zustand**     | Navigation, tabs, persistence | `useNavigationStore`              |
 | **Zustand**     | Cached API data               | `useApiCacheStore`                |
 | **Zustand**     | Panel sizes, card widths      | `usePanelStore`, `cardWidthStore` |
+| **Zustand**     | WebDAV preferred URL          | `useWebDavStore`                  |
 | **Context**     | Cross-component (dock layout) | `DockContext`                     |
 | **React Query** | Server state, entity data     | `useQuery`, `useMutation`         |
 | **Local state** | Component-specific            | `useState`                        |

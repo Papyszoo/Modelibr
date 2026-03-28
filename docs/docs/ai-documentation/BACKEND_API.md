@@ -132,19 +132,21 @@ Texture set association endpoints accept optional `?materialName` and `?variantN
 | `POST` | `/thumbnail-jobs/texture-sets/{jobId}/finish` | Mark texture set job complete/failed   |
 | `POST` | `/test/thumbnail-complete/{modelId}`          | Test completion notification (dev)     |
 
-### Settings (9 endpoints)
+### Settings (11 endpoints)
 
-| Method | Endpoint                      | Description                                                                                                                      |
-| ------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/settings`                   | Get application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`)                                          |
-| `GET`  | `/settings/all`               | Get all settings (key-value)                                                                                                     |
-| `GET`  | `/settings/blender-enabled`   | Get effective Blender status (`{ enableBlender, blenderPath, settingEnabled, installed, installedVersion }`) — reads from DB + install service |
-| `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`, `blenderPath`) — `blenderEnabled` is managed via install/uninstall service |
-| `PUT`  | `/settings/{key}`             | Update a single setting by key (e.g., `BlenderPath`, `BlenderEnabled`)                                                           |
-| `GET`  | `/settings/blender/versions`  | Get available Blender CLI versions for download                                                                                  |
-| `GET`  | `/settings/blender/status`    | Get Blender installation status (`{ state, installedVersion, installedPath, progress, downloadedBytes, totalBytes, error }`)      |
-| `POST` | `/settings/blender/install`   | Start Blender download+install (body: `{ version }`) — fire-and-forget, poll status for progress                                 |
-| `POST` | `/settings/blender/uninstall` | Uninstall currently installed Blender version                                                                                    |
+| Method | Endpoint                      | Description                                                                                                                                     |
+| ------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/settings`                   | Get application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`, `preferredWebDavBaseUrl`)                               |
+| `GET`  | `/settings/all`               | Get all settings (key-value)                                                                                                                    |
+| `GET`  | `/settings/blender-enabled`   | Get effective Blender status (`{ enableBlender, blenderPath, settingEnabled, installed, installedVersion }`) — reads from DB + install service  |
+| `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`) — `blenderEnabled` is managed via install/uninstall service                          |
+| `PUT`  | `/settings/{key}`             | Update a single setting by key (e.g., `BlenderPath`, `BlenderEnabled`)                                                                          |
+| `GET`  | `/settings/blender/versions`  | Get available Blender CLI versions for download                                                                                                 |
+| `GET`  | `/settings/blender/status`    | Get Blender installation status (`{ state, installedVersion, installedPath, progress, downloadedBytes, totalBytes, error }`)                    |
+| `POST` | `/settings/blender/install`   | Start Blender download+install (body: `{ version }`) — fire-and-forget, poll status for progress                                                |
+| `POST` | `/settings/blender/uninstall` | Uninstall currently installed Blender version                                                                                                   |
+| `GET`  | `/settings/webdav/urls`       | Discover available WebDAV URLs from `WEBDAV_HTTPS_PORT`/`WEBDAV_HTTP_PORT` env vars — returns `{ urls: [{ url, label, isHttps, port }] }`      |
+| `GET`  | `/settings/webdav/probe`      | Probe WebDAV connectivity (`?url=`) — returns `{ reachable, folderCount, error? }` via internal PROPFIND through nginx                         |
 
 ### Blender / WebDAV (5 virtual endpoints)
 
@@ -164,7 +166,7 @@ Handled by `WebDavMiddleware` — not standard REST endpoints. Requires `ENABLE_
 
 **REST API .blend support:** `POST /models` and `POST /models/{modelId}/versions` also accept `.blend` files. The `ModelUploadedEvent` is dispatched for both renderable and project (`.blend`) file types, triggering the asset-processor pipeline.
 
-**Total:** 58 endpoints (53 REST + 5 WebDAV)
+**Total:** 61 endpoints (56 REST + 5 WebDAV)
 
 ## Pagination
 
