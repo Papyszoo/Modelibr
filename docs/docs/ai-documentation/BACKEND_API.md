@@ -139,14 +139,14 @@ Texture set association endpoints accept optional `?materialName` and `?variantN
 | `GET`  | `/settings`                   | Get application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`, `preferredWebDavBaseUrl`)                               |
 | `GET`  | `/settings/all`               | Get all settings (key-value)                                                                                                                    |
 | `GET`  | `/settings/blender-enabled`   | Get effective Blender status (`{ enableBlender, blenderPath, settingEnabled, installed, installedVersion }`) — reads from DB + install service  |
-| `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`, `preferredWebDavBaseUrl`) — `blenderEnabled` is managed via install/uninstall service |
+| `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`) — `blenderEnabled` is managed via install/uninstall service                          |
 | `PUT`  | `/settings/{key}`             | Update a single setting by key (e.g., `BlenderPath`, `BlenderEnabled`)                                                                          |
 | `GET`  | `/settings/blender/versions`  | Get available Blender CLI versions for download                                                                                                 |
 | `GET`  | `/settings/blender/status`    | Get Blender installation status (`{ state, installedVersion, installedPath, progress, downloadedBytes, totalBytes, error }`)                    |
 | `POST` | `/settings/blender/install`   | Start Blender download+install (body: `{ version }`) — fire-and-forget, poll status for progress                                                |
 | `POST` | `/settings/blender/uninstall` | Uninstall currently installed Blender version                                                                                                   |
-| `GET`  | `/settings/webdav/urls`       | Discover available WebDAV URLs from `WEBDAV_PORT`/`WEBDAV_HTTP_PORT` env vars — returns `{ urls: [{ url, label, isHttps }] }`                   |
-| `GET`  | `/settings/webdav/probe`      | Probe WebDAV connectivity (`?url=`) — returns `{ reachable, folderCount, error? }` via internal PROPFIND to localhost:8080                      |
+| `GET`  | `/settings/webdav/urls`       | Discover available WebDAV URLs from `WEBDAV_HTTPS_PORT`/`WEBDAV_HTTP_PORT` env vars — returns `{ urls: [{ url, label, isHttps, port }] }`      |
+| `GET`  | `/settings/webdav/probe`      | Probe WebDAV connectivity (`?url=`) — returns `{ reachable, folderCount, error? }` via internal PROPFIND through nginx                         |
 
 ### Blender / WebDAV (5 virtual endpoints)
 

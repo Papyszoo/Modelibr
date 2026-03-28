@@ -97,7 +97,7 @@ export interface WebDavUrlEntry {
   url: string
   label: string
   isHttps: boolean
-  /** Port number string matching the WEBDAV_PORT / WEBDAV_HTTP_PORT env var value, e.g. "443" or "80" */
+  /** Port number string matching the WEBDAV_HTTPS_PORT / WEBDAV_HTTP_PORT env var value, e.g. "443" or "80" */
   port: string
 }
 

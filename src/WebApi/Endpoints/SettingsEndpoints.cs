@@ -212,7 +212,7 @@ public static class SettingsEndpoints
 
         // ── WebDAV Connectivity Probe ───────────────────────────────────────
 
-        app.MapGet("/settings/webdav/probe", async (string url, CancellationToken cancellationToken) =>
+        app.MapGet("/settings/webdav/probe", async (string url, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(url) ||
                 (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
@@ -223,12 +223,11 @@ public static class SettingsEndpoints
 
             try
             {
-                // Probe the internal WebDAV endpoint directly on localhost:8080
-                // to avoid TLS certificate issues with self-signed certs
-                var probeUrl = new Uri(new Uri("http://localhost:8080"), new Uri(url).PathAndQuery);
+                // Probe through the internal nginx HTTP server to validate the full
+                // nginx → webapi chain without TLS certificate issues.
+                var probeUrl = new Uri(new Uri("http://nginx:80"), new Uri(url).PathAndQuery);
 
-                using var handler = new HttpClientHandler();
-                using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+                var httpClient = httpClientFactory.CreateClient("WebDavProbe");
                 var request = new HttpRequestMessage(new HttpMethod("PROPFIND"), probeUrl);
                 request.Headers.Add("Depth", "1");
                 request.Content = new StringContent(

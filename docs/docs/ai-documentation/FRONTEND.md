@@ -67,8 +67,8 @@ src/frontend/src/
     - `features/models/components/ModelVersionHistory.tsx` now uses `features/model-viewer/api/queries.ts` (`useModelVersionsQuery`) for version list loading.
     - `components/tabs/Settings.tsx` now uses `features/settings/api/queries.ts` (`useSettingsQuery`) for initial settings load.
     - `components/tabs/Settings.tsx` includes Blender version management (version selector, install/uninstall, download progress bar) via `features/settings/api/settingsApi.ts` (`getBlenderVersions`, `getBlenderStatus`, `installBlender`, `uninstallBlender`).
-    - `components/tabs/Settings.tsx` includes WebDAV section with base URL selector (populated from `GET /settings/webdav/urls`), connection probe button (`GET /settings/webdav/probe`), and OS-specific mount instructions (`WebDavInstructions`). Preferred URL is persisted to `preferredWebDavBaseUrl` in settings. Dirty tracking includes WebDAV URL changes.
-    - `stores/webDavStore.ts` — Zustand store holding `preferredUrl` (from persisted settings) with exported `buildWebDavPath(virtualPath)` helper that resolves platform-aware paths using the preferred base URL instead of `window.location`.
+    - `components/tabs/Settings.tsx` includes a WebDAV section that displays available base URLs (from `GET /settings/webdav/urls`), provides a connection probe button (`GET /settings/webdav/probe`), and shows OS-specific mount instructions (`WebDavInstructions`). The effective WebDAV URL is currently chosen automatically rather than via a persisted user-selected setting.
+    - `stores/webDavStore.ts` — Zustand store that derives an `activeUrl` from available WebDAV URLs (preferring HTTP when present) and exposes `buildWebDavPath(virtualPath)` to resolve platform-aware paths based on the active WebDAV base URL instead of `window.location`.
     - `stores/blenderEnabledStore.ts` tracks `settingEnabled`, `installed`, and `installedVersion` in addition to effective `blenderEnabled`.
 
 ---

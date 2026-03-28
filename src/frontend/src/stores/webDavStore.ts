@@ -65,9 +65,27 @@ export function buildWebDavPath(virtualPath: string): WebDavPathInfo {
   let canOpenNatively = true
 
   switch (os) {
-    case 'windows':
-      nativePath = `\\\\${host}\\modelibr\\${cleanPath.replace(/\//g, '\\')}`
+    case 'windows': {
+      // Mini-Redirector UNC notation:
+      //   \\host\share         (HTTP port 80)
+      //   \\host@PORT\share    (HTTP non-standard port)
+      //   \\host@SSL\share     (HTTPS port 443)
+      //   \\host@SSL@PORT\share (HTTPS non-standard port)
+      const isStandardHttpPort = !isHttps && port === '80'
+      const isStandardHttpsPort = isHttps && port === '443'
+      let uncHost: string
+      if (isStandardHttpPort) {
+        uncHost = host
+      } else if (isStandardHttpsPort) {
+        uncHost = `${host}@SSL`
+      } else if (isHttps) {
+        uncHost = `${host}@SSL@${port}`
+      } else {
+        uncHost = `${host}@${port}`
+      }
+      nativePath = `\\\\${uncHost}\\modelibr\\${cleanPath.replace(/\//g, '\\')}`
       break
+    }
     case 'macos':
       nativePath = webDavUrl
       break

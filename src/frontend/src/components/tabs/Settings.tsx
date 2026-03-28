@@ -359,8 +359,8 @@ export function Settings(): JSX.Element {
     try {
       const results = await Promise.all(
         urls.map(async entry => {
-          // Append /modelibr — the probe endpoint uses PathAndQuery to reach
-          // http://localhost:8080/<path>, so we must include the WebDAV mount path.
+          // Append /modelibr — the probe endpoint forwards the path through
+          // the internal nginx server to validate the full request chain.
           const probeUrl = entry.url.replace(/\/+$/, '') + '/modelibr'
           try {
             const result = await probeWebDavUrl(probeUrl)

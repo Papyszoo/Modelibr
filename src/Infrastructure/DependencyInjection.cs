@@ -60,6 +60,11 @@ namespace Infrastructure
                 client.Timeout = TimeSpan.FromMinutes(30);
             });
 
+            services.AddHttpClient("WebDavProbe", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(5);
+            });
+
             // Add WebDAV virtual asset store services
             services.AddVirtualAssetStore();
 
