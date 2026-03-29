@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -11,17 +12,20 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
     private readonly IModelRepository _modelRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IBlendFileGenerator _blendFileGenerator;
 
     public AssociateTextureSetWithAllModelVersionsCommandHandler(
         ITextureSetRepository textureSetRepository,
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IBlendFileGenerator blendFileGenerator)
     {
         _textureSetRepository = textureSetRepository;
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _blendFileGenerator = blendFileGenerator;
     }
 
     public async Task<Result> Handle(AssociateTextureSetWithAllModelVersionsCommand command, CancellationToken cancellationToken)
@@ -70,6 +74,9 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
 
                 await _modelVersionRepository.AddTextureMappingAsync(
                     version.Id, command.TextureSetId, materialName, cancellationToken);
+
+                // Invalidate cached .blend so it regenerates with new textures
+                _blendFileGenerator.InvalidateCache(command.ModelId, version.Id);
             }
 
             return Result.Success();

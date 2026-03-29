@@ -26,6 +26,7 @@ services:
             args:
                 APP_UID: ${HOST_UID:-1000}
                 APP_GID: ${HOST_GID:-1000}
+                ENABLE_BLENDER: ${ENABLE_BLENDER:-false}
         container_name: webapi
         environment:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
