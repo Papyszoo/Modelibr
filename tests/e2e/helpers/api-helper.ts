@@ -717,6 +717,79 @@ export class ApiHelper {
     }
 
     /**
+     * Get blender installation status.
+     */
+    async getBlenderInstallStatus(): Promise<{
+        state: string;
+        installedVersion: string | null;
+        installedPath: string | null;
+        progress: number;
+        error: string | null;
+    }> {
+        const response = await this.client.get("/settings/blender/status");
+        if (response.status !== 200) {
+            throw new Error(`Failed to get blender status: ${response.status}`);
+        }
+        return response.data;
+    }
+
+    /**
+     * Start Blender installation (fire-and-forget). Poll getBlenderInstallStatus() for progress.
+     */
+    async installBlender(version: string): Promise<void> {
+        const response = await this.client.post("/settings/blender/install", {
+            version,
+        });
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to start blender install: ${response.status}`,
+            );
+        }
+    }
+
+    /**
+     * Install Blender and wait until installation completes.
+     * Polls status every 2 seconds. Throws if installation fails.
+     */
+    async ensureBlenderInstalled(
+        version: string,
+        timeoutMs: number = 600000,
+    ): Promise<void> {
+        const status = await this.getBlenderInstallStatus();
+        if (
+            status.state === "installed" &&
+            status.installedVersion === version
+        ) {
+            console.log(
+                `[Blender] Already installed: ${version} at ${status.installedPath}`,
+            );
+            return;
+        }
+
+        console.log(`[Blender] Installing Blender ${version}...`);
+        await this.installBlender(version);
+
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 2000));
+            const s = await this.getBlenderInstallStatus();
+            if (s.state === "installed") {
+                console.log(
+                    `[Blender] Installation complete: ${s.installedVersion} at ${s.installedPath}`,
+                );
+                return;
+            }
+            if (s.state === "error" || s.state === "failed") {
+                throw new Error(
+                    `Blender installation failed: ${s.error || "unknown error"}`,
+                );
+            }
+            console.log(`[Blender] Status: ${s.state} (${s.progress}%)`);
+        }
+        throw new Error(`Blender installation timed out after ${timeoutMs}ms`);
+    }
+
+    /**
      * Get version files for a specific model version.
      */
     async getModelVersionFiles(

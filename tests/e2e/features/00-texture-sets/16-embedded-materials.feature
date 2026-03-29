@@ -49,9 +49,8 @@ Feature: Embedded Materials Preset
   @embedded-materials @serial
   Scenario: Embedded as main persists after navigation
     Given I am on the model viewer page for "single-version-model"
-    When I select preset "Embedded"
-    And I set the current preset as main
-    Then the current preset should show the "Main" badge
+    Then the preset "Embedded" should be selected
+    And the current preset should show the "Main" badge
     When I navigate away from the model viewer
     And I am on the model viewer page for "single-version-model"
     Then the preset "Embedded" should be selected
