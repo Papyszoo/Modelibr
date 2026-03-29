@@ -970,4 +970,50 @@ export class ModelViewerPage {
         await dropdown.click();
         return names;
     }
+
+    /**
+     * Verify that unlinked materials show the "Embedded" indicator
+     */
+    async expectMaterialShowsEmbedded(materialName?: string): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const scope = materialName
+            ? this.page.locator(".materials-material-group", {
+                  has: this.page.locator(".materials-item-name", {
+                      hasText: materialName,
+                  }),
+              })
+            : this.page.locator(".materials-material-group").first();
+
+        const embeddedLabel = scope.locator(".materials-empty", {
+            hasText: "Embedded",
+        });
+        await expect(embeddedLabel).toBeVisible({ timeout: 10000 });
+        console.log(
+            `[UI] Material ${materialName ?? "(first)"} shows Embedded indicator ✓`,
+        );
+    }
+
+    /**
+     * Verify that the "Link Texture Set" button is NOT visible for the current preset
+     * (expected when Embedded preset is selected)
+     */
+    async expectLinkTextureSetHidden(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const linkBtns = this.page.locator('[data-testid^="link-ts-"]');
+        await expect(linkBtns).toHaveCount(0, { timeout: 5000 });
+        console.log(`[UI] Link Texture Set buttons are hidden ✓`);
+    }
+
+    /**
+     * Verify that the "Link Texture Set" button IS visible
+     */
+    async expectLinkTextureSetVisible(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const linkBtn = this.page.locator('[data-testid^="link-ts-"]').first();
+        await expect(linkBtn).toBeVisible({ timeout: 10000 });
+        console.log(`[UI] Link Texture Set buttons are visible ✓`);
+    }
 }

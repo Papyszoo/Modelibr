@@ -13,9 +13,11 @@ import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 function OBJModel({
   modelUrl,
   rotationSpeed,
+  preserveMaterials = false,
 }: {
   modelUrl: string
   rotationSpeed: number
+  preserveMaterials?: boolean
 }) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
@@ -43,12 +45,14 @@ function OBJModel({
       // Apply a basic TSL-style material with enhanced properties
       clonedModel.traverse(child => {
         if (child.isMesh) {
-          child.material = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(0.7, 0.7, 0.9),
-            metalness: 0.3,
-            roughness: 0.4,
-            envMapIntensity: 1.0,
-          })
+          if (!preserveMaterials) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(0.7, 0.7, 0.9),
+              metalness: 0.3,
+              roughness: 0.4,
+              envMapIntensity: 1.0,
+            })
+          }
           child.castShadow = true
           child.receiveShadow = true
         }
@@ -101,9 +105,11 @@ function OBJModel({
 function GLTFModel({
   modelUrl,
   rotationSpeed,
+  preserveMaterials = false,
 }: {
   modelUrl: string
   rotationSpeed: number
+  preserveMaterials?: boolean
 }) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
@@ -132,12 +138,14 @@ function GLTFModel({
       // Apply a basic TSL-style material with enhanced properties
       clonedModel.traverse(child => {
         if (child.isMesh) {
-          child.material = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(0.7, 0.7, 0.9),
-            metalness: 0.3,
-            roughness: 0.4,
-            envMapIntensity: 1.0,
-          })
+          if (!preserveMaterials) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(0.7, 0.7, 0.9),
+              metalness: 0.3,
+              roughness: 0.4,
+              envMapIntensity: 1.0,
+            })
+          }
           child.castShadow = true
           child.receiveShadow = true
         }
@@ -190,9 +198,11 @@ function GLTFModel({
 function FBXModel({
   modelUrl,
   rotationSpeed,
+  preserveMaterials = false,
 }: {
   modelUrl: string
   rotationSpeed: number
+  preserveMaterials?: boolean
 }) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
@@ -220,12 +230,14 @@ function FBXModel({
       // Apply a basic TSL-style material with enhanced properties
       clonedModel.traverse(child => {
         if (child.isMesh) {
-          child.material = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(0.7, 0.7, 0.9),
-            metalness: 0.3,
-            roughness: 0.4,
-            envMapIntensity: 1.0,
-          })
+          if (!preserveMaterials) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(0.7, 0.7, 0.9),
+              metalness: 0.3,
+              roughness: 0.4,
+              envMapIntensity: 1.0,
+            })
+          }
           child.castShadow = true
           child.receiveShadow = true
         }
@@ -297,17 +309,39 @@ function PlaceholderModel({ rotationSpeed }: { rotationSpeed: number }) {
   )
 }
 
-export function Model({ modelUrl, fileExtension, rotationSpeed = 0.002 }) {
+export function Model({
+  modelUrl,
+  fileExtension,
+  rotationSpeed = 0.002,
+  preserveMaterials = false,
+}: {
+  modelUrl: string
+  fileExtension: string
+  rotationSpeed?: number
+  preserveMaterials?: boolean
+}) {
   return (
     <Suspense fallback={<LoadingPlaceholder />}>
       {fileExtension === 'obj' && (
-        <OBJModel modelUrl={modelUrl} rotationSpeed={rotationSpeed} />
+        <OBJModel
+          modelUrl={modelUrl}
+          rotationSpeed={rotationSpeed}
+          preserveMaterials={preserveMaterials}
+        />
       )}
       {fileExtension === 'fbx' && (
-        <FBXModel modelUrl={modelUrl} rotationSpeed={rotationSpeed} />
+        <FBXModel
+          modelUrl={modelUrl}
+          rotationSpeed={rotationSpeed}
+          preserveMaterials={preserveMaterials}
+        />
       )}
       {(fileExtension === 'gltf' || fileExtension === 'glb') && (
-        <GLTFModel modelUrl={modelUrl} rotationSpeed={rotationSpeed} />
+        <GLTFModel
+          modelUrl={modelUrl}
+          rotationSpeed={rotationSpeed}
+          preserveMaterials={preserveMaterials}
+        />
       )}
       {!['obj', 'fbx', 'gltf', 'glb'].includes(fileExtension) && (
         <PlaceholderModel rotationSpeed={rotationSpeed} />

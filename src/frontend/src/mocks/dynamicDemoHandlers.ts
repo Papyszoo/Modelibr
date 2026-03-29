@@ -267,6 +267,8 @@ async function getVersionTextureMaps(
   version: DemoModelVersion
 ): Promise<TextureMapData[]> {
   const mainVariant = version.mainVariantName ?? ''
+  // "__embedded__" means use the model's original materials — skip texture maps
+  if (mainVariant === '__embedded__') return []
   // Get mappings for the main variant (or empty variant name)
   const mappings = version.textureMappings.filter(
     m => m.variantName === mainVariant || m.variantName === ''

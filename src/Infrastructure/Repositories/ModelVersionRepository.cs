@@ -190,6 +190,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     public async Task<int> GetLatestVersionNumberAsync(int modelId, CancellationToken cancellationToken = default)
     {
         var latestVersion = await _context.ModelVersions
+            .IgnoreQueryFilters()
             .Where(v => v.ModelId == modelId)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(cancellationToken);

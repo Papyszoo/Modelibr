@@ -127,11 +127,16 @@ export class ThumbnailProcessor extends BaseProcessor {
         jobLogger.info('.blend converted to .glb', { glbConvertedPath })
 
         // Upload the converted .glb back to the model version
+        const baseName = path.basename(
+          fileInfo.originalFileName,
+          path.extname(fileInfo.originalFileName)
+        )
+        const glbFileName = `${baseName}.glb`
         await this.jobService.uploadRenderableFile(
           job.modelId,
           job.modelVersionId,
           glbConvertedPath,
-          'model.glb'
+          glbFileName
         )
         jobLogger.info('Uploaded converted .glb to model version')
 
@@ -257,6 +262,14 @@ export class ThumbnailProcessor extends BaseProcessor {
   async _applyTextures(job, jobLogger, fileType = 'gltf') {
     const textureMappings = job.textureMappings || []
     const mainVariant = job.mainVariantName || ''
+
+    // "__embedded__" means use the model's original materials — skip all texture application
+    if (mainVariant === '__embedded__') {
+      this.jobLogger.info(
+        'Main variant is __embedded__, preserving original model materials'
+      )
+      return null
+    }
 
     // Filter mappings to the main variant (exact match only)
     let variantMappings = textureMappings.filter(

@@ -125,6 +125,22 @@ public class WebDavMiddleware
             return;
         }
 
+        // Intercept LOCK for existing newest-updateable-{model}.blend paths.
+        // Without this, NWebDav's NoLockingManager returns 403 Forbidden, which
+        // prevents macOS WebDAV clients (and Blender) from saving edits to the file.
+        if (method == "LOCK" && IsExistingBlendFile(requestPath))
+        {
+            // Return 200 (lock on existing resource) instead of 201 (new resource)
+            await HandleExistingBlendLockAsync(context, requestPath);
+            return;
+        }
+
+        if (method == "UNLOCK" && IsExistingBlendFile(requestPath))
+        {
+            context.Response.StatusCode = 204;
+            return;
+        }
+
         // Intercept PUT /modelibr/Models/{filename}.blend — create a new model from .blend
         if (method == "PUT" && IsNewModelBlendPut(requestPath))
         {
@@ -141,6 +157,18 @@ public class WebDavMiddleware
 
         var httpContext = new AspNetCoreContext(context);
         await _dispatcher.DispatchRequestAsync(httpContext);
+    }
+
+    /// <summary>
+    /// Returns true if the path ends with newest-updateable-{name}.blend (an existing model .blend file).
+    /// Used to intercept LOCK/UNLOCK for existing files so that NWebDav's NoLockingManager
+    /// doesn't return 403 Forbidden and block saves.
+    /// </summary>
+    private static bool IsExistingBlendFile(string path)
+    {
+        var fileName = Path.GetFileName(path);
+        return fileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase)
+            && fileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -403,21 +431,23 @@ public class WebDavMiddleware
                         return;
                     }
                 }
+                else
+                {
+                    _logger.LogInformation("Created model version {VersionId} for model {ModelId} via Blender save",
+                        createResult.Value.VersionId, modelId);
 
-                _logger.LogInformation("Created model version {VersionId} for model {ModelId} via Blender save",
-                    createResult.Value.VersionId, modelId);
-
-                // Dispatch ModelUploadedEvent so the asset-processor picks up the
-                // .blend file, converts it to .glb, and generates a thumbnail.
-                // The CreateModelVersionCommandHandler only raises this event for
-                // renderable file types; .blend is a project file, so we raise it manually.
-                var dispatcher = sp.GetRequiredService<IDomainEventDispatcher>();
-                var uploadedEvent = new Domain.Events.ModelUploadedEvent(
-                    modelId,
-                    createResult.Value.VersionId,
-                    uploadedHash,
-                    isNewModel: false);
-                await dispatcher.PublishAsync(new[] { uploadedEvent }, context.RequestAborted);
+                    // Dispatch ModelUploadedEvent so the asset-processor picks up the
+                    // .blend file, converts it to .glb, and generates a thumbnail.
+                    // The CreateModelVersionCommandHandler only raises this event for
+                    // renderable file types; .blend is a project file, so we raise it manually.
+                    var dispatcher = sp.GetRequiredService<IDomainEventDispatcher>();
+                    var uploadedEvent = new Domain.Events.ModelUploadedEvent(
+                        modelId,
+                        createResult.Value.VersionId,
+                        uploadedHash,
+                        isNewModel: false);
+                    await dispatcher.PublishAsync(new[] { uploadedEvent }, context.RequestAborted);
+                }
             }
         }
         catch (Exception ex)
@@ -491,6 +521,37 @@ public class WebDavMiddleware
         context.Response.Headers["Lock-Token"] = $"<{lockToken}>";
         await context.Response.WriteAsync(xml);
         _logger.LogDebug("Synthetic LOCK returned for {Path} (token={Token})", requestPath, lockToken);
+    }
+
+    /// <summary>
+    /// Returns a synthetic WebDAV lock token for an existing newest-updateable-{model}.blend file.
+    /// Without this, NWebDav's NoLockingManager returns 403 Forbidden, preventing saves.
+    /// </summary>
+    private async Task HandleExistingBlendLockAsync(HttpContext context, string requestPath)
+    {
+        var lockToken = $"urn:uuid:{Guid.NewGuid()}";
+        var escapedPath = System.Security.SecurityElement.Escape(requestPath);
+        var xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<D:prop xmlns:D=\"DAV:\">" +
+            "<D:lockdiscovery>" +
+            "<D:activelock>" +
+            "<D:locktype><D:write/></D:locktype>" +
+            "<D:lockscope><D:exclusive/></D:lockscope>" +
+            "<D:depth>0</D:depth>" +
+            "<D:timeout>Second-3600</D:timeout>" +
+            $"<D:locktoken><D:href>{lockToken}</D:href></D:locktoken>" +
+            $"<D:lockroot><D:href>{escapedPath}</D:href></D:lockroot>" +
+            "</D:activelock>" +
+            "</D:lockdiscovery>" +
+            "</D:prop>";
+
+        // 200 = locked existing resource (unlike 201 for new resources)
+        context.Response.StatusCode = 200;
+        context.Response.ContentType = "application/xml; charset=utf-8";
+        context.Response.Headers["Lock-Token"] = $"<{lockToken}>";
+        await context.Response.WriteAsync(xml);
+        _logger.LogDebug("Existing blend LOCK returned for {Path} (token={Token})", requestPath, lockToken);
     }
 
     /// <summary>

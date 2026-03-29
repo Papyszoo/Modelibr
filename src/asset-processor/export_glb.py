@@ -23,6 +23,8 @@ def main():
         'filepath': output_path,
         'export_format': 'GLB',
         'export_animations': True,
+        'export_image_format': 'AUTO',
+        'export_materials': 'EXPORT',
     }
 
     # Blender 4.0+ renamed export_apply_modifiers → export_apply

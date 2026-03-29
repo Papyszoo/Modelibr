@@ -144,6 +144,7 @@ export function Scene({
               modelUrl={modelUrl}
               fileExtension={fileExtension}
               rotationSpeed={modelRotationSpeed}
+              preserveMaterials
             />
           )}
         </Suspense>

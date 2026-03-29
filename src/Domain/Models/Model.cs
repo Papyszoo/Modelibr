@@ -198,6 +198,15 @@ namespace Domain.Models
         public ModelVersion CreateVersion(string? description, DateTime createdAt)
         {
             var nextVersionNumber = _versions.Count == 0 ? 1 : _versions.Max(v => v.VersionNumber) + 1;
+            return CreateVersion(nextVersionNumber, description, createdAt);
+        }
+
+        /// <summary>
+        /// Creates a new version with an explicit version number.
+        /// Use when soft-deleted versions may occupy higher version numbers than the loaded collection.
+        /// </summary>
+        public ModelVersion CreateVersion(int nextVersionNumber, string? description, DateTime createdAt)
+        {
             var version = ModelVersion.Create(Id, nextVersionNumber, description, createdAt);
             _versions.Add(version);
             

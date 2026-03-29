@@ -302,6 +302,10 @@ export function ModelViewer({
     selectedTextureSet,
     selectedTextureSetId,
   ])
+
+  // "Embedded" preset: use the model's original materials (no texture set override)
+  const useEmbeddedMaterials = selectedVariant === '__embedded__'
+
   const loading = !propModel && !!modelId && modelQuery.isLoading
   const error =
     modelQuery.error instanceof Error ? modelQuery.error.message : ''
@@ -759,7 +763,9 @@ export function ModelViewer({
                         key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
                         model={versionModel || model}
                         settings={viewerSettings}
-                        materialTextureSets={materialTextureSets}
+                        materialTextureSets={
+                          useEmbeddedMaterials ? {} : materialTextureSets
+                        }
                         defaultFileId={defaultFileId}
                       />
                     </Canvas>

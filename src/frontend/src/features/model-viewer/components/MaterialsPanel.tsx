@@ -153,6 +153,13 @@ export function MaterialsPanel({
     if (!modelVersionId || !modelId) return
     try {
       setSettingMainVariant(true)
+      // '__embedded__' is a frontend sentinel — register it in the backend if not yet stored
+      if (
+        selectedVariant === '__embedded__' &&
+        !variantNames.includes('__embedded__')
+      ) {
+        await addVariantName(modelVersionId, '__embedded__')
+      }
       await setMainVariant(modelVersionId, selectedVariant)
       // Thumbnail regeneration is handled by the backend when setting main variant
       onModelUpdated()
@@ -276,14 +283,18 @@ export function MaterialsPanel({
   }
 
   // Use persisted variant names from backend (no longer need localPresets)
+  // Filter out '' (Default) and '__embedded__' which are shown as fixed options
   const allPresetNames = useMemo(() => {
-    return variantNames.filter(v => v !== '').sort()
+    return variantNames.filter(v => v !== '' && v !== '__embedded__').sort()
   }, [variantNames])
 
   const variantOptions = [
     { label: 'Default', value: '' },
+    { label: 'Embedded', value: '__embedded__' },
     ...allPresetNames.map(v => ({ label: v, value: v })),
   ]
+
+  const isEmbeddedPreset = selectedVariant === '__embedded__'
 
   return (
     <div className="materials-panel" data-testid="materials-panel">
@@ -311,7 +322,7 @@ export function MaterialsPanel({
             size="small"
             data-testid="add-preset-btn"
           />
-          {selectedVariant !== '' && (
+          {selectedVariant !== '' && selectedVariant !== '__embedded__' && (
             <Button
               icon="pi pi-trash"
               className="p-button-sm p-button-text p-button-danger"
@@ -387,14 +398,16 @@ export function MaterialsPanel({
               <div key={materialName} className="materials-material-group">
                 <div className="materials-item-header">
                   <span className="materials-item-name">{materialName}</span>
-                  <Button
-                    icon="pi pi-link"
-                    label="Link Texture Set"
-                    className="p-button-sm p-button-text"
-                    onClick={() => handleLinkTextureSet(materialName)}
-                    size="small"
-                    data-testid={`link-ts-${materialName}`}
-                  />
+                  {!isEmbeddedPreset && (
+                    <Button
+                      icon="pi pi-link"
+                      label="Link Texture Set"
+                      className="p-button-sm p-button-text"
+                      onClick={() => handleLinkTextureSet(materialName)}
+                      size="small"
+                      data-testid={`link-ts-${materialName}`}
+                    />
+                  )}
                 </div>
                 {linkedSets.map(linkedTs => {
                   const previewUrl = getPreviewUrl(linkedTs)
@@ -445,7 +458,13 @@ export function MaterialsPanel({
                   )
                 })}
                 {linkedSets.length === 0 && (
-                  <div className="materials-empty">No texture sets linked</div>
+                  <div className="materials-empty">
+                    <i
+                      className="pi pi-box"
+                      style={{ marginRight: '0.5rem' }}
+                    />
+                    Embedded
+                  </div>
                 )}
               </div>
             )
