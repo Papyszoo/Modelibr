@@ -57,6 +57,7 @@ interface SceneProps {
   settings?: ViewerSettingsType
   materialTextureSets?: MaterialTextureSets
   defaultFileId?: number | null
+  preserveMaterials?: boolean
 }
 
 export function Scene({
@@ -64,6 +65,7 @@ export function Scene({
   settings,
   materialTextureSets,
   defaultFileId,
+  preserveMaterials = false,
 }: SceneProps): JSX.Element {
   // Find the renderable file - prioritize defaultFileId if set
   let renderableFile = model.files?.find(f => f.isRenderable)
@@ -144,6 +146,7 @@ export function Scene({
               modelUrl={modelUrl}
               fileExtension={fileExtension}
               rotationSpeed={modelRotationSpeed}
+              preserveMaterials={preserveMaterials}
             />
           )}
         </Suspense>

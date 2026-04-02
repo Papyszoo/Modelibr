@@ -132,9 +132,13 @@ ThenBdd(
         if (getScenarioState(page).getCustom<string>("lastTextureSetName")) {
             const tsName =
                 getScenarioState(page).getCustom<string>("lastTextureSetName")!;
-            const textureSetCard = page.locator(
-                `.texture-set-card:has-text("${tsName}")`,
-            );
+            const tsId =
+                getScenarioState(page).getCustom<number>("lastTextureSetId");
+            const textureSetCard = tsId
+                ? page.locator(
+                      `.texture-set-card[data-texture-set-id="${tsId}"]`,
+                  )
+                : page.locator(`.texture-set-card:has-text("${tsName}")`);
             await expect(textureSetCard).not.toBeVisible({ timeout: 5000 });
             console.log(
                 `[Verify] Texture set "${tsName}" not visible in list ✓`,

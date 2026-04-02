@@ -353,9 +353,11 @@ GivenBdd(
         }
 
         // Find and open the texture set card
-        const card = page
-            .locator(`.texture-set-card:has-text("${name}")`)
-            .first();
+        const card = realtimeTestState.textureSetId
+            ? page.locator(
+                  `.texture-set-card[data-texture-set-id="${realtimeTestState.textureSetId}"]`,
+              )
+            : page.locator(`.texture-set-card:has-text("${name}")`).first();
         await expect(card).toBeVisible({ timeout: 15000 });
         await card.dblclick();
 

@@ -251,15 +251,10 @@ export function ModelViewer({
       m => m.variantName === selectedVariant
     )
 
-    // Only use selectedTextureSet fallback for legacy (no variant system).
-    // When variants exist, an empty mapping means "no textures for this preset".
-    const hasVariants = (selectedVersion.variantNames ?? []).length > 0
-    if (
-      variantMappings.length === 0 &&
-      selectedTextureSet &&
-      !hasVariants &&
-      selectedVariant === ''
-    ) {
+    // When no variant-specific mappings exist for the current variant but a
+    // texture set is explicitly selected (or set as default), use it as a
+    // wildcard so the model still gets textured.
+    if (variantMappings.length === 0 && selectedTextureSet) {
       return { '': selectedTextureSet }
     }
 
@@ -302,6 +297,10 @@ export function ModelViewer({
     selectedTextureSet,
     selectedTextureSetId,
   ])
+
+  // "Embedded" preset: use the model's original materials (no texture set override)
+  const useEmbeddedMaterials = selectedVariant === '__embedded__'
+
   const loading = !propModel && !!modelId && modelQuery.isLoading
   const error =
     modelQuery.error instanceof Error ? modelQuery.error.message : ''
@@ -759,8 +758,11 @@ export function ModelViewer({
                         key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
                         model={versionModel || model}
                         settings={viewerSettings}
-                        materialTextureSets={materialTextureSets}
+                        materialTextureSets={
+                          useEmbeddedMaterials ? {} : materialTextureSets
+                        }
                         defaultFileId={defaultFileId}
+                        preserveMaterials={useEmbeddedMaterials}
                       />
                     </Canvas>
                   </CanvasErrorBoundary>

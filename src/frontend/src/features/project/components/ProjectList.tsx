@@ -128,6 +128,7 @@ export function ProjectList() {
               <div
                 key={project.id}
                 className="project-grid-card"
+                data-project-id={project.id}
                 onClick={() => {
                   openProjectDetailsTab(project.id.toString())
                 }}

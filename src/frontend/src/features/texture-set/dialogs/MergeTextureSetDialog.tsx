@@ -306,7 +306,7 @@ export function MergeTextureSetDialog({
                     <span className="file-name">{fm.fileName}</span>
                   </div>
 
-                  <div className="channel-row">
+                  <div className="channel-row" data-channel="RGB">
                     <label>RGB:</label>
                     <Dropdown
                       value={fm.rgbOption}
@@ -327,7 +327,7 @@ export function MergeTextureSetDialog({
 
                   {fm.rgbOption === 'split' && (
                     <div className="split-channels">
-                      <div className="channel-row indent">
+                      <div className="channel-row indent" data-channel="R">
                         <label>R:</label>
                         <Dropdown
                           value={fm.rChannel}
@@ -340,7 +340,7 @@ export function MergeTextureSetDialog({
                           placeholder="None"
                         />
                       </div>
-                      <div className="channel-row indent">
+                      <div className="channel-row indent" data-channel="G">
                         <label>G:</label>
                         <Dropdown
                           value={fm.gChannel}
@@ -353,7 +353,7 @@ export function MergeTextureSetDialog({
                           placeholder="None"
                         />
                       </div>
-                      <div className="channel-row indent">
+                      <div className="channel-row indent" data-channel="B">
                         <label>B:</label>
                         <Dropdown
                           value={fm.bChannel}
@@ -369,7 +369,7 @@ export function MergeTextureSetDialog({
                     </div>
                   )}
 
-                  <div className="channel-row">
+                  <div className="channel-row" data-channel="A">
                     <label>A:</label>
                     <Dropdown
                       value={fm.aChannel}

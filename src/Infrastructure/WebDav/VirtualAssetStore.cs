@@ -24,6 +24,7 @@ public sealed class VirtualAssetStore : IStore
     private readonly VirtualCollectionPropertyManager _collectionPropertyManager;
     private readonly NoLockingManager _lockingManager;
     private readonly IAudioSelectionService _audioSelectionService;
+    private readonly IBlendFileGenerator _blendFileGenerator;
 
     public VirtualAssetStore(
         IServiceScopeFactory scopeFactory,
@@ -32,6 +33,7 @@ public sealed class VirtualAssetStore : IStore
         VirtualCollectionPropertyManager collectionPropertyManager,
         NoLockingManager lockingManager,
         IAudioSelectionService audioSelectionService,
+        IBlendFileGenerator blendFileGenerator,
         ILogger<VirtualAssetStore> logger,
         ILoggerFactory loggerFactory)
     {
@@ -41,6 +43,7 @@ public sealed class VirtualAssetStore : IStore
         _collectionPropertyManager = collectionPropertyManager;
         _lockingManager = lockingManager;
         _audioSelectionService = audioSelectionService;
+        _blendFileGenerator = blendFileGenerator;
         _logger = logger;
         _loggerFactory = loggerFactory;
     }
@@ -209,7 +212,7 @@ public sealed class VirtualAssetStore : IStore
         {
             return assetType switch
             {
-                "models" => new VirtualProjectModelsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
+                "models" => new VirtualProjectModelsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger),
                 "texturesets" => new VirtualProjectTextureSetsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
                 "sprites" => new VirtualProjectSpritesCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
                 "sounds" => new VirtualProjectSoundsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
@@ -247,14 +250,45 @@ public sealed class VirtualAssetStore : IStore
         // /Projects/{P}/Models/{ModelName} → show versions
         if (segments.Length == 4)
         {
-            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
+            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
         }
 
-        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or newest-updateable-{ModelName}.blend
+        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or generated-/uploaded-{ModelName}.blend
         var segment4 = Uri.UnescapeDataString(segments[4]);
 
-        // /Projects/{P}/Models/{ModelName}/newest-updateable-{ModelName}.blend → shortcut to newest .blend file
-        if (segment4.Equals($"newest-updateable-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        // /Projects/{P}/Models/{ModelName}/generated-{ModelName}.blend → generated .blend from renderable file via Blender CLI
+        if (segment4.Equals($"generated-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVersion = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            if (newestVersion != null && _blendFileGenerator.IsAvailable)
+            {
+                var renderableFile = newestVersion.Files
+                    .FirstOrDefault(f => f.FileType.IsRenderable);
+
+                if (renderableFile != null)
+                {
+                    return new VirtualGeneratedBlendFile(
+                        _lockingManager,
+                        $"generated-{model.Name}.blend",
+                        renderableFile.SizeBytes,
+                        renderableFile.CreatedAt,
+                        renderableFile.UpdatedAt,
+                        _blendFileGenerator,
+                        model.Id,
+                        newestVersion.Id,
+                        _logger);
+                }
+            }
+
+            return null;
+        }
+
+        // /Projects/{P}/Models/{ModelName}/uploaded-{ModelName}.blend → actual .blend file from newest version
+        if (segment4.Equals($"uploaded-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
         {
             var newestVersion = model.Versions
                 .Where(v => !v.IsDeleted)
@@ -264,19 +298,21 @@ public sealed class VirtualAssetStore : IStore
             var blendFile = newestVersion?.Files
                 .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
 
-            if (blendFile == null)
-                return null;
+            if (blendFile != null)
+            {
+                return new VirtualAssetFile(
+                    _itemPropertyManager,
+                    _lockingManager,
+                    $"uploaded-{model.Name}.blend",
+                    blendFile.Sha256Hash,
+                    blendFile.SizeBytes,
+                    blendFile.MimeType,
+                    blendFile.CreatedAt,
+                    blendFile.UpdatedAt,
+                    _pathProvider);
+            }
 
-            return new VirtualAssetFile(
-                _itemPropertyManager,
-                _lockingManager,
-                $"newest-updateable-{model.Name}.blend",
-                blendFile.Sha256Hash,
-                blendFile.SizeBytes,
-                blendFile.MimeType,
-                blendFile.CreatedAt,
-                blendFile.UpdatedAt,
-                _pathProvider);
+            return null;
         }
 
         Domain.Models.ModelVersion? version;
@@ -641,7 +677,7 @@ public sealed class VirtualAssetStore : IStore
         {
             return assetType switch
             {
-                "models" => new VirtualPackModelsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
+                "models" => new VirtualPackModelsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger),
                 "texturesets" => new VirtualPackTextureSetsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
                 "sprites" => new VirtualPackSpritesCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
                 "sounds" => new VirtualPackSoundsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
@@ -670,7 +706,7 @@ public sealed class VirtualAssetStore : IStore
 
         if (segments.Length == 4)
         {
-            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
+            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
         }
 
         var versionName = Uri.UnescapeDataString(segments[4]);
@@ -797,7 +833,7 @@ public sealed class VirtualAssetStore : IStore
         if (segments.Length == 1)
         {
             var models = await GetModelsForWebDavAsync(sp);
-            return new VirtualAllModelsCollection(_collectionPropertyManager, _lockingManager, models, _itemPropertyManager, _pathProvider);
+            return new VirtualAllModelsCollection(_collectionPropertyManager, _lockingManager, models, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
         }
 
         // /Models/{ModelName} - use WebDAV-specific query with full includes
@@ -808,14 +844,45 @@ public sealed class VirtualAssetStore : IStore
 
         if (segments.Length == 2)
         {
-            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider);
+            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
         }
 
         // /Models/{ModelName}/v{N} or /Models/{ModelName}/newest
         var versionName = Uri.UnescapeDataString(segments[2]);
 
-        // /Models/{ModelName}/newest-updateable-{ModelName}.blend → shortcut to newest .blend file
-        if (versionName.Equals($"newest-updateable-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        // /Models/{ModelName}/generated-{ModelName}.blend → generated .blend from renderable file via Blender CLI
+        if (versionName.Equals($"generated-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVer = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            if (newestVer != null && _blendFileGenerator.IsAvailable)
+            {
+                var renderableFile = newestVer.Files
+                    .FirstOrDefault(f => f.FileType.IsRenderable);
+
+                if (renderableFile != null)
+                {
+                    return new VirtualGeneratedBlendFile(
+                        _lockingManager,
+                        $"generated-{model.Name}.blend",
+                        renderableFile.SizeBytes,
+                        renderableFile.CreatedAt,
+                        renderableFile.UpdatedAt,
+                        _blendFileGenerator,
+                        model.Id,
+                        newestVer.Id,
+                        _logger);
+                }
+            }
+
+            return null;
+        }
+
+        // /Models/{ModelName}/uploaded-{ModelName}.blend → actual .blend file from newest version
+        if (versionName.Equals($"uploaded-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
         {
             var newestVer = model.Versions
                 .Where(v => !v.IsDeleted)
@@ -825,19 +892,21 @@ public sealed class VirtualAssetStore : IStore
             var blendFile = newestVer?.Files
                 .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
 
-            if (blendFile == null)
-                return null;
+            if (blendFile != null)
+            {
+                return new VirtualAssetFile(
+                    _itemPropertyManager,
+                    _lockingManager,
+                    $"uploaded-{model.Name}.blend",
+                    blendFile.Sha256Hash,
+                    blendFile.SizeBytes,
+                    blendFile.MimeType,
+                    blendFile.CreatedAt,
+                    blendFile.UpdatedAt,
+                    _pathProvider);
+            }
 
-            return new VirtualAssetFile(
-                _itemPropertyManager,
-                _lockingManager,
-                $"newest-updateable-{model.Name}.blend",
-                blendFile.Sha256Hash,
-                blendFile.SizeBytes,
-                blendFile.MimeType,
-                blendFile.CreatedAt,
-                blendFile.UpdatedAt,
-                _pathProvider);
+            return null;
         }
 
         Domain.Models.ModelVersion? version;

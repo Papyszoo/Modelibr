@@ -511,6 +511,7 @@ export function TextureSetGrid({
             <div
               key={textureSet.id}
               className={`texture-set-card ${isDraggedOver ? 'drag-over-card' : ''}`}
+              data-texture-set-id={textureSet.id}
               draggable={true}
               onDragStart={e => handleCardDragStart(e, textureSet)}
               onDragEnd={handleCardDragEnd}

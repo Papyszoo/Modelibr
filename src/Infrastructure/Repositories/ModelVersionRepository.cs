@@ -2,6 +2,7 @@ using Application.Abstractions.Repositories;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -101,7 +102,20 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     {
         var mapping = ModelVersionTextureSet.Create(modelVersionId, textureSetId, materialName, variantName);
         _context.Set<ModelVersionTextureSet>().Add(mapping);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            _context.Entry(mapping).State = EntityState.Detached;
+            // Mapping already exists — load it so EF Core relationship fixup keeps the entity graph consistent
+            await _context.Set<ModelVersionTextureSet>()
+                .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId
+                    && m.TextureSetId == textureSetId
+                    && m.MaterialName == materialName
+                    && m.VariantName == variantName, cancellationToken);
+        }
     }
 
     public async Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default)
@@ -190,6 +204,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     public async Task<int> GetLatestVersionNumberAsync(int modelId, CancellationToken cancellationToken = default)
     {
         var latestVersion = await _context.ModelVersions
+            .IgnoreQueryFilters()
             .Where(v => v.ModelId == modelId)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(cancellationToken);

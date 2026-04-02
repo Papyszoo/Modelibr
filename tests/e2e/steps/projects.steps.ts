@@ -77,11 +77,9 @@ Given(
         await projectsPage.navigateToProjectList();
 
         // Find and double-click the project card to open viewer
-        const projectCard = page
-            .locator(
-                `.project-grid-card:has-text("${projectName}"), .container-card:has-text("${projectName}")`,
-            )
-            .first();
+        const projectCard = page.locator(
+            `.project-grid-card[data-project-id="${project.id}"]`,
+        );
         await projectCard.waitFor({ state: "visible", timeout: 30000 });
         await projectCard.dblclick();
 
@@ -170,14 +168,18 @@ When(
 // Open project
 When("I open the project {string}", async ({ page }, projectName: string) => {
     const projectsPage = new ProjectsPage(page);
-    await projectsPage.openProject(projectName);
-    console.log(`[Action] Opened project "${projectName}"`);
+    const project = getScenarioState(page).getProject(projectName);
+    await projectsPage.openProject(projectName, project?.id);
+    console.log(
+        `[Action] Opened project "${projectName}"${project?.id ? ` (id=${project.id})` : ""}`,
+    );
 });
 
 // Delete project
 When("I delete the project {string}", async ({ page }, projectName: string) => {
     const projectsPage = new ProjectsPage(page);
-    await projectsPage.deleteProject(projectName);
+    const project = getScenarioState(page).getProject(projectName);
+    await projectsPage.deleteProject(projectName, project?.id);
     console.log(`[Action] Deleted project "${projectName}"`);
 });
 
@@ -251,7 +253,7 @@ When(
 
         // Wait for model card to appear in project after adding
         await expect(
-            page.locator(`.model-card:has-text("${modelName}")`).first(),
+            page.locator(`.model-card[data-model-id="${model.id}"]`),
         ).toBeVisible({ timeout: 10000 });
         console.log(`[Action] Added model "${model.name}" to project`);
     },
@@ -275,9 +277,9 @@ When(
             .filter({ hasText: "Models" })
             .click();
 
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
         await modelCard.waitFor({ state: "visible", timeout: 5000 });
         await modelCard.click({ button: "right" });
         console.log("[Action] Right-clicked on model card");
@@ -373,9 +375,9 @@ Then(
             .filter({ hasText: "Models" })
             .click();
 
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
         await expect(modelCard).toBeVisible({ timeout: 5000 });
         console.log(`[UI] Project contains model "${model.name}" ✓`);
     },
@@ -398,9 +400,9 @@ Then(
             .filter({ hasText: "Models" })
             .click();
 
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
         await expect(modelCard).not.toBeVisible({ timeout: 5000 });
         console.log(`[UI] Project does not contain model "${model.name}" ✓`);
     },
@@ -424,9 +426,9 @@ Given(
             .filter({ hasText: "Models" })
             .click();
 
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
         // Wait for tab content to render, then check presence
         const isPresent = await modelCard
             .waitFor({ state: "visible", timeout: 5000 })
@@ -594,16 +596,19 @@ When(
         });
         console.log("[Action] Dialog closed");
 
-        // Wait for React Query to invalidate and refetch project data
-        await page.waitForTimeout(2000);
+        // Switch to Texture Sets tab to see the newly added card
+        const textureSetTab = page
+            .locator(".p-tabview-nav li")
+            .filter({ hasText: "Texture Sets" });
+        await textureSetTab.click();
 
-        // Wait for the texture set card to appear in the project viewer
+        // Wait for the texture set card to appear (React Query refetch + render)
         const textureSetCard = page
             .locator(".container-card")
             .filter({ hasText: textureSet.name })
             .first();
         await expect(textureSetCard).toBeVisible({
-            timeout: 10000,
+            timeout: 15000,
         });
         console.log(
             `[Action] Added texture set "${textureSet.name}" to project`,
@@ -628,11 +633,9 @@ When(
             .filter({ hasText: "Texture Sets" })
             .click();
 
-        const textureCard = page
-            .locator(
-                `.container-section .container-card:has-text("${textureSet.name}")`,
-            )
-            .first();
+        const textureCard = page.locator(
+            `.container-card[data-texture-set-id="${textureSet.id}"]`,
+        );
         await textureCard.waitFor({ state: "visible", timeout: 5000 });
         await textureCard.click({ button: "right" });
         console.log("[Action] Right-clicked on texture set card");
@@ -676,11 +679,9 @@ Then(
         await expect
             .poll(
                 async () => {
-                    const textureCard = page
-                        .locator(
-                            `.container-section .container-card:has-text("${textureSet.name}")`,
-                        )
-                        .first();
+                    const textureCard = page.locator(
+                        `.container-card[data-texture-set-id="${textureSet.id}"]`,
+                    );
                     return await textureCard.isVisible().catch(() => false);
                 },
                 {
@@ -711,11 +712,9 @@ Then(
             .filter({ hasText: "Texture Sets" })
             .click();
 
-        const textureCard = page
-            .locator(
-                `.container-section .container-card:has-text("${textureSet.name}")`,
-            )
-            .first();
+        const textureCard = page.locator(
+            `.container-card[data-texture-set-id="${textureSet.id}"]`,
+        );
         await expect(textureCard).not.toBeVisible({ timeout: 5000 });
         console.log(
             `[UI] Project does not contain texture set "${textureSet.name}" ✓`,
@@ -741,11 +740,9 @@ Given(
             .filter({ hasText: "Texture Sets" })
             .click();
 
-        const textureCard = page
-            .locator(
-                `.container-section .container-card:has-text("${textureSet.name}")`,
-            )
-            .first();
+        const textureCard = page.locator(
+            `.container-card[data-texture-set-id="${textureSet.id}"]`,
+        );
         // Wait for tab content to render, then check presence
         const isPresent = await textureCard
             .waitFor({ state: "visible", timeout: 5000 })

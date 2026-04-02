@@ -6,6 +6,7 @@
 
 import { execSync } from "child_process";
 import path from "path";
+import fs from "fs";
 import http from "http";
 import { fileURLToPath } from "url";
 
@@ -17,6 +18,7 @@ const COMPOSE_FILE = "docker-compose.e2e.yml";
 // Environment variables for test run
 const testEnv = {
     ...process.env,
+    PW_MERGE_BLOB: "1",
     POSTGRES_USER: "modelibr",
     POSTGRES_PASSWORD: "e2e_password",
     POSTGRES_DB: "Modelibr",
@@ -91,6 +93,25 @@ function cleanup() {
     run(`docker compose -f ${COMPOSE_FILE} down -v`);
 }
 
+/**
+ * Move blob report zips from blob-report/ to blob-all/ after each phase.
+ * Each phase clears blob-report/, so blobs must be preserved between phases.
+ */
+function preserveBlobs(phase) {
+    const blobDir = path.join(__dirname, "blob-report");
+    const blobAllDir = path.join(__dirname, "blob-all");
+    if (!fs.existsSync(blobDir)) return;
+    fs.mkdirSync(blobAllDir, { recursive: true });
+    for (const file of fs.readdirSync(blobDir)) {
+        if (file.endsWith(".zip")) {
+            fs.renameSync(
+                path.join(blobDir, file),
+                path.join(blobAllDir, `${phase}-${file}`),
+            );
+        }
+    }
+}
+
 async function main() {
     const startTime = Date.now();
 
@@ -123,6 +144,12 @@ async function main() {
     }
 
     console.log("\n🧪 Running tests...\n");
+
+    // Clean previous blob reports so merge starts fresh
+    const blobDir = path.join(__dirname, "blob-report");
+    const blobAllDir = path.join(__dirname, "blob-all");
+    fs.rmSync(blobDir, { recursive: true, force: true });
+    fs.rmSync(blobAllDir, { recursive: true, force: true });
 
     // Two-phase execution:
     //   Phase 1: Setup tests with 1 worker (sequential — avoids asset-processor overload)
@@ -157,12 +184,14 @@ async function main() {
         cleanup();
         process.exit(1);
     }
+    preserveBlobs("setup");
 
     console.log(`\n📋 Phase 2: Chromium tests (workers=${chromiumWorkers})\n`);
     const testResult = run(
         `npx playwright test --project=chromium --no-deps ${args}`,
         { env: chromiumEnv },
     );
+    preserveBlobs("chromium");
 
     console.log(`\n📋 Phase 3: Serial tests (workers=1)\n`);
     const serialEnv = { ...testEnv, PW_WORKERS: "1" };
@@ -170,6 +199,7 @@ async function main() {
         `npx playwright test --project=serial --no-deps ${args}`,
         { env: serialEnv },
     );
+    preserveBlobs("serial");
 
     console.log(`\n📋 Phase 4: Slow tests (workers=1)\n`);
     const slowEnv = { ...testEnv, PW_WORKERS: "1" };
@@ -177,6 +207,13 @@ async function main() {
         `npx playwright test --project=slow --no-deps ${args}`,
         { env: slowEnv },
     );
+    preserveBlobs("slow");
+
+    // Merge blob reports from all phases into a single HTML report
+    console.log("\n📊 Merging test reports...\n");
+    run("npx playwright merge-reports --reporter html ./blob-all", {
+        env: testEnv,
+    });
 
     // Cleanup
     cleanup();

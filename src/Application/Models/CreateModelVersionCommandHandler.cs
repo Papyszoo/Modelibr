@@ -79,7 +79,11 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         }
 
         // Create new version
-        var version = model.CreateVersion(command.Description, _dateTimeProvider.UtcNow);
+        // Query the max version number across ALL versions (including soft-deleted)
+        // to avoid unique constraint violation on IX_ModelVersions_ModelId_VersionNumber
+        var maxVersionNumber = await _versionRepository.GetLatestVersionNumberAsync(command.ModelId, cancellationToken);
+        var nextVersionNumber = maxVersionNumber + 1;
+        var version = model.CreateVersion(nextVersionNumber, command.Description, _dateTimeProvider.UtcNow);
         version.AddFile(fileEntity);
 
         // Save version

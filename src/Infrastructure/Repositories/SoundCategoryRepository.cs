@@ -2,6 +2,7 @@ using Application.Abstractions.Repositories;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -20,7 +21,15 @@ internal sealed class SoundCategoryRepository : ISoundCategoryRepository
             throw new ArgumentNullException(nameof(category));
 
         var entityEntry = await _context.SoundCategories.AddAsync(category, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            _context.Entry(entityEntry.Entity).State = EntityState.Detached;
+            throw new ArgumentException($"A sound category with the name '{category.Name}' already exists.");
+        }
         
         return entityEntry.Entity;
     }

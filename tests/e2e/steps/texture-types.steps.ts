@@ -135,6 +135,10 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
         1, // Albedo
     );
     getScenarioState(page).setCustom("lastCreatedTextureSetName", uniqueName);
+    getScenarioState(page).setCustom(
+        "lastCreatedTextureSetId",
+        result.textureSetId,
+    );
     console.log(
         `[API] Created texture set "${uniqueName}" with file, ID ${result.textureSetId}`,
     );
@@ -154,7 +158,9 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
     );
     if (!msTabActive) {
         await msTab.click();
-        await page.waitForTimeout(500);
+        await page
+            .waitForSelector(".texture-set-card", { timeout: 10000 })
+            .catch(() => {});
     }
 
     // Use search to find the specific card (grid may have many items off-screen)
@@ -166,13 +172,12 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
             .catch(() => false)
     ) {
         await searchInput.fill(uniqueName);
-        await page.waitForTimeout(500);
     }
 
     // Verify the card is visible
-    const card = page
-        .locator(`.texture-set-card:has-text("${uniqueName}")`)
-        .first();
+    const card = page.locator(
+        `.texture-set-card[data-texture-set-id="${result.textureSetId}"]`,
+    );
     await expect(card).toBeVisible({ timeout: 15000 });
 });
 
@@ -190,6 +195,10 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
         1, // Albedo
     );
     getScenarioState(page).setCustom("lastCreatedTextureSetName", uniqueName);
+    getScenarioState(page).setCustom(
+        "lastCreatedTextureSetId",
+        result.textureSetId,
+    );
     console.log(
         `[API] Created texture set "${uniqueName}" with ORM file, ID ${result.textureSetId}`,
     );
@@ -209,13 +218,15 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
     );
     if (!msTabOrmActive) {
         await msTabOrm.click();
-        await page.waitForTimeout(500);
+        await page
+            .waitForSelector(".texture-set-card", { timeout: 10000 })
+            .catch(() => {});
     }
 
     // Verify the card is visible
-    const card = page
-        .locator(`.texture-set-card:has-text("${uniqueName}")`)
-        .first();
+    const card = page.locator(
+        `.texture-set-card[data-texture-set-id="${result.textureSetId}"]`,
+    );
     await expect(card).toBeVisible({ timeout: 15000 });
 });
 
@@ -233,6 +244,10 @@ Given("I have a texture set with a height texture", async ({ page }) => {
         3, // Height
     );
     getScenarioState(page).setCustom("lastCreatedTextureSetName", uniqueName);
+    getScenarioState(page).setCustom(
+        "lastCreatedTextureSetId",
+        result.textureSetId,
+    );
     console.log(
         `[API] Created texture set "${uniqueName}" with Height texture, ID ${result.textureSetId}`,
     );
@@ -252,7 +267,9 @@ Given("I have a texture set with a height texture", async ({ page }) => {
     );
     if (!msTabHeightActive) {
         await msTabHeight.click();
-        await page.waitForTimeout(500);
+        await page
+            .waitForSelector(".texture-set-card", { timeout: 10000 })
+            .catch(() => {});
     }
 
     // Use search to find the specific card (grid may have many items off-screen)
@@ -264,27 +281,38 @@ Given("I have a texture set with a height texture", async ({ page }) => {
             .catch(() => false)
     ) {
         await searchInput3.fill(uniqueName);
-        await page.waitForTimeout(500);
     }
 
     // Verify the card is visible
-    const card = page
-        .locator(`.texture-set-card:has-text("${uniqueName}")`)
-        .first();
+    const card = page.locator(
+        `.texture-set-card[data-texture-set-id="${result.textureSetId}"]`,
+    );
     await expect(card).toBeVisible({ timeout: 10000 });
 });
 
 When("I open the texture set viewer", async ({ page }) => {
     // Open the specific texture set that was just created, not a random .first()
+    const lastTsId = getScenarioState(page).getCustom<number>(
+        "lastCreatedTextureSetId",
+    );
     const lastTsName = getScenarioState(page).getCustom<string>(
         "lastCreatedTextureSetName",
     );
     let card;
-    if (lastTsName) {
+    if (lastTsId) {
+        card = page.locator(
+            `.texture-set-card[data-texture-set-id="${lastTsId}"]`,
+        );
+        console.log(
+            `[Navigation] Opening texture set ID=${lastTsId} ("${lastTsName}")`,
+        );
+    } else if (lastTsName) {
         card = page
             .locator(`.texture-set-card:has-text("${lastTsName}")`)
             .first();
-        console.log(`[Navigation] Opening texture set "${lastTsName}"`);
+        console.log(
+            `[Navigation] Opening texture set "${lastTsName}" (no ID stored)`,
+        );
     } else {
         card = page.locator(".texture-set-card").first();
         console.log(

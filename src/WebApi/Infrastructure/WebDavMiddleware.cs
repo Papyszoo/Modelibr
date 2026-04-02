@@ -77,14 +77,14 @@ public class WebDavMiddleware
             return;
         }
 
-        // Intercept Blender Safe Save: PUT newest-updateable-{model.Name}.blend@ (temp upload)
+        // Intercept Blender Safe Save: PUT generated-/uploaded-{model.Name}.blend@ (temp upload)
         if (method == "PUT" && IsBlenderTempFile(requestPath))
         {
             await HandleBlenderTempPutAsync(context, requestPath);
             return;
         }
 
-        // Intercept Blender Safe Save: MOVE newest-updateable-{model.Name}.blend@ → newest-updateable-{model.Name}.blend
+        // Intercept Blender Safe Save: MOVE generated-/uploaded-{model.Name}.blend@ → generated-/uploaded-{model.Name}.blend
         if (method == "MOVE" && IsBlenderSaveMoveDestination(context))
         {
             await HandleBlenderSaveMoveAsync(context, requestPath);
@@ -125,6 +125,22 @@ public class WebDavMiddleware
             return;
         }
 
+        // Intercept LOCK for existing generated-/uploaded-{model}.blend paths.
+        // Without this, NWebDav's NoLockingManager returns 403 Forbidden, which
+        // prevents macOS WebDAV clients (and Blender) from saving edits to the file.
+        if (method == "LOCK" && IsExistingBlendFile(requestPath))
+        {
+            // Return 200 (lock on existing resource) instead of 201 (new resource)
+            await HandleExistingBlendLockAsync(context, requestPath);
+            return;
+        }
+
+        if (method == "UNLOCK" && IsExistingBlendFile(requestPath))
+        {
+            context.Response.StatusCode = 204;
+            return;
+        }
+
         // Intercept PUT /modelibr/Models/{filename}.blend — create a new model from .blend
         if (method == "PUT" && IsNewModelBlendPut(requestPath))
         {
@@ -144,18 +160,33 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Returns true if the path ends with a Blender temporary save file pattern (newest-updateable-{name}.blend@ or .tmp).
+    /// Returns true if the path ends with generated-{name}.blend or uploaded-{name}.blend.
+    /// Used to intercept LOCK/UNLOCK for virtual .blend files so that NWebDav's NoLockingManager
+    /// doesn't return 403 Forbidden and block saves.
+    /// </summary>
+    private static bool IsExistingBlendFile(string path)
+    {
+        var fileName = Path.GetFileName(path);
+        return (fileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+                || fileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase))
+            && fileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns true if the path ends with a Blender temporary save file pattern
+    /// (generated-/uploaded-{name}.blend@ or .tmp).
     /// </summary>
     private static bool IsBlenderTempFile(string path)
     {
         var fileName = Path.GetFileName(path);
         return fileName.EndsWith(".blend@", StringComparison.OrdinalIgnoreCase)
-            || (fileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase)
+            || ((fileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+                 || fileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase))
                 && fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
-    /// Returns true if this MOVE request's Destination ends with newest-updateable-{name}.blend.
+    /// Returns true if this MOVE request's Destination ends with generated-{name}.blend or uploaded-{name}.blend.
     /// </summary>
     private static bool IsBlenderSaveMoveDestination(HttpContext context)
     {
@@ -172,7 +203,8 @@ public class WebDavMiddleware
             destPath = destination; // treat as raw path
 
         var destFileName = Path.GetFileName(destPath.TrimEnd('/'));
-        return destFileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase)
+        return (destFileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+                || destFileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase))
             && destFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -333,7 +365,7 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Handles MOVE newest-updateable-{model.Name}.blend@ → newest-updateable-{model.Name}.blend.
+    /// Handles MOVE generated-/uploaded-{model.Name}.blend@ → generated-/uploaded-{model.Name}.blend.
     /// Compares hashes; if different, fires CreateModelVersionCommand + AddFileToVersionCommand.
     /// </summary>
     private async Task HandleBlenderSaveMoveAsync(HttpContext context, string requestPath)
@@ -354,7 +386,7 @@ public class WebDavMiddleware
             using var scope = _scopeFactory.CreateScope();
             var sp = scope.ServiceProvider;
 
-            // Resolve the model from the path (e.g. /modelibr/Projects/P/Models/M/newest-updateable-{modelName}.blend@)
+            // Resolve the model from the path (e.g. /modelibr/Projects/P/Models/M/uploaded-{modelName}.blend@)
             var modelInfo = await ResolveModelInfoFromPathAsync(sp, requestPath);
             if (modelInfo == null)
             {
@@ -403,21 +435,23 @@ public class WebDavMiddleware
                         return;
                     }
                 }
+                else
+                {
+                    _logger.LogInformation("Created model version {VersionId} for model {ModelId} via Blender save",
+                        createResult.Value.VersionId, modelId);
 
-                _logger.LogInformation("Created model version {VersionId} for model {ModelId} via Blender save",
-                    createResult.Value.VersionId, modelId);
-
-                // Dispatch ModelUploadedEvent so the asset-processor picks up the
-                // .blend file, converts it to .glb, and generates a thumbnail.
-                // The CreateModelVersionCommandHandler only raises this event for
-                // renderable file types; .blend is a project file, so we raise it manually.
-                var dispatcher = sp.GetRequiredService<IDomainEventDispatcher>();
-                var uploadedEvent = new Domain.Events.ModelUploadedEvent(
-                    modelId,
-                    createResult.Value.VersionId,
-                    uploadedHash,
-                    isNewModel: false);
-                await dispatcher.PublishAsync(new[] { uploadedEvent }, context.RequestAborted);
+                    // Dispatch ModelUploadedEvent so the asset-processor picks up the
+                    // .blend file, converts it to .glb, and generates a thumbnail.
+                    // The CreateModelVersionCommandHandler only raises this event for
+                    // renderable file types; .blend is a project file, so we raise it manually.
+                    var dispatcher = sp.GetRequiredService<IDomainEventDispatcher>();
+                    var uploadedEvent = new Domain.Events.ModelUploadedEvent(
+                        modelId,
+                        createResult.Value.VersionId,
+                        uploadedHash,
+                        isNewModel: false);
+                    await dispatcher.PublishAsync(new[] { uploadedEvent }, context.RequestAborted);
+                }
             }
         }
         catch (Exception ex)
@@ -456,7 +490,8 @@ public class WebDavMiddleware
 
         var fileName = segments[1];
         return fileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase)
-            && !fileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase);
+            && !fileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+            && !fileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -491,6 +526,37 @@ public class WebDavMiddleware
         context.Response.Headers["Lock-Token"] = $"<{lockToken}>";
         await context.Response.WriteAsync(xml);
         _logger.LogDebug("Synthetic LOCK returned for {Path} (token={Token})", requestPath, lockToken);
+    }
+
+    /// <summary>
+    /// Returns a synthetic WebDAV lock token for an existing generated-/uploaded-{model}.blend file.
+    /// Without this, NWebDav's NoLockingManager returns 403 Forbidden, preventing saves.
+    /// </summary>
+    private async Task HandleExistingBlendLockAsync(HttpContext context, string requestPath)
+    {
+        var lockToken = $"urn:uuid:{Guid.NewGuid()}";
+        var escapedPath = System.Security.SecurityElement.Escape(requestPath);
+        var xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<D:prop xmlns:D=\"DAV:\">" +
+            "<D:lockdiscovery>" +
+            "<D:activelock>" +
+            "<D:locktype><D:write/></D:locktype>" +
+            "<D:lockscope><D:exclusive/></D:lockscope>" +
+            "<D:depth>0</D:depth>" +
+            "<D:timeout>Second-3600</D:timeout>" +
+            $"<D:locktoken><D:href>{lockToken}</D:href></D:locktoken>" +
+            $"<D:lockroot><D:href>{escapedPath}</D:href></D:lockroot>" +
+            "</D:activelock>" +
+            "</D:lockdiscovery>" +
+            "</D:prop>";
+
+        // 200 = locked existing resource (unlike 201 for new resources)
+        context.Response.StatusCode = 200;
+        context.Response.ContentType = "application/xml; charset=utf-8";
+        context.Response.Headers["Lock-Token"] = $"<{lockToken}>";
+        await context.Response.WriteAsync(xml);
+        _logger.LogDebug("Existing blend LOCK returned for {Path} (token={Token})", requestPath, lockToken);
     }
 
     /// <summary>
@@ -577,15 +643,25 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Derives the temp file key from a path like .../ModelName/newest-updateable-{modelName}.blend@
-    /// Key is a safe filename encoding the normalized model folder path.
+    /// Derives the temp file key from a path like .../ModelName/generated-{modelName}.blend@
+    /// or .../ModelName/uploaded-{modelName}.blend@.
+    /// Key is a safe filename encoding the normalized model folder path + the blend file prefix
+    /// so that generated and uploaded temp files don't collide.
     /// </summary>
     private static string GetTempFileKey(string requestPath)
     {
-        // Remove the last segment (the temp filename) to get the model folder path
+        // Include the filename (minus the temp suffix) in the hash input
+        // so that generated-X.blend@ and uploaded-X.blend@ produce different temp files
         var segments = requestPath.TrimEnd('/').Split('/');
         var modelPath = string.Join("/", segments[..^1]).ToLowerInvariant();
-        var keyBytes = System.Text.Encoding.UTF8.GetBytes(modelPath);
+        var fileName = segments[^1].ToLowerInvariant();
+        // Strip temp suffixes (.blend@, .tmp) to get the base blend filename for hashing
+        if (fileName.EndsWith(".blend@", StringComparison.OrdinalIgnoreCase))
+            fileName = fileName[..^1]; // remove trailing @
+        else if (fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+            fileName = fileName[..^4] + ".blend";
+        var keyInput = modelPath + "/" + fileName;
+        var keyBytes = System.Text.Encoding.UTF8.GetBytes(keyInput);
         var keyHash = Convert.ToHexString(SHA256.HashData(keyBytes)).ToLowerInvariant();
         return keyHash + ".tmp";
     }
@@ -593,8 +669,10 @@ public class WebDavMiddleware
     /// <summary>
     /// Resolves the model ID, name, and current blend file hash from the WebDAV request path.
     /// Supports both project-based and global model paths:
-    ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/newest-updateable-{modelName}.blend@
-    ///   /modelibr/Models/{ModelName}/newest-updateable-{modelName}.blend@
+    ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/generated-{modelName}.blend@
+    ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/uploaded-{modelName}.blend@
+    ///   /modelibr/Models/{ModelName}/generated-{modelName}.blend@
+    ///   /modelibr/Models/{ModelName}/uploaded-{modelName}.blend@
     /// </summary>
     private async Task<(int ModelId, string ModelName, string? CurrentBlendHash)?> ResolveModelInfoFromPathAsync(IServiceProvider sp, string requestPath)
     {
@@ -611,7 +689,7 @@ public class WebDavMiddleware
         string? projectName = null;
         string? modelName = null;
 
-        // Project-based path: Projects / {ProjectName} / Models / {ModelName} / newest-updateable-{modelName}.blend@
+        // Project-based path: Projects / {ProjectName} / Models / {ModelName} / generated-/uploaded-{modelName}.blend@
         if (segments.Length >= 5 &&
             segments[0].Equals("Projects", StringComparison.OrdinalIgnoreCase) &&
             segments[2].Equals("Models", StringComparison.OrdinalIgnoreCase))
@@ -619,7 +697,7 @@ public class WebDavMiddleware
             projectName = segments[1];
             modelName = segments[3];
         }
-        // Global model path: Models / {ModelName} / newest-updateable-{modelName}.blend@
+        // Global model path: Models / {ModelName} / generated-/uploaded-{modelName}.blend@
         else if (segments.Length >= 3 &&
                  segments[0].Equals("Models", StringComparison.OrdinalIgnoreCase))
         {

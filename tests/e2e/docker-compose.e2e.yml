@@ -3,6 +3,8 @@ services:
         build:
             context: ../../
             dockerfile: src/WebApi/Dockerfile
+            args:
+                ENABLE_BLENDER: "true"
         container_name: webapi-e2e
         environment:
             - ASPNETCORE_ENVIRONMENT=Development
@@ -13,6 +15,7 @@ services:
             - AllowedOrigins__0=http://localhost:3002
             - AllowedOrigins__1=http://localhost:3000
             - ENABLE_BLENDER=true
+            - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
         ports:
             - "8090:8080"
         healthcheck:
@@ -22,6 +25,7 @@ services:
             retries: 10
         volumes:
             - webapi-uploads:/var/lib/modelibr/uploads
+            - blender-data:/var/lib/modelibr/blender
         depends_on:
             postgres-e2e:
                 condition: service_healthy
@@ -43,8 +47,6 @@ services:
         build:
             context: ../../src/asset-processor
             dockerfile: Dockerfile
-            args:
-                ENABLE_BLENDER: "true"
         container_name: asset-processor-e2e
         environment:
             - WORKER_ID=worker-e2e
@@ -65,6 +67,7 @@ services:
             retries: 10
         volumes:
             - worker-thumbnails:/var/lib/modelibr/thumbnails
+            - blender-data:/var/lib/modelibr/blender
         depends_on:
             webapi-e2e:
                 condition: service_healthy
@@ -97,3 +100,4 @@ volumes:
     webapi-uploads:
     worker-thumbnails:
     postgres-data:
+    blender-data:

@@ -73,6 +73,7 @@ public class VirtualAssetStoreTests : IDisposable
             collectionPropertyManager,
             lockingManager,
             _mockAudioSelectionService.Object,
+            new Mock<IBlendFileGenerator>().Object,
             _mockLogger.Object,
             new Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory());
     }

@@ -719,6 +719,29 @@ export class ModelViewerPage {
             timeout: 10000,
         });
 
+        // Capture the current texture UUID before clicking so we can detect the change
+        const uuidBefore = await this.page.evaluate(() => {
+            // @ts-expect-error - accessing runtime globals
+            const scene = window.__THREE_SCENE__;
+            if (!scene) return null;
+            let uuid: string | null = null;
+            scene.traverse((obj: any) => {
+                if (uuid) return;
+                if (obj.isMesh && obj.material?.isMeshStandardMaterial) {
+                    const mat = obj.material;
+                    const tex =
+                        mat.map ||
+                        mat.roughnessMap ||
+                        mat.metalnessMap ||
+                        mat.normalMap ||
+                        mat.aoMap ||
+                        mat.emissiveMap;
+                    if (tex) uuid = tex.uuid;
+                }
+            });
+            return uuid;
+        });
+
         // Find the material item with this texture set linked and click the preview to select it
         const item = this.page.locator(
             `.materials-item[data-texture-set*="${name}"]`,
@@ -741,6 +764,45 @@ export class ModelViewerPage {
             await preview.click();
         } else {
             await targetItem.click();
+        }
+
+        // Wait for the Three.js texture to actually change after selection
+        if (uuidBefore !== null) {
+            await expect
+                .poll(
+                    async () => {
+                        return await this.page.evaluate(() => {
+                            // @ts-expect-error - accessing runtime globals
+                            const scene = window.__THREE_SCENE__;
+                            if (!scene) return null;
+                            let uuid: string | null = null;
+                            scene.traverse((obj: any) => {
+                                if (uuid) return;
+                                if (
+                                    obj.isMesh &&
+                                    obj.material?.isMeshStandardMaterial
+                                ) {
+                                    const mat = obj.material;
+                                    const tex =
+                                        mat.map ||
+                                        mat.roughnessMap ||
+                                        mat.metalnessMap ||
+                                        mat.normalMap ||
+                                        mat.aoMap ||
+                                        mat.emissiveMap;
+                                    if (tex) uuid = tex.uuid;
+                                }
+                            });
+                            return uuid;
+                        });
+                    },
+                    {
+                        message: `Waiting for Three.js texture to change after selecting "${name}"`,
+                        timeout: 15000,
+                        intervals: [500, 1000, 2000],
+                    },
+                )
+                .not.toBe(uuidBefore);
         }
 
         console.log(`[UI] Selected texture set "${name}" ✓`);
@@ -969,5 +1031,51 @@ export class ModelViewerPage {
         // Close the dropdown
         await dropdown.click();
         return names;
+    }
+
+    /**
+     * Verify that unlinked materials show the "Embedded" indicator
+     */
+    async expectMaterialShowsEmbedded(materialName?: string): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const scope = materialName
+            ? this.page.locator(".materials-material-group", {
+                  has: this.page.locator(".materials-item-name", {
+                      hasText: materialName,
+                  }),
+              })
+            : this.page.locator(".materials-material-group").first();
+
+        const embeddedLabel = scope.locator(".materials-empty", {
+            hasText: "Embedded",
+        });
+        await expect(embeddedLabel).toBeVisible({ timeout: 10000 });
+        console.log(
+            `[UI] Material ${materialName ?? "(first)"} shows Embedded indicator ✓`,
+        );
+    }
+
+    /**
+     * Verify that the "Link Texture Set" button is NOT visible for the current preset
+     * (expected when Embedded preset is selected)
+     */
+    async expectLinkTextureSetHidden(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const linkBtns = this.page.locator('[data-testid^="link-ts-"]');
+        await expect(linkBtns).toHaveCount(0, { timeout: 5000 });
+        console.log(`[UI] Link Texture Set buttons are hidden ✓`);
+    }
+
+    /**
+     * Verify that the "Link Texture Set" button IS visible
+     */
+    async expectLinkTextureSetVisible(): Promise<void> {
+        await this.openTab("Materials", '[data-testid="materials-panel"]');
+
+        const linkBtn = this.page.locator('[data-testid^="link-ts-"]').first();
+        await expect(linkBtn).toBeVisible({ timeout: 10000 });
+        console.log(`[UI] Link Texture Set buttons are visible ✓`);
     }
 }

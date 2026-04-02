@@ -152,6 +152,7 @@ export function AddModelDialog({
               return (
                 <div
                   key={model.id}
+                  data-model-id={model.id}
                   className={`container-card ${isSelected ? 'selected' : ''}`}
                   onClick={() => toggleSelection(Number(model.id))}
                 >

@@ -64,7 +64,7 @@ export class ProjectsPage {
         // Click on the project card to open the viewer
         const projectCard = this.page
             .locator(
-                `.project-card[data-project-id="${projectId}"], .container-card[data-id="${projectId}"]`,
+                `.project-grid-card[data-project-id="${projectId}"], .project-card[data-project-id="${projectId}"], .container-card[data-id="${projectId}"]`,
             )
             .first();
         if (
@@ -157,17 +157,24 @@ export class ProjectsPage {
         );
         console.log("[Action] Dialog closed");
 
-        // Wait for project card to appear
-        await this.page.waitForSelector(
-            `.project-grid-card:has-text("${name}")`,
-            { state: "visible", timeout: 10000 },
-        );
-        console.log(`[Action] Project card "${name}" visible`);
-
         // Get project ID from API
         const response = await this.page.request.get(`${API_BASE}/projects`);
         const projects = await response.json();
         const project = projects.projects.find((p: any) => p.name === name);
+
+        // Wait for project card to appear using data-project-id
+        if (project?.id) {
+            await this.page.waitForSelector(
+                `.project-grid-card[data-project-id="${project.id}"]`,
+                { state: "visible", timeout: 10000 },
+            );
+        } else {
+            await this.page.waitForSelector(
+                `.project-grid-card:has-text("${name}")`,
+                { state: "visible", timeout: 10000 },
+            );
+        }
+        console.log(`[Action] Project card "${name}" visible`);
 
         console.log(
             `[Project] Created project "${name}" with ID: ${project?.id}`,
@@ -175,8 +182,8 @@ export class ProjectsPage {
         return { id: project?.id, name, description };
     }
 
-    async openProject(projectName: string): Promise<void> {
-        const projectCard = this.getProjectCard(projectName);
+    async openProject(projectName: string, projectId?: number): Promise<void> {
+        const projectCard = this.getProjectCard(projectName, projectId);
 
         // Wait for the specific card to be visible before clicking
         await projectCard.waitFor({ state: "visible", timeout: 30000 });
@@ -185,8 +192,11 @@ export class ProjectsPage {
         console.log(`[Navigation] Opened project: ${projectName}`);
     }
 
-    async deleteProject(projectName: string): Promise<void> {
-        const projectCard = this.getProjectCard(projectName);
+    async deleteProject(
+        projectName: string,
+        projectId?: number,
+    ): Promise<void> {
+        const projectCard = this.getProjectCard(projectName, projectId);
         const deleteBtn = projectCard.locator(
             ".delete-button, button:has(.pi-trash)",
         );
@@ -210,14 +220,22 @@ export class ProjectsPage {
         console.log(`[Action] Deleted project: ${projectName}`);
     }
 
-    getProjectCard(projectName: string): Locator {
+    getProjectCard(projectName: string, projectId?: number): Locator {
+        if (projectId) {
+            return this.page.locator(
+                `.project-grid-card[data-project-id="${projectId}"]`,
+            );
+        }
         return this.page
             .locator(`.project-grid-card:has-text("${projectName}")`)
             .first();
     }
 
-    async isProjectVisible(projectName: string): Promise<boolean> {
-        const projectCard = this.getProjectCard(projectName);
+    async isProjectVisible(
+        projectName: string,
+        projectId?: number,
+    ): Promise<boolean> {
+        const projectCard = this.getProjectCard(projectName, projectId);
         return await projectCard.isVisible();
     }
 }
