@@ -719,6 +719,29 @@ export class ModelViewerPage {
             timeout: 10000,
         });
 
+        // Capture the current texture UUID before clicking so we can detect the change
+        const uuidBefore = await this.page.evaluate(() => {
+            // @ts-expect-error - accessing runtime globals
+            const scene = window.__THREE_SCENE__;
+            if (!scene) return null;
+            let uuid: string | null = null;
+            scene.traverse((obj: any) => {
+                if (uuid) return;
+                if (obj.isMesh && obj.material?.isMeshStandardMaterial) {
+                    const mat = obj.material;
+                    const tex =
+                        mat.map ||
+                        mat.roughnessMap ||
+                        mat.metalnessMap ||
+                        mat.normalMap ||
+                        mat.aoMap ||
+                        mat.emissiveMap;
+                    if (tex) uuid = tex.uuid;
+                }
+            });
+            return uuid;
+        });
+
         // Find the material item with this texture set linked and click the preview to select it
         const item = this.page.locator(
             `.materials-item[data-texture-set*="${name}"]`,
@@ -741,6 +764,45 @@ export class ModelViewerPage {
             await preview.click();
         } else {
             await targetItem.click();
+        }
+
+        // Wait for the Three.js texture to actually change after selection
+        if (uuidBefore !== null) {
+            await expect
+                .poll(
+                    async () => {
+                        return await this.page.evaluate(() => {
+                            // @ts-expect-error - accessing runtime globals
+                            const scene = window.__THREE_SCENE__;
+                            if (!scene) return null;
+                            let uuid: string | null = null;
+                            scene.traverse((obj: any) => {
+                                if (uuid) return;
+                                if (
+                                    obj.isMesh &&
+                                    obj.material?.isMeshStandardMaterial
+                                ) {
+                                    const mat = obj.material;
+                                    const tex =
+                                        mat.map ||
+                                        mat.roughnessMap ||
+                                        mat.metalnessMap ||
+                                        mat.normalMap ||
+                                        mat.aoMap ||
+                                        mat.emissiveMap;
+                                    if (tex) uuid = tex.uuid;
+                                }
+                            });
+                            return uuid;
+                        });
+                    },
+                    {
+                        message: `Waiting for Three.js texture to change after selecting "${name}"`,
+                        timeout: 15000,
+                        intervals: [500, 1000, 2000],
+                    },
+                )
+                .not.toBe(uuidBefore);
         }
 
         console.log(`[UI] Selected texture set "${name}" ✓`);

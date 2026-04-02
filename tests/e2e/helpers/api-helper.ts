@@ -612,8 +612,8 @@ export class ApiHelper {
     /**
      * Simulate Blender Safe Save (PUT temp + MOVE) to create a new model version
      * via WebDAV. This is the pattern Blender uses when saving to an existing file:
-     *   1. PUT /modelibr/Models/{modelName}/newest-updateable-{modelName}.blend@  (temp upload)
-     *   2. MOVE the temp file → newest-updateable-{modelName}.blend (triggers version creation)
+     *   1. PUT /modelibr/Models/{modelName}/uploaded-{modelName}.blend@  (temp upload)
+     *   2. MOVE the temp file → uploaded-{modelName}.blend (triggers version creation)
      */
     async createVersionViaWebDavBlendSave(
         filePath: string,
@@ -622,11 +622,11 @@ export class ApiHelper {
         const fileBuffer = fs.readFileSync(filePath);
         const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
         const encodedName = encodeURIComponent(modelName);
-        const updateableFileName = `newest-updateable-${modelName}`;
+        const uploadedFileName = `uploaded-${modelName}`;
 
-        // Step 1: PUT the temp file (newest-updateable-{modelName}.blend@)
+        // Step 1: PUT the temp file (uploaded-{modelName}.blend@)
         const putResponse = await this.client.put(
-            `/modelibr/Models/${encodedName}/${encodeURIComponent(updateableFileName)}.blend@`,
+            `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
             fileBuffer,
             {
                 headers: {
@@ -637,12 +637,12 @@ export class ApiHelper {
             },
         );
 
-        // Step 2: MOVE temp → newest-updateable-{modelName}.blend
+        // Step 2: MOVE temp → uploaded-{modelName}.blend
         const moveResponse = await this.client.request({
             method: "MOVE",
-            url: `/modelibr/Models/${encodedName}/${encodeURIComponent(updateableFileName)}.blend@`,
+            url: `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
             headers: {
-                Destination: `${baseUrl}/modelibr/Models/${encodedName}/${encodeURIComponent(updateableFileName)}.blend`,
+                Destination: `${baseUrl}/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend`,
                 Overwrite: "T",
             },
         });

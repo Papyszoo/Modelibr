@@ -77,14 +77,14 @@ public class WebDavMiddleware
             return;
         }
 
-        // Intercept Blender Safe Save: PUT newest-updateable-{model.Name}.blend@ (temp upload)
+        // Intercept Blender Safe Save: PUT generated-/uploaded-{model.Name}.blend@ (temp upload)
         if (method == "PUT" && IsBlenderTempFile(requestPath))
         {
             await HandleBlenderTempPutAsync(context, requestPath);
             return;
         }
 
-        // Intercept Blender Safe Save: MOVE newest-updateable-{model.Name}.blend@ → newest-updateable-{model.Name}.blend
+        // Intercept Blender Safe Save: MOVE generated-/uploaded-{model.Name}.blend@ → generated-/uploaded-{model.Name}.blend
         if (method == "MOVE" && IsBlenderSaveMoveDestination(context))
         {
             await HandleBlenderSaveMoveAsync(context, requestPath);
@@ -125,7 +125,7 @@ public class WebDavMiddleware
             return;
         }
 
-        // Intercept LOCK for existing newest-updateable-{model}.blend paths.
+        // Intercept LOCK for existing generated-/uploaded-{model}.blend paths.
         // Without this, NWebDav's NoLockingManager returns 403 Forbidden, which
         // prevents macOS WebDAV clients (and Blender) from saving edits to the file.
         if (method == "LOCK" && IsExistingBlendFile(requestPath))
@@ -160,30 +160,33 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Returns true if the path ends with newest-updateable-{name}.blend (an existing model .blend file).
-    /// Used to intercept LOCK/UNLOCK for existing files so that NWebDav's NoLockingManager
+    /// Returns true if the path ends with generated-{name}.blend or uploaded-{name}.blend.
+    /// Used to intercept LOCK/UNLOCK for virtual .blend files so that NWebDav's NoLockingManager
     /// doesn't return 403 Forbidden and block saves.
     /// </summary>
     private static bool IsExistingBlendFile(string path)
     {
         var fileName = Path.GetFileName(path);
-        return fileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase)
+        return (fileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+                || fileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase))
             && fileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// Returns true if the path ends with a Blender temporary save file pattern (newest-updateable-{name}.blend@ or .tmp).
+    /// Returns true if the path ends with a Blender temporary save file pattern
+    /// (generated-/uploaded-{name}.blend@ or .tmp).
     /// </summary>
     private static bool IsBlenderTempFile(string path)
     {
         var fileName = Path.GetFileName(path);
         return fileName.EndsWith(".blend@", StringComparison.OrdinalIgnoreCase)
-            || (fileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase)
+            || ((fileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+                 || fileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase))
                 && fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
-    /// Returns true if this MOVE request's Destination ends with newest-updateable-{name}.blend.
+    /// Returns true if this MOVE request's Destination ends with generated-{name}.blend or uploaded-{name}.blend.
     /// </summary>
     private static bool IsBlenderSaveMoveDestination(HttpContext context)
     {
@@ -200,7 +203,8 @@ public class WebDavMiddleware
             destPath = destination; // treat as raw path
 
         var destFileName = Path.GetFileName(destPath.TrimEnd('/'));
-        return destFileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase)
+        return (destFileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+                || destFileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase))
             && destFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -361,7 +365,7 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Handles MOVE newest-updateable-{model.Name}.blend@ → newest-updateable-{model.Name}.blend.
+    /// Handles MOVE generated-/uploaded-{model.Name}.blend@ → generated-/uploaded-{model.Name}.blend.
     /// Compares hashes; if different, fires CreateModelVersionCommand + AddFileToVersionCommand.
     /// </summary>
     private async Task HandleBlenderSaveMoveAsync(HttpContext context, string requestPath)
@@ -382,7 +386,7 @@ public class WebDavMiddleware
             using var scope = _scopeFactory.CreateScope();
             var sp = scope.ServiceProvider;
 
-            // Resolve the model from the path (e.g. /modelibr/Projects/P/Models/M/newest-updateable-{modelName}.blend@)
+            // Resolve the model from the path (e.g. /modelibr/Projects/P/Models/M/uploaded-{modelName}.blend@)
             var modelInfo = await ResolveModelInfoFromPathAsync(sp, requestPath);
             if (modelInfo == null)
             {
@@ -486,7 +490,8 @@ public class WebDavMiddleware
 
         var fileName = segments[1];
         return fileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase)
-            && !fileName.StartsWith("newest-updateable-", StringComparison.OrdinalIgnoreCase);
+            && !fileName.StartsWith("generated-", StringComparison.OrdinalIgnoreCase)
+            && !fileName.StartsWith("uploaded-", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -524,7 +529,7 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Returns a synthetic WebDAV lock token for an existing newest-updateable-{model}.blend file.
+    /// Returns a synthetic WebDAV lock token for an existing generated-/uploaded-{model}.blend file.
     /// Without this, NWebDav's NoLockingManager returns 403 Forbidden, preventing saves.
     /// </summary>
     private async Task HandleExistingBlendLockAsync(HttpContext context, string requestPath)
@@ -638,15 +643,25 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Derives the temp file key from a path like .../ModelName/newest-updateable-{modelName}.blend@
-    /// Key is a safe filename encoding the normalized model folder path.
+    /// Derives the temp file key from a path like .../ModelName/generated-{modelName}.blend@
+    /// or .../ModelName/uploaded-{modelName}.blend@.
+    /// Key is a safe filename encoding the normalized model folder path + the blend file prefix
+    /// so that generated and uploaded temp files don't collide.
     /// </summary>
     private static string GetTempFileKey(string requestPath)
     {
-        // Remove the last segment (the temp filename) to get the model folder path
+        // Include the filename (minus the temp suffix) in the hash input
+        // so that generated-X.blend@ and uploaded-X.blend@ produce different temp files
         var segments = requestPath.TrimEnd('/').Split('/');
         var modelPath = string.Join("/", segments[..^1]).ToLowerInvariant();
-        var keyBytes = System.Text.Encoding.UTF8.GetBytes(modelPath);
+        var fileName = segments[^1].ToLowerInvariant();
+        // Strip temp suffixes (.blend@, .tmp) to get the base blend filename for hashing
+        if (fileName.EndsWith(".blend@", StringComparison.OrdinalIgnoreCase))
+            fileName = fileName[..^1]; // remove trailing @
+        else if (fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+            fileName = fileName[..^4] + ".blend";
+        var keyInput = modelPath + "/" + fileName;
+        var keyBytes = System.Text.Encoding.UTF8.GetBytes(keyInput);
         var keyHash = Convert.ToHexString(SHA256.HashData(keyBytes)).ToLowerInvariant();
         return keyHash + ".tmp";
     }
@@ -654,8 +669,10 @@ public class WebDavMiddleware
     /// <summary>
     /// Resolves the model ID, name, and current blend file hash from the WebDAV request path.
     /// Supports both project-based and global model paths:
-    ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/newest-updateable-{modelName}.blend@
-    ///   /modelibr/Models/{ModelName}/newest-updateable-{modelName}.blend@
+    ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/generated-{modelName}.blend@
+    ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/uploaded-{modelName}.blend@
+    ///   /modelibr/Models/{ModelName}/generated-{modelName}.blend@
+    ///   /modelibr/Models/{ModelName}/uploaded-{modelName}.blend@
     /// </summary>
     private async Task<(int ModelId, string ModelName, string? CurrentBlendHash)?> ResolveModelInfoFromPathAsync(IServiceProvider sp, string requestPath)
     {
@@ -672,7 +689,7 @@ public class WebDavMiddleware
         string? projectName = null;
         string? modelName = null;
 
-        // Project-based path: Projects / {ProjectName} / Models / {ModelName} / newest-updateable-{modelName}.blend@
+        // Project-based path: Projects / {ProjectName} / Models / {ModelName} / generated-/uploaded-{modelName}.blend@
         if (segments.Length >= 5 &&
             segments[0].Equals("Projects", StringComparison.OrdinalIgnoreCase) &&
             segments[2].Equals("Models", StringComparison.OrdinalIgnoreCase))
@@ -680,7 +697,7 @@ public class WebDavMiddleware
             projectName = segments[1];
             modelName = segments[3];
         }
-        // Global model path: Models / {ModelName} / newest-updateable-{modelName}.blend@
+        // Global model path: Models / {ModelName} / generated-/uploaded-{modelName}.blend@
         else if (segments.Length >= 3 &&
                  segments[0].Equals("Models", StringComparison.OrdinalIgnoreCase))
         {

@@ -17,8 +17,11 @@ const apiHelper = new ApiHelper();
 // Generate unique suffix for each test run to avoid name conflicts
 const runId = Date.now().toString(36).slice(-4);
 
-// Helper to find a texture set card by name
-const getTextureSetCard = (page: any, name: string) => {
+// Helper to find a texture set card by ID (preferred) or name (fallback)
+const getTextureSetCard = (page: any, name: string, id?: number) => {
+    if (id) {
+        return page.locator(`.texture-set-card[data-texture-set-id="${id}"]`);
+    }
     return page.locator(`.texture-set-card:has-text("${name}")`).first();
 };
 
@@ -113,12 +116,20 @@ When(
             await page.waitForTimeout(500);
         }
 
-        const sourceCard = page
-            .locator(`.texture-set-card:has-text("${sourceDisplayName}")`)
-            .first();
-        const targetCard = page
-            .locator(`.texture-set-card:has-text("${targetDisplayName}")`)
-            .first();
+        const sourceCard = sourceSet
+            ? page.locator(
+                  `.texture-set-card[data-texture-set-id="${sourceSet.id}"]`,
+              )
+            : page
+                  .locator(`.texture-set-card:has-text("${sourceDisplayName}")`)
+                  .first();
+        const targetCard = targetSet
+            ? page.locator(
+                  `.texture-set-card[data-texture-set-id="${targetSet.id}"]`,
+              )
+            : page
+                  .locator(`.texture-set-card:has-text("${targetDisplayName}")`)
+                  .first();
 
         await expect(sourceCard).toBeVisible({ timeout: 10000 });
         await expect(targetCard).toBeVisible({ timeout: 10000 });
@@ -127,25 +138,23 @@ When(
         // properly set custom dataTransfer data for React's synthetic events.
         // The React handler requires 'application/x-texture-set-id' in dataTransfer.
         await page.evaluate(
-            ({ sourceName, targetName }) => {
+            ({ sourceId, targetId }) => {
                 return new Promise<void>((resolve, reject) => {
-                    const allCards =
-                        document.querySelectorAll(".texture-set-card");
-                    let source: Element | null = null;
-                    let target: Element | null = null;
-
-                    for (const card of allCards) {
-                        const name =
-                            card.querySelector(".texture-set-card-name")
-                                ?.textContent || "";
-                        if (name.includes(sourceName) && !source) source = card;
-                        if (name.includes(targetName) && !target) target = card;
-                    }
+                    const source = sourceId
+                        ? document.querySelector(
+                              `[data-texture-set-id="${sourceId}"]`,
+                          )
+                        : null;
+                    const target = targetId
+                        ? document.querySelector(
+                              `[data-texture-set-id="${targetId}"]`,
+                          )
+                        : null;
 
                     if (!source || !target) {
                         reject(
                             new Error(
-                                `Cards not found: source="${sourceName}" (${!!source}), target="${targetName}" (${!!target})`,
+                                `Cards not found: source ID=${sourceId} (${!!source}), target ID=${targetId} (${!!target})`,
                             ),
                         );
                         return;
@@ -162,31 +171,34 @@ When(
                         }),
                     );
 
-                    // Wait for React state update, then dispatch dragover + drop
-                    setTimeout(() => {
-                        target!.dispatchEvent(
-                            new DragEvent("dragover", {
-                                bubbles: true,
-                                cancelable: true,
-                                dataTransfer: dataTransfer,
-                            }),
-                        );
+                    // Wait for React to process dragstart via requestAnimationFrame,
+                    // then dispatch dragover + drop
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            target!.dispatchEvent(
+                                new DragEvent("dragover", {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    dataTransfer: dataTransfer,
+                                }),
+                            );
 
-                        target!.dispatchEvent(
-                            new DragEvent("drop", {
-                                bubbles: true,
-                                cancelable: true,
-                                dataTransfer: dataTransfer,
-                            }),
-                        );
+                            target!.dispatchEvent(
+                                new DragEvent("drop", {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    dataTransfer: dataTransfer,
+                                }),
+                            );
 
-                        resolve();
-                    }, 200);
+                            resolve();
+                        });
+                    });
                 });
             },
             {
-                sourceName: sourceDisplayName,
-                targetName: targetDisplayName,
+                sourceId: sourceSet?.id,
+                targetId: targetSet?.id,
             },
         );
 
@@ -272,13 +284,9 @@ Then("I should see R, G, B channel dropdowns appear", async ({ page }) => {
     await expect(splitSection).toBeVisible({ timeout: 3000 });
 
     // Verify all channel options are visible
-    for (const channel of ["R:", "G:", "B:"]) {
+    for (const channel of ["R", "G", "B"]) {
         await expect(
-            page
-                .locator(
-                    `.channel-row:has-text("${channel}"), label:has-text("${channel}")`,
-                )
-                .first(),
+            page.locator(`.channel-row[data-channel="${channel}"]`),
         ).toBeVisible();
     }
     console.log("[UI] R, G, B channel dropdowns are visible");
@@ -304,7 +312,7 @@ When(
 
 When("I set the A channel to {string}", async ({ page }, type: string) => {
     const channelRow = page
-        .locator('.channel-row:has-text("A:"), label:has-text("Alpha")')
+        .locator('.channel-row[data-channel="A"]')
         .locator("..");
     const dropdown = channelRow.locator(".p-dropdown");
     await dropdown.click();
@@ -325,7 +333,7 @@ When(
         await page.locator(`.p-dropdown-item:has-text("${option}")`).click();
 
         // Set G channel
-        const channelRow = page.locator('.channel-row:has-text("G:")').first();
+        const channelRow = page.locator('.channel-row[data-channel="G"]');
         const dropdown = channelRow.locator(".p-dropdown");
         await dropdown.click();
         await page.locator(`.p-dropdown-item:has-text("${type}")`).click();
@@ -371,9 +379,11 @@ Then(
                 .catch(() => {});
         }
 
-        const card = page
-            .locator(`.texture-set-card:has-text("${displayName}")`)
-            .first();
+        const card = set
+            ? page.locator(`.texture-set-card[data-texture-set-id="${set.id}"]`)
+            : page
+                  .locator(`.texture-set-card:has-text("${displayName}")`)
+                  .first();
         await card.dblclick();
         await page.waitForSelector(".texture-set-viewer, .p-dialog", {
             timeout: 25000,
@@ -429,9 +439,11 @@ Then(
         const set = getScenarioState(page).getTextureSet(setName);
         const displayName = set?.name || setName;
 
-        const card = page
-            .locator(`.texture-set-card:has-text("${displayName}")`)
-            .first();
+        const card = set
+            ? page.locator(`.texture-set-card[data-texture-set-id="${set.id}"]`)
+            : page
+                  .locator(`.texture-set-card:has-text("${displayName}")`)
+                  .first();
         await card.dblclick();
         await page.waitForSelector(".texture-set-viewer, .p-dialog", {
             timeout: 25000,
@@ -455,7 +467,8 @@ Then(
 Then(
     "{string} should have both {string} and {string} textures",
     async ({ page }, setName: string, type1: string, type2: string) => {
-        const card = getTextureSetCard(page, setName);
+        const set = getScenarioState(page).getTextureSet(setName);
+        const card = getTextureSetCard(page, setName, set?.id);
         await card.dblclick();
         await page.waitForSelector(".texture-set-viewer, .p-dialog", {
             timeout: 25000,

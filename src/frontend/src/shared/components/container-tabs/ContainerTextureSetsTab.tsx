@@ -88,6 +88,7 @@ export function ContainerTextureSetsTab({
                 <div
                   key={textureSet.id}
                   className="container-card"
+                  data-texture-set-id={textureSet.id}
                   onClick={() =>
                     openTextureSetDetailsTab(textureSet.id, textureSet.name)
                   }

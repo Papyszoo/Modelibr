@@ -40,11 +40,9 @@ Given(
         await page.waitForLoadState("domcontentloaded");
 
         // Find and double-click the pack card to open viewer
-        const packCard = page
-            .locator(
-                `.pack-grid-card:has-text("${packName}"), .container-card:has-text("${packName}")`,
-            )
-            .first();
+        const packCard = page.locator(
+            `.pack-grid-card[data-pack-id="${pack.id}"]`,
+        );
         await packCard.waitFor({ state: "visible", timeout: 30000 });
         await packCard.dblclick();
 
@@ -191,13 +189,17 @@ When(
 
 When("I open the pack {string}", async ({ page }, packName: string) => {
     const packsPage = new PacksPage(page);
-    await packsPage.openPack(packName);
-    console.log(`[Action] Opened pack "${packName}"`);
+    const pack = getScenarioState(page).getPack(packName);
+    await packsPage.openPack(packName, pack?.id);
+    console.log(
+        `[Action] Opened pack "${packName}"${pack?.id ? ` (id=${pack.id})` : ""}`,
+    );
 });
 
 When("I delete the pack {string}", async ({ page }, packName: string) => {
     const packsPage = new PacksPage(page);
-    await packsPage.deletePack(packName);
+    const pack = getScenarioState(page).getPack(packName);
+    await packsPage.deletePack(packName, pack?.id);
     console.log(`[Action] Deleted pack "${packName}"`);
 });
 
@@ -211,7 +213,8 @@ Then(
         // Wait for pack grid to be stable
         await page.waitForLoadState("domcontentloaded");
 
-        const isVisible = await packsPage.isPackVisible(packName);
+        const pack = getScenarioState(page).getPack(packName);
+        const isVisible = await packsPage.isPackVisible(packName, pack?.id);
         expect(isVisible).toBe(true);
         console.log(`[UI] Pack "${packName}" is visible ✓`);
     },
@@ -225,7 +228,8 @@ Then(
         // Wait for pack grid to be stable
         await page.waitForLoadState("domcontentloaded");
 
-        const isVisible = await packsPage.isPackVisible(packName);
+        const pack = getScenarioState(page).getPack(packName);
+        const isVisible = await packsPage.isPackVisible(packName, pack?.id);
         expect(isVisible).toBe(false);
         console.log(`[UI] Pack "${packName}" is not visible ✓`);
     },
@@ -289,95 +293,31 @@ When(
         });
         console.log("[Action] Add Models dialog opened");
 
-        // Wait for dialog content to load
-        await page
-            .locator('.p-dialog [data-pc-section="content"]')
-            .first()
-            .waitFor({ state: "visible", timeout: 5000 });
+        // Wait for dialog content to load with model cards
+        await page.waitForSelector(".p-dialog .container-card[data-model-id]", {
+            state: "visible",
+            timeout: 10000,
+        });
 
-        const modelName = model.name; // This is the actual file name
-
-        // Find the model item by its name - items are clickable divs in the content area
-        // The structure is: [data-pc-section="content"] > container div > clickable items
-        // Each item has checkbox + thumbnail + name and is fully clickable
-        const dialogContent = page.locator(
-            '.p-dialog [data-pc-section="content"]',
+        // Select the specific model by its ID (avoids ambiguity when multiple models share the same name)
+        const modelCard = page.locator(
+            `.p-dialog .container-card[data-model-id="${model.id}"]`,
+        );
+        await modelCard.waitFor({ state: "visible", timeout: 5000 });
+        await modelCard.click();
+        console.log(
+            `[Action] Clicked model card with data-model-id="${model.id}" (${model.name})`,
         );
 
-        // Find ALL divs that contain the model name, then click the one with a checkbox
-        // The clickable container wraps checkbox + model info
-        const items = dialogContent
-            .locator("div")
-            .filter({
-                hasText: modelName,
-            })
-            .all();
-
-        // Click directly on a getByText match for the model name, which should be within the clickable area
-        // Use .first() because multiple models may share the same name (e.g. "test-cube")
-        const modelText = page
-            .locator(".p-dialog")
-            .getByText(modelName, { exact: true })
-            .first();
-        await modelText.waitFor({ state: "visible", timeout: 5000 });
-
-        // Click the parent container (the clickable item)
-        const clickableContainer = modelText
-            .locator(
-                'xpath=ancestor::*[@role="option" or contains(@class, "cursor") or position()=1]/..',
-            )
-            .first();
-
-        // Try to click using different strategies
-        try {
-            // Strategy 1: Click the text element's grandparent (the clickable container)
-            await modelText.locator("..").locator("..").click();
-            console.log(`[Action] Clicked container for model: ${modelName}`);
-        } catch (e) {
-            // Strategy 2: Click directly on the text
-            await modelText.click();
-            console.log(`[Action] Clicked model text: ${modelName}`);
-        }
-
-        // Check the Add button state
+        // Verify selection registered
         const addButton = page
             .locator('.p-dialog-footer button:has-text("Add Selected")')
             .first();
         await addButton.waitFor({ state: "visible", timeout: 5000 });
+        await expect(addButton).not.toContainText("(0)", { timeout: 3000 });
 
         const buttonText = await addButton.textContent();
         console.log(`[Action] Add button text: ${buttonText}`);
-
-        // If still shows (0), try clicking the checkbox via JavaScript
-        if (buttonText?.includes("(0)")) {
-            console.log(
-                "[Action] Selection not registered, trying JS click...",
-            );
-
-            // Try to find and toggle the checkbox via JavaScript
-            const checkboxInput = modelText
-                .locator('input[type="checkbox"]')
-                .first();
-            if ((await checkboxInput.count()) > 0) {
-                await checkboxInput.check({ force: true });
-                console.log("[Action] Force-checked the checkbox");
-            } else {
-                // Click on the item container itself
-                await modelText.click({
-                    force: true,
-                    position: { x: 20, y: 20 },
-                });
-                console.log("[Action] Clicked item at specific position");
-            }
-
-            // Wait for selection to register
-            // Soft wait — selection may already be registered or may take a moment
-            await expect(addButton)
-                .not.toContainText("(0)", { timeout: 2000 })
-                .catch(() => {});
-            const updatedText = await addButton.textContent();
-            console.log(`[Action] Updated button text: ${updatedText}`);
-        }
 
         // Click Add button
         await addButton.click();
@@ -392,6 +332,18 @@ When(
 
         // Wait for pack content to refresh after adding model
         await page.waitForLoadState("domcontentloaded");
+
+        // Wait for the model card to appear in the grid after refresh
+        await page
+            .waitForSelector(`.model-card[data-model-id="${model.id}"]`, {
+                state: "visible",
+                timeout: 15000,
+            })
+            .catch(() => {
+                console.warn(
+                    `[Warn] Model card data-model-id="${model.id}" not visible after add`,
+                );
+            });
         console.log(`[Action] Added model "${model.name}" to pack`);
     },
 );
@@ -414,9 +366,9 @@ When(
             .click();
 
         // Right-click on model card in container viewer (ModelGrid uses .model-card)
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
         await modelCard.waitFor({ state: "visible", timeout: 10000 });
         await modelCard.click({ button: "right" });
         console.log("[Action] Right-clicked on model card");
@@ -507,7 +459,7 @@ When(
 
         // Right-click on texture set card
         const textureCard = page.locator(
-            `.container-section .container-card:has-text("${textureSet.name}")`,
+            `.container-card[data-texture-set-id="${textureSet.id}"]`,
         );
         await textureCard.click({ button: "right" });
         // Wait for context menu
@@ -551,11 +503,38 @@ Then(
             .filter({ hasText: "Models" })
             .click();
 
+        // Wait for model grid to finish loading - wait for actual model cards (not just add button)
+        // Note: .model-card-add also has .model-card class, so we must wait for cards WITH data-model-id
+        await page
+            .waitForSelector(".model-card[data-model-id]", {
+                state: "visible",
+                timeout: 15000,
+            })
+            .catch(async () => {
+                // Debug: log what model cards exist in the DOM
+                const allCards = await page
+                    .locator(".model-card")
+                    .evaluateAll((els) =>
+                        els.map((el) => ({
+                            classes: el.className,
+                            dataModelId: el.getAttribute("data-model-id"),
+                            text: el.textContent?.substring(0, 50),
+                        })),
+                    );
+                console.log(
+                    `[Debug] All .model-card elements:`,
+                    JSON.stringify(allCards),
+                );
+            });
+
         // Model cards in container viewer use .model-card class (ModelGrid)
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
-        await expect(modelCard).toBeVisible({ timeout: 10000 });
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
+        console.log(
+            `[Debug] Looking for model card with data-model-id="${model.id}"`,
+        );
+        await expect(modelCard).toBeVisible({ timeout: 15000 });
         console.log(`[UI] Pack contains model "${model.name}" ✓`);
     },
 );
@@ -577,10 +556,18 @@ Then(
             .filter({ hasText: "Models" })
             .click();
 
+        // Wait for model grid to finish loading
+        await page
+            .waitForSelector(".model-card, .model-card-add, .no-results", {
+                state: "visible",
+                timeout: 15000,
+            })
+            .catch(() => {});
+
         // Check model card is not visible
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
         await expect(modelCard).not.toBeVisible();
         console.log(`[UI] Pack does not contain model "${model.name}" ✓`);
     },
@@ -627,7 +614,7 @@ Then(
             .click();
 
         const textureCard = page.locator(
-            `.container-section .container-card:has-text("${textureSet.name}")`,
+            `.container-card[data-texture-set-id="${textureSet.id}"]`,
         );
         await expect(textureCard).toBeVisible({ timeout: 10000 });
         console.log(`[UI] Pack contains texture set "${textureSet.name}" ✓`);
@@ -652,7 +639,7 @@ Then(
             .click();
 
         const textureCard = page.locator(
-            `.container-section .container-card:has-text("${textureSet.name}")`,
+            `.container-card[data-texture-set-id="${textureSet.id}"]`,
         );
         await expect(textureCard).not.toBeVisible();
         console.log(
@@ -702,12 +689,21 @@ Given(
             .filter({ hasText: "Models" })
             .click();
 
-        const modelCard = page
-            .locator(`.model-card:has-text("${model.name}")`)
-            .first();
+        // Wait for model grid to finish loading (cards or empty state)
+        await page.waitForSelector(
+            ".model-card, .model-card-add, .no-results",
+            {
+                state: "visible",
+                timeout: 15000,
+            },
+        );
+
+        const modelCard = page.locator(
+            `.model-card[data-model-id="${model.id}"]`,
+        );
         // Wait for tab content to render and verify model is present
         try {
-            await expect(modelCard).toBeVisible({ timeout: 10000 });
+            await expect(modelCard).toBeVisible({ timeout: 15000 });
         } catch {
             throw new Error(
                 `Pack does not contain model "${model.name}". Add it first.`,
@@ -734,7 +730,7 @@ Given(
             .click();
 
         const textureCard = page.locator(
-            `.container-section .container-card:has-text("${textureSet.name}")`,
+            `.container-card[data-texture-set-id="${textureSet.id}"]`,
         );
         // Wait for tab content to render and verify texture set is present
         try {

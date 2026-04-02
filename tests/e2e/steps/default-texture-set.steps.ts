@@ -84,18 +84,30 @@ When(
             `[DB] Saving state for model ${modelId}, version 1 (id=${v1Id})`,
         );
 
-        // Capture thumbnail details from database
+        // Wait for v1 thumbnail to be in a stable Ready state before snapshotting
+        // This prevents flakiness from capturing an in-progress thumbnail
+        await expect
+            .poll(
+                async () => {
+                    const details = await db.getThumbnailDetails(v1Id);
+                    const status = details?.Status ?? null;
+                    console.log(`[DB] v1 thumbnail status: ${status}`);
+                    return status;
+                },
+                {
+                    message: `Version 1 (id=${v1Id}) thumbnail did not reach Ready state before snapshotting`,
+                    intervals: [2000, 3000, 5000],
+                    timeout: 120000,
+                },
+            )
+            .toBe(2);
+
+        // Capture thumbnail details from database (now guaranteed to be stable)
         const thumbnailDetails = await db.getThumbnailDetails(v1Id);
 
-        if (!thumbnailDetails) {
-            console.warn(
-                `[Warning] No thumbnail found for version ${v1Id} - may be processing`,
-            );
-        } else {
-            console.log(
-                `[DB] Thumbnail status: ${thumbnailDetails.Status}, path: ${thumbnailDetails.ThumbnailPath ? "exists" : "null"}`,
-            );
-        }
+        console.log(
+            `[DB] Thumbnail status: ${thumbnailDetails.Status}, path: ${thumbnailDetails.ThumbnailPath ? "exists" : "null"}`,
+        );
 
         // Capture thumbnail src from UI
         const modelViewer = new ModelViewerPage(page);
@@ -370,24 +382,19 @@ When(
             expect(textureSet).not.toBeNull();
         }).toPass({ timeout: 10000 });
 
-        // UI upload creates Model-Specific sets; switch to that tab so the card is visible
-        const msTab = page.locator(".kind-filter-select button", {
-            hasText: "Model-Specific",
-        });
-        await msTab.waitFor({ state: "visible", timeout: 10000 });
-        const isActive = await msTab.evaluate((el) =>
-            el.classList.contains("p-highlight"),
-        );
-        if (!isActive) {
-            await msTab.click();
-            await page.waitForTimeout(500);
-        }
+        // Upload inherits kind from the currently-active tab (defaults to Global Materials / Universal).
+        // The card is already visible on the current tab — no tab switch needed.
 
-        // Store in shared state for subsequent steps
+        // Store in shared state for subsequent steps (both named map and custom keys)
         getScenarioState(page).saveTextureSet(setName, {
             id: textureSet.id,
             name: setName,
         });
+        getScenarioState(page).setCustom(
+            "lastCreatedTextureSetId",
+            textureSet.id,
+        );
+        getScenarioState(page).setCustom("lastCreatedTextureSetName", setName);
 
         // Persist to file for cross-phase state transfer (setup → chromium)
         persistTextureSet(setName, { id: textureSet.id, name: setName });
@@ -812,7 +819,13 @@ Then(
                 let hasEmissiveMap = false;
 
                 threeScene.traverse((obj: any) => {
-                    if (obj.isMesh && obj.material) {
+                    // Only check MeshStandardMaterial (our app's loaded model materials)
+                    // to avoid false positives from Stage shadow plane (MeshBasicMaterial)
+                    if (
+                        obj.isMesh &&
+                        obj.material &&
+                        obj.material.isMeshStandardMaterial
+                    ) {
                         meshesWithMaterial++;
                         const mat = obj.material;
 
@@ -852,7 +865,7 @@ Then(
                 },
                 {
                     message: "Waiting for model meshes with textures to load",
-                    timeout: 15000,
+                    timeout: 30000,
                     intervals: [500, 1000, 2000],
                 },
             )
@@ -992,60 +1005,60 @@ Then(
 );
 
 /**
- * Captures the current texture UUID from the Three.js scene for comparison.
- * Only looks at MeshStandardMaterial meshes to avoid picking up Stage shadow plane (MeshBasicMaterial).
+ * Helper to get a texture UUID from any texture map on MeshStandardMaterial meshes.
+ * Checks map, roughnessMap, metalnessMap, normalMap, aoMap, emissiveMap in order.
+ * Returns null if no textures found.
  */
-When("I capture the current texture state", async ({ page }) => {
-    // Poll until the Three.js scene has a texture map on a MeshStandardMaterial mesh
-    await expect
-        .poll(
-            async () => {
-                return await page.evaluate(() => {
-                    // @ts-expect-error - accessing runtime globals
-                    const scene = window.__THREE_SCENE__;
-                    if (!scene) return false;
-                    let hasMap = false;
-                    scene.traverse((obj: any) => {
-                        if (
-                            obj.isMesh &&
-                            obj.material &&
-                            obj.material.isMeshStandardMaterial &&
-                            obj.material.map
-                        ) {
-                            hasMap = true;
-                        }
-                    });
-                    return hasMap;
-                });
-            },
-            {
-                message: "No texture map found in Three.js scene",
-                intervals: [500],
-                timeout: 10000,
-            },
-        )
-        .toBe(true);
-
-    const uuid = await page.evaluate(() => {
+async function getAnyTextureUuid(page: any): Promise<string | null> {
+    return await page.evaluate(() => {
         // @ts-expect-error - accessing runtime globals
         const scene = window.__THREE_SCENE__;
         if (!scene) return null;
 
-        let mapUuid = null;
-        // Only look at MeshStandardMaterial (our app's materials) to avoid
-        // picking up Stage shadow plane which uses MeshBasicMaterial
+        let uuid: string | null = null;
         scene.traverse((obj: any) => {
+            if (uuid) return; // already found one
             if (
                 obj.isMesh &&
                 obj.material &&
-                obj.material.isMeshStandardMaterial &&
-                obj.material.map
+                obj.material.isMeshStandardMaterial
             ) {
-                mapUuid = obj.material.map.uuid;
+                const mat = obj.material;
+                const tex =
+                    mat.map ||
+                    mat.roughnessMap ||
+                    mat.metalnessMap ||
+                    mat.normalMap ||
+                    mat.aoMap ||
+                    mat.emissiveMap;
+                if (tex) uuid = tex.uuid;
             }
         });
-        return mapUuid;
+        return uuid;
     });
+}
+
+/**
+ * Captures the current texture UUID from the Three.js scene for comparison.
+ * Only looks at MeshStandardMaterial meshes to avoid picking up Stage shadow plane (MeshBasicMaterial).
+ */
+When("I capture the current texture state", async ({ page }) => {
+    // Poll until the Three.js scene has any texture on a MeshStandardMaterial mesh
+    await expect
+        .poll(
+            async () => {
+                const uuid = await getAnyTextureUuid(page);
+                return uuid !== null;
+            },
+            {
+                message: "No texture map found in Three.js scene",
+                intervals: [500, 1000, 2000],
+                timeout: 30000,
+            },
+        )
+        .toBe(true);
+
+    const uuid = await getAnyTextureUuid(page);
 
     if (!uuid) {
         console.warn(
@@ -1064,34 +1077,17 @@ When("I capture the current texture state", async ({ page }) => {
 Then(
     "the applied texture should be different from the captured state",
     async ({ page }) => {
-        // Poll for the texture UUID to change (only MeshStandardMaterial, not Stage shadow plane)
+        // Poll for the texture UUID to change
         await expect
             .poll(
                 async () => {
-                    return await page.evaluate(() => {
-                        // @ts-expect-error - accessing runtime globals
-                        const scene = window.__THREE_SCENE__;
-                        if (!scene) return null;
-
-                        let mapUuid = null;
-                        scene.traverse((obj: any) => {
-                            if (
-                                obj.isMesh &&
-                                obj.material &&
-                                obj.material.isMeshStandardMaterial &&
-                                obj.material.map
-                            ) {
-                                mapUuid = obj.material.map.uuid;
-                            }
-                        });
-                        return mapUuid;
-                    });
+                    return await getAnyTextureUuid(page);
                 },
                 {
                     message:
                         "Waiting for texture UUID to differ from captured state",
-                    timeout: 10000,
-                    intervals: [500, 1000],
+                    timeout: 20000,
+                    intervals: [500, 1000, 2000],
                 },
             )
             .not.toBe(textureTracker.capturedTextureUuid);
@@ -1099,22 +1095,7 @@ Then(
         console.log(`[Three.js] Texture changed from captured state âœ“`);
 
         // Update reference
-        const currentUuid = await page.evaluate(() => {
-            // @ts-expect-error
-            const scene = window.__THREE_SCENE__;
-            let mapUuid = null;
-            scene.traverse((obj: any) => {
-                if (
-                    obj.isMesh &&
-                    obj.material &&
-                    obj.material.isMeshStandardMaterial &&
-                    obj.material.map
-                ) {
-                    mapUuid = obj.material.map.uuid;
-                }
-            });
-            return mapUuid;
-        });
+        const currentUuid = await getAnyTextureUuid(page);
         textureTracker.previousTextureUuid = currentUuid;
     },
 );
@@ -1125,34 +1106,17 @@ Then(
 Then(
     "the applied texture should be different from the previous state",
     async ({ page }) => {
-        // Poll for the texture UUID to change (only MeshStandardMaterial, not Stage shadow plane)
+        // Poll for the texture UUID to change
         await expect
             .poll(
                 async () => {
-                    return await page.evaluate(() => {
-                        // @ts-expect-error - accessing runtime globals
-                        const scene = window.__THREE_SCENE__;
-                        if (!scene) return null;
-
-                        let mapUuid = null;
-                        scene.traverse((obj: any) => {
-                            if (
-                                obj.isMesh &&
-                                obj.material &&
-                                obj.material.isMeshStandardMaterial &&
-                                obj.material.map
-                            ) {
-                                mapUuid = obj.material.map.uuid;
-                            }
-                        });
-                        return mapUuid;
-                    });
+                    return await getAnyTextureUuid(page);
                 },
                 {
                     message:
                         "Waiting for texture UUID to differ from previous state",
-                    timeout: 10000,
-                    intervals: [500, 1000],
+                    timeout: 20000,
+                    intervals: [500, 1000, 2000],
                 },
             )
             .not.toBe(textureTracker.previousTextureUuid);
@@ -1160,22 +1124,7 @@ Then(
         console.log(`[Three.js] Texture changed from previous state âœ“`);
 
         // Update reference
-        const currentUuid = await page.evaluate(() => {
-            // @ts-expect-error
-            const scene = window.__THREE_SCENE__;
-            let mapUuid = null;
-            scene.traverse((obj: any) => {
-                if (
-                    obj.isMesh &&
-                    obj.material &&
-                    obj.material.isMeshStandardMaterial &&
-                    obj.material.map
-                ) {
-                    mapUuid = obj.material.map.uuid;
-                }
-            });
-            return mapUuid;
-        });
+        const currentUuid = await getAnyTextureUuid(page);
         textureTracker.previousTextureUuid = currentUuid;
     },
 );

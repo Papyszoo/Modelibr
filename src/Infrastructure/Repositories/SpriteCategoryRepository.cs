@@ -20,7 +20,16 @@ internal sealed class SpriteCategoryRepository : ISpriteCategoryRepository
             throw new ArgumentNullException(nameof(category));
 
         var entityEntry = await _context.SpriteCategories.AddAsync(category, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("unique", StringComparison.OrdinalIgnoreCase) == true
+                                            || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            _context.Entry(entityEntry.Entity).State = EntityState.Detached;
+            throw new ArgumentException($"A sprite category with the name '{category.Name}' already exists.");
+        }
         
         return entityEntry.Entity;
     }

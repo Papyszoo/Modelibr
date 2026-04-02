@@ -601,7 +601,7 @@ When("I PUT a temp file for model {string}", async ({}, modelName: string) => {
     const filePath = await UniqueFileGenerator.generate("test.blend");
     const fileBuffer = fs.readFileSync(filePath);
     const encodedName = encodeURIComponent(modelName);
-    tempFileState.tempPath = `/modelibr/Models/${encodedName}/newest-updateable-${encodedName}.blend@`;
+    tempFileState.tempPath = `/modelibr/Models/${encodedName}/uploaded-${encodedName}.blend@`;
 
     const result = await api.webdavPut(tempFileState.tempPath, fileBuffer);
     console.log(`[Blend B5] PUT temp file returned status=${result.status}`);
@@ -624,7 +624,7 @@ When(
         const encodedName = encodeURIComponent(modelName);
         const result = await api.webdavMove(
             tempFileState.tempPath,
-            `/modelibr/Models/${encodedName}/newest-updateable-${encodedName}.blend`,
+            `/modelibr/Models/${encodedName}/uploaded-${encodedName}.blend`,
         );
         console.log(
             `[Blend B5] MOVE temp file returned status=${result.status}`,

@@ -101,7 +101,21 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     {
         var mapping = ModelVersionTextureSet.Create(modelVersionId, textureSetId, materialName, variantName);
         _context.Set<ModelVersionTextureSet>().Add(mapping);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("unique", StringComparison.OrdinalIgnoreCase) == true
+                                            || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            _context.Entry(mapping).State = EntityState.Detached;
+            // Mapping already exists — load it so EF Core relationship fixup keeps the entity graph consistent
+            await _context.Set<ModelVersionTextureSet>()
+                .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId
+                    && m.TextureSetId == textureSetId
+                    && m.MaterialName == materialName
+                    && m.VariantName == variantName, cancellationToken);
+        }
     }
 
     public async Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default)

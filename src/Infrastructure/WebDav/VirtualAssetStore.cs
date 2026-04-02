@@ -253,11 +253,42 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
         }
 
-        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or newest-updateable-{ModelName}.blend
+        // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or generated-/uploaded-{ModelName}.blend
         var segment4 = Uri.UnescapeDataString(segments[4]);
 
-        // /Projects/{P}/Models/{ModelName}/newest-updateable-{ModelName}.blend → shortcut to newest .blend file
-        if (segment4.Equals($"newest-updateable-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        // /Projects/{P}/Models/{ModelName}/generated-{ModelName}.blend → generated .blend from renderable file via Blender CLI
+        if (segment4.Equals($"generated-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVersion = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            if (newestVersion != null && _blendFileGenerator.IsAvailable)
+            {
+                var renderableFile = newestVersion.Files
+                    .FirstOrDefault(f => f.FileType.IsRenderable);
+
+                if (renderableFile != null)
+                {
+                    return new VirtualGeneratedBlendFile(
+                        _lockingManager,
+                        $"generated-{model.Name}.blend",
+                        renderableFile.SizeBytes,
+                        renderableFile.CreatedAt,
+                        renderableFile.UpdatedAt,
+                        _blendFileGenerator,
+                        model.Id,
+                        newestVersion.Id,
+                        _logger);
+                }
+            }
+
+            return null;
+        }
+
+        // /Projects/{P}/Models/{ModelName}/uploaded-{ModelName}.blend → actual .blend file from newest version
+        if (segment4.Equals($"uploaded-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
         {
             var newestVersion = model.Versions
                 .Where(v => !v.IsDeleted)
@@ -272,34 +303,13 @@ public sealed class VirtualAssetStore : IStore
                 return new VirtualAssetFile(
                     _itemPropertyManager,
                     _lockingManager,
-                    $"newest-updateable-{model.Name}.blend",
+                    $"uploaded-{model.Name}.blend",
                     blendFile.Sha256Hash,
                     blendFile.SizeBytes,
                     blendFile.MimeType,
                     blendFile.CreatedAt,
                     blendFile.UpdatedAt,
                     _pathProvider);
-            }
-
-            // No .blend file — try generating from renderable file if Blender is available
-            if (newestVersion != null && _blendFileGenerator.IsAvailable)
-            {
-                var renderableFile = newestVersion.Files
-                    .FirstOrDefault(f => f.FileType.IsRenderable);
-
-                if (renderableFile != null)
-                {
-                    return new VirtualGeneratedBlendFile(
-                        _lockingManager,
-                        $"newest-updateable-{model.Name}.blend",
-                        renderableFile.SizeBytes,
-                        renderableFile.CreatedAt,
-                        renderableFile.UpdatedAt,
-                        _blendFileGenerator,
-                        model.Id,
-                        newestVersion.Id,
-                        _logger);
-                }
             }
 
             return null;
@@ -840,8 +850,39 @@ public sealed class VirtualAssetStore : IStore
         // /Models/{ModelName}/v{N} or /Models/{ModelName}/newest
         var versionName = Uri.UnescapeDataString(segments[2]);
 
-        // /Models/{ModelName}/newest-updateable-{ModelName}.blend → shortcut to newest .blend file
-        if (versionName.Equals($"newest-updateable-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        // /Models/{ModelName}/generated-{ModelName}.blend → generated .blend from renderable file via Blender CLI
+        if (versionName.Equals($"generated-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
+        {
+            var newestVer = model.Versions
+                .Where(v => !v.IsDeleted)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+
+            if (newestVer != null && _blendFileGenerator.IsAvailable)
+            {
+                var renderableFile = newestVer.Files
+                    .FirstOrDefault(f => f.FileType.IsRenderable);
+
+                if (renderableFile != null)
+                {
+                    return new VirtualGeneratedBlendFile(
+                        _lockingManager,
+                        $"generated-{model.Name}.blend",
+                        renderableFile.SizeBytes,
+                        renderableFile.CreatedAt,
+                        renderableFile.UpdatedAt,
+                        _blendFileGenerator,
+                        model.Id,
+                        newestVer.Id,
+                        _logger);
+                }
+            }
+
+            return null;
+        }
+
+        // /Models/{ModelName}/uploaded-{ModelName}.blend → actual .blend file from newest version
+        if (versionName.Equals($"uploaded-{model.Name}.blend", StringComparison.OrdinalIgnoreCase))
         {
             var newestVer = model.Versions
                 .Where(v => !v.IsDeleted)
@@ -856,34 +897,13 @@ public sealed class VirtualAssetStore : IStore
                 return new VirtualAssetFile(
                     _itemPropertyManager,
                     _lockingManager,
-                    $"newest-updateable-{model.Name}.blend",
+                    $"uploaded-{model.Name}.blend",
                     blendFile.Sha256Hash,
                     blendFile.SizeBytes,
                     blendFile.MimeType,
                     blendFile.CreatedAt,
                     blendFile.UpdatedAt,
                     _pathProvider);
-            }
-
-            // No .blend file — try generating from renderable file if Blender is available
-            if (newestVer != null && _blendFileGenerator.IsAvailable)
-            {
-                var renderableFile = newestVer.Files
-                    .FirstOrDefault(f => f.FileType.IsRenderable);
-
-                if (renderableFile != null)
-                {
-                    return new VirtualGeneratedBlendFile(
-                        _lockingManager,
-                        $"newest-updateable-{model.Name}.blend",
-                        renderableFile.SizeBytes,
-                        renderableFile.CreatedAt,
-                        renderableFile.UpdatedAt,
-                        _blendFileGenerator,
-                        model.Id,
-                        newestVer.Id,
-                        _logger);
-                }
             }
 
             return null;

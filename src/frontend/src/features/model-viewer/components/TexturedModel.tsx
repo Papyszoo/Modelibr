@@ -166,7 +166,16 @@ function applyMaterialTextures(
     if (!matched && hasWildcard && texturesReady) {
       ;(child as THREE.Mesh).material = builtMaterials['']
     }
-    // Unmatched meshes keep their original embedded materials
+
+    // Strip embedded materials from unmatched meshes to match worker behavior
+    if (!matched && !hasWildcard) {
+      ;(child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0.7, 0.7, 0.9),
+        metalness: 0.3,
+        roughness: 0.4,
+        envMapIntensity: 1.0,
+      })
+    }
   })
 }
 

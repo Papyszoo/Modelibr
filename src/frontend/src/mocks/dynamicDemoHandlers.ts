@@ -50,6 +50,48 @@ const assetUrl = (file: string) => `${DEMO_BASE}demo-assets/${file}`
 const thumbnailUrl = (file: string) =>
   `${DEMO_BASE}demo-assets/thumbnails/${file}`
 
+/**
+ * Infer a sensible MIME type for a File/Blob when `file.type` is missing.
+ * Falls back to the provided `fallback` when unknown.
+ */
+function inferMimeType(
+  file: File | Blob | null,
+  fileName?: string,
+  fallback = 'application/octet-stream'
+): string {
+  const t = (file && (file as any).type) || ''
+  if (t) return t
+  const name = fileName || (file && (file as any).name) || ''
+  const ext = name.split('.').pop()?.toLowerCase() || ''
+  switch (ext) {
+    case 'png':
+      return 'image/png'
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg'
+    case 'webp':
+      return 'image/webp'
+    case 'gif':
+      return 'image/gif'
+    case 'bmp':
+      return 'image/bmp'
+    case 'exr':
+      return 'image/x-exr'
+    case 'wav':
+      return 'audio/wav'
+    case 'ogg':
+      return 'audio/ogg'
+    case 'mp3':
+      return 'audio/mpeg'
+    case 'glb':
+      return 'model/gltf-binary'
+    case 'gltf':
+      return 'model/gltf+json'
+    default:
+      return fallback
+  }
+}
+
 // Map seed file IDs to static asset paths (for pre-seeded data)
 const seedFileAssets: Record<number, string> = {
   101: 'test-cube.glb',
@@ -1047,7 +1089,12 @@ export const dynamicDemoHandlers = [
     const textureType = parseTextureType(url.searchParams.get('textureType'))
     const kind = Number(url.searchParams.get('kind') || '0')
 
-    await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
+    await storeFileBlob(
+      fileId,
+      file,
+      file.name,
+      file.type || inferMimeType(file, file.name, 'image/png')
+    )
 
     const textureSet: DemoTextureSet = {
       id: tsId,
@@ -1597,7 +1644,12 @@ export const dynamicDemoHandlers = [
       ? Number(url.searchParams.get('categoryId'))
       : null
 
-    await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
+    await storeFileBlob(
+      fileId,
+      file,
+      file.name,
+      file.type || inferMimeType(file, file.name, 'image/png')
+    )
 
     let categoryName: string | null = null
     if (categoryId) {
@@ -2279,7 +2331,12 @@ export const dynamicDemoHandlers = [
       const textureId = await nextId('textures')
       const ts = now()
 
-      await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
+      await storeFileBlob(
+        fileId,
+        file,
+        file.name,
+        file.type || inferMimeType(file, file.name, 'image/png')
+      )
 
       const textureSet: DemoTextureSet = {
         id: tsId,
@@ -2509,7 +2566,12 @@ export const dynamicDemoHandlers = [
       const textureId = await nextId('textures')
       const ts = now()
 
-      await storeFileBlob(fileId, file, file.name, file.type || 'image/png')
+      await storeFileBlob(
+        fileId,
+        file,
+        file.name,
+        file.type || inferMimeType(file, file.name, 'image/png')
+      )
 
       const textureSet: DemoTextureSet = {
         id: tsId,

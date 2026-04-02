@@ -158,7 +158,8 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
 }
 
 /// <summary>
-/// Collection representing a single model - shows version subdirectories (v1, v2, etc.) and a newestVersion.blend shortcut.
+/// Collection representing a single model - shows version subdirectories (v1, v2, etc.)
+/// and generated-{name}.blend / uploaded-{name}.blend shortcuts.
 /// </summary>
 public sealed class VirtualModelCollection : VirtualCollectionBase
 {
@@ -168,7 +169,8 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
     private readonly IBlendFileGenerator? _blendFileGenerator;
     private readonly ILogger? _logger;
 
-    private string UpdateableBlendFileName => $"newest-updateable-{_model.Name}.blend";
+    private string GeneratedBlendFileName => $"generated-{_model.Name}.blend";
+    private string UploadedBlendFileName => $"uploaded-{_model.Name}.blend";
 
     public VirtualModelCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider, IBlendFileGenerator? blendFileGenerator = null, ILogger? logger = null)
         : base(propertyManager, lockingManager, model.Name)
@@ -184,8 +186,18 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        // Serve newest-updateable-{model.Name}.blend as the .blend file from the newest version
-        if (name.Equals(UpdateableBlendFileName, StringComparison.OrdinalIgnoreCase))
+        // Serve generated-{model.Name}.blend from Blender CLI (renderable file + textures)
+        if (name.Equals(GeneratedBlendFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            var generatedItem = TryCreateGeneratedBlendItem();
+            if (generatedItem != null)
+                return Task.FromResult<IStoreItem?>(generatedItem);
+
+            return Task.FromResult<IStoreItem?>(null);
+        }
+
+        // Serve uploaded-{model.Name}.blend from the newest version's actual .blend file
+        if (name.Equals(UploadedBlendFileName, StringComparison.OrdinalIgnoreCase))
         {
             var newestBlendFile = GetNewestBlendFile();
             if (newestBlendFile != null)
@@ -193,7 +205,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                 return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
                     _itemPropertyManager,
                     LockingManager,
-                    UpdateableBlendFileName,
+                    UploadedBlendFileName,
                     newestBlendFile.Sha256Hash,
                     newestBlendFile.SizeBytes,
                     newestBlendFile.MimeType,
@@ -201,11 +213,6 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                     newestBlendFile.UpdatedAt,
                     _pathProvider));
             }
-
-            // No .blend file - try generating one from a renderable file via Blender CLI
-            var generatedItem = TryCreateGeneratedBlendItem();
-            if (generatedItem != null)
-                return Task.FromResult<IStoreItem?>(generatedItem);
 
             return Task.FromResult<IStoreItem?>(null);
         }
@@ -278,27 +285,25 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                 _itemPropertyManager,
                 _pathProvider));
 
-            // Inject newest-updateable-{model.Name}.blend
+            // Always inject generated-{model.Name}.blend when a renderable file exists
+            var generatedItem = TryCreateGeneratedBlendItem();
+            if (generatedItem != null)
+                versionItems.Add(generatedItem);
+
+            // Inject uploaded-{model.Name}.blend only when an actual .blend exists in newest version
             var newestBlendFile = GetNewestBlendFile();
             if (newestBlendFile != null)
             {
                 versionItems.Add(new VirtualAssetFile(
                     _itemPropertyManager,
                     LockingManager,
-                    UpdateableBlendFileName,
+                    UploadedBlendFileName,
                     newestBlendFile.Sha256Hash,
                     newestBlendFile.SizeBytes,
                     newestBlendFile.MimeType,
                     newestBlendFile.CreatedAt,
                     newestBlendFile.UpdatedAt,
                     _pathProvider));
-            }
-            else
-            {
-                // No .blend file - try generated .blend from renderable file
-                var generatedItem = TryCreateGeneratedBlendItem();
-                if (generatedItem != null)
-                    versionItems.Add(generatedItem);
             }
         }
 
@@ -307,7 +312,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
 
     /// <summary>
     /// Creates a VirtualGeneratedBlendFile if Blender CLI is available and the newest version
-    /// has a renderable file but no .blend file.
+    /// has a renderable file.
     /// </summary>
     private IStoreItem? TryCreateGeneratedBlendItem()
     {
@@ -330,7 +335,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
 
         return new VirtualGeneratedBlendFile(
             LockingManager,
-            UpdateableBlendFileName,
+            GeneratedBlendFileName,
             renderableFile.SizeBytes,
             renderableFile.CreatedAt,
             renderableFile.UpdatedAt,

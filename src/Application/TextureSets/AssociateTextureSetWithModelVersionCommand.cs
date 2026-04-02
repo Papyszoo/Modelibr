@@ -80,11 +80,11 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
             // Invalidate cached .blend so it regenerates with new textures
             _blendFileGenerator.InvalidateCache(modelVersion.ModelId, modelVersion.Id);
 
-            // If the linked variant is the main variant, update DefaultTextureSetId and regenerate thumbnail.
-            // After AddTextureMappingAsync + SaveChanges, EF Core relationship fixup adds the new mapping
-            // to the tracked modelVersion entity, so SetDefaultTextureSet validation will pass.
+            // If the linked variant is the main variant and no default is set yet,
+            // auto-set DefaultTextureSetId and regenerate thumbnail.
+            // Only auto-set when null — explicit SetDefaultTextureSetCommand should be used to change it.
             var mainVariant = modelVersion.MainVariantName ?? string.Empty;
-            if (variantName == mainVariant)
+            if (variantName == mainVariant && modelVersion.DefaultTextureSetId == null)
             {
                 var now = _dateTimeProvider.UtcNow;
                 modelVersion.SetDefaultTextureSet(command.TextureSetId, now);

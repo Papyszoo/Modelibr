@@ -251,15 +251,10 @@ export function ModelViewer({
       m => m.variantName === selectedVariant
     )
 
-    // Only use selectedTextureSet fallback for legacy (no variant system).
-    // When variants exist, an empty mapping means "no textures for this preset".
-    const hasVariants = (selectedVersion.variantNames ?? []).length > 0
-    if (
-      variantMappings.length === 0 &&
-      selectedTextureSet &&
-      !hasVariants &&
-      selectedVariant === ''
-    ) {
+    // When no variant-specific mappings exist for the current variant but a
+    // texture set is explicitly selected (or set as default), use it as a
+    // wildcard so the model still gets textured.
+    if (variantMappings.length === 0 && selectedTextureSet) {
       return { '': selectedTextureSet }
     }
 
@@ -767,6 +762,7 @@ export function ModelViewer({
                           useEmbeddedMaterials ? {} : materialTextureSets
                         }
                         defaultFileId={defaultFileId}
+                        preserveMaterials={useEmbeddedMaterials}
                       />
                     </Canvas>
                   </CanvasErrorBoundary>
