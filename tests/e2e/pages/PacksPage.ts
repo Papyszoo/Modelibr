@@ -106,35 +106,50 @@ export class PacksPage {
         );
         console.log("[Action] Dialog closed");
 
-        // Wait for the pack card to appear in the grid
-        await this.page.waitForSelector(`.pack-grid-card:has-text("${name}")`, {
-            state: "visible",
-            timeout: 10000,
-        });
-        console.log(`[Action] Pack card "${name}" visible in grid`);
-
         // Get the pack ID from the API
         const response = await this.page.request.get(`${API_BASE}/packs`);
         const packs = await response.json();
         const pack = packs.packs.find((p: any) => p.name === name);
 
+        // Wait for the pack card to appear in the grid using data-pack-id
+        if (pack?.id) {
+            await this.page.waitForSelector(
+                `.pack-grid-card[data-pack-id="${pack.id}"]`,
+                {
+                    state: "visible",
+                    timeout: 10000,
+                },
+            );
+        } else {
+            await this.page.waitForSelector(
+                `.pack-grid-card:has-text("${name}")`,
+                {
+                    state: "visible",
+                    timeout: 10000,
+                },
+            );
+        }
+        console.log(`[Action] Pack card "${name}" visible in grid`);
+
         console.log(`[Pack] Created pack "${name}" with ID: ${pack?.id}`);
         return { id: pack?.id, name, description };
     }
 
-    async openPack(packName: string): Promise<void> {
-        const packCard = this.page.locator(
-            `.pack-grid-card:has-text("${packName}")`,
-        );
+    async openPack(packName: string, packId?: number): Promise<void> {
+        const packCard = packId
+            ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
+            : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
         await packCard.click();
         await this.page.waitForLoadState("domcontentloaded");
-        console.log(`[Navigation] Opened pack: ${packName}`);
+        console.log(
+            `[Navigation] Opened pack: ${packName}${packId ? ` (id=${packId})` : ""}`,
+        );
     }
 
-    async deletePack(packName: string): Promise<void> {
-        const packCard = this.page.locator(
-            `.pack-grid-card:has-text("${packName}")`,
-        );
+    async deletePack(packName: string, packId?: number): Promise<void> {
+        const packCard = packId
+            ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
+            : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
         const deleteButton = packCard.locator(
             'button[aria-label="Delete Pack"], button.p-button-danger',
         );
@@ -143,14 +158,19 @@ export class PacksPage {
         console.log(`[Action] Deleted pack: ${packName}`);
     }
 
-    getPackCard(packName: string): Locator {
+    getPackCard(packName: string, packId?: number): Locator {
+        if (packId) {
+            return this.page.locator(
+                `.pack-grid-card[data-pack-id="${packId}"]`,
+            );
+        }
         return this.page.locator(`.pack-grid-card:has-text("${packName}")`);
     }
 
-    async isPackVisible(packName: string): Promise<boolean> {
-        const packCard = this.page.locator(
-            `.pack-grid-card:has-text("${packName}")`,
-        );
+    async isPackVisible(packName: string, packId?: number): Promise<boolean> {
+        const packCard = packId
+            ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
+            : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
         try {
             await packCard.waitFor({ state: "visible", timeout: 15000 });
             return true;
@@ -194,15 +214,18 @@ export class PacksPage {
         console.log("[Action] Confirmed adding items to pack");
     }
 
-    async removeModelFromPack(modelName: string): Promise<void> {
+    async removeModelFromPack(
+        modelName: string,
+        modelId?: number,
+    ): Promise<void> {
         // Click Models tab first
         await this.page
             .locator(".p-tabview-nav li")
             .filter({ hasText: "Models" })
             .click();
-        const modelCard = this.page
-            .locator(`.model-card:has-text("${modelName}")`)
-            .first();
+        const modelCard = modelId
+            ? this.page.locator(`.model-card[data-model-id="${modelId}"]`)
+            : this.page.locator(`.model-card:has-text("${modelName}")`).first();
         await modelCard.waitFor({ state: "visible", timeout: 10000 });
         await modelCard.click({ button: "right" });
         await this.page

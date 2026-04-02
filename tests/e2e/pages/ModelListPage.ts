@@ -186,9 +186,12 @@ export class ModelListPage {
     }
 
     /**
-     * Get a model card locator by name
+     * Get a model card locator by name or ID
      */
-    getModelCard(name: string): Locator {
+    getModelCard(name: string, id?: number): Locator {
+        if (id) {
+            return this.page.locator(`.model-card[data-model-id="${id}"]`);
+        }
         return this.page.locator(`.model-card:has-text("${name}")`).first();
     }
 

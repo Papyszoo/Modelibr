@@ -19,6 +19,9 @@ const { Given, When, Then } = createBdd();
 const ASSETS_DIR = path.join(__dirname, "..", "assets");
 const api = new ApiHelper();
 
+const BLENDER_VERSION = "5.1.0";
+let blenderInstallVerified = false;
+
 // Per-scenario context shared across steps
 interface BlendTestContext {
     /** Model ID for the model created/referenced in the current scenario */
@@ -40,6 +43,13 @@ let ctx: BlendTestContext = {};
 
 Given("the backend has Blender integration enabled", async () => {
     ctx = {}; // Reset context for new scenario
+
+    // Install Blender on first invocation; skip on subsequent scenarios
+    if (!blenderInstallVerified) {
+        await api.ensureBlenderInstalled(BLENDER_VERSION);
+        blenderInstallVerified = true;
+    }
+
     const enabled = await api.getBlenderEnabled();
     expect(enabled).toBe(true);
 });
@@ -591,7 +601,7 @@ When("I PUT a temp file for model {string}", async ({}, modelName: string) => {
     const filePath = await UniqueFileGenerator.generate("test.blend");
     const fileBuffer = fs.readFileSync(filePath);
     const encodedName = encodeURIComponent(modelName);
-    tempFileState.tempPath = `/modelibr/Models/${encodedName}/newestVersion.blend@`;
+    tempFileState.tempPath = `/modelibr/Models/${encodedName}/uploaded-${encodedName}.blend@`;
 
     const result = await api.webdavPut(tempFileState.tempPath, fileBuffer);
     console.log(`[Blend B5] PUT temp file returned status=${result.status}`);
@@ -614,7 +624,7 @@ When(
         const encodedName = encodeURIComponent(modelName);
         const result = await api.webdavMove(
             tempFileState.tempPath,
-            `/modelibr/Models/${encodedName}/newestVersion.blend`,
+            `/modelibr/Models/${encodedName}/uploaded-${encodedName}.blend`,
         );
         console.log(
             `[Blend B5] MOVE temp file returned status=${result.status}`,

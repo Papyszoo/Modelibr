@@ -201,7 +201,7 @@ Then(
         );
 
         const modelListPage = new ModelListPage(page);
-        const modelCard = modelListPage.getModelCard(model.name);
+        const modelCard = modelListPage.getModelCard(model.name, model.id);
         await expect(modelCard).toBeVisible({ timeout: 10000 });
         console.log(`[UI] Model "${model.name}" is visible in model list ✓`);
     },

@@ -511,7 +511,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
             <div className="file-info">
               <span className="file-name">{fm.fileName}</span>
 
-              <div className="channel-row">
+              <div className="channel-row" data-channel="RGB">
                 <label>RGB:</label>
                 <Dropdown
                   value={fm.rgbOption}
@@ -527,7 +527,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                   className="split-channels"
                   data-testid={`split-channels-${fm.fileId}`}
                 >
-                  <div className="channel-row indent">
+                  <div className="channel-row indent" data-channel="R">
                     <label>R:</label>
                     <Dropdown
                       value={fm.rChannel}
@@ -543,7 +543,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                       data-testid={`channel-mapping-R-${fm.fileId}`}
                     />
                   </div>
-                  <div className="channel-row indent">
+                  <div className="channel-row indent" data-channel="G">
                     <label>G:</label>
                     <Dropdown
                       value={fm.gChannel}
@@ -559,7 +559,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                       data-testid={`channel-mapping-G-${fm.fileId}`}
                     />
                   </div>
-                  <div className="channel-row indent">
+                  <div className="channel-row indent" data-channel="B">
                     <label>B:</label>
                     <Dropdown
                       value={fm.bChannel}
@@ -579,7 +579,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
               )}
 
               {fm.aChannel && (
-                <div className="channel-row">
+                <div className="channel-row" data-channel="A">
                   <label>A:</label>
                   <Dropdown
                     value={fm.aChannel}

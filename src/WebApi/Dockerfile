@@ -39,6 +39,24 @@ FROM base AS final
 # Install curl for healthchecks and libgomp1 for Magick.NET (ImageMagick OpenMP)
 USER root
 RUN apt-get update && apt-get install -y curl libgomp1 xz-utils && rm -rf /var/lib/apt/lists/*
+
+# Conditionally install x86_64 compat libraries so the dynamically-downloaded
+# Blender binary can execute on ARM64 hosts (via Docker Desktop's QEMU binfmt_misc).
+# Same library set as asset-processor/Dockerfile.
+ARG ENABLE_BLENDER=false
+RUN if [ "$ENABLE_BLENDER" = "true" ]; then \
+      echo ">>> Installing x86_64 compat libraries for Blender CLI..." && \
+      dpkg --add-architecture amd64 && \
+      apt-get update && apt-get install -y --no-install-recommends \
+        libc6:amd64 \
+        libx11-6:amd64 libxi6:amd64 libxrender1:amd64 libxfixes3:amd64 \
+        libxxf86vm1:amd64 libgl1:amd64 libsm6:amd64 \
+        libxkbcommon0:amd64 libepoxy0:amd64 && \
+      rm -rf /var/lib/apt/lists/* && \
+      echo ">>> x86_64 compat libraries installed"; \
+    else \
+      echo ">>> Blender x86_64 libs skipped (ENABLE_BLENDER=$ENABLE_BLENDER)"; \
+    fi
 # Allow customizing UID/GID to match host for bind-mounted uploads directory
 ARG APP_UID=1000
 ARG APP_GID=1000

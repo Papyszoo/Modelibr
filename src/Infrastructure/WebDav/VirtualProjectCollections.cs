@@ -1,6 +1,8 @@
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Domain.Models;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
 using NWebDav.Server.Stores;
@@ -107,13 +109,17 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
     private readonly Project _project;
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly IUploadPathProvider _pathProvider;
+    private readonly IBlendFileGenerator? _blendFileGenerator;
+    private readonly ILogger? _logger;
 
-    public VirtualProjectModelsCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Project project, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+    public VirtualProjectModelsCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Project project, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider, IBlendFileGenerator? blendFileGenerator = null, ILogger? logger = null)
         : base(propertyManager, lockingManager, "Models")
     {
         _project = project;
         _itemPropertyManager = itemPropertyManager;
         _pathProvider = pathProvider;
+        _blendFileGenerator = blendFileGenerator;
+        _logger = logger;
     }
 
     public override string UniqueKey => $"project:{_project.Id}:models";
@@ -129,7 +135,9 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
             LockingManager,
             model,
             _itemPropertyManager,
-            _pathProvider));
+            _pathProvider,
+            _blendFileGenerator,
+            _logger));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
@@ -141,52 +149,72 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
                 LockingManager,
                 m,
                 _itemPropertyManager,
-                _pathProvider));
+                _pathProvider,
+                _blendFileGenerator,
+                _logger));
 
         return Task.FromResult(items);
     }
 }
 
 /// <summary>
-/// Collection representing a single model - shows version subdirectories (v1, v2, etc.) and a newestVersion.blend shortcut.
+/// Collection representing a single model - shows version subdirectories (v1, v2, etc.)
+/// and generated-{name}.blend / uploaded-{name}.blend shortcuts.
 /// </summary>
 public sealed class VirtualModelCollection : VirtualCollectionBase
 {
     private readonly Model _model;
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly IUploadPathProvider _pathProvider;
+    private readonly IBlendFileGenerator? _blendFileGenerator;
+    private readonly ILogger? _logger;
 
-    private string UpdateableBlendFileName => $"newest-updateable-{_model.Name}.blend";
+    private string GeneratedBlendFileName => $"generated-{_model.Name}.blend";
+    private string UploadedBlendFileName => $"uploaded-{_model.Name}.blend";
 
-    public VirtualModelCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
+    public VirtualModelCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider, IBlendFileGenerator? blendFileGenerator = null, ILogger? logger = null)
         : base(propertyManager, lockingManager, model.Name)
     {
         _model = model;
         _itemPropertyManager = itemPropertyManager;
         _pathProvider = pathProvider;
+        _blendFileGenerator = blendFileGenerator;
+        _logger = logger;
     }
 
     public override string UniqueKey => $"model:{_model.Id}";
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        // Serve newest-updateable-{model.Name}.blend as the .blend file from the newest version
-        if (name.Equals(UpdateableBlendFileName, StringComparison.OrdinalIgnoreCase))
+        // Serve generated-{model.Name}.blend from Blender CLI (renderable file + textures)
+        if (name.Equals(GeneratedBlendFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            var generatedItem = TryCreateGeneratedBlendItem();
+            if (generatedItem != null)
+                return Task.FromResult<IStoreItem?>(generatedItem);
+
+            return Task.FromResult<IStoreItem?>(null);
+        }
+
+        // Serve uploaded-{model.Name}.blend from the newest version's actual .blend file
+        if (name.Equals(UploadedBlendFileName, StringComparison.OrdinalIgnoreCase))
         {
             var newestBlendFile = GetNewestBlendFile();
-            if (newestBlendFile == null)
-                return Task.FromResult<IStoreItem?>(null);
+            if (newestBlendFile != null)
+            {
+                return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
+                    _itemPropertyManager,
+                    LockingManager,
+                    UploadedBlendFileName,
+                    newestBlendFile.Sha256Hash,
+                    newestBlendFile.SizeBytes,
+                    newestBlendFile.MimeType,
+                    newestBlendFile.CreatedAt,
+                    newestBlendFile.UpdatedAt,
+                    _pathProvider));
+            }
 
-            return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
-                _itemPropertyManager,
-                LockingManager,
-                UpdateableBlendFileName,
-                newestBlendFile.Sha256Hash,
-                newestBlendFile.SizeBytes,
-                newestBlendFile.MimeType,
-                newestBlendFile.CreatedAt,
-                newestBlendFile.UpdatedAt,
-                _pathProvider));
+            return Task.FromResult<IStoreItem?>(null);
         }
 
         // Handle "newest" folder - returns the highest version number
@@ -257,14 +285,19 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                 _itemPropertyManager,
                 _pathProvider));
 
-            // Inject newest-updateable-{model.Name}.blend if a .blend file exists in the newest version
+            // Always inject generated-{model.Name}.blend when a renderable file exists
+            var generatedItem = TryCreateGeneratedBlendItem();
+            if (generatedItem != null)
+                versionItems.Add(generatedItem);
+
+            // Inject uploaded-{model.Name}.blend only when an actual .blend exists in newest version
             var newestBlendFile = GetNewestBlendFile();
             if (newestBlendFile != null)
             {
                 versionItems.Add(new VirtualAssetFile(
                     _itemPropertyManager,
                     LockingManager,
-                    UpdateableBlendFileName,
+                    UploadedBlendFileName,
                     newestBlendFile.Sha256Hash,
                     newestBlendFile.SizeBytes,
                     newestBlendFile.MimeType,
@@ -275,6 +308,41 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
         }
 
         return Task.FromResult<IEnumerable<IStoreItem>>(versionItems);
+    }
+
+    /// <summary>
+    /// Creates a VirtualGeneratedBlendFile if Blender CLI is available and the newest version
+    /// has a renderable file.
+    /// </summary>
+    private IStoreItem? TryCreateGeneratedBlendItem()
+    {
+        if (_blendFileGenerator == null || !_blendFileGenerator.IsAvailable)
+            return null;
+
+        var newestVersion = _model.Versions
+            .Where(v => !v.IsDeleted)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstOrDefault();
+
+        if (newestVersion == null)
+            return null;
+
+        var renderableFile = newestVersion.Files
+            .FirstOrDefault(f => f.FileType.IsRenderable);
+
+        if (renderableFile == null)
+            return null;
+
+        return new VirtualGeneratedBlendFile(
+            LockingManager,
+            GeneratedBlendFileName,
+            renderableFile.SizeBytes,
+            renderableFile.CreatedAt,
+            renderableFile.UpdatedAt,
+            _blendFileGenerator,
+            _model.Id,
+            newestVersion.Id,
+            _logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
     }
 
     private Domain.Models.File? GetNewestBlendFile()

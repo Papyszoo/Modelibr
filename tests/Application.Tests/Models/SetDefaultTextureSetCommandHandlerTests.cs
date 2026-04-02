@@ -17,6 +17,7 @@ public class SetDefaultTextureSetCommandHandlerTests
     private readonly Mock<IThumbnailRepository> _mockThumbnailRepository;
     private readonly Mock<IThumbnailQueue> _mockThumbnailQueue;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
+    private readonly Mock<IBlendFileGenerator> _mockBlendFileGenerator;
     private readonly SetDefaultTextureSetCommandHandler _handler;
 
     public SetDefaultTextureSetCommandHandlerTests()
@@ -26,13 +27,15 @@ public class SetDefaultTextureSetCommandHandlerTests
         _mockThumbnailRepository = new Mock<IThumbnailRepository>();
         _mockThumbnailQueue = new Mock<IThumbnailQueue>();
         _mockDateTimeProvider = new Mock<IDateTimeProvider>();
+        _mockBlendFileGenerator = new Mock<IBlendFileGenerator>();
         
         _handler = new SetDefaultTextureSetCommandHandler(
             _mockModelRepository.Object,
             _mockModelVersionRepository.Object,
             _mockThumbnailRepository.Object,
             _mockThumbnailQueue.Object,
-            _mockDateTimeProvider.Object);
+            _mockDateTimeProvider.Object,
+            _mockBlendFileGenerator.Object);
     }
 
     [Fact]

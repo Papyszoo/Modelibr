@@ -55,6 +55,7 @@ namespace Infrastructure
 
             // Add Blender installation management service
             services.AddSingleton<IBlenderInstallationService, BlenderInstallationService>();
+            services.AddSingleton<IBlendFileGenerator, BlendFileGenerator>();
             services.AddHttpClient("BlenderDownload", client =>
             {
                 client.Timeout = TimeSpan.FromMinutes(30);

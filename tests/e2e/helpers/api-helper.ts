@@ -612,8 +612,8 @@ export class ApiHelper {
     /**
      * Simulate Blender Safe Save (PUT temp + MOVE) to create a new model version
      * via WebDAV. This is the pattern Blender uses when saving to an existing file:
-     *   1. PUT /modelibr/Models/{modelName}/newest-updateable-{modelName}.blend@  (temp upload)
-     *   2. MOVE the temp file → newest-updateable-{modelName}.blend (triggers version creation)
+     *   1. PUT /modelibr/Models/{modelName}/uploaded-{modelName}.blend@  (temp upload)
+     *   2. MOVE the temp file → uploaded-{modelName}.blend (triggers version creation)
      */
     async createVersionViaWebDavBlendSave(
         filePath: string,
@@ -622,11 +622,11 @@ export class ApiHelper {
         const fileBuffer = fs.readFileSync(filePath);
         const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
         const encodedName = encodeURIComponent(modelName);
-        const updateableFileName = `newest-updateable-${modelName}`;
+        const uploadedFileName = `uploaded-${modelName}`;
 
-        // Step 1: PUT the temp file (newest-updateable-{modelName}.blend@)
+        // Step 1: PUT the temp file (uploaded-{modelName}.blend@)
         const putResponse = await this.client.put(
-            `/modelibr/Models/${encodedName}/${encodeURIComponent(updateableFileName)}.blend@`,
+            `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
             fileBuffer,
             {
                 headers: {
@@ -637,12 +637,12 @@ export class ApiHelper {
             },
         );
 
-        // Step 2: MOVE temp → newest-updateable-{modelName}.blend
+        // Step 2: MOVE temp → uploaded-{modelName}.blend
         const moveResponse = await this.client.request({
             method: "MOVE",
-            url: `/modelibr/Models/${encodedName}/${encodeURIComponent(updateableFileName)}.blend@`,
+            url: `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
             headers: {
-                Destination: `${baseUrl}/modelibr/Models/${encodedName}/${encodeURIComponent(updateableFileName)}.blend`,
+                Destination: `${baseUrl}/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend`,
                 Overwrite: "T",
             },
         });
@@ -714,6 +714,79 @@ export class ApiHelper {
             );
         }
         return response.data.enableBlender;
+    }
+
+    /**
+     * Get blender installation status.
+     */
+    async getBlenderInstallStatus(): Promise<{
+        state: string;
+        installedVersion: string | null;
+        installedPath: string | null;
+        progress: number;
+        error: string | null;
+    }> {
+        const response = await this.client.get("/settings/blender/status");
+        if (response.status !== 200) {
+            throw new Error(`Failed to get blender status: ${response.status}`);
+        }
+        return response.data;
+    }
+
+    /**
+     * Start Blender installation (fire-and-forget). Poll getBlenderInstallStatus() for progress.
+     */
+    async installBlender(version: string): Promise<void> {
+        const response = await this.client.post("/settings/blender/install", {
+            version,
+        });
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to start blender install: ${response.status}`,
+            );
+        }
+    }
+
+    /**
+     * Install Blender and wait until installation completes.
+     * Polls status every 2 seconds. Throws if installation fails.
+     */
+    async ensureBlenderInstalled(
+        version: string,
+        timeoutMs: number = 600000,
+    ): Promise<void> {
+        const status = await this.getBlenderInstallStatus();
+        if (
+            status.state === "installed" &&
+            status.installedVersion === version
+        ) {
+            console.log(
+                `[Blender] Already installed: ${version} at ${status.installedPath}`,
+            );
+            return;
+        }
+
+        console.log(`[Blender] Installing Blender ${version}...`);
+        await this.installBlender(version);
+
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 2000));
+            const s = await this.getBlenderInstallStatus();
+            if (s.state === "installed") {
+                console.log(
+                    `[Blender] Installation complete: ${s.installedVersion} at ${s.installedPath}`,
+                );
+                return;
+            }
+            if (s.state === "error" || s.state === "failed") {
+                throw new Error(
+                    `Blender installation failed: ${s.error || "unknown error"}`,
+                );
+            }
+            console.log(`[Blender] Status: ${s.state} (${s.progress}%)`);
+        }
+        throw new Error(`Blender installation timed out after ${timeoutMs}ms`);
     }
 
     /**

@@ -17,19 +17,22 @@ namespace Application.Models
         private readonly IThumbnailRepository _thumbnailRepository;
         private readonly IThumbnailQueue _thumbnailQueue;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly IBlendFileGenerator _blendFileGenerator;
 
         public SetDefaultTextureSetCommandHandler(
             IModelRepository modelRepository,
             IModelVersionRepository modelVersionRepository,
             IThumbnailRepository thumbnailRepository,
             IThumbnailQueue thumbnailQueue,
-            IDateTimeProvider dateTimeProvider)
+            IDateTimeProvider dateTimeProvider,
+            IBlendFileGenerator blendFileGenerator)
         {
             _modelRepository = modelRepository;
             _modelVersionRepository = modelVersionRepository;
             _thumbnailRepository = thumbnailRepository;
             _thumbnailQueue = thumbnailQueue;
             _dateTimeProvider = dateTimeProvider;
+            _blendFileGenerator = blendFileGenerator;
         }
 
         public async Task<Result<SetDefaultTextureSetResponse>> Handle(SetDefaultTextureSetCommand command, CancellationToken cancellationToken)
@@ -105,6 +108,9 @@ namespace Application.Models
                         primaryFile.Sha256Hash,
                         cancellationToken: cancellationToken);
                 }
+
+                // Invalidate cached .blend so it regenerates with new textures
+                _blendFileGenerator.InvalidateCache(command.ModelId, targetVersion.Id);
 
                 return Result.Success(new SetDefaultTextureSetResponse(model.Id, targetVersion.Id, targetVersion.DefaultTextureSetId));
             }

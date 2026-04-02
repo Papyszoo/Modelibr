@@ -13,19 +13,22 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IBlendFileGenerator _blendFileGenerator;
 
     public AssociateTextureSetWithModelVersionCommandHandler(
         ITextureSetRepository textureSetRepository,
         IModelVersionRepository modelVersionRepository,
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IBlendFileGenerator blendFileGenerator)
     {
         _textureSetRepository = textureSetRepository;
         _modelVersionRepository = modelVersionRepository;
         _thumbnailRepository = thumbnailRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
+        _blendFileGenerator = blendFileGenerator;
     }
 
     public async Task<Result> Handle(AssociateTextureSetWithModelVersionCommand command, CancellationToken cancellationToken)
@@ -74,11 +77,14 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
             await _modelVersionRepository.AddTextureMappingAsync(
                 modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
 
-            // If the linked variant is the main variant, update DefaultTextureSetId and regenerate thumbnail.
-            // After AddTextureMappingAsync + SaveChanges, EF Core relationship fixup adds the new mapping
-            // to the tracked modelVersion entity, so SetDefaultTextureSet validation will pass.
+            // Invalidate cached .blend so it regenerates with new textures
+            _blendFileGenerator.InvalidateCache(modelVersion.ModelId, modelVersion.Id);
+
+            // If the linked variant is the main variant and no default is set yet,
+            // auto-set DefaultTextureSetId and regenerate thumbnail.
+            // Only auto-set when null — explicit SetDefaultTextureSetCommand should be used to change it.
             var mainVariant = modelVersion.MainVariantName ?? string.Empty;
-            if (variantName == mainVariant)
+            if (variantName == mainVariant && modelVersion.DefaultTextureSetId == null)
             {
                 var now = _dateTimeProvider.UtcNow;
                 modelVersion.SetDefaultTextureSet(command.TextureSetId, now);

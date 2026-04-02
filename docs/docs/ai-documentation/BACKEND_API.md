@@ -134,17 +134,17 @@ Texture set association endpoints accept optional `?materialName` and `?variantN
 
 ### Settings (11 endpoints)
 
-| Method | Endpoint                      | Description                                                                                                                                     |
-| ------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/settings`                   | Get application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`, `preferredWebDavBaseUrl`)                               |
-| `GET`  | `/settings/all`               | Get all settings (key-value)                                                                                                                    |
-| `GET`  | `/settings/blender-enabled`   | Get effective Blender status (`{ enableBlender, blenderPath, settingEnabled, installed, installedVersion }`) — reads from DB + install service  |
+| Method | Endpoint                      | Description                                                                                                                                    |
+| ------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/settings`                   | Get application settings (includes `textureProxySize`, `blenderPath`, `blenderEnabled`, `preferredWebDavBaseUrl`)                              |
+| `GET`  | `/settings/all`               | Get all settings (key-value)                                                                                                                   |
+| `GET`  | `/settings/blender-enabled`   | Get effective Blender status (`{ enableBlender, blenderPath, settingEnabled, installed, installedVersion }`) — reads from DB + install service |
 | `PUT`  | `/settings`                   | Update application settings (includes `textureProxySize`) — `blenderEnabled` is managed via install/uninstall service                          |
-| `PUT`  | `/settings/{key}`             | Update a single setting by key (e.g., `BlenderPath`, `BlenderEnabled`)                                                                          |
-| `GET`  | `/settings/blender/versions`  | Get available Blender CLI versions for download                                                                                                 |
-| `GET`  | `/settings/blender/status`    | Get Blender installation status (`{ state, installedVersion, installedPath, progress, downloadedBytes, totalBytes, error }`)                    |
-| `POST` | `/settings/blender/install`   | Start Blender download+install (body: `{ version }`) — fire-and-forget, poll status for progress                                                |
-| `POST` | `/settings/blender/uninstall` | Uninstall currently installed Blender version                                                                                                   |
+| `PUT`  | `/settings/{key}`             | Update a single setting by key (e.g., `BlenderPath`, `BlenderEnabled`)                                                                         |
+| `GET`  | `/settings/blender/versions`  | Get available Blender CLI versions for download                                                                                                |
+| `GET`  | `/settings/blender/status`    | Get Blender installation status (`{ state, installedVersion, installedPath, progress, downloadedBytes, totalBytes, error }`)                   |
+| `POST` | `/settings/blender/install`   | Start Blender download+install (body: `{ version }`) — fire-and-forget, poll status for progress                                               |
+| `POST` | `/settings/blender/uninstall` | Uninstall currently installed Blender version                                                                                                  |
 | `GET`  | `/settings/webdav/urls`       | Discover available WebDAV URLs from `WEBDAV_HTTPS_PORT`/`WEBDAV_HTTP_PORT` env vars — returns `{ urls: [{ url, label, isHttps, port }] }`      |
 | `GET`  | `/settings/webdav/probe`      | Probe WebDAV connectivity (`?url=`) — returns `{ reachable, folderCount, error? }` via internal PROPFIND through nginx                         |
 
@@ -165,6 +165,8 @@ Handled by `WebDavMiddleware` — not standard REST endpoints. Requires `ENABLE_
 **Multi-file drop (macOS Finder / Windows Explorer):** When a user drops multiple `.blend` files onto the mounted WebDAV `Models` folder, macOS Finder sends a `LOCK` before each `PUT`. The middleware intercepts `LOCK`/`UNLOCK` for `{name}.blend` paths and returns a synthetic lock token so the NWebDav library cannot block concurrent uploads. A 0-byte `PUT` guard skips model creation and returns 201 so the client does not retry; only PUTs with actual content create a model.
 
 **REST API .blend support:** `POST /models` and `POST /models/{modelId}/versions` also accept `.blend` files. The `ModelUploadedEvent` is dispatched for both renderable and project (`.blend`) file types, triggering the asset-processor pipeline.
+
+**Generated .blend files (auto-created via Blender CLI):** When a model's newest version has a renderable file (`.glb`, `.gltf`, `.fbx`, `.obj`), the WebDAV virtual filesystem can dynamically generate a `.blend` file using Blender CLI (headless). This file appears as `generated-{name}.blend` in the model directory. If the newest version also contains an uploaded `.blend` file, it appears as `uploaded-{name}.blend` alongside the generated one. Both files support Safe Save (PUT temp + MOVE) to create new versions. Requirements: Blender CLI must be installed (`IBlenderInstallationService` state = `installed`). The generated file imports the renderable model centered at the origin with PBR material preset textures applied (Albedo, Normal, Roughness, Metallic, AO, Emissive, Alpha, Height/Displacement). Generated files are cached at `{UPLOAD_STORAGE_PATH}/generated-blend/{modelId}-v{versionId}.blend`. The generation is implemented by `IBlendFileGenerator` (Application) / `BlendFileGenerator` (Infrastructure) using the `generate_blend_with_textures.py` Blender Python script.
 
 **Total:** 61 endpoints (56 REST + 5 WebDAV)
 

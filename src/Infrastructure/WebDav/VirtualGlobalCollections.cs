@@ -1,5 +1,7 @@
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Domain.Models;
+using Microsoft.Extensions.Logging;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
 using NWebDav.Server.Stores;
@@ -14,18 +16,24 @@ public sealed class VirtualAllModelsCollection : VirtualCollectionBase
     private readonly List<Model> _models;
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly IUploadPathProvider _pathProvider;
+    private readonly IBlendFileGenerator? _blendFileGenerator;
+    private readonly ILogger? _logger;
 
     public VirtualAllModelsCollection(
         VirtualCollectionPropertyManager propertyManager,
         ILockingManager lockingManager,
         List<Model> models,
         VirtualItemPropertyManager itemPropertyManager,
-        IUploadPathProvider pathProvider)
+        IUploadPathProvider pathProvider,
+        IBlendFileGenerator? blendFileGenerator = null,
+        ILogger? logger = null)
         : base(propertyManager, lockingManager, "Models")
     {
         _models = models;
         _itemPropertyManager = itemPropertyManager;
         _pathProvider = pathProvider;
+        _blendFileGenerator = blendFileGenerator;
+        _logger = logger;
     }
 
     public override string UniqueKey => "allmodels";
@@ -41,7 +49,9 @@ public sealed class VirtualAllModelsCollection : VirtualCollectionBase
             LockingManager,
             model,
             _itemPropertyManager,
-            _pathProvider));
+            _pathProvider,
+            _blendFileGenerator,
+            _logger));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
@@ -53,7 +63,9 @@ public sealed class VirtualAllModelsCollection : VirtualCollectionBase
                 LockingManager,
                 m,
                 _itemPropertyManager,
-                _pathProvider));
+                _pathProvider,
+                _blendFileGenerator,
+                _logger));
 
         return Task.FromResult(items);
     }

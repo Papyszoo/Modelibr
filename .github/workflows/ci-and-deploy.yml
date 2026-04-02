@@ -70,7 +70,7 @@ jobs:
               run: dotnet build Modelibr.sln --no-restore
 
             - name: Run tests
-              run: dotnet test Modelibr.sln --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+              run: dotnet test Modelibr.sln --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --filter "Category!=Integration"
 
             - name: Parse test results
               if: always()

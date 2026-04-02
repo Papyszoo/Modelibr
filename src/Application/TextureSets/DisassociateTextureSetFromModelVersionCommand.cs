@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -9,13 +10,16 @@ internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHa
 {
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IBlendFileGenerator _blendFileGenerator;
 
     public DisassociateTextureSetFromModelVersionCommandHandler(
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IBlendFileGenerator blendFileGenerator)
     {
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _blendFileGenerator = blendFileGenerator;
     }
 
     public async Task<Result> Handle(DisassociateTextureSetFromModelVersionCommand command, CancellationToken cancellationToken)
@@ -43,6 +47,9 @@ internal class DisassociateTextureSetFromModelVersionCommandHandler : ICommandHa
                 await _modelVersionRepository.RemoveTextureMappingAsync(
                     modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
             }
+
+            // Invalidate cached .blend so it regenerates without removed textures
+            _blendFileGenerator.InvalidateCache(modelVersion.ModelId, modelVersion.Id);
 
             return Result.Success();
         }

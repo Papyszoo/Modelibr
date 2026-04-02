@@ -145,8 +145,8 @@ function applyMaterialTextures(
     }
   }
 
-  // Default untextured material for meshes without a mapping
-  const defaultMaterial = new THREE.MeshStandardMaterial({
+  // Shared fallback material for unmatched meshes (avoids per-mesh allocation)
+  const fallbackMaterial = new THREE.MeshStandardMaterial({
     color: new THREE.Color(0.7, 0.7, 0.9),
     metalness: 0.3,
     roughness: 0.4,
@@ -173,8 +173,11 @@ function applyMaterialTextures(
     // Fallback: use wildcard "" material (applies to all unmatched meshes)
     if (!matched && hasWildcard && texturesReady) {
       ;(child as THREE.Mesh).material = builtMaterials['']
-    } else if (!matched) {
-      ;(child as THREE.Mesh).material = defaultMaterial
+    }
+
+    // Strip embedded materials from unmatched meshes to match worker behavior
+    if (!matched && !hasWildcard) {
+      ;(child as THREE.Mesh).material = fallbackMaterial
     }
   })
 }

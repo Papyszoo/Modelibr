@@ -93,6 +93,37 @@ dotnet test --no-build  # Avoids Azure.Core timeout issue
 
 ---
 
+### Concurrency / Integration Tests
+
+**Location:** `tests/WebApi.Tests/Integration/`
+
+**Purpose:** Test concurrent operations against a real PostgreSQL database via `WebApplicationFactory<Program>`.
+
+**Infrastructure:**
+
+- `ModelibrWebFactory.cs` — `WebApplicationFactory` fixture that connects to the local Docker PostgreSQL (port 5432) using an isolated test database (`Modelibr_IntegrationTests`). The database is created fresh and dropped on dispose. Overrides `UPLOAD_STORAGE_PATH` to a temp directory. The app's built-in `MigrateAsync()` handles schema setup.
+- `ConcurrencyTests.cs` — 6 concurrency scenarios testing race conditions. Marked with `[Trait("Category", "Integration")]` so they are excluded from CI unit test runs (which lack PostgreSQL).
+
+**Tests:**
+
+| Test                                                       | What it verifies                                           | Known bugs                                                                   |
+| ---------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `Parallel_Uploads_Same_File_Hash_Do_Not_Create_Duplicates` | 5 identical file uploads share deduplicated storage        | Some uploads may 500 due to `DbUpdateConcurrencyException` on thumbnail jobs |
+| `Delete_And_Restore_Same_Entity_From_Two_Threads`          | Simultaneous restore + permanent delete → consistent state | —                                                                            |
+| `Parallel_Model_To_Pack_Association_No_Duplicates`         | 5 concurrent pack-model associations → exactly 1 entry     | Unhandled duplicate key violation returns 500 instead of 409                 |
+| `Concurrent_Job_Dequeue_Gives_Each_Job_To_One_Worker`      | 5 workers dequeue simultaneously                           | No `SELECT FOR UPDATE` — multiple workers can claim the same job             |
+| `Parallel_Pack_Creation_Same_Name_Handles_Gracefully`      | Concurrent pack creation with same name                    | —                                                                            |
+| `Parallel_File_Uploads_To_Same_Model_All_Succeed`          | 3 file uploads to same model concurrently                  | —                                                                            |
+
+**Running:**
+
+```bash
+# Requires Docker PostgreSQL running on port 5432
+dotnet test tests/WebApi.Tests/WebApi.Tests.csproj --filter "FullyQualifiedName~ConcurrencyTests" --no-build
+```
+
+---
+
 ### Frontend Unit Tests
 
 **Location:** `src/frontend/src/**/__tests__/`

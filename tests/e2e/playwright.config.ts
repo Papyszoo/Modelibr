@@ -6,6 +6,10 @@ const testDir = defineBddConfig({
     steps: "steps/*.ts",
 });
 
+// When PW_MERGE_BLOB is set, each phase writes a blob report;
+// after all phases, run-e2e.js merges them into a single HTML report.
+const useBlobReporter = !!process.env.PW_MERGE_BLOB;
+
 export default defineConfig({
     testDir,
     globalSetup: "./global-setup.ts",
@@ -21,7 +25,9 @@ export default defineConfig({
     // eliminating most parallel timing issues while keeping run time reasonable.
     // When running manually, default to 2.
     workers: parseInt(process.env.PW_WORKERS || "2", 10),
-    reporter: [["html", { open: "never" }]],
+    reporter: useBlobReporter
+        ? [["blob", { outputDir: "blob-report" }]]
+        : [["html", { open: "never" }]],
     use: {
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
         trace: "on-first-retry",

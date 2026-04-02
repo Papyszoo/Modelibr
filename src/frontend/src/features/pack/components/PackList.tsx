@@ -126,6 +126,7 @@ export function PackList() {
               <div
                 key={pack.id}
                 className="pack-grid-card"
+                data-pack-id={pack.id}
                 onClick={() => {
                   openPackDetailsTab(pack.id.toString())
                 }}
