@@ -9,6 +9,7 @@ namespace WebApi.Tests.Integration;
 /// Tests for concurrent operations that could cause data corruption.
 /// Runs against a real PostgreSQL database via WebApplicationFactory.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>
 {
     private readonly ModelibrWebFactory _factory;

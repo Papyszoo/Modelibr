@@ -457,13 +457,22 @@ export function MaterialsPanel({
                     </div>
                   )
                 })}
-                {linkedSets.length === 0 && (
+                {linkedSets.length === 0 && isEmbeddedPreset && (
                   <div className="materials-empty">
                     <i
                       className="pi pi-box"
                       style={{ marginRight: '0.5rem' }}
                     />
                     Embedded
+                  </div>
+                )}
+                {linkedSets.length === 0 && !isEmbeddedPreset && (
+                  <div className="materials-empty">
+                    <i
+                      className="pi pi-link"
+                      style={{ marginRight: '0.5rem' }}
+                    />
+                    No texture sets linked
                   </div>
                 )}
               </div>

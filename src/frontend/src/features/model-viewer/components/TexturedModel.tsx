@@ -145,6 +145,14 @@ function applyMaterialTextures(
     }
   }
 
+  // Shared fallback material for unmatched meshes (avoids per-mesh allocation)
+  const fallbackMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0.7, 0.7, 0.9),
+    metalness: 0.3,
+    roughness: 0.4,
+    envMapIntensity: 1.0,
+  })
+
   clonedModel.traverse(child => {
     if (!child.isMesh) return
     child.castShadow = true
@@ -169,12 +177,7 @@ function applyMaterialTextures(
 
     // Strip embedded materials from unmatched meshes to match worker behavior
     if (!matched && !hasWildcard) {
-      ;(child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(0.7, 0.7, 0.9),
-        metalness: 0.3,
-        roughness: 0.4,
-        envMapIntensity: 1.0,
-      })
+      ;(child as THREE.Mesh).material = fallbackMaterial
     }
   })
 }

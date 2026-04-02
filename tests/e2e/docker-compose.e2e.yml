@@ -3,6 +3,8 @@ services:
         build:
             context: ../../
             dockerfile: src/WebApi/Dockerfile
+            args:
+                ENABLE_BLENDER: "true"
         container_name: webapi-e2e
         environment:
             - ASPNETCORE_ENVIRONMENT=Development

@@ -101,8 +101,8 @@ dotnet test --no-build  # Avoids Azure.Core timeout issue
 
 **Infrastructure:**
 
-- `ModelibrWebFactory.cs` — `WebApplicationFactory` fixture that connects to the local Docker PostgreSQL (port 5432, database `Modelibr`). Overrides `UPLOAD_STORAGE_PATH` to a temp directory. The app's built-in `MigrateAsync()` handles schema setup.
-- `ConcurrencyTests.cs` — 6 concurrency scenarios testing race conditions.
+- `ModelibrWebFactory.cs` — `WebApplicationFactory` fixture that connects to the local Docker PostgreSQL (port 5432) using an isolated test database (`Modelibr_IntegrationTests`). The database is created fresh and dropped on dispose. Overrides `UPLOAD_STORAGE_PATH` to a temp directory. The app's built-in `MigrateAsync()` handles schema setup.
+- `ConcurrencyTests.cs` — 6 concurrency scenarios testing race conditions. Marked with `[Trait("Category", "Integration")]` so they are excluded from CI unit test runs (which lack PostgreSQL).
 
 **Tests:**
 
