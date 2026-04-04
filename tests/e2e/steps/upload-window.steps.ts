@@ -19,6 +19,9 @@ const __dirname = path.dirname(__filename);
 
 const { Given, When, Then } = createBdd();
 
+// Module-level state shared between history steps
+let foundModelItemIndex: number = 0;
+
 // ============================================
 // Upload Progress Window Steps
 // ============================================
@@ -455,16 +458,26 @@ Then('the item should display an "Uploaded to" location', async ({ page }) => {
 });
 
 When("I find a history item with a model", async ({ page }) => {
-    // The first item should be a model since we uploaded one
     const historyPage = new UploadHistoryPage(page);
-    const isModelButtonVisible = await historyPage.isOpenModelButtonVisible(0);
-    expect(isModelButtonVisible).toBe(true);
-    console.log("[UI] Found history item with model ✓");
+    const totalItems = await historyPage.getTotalItemCount();
+    let found = false;
+    for (let i = 0; i < totalItems; i++) {
+        const isModel = await historyPage.isOpenModelButtonVisible(i);
+        if (isModel) {
+            foundModelItemIndex = i;
+            found = true;
+            break;
+        }
+    }
+    expect(found).toBe(true);
+    console.log(
+        `[UI] Found history item with model at index ${foundModelItemIndex} ✓`,
+    );
 });
 
 When('I click the "Open Model" button for that item', async ({ page }) => {
     const historyPage = new UploadHistoryPage(page);
-    await historyPage.clickOpenModel(0);
+    await historyPage.clickOpenModel(foundModelItemIndex);
     console.log('[UI] Clicked "Open Model" button');
 });
 

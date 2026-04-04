@@ -55,7 +55,7 @@ export default defineConfig({
         {
             name: "chromium",
             testDir,
-            grepInvert: /@setup|@slow|@serial/,
+            grepInvert: /@setup|@slow|@serial|@performance/,
             dependencies: ["setup"], // Wait for all setup features to finish
             use: { ...devices["Desktop Chrome"] },
         },
@@ -63,7 +63,7 @@ export default defineConfig({
             name: "serial",
             testDir,
             grep: /@serial/,
-            grepInvert: /@setup/,
+            grepInvert: /@setup|@performance/,
             dependencies: ["setup", "chromium"], // Run after chromium to avoid asset-processor contention
             fullyParallel: false,
             use: { ...devices["Desktop Chrome"] },
@@ -72,10 +72,23 @@ export default defineConfig({
             name: "slow",
             testDir,
             grep: /@slow/,
-            grepInvert: /@setup/,
+            grepInvert: /@setup|@performance/,
             dependencies: ["setup", "chromium", "serial"], // Run last to avoid asset-processor contention with other projects
             fullyParallel: false, // Slow tests run sequentially to avoid asset-processor contention
             timeout: 720000, // 12 min for Blender rendering
+            use: { ...devices["Desktop Chrome"] },
+        },
+        {
+            // Performance tests run ONLY when explicitly requested:
+            //   npx playwright test --project=performance
+            // Never included in CI, test:quick, or test:ci scripts.
+            name: "performance",
+            testDir,
+            grep: /@performance/,
+            grepInvert: /@setup/,
+            dependencies: ["setup"],
+            fullyParallel: false, // Sequential to get reliable timing measurements
+            timeout: 600000, // 10 min — bulk uploads with thumbnail generation
             use: { ...devices["Desktop Chrome"] },
         },
     ],

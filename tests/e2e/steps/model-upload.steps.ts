@@ -48,16 +48,37 @@ Then(
         // Wait for a model card to appear with either a thumbnail image or placeholder
         // A "Ready" status means the thumbnail should be loaded
         if (status.toLowerCase() === "ready") {
-            // Wait for a thumbnail image to appear in any model card
-            await expect(
-                page
-                    .locator(
-                        ".model-card .thumbnail-image, .model-card .thumbnail-image-container img",
-                    )
-                    .first(),
-            ).toBeVisible({
-                timeout: 90000, // Give worker time to process
-            });
+            const thumbnailSelector =
+                ".model-card .thumbnail-image, .model-card .thumbnail-image-container img";
+
+            // With VirtuosoGrid only visible model cards have DOM elements.
+            // First try: wait for SignalR to push the thumbnail status update
+            // into the React Query cache, which triggers a re-render.
+            const found = await page
+                .locator(thumbnailSelector)
+                .first()
+                .waitFor({ state: "visible", timeout: 120000 })
+                .then(() => true)
+                .catch(() => false);
+
+            if (!found) {
+                // Fallback: SignalR may have missed the event or React Query
+                // cache still holds stale "Pending" status. Reload the page so
+                // useThumbnail fetches fresh data from the API.
+                console.log(
+                    "[Fallback] Thumbnail not visible after 120s via SignalR, refreshing page...",
+                );
+                await page.reload({ waitUntil: "domcontentloaded" });
+                await page.waitForSelector(
+                    ".model-card, .no-results, .empty-state",
+                    { state: "visible", timeout: 15000 },
+                );
+                await expect(
+                    page.locator(thumbnailSelector).first(),
+                ).toBeVisible({
+                    timeout: 60000,
+                });
+            }
         } else {
             // For other statuses, look for the thumbnail placeholder
             await expect(

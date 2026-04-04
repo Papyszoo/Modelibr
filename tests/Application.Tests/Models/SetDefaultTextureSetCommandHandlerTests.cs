@@ -80,6 +80,7 @@ public class SetDefaultTextureSetCommandHandlerTests
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<string>(),
+                It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>()))
@@ -133,6 +134,7 @@ public class SetDefaultTextureSetCommandHandlerTests
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<string>(),
+                It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>()))

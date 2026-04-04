@@ -17,21 +17,21 @@ namespace Application.Models
 
         public async Task<Result<GetAllModelsQueryResponse>> Handle(GetAllModelsQuery query, CancellationToken cancellationToken)
         {
-            IEnumerable<Model> models;
+            IEnumerable<ModelListDto> modelListDtos;
             int? totalCount = null;
 
             if (query.Page.HasValue && query.PageSize.HasValue)
             {
-                var result = await _modelRepository.GetPagedAsync(
+                var result = await _modelRepository.GetPagedListAsync(
                     query.Page.Value, query.PageSize.Value,
                     query.PackId, query.ProjectId, query.TextureSetId,
                     cancellationToken);
-                models = result.Items;
+                modelListDtos = result.Items;
                 totalCount = result.TotalCount;
             }
             else
             {
-                models = await _modelRepository.GetAllAsync(cancellationToken);
+                var models = await _modelRepository.GetAllAsync(cancellationToken);
 
                 // Filter by pack if specified
                 if (query.PackId.HasValue)
@@ -50,24 +50,24 @@ namespace Application.Models
                 {
                     models = models.Where(m => m.TextureSets.Any(ts => ts.Id == query.TextureSetId.Value));
                 }
-            }
 
-            var modelListDtos = models.Select(m => new ModelListDto
-            {
-                Id = m.Id,
-                Name = m.Name,
-                CreatedAt = m.CreatedAt,
-                UpdatedAt = m.UpdatedAt,
-                Tags = m.Tags,
-                Description = m.Description,
-                ActiveVersionId = m.ActiveVersionId,
-                ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
-                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
-                    : null,
-                PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
-                    ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
-                    : null
-            }).ToList();
+                modelListDtos = models.Select(m => new ModelListDto
+                {
+                    Id = m.Id,
+                    Name = m.Name,
+                    CreatedAt = m.CreatedAt,
+                    UpdatedAt = m.UpdatedAt,
+                    Tags = m.Tags,
+                    Description = m.Description,
+                    ActiveVersionId = m.ActiveVersionId,
+                    ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
+                        ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
+                        : null,
+                    PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
+                        ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
+                        : null
+                }).ToList();
+            }
 
             int? totalPages = (totalCount.HasValue && query.PageSize.HasValue)
                 ? (int)Math.Ceiling((double)totalCount.Value / query.PageSize.Value)

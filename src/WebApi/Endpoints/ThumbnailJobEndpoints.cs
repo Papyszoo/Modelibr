@@ -178,6 +178,7 @@ public static class ThumbnailJobEndpoints
             {
                 await notificationService.SendThumbnailStatusChangedAsync(
                     modelId,
+                    modelId,
                     request.Status,
                     request.ThumbnailUrl,
                     request.ErrorMessage);

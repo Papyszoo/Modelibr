@@ -1,6 +1,7 @@
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Domain.Models;
+using Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
@@ -29,6 +30,7 @@ public class ThumbnailQueue : IThumbnailQueue
         int modelId,
         int modelVersionId,
         string modelHash, 
+        bool forceRegenerate = false,
         int maxAttempts = 3, 
         int lockTimeoutMinutes = 10, 
         CancellationToken cancellationToken = default)
@@ -40,17 +42,24 @@ public class ThumbnailQueue : IThumbnailQueue
         
         if (existingJob != null)
         {
-            // Reset the existing job to trigger fresh thumbnail generation
-            // This is important when regenerating thumbnails or changing default texture sets
-            var currentTime = DateTime.UtcNow;
-            existingJob.Reset(currentTime);
-            await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
-            
-            _logger.LogInformation("Reset existing thumbnail job {JobId} (status: {OldStatus}) for model {ModelId} version {ModelVersionId} for regeneration", 
-                existingJob.Id, existingJob.Status, modelId, modelVersionId);
-            
-            // Send real-time notification to workers that a job is available for processing
-            await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+            // Only reset if explicitly requested (e.g., texture/variant change) or if the job is permanently failed
+            if (forceRegenerate || existingJob.Status == ThumbnailJobStatus.Dead)
+            {
+                var currentTime = DateTime.UtcNow;
+                existingJob.Reset(currentTime);
+                await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+                
+                _logger.LogInformation("Reset existing thumbnail job {JobId} (status: {Status}) for model {ModelId} version {ModelVersionId} for regeneration (forceRegenerate: {ForceRegenerate})", 
+                    existingJob.Id, existingJob.Status, modelId, modelVersionId, forceRegenerate);
+                
+                // Send real-time notification to workers that a job is available for processing
+                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+            }
+            else
+            {
+                _logger.LogInformation("Skipping reset of existing thumbnail job {JobId} (status: {Status}) for model {ModelId} version {ModelVersionId}", 
+                    existingJob.Id, existingJob.Status, modelId, modelVersionId);
+            }
             
             return existingJob;
         }
@@ -70,6 +79,7 @@ public class ThumbnailQueue : IThumbnailQueue
     public async Task<ThumbnailJob> EnqueueSoundWaveformAsync(
         int soundId,
         string soundHash,
+        bool forceRegenerate = false,
         int maxAttempts = 3,
         int lockTimeoutMinutes = 10,
         CancellationToken cancellationToken = default)
@@ -79,16 +89,22 @@ public class ThumbnailQueue : IThumbnailQueue
 
         if (existingJob != null)
         {
-            // Reset the existing job to trigger fresh waveform generation
-            var currentTime = DateTime.UtcNow;
-            existingJob.Reset(currentTime);
-            await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+            if (forceRegenerate || existingJob.Status == ThumbnailJobStatus.Dead)
+            {
+                var currentTime = DateTime.UtcNow;
+                existingJob.Reset(currentTime);
+                await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
 
-            _logger.LogInformation("Reset existing waveform job {JobId} (status: {OldStatus}) for sound {SoundId} for regeneration",
-                existingJob.Id, existingJob.Status, soundId);
+                _logger.LogInformation("Reset existing waveform job {JobId} (status: {Status}) for sound {SoundId} for regeneration (forceRegenerate: {ForceRegenerate})",
+                    existingJob.Id, existingJob.Status, soundId, forceRegenerate);
 
-            // Send real-time notification to workers
-            await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+            }
+            else
+            {
+                _logger.LogInformation("Skipping reset of existing waveform job {JobId} (status: {Status}) for sound {SoundId}",
+                    existingJob.Id, existingJob.Status, soundId);
+            }
 
             return existingJob;
         }
@@ -108,6 +124,7 @@ public class ThumbnailQueue : IThumbnailQueue
     public async Task<ThumbnailJob> EnqueueTextureSetThumbnailAsync(
         int textureSetId,
         int? proxySize = null,
+        bool forceRegenerate = false,
         int maxAttempts = 3,
         int lockTimeoutMinutes = 10,
         CancellationToken cancellationToken = default)
@@ -117,14 +134,22 @@ public class ThumbnailQueue : IThumbnailQueue
 
         if (existingJob != null)
         {
-            var currentTime = DateTime.UtcNow;
-            existingJob.Reset(currentTime);
-            await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+            if (forceRegenerate || existingJob.Status == ThumbnailJobStatus.Dead)
+            {
+                var currentTime = DateTime.UtcNow;
+                existingJob.Reset(currentTime);
+                await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
 
-            _logger.LogInformation("Reset existing texture set thumbnail job {JobId} for texture set {TextureSetId} for regeneration",
-                existingJob.Id, textureSetId);
+                _logger.LogInformation("Reset existing texture set thumbnail job {JobId} (status: {Status}) for texture set {TextureSetId} for regeneration (forceRegenerate: {ForceRegenerate})",
+                    existingJob.Id, existingJob.Status, textureSetId, forceRegenerate);
 
-            await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+            }
+            else
+            {
+                _logger.LogInformation("Skipping reset of existing texture set thumbnail job {JobId} (status: {Status}) for texture set {TextureSetId}",
+                    existingJob.Id, existingJob.Status, textureSetId);
+            }
 
             return existingJob;
         }

@@ -1,3 +1,4 @@
+using Application.Models;
 using Domain.Models;
 
 namespace Application.Abstractions.Repositories;
@@ -16,6 +17,12 @@ public interface IModelRepository
         int page, int pageSize,
         int? packId = null, int? projectId = null, int? textureSetId = null,
         CancellationToken cancellationToken = default);
+    Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
+        int page, int pageSize,
+        int? packId = null, int? projectId = null, int? textureSetId = null,
+        CancellationToken cancellationToken = default);
+    Task<(int? ActiveVersionId, Domain.Models.Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
+        int modelId, CancellationToken cancellationToken = default);
     Task UpdateAsync(Model model, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }

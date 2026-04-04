@@ -33,12 +33,13 @@ npm run test:quick       # Quick run (existing containers, four-phase execution)
 
 **Four-project execution:**
 
-E2E tests use a four-project approach for reliable execution:
+E2E tests use a five-project approach for reliable execution:
 
 1. **Setup** (`workers=1`, `@setup` tag): Creates shared test data (models, texture sets) sequentially to avoid asset processor overload. State is persisted to `.setup-state.json` via the setup-state-bridge.
-2. **Chromium** (`workers=2`, excludes `@setup|@slow|@serial`): Runs fast test features in parallel. Tests tagged `@slow` or `@serial` are excluded.
+2. **Chromium** (`workers=2`, excludes `@setup|@slow|@serial|@performance`): Runs fast test features in parallel. Tests tagged `@slow`, `@serial`, or `@performance` are excluded.
 3. **Serial** (`fullyParallel=false`, `@serial` tag, depends on setup + chromium): Runs contention-sensitive tests sequentially AFTER all parallel tests complete. Includes pack CRUD, project CRUD, model metadata, permanent delete, presets, version independence, and recycled model versions.
 4. **Slow** (`workers=1`, `@slow` tag, depends on setup + chromium + serial): Runs `@slow`-tagged tests sequentially LAST to avoid asset-processor contention. Includes mixed-format-thumbnail, SignalR, blend-upload, and thumbnail auto-gen scenarios.
+5. **Performance** (`workers=1`, `@performance` tag, depends on setup): Bulk upload throughput, thumbnail uniqueness, and grid virtualization tests. **Never runs in CI** — only when explicitly requested: `npm run test:performance` or `npx playwright test --project=performance --no-deps`.
 
 **Key files:**
 
@@ -291,7 +292,7 @@ Slow tests are tagged `@slow` and run in a dedicated `slow` Playwright project (
 | `15-blend-upload/blend-upload.feature`              | @slow | ~8 min           | Blender .blend → .glb conversion + thumbnail             |
 | `10-texture-set-kind.feature` (scenario 5)          | @slow | ~4 min           | Thumbnail auto-gen on kind change to Universal           |
 
-**Three Playwright projects**: `setup` (workers=1, sequential), `chromium` (workers=3, fast tests), `serial` (fullyParallel=false, for tests sharing global state like settings), `slow` (workers=1, sequential). The `chromium` project excludes `@slow` and `@serial` tests via `grepInvert`. All projects use `retries: 1` to handle parallel-execution flakiness from shared database state.
+**Five Playwright projects**: `setup` (workers=1, sequential), `chromium` (workers=3, fast tests), `serial` (fullyParallel=false, for tests sharing global state like settings), `slow` (workers=1, sequential), `performance` (workers=1, excluded from CI). The `chromium` project excludes `@slow`, `@serial`, and `@performance` tests via `grepInvert`. All projects use `retries: 1` to handle parallel-execution flakiness from shared database state.
 
 ```
 workers: 3  # chromium project — run-e2e.js, package.json test:quick

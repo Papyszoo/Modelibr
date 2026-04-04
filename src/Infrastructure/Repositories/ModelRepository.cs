@@ -1,6 +1,8 @@
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Models;
 using Domain.Services;
+using Domain.ValueObjects;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -78,6 +80,49 @@ internal sealed class ModelRepository : IModelRepository
         return (items, totalCount);
     }
 
+    public async Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
+        int page, int pageSize,
+        int? packId = null, int? projectId = null, int? textureSetId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Models.AsNoTracking().AsQueryable();
+
+        if (packId.HasValue)
+            query = query.Where(m => m.Packs.Any(p => p.Id == packId.Value));
+
+        if (projectId.HasValue)
+            query = query.Where(m => m.Projects.Any(p => p.Id == projectId.Value));
+
+        if (textureSetId.HasValue)
+            query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(m => m.UpdatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(m => new ModelListDto
+            {
+                Id = m.Id,
+                Name = m.Name,
+                CreatedAt = m.CreatedAt,
+                UpdatedAt = m.UpdatedAt,
+                Tags = m.Tags,
+                Description = m.Description,
+                ActiveVersionId = m.ActiveVersionId,
+                ThumbnailUrl = m.ActiveVersion != null && m.ActiveVersion.Thumbnail != null && m.ActiveVersion.Thumbnail.Status == ThumbnailStatus.Ready
+                    ? "/model-versions/" + m.ActiveVersion.Id + "/thumbnail/file?t=" + m.ActiveVersion.Thumbnail.UpdatedAt.ToString("yyyyMMddHHmmss")
+                    : null,
+                PngThumbnailUrl = m.ActiveVersion != null && m.ActiveVersion.Thumbnail != null && m.ActiveVersion.Thumbnail.Status == ThumbnailStatus.Ready && m.ActiveVersion.Thumbnail.PngThumbnailPath != null && m.ActiveVersion.Thumbnail.PngThumbnailPath != ""
+                    ? "/model-versions/" + m.ActiveVersion.Id + "/thumbnail/png-file?t=" + m.ActiveVersion.Thumbnail.UpdatedAt.ToString("yyyyMMddHHmmss")
+                    : null
+            })
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models
@@ -115,6 +160,24 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.Versions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)), cancellationToken);
+    }
+
+    public async Task<(int? ActiveVersionId, Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
+        int modelId, CancellationToken cancellationToken = default)
+    {
+        var result = await _context.Models
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(m => m.Id == modelId)
+            .Select(m => new
+            {
+                m.ActiveVersionId,
+                Thumbnail = m.ActiveVersion != null ? m.ActiveVersion.Thumbnail : null
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (result == null) return null;
+        return (result.ActiveVersionId, result.Thumbnail);
     }
 
     public async Task UpdateAsync(Model model, CancellationToken cancellationToken = default)

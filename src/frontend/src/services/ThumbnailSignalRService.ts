@@ -1,6 +1,7 @@
 import * as signalR from '@microsoft/signalr'
 
 export interface ThumbnailStatusChangedEvent {
+  modelId: number
   modelVersionId: number
   status: string
   thumbnailUrl: string | null

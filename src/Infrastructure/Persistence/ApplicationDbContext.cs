@@ -133,6 +133,9 @@ namespace Infrastructure.Persistence
                 // Add index for efficient soft delete queries
                 entity.HasIndex(m => m.IsDeleted);
 
+                // Add index for efficient ORDER BY UpdatedAt DESC pagination
+                entity.HasIndex(m => m.UpdatedAt).HasDatabaseName("IX_Models_UpdatedAt");
+
                 // Global query filter for soft deletes
                 entity.HasQueryFilter(m => !m.IsDeleted);
             });
@@ -375,6 +378,7 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<Thumbnail>(entity =>
             {
                 entity.HasKey(t => t.Id);
+                entity.Property(t => t.ModelId).IsRequired();
                 // ModelVersionId is a shadow property kept for tracking but not used as FK (ModelVersion.ThumbnailId is the FK)
                 entity.Property(t => t.ModelVersionId).IsRequired();
                 entity.Property(t => t.Status).IsRequired();

@@ -93,7 +93,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
             {
                 try
                 {
-                    await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.TextureSetId, cancellationToken: cancellationToken);
+                    await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.TextureSetId, forceRegenerate: true, cancellationToken: cancellationToken);
                     _logger.LogInformation("Auto-enqueued thumbnail job for Universal texture set {TextureSetId}", command.TextureSetId);
                 }
                 catch (Exception ex)

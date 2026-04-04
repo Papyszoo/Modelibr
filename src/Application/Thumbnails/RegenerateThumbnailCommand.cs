@@ -78,13 +78,13 @@ public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumb
         else
         {
             // Create new thumbnail record
-            var newThumbnail = Thumbnail.Create(targetVersion.Id, currentTime);
+            var newThumbnail = Thumbnail.Create(model.Id, targetVersion.Id, currentTime);
             targetVersion.SetThumbnail(await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken));
         }
 
         // Enqueue thumbnail job for this version
         // EnqueueAsync will check for existing jobs for this specific version and reuse them
-        await _thumbnailQueue.EnqueueAsync(model.Id, targetVersion.Id, primaryFile.Sha256Hash, cancellationToken: cancellationToken);
+        await _thumbnailQueue.EnqueueAsync(model.Id, targetVersion.Id, primaryFile.Sha256Hash, forceRegenerate: true, cancellationToken: cancellationToken);
 
         return Result.Success(new RegenerateThumbnailCommandResponse(model.Id, targetVersion.Id));
     }

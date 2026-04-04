@@ -25,6 +25,7 @@ public class ModelUploadedEventHandlerTests
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<string>(),
+                It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>()))
@@ -42,6 +43,7 @@ public class ModelUploadedEventHandlerTests
             1,
             10,
             validHash,
+            It.IsAny<bool>(),
             It.IsAny<int>(),
             It.IsAny<int>(),
             CancellationToken.None), Times.Once);
@@ -58,6 +60,7 @@ public class ModelUploadedEventHandlerTests
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<string>(),
+                It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>()))
