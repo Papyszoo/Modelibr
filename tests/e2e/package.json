@@ -11,7 +11,8 @@
         "test:teardown": "docker compose -f docker-compose.e2e.yml down -v && node -e \"fs.rmSync('data',{recursive:true,force:true})\"",
         "test:cleanup": "node -e \"fs.rmSync('data',{recursive:true,force:true});fs.rmSync('test-results',{recursive:true,force:true})\"",
         "bdd": "npx bddgen",
-        "test:report": "npx playwright show-report"
+        "test:report": "npx playwright show-report",
+        "test:performance": "npx bddgen && PW_WORKERS=1 npx playwright test --project=setup && PW_WORKERS=1 npx playwright test --project=performance --no-deps"
     },
     "devDependencies": {
         "@playwright/test": "^1.49.1",

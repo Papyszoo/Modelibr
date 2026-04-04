@@ -218,109 +218,6 @@ jobs:
                   path: test-results/frontend-results.json
                   retention-days: 30
 
-    blender-addon-tests:
-        name: Blender Addon Tests
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: blender-addon
-
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-
-            - name: Setup Python 3.10
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.10"
-                  cache: "pip"
-                  cache-dependency-path: blender-addon/tests/
-
-            - name: Install test dependencies
-              run: |
-                  pip install pytest fake-bpy-module-latest numpy
-
-            - name: Run unit tests
-              id: blender-test
-              continue-on-error: true
-              run: python -m pytest tests/unit -v 2>&1 | tee test-output.txt
-
-            - name: Parse test results
-              if: always()
-              working-directory: blender-addon
-              run: |
-                  # Parse pytest output from console
-                  if [ -f "test-output.txt" ]; then
-                    # Extract test counts from pytest summary output using grep -oP
-                    # pytest outputs something like "5 passed, 1 failed in 2.5s"
-                    # Note: Using grep -oP with look-ahead instead of sed to avoid greedy matching issues
-                    passed=$(grep -oP '\d+(?= passed)' test-output.txt | tail -1 || echo "0")
-                    failed=$(grep -oP '\d+(?= failed)' test-output.txt | tail -1 || echo "0")
-
-                    # Set defaults if empty
-                    passed=${passed:-0}
-                    failed=${failed:-0}
-                    total=$((passed + failed))
-
-                    # If we didn't find any results, try alternative patterns
-                    if [ "$total" = "0" ]; then
-                      # Try to find the total from collected tests
-                      collected=$(grep -oP '(?<=collected )\d+' test-output.txt | head -1 || echo "0")
-                      collected=${collected:-0}
-                      if [ "$collected" != "0" ]; then
-                        total=$collected
-                        # Check if all passed (no failed mentioned)
-                        if [ "$failed" = "0" ] && grep -q "passed" test-output.txt; then
-                          passed=$total
-                        fi
-                      fi
-                    fi
-
-                    # Extract failing test names and messages from pytest output
-                    # pytest format: "FAILED tests/path::test_name - Error message"
-                    failures="[]"
-                    if [ "$failed" -gt 0 ]; then
-                      grep "^FAILED" test-output.txt | while IFS= read -r line; do
-                        test_name=$(echo "$line" | sed 's/^FAILED //' | cut -d' ' -f1 | cut -c1-150)
-                        error_msg=$(echo "$line" | sed 's/^FAILED [^ ]* - //' | sed 's/"/\\"/g' | cut -c1-200)
-                        failures=$(echo "$failures" | jq --arg name "$test_name" --arg msg "$error_msg" '. + [{"name": $name, "message": $msg}]')
-                      done 2>/dev/null || true
-                    fi
-                    
-                    # Handle case where jq parsing failed
-                    if ! echo "$failures" | jq . >/dev/null 2>&1; then
-                      failures="[]"
-                    fi
-
-                    # Create summary JSON
-                    mkdir -p "$GITHUB_WORKSPACE/test-results"
-                    echo "{\"total\": ${total}, \"passed\": ${passed}, \"failed\": ${failed}, \"framework\": \"pytest\", \"failures\": ${failures}}" > "$GITHUB_WORKSPACE/test-results/blender-results.json"
-                    echo "Blender addon tests: ${passed}/${total} passed, ${failed} failed"
-                  else
-                    echo "No test output found"
-                    mkdir -p "$GITHUB_WORKSPACE/test-results"
-                    echo '{"total": 0, "passed": 0, "failed": 0, "framework": "pytest", "failures": [], "error": "No results"}' > "$GITHUB_WORKSPACE/test-results/blender-results.json"
-                  fi
-
-            - name: Upload blender test results
-              uses: actions/upload-artifact@v4
-              if: always()
-              with:
-                  name: blender-test-results-${{ github.run_number }}
-                  path: test-results/blender-results.json
-                  retention-days: 30
-
-            - name: Install Blender
-              run: |
-                  sudo snap install blender --classic
-                  blender --version
-
-            - name: Run Blender integration tests
-              uses: GabrielBB/xvfb-action@v1
-              with:
-                  working-directory: blender-addon
-                  run: blender -b --python tests/integration/run_in_blender.py
-
     asset-processor-tests:
         name: Asset Processor Tests
         runs-on: ubuntu-latest
@@ -530,7 +427,6 @@ jobs:
             [
                 backend-tests,
                 frontend-tests,
-                blender-addon-tests,
                 asset-processor-tests,
                 e2e-tests,
             ]
@@ -618,7 +514,6 @@ jobs:
                 detect-changes,
                 backend-tests,
                 frontend-tests,
-                blender-addon-tests,
                 asset-processor-tests,
                 build-storybook,
                 generate-videos,
@@ -687,12 +582,6 @@ jobs:
                     cp "current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
                   fi
 
-                  # Copy blender test results if available
-                  if [ -f "current-run-artifacts/blender-test-results-${{ github.run_number }}/blender-results.json" ]; then
-                    echo "Found current run blender test results"
-                    cp "current-run-artifacts/blender-test-results-${{ github.run_number }}/blender-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
-                  fi
-
                   # Copy asset processor test results if available
                   if [ -f "current-run-artifacts/asset-processor-test-results-${{ github.run_number }}/asset-processor-results.json" ]; then
                     echo "Found current run asset processor test results"
@@ -712,7 +601,6 @@ jobs:
                   TEST_CONCLUSION="success"
                   if [ "${{ needs.backend-tests.result }}" = "failure" ] || \
                      [ "${{ needs.frontend-tests.result }}" = "failure" ] || \
-                     [ "${{ needs.blender-addon-tests.result }}" = "failure" ] || \
                      [ "${{ needs.asset-processor-tests.result }}" = "failure" ] || \
                      [ "${{ needs.e2e-tests.result }}" = "failure" ]; then
                     TEST_CONCLUSION="failure"

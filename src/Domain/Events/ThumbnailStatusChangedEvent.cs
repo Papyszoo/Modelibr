@@ -10,6 +10,11 @@ namespace Domain.Events;
 public class ThumbnailStatusChangedEvent : DomainEvent
 {
     /// <summary>
+    /// The ID of the model that owns the version.
+    /// </summary>
+    public int ModelId { get; }
+
+    /// <summary>
     /// The ID of the model version that had its thumbnail status changed.
     /// </summary>
     public int ModelVersionId { get; }
@@ -29,8 +34,9 @@ public class ThumbnailStatusChangedEvent : DomainEvent
     /// </summary>
     public string? ErrorMessage { get; }
 
-    public ThumbnailStatusChangedEvent(int modelVersionId, ThumbnailStatus status, string? thumbnailUrl = null, string? errorMessage = null)
+    public ThumbnailStatusChangedEvent(int modelId, int modelVersionId, ThumbnailStatus status, string? thumbnailUrl = null, string? errorMessage = null)
     {
+        ModelId = modelId;
         ModelVersionId = modelVersionId;
         Status = status;
         ThumbnailUrl = thumbnailUrl;

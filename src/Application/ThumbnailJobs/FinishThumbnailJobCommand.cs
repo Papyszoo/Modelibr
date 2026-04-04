@@ -120,7 +120,7 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
             var thumbnail = await _thumbnailRepository.GetByModelVersionIdAsync(job.ModelVersionId.Value, cancellationToken);
             if (thumbnail == null)
             {
-                thumbnail = Thumbnail.Create(job.ModelVersionId.Value, now);
+                thumbnail = Thumbnail.Create(job.ModelId.Value, job.ModelVersionId.Value, now);
                 thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
                 
                 // Set ThumbnailId on the ModelVersion

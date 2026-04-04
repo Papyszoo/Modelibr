@@ -54,7 +54,7 @@ public class ThumbnailQueueTests
     }
 
     [Fact]
-    public async Task EnqueueAsync_WhenJobExists_ShouldResetAndReturnExistingJob()
+    public async Task EnqueueAsync_WhenJobExists_ShouldReturnExistingJobWithoutReset()
     {
         // Arrange
         var modelId = 1;
@@ -67,6 +67,31 @@ public class ThumbnailQueueTests
 
         // Act
         var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash);
+
+        // Assert
+        Assert.Same(existingJob, result);
+
+        _mockRepository.Verify(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()), Times.Once);
+        // Should NOT reset or update since forceRegenerate is false and job is Pending
+        _mockRepository.Verify(r => r.UpdateAsync(existingJob, It.IsAny<CancellationToken>()), Times.Never);
+        _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(existingJob, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task EnqueueAsync_WhenJobExistsAndForceRegenerate_ShouldResetAndReturn()
+    {
+        // Arrange
+        var modelId = 1;
+        var modelVersionId = 10;
+        var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        var existingJob = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow);
+
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingJob);
+
+        // Act
+        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash, forceRegenerate: true);
 
         // Assert
         Assert.Same(existingJob, result);
