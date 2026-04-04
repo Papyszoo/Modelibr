@@ -11,6 +11,11 @@ public class Thumbnail : AggregateRoot
     public int Id { get; private set; }
     
     /// <summary>
+    /// The ID of the model that owns this thumbnail's version.
+    /// </summary>
+    public int ModelId { get; private set; }
+    
+    /// <summary>
     /// The ID of the model version this thumbnail was generated for.
     /// </summary>
     public int ModelVersionId { get; private set; }
@@ -72,12 +77,13 @@ public class Thumbnail : AggregateRoot
     /// <summary>
     /// Creates a new thumbnail record for processing.
     /// </summary>
-    public static Thumbnail Create(int modelVersionId, DateTime createdAt)
+    public static Thumbnail Create(int modelId, int modelVersionId, DateTime createdAt)
     {
         ValidateModelVersionId(modelVersionId);
 
         return new Thumbnail
         {
+            ModelId = modelId,
             ModelVersionId = modelVersionId,
             Status = ThumbnailStatus.Pending,
             CreatedAt = createdAt,
@@ -93,7 +99,7 @@ public class Thumbnail : AggregateRoot
         Status = ThumbnailStatus.Processing;
         UpdatedAt = updatedAt;
         
-        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status));
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, ModelVersionId, Status));
     }
 
     /// <summary>
@@ -115,7 +121,7 @@ public class Thumbnail : AggregateRoot
         UpdatedAt = processedAt;
         
         var thumbnailUrl = $"/model-versions/{ModelVersionId}/thumbnail/file";
-        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status, thumbnailUrl));
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, ModelVersionId, Status, thumbnailUrl));
     }
 
     /// <summary>
@@ -143,7 +149,7 @@ public class Thumbnail : AggregateRoot
         UpdatedAt = processedAt;
         
         var thumbnailUrl = $"/model-versions/{ModelVersionId}/thumbnail/file";
-        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status, thumbnailUrl));
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, ModelVersionId, Status, thumbnailUrl));
     }
 
     /// <summary>
@@ -158,7 +164,7 @@ public class Thumbnail : AggregateRoot
         ProcessedAt = processedAt;
         UpdatedAt = processedAt;
         
-        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelVersionId, Status, null, ErrorMessage));
+        RaiseDomainEvent(new ThumbnailStatusChangedEvent(ModelId, ModelVersionId, Status, null, ErrorMessage));
     }
 
     /// <summary>

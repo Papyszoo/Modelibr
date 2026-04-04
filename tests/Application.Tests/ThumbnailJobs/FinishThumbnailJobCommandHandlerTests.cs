@@ -93,7 +93,7 @@ public class FinishThumbnailJobCommandHandlerTests
         var job = ThumbnailJob.Create(1, 10, validHash, DateTime.UtcNow, 3, 10);
         var model = Model.Create("Test Model", DateTime.UtcNow);
         var now = DateTime.UtcNow;
-        var newThumbnail = Thumbnail.Create(10, now);
+        var newThumbnail = Thumbnail.Create(1, 10, now);
 
         _mockThumbnailJobRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(job);
@@ -127,7 +127,7 @@ public class FinishThumbnailJobCommandHandlerTests
         var validHash = "a".PadRight(64, '0'); // Valid SHA256 hash (64 chars)
         var job = ThumbnailJob.Create(1, 10, validHash, DateTime.UtcNow, 3, 10);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var existingThumbnail = Thumbnail.Create(10, DateTime.UtcNow.AddMinutes(-10));
+        var existingThumbnail = Thumbnail.Create(1, 10, DateTime.UtcNow.AddMinutes(-10));
         var now = DateTime.UtcNow;
 
         _mockThumbnailJobRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
@@ -188,7 +188,7 @@ public class FinishThumbnailJobCommandHandlerTests
         var validHash = "a".PadRight(64, '0'); // Valid SHA256 hash (64 chars)
         var job = ThumbnailJob.Create(1, 10, validHash, DateTime.UtcNow, 3, 10);
         var model = Model.Create("Test Model", DateTime.UtcNow);
-        var existingThumbnail = Thumbnail.Create(10, DateTime.UtcNow.AddMinutes(-10));
+        var existingThumbnail = Thumbnail.Create(1, 10, DateTime.UtcNow.AddMinutes(-10));
         var now = DateTime.UtcNow;
 
         _mockThumbnailJobRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))

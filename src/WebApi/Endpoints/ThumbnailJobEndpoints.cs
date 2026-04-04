@@ -178,6 +178,7 @@ public static class ThumbnailJobEndpoints
             {
                 await notificationService.SendThumbnailStatusChangedAsync(
                     modelId,
+                    request.ModelVersionId,
                     request.Status,
                     request.ThumbnailUrl,
                     request.ErrorMessage);
@@ -236,4 +237,4 @@ public record LogJobEventRequest(string EventType, string Message, string? Metad
 /// <summary>
 /// Request model for testing thumbnail completion.
 /// </summary>
-public record TestThumbnailCompleteRequest(string Status, string? ThumbnailUrl = null, string? ErrorMessage = null);
+public record TestThumbnailCompleteRequest(int ModelVersionId, string Status, string? ThumbnailUrl = null, string? ErrorMessage = null);

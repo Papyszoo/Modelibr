@@ -1,6 +1,6 @@
 import { BaseProcessor } from './baseProcessor.js'
 import { ModelDataService } from '../modelDataService.js'
-import { PuppeteerRenderer } from '../puppeteerRenderer.js'
+import { RendererPool } from '../rendererPool.js'
 import { TextureSetApiService } from '../textureSetApiService.js'
 import { FrameEncoderService } from '../frameEncoderService.js'
 import { generateTextureProxies } from '../textureProxyGenerator.js'
@@ -11,13 +11,15 @@ import { generateTextureProxies } from '../textureProxyGenerator.js'
  *
  * Pipeline: fetch texture set → download textures → create geometry → apply textures
  *           → render swing animation → encode animated WebP → upload via texture-set thumbnail endpoints
+ *
+ * Uses a RendererPool so concurrent jobs each get their own WebGL context.
  */
 export class TextureSetProcessor extends BaseProcessor {
   constructor() {
     super()
     this.modelDataService = new ModelDataService()
     this.textureSetApiService = new TextureSetApiService()
-    this.puppeteerRenderer = null
+    this.rendererPool = null
   }
 
   get processorType() {
@@ -32,6 +34,8 @@ export class TextureSetProcessor extends BaseProcessor {
    */
   async process(job, jobLogger) {
     let texturePaths = null
+
+    let renderer = null
 
     try {
       const textureSetId = job.textureSetId
@@ -75,16 +79,17 @@ export class TextureSetProcessor extends BaseProcessor {
         types: Object.keys(texturePaths),
       })
 
-      // Step 3: Initialize renderer and load the preview geometry
-      if (!this.puppeteerRenderer) {
-        this.puppeteerRenderer = new PuppeteerRenderer()
-        await this.puppeteerRenderer.initialize()
+      // Step 3: Acquire an exclusive renderer from the pool and load geometry
+      if (!this.rendererPool) {
+        this.rendererPool = new RendererPool()
+        await this.rendererPool.initialize()
       }
+
+      renderer = await this.rendererPool.acquire()
 
       // Use the stored preview geometry type (defaults to plane)
       const geometryType = textureSet.previewGeometryType || 'plane'
-      const polygonCount =
-        await this.puppeteerRenderer.loadPrimitive(geometryType)
+      const polygonCount = await renderer.loadPrimitive(geometryType)
       jobLogger.info('Primitive loaded', { polygonCount, geometryType })
 
       // Step 4: Apply textures to the sphere
@@ -95,7 +100,7 @@ export class TextureSetProcessor extends BaseProcessor {
 
       jobLogger.info('UV scale applied', { uvScale, tilingScale })
 
-      const applied = await this.puppeteerRenderer.applyTextures(
+      const applied = await renderer.applyTextures(
         texturePaths,
         'obj',
         tilingScale
@@ -111,13 +116,13 @@ export class TextureSetProcessor extends BaseProcessor {
 
       // Step 5: Render swing animation frames
       // Camera swings from 45° top-left to -30° bottom-right, then back
-      const cameraDistance =
-        await this.puppeteerRenderer.calculateOptimalCameraDistance()
+      const cameraDistance = await renderer.calculateOptimalCameraDistance()
 
       const swingFrames = await this._renderSwingFrames(
         cameraDistance,
         geometryType,
-        jobLogger
+        jobLogger,
+        renderer
       )
 
       jobLogger.info('Swing animation rendered for texture set', {
@@ -172,6 +177,9 @@ export class TextureSetProcessor extends BaseProcessor {
         'Thumbnail upload failed — no valid thumbnail data available'
       )
     } finally {
+      if (renderer) {
+        this.rendererPool.release(renderer)
+      }
       if (texturePaths) {
         await this.modelDataService.cleanupTextureFiles(texturePaths)
       }
@@ -185,7 +193,7 @@ export class TextureSetProcessor extends BaseProcessor {
    * Plane geometry gets a gentler swing since it faces the camera.
    * @private
    */
-  async _renderSwingFrames(cameraDistance, geometryType, jobLogger) {
+  async _renderSwingFrames(cameraDistance, geometryType, jobLogger, renderer) {
     const isPlane = geometryType === 'plane'
 
     // Swing parameters — gentler for planes
@@ -210,7 +218,7 @@ export class TextureSetProcessor extends BaseProcessor {
       const azimuth = startAzimuth + (endAzimuth - startAzimuth) * t
       const elevation = startElevation + (endElevation - startElevation) * t
 
-      const frameData = await this.puppeteerRenderer.renderFrame(
+      const frameData = await renderer.renderFrame(
         azimuth,
         effectiveCameraDistance,
         frames.length,
@@ -225,7 +233,7 @@ export class TextureSetProcessor extends BaseProcessor {
       const azimuth = startAzimuth + (endAzimuth - startAzimuth) * t
       const elevation = startElevation + (endElevation - startElevation) * t
 
-      const frameData = await this.puppeteerRenderer.renderFrame(
+      const frameData = await renderer.renderFrame(
         azimuth,
         effectiveCameraDistance,
         frames.length,
@@ -357,9 +365,9 @@ export class TextureSetProcessor extends BaseProcessor {
   }
 
   async cleanup() {
-    if (this.puppeteerRenderer) {
-      await this.puppeteerRenderer.dispose()
-      this.puppeteerRenderer = null
+    if (this.rendererPool) {
+      await this.rendererPool.dispose()
+      this.rendererPool = null
     }
     if (this.frameEncoder) {
       await this.frameEncoder.cleanupOldFiles(0)

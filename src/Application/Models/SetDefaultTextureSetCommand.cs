@@ -106,6 +106,7 @@ namespace Application.Models
                         command.ModelId,
                         targetVersion.Id,
                         primaryFile.Sha256Hash,
+                        forceRegenerate: true,
                         cancellationToken: cancellationToken);
                 }
 

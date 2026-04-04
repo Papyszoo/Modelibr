@@ -1,7 +1,6 @@
 import { type Toast } from 'primereact/toast'
 import { useCallback, useRef } from 'react'
 
-import { useThumbnailSignalR } from '@/shared/thumbnail/hooks/useThumbnailSignalR'
 import { type PackDto, type ProjectDto } from '@/types'
 
 import { useModelData } from './useModelData'
@@ -38,10 +37,6 @@ export function useModelGrid({
     toast,
     onUploadComplete: () => data.fetchModels(),
   })
-
-  // SignalR thumbnail updates (param unused but reserved)
-  const modelIds = data.models.map(m => Number(m.id))
-  useThumbnailSignalR(modelIds)
 
   // Client-side search filter
   const filteredModels = filters.filterModels(data.models)

@@ -16,13 +16,14 @@ public class SignalRThumbnailNotificationService : IThumbnailNotificationService
         _hubContext = hubContext ?? throw new ArgumentNullException(nameof(hubContext));
     }
 
-    public async Task SendThumbnailStatusChangedAsync(int modelVersionId, string status, string? thumbnailUrl = null, string? errorMessage = null, CancellationToken cancellationToken = default)
+    public async Task SendThumbnailStatusChangedAsync(int modelId, int modelVersionId, string status, string? thumbnailUrl = null, string? errorMessage = null, CancellationToken cancellationToken = default)
     {
         var groupName = ThumbnailHub.GetModelVersionGroupName(modelVersionId.ToString());
         
         // Create the notification payload
         var notification = new
         {
+            ModelId = modelId,
             ModelVersionId = modelVersionId,
             Status = status,
             ThumbnailUrl = thumbnailUrl,

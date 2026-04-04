@@ -13,7 +13,7 @@ public interface IThumbnailNotificationService
     /// <param name="thumbnailUrl">The thumbnail URL if ready, null otherwise</param>
     /// <param name="errorMessage">Error message if failed, null otherwise</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    Task SendThumbnailStatusChangedAsync(int modelVersionId, string status, string? thumbnailUrl = null, string? errorMessage = null, CancellationToken cancellationToken = default);
+    Task SendThumbnailStatusChangedAsync(int modelId, int modelVersionId, string status, string? thumbnailUrl = null, string? errorMessage = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Sends a notification when the active version of a model changes.

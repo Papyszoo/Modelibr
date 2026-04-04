@@ -46,7 +46,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
             {
                 try
                 {
-                    await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.Id, cancellationToken: cancellationToken);
+                    await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.Id, forceRegenerate: true, cancellationToken: cancellationToken);
                     _logger.LogInformation("Auto-enqueued thumbnail job for texture set {TextureSetId} after kind change to Universal", command.Id);
                 }
                 catch (Exception ex)

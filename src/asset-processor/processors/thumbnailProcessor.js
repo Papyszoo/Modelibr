@@ -1,7 +1,7 @@
 import { BaseProcessor } from './baseProcessor.js'
 import { ModelFileService } from '../modelFileService.js'
 import { ModelDataService } from '../modelDataService.js'
-import { PuppeteerRenderer } from '../puppeteerRenderer.js'
+import { RendererPool } from '../rendererPool.js'
 import { FrameEncoderService } from '../frameEncoderService.js'
 import { ThumbnailStorageService } from '../thumbnailStorageService.js'
 import { ThumbnailApiService } from '../thumbnailApiService.js'
@@ -14,6 +14,9 @@ import { fileURLToPath } from 'url'
 /**
  * Processor for generating 3D model thumbnails.
  * Handles: file download → 3D rendering → frame encoding → storage → image classification.
+ *
+ * Uses a RendererPool so concurrent jobs each get their own WebGL context
+ * and never interfere with each other's scenes.
  */
 export class ThumbnailProcessor extends BaseProcessor {
   constructor() {
@@ -22,7 +25,7 @@ export class ThumbnailProcessor extends BaseProcessor {
     this.modelDataService = new ModelDataService()
     this.thumbnailStorage = new ThumbnailStorageService()
     this.thumbnailApiService = new ThumbnailApiService()
-    this.puppeteerRenderer = null
+    this.rendererPool = null
     this.frameEncoder = null
   }
 
@@ -40,6 +43,7 @@ export class ThumbnailProcessor extends BaseProcessor {
     let tempFilePath = null
     let glbConvertedPath = null
     let texturePaths = null
+    let renderer = null
 
     try {
       jobLogger.info('Starting model processing', {
@@ -145,18 +149,20 @@ export class ThumbnailProcessor extends BaseProcessor {
         fileInfo.fileType = 'glb'
       }
 
-      // Step 3: Initialize renderer and load model
+      // Step 3: Acquire an exclusive renderer from the pool and load model
       await this.jobEventService.logModelLoadingStarted(
         job.id,
         fileInfo.fileType
       )
 
-      if (!this.puppeteerRenderer) {
-        this.puppeteerRenderer = new PuppeteerRenderer()
-        await this.puppeteerRenderer.initialize()
+      if (!this.rendererPool) {
+        this.rendererPool = new RendererPool()
+        await this.rendererPool.initialize()
       }
 
-      const polygonCount = await this.puppeteerRenderer.loadModel(
+      renderer = await this.rendererPool.acquire()
+
+      const polygonCount = await renderer.loadModel(
         fileInfo.filePath,
         fileInfo.fileType
       )
@@ -170,8 +176,7 @@ export class ThumbnailProcessor extends BaseProcessor {
 
       // Step 3.2: Extract and save material names from the loaded model
       try {
-        const materialNames =
-          await this.puppeteerRenderer.extractMaterialNames()
+        const materialNames = await renderer.extractMaterialNames()
         if (materialNames.length > 0) {
           jobLogger.info('Extracted material names from model', {
             materialNames,
@@ -191,7 +196,8 @@ export class ThumbnailProcessor extends BaseProcessor {
       texturePaths = await this._applyTextures(
         job,
         jobLogger,
-        fileInfo.fileType
+        fileInfo.fileType,
+        renderer
       )
 
       // Step 4: Render orbit frames
@@ -201,7 +207,12 @@ export class ThumbnailProcessor extends BaseProcessor {
         )
       }
 
-      const frames = await this._renderOrbitFrames(job, jobLogger, polygonCount)
+      const frames = await this._renderOrbitFrames(
+        job,
+        jobLogger,
+        polygonCount,
+        renderer
+      )
 
       // Step 5: Encode frames
       if (!config.encoding.enabled) {
@@ -242,6 +253,9 @@ export class ThumbnailProcessor extends BaseProcessor {
         'Thumbnail upload failed — no valid thumbnail data available'
       )
     } finally {
+      if (renderer) {
+        this.rendererPool.release(renderer)
+      }
       if (tempFilePath) {
         await this.modelFileService.cleanupFile(tempFilePath)
       }
@@ -259,7 +273,7 @@ export class ThumbnailProcessor extends BaseProcessor {
    * Falls back to single defaultTextureSetId if no mappings exist.
    * @private
    */
-  async _applyTextures(job, jobLogger, fileType = 'gltf') {
+  async _applyTextures(job, jobLogger, fileType = 'gltf', renderer = null) {
     const textureMappings = job.textureMappings || []
     const mainVariant = job.mainVariantName || ''
 
@@ -355,7 +369,7 @@ export class ThumbnailProcessor extends BaseProcessor {
             downloadedFilesCache.set(mapping.textureSetId, texturePaths)
           }
           if (Object.keys(texturePaths).length > 0) {
-            const applied = await this.puppeteerRenderer.applyTextures(
+            const applied = await renderer.applyTextures(
               texturePaths,
               fileType,
               undefined,
@@ -423,10 +437,7 @@ export class ThumbnailProcessor extends BaseProcessor {
         await this.modelDataService.downloadTextureSetFiles(textureSet)
 
       if (Object.keys(texturePaths).length > 0) {
-        const applied = await this.puppeteerRenderer.applyTextures(
-          texturePaths,
-          fileType
-        )
+        const applied = await renderer.applyTextures(texturePaths, fileType)
         if (applied) {
           await this.jobEventService.logEvent(
             job.id,
@@ -449,7 +460,7 @@ export class ThumbnailProcessor extends BaseProcessor {
    * Render orbit animation frames.
    * @private
    */
-  async _renderOrbitFrames(job, jobLogger, polygonCount) {
+  async _renderOrbitFrames(job, jobLogger, polygonCount, renderer = null) {
     const angleRange = config.orbit.endAngle - config.orbit.startAngle
     const frameCount = Math.ceil(angleRange / config.orbit.angleStep)
 
@@ -460,10 +471,10 @@ export class ThumbnailProcessor extends BaseProcessor {
     })
 
     const renderStartTime = Date.now()
-    const frames = await this.puppeteerRenderer.renderOrbitFrames(jobLogger)
+    const frames = await renderer.renderOrbitFrames(jobLogger)
     const renderTime = Date.now() - renderStartTime
 
-    const memoryStats = this.puppeteerRenderer.getMemoryStats(frames)
+    const memoryStats = renderer.getMemoryStats(frames)
     jobLogger.info('Orbit frames rendered', {
       polygonCount,
       ...memoryStats,
@@ -541,9 +552,9 @@ export class ThumbnailProcessor extends BaseProcessor {
   }
 
   async cleanup() {
-    if (this.puppeteerRenderer) {
-      await this.puppeteerRenderer.dispose()
-      this.puppeteerRenderer = null
+    if (this.rendererPool) {
+      await this.rendererPool.dispose()
+      this.rendererPool = null
     }
     if (this.frameEncoder) {
       await this.frameEncoder.cleanupOldFiles(0)
