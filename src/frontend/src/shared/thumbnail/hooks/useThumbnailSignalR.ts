@@ -6,10 +6,28 @@ import {
   thumbnailSignalRService,
   type ThumbnailStatusChangedEvent,
 } from '../../../services/ThumbnailSignalRService'
+import { type ThumbnailStatus } from '../api/thumbnailApi'
+
+/**
+ * Build a partial ThumbnailStatus from a SignalR event for setQueryData.
+ */
+function thumbnailStatusFromEvent(
+  event: ThumbnailStatusChangedEvent
+): ThumbnailStatus {
+  return {
+    status: event.status as ThumbnailStatus['status'],
+    processedAt: event.timestamp,
+    errorMessage: event.errorMessage ?? undefined,
+  }
+}
 
 /**
  * Hook to subscribe to thumbnail status changes for displayed models.
  * Automatically manages SignalR connection and subscriptions.
+ *
+ * Uses setQueryData to push SignalR events directly into React Query cache.
+ * No invalidation/refetch is needed — the cache update triggers a re-render
+ * which recomputes imgSrc and the browser loads the thumbnail image.
  *
  * @param _modelIds - Currently unused, but reserved for future per-model subscriptions
  */
@@ -31,7 +49,6 @@ export function useThumbnailSignalR(_modelIds: number[]) {
         await thumbnailSignalRService.connect()
         if (mounted) {
           setIsConnected(thumbnailSignalRService.isConnected())
-          // Join all models group to receive broadcasts for active version changes
           await thumbnailSignalRService.joinAllModelsGroup()
         }
       } catch (error) {
@@ -46,26 +63,36 @@ export function useThumbnailSignalR(_modelIds: number[]) {
 
     return () => {
       mounted = false
-      // Don't leave group on unmount — this is app-level, we want to stay connected
     }
   }, [])
 
-  // Handle thumbnail status changes
+  // Handle thumbnail status changes via setQueryData (zero network cost).
+  // The backend includes modelId in the event, so we can update directly.
   const handleThumbnailStatusChanged = useCallback(
-    (_event: ThumbnailStatusChangedEvent) => {
-      // Thumbnail status affects model lists and model detail views.
-      // We don't have modelId here, so invalidate broadly.
-      queryClient.invalidateQueries({ queryKey: ['models'] })
-      queryClient.invalidateQueries({ queryKey: ['models', 'detail'] })
+    (event: ThumbnailStatusChangedEvent) => {
+      const newData = thumbnailStatusFromEvent(event)
+
+      // Update version-level cache (used by VersionStrip detail view)
+      queryClient.setQueryData<ThumbnailStatus>(
+        ['thumbnail', 'version', event.modelVersionId],
+        old => ({ ...old, ...newData })
+      )
+
+      // Update model-level cache (used by grid view) — modelId comes from the event
+      queryClient.setQueryData<ThumbnailStatus>(
+        ['thumbnail', event.modelId.toString()],
+        old => ({ ...old, ...newData })
+      )
     },
     [queryClient]
   )
 
-  // Handle active version changes
+  // Handle active version changes — targeted invalidation only
   const handleActiveVersionChanged = useCallback(
     (event: ActiveVersionChangedEvent) => {
-      // Active version affects both model detail and model list rendering.
-      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({
+        queryKey: ['thumbnail', event.modelId.toString()],
+      })
       queryClient.invalidateQueries({
         queryKey: ['models', 'detail', event.modelId.toString()],
       })
@@ -92,8 +119,9 @@ export function useThumbnailSignalR(_modelIds: number[]) {
 }
 
 /**
- * Hook to subscribe to thumbnail updates for a specific model.
- * Returns callbacks that can be used to trigger re-renders when thumbnails change.
+ * Hook to subscribe to thumbnail updates for a specific model (detail view).
+ * Uses setQueryData for instant cache updates. Only invalidates the model
+ * detail query (not thumbnail) since setQueryData handles the thumbnail.
  */
 export function useModelThumbnailUpdates(
   modelId: number | null,
@@ -109,12 +137,23 @@ export function useModelThumbnailUpdates(
     const handleThumbnailStatusChanged = (
       event: ThumbnailStatusChangedEvent
     ) => {
+      // Only handle events for THIS model
+      if (event.modelId !== modelId) return
+
       onThumbnailStatusChanged?.(event)
       if (event.status === 'Ready' && event.thumbnailUrl && onThumbnailReady) {
         onThumbnailReady(event.thumbnailUrl)
       }
-      // Invalidate queries to trigger re-fetch
-      queryClient.invalidateQueries({ queryKey: ['models'] })
+      // Update caches via setQueryData — no network request
+      queryClient.setQueryData<ThumbnailStatus>(
+        ['thumbnail', 'version', event.modelVersionId],
+        old => ({ ...old, ...thumbnailStatusFromEvent(event) })
+      )
+      queryClient.setQueryData<ThumbnailStatus>(
+        ['thumbnail', modelId.toString()],
+        old => ({ ...old, ...thumbnailStatusFromEvent(event) })
+      )
+      // Only invalidate model detail (for metadata like file list), not thumbnail
       queryClient.invalidateQueries({
         queryKey: ['models', 'detail', modelId.toString()],
       })
@@ -122,14 +161,14 @@ export function useModelThumbnailUpdates(
 
     const handleActiveVersionChanged = (event: ActiveVersionChangedEvent) => {
       if (event.modelId === modelId) {
-        queryClient.invalidateQueries({ queryKey: ['models'] })
+        // Active version changed — need to refetch thumbnail since it points to a new version
+        queryClient.invalidateQueries({
+          queryKey: ['thumbnail', modelId.toString()],
+        })
         queryClient.invalidateQueries({
           queryKey: ['models', 'detail', modelId.toString()],
         })
-        // Call the callback if provided
-        if (onActiveVersionChanged) {
-          onActiveVersionChanged(event)
-        }
+        onActiveVersionChanged?.(event)
       }
     }
 

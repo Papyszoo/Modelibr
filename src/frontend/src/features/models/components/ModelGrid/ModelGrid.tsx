@@ -3,7 +3,8 @@ import './ModelGrid.css'
 import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
 import { Toast } from 'primereact/toast'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
+import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { useTabContext } from '@/hooks/useTabContext'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
@@ -17,12 +18,35 @@ import { ModelsFilters } from './ModelsFilters'
 import { type ModelGridProps } from './types'
 import { useModelGrid } from './useModelGrid'
 
+// VirtuosoGrid components with CSS Grid layout
+const gridComponents: GridComponents<{ cardWidth: number }> = {
+  List: forwardRef(({ children, context, ...props }, ref) => (
+    <div
+      ref={ref}
+      {...props}
+      className="model-grid"
+      style={{
+        ...props.style,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${context?.cardWidth ?? 180}px, 1fr))`,
+      }}
+    >
+      {children}
+    </div>
+  )),
+  Item: ({ children, ...props }) => (
+    <div {...props} style={props.style}>
+      {children}
+    </div>
+  ),
+}
+
 export function ModelGrid({
   projectId,
   packId,
   textureSetId,
   onTotalCountChange,
 }: ModelGridProps) {
+  const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null)
   const contextMenuRef = useRef<ModelContextMenuHandle>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { openModelDetailsTab } = useTabContext()
@@ -118,6 +142,7 @@ export function ModelGrid({
 
   return (
     <div
+      ref={setScrollParent}
       className="model-grid-container"
       onDrop={onDrop}
       onDragOver={onDragOver}
@@ -197,16 +222,38 @@ export function ModelGrid({
           </p>
         </div>
       ) : (
-        <>
-          <div
-            className="model-grid"
-            style={{
-              gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
-            }}
-          >
-            {filteredModels.map(model => (
+        <VirtuosoGrid
+          customScrollParent={scrollParent ?? undefined}
+          totalCount={filteredModels.length + (isContainerContext ? 1 : 0)}
+          overscan={200}
+          components={gridComponents}
+          context={{ cardWidth }}
+          endReached={() => {
+            if (pagination.hasMore && !isLoadingMore) {
+              fetchModels(true)
+            }
+          }}
+          itemContent={index => {
+            // Last item is the "Add" card in container context
+            if (isContainerContext && index === filteredModels.length) {
+              return (
+                <div
+                  className="model-card model-card-add"
+                  onClick={openAddModelDialog}
+                >
+                  <div className="model-card-add-content">
+                    <i className="pi pi-plus" />
+                    <span>Add Model</span>
+                  </div>
+                </div>
+              )
+            }
+
+            const model = filteredModels[index]
+            if (!model) return null
+
+            return (
               <div
-                key={model.id}
                 className="model-card"
                 data-model-id={model.id}
                 onClick={() => handleModelSelect(model)}
@@ -223,44 +270,9 @@ export function ModelGrid({
                   </div>
                 </div>
               </div>
-            ))}
-            {isContainerContext && (
-              <div
-                className="model-card model-card-add"
-                onClick={openAddModelDialog}
-              >
-                <div className="model-card-add-content">
-                  <i className="pi pi-plus" />
-                  <span>Add Model</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {pagination.hasMore && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                padding: '16px',
-              }}
-            >
-              <Button
-                label={
-                  isLoadingMore
-                    ? 'Loading...'
-                    : `Load More (${filteredModels.length} of ${pagination.totalCount})`
-                }
-                icon={
-                  isLoadingMore ? 'pi pi-spinner pi-spin' : 'pi pi-chevron-down'
-                }
-                onClick={() => fetchModels(true)}
-                disabled={isLoadingMore}
-                className="p-button-outlined"
-              />
-            </div>
-          )}
-        </>
+            )
+          }}
+        />
       )}
 
       {isContainerContext && (

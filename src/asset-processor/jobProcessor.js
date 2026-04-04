@@ -27,7 +27,7 @@ export class JobProcessor {
     this.thumbnailStorage = new ThumbnailStorageService()
     this.jobEventService = new JobEventService()
     this.thumbnailApiService = new ThumbnailApiService()
-    this.puppeteerRenderer = null // Will be initialized when needed
+    this.puppeteerRenderer = null // Legacy — kept for backward compat, active rendering uses ProcessorRegistry
     this.frameEncoder = null // Will be initialized when needed
     this.isShuttingDown = false
     this.activeJobs = new Map()
@@ -99,14 +99,15 @@ export class JobProcessor {
       return
     }
 
-    const pollIntervalMs = 10000
+    const pollIntervalMs = parseInt(process.env.POLL_INTERVAL_MS) || 5000
+    logger.info('Starting periodic polling', { pollIntervalMs })
     this.pollIntervalHandle = setInterval(async () => {
       if (this.isShuttingDown || this.isPollingForJobs) {
         return
       }
 
-      // Only poll when queue is empty to avoid competing with active processing
-      if (this.jobQueue.length > 0 || this.isProcessingQueue) {
+      // Don't poll if queue already has plenty of items waiting
+      if (this.jobQueue.length >= 50) {
         return
       }
 
@@ -261,55 +262,101 @@ export class JobProcessor {
   }
 
   /**
-   * Process jobs from the queue sequentially
+   * Process jobs from the queue with parallel execution
    */
   async processQueue() {
-    // Prevent concurrent queue processing
+    // Prevent concurrent queue processing loops
     if (this.isProcessingQueue) {
       return
     }
 
     this.isProcessingQueue = true
+    const maxConcurrent = config.maxConcurrentJobs || 3
 
     try {
-      while (this.jobQueue.length > 0 && !this.isShuttingDown) {
-        await refreshBlenderConfigFromApi(this.jobService)
+      const activePromises = new Set()
+
+      // MUST be synchronous — shift from queue and add to activePromises immediately
+      // so the while-loop conditions update on each iteration without yielding.
+      const startNextJob = () => {
+        if (this.jobQueue.length === 0 || this.isShuttingDown) return
+
         const { job, processor } = this.jobQueue.shift()
         logger.info('Processing job from queue', {
           jobId: job.id,
           remainingInQueue: this.jobQueue.length,
+          activeJobs: activePromises.size,
         })
 
         const timeoutMs = config.jobTimeout || 300000
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Job processing timed out after ${timeoutMs}ms`)
-              ),
-            timeoutMs
-          )
-        )
-
-        try {
-          await Promise.race([processor(job), timeoutPromise])
-        } catch (error) {
-          if (error.message.includes('timed out')) {
-            logger.error(`Job ${job.id} timed out after ${timeoutMs}ms`, {
-              jobId: job.id,
-              timeoutMs,
-            })
-            try {
-              await this.jobService.markJobFailed(job.id, error.message)
-            } catch (markFailedError) {
-              logger.error('Failed to mark timed-out job as failed', {
+        const jobPromise = (async () => {
+          try {
+            await refreshBlenderConfigFromApi(this.jobService)
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(`Job processing timed out after ${timeoutMs}ms`)
+                  ),
+                timeoutMs
+              )
+            )
+            await Promise.race([processor(job), timeoutPromise])
+          } catch (error) {
+            if (error.message.includes('timed out')) {
+              logger.error(`Job ${job.id} timed out after ${timeoutMs}ms`, {
                 jobId: job.id,
-                error: markFailedError.message,
+                timeoutMs,
               })
+              try {
+                await this.jobService.markJobFailed(job.id, error.message)
+              } catch (markFailedError) {
+                logger.error('Failed to mark timed-out job as failed', {
+                  jobId: job.id,
+                  error: markFailedError.message,
+                })
+              }
+              this.activeJobs.delete(job.id)
             }
-            this.activeJobs.delete(job.id)
           }
+        })()
+
+        activePromises.add(jobPromise)
+        jobPromise.finally(() => activePromises.delete(jobPromise))
+      }
+
+      // Fill initial slots up to maxConcurrent
+      while (
+        activePromises.size < maxConcurrent &&
+        this.jobQueue.length > 0 &&
+        !this.isShuttingDown
+      ) {
+        startNextJob()
+      }
+
+      // Process remaining jobs as slots free up
+      while (
+        (activePromises.size > 0 || this.jobQueue.length > 0) &&
+        !this.isShuttingDown
+      ) {
+        if (activePromises.size === 0) break
+
+        // Wait for any job to finish
+        await Promise.race([...activePromises])
+
+        // Fill available slots
+        while (
+          activePromises.size < maxConcurrent &&
+          this.jobQueue.length > 0 &&
+          !this.isShuttingDown
+        ) {
+          startNextJob()
         }
+      }
+
+      // Wait for all remaining active jobs to complete
+      if (activePromises.size > 0) {
+        await Promise.allSettled([...activePromises])
       }
     } finally {
       this.isProcessingQueue = false

@@ -31,6 +31,7 @@ public class ThumbnailStatusChangedEventHandler : IDomainEventHandler<ThumbnailS
                 domainEvent.ModelVersionId, domainEvent.Status);
 
             await _notificationService.SendThumbnailStatusChangedAsync(
+                domainEvent.ModelId,
                 domainEvent.ModelVersionId,
                 domainEvent.Status.ToString(),
                 domainEvent.ThumbnailUrl,

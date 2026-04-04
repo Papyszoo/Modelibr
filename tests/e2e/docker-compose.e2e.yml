@@ -58,6 +58,7 @@ services:
             - RENDER_FORMAT=png
             - LOG_LEVEL=info
             - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
+            - POLL_INTERVAL_MS=2000
         ports:
             - "3003:3001"
         healthcheck:

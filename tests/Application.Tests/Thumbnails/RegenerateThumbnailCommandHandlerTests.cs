@@ -98,7 +98,7 @@ public class RegenerateThumbnailCommandHandlerTests
         var command = new RegenerateThumbnailCommand(1);
         var model = CreateModelWithActiveVersionAndFile("test.obj", ValidHash);
         
-        var thumbnail = Thumbnail.Create(model.ActiveVersion!.Id, DateTime.UtcNow);
+        var thumbnail = Thumbnail.Create(model.Id, model.ActiveVersion!.Id, DateTime.UtcNow);
         thumbnail.MarkAsReady("/old/path.png", 512, 128, 128, DateTime.UtcNow);
         model.ActiveVersion!.SetThumbnail(thumbnail);
 
@@ -121,7 +121,7 @@ public class RegenerateThumbnailCommandHandlerTests
         _mockThumbnailRepository.Verify(x => x.UpdateAsync(thumbnail, It.IsAny<CancellationToken>()), Times.Once);
         
         // Verify new job was enqueued
-        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(1, model.ActiveVersion!.Id, ValidHash, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(1, model.ActiveVersion!.Id, ValidHash, It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public class RegenerateThumbnailCommandHandlerTests
         var command = new RegenerateThumbnailCommand(1);
         var model = CreateModelWithActiveVersionAndFile("test.obj", ValidHash);
         
-        var thumbnail = Thumbnail.Create(model.ActiveVersion!.Id, DateTime.UtcNow);
+        var thumbnail = Thumbnail.Create(model.Id, model.ActiveVersion!.Id, DateTime.UtcNow);
         model.ActiveVersion!.SetThumbnail(thumbnail);
 
         var existingJob = ThumbnailJob.Create(1, model.ActiveVersion!.Id, ValidHash, DateTime.UtcNow);
@@ -154,7 +154,7 @@ public class RegenerateThumbnailCommandHandlerTests
         _mockThumbnailRepository.Verify(x => x.UpdateAsync(thumbnail, It.IsAny<CancellationToken>()), Times.Once);
         
         // EnqueueAsync is called which handles deduplication internally
-        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(1, model.ActiveVersion!.Id, ValidHash, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(1, model.ActiveVersion!.Id, ValidHash, It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class RegenerateThumbnailCommandHandlerTests
         // ActiveVersion.Thumbnail is null by default
 
         var currentTime = DateTime.UtcNow;
-        var newThumbnail = Thumbnail.Create(model.ActiveVersion!.Id, currentTime);
+        var newThumbnail = Thumbnail.Create(model.Id, model.ActiveVersion!.Id, currentTime);
         
         _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(model);
@@ -187,6 +187,6 @@ public class RegenerateThumbnailCommandHandlerTests
         _mockThumbnailRepository.Verify(x => x.AddAsync(It.IsAny<Thumbnail>(), It.IsAny<CancellationToken>()), Times.Once);
         
         // Verify new job was enqueued
-        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(1, model.ActiveVersion!.Id, ValidHash, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockThumbnailQueue.Verify(x => x.EnqueueAsync(1, model.ActiveVersion!.Id, ValidHash, It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

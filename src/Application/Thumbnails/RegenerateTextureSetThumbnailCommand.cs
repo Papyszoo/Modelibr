@@ -34,7 +34,7 @@ internal class RegenerateTextureSetThumbnailCommandHandler : ICommandHandler<Reg
             await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
         }
 
-        await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.TextureSetId, command.ProxySize, cancellationToken: cancellationToken);
+        await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.TextureSetId, command.ProxySize, forceRegenerate: true, cancellationToken: cancellationToken);
 
         return Result.Success();
     }

@@ -12,120 +12,95 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 /**
- * Service for rendering orbit animation frames using Puppeteer with Three.js in browser
+ * Service for rendering orbit animation frames using Puppeteer with Three.js in browser.
+ *
+ * Supports two modes:
+ * - **Standalone**: creates and owns its own browser instance (default).
+ * - **Shared browser**: receives an external browser instance (used by RendererPool).
+ *   In shared mode, _reinitialize() only recreates the page, and dispose() only closes the page.
  */
 export class PuppeteerRenderer {
-  constructor() {
-    this.browser = null
+  /**
+   * @param {import('puppeteer').Browser|null} sharedBrowser - Optional external browser to use.
+   */
+  constructor(sharedBrowser = null) {
+    this.browser = sharedBrowser || null
+    this._ownsBrowser = !sharedBrowser
     this.page = null
   }
 
   /**
-   * Initialize the Puppeteer browser and page
+   * Build Puppeteer launch options (static so RendererPool can reuse them).
+   * @returns {Object} Puppeteer launch options
+   */
+  static getLaunchOptions() {
+    const executablePath =
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      process.env.CHROME_PATH ||
+      process.env.CHROMIUM_PATH ||
+      undefined
+
+    const launchOptions = {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--js-flags=--max-old-space-size=4096',
+        '--disable-gpu',
+        '--use-gl=angle',
+        '--use-angle=swiftshader',
+        '--enable-webgl',
+        '--disable-extensions',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-crash-reporter',
+        '--disable-breakpad',
+        '--disable-crashpad',
+        '--no-crash-upload',
+        '--disable-client-side-phishing-detection',
+        '--disable-component-extensions-with-background-pages',
+        '--crash-dumps-dir=/tmp',
+      ],
+      dumpio: config.logLevel === 'debug',
+      env: {
+        ...process.env,
+        CHROME_CRASHPAD_PIPE_NAME: '',
+        BREAKPAD_DISABLE: '1',
+      },
+    }
+
+    if (executablePath) {
+      launchOptions.executablePath = executablePath
+      logger.debug('Using custom Chrome/Chromium path', { executablePath })
+    }
+
+    return launchOptions
+  }
+
+  /**
+   * Initialize the Puppeteer browser (if standalone) and page.
    */
   async initialize() {
-    logger.info('Initializing Puppeteer renderer')
+    logger.info('Initializing Puppeteer renderer', {
+      sharedBrowser: !this._ownsBrowser,
+    })
 
     try {
-      // Determine executable path - use env var or try to find chrome/chromium
-      const executablePath =
-        process.env.PUPPETEER_EXECUTABLE_PATH ||
-        process.env.CHROME_PATH ||
-        process.env.CHROMIUM_PATH ||
-        undefined // Let Puppeteer auto-detect if not specified
-
-      const launchOptions = {
-        headless: true,
-        args: [
-          // Sandbox flags - required in Docker/CI environments even with proper user setup
-          // See: https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          // Memory flags - give Chromium enough heap for full 4K textures
-          '--js-flags=--max-old-space-size=4096',
-          '--disable-gpu',
-          // WebGL/GPU flags - enable WebGL with software rendering for headless mode
-          '--use-gl=angle', // Use ANGLE for WebGL compatibility
-          '--use-angle=swiftshader', // Use SwiftShader for software rendering
-          '--enable-webgl', // Explicitly enable WebGL
-          '--disable-extensions',
-          '--disable-web-security', // Allow loading models from data URLs
-          '--disable-features=IsolateOrigins,site-per-process',
-          // Crash reporter flags - disable to prevent crashpad_handler errors
-          '--disable-crash-reporter',
-          '--disable-breakpad',
-          '--disable-crashpad',
-          '--no-crash-upload',
-          '--disable-client-side-phishing-detection',
-          '--disable-component-extensions-with-background-pages',
-          '--crash-dumps-dir=/tmp',
-        ],
-        dumpio: config.logLevel === 'debug',
-        // Set environment variables to completely disable crash reporting
-        env: {
-          ...process.env,
-          CHROME_CRASHPAD_PIPE_NAME: '', // Disable crashpad pipe
-          BREAKPAD_DISABLE: '1', // Legacy Breakpad disable
-        },
-      }
-
-      // Add executable path if provided
-      if (executablePath) {
-        launchOptions.executablePath = executablePath
-        logger.debug('Using custom Chrome/Chromium path', { executablePath })
-      }
-
-      // Launch browser with appropriate flags
-      this.browser = await puppeteer.launch(launchOptions)
-
-      this.page = await this.browser.newPage()
-
-      // Set viewport to match output size
-      await this.page.setViewport({
-        width: config.rendering.outputWidth,
-        height: config.rendering.outputHeight,
-        deviceScaleFactor: 1,
-      })
-
-      // Load the rendering template
-      const templatePath = path.join(__dirname, 'render-template.html')
-      const templateUrl = `file://${templatePath}`
-
-      logger.debug('Loading render template', { templatePath, templateUrl })
-      await this.page.goto(templateUrl, { waitUntil: 'networkidle0' })
-
-      // Wait for Three.js to be loaded
-      await this.page.waitForFunction(() => window.THREE !== undefined, {
-        timeout: 10000,
-      })
-
-      // Initialize the renderer in the page (async for WebGPU support)
-      const initialized = await this.page.evaluate(
-        async (width, height, bgColor) => {
-          try {
-            return await window.initRenderer(width, height, bgColor)
-          } catch (error) {
-            console.error('Failed to initialize renderer:', error)
-            return false
-          }
-        },
-        config.rendering.outputWidth,
-        config.rendering.outputHeight,
-        config.rendering.backgroundColor
-      )
-
-      if (!initialized) {
-        const error = await this.page.evaluate(() => window.modelRenderer.error)
-        throw new Error(
-          `Failed to initialize renderer: ${error || 'Unknown error'}`
+      // Launch browser only if we don't have one (standalone mode)
+      if (!this.browser) {
+        this.browser = await puppeteer.launch(
+          PuppeteerRenderer.getLaunchOptions()
         )
       }
+
+      await this._initializePage()
 
       logger.info('Puppeteer renderer initialized successfully', {
         width: config.rendering.outputWidth,
         height: config.rendering.outputHeight,
         backgroundColor: config.rendering.backgroundColor,
+        ownsBrowser: this._ownsBrowser,
       })
 
       return true
@@ -136,6 +111,52 @@ export class PuppeteerRenderer {
       })
       await this.dispose()
       throw error
+    }
+  }
+
+  /**
+   * Create a new page, load the render template, and initialize Three.js.
+   * Separated from initialize() so it can be called independently when
+   * reinitializing just the page (shared-browser mode).
+   */
+  async _initializePage() {
+    this.page = await this.browser.newPage()
+
+    await this.page.setViewport({
+      width: config.rendering.outputWidth,
+      height: config.rendering.outputHeight,
+      deviceScaleFactor: 1,
+    })
+
+    const templatePath = path.join(__dirname, 'render-template.html')
+    const templateUrl = `file://${templatePath}`
+
+    logger.debug('Loading render template', { templatePath, templateUrl })
+    await this.page.goto(templateUrl, { waitUntil: 'networkidle0' })
+
+    await this.page.waitForFunction(() => window.THREE !== undefined, {
+      timeout: 10000,
+    })
+
+    const initialized = await this.page.evaluate(
+      async (width, height, bgColor) => {
+        try {
+          return await window.initRenderer(width, height, bgColor)
+        } catch (error) {
+          console.error('Failed to initialize renderer:', error)
+          return false
+        }
+      },
+      config.rendering.outputWidth,
+      config.rendering.outputHeight,
+      config.rendering.backgroundColor
+    )
+
+    if (!initialized) {
+      const error = await this.page.evaluate(() => window.modelRenderer.error)
+      throw new Error(
+        `Failed to initialize renderer: ${error || 'Unknown error'}`
+      )
     }
   }
 
@@ -155,23 +176,45 @@ export class PuppeteerRenderer {
   }
 
   /**
-   * Close the existing browser (if any) and reinitialize from scratch.
-   * Used when the page/frame becomes detached or the renderer process crashes.
+   * Reinitialize the renderer after a page crash or frame detach.
+   * In shared-browser mode, only the page is recreated (other pages are unaffected).
+   * In standalone mode, the entire browser is restarted.
    */
   async _reinitialize() {
-    if (this.browser) {
+    // Always close the current page
+    if (this.page) {
       try {
-        await this.browser.close()
+        await this.page.close()
       } catch (e) {
-        logger.debug('Error closing browser during reinit', {
+        logger.debug('Error closing page during reinit', {
           error: e.message,
         })
       }
-      this.browser = null
+      this.page = null
     }
-    this.page = null
-    await this.initialize()
-    logger.info('Renderer reinitialized successfully')
+
+    if (this._ownsBrowser) {
+      // Standalone mode: restart the entire browser
+      if (this.browser) {
+        try {
+          await this.browser.close()
+        } catch (e) {
+          logger.debug('Error closing browser during reinit', {
+            error: e.message,
+          })
+        }
+        this.browser = null
+      }
+      this.browser = await puppeteer.launch(
+        PuppeteerRenderer.getLaunchOptions()
+      )
+    }
+
+    // Create a fresh page on the (possibly new) browser
+    await this._initializePage()
+    logger.info('Renderer reinitialized successfully', {
+      ownsBrowser: this._ownsBrowser,
+    })
   }
 
   /**
@@ -1301,10 +1344,13 @@ export class PuppeteerRenderer {
   }
 
   /**
-   * Clean up resources
+   * Clean up resources.
+   * In shared-browser mode, only the page is closed (the browser is managed by RendererPool).
    */
   async dispose() {
-    logger.debug('Disposing Puppeteer renderer')
+    logger.debug('Disposing Puppeteer renderer', {
+      ownsBrowser: this._ownsBrowser,
+    })
 
     try {
       if (this.page) {
@@ -1312,7 +1358,7 @@ export class PuppeteerRenderer {
         this.page = null
       }
 
-      if (this.browser) {
+      if (this._ownsBrowser && this.browser) {
         await this.browser.close()
         this.browser = null
       }

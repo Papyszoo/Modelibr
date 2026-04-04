@@ -16,17 +16,15 @@ public class GetThumbnailStatusQueryHandler : IQueryHandler<GetThumbnailStatusQu
 
     public async Task<Result<GetThumbnailStatusQueryResponse>> Handle(GetThumbnailStatusQuery query, CancellationToken cancellationToken)
     {
-        var model = await _modelRepository.GetByIdAsync(query.ModelId, cancellationToken)
-                    ?? await _modelRepository.GetDeletedByIdAsync(query.ModelId, cancellationToken);
+        var thumbnailData = await _modelRepository.GetThumbnailDataAsync(query.ModelId, cancellationToken);
         
-        if (model == null)
+        if (thumbnailData == null)
         {
             return Result.Failure<GetThumbnailStatusQueryResponse>(
                 new Error("ModelNotFound", $"Model with ID {query.ModelId} was not found."));
         }
 
-        var activeVersionId = model.ActiveVersionId;
-        var thumbnail = model.ActiveVersion?.Thumbnail;
+        var (activeVersionId, thumbnail) = thumbnailData.Value;
         if (thumbnail == null)
         {
             return Result.Success(new GetThumbnailStatusQueryResponse(

@@ -15,11 +15,12 @@ public interface IThumbnailQueue
     /// <param name="modelId">The model ID</param>
     /// <param name="modelVersionId">The model version ID</param>
     /// <param name="modelHash">The SHA256 hash of the model for deduplication</param>
+    /// <param name="forceRegenerate">When true, resets existing Done jobs to trigger regeneration (e.g., texture/variant changes)</param>
     /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
     /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The created job or existing job if already exists</returns>
-    Task<ThumbnailJob> EnqueueAsync(int modelId, int modelVersionId, string modelHash, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+    Task<ThumbnailJob> EnqueueAsync(int modelId, int modelVersionId, string modelHash, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Enqueues a new waveform thumbnail generation job for the given sound.
@@ -27,11 +28,12 @@ public interface IThumbnailQueue
     /// </summary>
     /// <param name="soundId">The sound ID</param>
     /// <param name="soundHash">The SHA256 hash of the sound file for deduplication</param>
+    /// <param name="forceRegenerate">When true, resets existing Done jobs to trigger regeneration</param>
     /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
     /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The created job or existing job if already exists</returns>
-    Task<ThumbnailJob> EnqueueSoundWaveformAsync(int soundId, string soundHash, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+    Task<ThumbnailJob> EnqueueSoundWaveformAsync(int soundId, string soundHash, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Enqueues a new thumbnail generation job for a texture set.
@@ -39,11 +41,12 @@ public interface IThumbnailQueue
     /// </summary>
     /// <param name="textureSetId">The texture set ID</param>
     /// <param name="proxySize">Optional proxy size override (256, 512, 1024, 2048). When set, only this size is generated.</param>
+    /// <param name="forceRegenerate">When true, resets existing Done jobs to trigger regeneration</param>
     /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
     /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The created job or existing job if already exists</returns>
-    Task<ThumbnailJob> EnqueueTextureSetThumbnailAsync(int textureSetId, int? proxySize = null, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+    Task<ThumbnailJob> EnqueueTextureSetThumbnailAsync(int textureSetId, int? proxySize = null, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Attempts to dequeue and claim the next pending job for processing.

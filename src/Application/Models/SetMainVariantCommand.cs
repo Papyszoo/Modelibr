@@ -66,6 +66,7 @@ internal class SetMainVariantCommandHandler : ICommandHandler<SetMainVariantComm
                     modelVersion.ModelId,
                     modelVersion.Id,
                     primaryFile.Sha256Hash,
+                    forceRegenerate: true,
                     cancellationToken: cancellationToken);
             }
 

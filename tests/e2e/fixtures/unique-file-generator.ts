@@ -79,7 +79,10 @@ export class UniqueFileGenerator {
                 `[UniqueFileGenerator] .blend file: appended unique marker (${marker.length} bytes)`,
             );
         } else {
-            // FBX, OBJ, etc — can't safely modify binary formats
+            // FBX, OBJ, etc — copy without modification.
+            // Appending bytes breaks binary formats like FBX (THREE.FBXLoader fails).
+            // These files will produce identical SHA256 hashes on re-upload.
+            // For tests needing unique uploads, use GLB (which supports safe JSON editing).
             newBuffer = originalBuffer;
             console.log(
                 `[UniqueFileGenerator] Binary file copied without modification`,

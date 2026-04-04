@@ -103,6 +103,7 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
                         modelVersion.ModelId,
                         modelVersion.Id,
                         primaryFile.Sha256Hash,
+                        forceRegenerate: true,
                         cancellationToken: cancellationToken);
                 }
             }
