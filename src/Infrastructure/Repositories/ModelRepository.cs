@@ -102,6 +102,7 @@ internal sealed class ModelRepository : IModelRepository
             .OrderByDescending(m => m.UpdatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            // NOTE: Keep this mapping in sync with GetAllModelsQueryHandler (non-paged path)
             .Select(m => new ModelListDto
             {
                 Id = m.Id,
