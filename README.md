@@ -18,14 +18,13 @@ Organize, preview, and manage your 3D models with automatic animated thumbnails,
 
 ## ✨ Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Animated Thumbnails** | Every model gets a rotating 360° preview automatically |
-| **Version Control** | Keep multiple versions of each model, rollback anytime |
-| **Texture Sets** | PBR materials with real-time preview on customizable shapes |
-| **Blender Integration** | Import/export directly from Blender via addon |
-| **Smart Deduplication** | Same file uploaded twice? Storage is shared automatically |
-| **Self-Hosted** | Your data stays on your hardware. Works 100% offline |
+| Feature                 | Description                                                 |
+| ----------------------- | ----------------------------------------------------------- |
+| **Animated Thumbnails** | Every model gets a rotating 360° preview automatically      |
+| **Version Control**     | Keep multiple versions of each model, rollback anytime      |
+| **Texture Sets**        | PBR materials with real-time preview on customizable shapes |
+| **Smart Deduplication** | Same file uploaded twice? Storage is shared automatically   |
+| **Self-Hosted**         | Your data stays on your hardware. Works 100% offline        |
 
 ---
 
@@ -60,23 +59,23 @@ Drag and drop your 3D models into the browser. That's it!
 
 ## 📁 Supported Formats
 
-| Format | Extension | Preview |
-|--------|-----------|---------|
-| glTF Binary | `.glb` | ✅ |
-| glTF | `.gltf` | ✅ |
-| Autodesk FBX | `.fbx` | ✅ |
-| Wavefront OBJ | `.obj` | ✅ |
-| Blender | `.blend` | Storage only |
+| Format        | Extension | Preview                        |
+| ------------- | --------- | ------------------------------ |
+| glTF Binary   | `.glb`    | ✅                             |
+| glTF          | `.gltf`   | ✅                             |
+| Autodesk FBX  | `.fbx`    | ✅                             |
+| Wavefront OBJ | `.obj`    | ✅                             |
+| Blender       | `.blend`  | Extract .glb using blender CLI |
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer | Technologies |
-|-------|--------------|
-| **Frontend** | React 18, Three.js 0.180, TypeScript |
-| **Backend** | .NET 9.0, PostgreSQL, REST API |
-| **Infrastructure** | Docker, Automated thumbnails |
+| Layer              | Technologies                         |
+| ------------------ | ------------------------------------ |
+| **Frontend**       | React 18, Three.js 0.180, TypeScript |
+| **Backend**        | .NET 9.0, PostgreSQL, REST API       |
+| **Infrastructure** | Docker, Automated thumbnails         |
 
 ---
 
