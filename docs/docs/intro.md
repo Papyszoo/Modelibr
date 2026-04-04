@@ -125,3 +125,4 @@ Back up the `data` folder regularly to keep your library safe!
 
 - [Model Management](/docs/features/models) - Learn about versions and organization
 - [Texture Sets](/docs/features/texture-sets) - Apply PBR textures to your models
+- [Blender Addon](/docs/features/blender-addon) - Integrate with your Blender workflow
