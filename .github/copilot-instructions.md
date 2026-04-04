@@ -1,304 +1,130 @@
-# Modelibr — AI Agent Instructions
+# Modelibr AI Orchestrator
 
-> **This is the single source of truth for all AI agents.** Both GitHub Copilot and Gemini/Antigravity must follow these rules.
-> For specialized workflows, see `.github/agents/` (e2e testing, feature implementation).
+This file is the single workflow source of truth for repository AI work.
+Keep orchestration here.
+Keep implementation patterns in scoped files under `.github/instructions/`.
+Keep focused delegation logic in `.github/agents/`.
 
-## Identity
+## Project Baseline
 
-Modelibr is a .NET 9.0 C# Web API with a React/TypeScript frontend, Node.js worker service, and Python Blender addon. Clean Architecture with DDD. PostgreSQL database. Docker Compose for orchestration. Hash-based file storage with deduplication.
+Modelibr is a self-hosted game asset library for artists and game developers.
+It runs locally, stores assets locally, and must not depend on remote runtime services for core product behavior.
 
----
+- Backend: .NET 9.0 Web API using Clean Architecture and DDD
+- Frontend: React + TypeScript
+- Worker: Node.js asset processor under `src/asset-processor/`
+- Blender integration: Python addon plus Blender CLI workflow
+- Database: PostgreSQL
+- Orchestration: Docker Compose
+- Storage: hash-based deduplication
 
-## Hard Rules
+## Invariants
 
-These rules are non-negotiable. Violating any of them is a blocking error.
+- Keep the product local-first. Do not add hosted AI services, external inference APIs, or CDN-only runtime dependencies.
+- Keep environment configuration in the root `.env` flow unless an existing toolchain requires a dedicated build-time file such as `src/frontend/.env.demo`.
+- Use PostgreSQL behavior as the baseline for application and test decisions.
+- Route frontend HTTP through feature-local API modules under `src/frontend/src/features/*/api/` backed by `src/frontend/src/lib/apiBase.ts` (axios). `ApiClient.ts` is a re-export facade for backward compatibility — do not add new fetch logic there.
+- Use React Query for server state (queries + mutations) and Zustand stores for UI state (panels, navigation, preferences). Use `useState` only for component-local ephemeral state.
 
-### OFFLINE-FIRST
+## One Flow
 
-The application MUST work completely offline. Never suggest or implement solutions requiring external API calls (cloud AI, CDNs, external APIs, `googleapis.com`, `openai`, `anthropic`, `azure.cognitive`).
+The main agent stays responsible for synthesis, approval handling, and final QA.
+Delegate specialized work to subagents only when that workstream is actually in scope.
 
-### CLEAN ARCHITECTURE — Dependency Flow
+### 1. Plan
 
-```
-WebApi → Application → Domain ← Infrastructure
-                ↓              ↑
-           SharedKernel ← ← ← ←
-```
+- Invoke `plan` to restate the request, map affected layers, identify tests early, and propose a concrete change set.
 
-- **Domain + SharedKernel**: Zero dependencies on other layers. No EF Core, no HTTP, no framework code.
-- **Application**: Only depends on Domain and SharedKernel. Defines interfaces — never implements infrastructure.
-- **Infrastructure**: Implements Application interfaces. Contains EF Core, file I/O, external integrations.
-- **WebApi**: HTTP concerns only. Maps requests to Application commands/queries.
+### 2. Audit The Plan
 
-### ENVIRONMENT VARIABLES
+- Invoke `plan-audit` to compare the proposed plan against existing code and docs.
+- Use it to find holes, naming conflicts, missed files, missing tests, or documentation drift before editing starts.
 
-- All config lives in the root `.env` file. Never create `.env` files in subdirectories.
-- Always update `.env.example` when adding or modifying variables.
-- Never hardcode URLs or override `.env` values in `docker-compose.yml`. Use `${VARIABLE_NAME}` syntax.
+### 3. Decide Workstreams
 
-### DATABASE
+Dispatch only the agents required by the touched areas.
+Do not pull backend guidance into a frontend-only task, and do not pull demo or docs reviewers unless the change can actually affect them.
 
-- Never use in-memory database. Always PostgreSQL via Docker Compose.
-- Never remove connection strings from `appsettings.Development.json`.
+| Workstream        | Use When                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `backend`         | `src/WebApi/**`, `src/Application/**`, `src/Domain/**`, `src/Infrastructure/**`, `src/SharedKernel/**` are changing |
+| `frontend`        | `src/frontend/**` is changing                                                                                       |
+| `asset-processor` | `src/asset-processor/**` is changing                                                                                |
+| `e2e`             | `tests/e2e/**` is changing or UI behavior needs E2E coverage                                                        |
+| `docs`            | user-facing behavior, API contracts, worker behavior, testing guidance, or env docs may have changed                |
+| `demo`            | frontend-visible behavior, demo mocks, demo assets, or `build:demo` output may be affected                          |
 
-### NO FILE CREATION WITHOUT PURPOSE
+### 4. Implement
 
-- Never create standalone documentation files (`.md`, `.txt`, `.doc`) unless explicitly requested.
-- Never create files in the repository root (only `README.md` lives there).
-- Exception: `docs/RESEARCH/` is allowed for audit/analysis artifacts.
+- Delegate implementation to the minimal set of workstream agents.
+- Those agents must follow only the scoped instruction files relevant to the files they edit.
+- If a delegated implementation discovers cross-layer scope expansion, surface it back to the main agent instead of silently spreading further.
 
----
+### 5. Check Docs
 
-## Code Style
+- Invoke `docs` when the change may affect `README.md`, `docs/docs/ai-documentation/*.md`, `.env.example`, or user-facing feature docs.
 
-### Style Anchors — Follow These Patterns
+### 6. Check Demo Mode
 
-When writing new code, match the structure and style of these reference files:
+- Invoke `demo` when the change may affect `src/frontend/.env.demo`, demo mocks, demo asset preparation scripts, or the demo build behavior.
 
-- **Command handler**: `src/Application/Models/AddModelCommandHandler.cs`
-- **Domain entity**: `src/Domain/Models/Model.cs`
-- **Endpoint**: `src/WebApi/Endpoints/ModelEndpoints.cs`
-- **Repository**: `src/Infrastructure/Repositories/ModelRepository.cs`
-- **React component**: Keep simple, single-responsibility, minimal props. Use `useState` by default. Use `ApiClient` for all HTTP calls.
+### 7. QA
 
-### Naming Conventions
+The main agent owns final verification.
 
-- Commands: `{Verb}{Noun}Command` (e.g., `AddModelCommand`)
-- Queries: `{Get}{Noun}Query` (e.g., `GetAllModelsQuery`)
-- Handlers: `{CommandName}Handler` (e.g., `AddModelCommandHandler`)
-- Interfaces: `I{Name}` (e.g., `IModelRepository`)
-- Value Objects: Descriptive noun (e.g., `FileType`, not `FileTypeVO`)
+- Use targeted checks while iterating.
+- Before closing a code change, run the relevant required suites.
+- When backend changes are involved, run `dotnet build Modelibr.sln` and `dotnet test Modelibr.sln --no-build`.
+- When frontend changes are involved, run `cd src/frontend && npm test && npm run lint && npm run build`.
+- When E2E-relevant behavior changes are involved, run `cd tests/e2e && npm run test`.
 
-### Keep It Simple
+## Scoped Guidance Only
 
-- Implement only what is specifically requested. Suggest improvements as comments to the user — never auto-apply unrequested changes.
-- Add comments only for non-obvious business logic. No JSDoc on self-explanatory methods.
-- Frontend: Don't create custom hooks unless logic is reused in 3+ places. Use `ApiClient` from `src/frontend/src/services/ApiClient.ts` — never raw `fetch()` or hardcoded URLs.
-- Frontend: Use `nuqs` (`useQueryState`) for tab/URL state persistence. Follow `SplitterLayout.tsx` pattern.
+These files exist to keep implementation guidance out of the always-loaded orchestrator.
 
----
+- `.github/instructions/backend.instructions.md`
+- `.github/instructions/frontend.instructions.md`
+- `.github/instructions/asset-processor.instructions.md`
+- `.github/instructions/e2e.instructions.md`
 
-## Guardrails & Stop Conditions
+They should stay short, specific, and file-scoped.
 
-### Scope Creep
+## Subagents
 
-If the task requires modifying more than 3 files not mentioned in the original request, **PAUSE**. Present a scope expansion proposal to the user before proceeding.
+These focused agents are the only workflow specializations this orchestrator should rely on.
 
-### Build Verification
+- `.github/agents/plan.agent.md`
+- `.github/agents/plan-audit.agent.md`
+- `.github/agents/backend.agent.md`
+- `.github/agents/frontend.agent.md`
+- `.github/agents/asset-processor.agent.md`
+- `.github/agents/e2e.agent.md`
+- `.github/agents/docs.agent.md`
+- `.github/agents/demo.agent.md`
 
-After every backend edit: `dotnet build Modelibr.sln`. After every frontend edit: check for lint/type errors. If the build fails, **revert the last edit** and ask the user for guidance — do not attempt speculative fixes.
+## Notes
 
-### E2E Test Verification
+- Keep this file small enough to remain orchestration-only.
+- Do not duplicate detailed backend, frontend, worker, or E2E rules here when they can live in scoped files.
+- Prefer delegation plus scoped instructions over one giant always-loaded rulebook.
 
-After making changes that affect frontend behavior, backend endpoints, or test infrastructure, **always run e2e tests** to verify nothing is broken:
+## CI Alignment
 
-```bash
-cd tests/e2e
-npm run test          # Full suite (~163 tests, ~5 min)
-```
+Local QA instructions are intentionally stricter than CI pipeline gates. CI (`ci-and-deploy.yml`, `code-quality.yml`) is a minimum bar. The agent must still run the full local verification commands listed in the QA section.
 
-- If only specific features were changed, run targeted tests: `npm run test -- --grep "feature name"`
-- E2e tests use Docker Compose (builds + starts containers automatically). Never cancel mid-run.
-- If e2e tests fail, investigate error context in `tests/e2e/test-results/` before attempting fixes.
-- A task is **not complete** if e2e tests fail due to the changes made.
+- Dockerfile or compose changes may affect `docker-publish.yml` GHCR image publishing.
+- Frontend-visible changes that alter demo behavior must validate `build:demo`.
+- Nightly E2E (`nightly-e2e.yml`) covers `@slow` tests only — it does not replace local full-suite E2E.
 
-### Confidence Signaling
+## Completion Gate
 
-Prefix implementation proposals with a confidence level:
+Before finishing work and clearing context, the main agent must explicitly answer:
 
-- **[CERTAIN]** — I've read the exact code and know the pattern.
-- **[EXPLORING]** — I'm inferring from naming conventions or partial context.
-- **[GUESSING]** — I haven't found relevant code; this is best-effort. **PAUSE and ask the user.**
-
-### Large File Reads
-
-If a file exceeds 200 lines, read method signatures first (use symbol overview tools if available). Read full method bodies only for the specific method you need to edit.
-
-### Rabbit Hole Prevention
-
-If you perform more than 5 sequential searches without producing an edit, **PAUSE**. Summarize what you found and ask the user if the direction is correct.
-
----
-
-## Documentation Maintenance
-
-### CRITICAL: Update Docs After Every Task
-
-This is a mandatory completion step. Before marking any task complete, check:
-
-1. **Did the task change any API endpoint?** → Update `docs/docs/ai-documentation/BACKEND_API.md`
-2. **Did the task change frontend behavior or components?** → Update `docs/docs/ai-documentation/FRONTEND.md`
-3. **Did the task change worker service behavior?** → Update `docs/docs/ai-documentation/WORKER.md`
-4. **Did the task change Blender addon behavior?** → Update `docs/docs/ai-documentation/BLENDER_ADDON.md`
-5. **Did the task change test infrastructure or patterns?** → Update `docs/docs/ai-documentation/TESTING.md`
-6. **Did the task change environment variables or Docker config?** → Update `.env.example` and relevant doc
-7. **Did the task change API contracts between services?** → Update `docs/docs/ai-documentation/API_CONTRACTS.md`
-
-If none of the above apply, no doc update is needed. But you MUST explicitly check.
-
-### Documentation Locations (Canonical)
-
-| What                       | Where                                                   |
-| -------------------------- | ------------------------------------------------------- |
-| User-facing README         | `README.md`                                             |
-| AI agent instructions      | `.github/copilot-instructions.md` (this file)           |
-| Backend API reference      | `docs/docs/ai-documentation/BACKEND_API.md`             |
-| Frontend development guide | `docs/docs/ai-documentation/FRONTEND.md`                |
-| Worker service guide       | `docs/docs/ai-documentation/WORKER.md`                  |
-| Blender addon guide        | `docs/docs/ai-documentation/BLENDER_ADDON.md`           |
-| Testing guide              | `docs/docs/ai-documentation/TESTING.md`                 |
-| API contracts              | `docs/docs/ai-documentation/API_CONTRACTS.md`           |
-| Texture channel mapping    | `docs/docs/ai-documentation/TEXTURE_CHANNEL_MAPPING.md` |
-| E2E tests                  | `tests/e2e/` (see `tests/e2e/README.md`)                |
-| Audit/research artifacts   | `docs/RESEARCH/`                                        |
-| User documentation site    | `docs/` (Docusaurus)                                    |
-
----
-
-## Build & Test Commands
-
-### Backend (.NET)
-
-```bash
-dotnet restore Modelibr.sln          # ~10 seconds. Never cancel.
-dotnet build Modelibr.sln            # ~10 seconds. Never cancel.
-dotnet test Modelibr.sln --no-build  # ~2 seconds. Always use --no-build.
-```
-
-### Frontend (React)
-
-```bash
-cd src/frontend
-npm install
-npm test                             # Jest unit tests
-npm run lint                         # ESLint
-```
-
-### E2E Tests
-
-```bash
-cd tests/e2e
-npm run test:setup                   # Start Docker containers + wait for health
-npm run test:quick                   # Run ALL tests (existing containers)
-npm run test:quick -- --grep "Pack"  # Run only matching tests
-npm run test:teardown                # Stop containers + clean volumes
-npm run test:e2e                     # Full run (setup → all tests → teardown)
-```
-
-When fixing tests, run only the affected files — not the full suite.
-
-### Run Locally
-
-```bash
-# Backend
-export UPLOAD_STORAGE_PATH="/tmp/modelibr/uploads"
-cd src/WebApi && dotnet run          # http://localhost:5009
-
-# Or full stack via Docker Compose
-cp .env.example .env                 # First time only
-docker compose up -d --build
-```
-
-### Service Ports
-
-| Service        | Dev Port | Docker Port |
-| -------------- | -------- | ----------- |
-| WebApi         | 5009     | 8080        |
-| Frontend       | 3000     | 3000        |
-| Worker         | 3001     | 3001        |
-| PostgreSQL     | 5432     | 5432        |
-| E2E WebApi     | —        | 8090        |
-| E2E Frontend   | —        | 3002        |
-| E2E PostgreSQL | —        | 5433        |
-
-### Build Timing — Never Cancel
-
-- Package restore: ~10s
-- Build: ~10s
-- Tests (--no-build): ~2s
-- App startup: ~4s
-
----
-
-## Architecture Quick Reference
-
-### Design Patterns
-
-- **CQRS**: Commands (write, return `Result<T>`), Queries (read, return DTOs), one Handler per operation.
-- **Result Pattern**: All fallible operations return `Result<T>` from SharedKernel. No exceptions for flow control.
-- **Value Objects**: Immutable, self-validating, equality by value (e.g., `FileType`).
-- **Entity Factory Methods**: `Entity.Create(...)` — controlled construction with validation.
-- **Repository Pattern**: Interface in Application, implementation in Infrastructure.
-
-### Key Code Locations
-
-| What                  | Where                                                     |
-| --------------------- | --------------------------------------------------------- |
-| Entry point           | `src/WebApi/Program.cs`                                   |
-| DI registration       | `src/*/DependencyInjection.cs`                            |
-| API client (frontend) | `src/frontend/src/services/ApiClient.ts`                  |
-| File storage          | `src/Infrastructure/Storage/HashBasedFileStorage.cs`      |
-| Upload init           | `src/WebApi/Infrastructure/UploadDirectoryInitializer.cs` |
-| Docker config         | `docker-compose.yml`, `src/WebApi/Dockerfile`             |
-
-### Asset Type Pattern
-
-All asset types (Models, Sprites, Sounds, TextureSets) follow the same structure:
-
-- Domain entity with factory method, soft delete, Pack/Project navigation properties
-- Optional category entity for user organization
-- Application CQRS handlers for CRUD + associations
-- Infrastructure repository + EF Core config
-- WebApi RESTful endpoints
-- Frontend list page with category tabs, card grid, drag-drop upload
-
-For the full step-by-step template, use the `@feature` agent: `.github/agents/feature.agent.md`
-
----
-
-## Agent Workflows
-
-Use specialized agents for specific task types:
-
-| Task Type                     | Agent                                          | When to Use                                                      |
-| ----------------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
-| E2E testing                   | `@e2e` (`.github/agents/e2e.agent.md`)         | Writing, fixing, or running Playwright-BDD E2E tests             |
-| New feature/entity/asset type | `@feature` (`.github/agents/feature.agent.md`) | Implementing new entities, asset types, CQRS handlers, endpoints |
-| General coding                | Default (this file)                            | Bug fixes, refactoring, configuration changes, investigations    |
-
-### Workflow: Planning
-
-1. Read this file and relevant `docs/docs/ai-documentation/` files for context.
-2. Search existing code for similar patterns before creating anything new.
-3. Present a plan with files to create/modify. Get user approval if >3 files.
-
-### Workflow: Implementation
-
-1. Follow the style anchors above. Match existing patterns exactly.
-2. Build after every backend change. Lint after every frontend change.
-3. If build fails, revert and ask — don't speculate.
-4. Signal confidence level on every proposal.
-
-### Workflow: Testing
-
-1. Write unit tests for domain/application logic.
-2. For E2E tests, use the `@e2e` agent and follow `tests/e2e/README.md`.
-3. Run `dotnet test Modelibr.sln --no-build` before considering backend work complete.
-4. Run `npm test` in `src/frontend` before considering frontend work complete.
-
-### Workflow: Completion
-
-1. Verify build passes across all affected layers.
-2. **Check the documentation update checklist** (§Documentation Maintenance above).
-3. Summarize what was done, what was changed, and any trade-offs.
-
----
-
-## Common Pitfalls
-
-- Azure.Core dependency error in tests → use `--no-build` flag
-- Permission denied on upload dir → set `UPLOAD_STORAGE_PATH=/tmp/modelibr/uploads`
-- .NET version errors → ensure .NET 9.0 SDK is installed
-- Frontend API calls → always use `ApiClient`, never `fetch()` or hardcoded URLs
-- EF Core in Domain layer → never. Configure entities in `ApplicationDbContext.OnModelCreating`
-- Business logic in repositories → never. Keep repositories as thin data access wrappers
+1. Which layers changed?
+2. Which tests were run for those layers?
+3. Did backend API or DTO shape change? If yes, were frontend API modules, docs, and demo mocks checked?
+4. Did frontend-visible behavior change? If yes, were docs, demo mode, and E2E implications checked?
+5. Did worker behavior or job contract change? If yes, were worker docs, API contracts, and processor/service boundaries checked?
+6. Did any env/config/build path change? If yes, were `.env.example`, `.env.demo`, typed env files, and workflow implications checked?
+7. Are there any user-facing regressions still unverified?
+8. What remains intentionally out of scope?
