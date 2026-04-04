@@ -51,6 +51,7 @@ namespace Application.Models
                     models = models.Where(m => m.TextureSets.Any(ts => ts.Id == query.TextureSetId.Value));
                 }
 
+                // NOTE: Keep this mapping in sync with ModelRepository.GetPagedListAsync
                 modelListDtos = models.Select(m => new ModelListDto
                 {
                     Id = m.Id,

@@ -15,7 +15,7 @@ public interface IThumbnailQueue
     /// <param name="modelId">The model ID</param>
     /// <param name="modelVersionId">The model version ID</param>
     /// <param name="modelHash">The SHA256 hash of the model for deduplication</param>
-    /// <param name="forceRegenerate">When true, resets existing Done jobs to trigger regeneration (e.g., texture/variant changes)</param>
+    /// <param name="forceRegenerate">When true, resets existing jobs regardless of status to trigger regeneration. Dead jobs are always reset even when false.</param>
     /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
     /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -28,7 +28,7 @@ public interface IThumbnailQueue
     /// </summary>
     /// <param name="soundId">The sound ID</param>
     /// <param name="soundHash">The SHA256 hash of the sound file for deduplication</param>
-    /// <param name="forceRegenerate">When true, resets existing Done jobs to trigger regeneration</param>
+    /// <param name="forceRegenerate">When true, resets existing jobs regardless of status to trigger regeneration. Dead jobs are always reset even when false.</param>
     /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
     /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -41,7 +41,7 @@ public interface IThumbnailQueue
     /// </summary>
     /// <param name="textureSetId">The texture set ID</param>
     /// <param name="proxySize">Optional proxy size override (256, 512, 1024, 2048). When set, only this size is generated.</param>
-    /// <param name="forceRegenerate">When true, resets existing Done jobs to trigger regeneration</param>
+    /// <param name="forceRegenerate">When true, resets existing jobs regardless of status to trigger regeneration. Dead jobs are always reset even when false.</param>
     /// <param name="maxAttempts">Maximum retry attempts (default: 3)</param>
     /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 10)</param>
     /// <param name="cancellationToken">Cancellation token</param>

@@ -79,9 +79,9 @@ export default defineConfig({
             use: { ...devices["Desktop Chrome"] },
         },
         {
-            // Performance tests run ONLY when explicitly requested:
+            // Performance tests are excluded from test:quick, test:ci, and CI scripts.
+            // They run only when explicitly requested:
             //   npx playwright test --project=performance
-            // Never included in CI, test:quick, or test:ci scripts.
             name: "performance",
             testDir,
             grep: /@performance/,
