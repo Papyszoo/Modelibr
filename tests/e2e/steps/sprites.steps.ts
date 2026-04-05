@@ -1172,6 +1172,31 @@ Given(
                     },
                 );
                 if (!createResponse.ok()) {
+                    const retryResponse = await page.request.get(
+                        `${API_BASE}/sprite-categories`,
+                    );
+                    const retryData = await retryResponse.json();
+                    const recovered = (
+                        retryData.categories ||
+                        retryData ||
+                        []
+                    ).find((c: any) => c.name === categoryName);
+
+                    if (recovered) {
+                        getScenarioState(page).saveSpriteCategory(
+                            categoryName,
+                            {
+                                id: recovered.id,
+                                name: recovered.name,
+                                description: recovered.description,
+                            },
+                        );
+                        console.log(
+                            `[AutoProvision] Recovered existing category "${categoryName}" after create conflict (ID: ${recovered.id})`,
+                        );
+                        return;
+                    }
+
                     throw new Error(
                         `Failed to auto-provision sprite category "${categoryName}": ${createResponse.status()}`,
                     );
@@ -1218,36 +1243,36 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
     });
 
     // Use polling to wait for the specific category tab to appear (may need re-render)
-    let targetTab = null;
-    await expect
-        .poll(
-            async () => {
-                const allTabs = page.locator(".category-tab");
-                const tabCount = await allTabs.count();
-                for (let i = 0; i < tabCount; i++) {
-                    const tab = allTabs.nth(i);
-                    const tabText = await tab.textContent();
-                    const rawName = tabText?.replace(/\(\d+\)\s*$/, "").trim();
-                    if (rawName === categoryName) {
-                        targetTab = tab;
-                        return true;
-                    }
-                }
-                return false;
-            },
-            {
-                message: `Waiting for category tab "${categoryName}" to appear`,
-                timeout: 15000,
-                intervals: [500, 1000, 2000],
-            },
-        )
-        .toBe(true);
+    const findCategoryTabIndex = async () => {
+        const allTabs = page.locator(".category-tab");
+        const tabCount = await allTabs.count();
+        for (let i = 0; i < tabCount; i++) {
+            const tab = allTabs.nth(i);
+            const tabText = await tab.textContent();
+            const rawName = tabText?.replace(/\(\d+\)\s*$/, "").trim();
+            if (rawName === categoryName) {
+                return i;
+            }
+        }
 
-    if (!targetTab) {
+        return -1;
+    };
+
+    await expect
+        .poll(findCategoryTabIndex, {
+            message: `Waiting for category tab "${categoryName}" to appear`,
+            timeout: 15000,
+            intervals: [500, 1000, 2000],
+        })
+        .not.toBe(-1);
+
+    const targetTabIndex = await findCategoryTabIndex();
+    if (targetTabIndex < 0) {
         throw new Error(
             `Category tab "${categoryName}" not found (exact match)`,
         );
     }
+    const targetTab: any = page.locator(".category-tab").nth(targetTabIndex);
     await targetTab.click();
 
     // Click the edit (pencil) button on the category tab

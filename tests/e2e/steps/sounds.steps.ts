@@ -71,6 +71,24 @@ async function cleanupSoundByName(
             .delete(`${API_BASE}/sounds/${sound.id}`)
             .catch(() => {});
     }
+
+    const recycledResponse = await page.request
+        .get(`${API_BASE}/recycled`)
+        .catch(() => null);
+    if (!recycledResponse?.ok()) {
+        return;
+    }
+
+    const recycledData = await recycledResponse.json();
+    const recycledMatches = (recycledData.sounds || []).filter(
+        (sound: any) => sound.name === name && sound.id !== excludeId,
+    );
+
+    for (const sound of recycledMatches) {
+        await page.request
+            .delete(`${API_BASE}/recycled/sound/${sound.id}/permanent`)
+            .catch(() => {});
+    }
 }
 
 async function cleanupCategoryByName(
@@ -108,6 +126,8 @@ Given("I am on the sounds page", async ({ page }) => {
 When(
     "I upload a sound named {string} from {string}",
     async ({ page }, soundName: string, filename: string) => {
+        await cleanupSoundByName(page, soundName);
+
         // Generate unique file with modified content to avoid hash-based deduplication
         const filePath = await UniqueFileGenerator.generate(filename);
 
@@ -173,6 +193,22 @@ When(
                 console.log(
                     `[Warning] Rename failed: ${renameResponse.status()} ${await renameResponse.text()}`,
                 );
+
+                const refreshedResponse = await page.request
+                    .get(`${API_BASE}/sounds`)
+                    .catch(() => null);
+                if (refreshedResponse?.ok()) {
+                    const refreshedData = await refreshedResponse.json();
+                    const existingSound = (refreshedData.sounds || []).find(
+                        (candidate: any) => candidate.name === soundName,
+                    );
+                    if (existingSound) {
+                        sound = existingSound;
+                        console.log(
+                            `[Recovery] Reusing existing sound "${soundName}" (ID: ${existingSound.id})`,
+                        );
+                    }
+                }
             }
         }
 

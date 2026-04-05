@@ -11,7 +11,7 @@ Feature: Model 3D Viewer Rendering
   Scenario: Model renders in 3D canvas after opening viewer
     Given I am on the model viewer page for "multi-version-model"
     Then the 3D canvas should be visible
-    And the model name "test-torus" should be displayed in the header
+    And the model name "test-cube" should be displayed in the header
     And the viewer controls should be visible
     And I take a screenshot of the 3D model rendering
 

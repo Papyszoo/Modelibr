@@ -924,7 +924,7 @@ export const demoHandlers = [
       maxFileSizeBytes: 104857600,
       maxThumbnailSizeBytes: 10485760,
       thumbnailFrameCount: 30,
-      thumbnailCameraVerticalAngle: 25,
+      thumbnailCameraVerticalAngle: 0.75,
       thumbnailWidth: 256,
       thumbnailHeight: 256,
       generateThumbnailOnUpload: true,
@@ -968,6 +968,20 @@ export const demoHandlers = [
       downloadedBytes: null,
       totalBytes: null,
       error: null,
+    })
+  }),
+
+  http.get('*/settings/webdav/urls', () => {
+    return HttpResponse.json({
+      urls: [],
+    })
+  }),
+
+  http.get('*/settings/webdav/probe', () => {
+    return HttpResponse.json({
+      reachable: false,
+      folderCount: 0,
+      error: 'WebDAV is not available in demo mode',
     })
   }),
 

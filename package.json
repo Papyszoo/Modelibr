@@ -11,6 +11,7 @@
         "format:check": "cd src/frontend && npm run format:check && cd ../asset-processor && npm run format:check",
         "test:frontend": "cd src/frontend && npm test",
         "test:e2e": "cd tests/e2e && npm test",
+        "test:e2e:demo": "cd tests/e2e && npm run test:demo",
         "build:frontend": "cd src/frontend && npm run build"
     },
     "repository": {

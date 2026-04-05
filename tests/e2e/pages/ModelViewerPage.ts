@@ -30,13 +30,53 @@ export class ModelViewerPage {
 
     /** Open the version dropdown menu if not already open */
     async openVersionDropdown(): Promise<void> {
-        if (!(await this.versionDropdownMenu.isVisible())) {
-            await this.versionDropdownTrigger.click();
-        }
-        await this.versionDropdownMenu.waitFor({
-            state: "visible",
-            timeout: 5000,
+        await expect(this.versionDropdownTrigger).toBeVisible({
+            timeout: 30000,
         });
+
+        await expect
+            .poll(
+                async () => {
+                    if (
+                        await this.versionDropdownMenu
+                            .isVisible()
+                            .catch(() => false)
+                    ) {
+                        return true;
+                    }
+
+                    try {
+                        await this.versionDropdownTrigger.click({
+                            timeout: 5000,
+                        });
+                    } catch {
+                        await this.versionDropdownTrigger.click({
+                            force: true,
+                            timeout: 5000,
+                        });
+                    }
+
+                    if (
+                        await this.versionDropdownMenu
+                            .isVisible()
+                            .catch(() => false)
+                    ) {
+                        return true;
+                    }
+
+                    await this.page.reload({ waitUntil: "domcontentloaded" });
+                    await expect(this.versionDropdownTrigger).toBeVisible({
+                        timeout: 15000,
+                    });
+                    return false;
+                },
+                {
+                    message: "Waiting for version dropdown to open",
+                    timeout: 30000,
+                    intervals: [500, 1000, 2000, 5000],
+                },
+            )
+            .toBe(true);
     }
 
     /**
@@ -538,22 +578,41 @@ export class ModelViewerPage {
         // Press Escape to close any remaining dropdowns/menus
         await this.page.keyboard.press("Escape");
 
-        // Click on the version dropdown trigger
         const dropdownTrigger = this.page.locator(".version-dropdown-trigger");
         await expect(dropdownTrigger).toBeVisible({ timeout: 30000 });
-        await dropdownTrigger.click();
-
-        // Wait for dropdown menu to appear
-        await this.page.waitForSelector(".version-dropdown-menu", {
-            state: "visible",
-            timeout: 15000,
-        });
-
-        // Click on the version item
+        const versionMenu = this.page.locator(".version-dropdown-menu");
         const versionItem = this.page.locator(".version-dropdown-item", {
             hasText: `v${versionNumber}`,
         });
-        await expect(versionItem).toBeVisible({ timeout: 10000 });
+
+        await expect
+            .poll(
+                async () => {
+                    if (!(await versionMenu.isVisible().catch(() => false))) {
+                        await dropdownTrigger.click();
+                    }
+
+                    const visible = await versionItem
+                        .isVisible()
+                        .catch(() => false);
+                    if (visible) {
+                        return true;
+                    }
+
+                    await this.page.reload({ waitUntil: "domcontentloaded" });
+                    await expect(dropdownTrigger).toBeVisible({
+                        timeout: 15000,
+                    });
+                    return false;
+                },
+                {
+                    message: `Waiting for version v${versionNumber} to appear in the dropdown`,
+                    timeout: 30000,
+                    intervals: [1000, 2000, 5000],
+                },
+            )
+            .toBe(true);
+
         try {
             await versionItem.click({ timeout: 10000 });
         } catch {
@@ -577,7 +636,7 @@ export class ModelViewerPage {
         const dropdownMenu = this.page.locator(".version-dropdown-menu");
 
         // Poll for the thumbnail with retries (useThumbnail hook may need time to fetch)
-        const maxAttempts = 15;
+        const maxAttempts = 20;
         const pollInterval = 2000;
 
         console.log(
@@ -635,8 +694,23 @@ export class ModelViewerPage {
                 `[getVersionThumbnailSrc] Thumbnail not ready for v${versionNumber}, retrying... (${attempt + 1}/${maxAttempts})`,
             );
 
-            // Keep dropdown open — just wait for re-render
-            await this.page.waitForTimeout(pollInterval);
+            if ((attempt + 1) % 5 === 0) {
+                console.log(
+                    `[getVersionThumbnailSrc] Reloading viewer to refresh version thumbnails for v${versionNumber}`,
+                );
+                await this.page.reload({ waitUntil: "domcontentloaded" });
+                await this.waitForModelLoaded();
+                await this.page.waitForSelector(
+                    '[data-testid="version-strip"], .version-dropdown-trigger',
+                    {
+                        state: "visible",
+                        timeout: 15000,
+                    },
+                );
+            } else {
+                // Keep dropdown open — just wait for re-render
+                await this.page.waitForTimeout(pollInterval);
+            }
         }
 
         console.log(

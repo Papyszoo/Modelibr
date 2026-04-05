@@ -189,13 +189,13 @@ Then(
 
         // Verify each expected button/menu item is visible individually
         for (const buttonLabel of buttons) {
-            const button = menubar.getByText(buttonLabel, { exact: true }).first();
+            const button = menubar
+                .getByText(buttonLabel, { exact: true })
+                .first();
             await expect(button).toBeVisible({ timeout: 10000 });
             console.log(`[UI] Button "${buttonLabel}" visible ✓`);
         }
-        console.log(
-            `[UI] All ${buttons.length} menubar controls verified ✓`,
-        );
+        console.log(`[UI] All ${buttons.length} menubar controls verified ✓`);
     },
 );
 
@@ -204,12 +204,8 @@ Then(
 When("I open the version dropdown", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
 
-    const dropdownTrigger = page.locator(".version-dropdown-trigger");
-    await expect(dropdownTrigger).toBeVisible({ timeout: 15000 });
-    await dropdownTrigger.click();
-
-    const dropdownMenu = page.locator(".version-dropdown-menu");
-    await expect(dropdownMenu).toBeVisible({ timeout: 5000 });
+    const modelViewer = new ModelViewerPage(page);
+    await modelViewer.openVersionDropdown();
     console.log("[UI] Version dropdown opened ✓");
 });
 
@@ -295,56 +291,16 @@ Then(
             )
             .toBe(true);
 
-        // The VersionThumbnail component uses useThumbnail hook which subscribes to SignalR
-        // Simply poll the dropdown until the thumbnail image appears (SignalR will update the component)
-        const dropdownTrigger = page.locator(".version-dropdown-trigger");
-        const dropdownMenu = page.locator(".version-dropdown-menu");
-        const versionItem = page.locator(".version-dropdown-item", {
-            hasText: `v${versionNumber}`,
-        });
-        const thumbnail = versionItem.locator("img.version-dropdown-thumb");
-
-        // Poll for up to 30 seconds for the thumbnail image to appear
         console.log(
             `[UI] Polling for version ${versionNumber} thumbnail in dropdown...`,
         );
 
-        await expect
-            .poll(
-                async () => {
-                    // Ensure dropdown is open
-                    if (!(await dropdownMenu.isVisible())) {
-                        await dropdownTrigger.click();
-                        // Let next poll iteration verify it opened
-                        return false;
-                    }
-
-                    // Check for thumbnail image
-                    const imgCount = await thumbnail.count();
-                    if (imgCount > 0) {
-                        const naturalWidth = await thumbnail.evaluate(
-                            (img: HTMLImageElement) => img.naturalWidth,
-                        );
-                        if (naturalWidth > 0) {
-                            console.log(
-                                `[UI] Thumbnail image found for version ${versionNumber} (naturalWidth=${naturalWidth})`,
-                            );
-                            return true;
-                        }
-                    }
-
-                    // Toggle dropdown closed to trigger re-render on next open
-                    await dropdownTrigger.click(); // close
-
-                    return false;
-                },
-                {
-                    message: `Waiting for version ${versionNumber} thumbnail to appear in dropdown via SignalR`,
-                    timeout: 30000,
-                    intervals: [2000],
-                },
-            )
-            .toBe(true);
+        const thumbnailSrc =
+            await modelViewer.getVersionThumbnailSrc(versionNumber);
+        expect(
+            thumbnailSrc,
+            `Waiting for version ${versionNumber} thumbnail to appear in dropdown after DB readiness`,
+        ).toBeTruthy();
 
         console.log(
             `[UI] Version ${versionNumber} thumbnail loaded (naturalWidth > 0) ✓`,
@@ -409,7 +365,9 @@ When("I close the viewer tab {string}", async ({ page }, tabName: string) => {
 Then(
     "I capture a screenshot of the version dropdown with thumbnails",
     async ({ page }) => {
-        // Ensure dropdown is still visible
+        const modelViewer = new ModelViewerPage(page);
+        await modelViewer.openVersionDropdown();
+
         const dropdown = page.locator(".version-dropdown-menu");
         await expect(dropdown).toBeVisible({ timeout: 5000 });
 

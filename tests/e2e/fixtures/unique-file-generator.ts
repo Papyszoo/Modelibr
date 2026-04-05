@@ -23,7 +23,10 @@ export class UniqueFileGenerator {
      * @param sourceFilename - The name of the file in tests/e2e/assets/
      * @returns Absolute path to the unique file
      */
-    static async generate(sourceFilename: string): Promise<string> {
+    static async generate(
+        sourceFilename: string,
+        options?: { uniqueFilename?: boolean },
+    ): Promise<string> {
         const sourcePath = path.join(this.ASSETS_DIR, sourceFilename);
         const uniqueId = crypto.randomUUID();
         const shortId = uniqueId.substring(0, 8);
@@ -37,7 +40,12 @@ export class UniqueFileGenerator {
         // NOT renaming is critical: the server derives entity names (texture sets,
         // models) from the uploaded filename, so renaming breaks test assertions.
         const ext = path.extname(sourceFilename).toLowerCase();
-        const uniqueFilename = sourceFilename;
+        const uniqueFilename = options?.uniqueFilename
+            ? path.join(
+                  path.dirname(sourceFilename),
+                  `${path.basename(sourceFilename, ext)}-${shortId}${ext}`,
+              )
+            : sourceFilename;
 
         const targetPath = path.join(tempDir, uniqueFilename);
 

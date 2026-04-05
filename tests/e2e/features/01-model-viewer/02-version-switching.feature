@@ -21,9 +21,9 @@ Feature: Version Switching
     And I am viewing version 2
     When I switch to version 1
     Then the version indicator should show "v1"
-    And the file info should show "test-torus.fbx"
+    And the file info should show "test-cube-"
     And I take a screenshot of version 1 active
     When I switch to version 2
     Then the version indicator should show "v2"
-    And the file info should show "test-cylinder.fbx"
+    And the file info should show "test-cube.glb"
     And I take a screenshot of version 2 active

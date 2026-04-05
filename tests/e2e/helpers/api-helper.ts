@@ -286,13 +286,46 @@ export class ApiHelper {
     /**
      * Get a texture set by name
      */
-    async getTextureSetByName(name: string): Promise<any> {
-        const sets = await this.getAllTextureSets();
-        const found = sets.find((s) => s.name === name);
-        if (!found) {
+    async getTextureSetByName(
+        name: string,
+        options?: { requireTextures?: boolean },
+    ): Promise<any> {
+        const sets = (await this.getAllTextureSets())
+            .filter((s) => s.name === name)
+            .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0));
+
+        if (sets.length === 0) {
             throw new Error(`Texture set "${name}" not found`);
         }
-        return found;
+
+        let fallback = sets[0];
+
+        for (const candidate of sets) {
+            if (!candidate?.id) {
+                continue;
+            }
+
+            try {
+                const details = await this.getTextureSetById(candidate.id);
+                const textureCount = Array.isArray(details?.textures)
+                    ? details.textures.length
+                    : 0;
+
+                fallback = { ...candidate, ...details };
+
+                if (textureCount > 0) {
+                    return fallback;
+                }
+            } catch {
+                // Ignore hydration failures and continue checking newer candidates.
+            }
+        }
+
+        if (options?.requireTextures) {
+            throw new Error(`Texture set "${name}" exists but has no textures`);
+        }
+
+        return fallback;
     }
 
     /**

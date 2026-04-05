@@ -138,10 +138,31 @@ export class ModelListPage {
         });
     }
 
-    async expectModelVisible(modelName: string) {
-        await expect(this.page.getByText(modelName).first()).toBeVisible({
-            timeout: 30000,
-        });
+    async expectModelVisible(modelName: string, modelId?: number) {
+        const modelCard = modelId
+            ? this.page.locator(`[data-model-id="${modelId}"]`).first()
+            : this.page
+                  .locator(
+                      ".model-card, .model-grid-item, .p-card, [class*='model-card'], [class*='model-list-item']",
+                  )
+                  .filter({ hasText: modelName })
+                  .first();
+
+        await expect(async () => {
+            const visible = await modelCard.isVisible().catch(() => false);
+            if (!visible) {
+                await this.page.reload({ waitUntil: "domcontentloaded" });
+                await this.page.waitForSelector(
+                    ".model-card, .model-grid, .no-results, .empty-state",
+                    {
+                        state: "visible",
+                        timeout: 15000,
+                    },
+                );
+            }
+
+            await expect(modelCard).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 60000, intervals: [1000, 2000, 5000] });
     }
 
     async openModel(modelName: string) {

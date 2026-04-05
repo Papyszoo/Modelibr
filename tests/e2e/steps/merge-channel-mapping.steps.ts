@@ -25,6 +25,49 @@ const getTextureSetCard = (page: any, name: string, id?: number) => {
     return page.locator(`.texture-set-card:has-text("${name}")`).first();
 };
 
+async function openTextureSetViewerForVerification(
+    page: any,
+    displayName: string,
+    id?: number,
+) {
+    const card = getTextureSetCard(page, displayName, id).first();
+
+    await expect(async () => {
+        const dialogMask = page.locator(".p-dialog-mask");
+        if (await dialogMask.isVisible().catch(() => false)) {
+            await page.keyboard.press("Escape");
+            await dialogMask
+                .waitFor({ state: "hidden", timeout: 5000 })
+                .catch(() => {});
+        }
+
+        await card.waitFor({ state: "visible", timeout: 10000 });
+        await card.scrollIntoViewIfNeeded();
+        await card.dblclick();
+
+        const viewerOpened = await page
+            .locator(".texture-set-viewer, .p-dialog")
+            .first()
+            .waitFor({ state: "visible", timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+
+        if (!viewerOpened) {
+            await page.reload({ waitUntil: "domcontentloaded" });
+            await page.waitForSelector(".texture-set-list, .texture-set-card", {
+                state: "visible",
+                timeout: 15000,
+            });
+            await card.waitFor({ state: "visible", timeout: 10000 });
+            await card.scrollIntoViewIfNeeded();
+            await card.dblclick();
+            await page.waitForSelector(".texture-set-viewer, .p-dialog", {
+                timeout: 10000,
+            });
+        }
+    }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000] });
+}
+
 // ==================== Setup Steps ====================
 
 Given("texture set {string} exists", async ({ page }, name: string) => {
@@ -370,24 +413,7 @@ Then(
         const set = getScenarioState(page).getTextureSet(setName);
         const displayName = set?.name || setName;
 
-        // Dismiss any blocking dialog overlays
-        const dialogMask = page.locator(".p-dialog-mask");
-        if (await dialogMask.isVisible().catch(() => false)) {
-            await page.keyboard.press("Escape");
-            await dialogMask
-                .waitFor({ state: "hidden", timeout: 5000 })
-                .catch(() => {});
-        }
-
-        const card = set
-            ? page.locator(`.texture-set-card[data-texture-set-id="${set.id}"]`)
-            : page
-                  .locator(`.texture-set-card:has-text("${displayName}")`)
-                  .first();
-        await card.dblclick();
-        await page.waitForSelector(".texture-set-viewer, .p-dialog", {
-            timeout: 25000,
-        });
+        await openTextureSetViewerForVerification(page, displayName, set?.id);
 
         // Try both "Texture Types" tab (new name) and "Textures" tab (old name)
         const newTab = page.locator(
@@ -439,15 +465,7 @@ Then(
         const set = getScenarioState(page).getTextureSet(setName);
         const displayName = set?.name || setName;
 
-        const card = set
-            ? page.locator(`.texture-set-card[data-texture-set-id="${set.id}"]`)
-            : page
-                  .locator(`.texture-set-card:has-text("${displayName}")`)
-                  .first();
-        await card.dblclick();
-        await page.waitForSelector(".texture-set-viewer, .p-dialog", {
-            timeout: 25000,
-        });
+        await openTextureSetViewerForVerification(page, displayName, set?.id);
 
         const tab = page.locator(
             '.p-tabview-nav-link:has-text("Texture Types")',
@@ -468,11 +486,11 @@ Then(
     "{string} should have both {string} and {string} textures",
     async ({ page }, setName: string, type1: string, type2: string) => {
         const set = getScenarioState(page).getTextureSet(setName);
-        const card = getTextureSetCard(page, setName, set?.id);
-        await card.dblclick();
-        await page.waitForSelector(".texture-set-viewer, .p-dialog", {
-            timeout: 25000,
-        });
+        await openTextureSetViewerForVerification(
+            page,
+            set?.name || setName,
+            set?.id,
+        );
 
         const tab = page.locator(
             '.p-tabview-nav-link:has-text("Texture Types")',

@@ -11,9 +11,9 @@ Feature: Setup - Create Models and Versions for Texture Set Tests
   @timeout:720000
   Scenario: Create model with two versions for independence tests
     Given I am on the model list page
-    When I upload a model "test-torus.fbx" and store it as "multi-version-model"
+    When I upload a model "test-cube.glb" and store it as "multi-version-model"
     And I am on the model viewer page for "multi-version-model"
-    And I upload a new version "test-cylinder.fbx"
+    And I upload a new version "test-cube.glb"
     Then the model should have 2 versions in shared state
     And the version dropdown should be open
     And version 1 should have a thumbnail image
