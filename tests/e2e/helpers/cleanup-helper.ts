@@ -253,7 +253,7 @@ export async function cleanupStaleSounds(): Promise<void> {
         const all = data.sounds || [];
         console.log(`[Sound Cleanup] Found ${all.length} sounds`);
 
-        if (all.length <= 5) return;
+        if (all.length === 0) return;
 
         let deleted = 0;
         for (const sound of all) {

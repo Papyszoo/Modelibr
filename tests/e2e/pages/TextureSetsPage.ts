@@ -117,6 +117,17 @@ export class TextureSetsPage {
     }
 
     /**
+     * Select the kind filter tab.
+     * @param label - Visible tab label
+     */
+    async selectKindTab(
+        label: "Model-Specific" | "Global Materials",
+    ): Promise<void> {
+        await this.page.getByRole("button", { name: label }).click();
+        await this.waitForLoad();
+    }
+
+    /**
      * Check if a texture set exists by name
      * @param name - Name of the texture set to check
      */
@@ -177,16 +188,17 @@ export class TextureSetsPage {
         await this.createSetButton.click();
 
         // Wait for dialog to appear and input to be ready
-        const dialog = this.page.locator(".p-dialog");
+        const dialog = this.page.getByRole("dialog", {
+            name: "Create Texture Set",
+        });
         await dialog.waitFor({ state: "visible" });
 
-        // Wait specifically for the input to be visible and enabled
-        const nameInput = dialog.locator('input[type="text"]');
+        const nameInput = dialog.getByPlaceholder("Enter texture set name");
         await nameInput.waitFor({ state: "visible", timeout: 5000 });
         await nameInput.fill(name);
 
         // Click create/submit button
-        const submitButton = dialog.locator('button:has-text("Create")');
+        const submitButton = dialog.getByRole("button", { name: "Create" });
         await submitButton.click();
 
         // Wait for dialog to close
@@ -245,10 +257,17 @@ export class TextureSetsPage {
      * @param name - Name of the texture set to recycle
      */
     async recycleTextureSet(name: string): Promise<void> {
+        const card = this.getCardByName(name).first();
         await this.openContextMenu(name);
         await this.selectContextMenuOption("Recycle");
 
-        // Wait for toast confirmation
-        await this.page.waitForSelector(".p-toast-message", { timeout: 5000 });
+        await Promise.all([
+            card.waitFor({ state: "hidden", timeout: 15000 }),
+            this.page
+                .locator(".p-toast-message", {
+                    hasText: "Texture set moved to recycled files",
+                })
+                .waitFor({ state: "visible", timeout: 15000 }),
+        ]);
     }
 }

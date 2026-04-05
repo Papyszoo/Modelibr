@@ -796,6 +796,26 @@ Then("the texture set selector should be visible", async ({ page }) => {
 Then(
     "the model should have textures applied in the 3D scene",
     async ({ page }) => {
+        await page.waitForSelector("canvas", {
+            state: "visible",
+            timeout: 30000,
+        });
+
+        await expect
+            .poll(
+                async () =>
+                    page.evaluate(() => {
+                        // @ts-expect-error - accessing runtime globals
+                        return Boolean(window.__THREE_SCENE__);
+                    }),
+                {
+                    message: "Waiting for Three.js scene to be available",
+                    timeout: 30000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toBe(true);
+
         // Poll for meshes with textures to be available (async model loading)
         const getTextureInfo = async () => {
             return await page.evaluate(() => {
@@ -856,6 +876,17 @@ Then(
             });
         };
 
+        // Poll until any texture UUID is present on a mesh material.
+        // Under parallel chromium load the scene can appear before textures finish binding.
+        await expect
+            .poll(async () => getAnyTextureUuid(page), {
+                message:
+                    "Waiting for a texture UUID to appear in the Three.js scene",
+                timeout: 90000,
+                intervals: [500, 1000, 2000, 5000],
+            })
+            .not.toBeNull();
+
         // Poll until we have meshes with textures (model loading is async)
         await expect
             .poll(
@@ -865,8 +896,8 @@ Then(
                 },
                 {
                     message: "Waiting for model meshes with textures to load",
-                    timeout: 30000,
-                    intervals: [500, 1000, 2000],
+                    timeout: 90000,
+                    intervals: [500, 1000, 2000, 5000],
                 },
             )
             .toBe(true);

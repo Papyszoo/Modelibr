@@ -616,7 +616,7 @@ export const dynamicDemoHandlers = [
   }),
 
   // Delete model (soft) → move to recycled
-  http.delete('*//:host/models/:id', async ({ params }) => {
+  http.delete('*/models/:id', async ({ params }) => {
     const id = Number(params.id)
     const model = await getById('models', id)
     if (model) {
@@ -1231,12 +1231,12 @@ export const dynamicDemoHandlers = [
     return HttpResponse.json({ id: ts.id, name: ts.name })
   }),
 
-  http.delete('*//:host/texture-sets/:id/hard', async ({ params }) => {
+  http.delete('*/texture-sets/:id/hard', async ({ params }) => {
     await remove('textureSets', Number(params.id))
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*//:host/texture-sets/:id', async ({ params }) => {
+  http.delete('*/texture-sets/:id', async ({ params }) => {
     const id = Number(params.id)
     const ts = await getById('textureSets', id)
     if (ts) {
@@ -1794,7 +1794,7 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*//:host/sprites/:id', async ({ params }) => {
+  http.delete('*/sprites/:id', async ({ params }) => {
     await remove('sprites', Number(params.id))
     return new HttpResponse(null, { status: 204 })
   }),
@@ -2084,7 +2084,7 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*//:host/sounds/:id', async ({ params }) => {
+  http.delete('*/sounds/:id', async ({ params }) => {
     await remove('sounds', Number(params.id))
     return new HttpResponse(null, { status: 204 })
   }),
@@ -2654,7 +2654,7 @@ export const dynamicDemoHandlers = [
       maxFileSizeBytes: 104857600,
       maxThumbnailSizeBytes: 10485760,
       thumbnailFrameCount: 30,
-      thumbnailCameraVerticalAngle: 25,
+      thumbnailCameraVerticalAngle: 0.75,
       thumbnailWidth: 256,
       thumbnailHeight: 256,
       generateThumbnailOnUpload: true,
@@ -2698,6 +2698,20 @@ export const dynamicDemoHandlers = [
       downloadedBytes: null,
       totalBytes: null,
       error: null,
+    })
+  }),
+
+  http.get('*/settings/webdav/urls', async () => {
+    return HttpResponse.json({
+      urls: [],
+    })
+  }),
+
+  http.get('*/settings/webdav/probe', async () => {
+    return HttpResponse.json({
+      reachable: false,
+      folderCount: 0,
+      error: 'WebDAV is not available in demo mode',
     })
   }),
 

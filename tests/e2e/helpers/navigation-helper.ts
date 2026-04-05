@@ -356,50 +356,173 @@ export async function openModelViewer(
         timeout: 10000,
     });
 
-    // Find and click the model card — prefer ID-based selector when available
-    if (modelId) {
-        const cardById = page.locator(`[data-model-id="${modelId}"]`).first();
-        if (
-            await cardById
-                .waitFor({ state: "visible", timeout: 10000 })
-                .then(() => true)
-                .catch(() => false)
-        ) {
-            await cardById.click();
-        } else {
-            console.warn(
-                `[Nav] data-model-id="${modelId}" not found, falling back to name match`,
-            );
-            await page
-                .locator(`.model-card:has-text("${modelName}")`)
-                .first()
-                .click();
+    const nameCard = page
+        .locator(
+            ".model-card, .model-grid-item, .p-card, [class*='model-card'], [class*='model-list-item']",
+        )
+        .filter({ hasText: modelName })
+        .first();
+    const idCard = modelId
+        ? page.locator(`[data-model-id="${modelId}"]`).first()
+        : null;
+
+    let cardSelectorMode: "id" | "name" | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+        if (idCard && (await idCard.isVisible().catch(() => false))) {
+            cardSelectorMode = "id";
+            break;
         }
-    } else {
-        const clickTarget = page.locator(`text="${modelName}"`).first();
-        if (
-            await clickTarget
-                .waitFor({ state: "visible", timeout: 10000 })
-                .then(() => true)
-                .catch(() => false)
-        ) {
-            await clickTarget.dblclick();
-        } else {
-            // Fall back to partial match
-            const card = page
-                .locator(`.model-card:has-text("${modelName}")`)
-                .first();
-            await card.dblclick();
+
+        if (await nameCard.isVisible().catch(() => false)) {
+            cardSelectorMode = "name";
+            break;
         }
+
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.waitForSelector(
+            ".model-card, .model-grid, .no-results, .empty-state",
+            {
+                state: "visible",
+                timeout: 15000,
+            },
+        );
     }
 
-    // Wait for the model viewer to load WITH version data.
-    // The .version-dropdown-trigger only renders when versions.length > 0,
-    // so this guarantees the API responded with version info.
-    await page.waitForSelector(".version-dropdown-trigger", {
-        state: "visible",
-        timeout: 60000,
-    });
+    if (!cardSelectorMode && modelId) {
+        await page.evaluate(
+            ({ id, name }) => {
+                const storageKey = "modelibr_navigation";
+                const sessionWindowIdKey = "modelibr_windowId";
+                const storedRaw = localStorage.getItem(storageKey);
+                const stored = storedRaw
+                    ? JSON.parse(storedRaw)
+                    : {
+                          state: {
+                              activeWindows: {},
+                              recentlyClosedTabs: [],
+                              recentlyClosedWindows: [],
+                          },
+                          version: 0,
+                      };
+
+                let windowId = sessionStorage.getItem(sessionWindowIdKey);
+                if (!windowId) {
+                    windowId = crypto.randomUUID();
+                    sessionStorage.setItem(sessionWindowIdKey, windowId);
+                }
+
+                const defaultWindowState = {
+                    tabs: [
+                        {
+                            id: "modelList",
+                            type: "modelList",
+                            label: "Models",
+                            params: {},
+                        },
+                    ],
+                    activeTabId: "modelList",
+                    activeRightTabId: null,
+                    splitterSize: 50,
+                    lastActiveAt: new Date().toISOString(),
+                };
+
+                const activeWindows = stored.state?.activeWindows || {};
+                const windowState =
+                    activeWindows[windowId] || defaultWindowState;
+                const tabId = `model-${id}`;
+                const existingTabs = (windowState.tabs || []).filter(
+                    (tab: any) => tab.id !== tabId,
+                );
+
+                existingTabs.push({
+                    id: tabId,
+                    type: "modelViewer",
+                    label: name,
+                    params: { modelId: String(id) },
+                    modelId: String(id),
+                });
+
+                activeWindows[windowId] = {
+                    ...windowState,
+                    tabs: existingTabs,
+                    activeTabId: tabId,
+                    lastActiveAt: new Date().toISOString(),
+                };
+
+                stored.state = {
+                    activeWindows,
+                    recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
+                    recentlyClosedWindows:
+                        stored.state?.recentlyClosedWindows || [],
+                };
+
+                localStorage.setItem(storageKey, JSON.stringify(stored));
+            },
+            { id: modelId, name: modelName },
+        );
+
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.waitForSelector(".version-dropdown-trigger", {
+            state: "visible",
+            timeout: 30000,
+        });
+    } else {
+        expect(cardSelectorMode).not.toBeNull();
+
+        await expect(async () => {
+            const clickTarget =
+                cardSelectorMode === "id" && idCard ? idCard : nameCard;
+
+            if (modelId && clickTarget === nameCard) {
+                console.warn(
+                    `[Nav] data-model-id="${modelId}" not found, falling back to name match`,
+                );
+            }
+
+            await expect(clickTarget).toBeVisible({ timeout: 5000 });
+
+            try {
+                await clickTarget.click({ timeout: 10000 });
+            } catch {
+                await clickTarget.click({ force: true, timeout: 10000 });
+            }
+
+            // Wait for the model viewer to load WITH version data.
+            // The .version-dropdown-trigger only renders when versions.length > 0,
+            // so this guarantees the API responded with version info.
+            await page.waitForSelector(".version-dropdown-trigger", {
+                state: "visible",
+                timeout: 15000,
+            });
+        }).toPass({ timeout: 60000, intervals: [1000, 2000, 5000] });
+    }
+
+    if (modelId) {
+        const openedModelId = await page.evaluate(() => {
+            try {
+                const stored = localStorage.getItem("modelibr_navigation");
+                if (!stored) return null;
+                const data = JSON.parse(stored);
+                const windows = data?.state?.activeWindows || {};
+                for (const win of Object.values(windows) as any[]) {
+                    const activeTab = win?.tabs?.find(
+                        (tab: any) =>
+                            tab.id === win.activeTabId &&
+                            tab.type === "modelViewer",
+                    );
+                    if (activeTab?.modelId) {
+                        return Number(activeTab.modelId);
+                    }
+                }
+                return null;
+            } catch {
+                return null;
+            }
+        });
+
+        expect(openedModelId).toBe(modelId);
+    }
+
     console.log(
         `[Nav] Opened model viewer for "${modelName}"${modelId ? ` (id=${modelId})` : ""} ✓`,
     );

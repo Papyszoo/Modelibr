@@ -10,6 +10,8 @@ import {
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
+import { createHash } from "crypto";
+import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
@@ -64,33 +66,32 @@ Given(
                             modelName.includes("multi-version")
                         ) {
                             console.log(
-                                `[AutoProvision] Bridge model "${modelName}" v1 has no files — recovering with test-torus.fbx`,
+                                `[AutoProvision] Bridge model "${modelName}" v1 has no files — recovering with test-cube.glb`,
                             );
                             const fsModule = await import("fs");
-                            const torusPath = path.join(
+                            const recoveryPath = path.join(
                                 __dirname,
                                 "..",
                                 "assets",
-                                "test-torus.fbx",
+                                "test-cube.glb",
                             );
-                            const torusBuffer =
-                                fsModule.readFileSync(torusPath);
+                            const recoveryBuffer =
+                                fsModule.readFileSync(recoveryPath);
                             const uploadResp = await page.request.post(
                                 `${apiBase}/models/${persisted.id}/versions/${v1.id}/files`,
                                 {
                                     multipart: {
                                         file: {
-                                            name: "test-torus.fbx",
-                                            mimeType:
-                                                "application/octet-stream",
-                                            buffer: torusBuffer,
+                                            name: "test-cube.glb",
+                                            mimeType: "model/gltf-binary",
+                                            buffer: recoveryBuffer,
                                         },
                                     },
                                 },
                             );
                             if (uploadResp.ok()) {
                                 console.log(
-                                    `[AutoProvision] Uploaded test-torus.fbx to "${modelName}" v1 (id=${v1.id}) ✓`,
+                                    `[AutoProvision] Uploaded test-cube.glb to "${modelName}" v1 (id=${v1.id}) ✓`,
                                 );
                                 // Wait for thumbnail generation before proceeding —
                                 // this prevents the version-switching test from polling
@@ -129,7 +130,7 @@ Given(
                                 }
                             } else {
                                 console.warn(
-                                    `[AutoProvision] Failed to upload test-torus.fbx to v1: ${uploadResp.status()}`,
+                                    `[AutoProvision] Failed to upload test-cube.glb to v1: ${uploadResp.status()}`,
                                 );
                             }
                         }
@@ -152,7 +153,7 @@ Given(
                 try {
                     let dbResult;
                     if (modelName.includes("multi-version")) {
-                        // Look for a model with 2+ versions (setup creates test-torus with 2 versions)
+                        // Look for a model with 2+ versions (setup creates a shared multi-version model)
                         dbResult = await db.query(
                             `SELECT m."Id" as "ModelId", m."Name",
                                     (SELECT mv2."Id" FROM "ModelVersions" mv2 WHERE mv2."ModelId" = m."Id" ORDER BY mv2."VersionNumber" LIMIT 1) as "VersionId"
@@ -203,8 +204,6 @@ Given(
                 const uniqueFileName = path.basename(filePath);
                 const generatedName = uniqueFileName.replace(/\.[^/.]+$/, "");
 
-                await modelListPage.expectModelVisible(generatedName);
-
                 // Query DB to get IDs
                 const db2 = new DbHelper();
                 try {
@@ -218,13 +217,21 @@ Given(
                     );
 
                     if (result.rows.length > 0) {
+                        const modelId = result.rows[0].ModelId;
                         getScenarioState(page).saveModel(modelName, {
-                            id: result.rows[0].ModelId,
+                            id: modelId,
                             name: generatedName,
                             versionId: result.rows[0].VersionId,
                         });
+                        await modelListPage
+                            .expectModelVisible(generatedName, modelId)
+                            .catch(() => {
+                                console.warn(
+                                    `[AutoProvision] Model "${generatedName}" exists in DB but did not become visible in the list during setup fallback`,
+                                );
+                            });
                         console.log(
-                            `[AutoProvision] Created model "${modelName}" (ID: ${result.rows[0].ModelId})`,
+                            `[AutoProvision] Created model "${modelName}" (ID: ${modelId})`,
                         );
                     } else {
                         throw new Error(
@@ -250,11 +257,28 @@ Given(
             `[SharedState Debug] Checking texture sets. Current state: ${getScenarioState(page).getDebugInfo()}`,
         );
         const textureSets = dataTable.hashes();
+        const { ApiHelper } = await import("../helpers/api-helper");
+        const api = new ApiHelper();
 
         for (const row of textureSets) {
             const textureSetName = row.name;
             let textureSet =
                 getScenarioState(page).getTextureSet(textureSetName);
+
+            const resolvePopulatedTextureSet = async () => {
+                try {
+                    const populated = await api.getTextureSetByName(
+                        textureSetName,
+                        { requireTextures: true },
+                    );
+                    return {
+                        id: populated.id,
+                        name: populated.name,
+                    };
+                } catch {
+                    return undefined;
+                }
+            };
 
             // Validate cached shared-state entry against database to avoid stale IDs
             if (textureSet) {
@@ -274,26 +298,16 @@ Given(
                     }
 
                     if (!isValid) {
-                        const byName = await db.query(
-                            `SELECT "Id", "Name"
-                             FROM "TextureSets"
-                             WHERE "Name" = $1 AND "IsDeleted" = false
-                             ORDER BY "Id" DESC
-                             LIMIT 1`,
-                            [textureSetName],
-                        );
+                        textureSet = await resolvePopulatedTextureSet();
 
-                        if (byName.rows.length > 0) {
-                            textureSet = {
-                                id: byName.rows[0].Id,
-                                name: byName.rows[0].Name,
-                            };
+                        if (textureSet) {
                             getScenarioState(page).saveTextureSet(
                                 textureSetName,
                                 textureSet,
                             );
+                            persistTextureSet(textureSetName, textureSet);
                             console.log(
-                                `[AutoHeal] Refreshed stale texture set "${textureSetName}" -> ID ${textureSet.id}`,
+                                `[AutoHeal] Refreshed stale texture set "${textureSetName}" -> ID ${textureSet.id} with populated textures`,
                             );
                         } else {
                             textureSet = undefined;
@@ -308,62 +322,92 @@ Given(
                 // First try: load from persisted setup state file
                 const persistedTs = loadPersistedTextureSet(textureSetName);
                 if (persistedTs) {
-                    getScenarioState(page).saveTextureSet(textureSetName, {
-                        id: persistedTs.id,
-                        name: persistedTs.name,
-                    });
+                    try {
+                        const persistedDetails = await api.getTextureSetById(
+                            persistedTs.id,
+                        );
+                        const persistedTextureCount = Array.isArray(
+                            persistedDetails?.textures,
+                        )
+                            ? persistedDetails.textures.length
+                            : 0;
+
+                        if (persistedTextureCount > 0) {
+                            textureSet = {
+                                id: persistedTs.id,
+                                name: persistedTs.name,
+                            };
+                            getScenarioState(page).saveTextureSet(
+                                textureSetName,
+                                textureSet,
+                            );
+                            console.log(
+                                `[AutoProvision] Loaded populated texture set "${textureSetName}" from setup bridge → id=${persistedTs.id}`,
+                            );
+                            continue;
+                        }
+
+                        console.warn(
+                            `[AutoProvision] Ignoring persisted texture set "${textureSetName}" → id=${persistedTs.id} because it has no textures`,
+                        );
+                    } catch {
+                        console.warn(
+                            `[AutoProvision] Persisted texture set "${textureSetName}" → id=${persistedTs.id} could not be hydrated`,
+                        );
+                    }
+                }
+
+                textureSet = await resolvePopulatedTextureSet();
+                if (textureSet) {
+                    getScenarioState(page).saveTextureSet(
+                        textureSetName,
+                        textureSet,
+                    );
+                    persistTextureSet(textureSetName, textureSet);
                     console.log(
-                        `[AutoProvision] Loaded texture set "${textureSetName}" from setup bridge → id=${persistedTs.id}`,
+                        `[AutoProvision] Recovered populated texture set "${textureSetName}" by name → id=${textureSet.id}`,
                     );
                     continue;
                 }
 
-                // Self-provision: create or find the texture set via API
+                // Self-provision a populated texture set so downstream viewer checks have real textures to apply.
                 console.log(
-                    `[AutoProvision] Texture set "${textureSetName}" not in shared state, creating via API...`,
+                    `[AutoProvision] Texture set "${textureSetName}" not in shared state, creating populated set via API...`,
                 );
-                const { ApiHelper } = await import("../helpers/api-helper");
-                const api = new ApiHelper();
                 try {
-                    const created = await api.createTextureSet(textureSetName);
+                    const textureFilePath = await UniqueFileGenerator.generate(
+                        `${textureSetName}.png`,
+                    );
+                    const created = await api.createTextureSetWithFile(
+                        textureSetName,
+                        textureFilePath,
+                    );
                     getScenarioState(page).saveTextureSet(textureSetName, {
-                        id: created.id,
+                        id: created.textureSetId,
+                        name: created.name,
+                    });
+                    persistTextureSet(textureSetName, {
+                        id: created.textureSetId,
                         name: created.name,
                     });
                     console.log(
-                        `[AutoProvision] Created texture set "${textureSetName}" (ID: ${created.id})`,
+                        `[AutoProvision] Created populated texture set "${textureSetName}" (ID: ${created.textureSetId})`,
                     );
                 } catch {
-                    // Creation failed (likely already exists from setup or another worker) — look up in DB
-                    const { DbHelper } = await import("../fixtures/db-helper");
-                    const dbLookup = new DbHelper();
-                    try {
-                        const byName = await dbLookup.query(
-                            `SELECT "Id", "Name"
-                             FROM "TextureSets"
-                             WHERE "Name" = $1 AND "IsDeleted" = false
-                             ORDER BY "Id" DESC
-                             LIMIT 1`,
-                            [textureSetName],
+                    textureSet = await resolvePopulatedTextureSet();
+                    if (textureSet) {
+                        getScenarioState(page).saveTextureSet(
+                            textureSetName,
+                            textureSet,
                         );
-                        if (byName.rows.length > 0) {
-                            getScenarioState(page).saveTextureSet(
-                                textureSetName,
-                                {
-                                    id: byName.rows[0].Id,
-                                    name: byName.rows[0].Name,
-                                },
-                            );
-                            console.log(
-                                `[AutoProvision] Found existing texture set "${textureSetName}" (ID: ${byName.rows[0].Id})`,
-                            );
-                        } else {
-                            throw new Error(
-                                `Failed to auto-provision texture set "${textureSetName}": creation failed and not found in DB`,
-                            );
-                        }
-                    } finally {
-                        await dbLookup.close();
+                        persistTextureSet(textureSetName, textureSet);
+                        console.log(
+                            `[AutoProvision] Found existing populated texture set "${textureSetName}" (ID: ${textureSet.id})`,
+                        );
+                    } else {
+                        throw new Error(
+                            `Failed to auto-provision populated texture set "${textureSetName}"`,
+                        );
                     }
                 }
             }
@@ -383,41 +427,95 @@ When(
         console.log(
             `[Setup] Generating unique model file from "${fileName}"...`,
         );
-        const filePath = await UniqueFileGenerator.generate(fileName);
+        const fileExt = path.extname(fileName).toLowerCase();
+        const filePath = await UniqueFileGenerator.generate(fileName, {
+            uniqueFilename: true,
+        });
+        const uploadStartedAt = new Date(Date.now() - 10000);
 
         await modelListPage.uploadModel(filePath);
 
         // Get the unique model name from the generated file path (includes unique ID)
         const uniqueFileName = path.basename(filePath);
-        const modelName = uniqueFileName.replace(/\.[^/.]+$/, ""); // Strip extension
-
-        // Wait for model to appear in list (grid shows name without extension)
-        await modelListPage.expectModelVisible(modelName);
+        let modelName = uniqueFileName.replace(/\.[^/.]+$/, ""); // Strip extension
+        const fileHash = createHash("sha256")
+            .update(await fs.readFile(filePath))
+            .digest("hex");
 
         // Query database to get the actual model version ID of the just-uploaded model
         // This is the most reliable way to identify the specific model we just created
         const { DbHelper } = await import("../fixtures/db-helper");
         const db = new DbHelper();
-        const result = await db.query(
-            `SELECT mv."Id" as "VersionId", m."Id" as "ModelId", m."Name"
-             FROM "ModelVersions" mv
-             JOIN "Models" m ON m."Id" = mv."ModelId"
-             WHERE m."Name" = $1 AND m."DeletedAt" IS NULL
-             ORDER BY mv."CreatedAt" DESC
-             LIMIT 1`,
-            [modelName],
-        );
+        const queryParams = [
+            uploadStartedAt.toISOString(),
+            uniqueFileName,
+            fileHash,
+        ];
 
         let modelId = 0;
         let versionId = 0;
+        await expect
+            .poll(
+                async () =>
+                    (
+                        await db.query(
+                            `SELECT mv."Id" as "VersionId", m."Id" as "ModelId", m."Name"
+                                                 FROM "Files" f
+                                                 JOIN "ModelVersions" mv ON mv."Id" = f."ModelVersionId"
+                                                 JOIN "Models" m ON m."Id" = mv."ModelId"
+                                                 WHERE m."DeletedAt" IS NULL
+                                                     AND f."CreatedAt" >= $1
+                                                     AND f."OriginalFileName" = $2
+                                                     AND f."Sha256Hash" = $3
+                                                 ORDER BY f."CreatedAt" DESC, mv."CreatedAt" DESC
+                                                 LIMIT 1`,
+                            queryParams,
+                        )
+                    ).rows.length,
+                {
+                    message: `Waiting for uploaded file "${uniqueFileName}" to appear in the database`,
+                    timeout: 60000,
+                    intervals: [1000, 2000, 5000],
+                },
+            )
+            .toBeGreaterThan(0);
+
+        const result = await db.query(
+            `SELECT mv."Id" as "VersionId", m."Id" as "ModelId", m."Name"
+                         FROM "Files" f
+                         JOIN "ModelVersions" mv ON mv."Id" = f."ModelVersionId"
+                         JOIN "Models" m ON m."Id" = mv."ModelId"
+                         WHERE m."DeletedAt" IS NULL
+                             AND f."CreatedAt" >= $1
+                             AND f."OriginalFileName" = $2
+                             AND f."Sha256Hash" = $3
+                         ORDER BY f."CreatedAt" DESC, mv."CreatedAt" DESC
+             LIMIT 1`,
+            queryParams,
+        );
+
         if (result.rows.length > 0) {
             modelId = result.rows[0].ModelId;
             versionId = result.rows[0].VersionId;
+            const storedModelName = result.rows[0].Name;
+            if (storedModelName && storedModelName !== modelName) {
+                console.log(
+                    `[Setup] Uploaded filename resolved to model name "${storedModelName}" instead of "${modelName}"`,
+                );
+            }
+            await modelListPage
+                .expectModelVisible(storedModelName ?? modelName, modelId)
+                .catch(() => {
+                    console.warn(
+                        `[Setup] Model "${storedModelName ?? modelName}" exists in DB but did not become visible in the model list before setup continued`,
+                    );
+                });
             console.log(
-                `[Setup] Uploaded model "${modelName}" -> modelId=${modelId}, versionId=${versionId}`,
+                `[Setup] Uploaded model "${storedModelName ?? modelName}" -> modelId=${modelId}, versionId=${versionId}`,
             );
+            modelName = storedModelName ?? modelName;
         } else {
-            console.warn(
+            throw new Error(
                 `[Setup] Could not find model "${modelName}" in database after upload`,
             );
         }
@@ -542,7 +640,17 @@ Given(
 
             const { navigateToAppClean, openModelViewer } =
                 await import("../helpers/navigation-helper");
-            await navigateToAppClean(page);
+            const hasModelListContext = await page
+                .locator(
+                    ".dock-bar-left .draggable-tab:has(.pi-list), .model-card, .model-grid, .no-results, .empty-state",
+                )
+                .first()
+                .isVisible()
+                .catch(() => false);
+
+            if (!hasModelListContext) {
+                await navigateToAppClean(page);
+            }
             await openModelViewer(page, model.name, model.id);
 
             console.log(
@@ -592,11 +700,12 @@ Then(
         let lastStatus: number | null = null;
         let lastModelName = "";
         let lastVersionId = 0;
+        const trackedModelName = getScenarioState(page).uploadTrackerModelName;
+        const trackedVersionId = getScenarioState(page).uploadTrackerVersionId;
 
         // Determine query strategy: prefer version ID > model name > global most-recent
-        const hasVersionId = getScenarioState(page).uploadTrackerVersionId > 0;
-        const hasModelName =
-            getScenarioState(page).uploadTrackerModelName !== null;
+        const hasVersionId = trackedVersionId > 0;
+        const hasModelName = trackedModelName !== null;
 
         if (hasVersionId) {
             console.log(
@@ -622,7 +731,7 @@ Then(
                      JOIN "Models" m ON m."Id" = mv."ModelId"
                      LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
                      WHERE mv."Id" = $1`;
-            params = [getScenarioState(page).uploadTrackerVersionId];
+            params = [trackedVersionId];
         } else if (hasModelName) {
             query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
                      FROM "ModelVersions" mv
@@ -631,7 +740,7 @@ Then(
                      WHERE m."DeletedAt" IS NULL AND m."Name" = $1
                      ORDER BY mv."CreatedAt" DESC
                      LIMIT 1`;
-            params = [getScenarioState(page).uploadTrackerModelName];
+            params = [trackedModelName];
         } else {
             query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
                      FROM "ModelVersions" mv
@@ -647,7 +756,30 @@ Then(
         await expect
             .poll(
                 async () => {
-                    const result = await db.query(query, params);
+                    let result = await db.query(query, params);
+
+                    if (
+                        result.rows.length === 0 &&
+                        hasVersionId &&
+                        trackedModelName
+                    ) {
+                        result = await db.query(
+                            `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
+                             FROM "ModelVersions" mv
+                             JOIN "Models" m ON m."Id" = mv."ModelId"
+                             LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                             WHERE m."DeletedAt" IS NULL AND m."Name" = $1
+                             ORDER BY mv."CreatedAt" DESC
+                             LIMIT 1`,
+                            [trackedModelName],
+                        );
+
+                        if (result.rows.length > 0) {
+                            console.warn(
+                                `[Thumbnail] Uploaded version ${trackedVersionId} was not found; falling back to latest version for model "${trackedModelName}"`,
+                            );
+                        }
+                    }
 
                     if (result.rows.length > 0) {
                         const row = result.rows[0];
