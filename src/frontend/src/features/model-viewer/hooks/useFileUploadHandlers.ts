@@ -143,9 +143,7 @@ export function useFileUploadHandlers(deps: FileUploadDeps): FileUploadState {
       if (!model) return
 
       if (rejectDisabledBlendUpload(file)) {
-        throw new Error(
-          'Install Blender from Settings before uploading .blend files.'
-        )
+        return
       }
 
       try {

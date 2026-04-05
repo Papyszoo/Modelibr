@@ -311,13 +311,9 @@ describe('useFileUploadHandlers', () => {
     const { result } = renderHook(() => useFileUploadHandlers(deps))
     const file = new File(['data'], 'model.blend')
 
-    await expect(
-      act(async () => {
-        await result.current.handleFileUpload(file, 'new')
-      })
-    ).rejects.toThrow(
-      'Install Blender from Settings before uploading .blend files.'
-    )
+    await act(async () => {
+      await result.current.handleFileUpload(file, 'new')
+    })
 
     expect(mockCreateModelVersion).not.toHaveBeenCalled()
     expect(deps.showToast).toHaveBeenCalledWith(
