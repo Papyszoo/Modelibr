@@ -150,7 +150,7 @@ Texture set association endpoints accept optional `?materialName` and `?variantN
 
 ### Blender / WebDAV (5 virtual endpoints)
 
-Handled by `WebDavMiddleware` — not standard REST endpoints. Requires `ENABLE_BLENDER=true` environment variable.
+Handled by `WebDavMiddleware` — not standard REST endpoints. Available when Blender has been installed via Settings and Blender integration is enabled in persisted settings.
 
 | Method   | Path                                                      | Description                                                                  |
 | -------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |

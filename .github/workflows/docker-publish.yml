@@ -66,26 +66,12 @@ jobs:
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-webapi:dev
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-webapi:dev-sha-${{ steps.vars.outputs.sha_short }}
 
-            - name: Build and push modelibr-asset-processor (standard)
+            - name: Build and push modelibr-asset-processor
               uses: docker/build-push-action@v6
               with:
                   context: ./src/asset-processor
                   file: ./src/asset-processor/Dockerfile
                   push: true
-                  build-args: |
-                      ENABLE_BLENDER=false
                   tags: |
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-asset-processor:dev
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-asset-processor:dev-sha-${{ steps.vars.outputs.sha_short }}
-
-            - name: Build and push modelibr-asset-processor (blender)
-              uses: docker/build-push-action@v6
-              with:
-                  context: ./src/asset-processor
-                  file: ./src/asset-processor/Dockerfile
-                  push: true
-                  build-args: |
-                      ENABLE_BLENDER=true
-                  tags: |
-                      ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-asset-processor:dev-blender
-                      ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-asset-processor:dev-blender-sha-${{ steps.vars.outputs.sha_short }}

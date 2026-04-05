@@ -4,6 +4,7 @@ import {
   addFileToVersion,
   createModelVersion,
 } from '@/features/model-viewer/api/modelVersionApi'
+import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
 import { type ModelVersionDto } from '@/types'
 import { type Model } from '@/utils/fileUtils'
 
@@ -57,6 +58,25 @@ export function useFileUploadHandlers(deps: FileUploadDeps): FileUploadState {
   const [uploadModalVisible, setUploadModalVisible] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
+
+  const rejectDisabledBlendUpload = useCallback(
+    (file: File) => {
+      if (file.name.toLowerCase().endsWith('.blend') && !blenderEnabled) {
+        showToast({
+          severity: 'warn',
+          summary: 'Blender Required',
+          detail:
+            'Install Blender from Settings before uploading .blend files.',
+          life: 5000,
+        })
+        return true
+      }
+
+      return false
+    },
+    [blenderEnabled, showToast]
+  )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -70,27 +90,37 @@ export function useFileUploadHandlers(deps: FileUploadDeps): FileUploadState {
     setDragOver(false)
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(false)
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOver(false)
 
-    const files = e.dataTransfer.files
-    if (files && files.length > 0) {
-      setDroppedFile(files[0])
-      setUploadModalVisible(true)
-    }
-  }, [])
+      const files = e.dataTransfer.files
+      if (files && files.length > 0) {
+        if (rejectDisabledBlendUpload(files[0])) {
+          return
+        }
+        setDroppedFile(files[0])
+        setUploadModalVisible(true)
+      }
+    },
+    [rejectDisabledBlendUpload]
+  )
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
+        if (rejectDisabledBlendUpload(e.target.files[0])) {
+          e.target.value = ''
+          return
+        }
         setDroppedFile(e.target.files[0])
         setUploadModalVisible(true)
         e.target.value = ''
       }
     },
-    []
+    [rejectDisabledBlendUpload]
   )
 
   const handleUploadClick = useCallback(() => {
@@ -111,6 +141,12 @@ export function useFileUploadHandlers(deps: FileUploadDeps): FileUploadState {
       setAsActive?: boolean
     ) => {
       if (!model) return
+
+      if (rejectDisabledBlendUpload(file)) {
+        throw new Error(
+          'Install Blender from Settings before uploading .blend files.'
+        )
+      }
 
       try {
         if (action === 'new') {
@@ -162,7 +198,15 @@ export function useFileUploadHandlers(deps: FileUploadDeps): FileUploadState {
         throw error
       }
     },
-    [model, versions, selectedVersion, onSuccess, showToast, refetchVersions]
+    [
+      model,
+      versions,
+      selectedVersion,
+      onSuccess,
+      showToast,
+      refetchVersions,
+      rejectDisabledBlendUpload,
+    ]
   )
 
   return {

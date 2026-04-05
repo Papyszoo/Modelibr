@@ -22,16 +22,16 @@ import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
+import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 import { type ModelVersionDto, type TextureSetDto } from '@/types'
 import { type Model } from '@/utils/fileUtils'
 
-import { type MaterialTextureSets } from './TexturedModel'
-
+import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { FileUploadModal } from './FileUploadModal'
 import { Scene as ModelPreviewScene } from './ModelPreviewScene'
-import { PanelWrapper, type ExpandAction } from './PanelWrapper'
-import { CanvasErrorBoundary } from './CanvasErrorBoundary'
+import { type ExpandAction, PanelWrapper } from './PanelWrapper'
+import { type MaterialTextureSets } from './TexturedModel'
 import { VersionStrip } from './VersionStrip'
 import { type PanelContent, ViewerMenubar } from './ViewerMenubar'
 import { ViewerSidePanel } from './ViewerSidePanel'
@@ -48,6 +48,7 @@ export function ModelViewer({
   side = 'left',
 }: ModelViewerProps): JSX.Element {
   const viewerSettings = useViewerSettingsStore(s => s.settings)
+  const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
@@ -626,7 +627,11 @@ export function ModelViewer({
           ref={fileUpload.fileInputRef}
           style={{ display: 'none' }}
           onChange={fileUpload.handleFileSelect}
-          accept=".obj,.fbx,.gltf,.glb,.blend"
+          accept={
+            blenderEnabled
+              ? '.obj,.fbx,.gltf,.glb,.blend'
+              : '.obj,.fbx,.gltf,.glb'
+          }
         />
 
         <div className="viewer-layout" style={gridStyle}>
