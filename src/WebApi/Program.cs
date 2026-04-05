@@ -129,6 +129,7 @@ namespace WebApi
             app.MapTextureSetEndpoints();
             app.MapPackEndpoints();
             app.MapProjectEndpoints();
+            app.MapModelCategoryEndpoints();
             app.MapStageEndpoints();
             app.MapSettingsEndpoints();
             app.MapBatchUploadEndpoints();

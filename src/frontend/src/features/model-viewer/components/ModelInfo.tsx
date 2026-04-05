@@ -3,26 +3,51 @@ import './ModelInfo.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Chip } from 'primereact/chip'
+import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
+import { useRef } from 'react'
 import { useEffect, useState } from 'react'
 
-import { updateModelTags } from '@/features/models/api/modelApi'
+import {
+  addModelConceptImage,
+  getFilePreviewUrl,
+  removeModelConceptImage,
+  updateModelTags,
+  uploadFile,
+} from '@/features/models/api/modelApi'
+import { useModelCategoriesQuery } from '@/features/models/api/queries'
 import { getModelFileFormat } from '@/utils/fileUtils'
+
+import { ModelCategoryManagerDialog } from './ModelCategoryManagerDialog'
 
 export function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(
     model.tags ? model.tags.split(', ').filter(t => t.trim()) : []
   )
   const [description, setDescription] = useState(model.description || '')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(
+    model.category?.id ?? model.categoryId ?? null
+  )
   const [newTag, setNewTag] = useState('')
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
+  const conceptFileInputRef = useRef<HTMLInputElement | null>(null)
   const queryClient = useQueryClient()
+  const categoriesQuery = useModelCategoriesQuery()
+  const categories = categoriesQuery.data ?? []
 
   // Sync local state when the model prop updates (e.g. after React Query refetch)
   useEffect(() => {
     setTags(model.tags ? model.tags.split(', ').filter(t => t.trim()) : [])
     setDescription(model.description || '')
-  }, [model.id, model.tags, model.description])
+    setSelectedCategoryId(model.category?.id ?? model.categoryId ?? null)
+  }, [
+    model.id,
+    model.tags,
+    model.description,
+    model.category?.id,
+    model.categoryId,
+  ])
 
   const invalidateModelQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['models'] })
@@ -35,10 +60,12 @@ export function ModelInfo({ model, onModelUpdated }) {
     mutationFn: async ({
       tagsString,
       desc,
+      categoryId,
     }: {
       tagsString: string
       desc: string
-    }) => updateModelTags(model.id, tagsString, desc),
+      categoryId?: number | null
+    }) => updateModelTags(model.id, tagsString, desc, categoryId),
     onSuccess: () => {
       invalidateModelQueries()
       if (onModelUpdated) {
@@ -69,11 +96,50 @@ export function ModelInfo({ model, onModelUpdated }) {
 
   const handleSave = () => {
     const tagsString = tags.join(', ')
-    saveModelInfoMutation.mutate({ tagsString, desc: description })
+    saveModelInfoMutation.mutate({
+      tagsString,
+      desc: description,
+      categoryId: selectedCategoryId,
+    })
   }
+
+  const uploadConceptImageMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      for (const file of files) {
+        const upload = await uploadFile(file, { uploadType: 'model-concept' })
+        await addModelConceptImage(model.id, upload.fileId)
+      }
+    },
+    onSuccess: invalidateModelQueries,
+  })
+
+  const removeConceptImageMutation = useMutation({
+    mutationFn: (fileId: number) => removeModelConceptImage(model.id, fileId),
+    onSuccess: invalidateModelQueries,
+  })
+
+  const technicalMetadata = model.technicalMetadata ?? {
+    latestVersionId: model.latestVersionId,
+    latestVersionNumber: model.latestVersionNumber,
+    triangleCount: model.triangleCount,
+    vertexCount: model.vertexCount,
+    meshCount: model.meshCount,
+    materialCount: model.materialCount,
+  }
+
+  const categoryOptions = categories.map(category => ({
+    label: category.path,
+    value: category.id,
+  }))
 
   return (
     <div className="model-info">
+      <ModelCategoryManagerDialog
+        visible={showCategoryManager}
+        categories={categories}
+        onHide={() => setShowCategoryManager(false)}
+      />
+
       <div className="model-info-section">
         <div className="model-info-grid">
           <div className="model-info-item">
@@ -92,7 +158,113 @@ export function ModelInfo({ model, onModelUpdated }) {
             <label>Format:</label>
             <span>{getModelFileFormat(model)}</span>
           </div>
+          <div className="model-info-item model-info-item-wide">
+            <label>Category:</label>
+            <div className="model-info-category-row">
+              <Dropdown
+                value={selectedCategoryId}
+                options={categoryOptions}
+                onChange={e => setSelectedCategoryId(e.value ?? null)}
+                placeholder="Uncategorized"
+                showClear
+                filter
+                className="model-info-category-dropdown"
+              />
+              <Button
+                label="Manage"
+                icon="pi pi-sitemap"
+                text
+                onClick={() => setShowCategoryManager(true)}
+              />
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div className="model-info-section">
+        <h3 className="model-info-title">Technical Data</h3>
+        <div className="model-info-grid">
+          <div className="model-info-item">
+            <label>Triangles</label>
+            <span>{technicalMetadata.triangleCount ?? 'Unknown'}</span>
+          </div>
+          <div className="model-info-item">
+            <label>Vertices</label>
+            <span>{technicalMetadata.vertexCount ?? 'Unknown'}</span>
+          </div>
+          <div className="model-info-item">
+            <label>Meshes</label>
+            <span>{technicalMetadata.meshCount ?? 'Unknown'}</span>
+          </div>
+          <div className="model-info-item">
+            <label>Materials</label>
+            <span>{technicalMetadata.materialCount ?? 'Unknown'}</span>
+          </div>
+          <div className="model-info-item model-info-item-wide">
+            <label>Based On</label>
+            <span>
+              {technicalMetadata.latestVersionNumber
+                ? `Version ${technicalMetadata.latestVersionNumber}`
+                : 'No analyzed version'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="model-info-section">
+        <div className="model-info-header-row">
+          <h3 className="model-info-title">Concept Images</h3>
+          <Button
+            label="Add"
+            icon="pi pi-images"
+            className="p-button-outlined p-button-sm"
+            onClick={() => conceptFileInputRef.current?.click()}
+          />
+        </div>
+
+        <input
+          ref={conceptFileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          multiple
+          onChange={event => {
+            const files = Array.from(event.target.files ?? [])
+            if (files.length > 0) {
+              uploadConceptImageMutation.mutate(files)
+            }
+            event.target.value = ''
+          }}
+        />
+
+        {model.conceptImages && model.conceptImages.length > 0 ? (
+          <div className="model-info-concept-grid">
+            {model.conceptImages.map(image => (
+              <div key={image.fileId} className="model-info-concept-card">
+                <img
+                  src={
+                    image.previewUrl || getFilePreviewUrl(String(image.fileId))
+                  }
+                  alt={image.fileName}
+                />
+                <div className="model-info-concept-footer">
+                  <span title={image.fileName}>{image.fileName}</span>
+                  <Button
+                    icon="pi pi-times"
+                    text
+                    rounded
+                    severity="danger"
+                    onClick={() =>
+                      removeConceptImageMutation.mutate(image.fileId)
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="model-info-empty">No concept images attached.</div>
+        )}
       </div>
 
       <div className="model-info-section">

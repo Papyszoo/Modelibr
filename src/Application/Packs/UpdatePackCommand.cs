@@ -37,7 +37,7 @@ internal class UpdatePackCommandHandler : ICommandHandler<UpdatePackCommand>
                     new Error("PackAlreadyExists", $"A pack with the name '{command.Name}' already exists."));
             }
 
-            pack.Update(command.Name, command.Description, _dateTimeProvider.UtcNow);
+            pack.Update(command.Name, command.Description, command.LicenseType, command.Url, _dateTimeProvider.UtcNow);
 
             await _packRepository.UpdateAsync(pack, cancellationToken);
 
@@ -51,4 +51,4 @@ internal class UpdatePackCommandHandler : ICommandHandler<UpdatePackCommand>
     }
 }
 
-public record UpdatePackCommand(int Id, string Name, string? Description) : ICommand;
+public record UpdatePackCommand(int Id, string Name, string? Description, string? LicenseType, string? Url) : ICommand;

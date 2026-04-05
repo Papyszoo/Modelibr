@@ -15,11 +15,11 @@ public interface IModelRepository
     Task<Model?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
     Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null,
+        int? packId = null, int? projectId = null, int? textureSetId = null, int? categoryId = null, bool? hasConceptImages = null,
         CancellationToken cancellationToken = default);
     Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null,
+        int? packId = null, int? projectId = null, int? textureSetId = null, int? categoryId = null, bool? hasConceptImages = null,
         CancellationToken cancellationToken = default);
     Task<(int? ActiveVersionId, Domain.Models.Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
         int modelId, CancellationToken cancellationToken = default);

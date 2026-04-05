@@ -174,22 +174,20 @@ export class ThumbnailProcessor extends BaseProcessor {
         fileInfo.fileType
       )
 
-      // Step 3.2: Extract and save material names from the loaded model
+      // Step 3.2: Extract and save technical metadata from the loaded model
       try {
-        const materialNames = await renderer.extractMaterialNames()
-        if (materialNames.length > 0) {
-          jobLogger.info('Extracted material names from model', {
-            materialNames,
-          })
-          await this.modelDataService.saveMaterialNames(
-            job.modelVersionId,
-            materialNames
-          )
-        }
+        const technicalMetadata = await renderer.extractTechnicalMetadata()
+        await this.modelDataService.saveTechnicalMetadata(
+          job.modelVersionId,
+          technicalMetadata
+        )
       } catch (matError) {
-        jobLogger.warn('Failed to extract/save material names, continuing', {
-          error: matError.message,
-        })
+        jobLogger.warn(
+          'Failed to extract/save technical metadata, continuing',
+          {
+            error: matError.message,
+          }
+        )
       }
 
       // Step 3.5: Apply textures if configured

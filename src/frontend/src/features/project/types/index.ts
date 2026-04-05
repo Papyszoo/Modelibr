@@ -17,6 +17,7 @@ export interface ProjectDto {
   id: number
   name: string
   description?: string
+  notes?: string
   createdAt: string
   updatedAt: string
   modelCount: number
@@ -24,9 +25,23 @@ export interface ProjectDto {
   spriteCount: number
   soundCount: number
   isEmpty: boolean
+  customThumbnailUrl?: string | null
+  conceptImageCount: number
   models: ProjectModelDto[]
   textureSets: ProjectTextureSetDto[]
   sprites: ProjectSpriteDto[]
+}
+
+export interface ProjectConceptImageDto {
+  fileId: number
+  fileName: string
+  previewUrl: string
+  fileUrl: string
+  sortOrder: number
+}
+
+export interface ProjectDetailDto extends ProjectDto {
+  conceptImages: ProjectConceptImageDto[]
 }
 
 export interface GetAllProjectsResponse {
@@ -36,15 +51,18 @@ export interface GetAllProjectsResponse {
 export interface CreateProjectRequest {
   name: string
   description?: string
+  notes?: string
 }
 
 export interface CreateProjectResponse {
   id: number
   name: string
   description?: string
+  notes?: string
 }
 
 export interface UpdateProjectRequest {
   name: string
   description?: string
+  notes?: string
 }

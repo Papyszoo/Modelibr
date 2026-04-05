@@ -32,11 +32,11 @@ internal class CreatePackCommandHandler : ICommandHandler<CreatePackCommand, Cre
             }
 
             // Create new pack using domain factory method
-            var pack = Pack.Create(command.Name, command.Description, _dateTimeProvider.UtcNow);
+            var pack = Pack.Create(command.Name, command.Description, command.LicenseType, command.Url, _dateTimeProvider.UtcNow);
 
             var savedPack = await _packRepository.AddAsync(pack, cancellationToken);
 
-            return Result.Success(new CreatePackResponse(savedPack.Id, savedPack.Name, savedPack.Description));
+            return Result.Success(new CreatePackResponse(savedPack.Id, savedPack.Name, savedPack.Description, savedPack.LicenseType, savedPack.Url));
         }
         catch (ArgumentException ex)
         {
@@ -46,5 +46,5 @@ internal class CreatePackCommandHandler : ICommandHandler<CreatePackCommand, Cre
     }
 }
 
-public record CreatePackCommand(string Name, string? Description) : ICommand<CreatePackResponse>;
-public record CreatePackResponse(int Id, string Name, string? Description);
+public record CreatePackCommand(string Name, string? Description, string? LicenseType, string? Url) : ICommand<CreatePackResponse>;
+public record CreatePackResponse(int Id, string Name, string? Description, string? LicenseType, string? Url);

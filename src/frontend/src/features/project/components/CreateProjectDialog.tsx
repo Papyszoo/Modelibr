@@ -37,12 +37,16 @@ export function CreateProjectDialog({
     defaultValues: {
       name: '',
       description: '',
+      notes: '',
     },
   })
 
   const createProjectMutation = useMutation({
-    mutationFn: (payload: { name: string; description?: string }) =>
-      createProject(payload),
+    mutationFn: (payload: {
+      name: string
+      description?: string
+      notes?: string
+    }) => createProject(payload),
     onSuccess: async () => {
       toast.current?.show({
         severity: 'success',
@@ -52,7 +56,7 @@ export function CreateProjectDialog({
       })
 
       onHide()
-      reset({ name: '', description: '' })
+      reset({ name: '', description: '', notes: '' })
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
     onError: error => {
@@ -82,7 +86,7 @@ export function CreateProjectDialog({
 
   const handleHide = () => {
     onHide()
-    reset({ name: '', description: '' })
+    reset({ name: '', description: '', notes: '' })
   }
 
   return (
@@ -126,6 +130,15 @@ export function CreateProjectDialog({
               {...register('description')}
               rows={3}
               placeholder="Enter project description (optional)"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="project-notes">Notes</label>
+            <InputTextarea
+              id="project-notes"
+              {...register('notes')}
+              rows={4}
+              placeholder="Planning notes, art references, TODOs"
             />
           </div>
         </div>

@@ -10,6 +10,10 @@ interface UseModelFiltersOptions {
 
 export function useModelFilters({ packId, projectId }: UseModelFiltersOptions) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null
+  )
+  const [hasConceptImages, setHasConceptImages] = useState(false)
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>(
     packId ? [packId] : []
   )
@@ -72,6 +76,10 @@ export function useModelFilters({ packId, projectId }: UseModelFiltersOptions) {
   return {
     searchQuery,
     setSearchQuery,
+    selectedCategoryId,
+    setSelectedCategoryId,
+    hasConceptImages,
+    setHasConceptImages,
     effectivePackIds,
     effectiveProjectIds,
     handlePackFilterChange,

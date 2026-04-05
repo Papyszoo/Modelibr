@@ -5,11 +5,13 @@ namespace Application.Models;
 public record UpdateModelTagsCommand(
     int ModelId,
     string? Tags,
-    string? Description
+    string? Description,
+    int? CategoryId
 ) : ICommand<UpdateModelTagsResponse>;
 
 public record UpdateModelTagsResponse(
     int ModelId,
     string? Tags,
-    string? Description
+    string? Description,
+    int? CategoryId
 );

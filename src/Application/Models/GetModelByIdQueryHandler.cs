@@ -31,6 +31,19 @@ namespace Application.Models
                 UpdatedAt = model.UpdatedAt,
                 Tags = model.Tags,
                 Description = model.Description,
+                Category = model.ModelCategory == null ? null : new ModelCategorySummaryDto
+                {
+                    Id = model.ModelCategory.Id,
+                    Name = model.ModelCategory.Name,
+                    Description = model.ModelCategory.Description,
+                    ParentId = model.ModelCategory.ParentId,
+                    Path = ModelDtoMappings.BuildCategoryPath(model.ModelCategory) ?? model.ModelCategory.Name
+                },
+                ConceptImages = model.ConceptImages
+                    .OrderBy(ci => ci.SortOrder)
+                    .Select(ModelDtoMappings.ToConceptImageDto)
+                    .ToList(),
+                TechnicalMetadata = ModelDtoMappings.ToTechnicalMetadataDto(model.GetLatestVersion()),
                 ActiveVersionId = model.ActiveVersionId,
                 ThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
                     ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/file?t={model.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
@@ -83,6 +96,9 @@ namespace Application.Models
         public DateTime UpdatedAt { get; init; }
         public string? Tags { get; init; }
         public string? Description { get; init; }
+        public ModelCategorySummaryDto? Category { get; init; }
+        public ICollection<ModelConceptImageDto> ConceptImages { get; init; } = new List<ModelConceptImageDto>();
+        public ModelTechnicalMetadataDto TechnicalMetadata { get; init; } = new();
         public int? ActiveVersionId { get; init; }
         public string? ThumbnailUrl { get; init; }
         public string? PngThumbnailUrl { get; init; }

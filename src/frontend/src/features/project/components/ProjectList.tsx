@@ -2,6 +2,8 @@ import './ProjectList.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
+import { InputSwitch } from 'primereact/inputswitch'
+import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
 import { useRef } from 'react'
@@ -21,6 +23,8 @@ export function ProjectList() {
   const projects = projectsQuery.data ?? []
   const loading = projectsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [onlyWithConceptArt, setOnlyWithConceptArt] = useState(false)
   const toast = useRef<Toast>(null)
   const { openProjectDetailsTab } = useTabContext()
 
@@ -72,11 +76,17 @@ export function ProjectList() {
     await deleteProjectMutation.mutateAsync(projectId)
   }
 
-  const getProjectThumbnail = (_project: ProjectDto) => {
-    // TODO: Add project thumbnail support
-    // For now, return null - will be implemented when thumbnail upload is added
-    return null
-  }
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch =
+      searchQuery.trim().length === 0 ||
+      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (project.description ?? '')
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
+
+    const matchesConcept = !onlyWithConceptArt || project.conceptImageCount > 0
+    return matchesSearch && matchesConcept
+  })
 
   return (
     <div className="project-list">
@@ -85,6 +95,21 @@ export function ProjectList() {
       <div className="project-list-header">
         <h2>Projects</h2>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="search-bar" style={{ minWidth: '220px' }}>
+            <i className="pi pi-search" />
+            <InputText
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search projects"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <InputSwitch
+              checked={onlyWithConceptArt}
+              onChange={e => setOnlyWithConceptArt(Boolean(e.value))}
+            />
+            <span>Concept art</span>
+          </div>
           <CardWidthSlider
             value={cardWidth}
             min={200}
@@ -104,11 +129,11 @@ export function ProjectList() {
           <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }} />
           <p>Loading projects...</p>
         </div>
-      ) : projects.length === 0 ? (
+      ) : filteredProjects.length === 0 ? (
         <div className="project-list-empty">
           <i className="pi pi-box" style={{ fontSize: '3rem' }} />
-          <h3>No Projects Yet</h3>
-          <p>Create your first project to organize models and texture sets</p>
+          <h3>No Matching Projects</h3>
+          <p>Adjust the filters or create a new project.</p>
           <Button
             label="Create Project"
             icon="pi pi-plus"
@@ -122,8 +147,8 @@ export function ProjectList() {
             gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
           }}
         >
-          {projects.map(project => {
-            const thumbnail = getProjectThumbnail(project)
+          {filteredProjects.map(project => {
+            const thumbnail = project.customThumbnailUrl
             return (
               <div
                 key={project.id}
@@ -149,6 +174,11 @@ export function ProjectList() {
                       {project.description}
                     </p>
                   )}
+                  {project.notes && (
+                    <p className="project-grid-card-description">
+                      {project.notes}
+                    </p>
+                  )}
                   <div className="project-grid-card-stats">
                     <span>
                       <i className="pi pi-box" /> {project.modelCount}
@@ -161,6 +191,9 @@ export function ProjectList() {
                     </span>
                     <span>
                       <i className="pi pi-volume-up" /> {project.soundCount}
+                    </span>
+                    <span>
+                      <i className="pi pi-images" /> {project.conceptImageCount}
                     </span>
                   </div>
                 </div>

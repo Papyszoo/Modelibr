@@ -1,4 +1,11 @@
 export {
+  type GetAllModelCategoriesResponse,
+  type ModelCategoryDto,
+  type ModelConceptImageDto,
+  type ModelTechnicalMetadataDto,
+  type UpsertModelCategoryRequest,
+} from '@/features/models/types'
+export {
   type CreateModelVersionResponse,
   type GetModelVersionsResponse,
   type ModelVersionDto,
@@ -9,6 +16,7 @@ export {
   type CreatePackResponse,
   type GetAllPacksResponse,
   type PackDto,
+  type PackDetailDto,
   type PackModelDto,
   type PackSpriteDto,
   type PackTextureSetDto,
@@ -19,6 +27,8 @@ export {
   type CreateProjectResponse,
   type GetAllProjectsResponse,
   type ProjectDto,
+  type ProjectDetailDto,
+  type ProjectConceptImageDto,
   type ProjectModelDto,
   type ProjectSpriteDto,
   type ProjectTextureSetDto,

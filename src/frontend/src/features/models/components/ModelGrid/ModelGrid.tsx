@@ -63,6 +63,7 @@ export function ModelGrid({
     error,
     packs,
     projects,
+    categories,
     pagination,
     isLoadingMore,
     uploading,
@@ -74,6 +75,10 @@ export function ModelGrid({
     onDragLeave,
     searchQuery,
     setSearchQuery,
+    selectedCategoryId,
+    setSelectedCategoryId,
+    hasConceptImages,
+    setHasConceptImages,
     effectivePackIds,
     effectiveProjectIds,
     handlePackFilterChange,
@@ -176,10 +181,15 @@ export function ModelGrid({
         onSearchChange={setSearchQuery}
         packs={packs}
         projects={projects}
+        categories={categories}
         selectedPackIds={effectivePackIds}
         selectedProjectIds={effectiveProjectIds}
+        selectedCategoryId={selectedCategoryId}
+        hasConceptImages={hasConceptImages}
         onPackFilterChange={handlePackFilterChange}
         onProjectFilterChange={handleProjectFilterChange}
+        onCategoryChange={setSelectedCategoryId}
+        onHasConceptImagesChange={setHasConceptImages}
         packFilterDisabled={packFilterDisabled}
         projectFilterDisabled={projectFilterDisabled}
         cardWidth={cardWidth}

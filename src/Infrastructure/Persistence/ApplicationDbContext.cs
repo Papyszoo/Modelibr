@@ -13,6 +13,9 @@ namespace Infrastructure.Persistence
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
+        public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
+        public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
+        public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
         public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
@@ -115,6 +118,7 @@ namespace Infrastructure.Persistence
                 entity.Property(m => m.Name).IsRequired();
                 entity.Property(m => m.CreatedAt).IsRequired();
                 entity.Property(m => m.UpdatedAt).IsRequired();
+                entity.Property(m => m.ModelCategoryId).IsRequired(false);
                 entity.Property(m => m.IsDeleted).IsRequired();
                 entity.Property(m => m.DeletedAt);
 
@@ -130,8 +134,19 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(v => v.ModelId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasOne(m => m.ModelCategory)
+                    .WithMany()
+                    .HasForeignKey(m => m.ModelCategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(m => m.ConceptImages)
+                    .WithOne(ci => ci.Model)
+                    .HasForeignKey(ci => ci.ModelId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 // Add index for efficient soft delete queries
                 entity.HasIndex(m => m.IsDeleted);
+                entity.HasIndex(m => m.ModelCategoryId);
 
                 // Add index for efficient ORDER BY UpdatedAt DESC pagination
                 entity.HasIndex(m => m.UpdatedAt).HasDatabaseName("IX_Models_UpdatedAt");
@@ -164,6 +179,11 @@ namespace Infrastructure.Persistence
                 // Map MainVariantName
                 entity.Property(v => v.MainVariantName)
                     .HasMaxLength(200);
+                entity.Property(v => v.TriangleCount).IsRequired(false);
+                entity.Property(v => v.VertexCount).IsRequired(false);
+                entity.Property(v => v.MeshCount).IsRequired(false);
+                entity.Property(v => v.MaterialCount).IsRequired(false);
+                entity.Property(v => v.TechnicalDetailsUpdatedAt).IsRequired(false);
 
                 // Create unique index on ModelId and VersionNumber
                 entity.HasIndex(v => new { v.ModelId, v.VersionNumber }).IsUnique();
@@ -341,11 +361,19 @@ namespace Infrastructure.Persistence
                 entity.HasKey(p => p.Id);
                 entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
                 entity.Property(p => p.Description).HasMaxLength(1000);
+                entity.Property(p => p.LicenseType).HasMaxLength(100);
+                entity.Property(p => p.Url).HasMaxLength(500);
                 entity.Property(p => p.CreatedAt).IsRequired();
                 entity.Property(p => p.UpdatedAt).IsRequired();
 
+                entity.HasOne(p => p.CustomThumbnailFile)
+                    .WithMany()
+                    .HasForeignKey(p => p.CustomThumbnailFileId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 // Create index for efficient querying by name
                 entity.HasIndex(p => p.Name);
+                entity.HasIndex(p => p.LicenseType);
             });
 
             // Configure Project entity
@@ -354,11 +382,68 @@ namespace Infrastructure.Persistence
                 entity.HasKey(p => p.Id);
                 entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
                 entity.Property(p => p.Description).HasMaxLength(1000);
+                entity.Property(p => p.Notes).HasMaxLength(4000);
                 entity.Property(p => p.CreatedAt).IsRequired();
                 entity.Property(p => p.UpdatedAt).IsRequired();
 
+                entity.HasOne(p => p.CustomThumbnailFile)
+                    .WithMany()
+                    .HasForeignKey(p => p.CustomThumbnailFileId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(p => p.ConceptImages)
+                    .WithOne(ci => ci.Project)
+                    .HasForeignKey(ci => ci.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 // Create index for efficient querying by name
                 entity.HasIndex(p => p.Name);
+            });
+
+            modelBuilder.Entity<ModelCategory>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.Description).HasMaxLength(500);
+                entity.Property(c => c.CreatedAt).IsRequired();
+                entity.Property(c => c.UpdatedAt).IsRequired();
+
+                entity.HasOne(c => c.Parent)
+                    .WithMany(c => c.Children)
+                    .HasForeignKey(c => c.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => new { c.ParentId, c.Name }).IsUnique();
+            });
+
+            modelBuilder.Entity<ModelConceptImage>(entity =>
+            {
+                entity.HasKey(ci => ci.Id);
+                entity.Property(ci => ci.SortOrder).IsRequired();
+                entity.Property(ci => ci.CreatedAt).IsRequired();
+
+                entity.HasOne(ci => ci.File)
+                    .WithMany()
+                    .HasForeignKey(ci => ci.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(ci => new { ci.ModelId, ci.FileId }).IsUnique();
+                entity.HasIndex(ci => new { ci.ModelId, ci.SortOrder });
+            });
+
+            modelBuilder.Entity<ProjectConceptImage>(entity =>
+            {
+                entity.HasKey(ci => ci.Id);
+                entity.Property(ci => ci.SortOrder).IsRequired();
+                entity.Property(ci => ci.CreatedAt).IsRequired();
+
+                entity.HasOne(ci => ci.File)
+                    .WithMany()
+                    .HasForeignKey(ci => ci.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(ci => new { ci.ProjectId, ci.FileId }).IsUnique();
+                entity.HasIndex(ci => new { ci.ProjectId, ci.SortOrder });
             });
 
             // Configure Stage entity

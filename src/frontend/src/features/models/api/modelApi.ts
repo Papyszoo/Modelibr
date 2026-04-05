@@ -2,6 +2,11 @@ import { type AxiosResponse } from 'axios'
 
 import { baseURL, client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
 import { type PaginatedResponse } from '@/types'
+import {
+  type GetAllModelCategoriesResponse,
+  type ModelCategoryDto,
+  type UpsertModelCategoryRequest,
+} from '@/types'
 import { type Model } from '@/utils/fileUtils'
 
 export interface UploadModelResponse {
@@ -110,6 +115,8 @@ export async function getModelsPaginated(options: {
   packId?: number
   projectId?: number
   textureSetId?: number
+  categoryId?: number
+  hasConceptImages?: boolean
 }): Promise<PaginatedResponse<Model>> {
   const params = new URLSearchParams()
   params.append('page', options.page.toString())
@@ -119,6 +126,11 @@ export async function getModelsPaginated(options: {
     params.append('projectId', options.projectId.toString())
   if (options.textureSetId)
     params.append('textureSetId', options.textureSetId.toString())
+  if (options.categoryId)
+    params.append('categoryId', options.categoryId.toString())
+  if (typeof options.hasConceptImages === 'boolean') {
+    params.append('hasConceptImages', String(options.hasConceptImages))
+  }
 
   const response = await client.get<PaginatedResponse<Model>>(
     `/models?${params.toString()}`
@@ -151,17 +163,61 @@ export function getFilePreviewUrl(fileId: string, channel?: string): string {
 export async function updateModelTags(
   modelId: string,
   tags: string,
-  description: string
+  description: string,
+  categoryId?: number | null
 ): Promise<{
   modelId: number
   tags: string
   description: string
+  categoryId?: number | null
 }> {
   const response = await client.post(`/models/${modelId}/tags`, {
     tags,
     description,
+    categoryId,
   })
   return response.data
+}
+
+export async function getModelCategories(): Promise<ModelCategoryDto[]> {
+  const response =
+    await client.get<GetAllModelCategoriesResponse>('/model-categories')
+  return response.data.categories
+}
+
+export async function createModelCategory(
+  request: UpsertModelCategoryRequest
+): Promise<ModelCategoryDto> {
+  const response = await client.post<ModelCategoryDto>(
+    '/model-categories',
+    request
+  )
+  return response.data
+}
+
+export async function updateModelCategory(
+  id: number,
+  request: UpsertModelCategoryRequest
+): Promise<void> {
+  await client.put(`/model-categories/${id}`, request)
+}
+
+export async function deleteModelCategory(id: number): Promise<void> {
+  await client.delete(`/model-categories/${id}`)
+}
+
+export async function addModelConceptImage(
+  modelId: string | number,
+  fileId: number
+): Promise<void> {
+  await client.post(`/models/${modelId}/concept-images`, { fileId })
+}
+
+export async function removeModelConceptImage(
+  modelId: string | number,
+  fileId: number
+): Promise<void> {
+  await client.delete(`/models/${modelId}/concept-images/${fileId}`)
 }
 
 export async function softDeleteModel(modelId: number): Promise<void> {

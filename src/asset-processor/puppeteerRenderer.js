@@ -1344,6 +1344,106 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Extract material names and technical mesh stats from the currently loaded model.
+   * @returns {Promise<{materialNames: string[], triangleCount: number, vertexCount: number, meshCount: number, materialCount: number}>}
+   */
+  async extractTechnicalMetadata() {
+    if (!this.page || this.page.isClosed()) {
+      logger.warn('Cannot extract technical metadata — page not available')
+      return {
+        materialNames: [],
+        triangleCount: 0,
+        vertexCount: 0,
+        meshCount: 0,
+        materialCount: 0,
+      }
+    }
+
+    try {
+      const result = await this.page.evaluate(() => {
+        const model = window.modelRenderer?.model
+        if (!model) return { success: false, error: 'No model loaded' }
+
+        const materialNames = new Set()
+        const materialKeys = new Set()
+        let triangleCount = 0
+        let vertexCount = 0
+        let meshCount = 0
+
+        model.traverse(child => {
+          if (!child.isMesh || !child.geometry) return
+
+          meshCount += 1
+
+          const positionCount = child.geometry.attributes?.position?.count ?? 0
+          vertexCount += positionCount
+
+          const indexCount = child.geometry.index?.count ?? 0
+          triangleCount += indexCount > 0 ? indexCount / 3 : positionCount / 3
+
+          const materials = Array.isArray(child.material)
+            ? child.material
+            : child.material
+              ? [child.material]
+              : []
+
+          for (const material of materials) {
+            if (material.name) {
+              materialNames.add(material.name)
+            }
+            materialKeys.add(
+              material.uuid || material.name || `material-${materialKeys.size}`
+            )
+          }
+        })
+
+        return {
+          success: true,
+          materialNames: [...materialNames],
+          triangleCount: Math.round(triangleCount),
+          vertexCount,
+          meshCount,
+          materialCount: materialKeys.size,
+        }
+      })
+
+      if (!result.success) {
+        logger.warn('Failed to extract technical metadata', {
+          error: result.error,
+        })
+        return {
+          materialNames: [],
+          triangleCount: 0,
+          vertexCount: 0,
+          meshCount: 0,
+          materialCount: 0,
+        }
+      }
+
+      logger.info('Extracted technical metadata from model', {
+        materialCount: result.materialNames.length,
+        triangleCount: result.triangleCount,
+        vertexCount: result.vertexCount,
+        meshCount: result.meshCount,
+        distinctMaterialCount: result.materialCount,
+      })
+
+      return result
+    } catch (error) {
+      logger.warn('Error extracting technical metadata', {
+        error: error.message,
+      })
+      return {
+        materialNames: [],
+        triangleCount: 0,
+        vertexCount: 0,
+        meshCount: 0,
+        materialCount: 0,
+      }
+    }
+  }
+
+  /**
    * Clean up resources.
    * In shared-browser mode, only the page is closed (the browser is managed by RendererPool).
    */

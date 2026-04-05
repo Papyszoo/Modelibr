@@ -28,6 +28,7 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             Id = project.Id,
             Name = project.Name,
             Description = project.Description,
+            Notes = project.Notes,
             CreatedAt = project.CreatedAt,
             UpdatedAt = project.UpdatedAt,
             ModelCount = project.ModelCount,
@@ -35,6 +36,17 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             SpriteCount = project.SpriteCount,
             SoundCount = project.SoundCount,
             IsEmpty = project.IsEmpty,
+            CustomThumbnailUrl = project.CustomThumbnailFileId.HasValue ? $"/files/{project.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
+            ConceptImages = project.ConceptImages
+                .OrderBy(ci => ci.SortOrder)
+                .Select(ci => new ProjectConceptImageDto
+                {
+                    FileId = ci.FileId,
+                    FileName = ci.File.OriginalFileName,
+                    PreviewUrl = $"/files/{ci.FileId}/preview?channel=rgb",
+                    FileUrl = $"/files/{ci.FileId}",
+                    SortOrder = ci.SortOrder
+                }).ToList(),
             Models = project.Models.Select(m => new ProjectModelDto
             {
                 Id = m.Id,
@@ -66,6 +78,7 @@ public record ProjectDetailDto
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
+    public string? Notes { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
@@ -73,9 +86,20 @@ public record ProjectDetailDto
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
     public bool IsEmpty { get; init; }
+    public string? CustomThumbnailUrl { get; init; }
+    public ICollection<ProjectConceptImageDto> ConceptImages { get; init; } = new List<ProjectConceptImageDto>();
     public ICollection<ProjectModelDto> Models { get; init; } = new List<ProjectModelDto>();
     public ICollection<ProjectTextureSetDto> TextureSets { get; init; } = new List<ProjectTextureSetDto>();
     public ICollection<ProjectSpriteDto> Sprites { get; init; } = new List<ProjectSpriteDto>();
+}
+
+public record ProjectConceptImageDto
+{
+    public int FileId { get; init; }
+    public string FileName { get; init; } = string.Empty;
+    public string PreviewUrl { get; init; } = string.Empty;
+    public string FileUrl { get; init; } = string.Empty;
+    public int SortOrder { get; init; }
 }
 
 public record ProjectModelDto

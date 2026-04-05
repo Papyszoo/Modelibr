@@ -34,6 +34,11 @@ public static class PackEndpoints
             .WithSummary("Deletes a pack")
             .WithOpenApi();
 
+        app.MapPut("/packs/{id}/thumbnail", SetCustomThumbnail)
+            .WithName("Set Pack Custom Thumbnail")
+            .WithSummary("Sets or clears a custom pack thumbnail")
+            .WithOpenApi();
+
         // Pack-Model association
         app.MapPost("/packs/{packId}/models/{modelId}", AddModelToPack)
             .WithName("Add Model to Pack")
@@ -115,7 +120,7 @@ public static class PackEndpoints
         ICommandHandler<CreatePackCommand, CreatePackResponse> commandHandler,
         CancellationToken cancellationToken)
     {
-        var command = new CreatePackCommand(request.Name, request.Description);
+        var command = new CreatePackCommand(request.Name, request.Description, request.LicenseType, request.Url);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess
@@ -129,7 +134,7 @@ public static class PackEndpoints
         ICommandHandler<UpdatePackCommand> commandHandler,
         CancellationToken cancellationToken)
     {
-        var command = new UpdatePackCommand(id, request.Name, request.Description);
+        var command = new UpdatePackCommand(id, request.Name, request.Description, request.LicenseType, request.Url);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess
@@ -287,8 +292,18 @@ public static class PackEndpoints
             ? Results.NoContent()
             : Results.BadRequest(result.Error);
     }
+
+    private static async Task<IResult> SetCustomThumbnail(
+        int id,
+        [FromBody] AttachOptionalFileRequest request,
+        ICommandHandler<SetPackCustomThumbnailCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new SetPackCustomThumbnailCommand(id, request.FileId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
 }
 
 // Request DTOs
-public record CreatePackRequest(string Name, string? Description);
-public record UpdatePackRequest(string Name, string? Description);
+public record CreatePackRequest(string Name, string? Description, string? LicenseType, string? Url);
+public record UpdatePackRequest(string Name, string? Description, string? LicenseType, string? Url);

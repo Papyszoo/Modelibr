@@ -2,7 +2,11 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import { getModelsPaginated } from '@/features/models/api/modelApi'
-import { usePacksQuery, useProjectsQuery } from '@/features/models/api/queries'
+import {
+  useModelCategoriesQuery,
+  usePacksQuery,
+  useProjectsQuery,
+} from '@/features/models/api/queries'
 import { type PaginationState } from '@/types'
 
 const PAGE_SIZE = 50
@@ -10,12 +14,16 @@ const PAGE_SIZE = 50
 interface UseModelDataOptions {
   effectivePackIds: number[]
   effectiveProjectIds: number[]
+  selectedCategoryId: number | null
+  hasConceptImages: boolean
   textureSetId?: number
 }
 
 export function useModelData({
   effectivePackIds,
   effectiveProjectIds,
+  selectedCategoryId,
+  hasConceptImages,
   textureSetId,
 }: UseModelDataOptions) {
   const queryClient = useQueryClient()
@@ -32,7 +40,10 @@ export function useModelData({
     isLoading,
     error: queryError,
   } = useInfiniteQuery({
-    queryKey: ['models', { packId, projectId, textureSetId }],
+    queryKey: [
+      'models',
+      { packId, projectId, textureSetId, selectedCategoryId, hasConceptImages },
+    ],
     queryFn: ({ pageParam }) =>
       getModelsPaginated({
         page: pageParam,
@@ -40,6 +51,8 @@ export function useModelData({
         packId,
         projectId,
         textureSetId,
+        categoryId: selectedCategoryId ?? undefined,
+        hasConceptImages: hasConceptImages || undefined,
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
@@ -51,6 +64,7 @@ export function useModelData({
   // Fetch filter options (packs and projects) with React Query
   const packsQuery = usePacksQuery()
   const projectsQuery = useProjectsQuery()
+  const categoriesQuery = useModelCategoriesQuery()
 
   const models = paginatedData?.pages.flatMap(p => p.items) ?? []
   const totalCount = paginatedData?.pages[0]?.totalCount ?? 0
@@ -88,6 +102,7 @@ export function useModelData({
     error: queryError ? `Failed to fetch models: ${queryError.message}` : '',
     packs: packsQuery.data ?? [],
     projects: projectsQuery.data ?? [],
+    categories: categoriesQuery.data ?? [],
     pagination,
     isLoadingMore: isFetchingNextPage,
     fetchModels,

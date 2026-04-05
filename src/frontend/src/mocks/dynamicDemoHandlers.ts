@@ -11,6 +11,7 @@ import { http, HttpResponse } from 'msw'
 import {
   addRecycledItem,
   addUploadHistory,
+  type DemoCategory,
   type DemoModel,
   type DemoModelVersion,
   type DemoPack,
@@ -259,6 +260,92 @@ function recomputeProjectCounts(project: DemoProject) {
     0
 }
 
+function buildCategoryPath(
+  category: DemoCategory,
+  categories: DemoCategory[]
+): string {
+  const segments: string[] = []
+  let current: DemoCategory | undefined = category
+  while (current) {
+    segments.unshift(current.name)
+    current = current.parentId
+      ? categories.find(item => item.id === current?.parentId)
+      : undefined
+  }
+  return segments.join(' / ')
+}
+
+async function enrichModel(model: DemoModel, stringId = false) {
+  const versions = await getVersionsByModelId(model.id)
+  const latestVersion = versions.reduce<DemoModelVersion | null>(
+    (latest, version) => {
+      if (!latest || version.versionNumber > latest.versionNumber) {
+        return version
+      }
+      return latest
+    },
+    null
+  )
+
+  const categories = model.categoryId ? await getAll('modelCategories') : []
+  const category = model.categoryId
+    ? categories.find(item => item.id === model.categoryId)
+    : null
+
+  const categoryDto = category
+    ? {
+        id: category.id,
+        name: category.name,
+        description: category.description ?? undefined,
+        parentId: category.parentId ?? null,
+        path: buildCategoryPath(category, categories),
+      }
+    : null
+
+  const conceptImages = model.conceptImages ?? []
+
+  return {
+    ...model,
+    id: stringId ? String(model.id) : model.id,
+    categoryId: model.categoryId ?? null,
+    category: categoryDto,
+    categoryPath: categoryDto?.path ?? null,
+    conceptImages,
+    conceptImageCount: conceptImages.length,
+    hasConceptImages: conceptImages.length > 0,
+    technicalMetadata: {
+      latestVersionId: latestVersion?.id ?? null,
+      latestVersionNumber: latestVersion?.versionNumber ?? null,
+      triangleCount: latestVersion?.triangleCount ?? null,
+      vertexCount: latestVersion?.vertexCount ?? null,
+      meshCount: latestVersion?.meshCount ?? null,
+      materialCount: latestVersion?.materialCount ?? null,
+      updatedAt: latestVersion?.technicalDetailsUpdatedAt ?? null,
+    },
+    latestVersionId: latestVersion?.id ?? null,
+    latestVersionNumber: latestVersion?.versionNumber ?? null,
+    triangleCount: latestVersion?.triangleCount ?? null,
+    vertexCount: latestVersion?.vertexCount ?? null,
+    meshCount: latestVersion?.meshCount ?? null,
+    materialCount: latestVersion?.materialCount ?? null,
+  }
+}
+
+function buildConceptImage(
+  fileId: number,
+  fileName: string,
+  mimeType?: string
+) {
+  return {
+    fileId,
+    fileName,
+    previewUrl: `/files/${fileId}/preview?channel=rgb`,
+    fileUrl: `/files/${fileId}`,
+    sortOrder: 0,
+    mimeType,
+  }
+}
+
 // Background thumbnail generation — fire and forget
 function generateModelThumbnailAsync(
   modelId: number,
@@ -364,6 +451,8 @@ export const dynamicDemoHandlers = [
     const packId = url.searchParams.get('packId')
     const projectId = url.searchParams.get('projectId')
     const textureSetId = url.searchParams.get('textureSetId')
+    const categoryId = url.searchParams.get('categoryId')
+    const hasConceptImages = url.searchParams.get('hasConceptImages')
 
     let models = await getAll('models')
 
@@ -386,9 +475,20 @@ export const dynamicDemoHandlers = [
         m.textureSets?.some(ts => ts.id === Number(textureSetId))
       )
     }
+    if (categoryId) {
+      models = models.filter(m => m.categoryId === Number(categoryId))
+    }
+    if (hasConceptImages !== null) {
+      const wantsConceptImages = hasConceptImages === 'true'
+      models = models.filter(
+        m => (m.conceptImages ?? []).length > 0 === wantsConceptImages
+      )
+    }
+
+    const enriched = await Promise.all(models.map(model => enrichModel(model)))
 
     if (url.searchParams.has('page')) {
-      const result = paginate(models, page, pageSize)
+      const result = paginate(enriched, page, pageSize)
       return HttpResponse.json({
         items: result.items,
         totalCount: result.totalCount,
@@ -397,7 +497,7 @@ export const dynamicDemoHandlers = [
         totalPages: result.totalPages,
       })
     }
-    return HttpResponse.json(models)
+    return HttpResponse.json(enriched)
   }),
 
   // Get single model
@@ -486,8 +586,7 @@ export const dynamicDemoHandlers = [
   http.get('*/models/:id', async ({ params }) => {
     const model = await getById('models', Number(params.id))
     if (!model) return new HttpResponse(null, { status: 404 })
-    // Return with string id for compatibility
-    return HttpResponse.json({ ...model, id: String(model.id) })
+    return HttpResponse.json(await enrichModel(model, true))
   }),
 
   // Upload a new model (multipart form)
@@ -530,8 +629,11 @@ export const dynamicDemoHandlers = [
       updatedAt: ts,
       activeVersionId: versionId,
       defaultTextureSetId: null,
+      categoryId: null,
+      conceptImages: [],
       textureSets: [],
       packs: [],
+      projects: [],
     }
 
     const version: DemoModelVersion = {
@@ -603,16 +705,192 @@ export const dynamicDemoHandlers = [
     const body = (await request.json()) as {
       tags?: string
       description?: string
+      categoryId?: number | null
     }
     model.tags = body.tags ?? model.tags
     model.description = body.description ?? model.description
+    if (body.categoryId !== undefined) {
+      model.categoryId = body.categoryId
+    }
     model.updatedAt = now()
     await put('models', model)
     return HttpResponse.json({
       modelId: model.id,
       tags: model.tags,
       description: model.description,
+      categoryId: model.categoryId ?? null,
     })
+  }),
+
+  http.post('*/models/:id/concept-images', async ({ params, request }) => {
+    const model = await getById('models', Number(params.id))
+    if (!model) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { fileId: number }
+    const blob = await getFileBlob(body.fileId)
+    if (!blob) return new HttpResponse(null, { status: 404 })
+
+    const conceptImage = buildConceptImage(
+      body.fileId,
+      blob.fileName,
+      blob.mimeType
+    )
+    conceptImage.sortOrder = model.conceptImages.length
+    model.conceptImages = [...(model.conceptImages ?? []), conceptImage]
+    model.updatedAt = now()
+    await put('models', model)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('*/models/:id/concept-images/:fileId', async ({ params }) => {
+    const model = await getById('models', Number(params.id))
+    if (!model) return new HttpResponse(null, { status: 404 })
+    model.conceptImages = (model.conceptImages ?? [])
+      .filter(image => image.fileId !== Number(params.fileId))
+      .map((image, index) => ({ ...image, sortOrder: index }))
+    model.updatedAt = now()
+    await put('models', model)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get('*/model-categories', async () => {
+    const categories = await getAll('modelCategories')
+    return HttpResponse.json({
+      categories: categories.map(category => ({
+        id: category.id,
+        name: category.name,
+        description: category.description ?? undefined,
+        parentId: category.parentId ?? null,
+        path: buildCategoryPath(category, categories),
+      })),
+    })
+  }),
+
+  http.post('*/model-categories', async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    const categories = await getAll('modelCategories')
+    const duplicate = categories.find(
+      category =>
+        category.parentId === (body.parentId ?? null) &&
+        category.name.trim().toLowerCase() === body.name.trim().toLowerCase()
+    )
+    if (duplicate) {
+      return HttpResponse.json(
+        {
+          error: 'CategoryAlreadyExists',
+          message: `A model category named '${body.name}' already exists in this branch.`,
+        },
+        { status: 400 }
+      )
+    }
+
+    const id = await nextId('modelCategories')
+    const ts = now()
+    const category = {
+      id,
+      name: body.name,
+      description: body.description ?? null,
+      parentId: body.parentId ?? null,
+      createdAt: ts,
+      updatedAt: ts,
+    }
+    await put('modelCategories', category)
+    return HttpResponse.json(
+      {
+        id: category.id,
+        name: category.name,
+        description: category.description ?? undefined,
+        parentId: category.parentId ?? null,
+        path: buildCategoryPath(category, [...categories, category]),
+      },
+      { status: 201 }
+    )
+  }),
+
+  http.put('*/model-categories/:id', async ({ params, request }) => {
+    const category = await getById('modelCategories', Number(params.id))
+    if (!category) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    const categories = await getAll('modelCategories')
+    if (body.parentId === category.id) {
+      return HttpResponse.json(
+        {
+          error: 'InvalidCategoryParent',
+          message: 'A category cannot be its own parent.',
+        },
+        { status: 400 }
+      )
+    }
+
+    let currentParentId = body.parentId ?? null
+    while (currentParentId) {
+      if (currentParentId === category.id) {
+        return HttpResponse.json(
+          {
+            error: 'InvalidCategoryParent',
+            message: 'A category cannot be moved under one of its descendants.',
+          },
+          { status: 400 }
+        )
+      }
+      currentParentId =
+        categories.find(item => item.id === currentParentId)?.parentId ?? null
+    }
+
+    const duplicate = categories.find(
+      item =>
+        item.id !== category.id &&
+        item.parentId === (body.parentId ?? null) &&
+        item.name.trim().toLowerCase() === body.name.trim().toLowerCase()
+    )
+    if (duplicate) {
+      return HttpResponse.json(
+        {
+          error: 'CategoryAlreadyExists',
+          message: `A model category named '${body.name}' already exists in this branch.`,
+        },
+        { status: 400 }
+      )
+    }
+
+    category.name = body.name
+    category.description = body.description ?? null
+    category.parentId = body.parentId ?? null
+    category.updatedAt = now()
+    await put('modelCategories', category)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('*/model-categories/:id', async ({ params }) => {
+    const categoryId = Number(params.id)
+    const categories = await getAll('modelCategories')
+    if (categories.some(category => category.parentId === categoryId)) {
+      return HttpResponse.json(
+        {
+          error: 'CategoryHasChildren',
+          message:
+            'Delete or move child categories before removing this category.',
+        },
+        { status: 400 }
+      )
+    }
+
+    await remove('modelCategories', categoryId)
+    const models = await getAll('models')
+    for (const model of models) {
+      if (model.categoryId === categoryId) {
+        model.categoryId = null
+        await put('models', model)
+      }
+    }
+    return new HttpResponse(null, { status: 204 })
   }),
 
   // Delete model (soft) → move to recycled
@@ -2151,6 +2429,8 @@ export const dynamicDemoHandlers = [
     const body = (await request.json()) as {
       name: string
       description?: string
+      licenseType?: string
+      url?: string
     }
     const id = await nextId('packs')
     const ts = now()
@@ -2158,6 +2438,8 @@ export const dynamicDemoHandlers = [
       id,
       name: body.name,
       description: body.description ?? '',
+      licenseType: body.licenseType ?? '',
+      url: body.url ?? '',
       createdAt: ts,
       updatedAt: ts,
       modelCount: 0,
@@ -2165,6 +2447,8 @@ export const dynamicDemoHandlers = [
       spriteCount: 0,
       soundCount: 0,
       isEmpty: true,
+      customThumbnailFileId: null,
+      customThumbnailUrl: null,
       models: [],
       textureSets: [],
       sprites: [],
@@ -2172,7 +2456,13 @@ export const dynamicDemoHandlers = [
     }
     await put('packs', pack)
     return HttpResponse.json(
-      { id, name: body.name, description: body.description },
+      {
+        id,
+        name: body.name,
+        description: body.description,
+        licenseType: body.licenseType,
+        url: body.url,
+      },
       { status: 201 }
     )
   }),
@@ -2183,9 +2473,26 @@ export const dynamicDemoHandlers = [
     const body = (await request.json()) as {
       name: string
       description?: string
+      licenseType?: string
+      url?: string
     }
     pack.name = body.name
     if (body.description !== undefined) pack.description = body.description
+    if (body.licenseType !== undefined) pack.licenseType = body.licenseType
+    if (body.url !== undefined) pack.url = body.url
+    pack.updatedAt = now()
+    await put('packs', pack)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.put('*/packs/:id/thumbnail', async ({ params, request }) => {
+    const pack = await getById('packs', Number(params.id))
+    if (!pack) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { fileId?: number | null }
+    pack.customThumbnailFileId = body.fileId ?? null
+    pack.customThumbnailUrl = body.fileId
+      ? `/files/${body.fileId}/preview?channel=rgb`
+      : null
     pack.updatedAt = now()
     await put('packs', pack)
     return new HttpResponse(null, { status: 204 })
@@ -2399,6 +2706,7 @@ export const dynamicDemoHandlers = [
     const body = (await request.json()) as {
       name: string
       description?: string
+      notes?: string
     }
     const id = await nextId('projects')
     const ts = now()
@@ -2406,6 +2714,7 @@ export const dynamicDemoHandlers = [
       id,
       name: body.name,
       description: body.description ?? '',
+      notes: body.notes ?? '',
       createdAt: ts,
       updatedAt: ts,
       modelCount: 0,
@@ -2413,6 +2722,9 @@ export const dynamicDemoHandlers = [
       spriteCount: 0,
       soundCount: 0,
       isEmpty: true,
+      customThumbnailFileId: null,
+      customThumbnailUrl: null,
+      conceptImages: [],
       models: [],
       textureSets: [],
       sprites: [],
@@ -2420,7 +2732,12 @@ export const dynamicDemoHandlers = [
     }
     await put('projects', project)
     return HttpResponse.json(
-      { id, name: body.name, description: body.description },
+      {
+        id,
+        name: body.name,
+        description: body.description,
+        notes: body.notes,
+      },
       { status: 201 }
     )
   }),
@@ -2431,9 +2748,54 @@ export const dynamicDemoHandlers = [
     const body = (await request.json()) as {
       name: string
       description?: string
+      notes?: string
     }
     project.name = body.name
     if (body.description !== undefined) project.description = body.description
+    if (body.notes !== undefined) project.notes = body.notes
+    project.updatedAt = now()
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.put('*/projects/:id/thumbnail', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { fileId?: number | null }
+    project.customThumbnailFileId = body.fileId ?? null
+    project.customThumbnailUrl = body.fileId
+      ? `/files/${body.fileId}/preview?channel=rgb`
+      : null
+    project.updatedAt = now()
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post('*/projects/:id/concept-images', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { fileId: number }
+    const blob = await getFileBlob(body.fileId)
+    if (!blob) return new HttpResponse(null, { status: 404 })
+
+    const conceptImage = buildConceptImage(
+      body.fileId,
+      blob.fileName,
+      blob.mimeType
+    )
+    conceptImage.sortOrder = project.conceptImages.length
+    project.conceptImages = [...(project.conceptImages ?? []), conceptImage]
+    project.updatedAt = now()
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('*/projects/:id/concept-images/:fileId', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    project.conceptImages = (project.conceptImages ?? [])
+      .filter(image => image.fileId !== Number(params.fileId))
+      .map((image, index) => ({ ...image, sortOrder: index }))
     project.updatedAt = now()
     await put('projects', project)
     return new HttpResponse(null, { status: 204 })
@@ -2455,16 +2817,28 @@ export const dynamicDemoHandlers = [
       project.updatedAt = now()
       await put('projects', project)
     }
+    if (!(model.projects ?? []).some(p => p.id === project.id)) {
+      model.projects = [
+        ...(model.projects ?? []),
+        { id: project.id, name: project.name },
+      ]
+      await put('models', model)
+    }
     return new HttpResponse(null, { status: 204 })
   }),
 
   http.delete('*/projects/:projectId/models/:modelId', async ({ params }) => {
     const project = await getById('projects', Number(params.projectId))
+    const model = await getById('models', Number(params.modelId))
     if (!project) return new HttpResponse(null, { status: 404 })
     project.models = project.models.filter(m => m.id !== Number(params.modelId))
     recomputeProjectCounts(project)
     project.updatedAt = now()
     await put('projects', project)
+    if (model) {
+      model.projects = (model.projects ?? []).filter(p => p.id !== project.id)
+      await put('models', model)
+    }
     return new HttpResponse(null, { status: 204 })
   }),
 

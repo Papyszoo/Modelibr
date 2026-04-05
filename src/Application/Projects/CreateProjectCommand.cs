@@ -32,11 +32,11 @@ internal class CreateProjectCommandHandler : ICommandHandler<CreateProjectComman
             }
 
             // Create new project using domain factory method
-            var project = Project.Create(command.Name, command.Description, _dateTimeProvider.UtcNow);
+            var project = Project.Create(command.Name, command.Description, command.Notes, _dateTimeProvider.UtcNow);
 
             var savedProject = await _projectRepository.AddAsync(project, cancellationToken);
 
-            return Result.Success(new CreateProjectResponse(savedProject.Id, savedProject.Name, savedProject.Description));
+            return Result.Success(new CreateProjectResponse(savedProject.Id, savedProject.Name, savedProject.Description, savedProject.Notes));
         }
         catch (ArgumentException ex)
         {
@@ -46,5 +46,5 @@ internal class CreateProjectCommandHandler : ICommandHandler<CreateProjectComman
     }
 }
 
-public record CreateProjectCommand(string Name, string? Description) : ICommand<CreateProjectResponse>;
-public record CreateProjectResponse(int Id, string Name, string? Description);
+public record CreateProjectCommand(string Name, string? Description, string? Notes) : ICommand<CreateProjectResponse>;
+public record CreateProjectResponse(int Id, string Name, string? Description, string? Notes);
