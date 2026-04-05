@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execSync, spawn } from "child_process";
+import { existsSync } from "fs";
 import fs from "fs/promises";
 import http, { createServer } from "http";
 import path from "path";
@@ -13,6 +14,12 @@ const HOST = "127.0.0.1";
 const PORT = 3004;
 const FRONTEND_URL = "http://localhost:3004/Modelibr/demo/";
 const DEMO_BASE_PATH = "/Modelibr/demo/";
+const VITE_BIN = path.join(
+    FRONTEND_DIR,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "vite.cmd" : "vite",
+);
 
 const MIME_TYPES = {
     ".css": "text/css; charset=utf-8",
@@ -65,6 +72,19 @@ function runAsync(command, args, options = {}) {
         child.on("error", reject);
         child.on("exit", (code) => resolve(code ?? 1));
     });
+}
+
+function ensureFrontendDependencies() {
+    if (existsSync(VITE_BIN)) {
+        return;
+    }
+
+    console.log("📦 Installing frontend dependencies for demo build...\n");
+    const installResult = run("npm ci", { cwd: FRONTEND_DIR });
+    if (installResult !== 0) {
+        console.error("❌ Failed to install frontend dependencies for demo build");
+        process.exit(1);
+    }
 }
 
 function httpGet(url) {
@@ -212,6 +232,8 @@ async function main() {
     const startTime = Date.now();
     const args = process.argv.slice(2);
     let server;
+
+    ensureFrontendDependencies();
 
     console.log("🚀 Building demo frontend...\n");
 

@@ -2,6 +2,7 @@ import { ThumbnailProcessor } from './thumbnailProcessor.js'
 import { SoundProcessor } from './soundProcessor.js'
 import { MeshAnalysisProcessor } from './meshProcessor.js'
 import { TextureSetProcessor } from './textureSetProcessor.js'
+import { config } from '../config.js'
 import logger from '../logger.js'
 
 /**
@@ -28,7 +29,7 @@ export class ProcessorRegistry {
 
     logger.info('Processor registry initialized', {
       registeredTypes: Array.from(this.processors.keys()),
-      blenderEnabled: process.env.BLENDER_ENABLED === 'true',
+      blenderEnabled: config.blender?.enabled ?? false,
     })
   }
 

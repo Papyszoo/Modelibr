@@ -5,6 +5,14 @@ import { type Model } from '@/utils/fileUtils'
 
 import { useFileUploadHandlers } from '../useFileUploadHandlers'
 
+let mockBlenderEnabled = true
+
+jest.mock('@/stores/blenderEnabledStore', () => ({
+  useBlenderEnabledStore: (
+    selector: (state: { blenderEnabled: boolean }) => boolean
+  ) => selector({ blenderEnabled: mockBlenderEnabled }),
+}))
+
 // Mock the API
 const mockCreateModelVersion = jest.fn()
 const mockAddFileToVersion = jest.fn()
@@ -51,6 +59,7 @@ function makeDeps(overrides?: Record<string, unknown>) {
 describe('useFileUploadHandlers', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockBlenderEnabled = true
   })
 
   it('should start with no drag state and modal hidden', () => {
@@ -271,6 +280,44 @@ describe('useFileUploadHandlers', () => {
       file,
       undefined,
       true
+    )
+  })
+
+  it('should reject dropped .blend files when Blender is disabled', () => {
+    mockBlenderEnabled = false
+    const deps = makeDeps()
+    const { result } = renderHook(() => useFileUploadHandlers(deps))
+
+    const file = new File(['data'], 'model.blend')
+    const event = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      dataTransfer: { files: [file] },
+    } as unknown as React.DragEvent
+
+    act(() => {
+      result.current.handleDrop(event)
+    })
+
+    expect(result.current.uploadModalVisible).toBe(false)
+    expect(deps.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'warn' })
+    )
+  })
+
+  it('should reject direct .blend uploads when Blender is disabled', async () => {
+    mockBlenderEnabled = false
+    const deps = makeDeps()
+    const { result } = renderHook(() => useFileUploadHandlers(deps))
+    const file = new File(['data'], 'model.blend')
+
+    await act(async () => {
+      await result.current.handleFileUpload(file, 'new')
+    })
+
+    expect(mockCreateModelVersion).not.toHaveBeenCalled()
+    expect(deps.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'warn' })
     )
   })
 })

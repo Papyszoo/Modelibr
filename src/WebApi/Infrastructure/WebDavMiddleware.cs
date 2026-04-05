@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
+using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Application.Models;
+using Application.Settings;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -561,16 +563,28 @@ public class WebDavMiddleware
 
     /// <summary>
     /// Handles PUT /modelibr/Models/{filename}.blend — creates a new model from a .blend file.
-    /// Returns 403 when ENABLE_BLENDER=false, 201 on success.
+    /// Returns 403 when Blender integration is disabled or installation is in progress, 201 on success.
     /// </summary>
     private async Task HandleNewModelBlendPutAsync(HttpContext context, string requestPath)
     {
-        // Check ENABLE_BLENDER gate
-        var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
-        var enableBlender = configuration.GetValue<bool>("ENABLE_BLENDER", false);
-        if (!enableBlender)
+        var installService = context.RequestServices.GetRequiredService<IBlenderInstallationService>();
+        var status = installService.GetStatus();
+
+        if (status.State is "downloading" or "extracting")
         {
-            _logger.LogWarning("PUT .blend rejected: ENABLE_BLENDER is false");
+            _logger.LogWarning("PUT .blend rejected: Blender installation is in progress (state={State})", status.State);
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsync("Blender installation is in progress");
+            return;
+        }
+
+        var settingRepository = context.RequestServices.GetRequiredService<ISettingRepository>();
+        var blenderEnabledSetting = await settingRepository.GetByKeyAsync(SettingKeys.BlenderEnabled, context.RequestAborted);
+        var blenderEnabled = bool.TryParse(blenderEnabledSetting?.Value, out var parsedEnabled) && parsedEnabled;
+
+        if (!blenderEnabled)
+        {
+            _logger.LogWarning("PUT .blend rejected: Blender integration is disabled in settings");
             context.Response.StatusCode = 403;
             await context.Response.WriteAsync("Blender integration is disabled");
             return;

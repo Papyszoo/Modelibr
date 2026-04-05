@@ -25,11 +25,12 @@ It runs locally, stores assets locally, and must not depend on remote runtime se
 - Use PostgreSQL behavior as the baseline for application and test decisions.
 - Route frontend HTTP through feature-local API modules under `src/frontend/src/features/*/api/` backed by `src/frontend/src/lib/apiBase.ts` (axios). `ApiClient.ts` is a re-export facade for backward compatibility — do not add new fetch logic there.
 - Use React Query for server state (queries + mutations) and Zustand stores for UI state (panels, navigation, preferences). Use `useState` only for component-local ephemeral state.
+- When task intent is unclear or a major decision is required, explicitly ask for clarification in the conversation and pause implementation until the direction is confirmed.
 
 ## One Flow
 
 The main agent stays responsible for synthesis, approval handling, and final QA.
-Delegate specialized work to subagents only when that workstream is actually in scope.
+Delegate specialized work to the scoped agents documented in `.github/agents/` only when that workstream is actually in scope.
 
 ### 1. Plan
 

@@ -26,11 +26,9 @@ services:
             args:
                 APP_UID: ${HOST_UID:-1000}
                 APP_GID: ${HOST_GID:-1000}
-                ENABLE_BLENDER: ${ENABLE_BLENDER:-false}
         container_name: webapi
         environment:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
-            - ENABLE_BLENDER=${ENABLE_BLENDER:-false}
             - WORKER_API_KEY=${WORKER_API_KEY:-}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
             - ConnectionStrings__Default=Host=postgres;Port=5432;Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
@@ -72,9 +70,6 @@ services:
         build:
             context: ./src/asset-processor
             dockerfile: Dockerfile
-            args:
-                ENABLE_BLENDER: ${ENABLE_BLENDER:-false}
-                BLENDER_VERSION: ${BLENDER_VERSION:-5.0.1}
         container_name: asset-processor
         environment:
             - WORKER_ID=${WORKER_ID:-worker-1}
@@ -88,7 +83,6 @@ services:
             - LOG_LEVEL=${LOG_LEVEL:-info}
             - NODE_TLS_REJECT_UNAUTHORIZED=0 # Required for self-signed cert; do NOT use in production with external TLS
             - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
-            - BLENDER_PATH=${BLENDER_PATH:-/opt/blender/blender}
         ports:
             - "${WORKER_PORT:-3001}:3001"
         volumes:

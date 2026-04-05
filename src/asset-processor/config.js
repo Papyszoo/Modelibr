@@ -77,10 +77,10 @@ export const config = {
     endpoint: process.env.HEALTHCHECK_ENDPOINT || '/health',
   },
 
-  // Blender settings (env-var fallback for backward compatibility)
+  // Blender settings are refreshed from the backend Settings API at runtime.
   blender: {
-    path: process.env.BLENDER_PATH || 'blender',
-    enabled: process.env.BLENDER_ENABLED === 'true',
+    path: 'blender',
+    enabled: false,
   },
 }
 
@@ -177,7 +177,7 @@ export function validateConfig() {
 
 /**
  * Refresh blender configuration from the backend API settings.
- * Falls back silently to existing config values on failure.
+ * Falls back silently to the existing in-memory config values on failure.
  * @param {import('./jobApiClient.js').JobApiClient} apiClient
  */
 export async function refreshBlenderConfigFromApi(apiClient) {
@@ -191,6 +191,6 @@ export async function refreshBlenderConfigFromApi(apiClient) {
       config.blender.enabled = data.enableBlender
     }
   } catch {
-    // Silently fall back to env-var / current config values
+    // Silently fall back to the current config values
   }
 }
