@@ -1,11 +1,5 @@
 # Dockerfile for the Modelibr Asset Processor Service
 
-# Build ARGs:
-# ENABLE_BLENDER=true  → install Blender for .blend → .glb conversion
-# BLENDER_VERSION      → official release version to download (default: 4.2.0 LTS)
-ARG ENABLE_BLENDER=false
-ARG BLENDER_VERSION=5.0.1
-
 # =============================================================================
 # BASE STAGE - Install Chromium and dependencies (cached after first build)
 # =============================================================================
@@ -97,38 +91,17 @@ RUN npm config set strict-ssl false && \
 # =============================================================================
 FROM chromium-base AS runtime
 
-# Re-declare the ARGs so they're available in this stage
-ARG ENABLE_BLENDER=false
-ARG BLENDER_VERSION=5.0.1
-
-# Conditionally install Blender (supports .blend 4.0+/5.0 files).
-# The official blender.org tarball is self-contained (bundles all libraries).
-# On ARM64 hosts: x64 Blender runs via Docker Desktop's QEMU binfmt_misc.
-# On x64 hosts:   x64 Blender runs natively.
-# Skipped entirely when ENABLE_BLENDER=false (default) — zero image size cost.
-RUN if [ "$ENABLE_BLENDER" = "true" ]; then \
-      echo ">>> Installing Blender ${BLENDER_VERSION} (x64 standalone binary)..." && \
+# Install compatibility libraries needed to execute the runtime-downloaded
+# Linux x64 Blender binary on non-amd64 containers.
+RUN if [ "$(dpkg --print-architecture)" != "amd64" ]; then \
       dpkg --add-architecture amd64 && \
       apt-get update && apt-get install -y --no-install-recommends \
-        xz-utils libc6:amd64 \
+        libc6:amd64 \
         libx11-6:amd64 libxi6:amd64 libxrender1:amd64 libxfixes3:amd64 \
         libxxf86vm1:amd64 libgl1:amd64 libsm6:amd64 \
         libxkbcommon0:amd64 libepoxy0:amd64 && \
-      rm -rf /var/lib/apt/lists/* && \
-      BLENDER_MAJOR=$(echo ${BLENDER_VERSION} | cut -d. -f1,2) && \
-      URL="https://download.blender.org/release/Blender${BLENDER_MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz" && \
-      echo ">>> Downloading ${URL}" && \
-      wget -q "${URL}" -O /tmp/blender.tar.xz && \
-      mkdir -p /opt/blender && \
-      tar -xf /tmp/blender.tar.xz --strip-components=1 -C /opt/blender && \
-      rm -f /tmp/blender.tar.xz && \
-      echo ">>> Blender ${BLENDER_VERSION} installed to /opt/blender"; \
-    else \
-      echo ">>> Blender NOT installed (ENABLE_BLENDER=$ENABLE_BLENDER)"; \
+      rm -rf /var/lib/apt/lists/*; \
     fi
-
-# Persist as an env var so the app can check at runtime
-ENV BLENDER_ENABLED=$ENABLE_BLENDER
 
 WORKDIR /app
 

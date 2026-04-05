@@ -1,4 +1,4 @@
-@depends-on:sounds-setup @sounds @crud
+@depends-on:sounds-setup @sounds @crud @serial
 Feature: Sound CRUD Operations
   Create, Read, Update, Delete operations for sounds.
 

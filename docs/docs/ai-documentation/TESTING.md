@@ -209,7 +209,7 @@ python run_tests.py
 
 ### Blend Upload Tests (`features/15-blend-upload/`)
 
-Tests .blend file upload via WebDAV and REST API. Requires `ENABLE_BLENDER=true` in `docker-compose.e2e.yml` for both `webapi-e2e` and `asset-processor-e2e`.
+Tests .blend file upload via WebDAV and REST API. The suite installs Blender at runtime through the Settings API before running the .blend scenarios.
 
 **Scenarios tested:**
 

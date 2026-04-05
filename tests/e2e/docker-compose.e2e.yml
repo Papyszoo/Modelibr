@@ -3,8 +3,6 @@ services:
         build:
             context: ../../
             dockerfile: src/WebApi/Dockerfile
-            args:
-                ENABLE_BLENDER: "true"
         container_name: webapi-e2e
         environment:
             - ASPNETCORE_ENVIRONMENT=Development
@@ -14,7 +12,6 @@ services:
             - DisableHttpsRedirection=true
             - AllowedOrigins__0=http://localhost:3002
             - AllowedOrigins__1=http://localhost:3000
-            - ENABLE_BLENDER=true
             - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
         ports:
             - "8090:8080"

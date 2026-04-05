@@ -22,9 +22,6 @@ const execFileAsync = promisify(execFile)
  *
  * The Python script will use bpy (Blender Python API) to iterate scene
  * objects and collect mesh statistics, outputting a JSON summary.
- *
- * ENABLE_BLENDER: Set to "true" at Docker build time to install Blender CLI.
- * At runtime, BLENDER_ENABLED env var is checked before processing.
  */
 export class MeshAnalysisProcessor extends BaseProcessor {
   constructor() {
@@ -86,15 +83,15 @@ export class MeshAnalysisProcessor extends BaseProcessor {
     // Guard: Blender must be installed
     if (!config.blender.enabled) {
       throw new Error(
-        'Mesh analysis requires Blender. Rebuild the Docker image with ENABLE_BLENDER=true ' +
-          '(set in .env or pass as build-arg). This adds ~500MB to the image.'
+        'Mesh analysis requires Blender. Install a Blender version via Settings ' +
+          'or configure a valid Blender path before running this job.'
       )
     }
 
     const available = await this.isBlenderAvailable()
     if (!available) {
       throw new Error(
-        'BLENDER_ENABLED is true but Blender CLI was not found at: ' +
+        'Blender integration is enabled but the Blender CLI was not found at: ' +
           config.blender.path
       )
     }
