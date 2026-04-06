@@ -3,7 +3,6 @@ import './ProjectList.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
-import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
 import { useRef } from 'react'
@@ -11,7 +10,9 @@ import { useRef } from 'react'
 import { deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { FilterPanel } from '@/shared/components/FilterPanel'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ProjectDto } from '@/types'
 
@@ -88,22 +89,41 @@ export function ProjectList() {
     return matchesSearch && matchesConcept
   })
 
+  const activeFilterCount = [
+    searchQuery.trim().length > 0,
+    onlyWithConceptArt,
+  ].filter(Boolean).length
+
   return (
     <div className="project-list">
       <Toast ref={toast} />
 
       <div className="project-list-header">
         <h2>Projects</h2>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div className="search-bar" style={{ minWidth: '220px' }}>
-            <i className="pi pi-search" />
-            <InputText
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search projects"
-            />
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <Button
+          label="Create Project"
+          icon="pi pi-plus"
+          onClick={() => setShowCreateDialog(true)}
+        />
+      </div>
+
+      <FilterPanel
+        activeCount={activeFilterCount}
+        summaryLabel="Project Filters"
+      >
+        <div className="list-filters-search">
+          <i className="pi pi-search" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search projects"
+            className="list-filters-search-input"
+          />
+        </div>
+
+        <div className="list-filters-row">
+          <div className="list-filters-switch">
             <InputSwitch
               checked={onlyWithConceptArt}
               onChange={e => setOnlyWithConceptArt(Boolean(e.value))}
@@ -116,13 +136,20 @@ export function ProjectList() {
             max={500}
             onChange={width => setCardWidth('projects', width)}
           />
-          <Button
-            label="Create Project"
-            icon="pi pi-plus"
-            onClick={() => setShowCreateDialog(true)}
-          />
+          {activeFilterCount > 0 ? (
+            <Button
+              icon="pi pi-times"
+              className="p-button-text p-button-sm list-filters-clear"
+              tooltip="Clear project filters"
+              tooltipOptions={{ position: 'bottom' }}
+              onClick={() => {
+                setSearchQuery('')
+                setOnlyWithConceptArt(false)
+              }}
+            />
+          ) : null}
         </div>
-      </div>
+      </FilterPanel>
 
       {loading ? (
         <div className="project-list-loading">
@@ -148,7 +175,7 @@ export function ProjectList() {
           }}
         >
           {filteredProjects.map(project => {
-            const thumbnail = project.customThumbnailUrl
+            const thumbnail = resolveApiAssetUrl(project.customThumbnailUrl)
             return (
               <div
                 key={project.id}

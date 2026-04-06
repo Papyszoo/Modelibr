@@ -17,9 +17,10 @@ import {
   uploadFile,
 } from '@/features/models/api/modelApi'
 import { useModelCategoriesQuery } from '@/features/models/api/queries'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { getModelFileFormat } from '@/utils/fileUtils'
 
-import { ModelCategoryManagerDialog } from './ModelCategoryManagerDialog'
+import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
 
 export function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(
@@ -106,7 +107,7 @@ export function ModelInfo({ model, onModelUpdated }) {
   const uploadConceptImageMutation = useMutation({
     mutationFn: async (files: File[]) => {
       for (const file of files) {
-        const upload = await uploadFile(file, { uploadType: 'model-concept' })
+        const upload = await uploadFile(file, { uploadType: 'file' })
         await addModelConceptImage(model.id, upload.fileId)
       }
     },
@@ -215,7 +216,7 @@ export function ModelInfo({ model, onModelUpdated }) {
         <div className="model-info-header-row">
           <h3 className="model-info-title">Concept Images</h3>
           <Button
-            label="Add"
+            label="Add Images"
             icon="pi pi-images"
             className="p-button-outlined p-button-sm"
             onClick={() => conceptFileInputRef.current?.click()}
@@ -243,7 +244,8 @@ export function ModelInfo({ model, onModelUpdated }) {
               <div key={image.fileId} className="model-info-concept-card">
                 <img
                   src={
-                    image.previewUrl || getFilePreviewUrl(String(image.fileId))
+                    resolveApiAssetUrl(image.previewUrl) ||
+                    getFilePreviewUrl(String(image.fileId))
                   }
                   alt={image.fileName}
                 />
@@ -294,7 +296,7 @@ export function ModelInfo({ model, onModelUpdated }) {
               className="tag-input"
             />
             <Button
-              label="Add"
+              label="Add Tag"
               icon="pi pi-plus"
               onClick={handleAddTag}
               disabled={!newTag.trim()}

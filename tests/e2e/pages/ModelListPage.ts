@@ -4,6 +4,36 @@ import { navigateToAppClean } from "../helpers/navigation-helper";
 export class ModelListPage {
     constructor(private page: Page) {}
 
+    private async ensureSearchOpen(): Promise<void> {
+        const searchPanel = this.page.locator("#model-grid-search-panel");
+        const isVisible = await searchPanel.isVisible().catch(() => false);
+
+        if (isVisible) {
+            return;
+        }
+
+        const searchButton = this.page.getByRole("button", {
+            name: /^search$/i,
+        });
+        await searchButton.click();
+        await searchPanel.waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    private async ensureFiltersOpen(): Promise<void> {
+        const filterPanel = this.page.locator("#model-grid-filters-panel");
+        const isVisible = await filterPanel.isVisible().catch(() => false);
+
+        if (isVisible) {
+            return;
+        }
+
+        const filtersButton = this.page.getByRole("button", {
+            name: /^filters$/i,
+        });
+        await filtersButton.click();
+        await filterPanel.waitFor({ state: "visible", timeout: 5000 });
+    }
+
     async goto() {
         // Navigate with clean state — default tab is modelList
         await navigateToAppClean(this.page);
@@ -217,10 +247,14 @@ export class ModelListPage {
     }
 
     /**
-     * Get the filter token/chip locators in the filter bar
+     * Get the active-filter indicator in the shared filter panel summary.
+     * The new collapsed filter UI may hide the control body after data refreshes,
+     * but the summary remains stable and reflects the active filter count.
      */
     getFilterTokens(): Locator {
-        return this.page.locator(".filter-bar .p-multiselect-token");
+        return this.page
+            .locator(".list-filters-summary")
+            .filter({ hasText: /\bactive\b/i });
     }
 
     /**
@@ -230,9 +264,11 @@ export class ModelListPage {
      */
     async filterByPack(packName: string): Promise<void> {
         for (let attempt = 0; attempt < 3; attempt++) {
+            await this.ensureFiltersOpen();
+
             // Wait for the Packs multiselect to appear (packs query must complete)
             const packsMultiselect = this.page.locator(
-                '.filter-bar .p-multiselect:has(.p-placeholder:has-text("Packs"))',
+                '.list-filters-panel .p-multiselect:has-text("Filter by Packs")',
             );
             try {
                 await packsMultiselect.waitFor({
@@ -295,8 +331,10 @@ export class ModelListPage {
      */
     async filterByProject(projectName: string): Promise<void> {
         for (let attempt = 0; attempt < 3; attempt++) {
+            await this.ensureFiltersOpen();
+
             const projectsMultiselect = this.page.locator(
-                '.filter-bar .p-multiselect:has([class*="placeholder"]:has-text("Projects"))',
+                '.list-filters-panel .p-multiselect:has-text("Filter by Projects")',
             );
             await projectsMultiselect.click();
             await this.page
@@ -339,26 +377,66 @@ export class ModelListPage {
      * Clear all active filters in the filter bar
      */
     async clearFilters(): Promise<void> {
-        const clearButton = this.page.locator(".clear-filters-btn");
-        if (await clearButton.isVisible()) {
+        await this.ensureFiltersOpen();
+
+        const clearButton = this.page.locator(
+            "#model-grid-filters-panel .list-filters-clear",
+        );
+        if (await clearButton.isVisible().catch(() => false)) {
             await clearButton.click();
             await this.page.waitForLoadState("domcontentloaded");
         } else {
             const packsClear = this.page
-                .locator(".filter-bar .p-multiselect")
+                .locator(".list-filters-panel .p-multiselect")
                 .first()
                 .locator(".p-multiselect-clear-icon");
-            if (await packsClear.isVisible()) {
+            if (await packsClear.isVisible().catch(() => false)) {
                 await packsClear.click();
             }
             const projectsClear = this.page
-                .locator(".filter-bar .p-multiselect")
+                .locator(".list-filters-panel .p-multiselect")
                 .nth(1)
                 .locator(".p-multiselect-clear-icon");
-            if (await projectsClear.isVisible()) {
+            if (await projectsClear.isVisible().catch(() => false)) {
                 await projectsClear.click();
             }
             await this.page.waitForLoadState("domcontentloaded");
         }
+    }
+
+    async enableConceptArtFilter(): Promise<void> {
+        await this.ensureFiltersOpen();
+
+        const filterToggle = this.page.locator(
+            '.models-filter-switch:has-text("Concept art") .p-inputswitch',
+        );
+        await filterToggle.waitFor({ state: "visible", timeout: 10000 });
+
+        const responsePromise = this.page.waitForResponse(
+            (response) => {
+                const url = response.url();
+                return (
+                    url.includes("/models?") &&
+                    url.includes("hasConceptImages=true") &&
+                    response.status() >= 200 &&
+                    response.status() < 300
+                );
+            },
+            { timeout: 15000 },
+        );
+
+        await filterToggle.click();
+        await responsePromise;
+        await this.page.waitForLoadState("domcontentloaded");
+    }
+
+    async searchForModels(text: string): Promise<void> {
+        await this.ensureSearchOpen();
+
+        const searchInput = this.page.locator(
+            '#model-grid-search-panel input[placeholder="Search models..."], #model-grid-search-panel .search-input',
+        );
+        await expect(searchInput).toBeVisible({ timeout: 5000 });
+        await searchInput.fill(text);
     }
 }

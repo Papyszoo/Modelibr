@@ -3,13 +3,12 @@ import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
 
-import { type JSX, useCallback, useState } from 'react'
+import { type JSX } from 'react'
 
 import { type TabContextValue } from '@/contexts/TabContext'
 import { useTabContext } from '@/hooks/useTabContext'
 
 import { ModelGrid } from './ModelGrid'
-import { ModelListHeader } from './ModelListHeader'
 
 interface ModelListProps {
   onBackToUpload?: () => void
@@ -49,27 +48,15 @@ function ModelListWithTabContext({
 }
 
 function ModelListContent({
-  onBackToUpload,
   isTabContent,
 }: {
   onBackToUpload?: () => void
   tabContext: TabContextValue | null
   isTabContent: boolean
 }): JSX.Element {
-  const [modelCount, setModelCount] = useState(0)
-  const handleTotalCountChange = useCallback((count: number) => {
-    setModelCount(count)
-  }, [])
-
   return (
     <div className={`model-list ${isTabContent ? 'model-list-tab' : ''}`}>
-      <ModelListHeader
-        isTabContent={isTabContent}
-        onBackToUpload={onBackToUpload}
-        modelCount={modelCount}
-      />
-
-      <ModelGrid onTotalCountChange={handleTotalCountChange} />
+      <ModelGrid />
     </div>
   )
 }

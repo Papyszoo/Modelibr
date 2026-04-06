@@ -10,6 +10,7 @@ import { type z } from 'zod'
 
 import { uploadFile } from '@/features/models/api/modelApi'
 import { setPackCustomThumbnail, updatePack } from '@/features/pack/api/packApi'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { packDetailsFormSchema } from '@/shared/validation/formSchemas'
 import { type PackDetailDto } from '@/types'
 
@@ -98,7 +99,7 @@ export function PackDetailsPanel({
         return
       }
 
-      const upload = await uploadFile(file, { uploadType: 'pack-thumbnail' })
+      const upload = await uploadFile(file, { uploadType: 'file' })
       await setPackCustomThumbnail(pack.id, upload.fileId)
     },
     onSuccess: async () => {
@@ -113,6 +114,7 @@ export function PackDetailsPanel({
   })
 
   const onSave = handleSubmit(values => updateMutation.mutate(values))
+  const thumbnailUrl = resolveApiAssetUrl(pack.customThumbnailUrl)
 
   return (
     <div className="container-rich-details">
@@ -177,8 +179,8 @@ export function PackDetailsPanel({
             <span className="container-rich-kicker">Thumbnail</span>
             <h3>Cover Image</h3>
             <div className="container-cover-card">
-              {pack.customThumbnailUrl ? (
-                <img src={pack.customThumbnailUrl} alt={pack.name} />
+              {thumbnailUrl ? (
+                <img src={thumbnailUrl} alt={pack.name} />
               ) : (
                 <div className="container-cover-placeholder">
                   <i className="pi pi-box" />
@@ -215,9 +217,7 @@ export function PackDetailsPanel({
                 severity="secondary"
                 text
                 onClick={() => thumbnailMutation.mutate(null)}
-                disabled={
-                  !pack.customThumbnailUrl || thumbnailMutation.isPending
-                }
+                disabled={!thumbnailUrl || thumbnailMutation.isPending}
               />
             </div>
           </div>

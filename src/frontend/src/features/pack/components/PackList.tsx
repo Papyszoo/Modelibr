@@ -3,7 +3,6 @@ import './PackList.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
-import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
 import { useRef } from 'react'
@@ -11,7 +10,9 @@ import { useRef } from 'react'
 import { deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { FilterPanel } from '@/shared/components/FilterPanel'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type PackDto } from '@/types'
 
@@ -78,6 +79,11 @@ export function PackList() {
     new Set(packs.map(pack => pack.licenseType).filter(Boolean))
   ).map(license => ({ label: license, value: license }))
 
+  const activeFilterCount = [
+    searchQuery.trim().length > 0,
+    selectedLicense !== null,
+  ].filter(Boolean).length
+
   const filteredPacks = packs.filter(pack => {
     const matchesSearch =
       searchQuery.trim().length === 0 ||
@@ -95,22 +101,33 @@ export function PackList() {
 
       <div className="pack-list-header">
         <h2>Packs</h2>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div className="search-bar" style={{ minWidth: '220px' }}>
-            <i className="pi pi-search" />
-            <InputText
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search packs"
-            />
-          </div>
+        <Button
+          label="Create Pack"
+          icon="pi pi-plus"
+          onClick={() => setShowCreateDialog(true)}
+        />
+      </div>
+
+      <FilterPanel activeCount={activeFilterCount} summaryLabel="Pack Filters">
+        <div className="list-filters-search">
+          <i className="pi pi-search" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search packs"
+            className="list-filters-search-input"
+          />
+        </div>
+
+        <div className="list-filters-row">
           <Dropdown
             value={selectedLicense}
             options={licenseOptions}
             onChange={e => setSelectedLicense(e.value ?? null)}
             placeholder="License"
             showClear
-            className="filter-multiselect"
+            className="list-filters-control"
           />
           <CardWidthSlider
             value={cardWidth}
@@ -118,13 +135,20 @@ export function PackList() {
             max={500}
             onChange={width => setCardWidth('packs', width)}
           />
-          <Button
-            label="Create Pack"
-            icon="pi pi-plus"
-            onClick={() => setShowCreateDialog(true)}
-          />
+          {activeFilterCount > 0 ? (
+            <Button
+              icon="pi pi-times"
+              className="p-button-text p-button-sm list-filters-clear"
+              tooltip="Clear pack filters"
+              tooltipOptions={{ position: 'bottom' }}
+              onClick={() => {
+                setSearchQuery('')
+                setSelectedLicense(null)
+              }}
+            />
+          ) : null}
         </div>
-      </div>
+      </FilterPanel>
 
       {loading ? (
         <div className="pack-list-loading">
@@ -150,7 +174,7 @@ export function PackList() {
           }}
         >
           {filteredPacks.map(pack => {
-            const thumbnail = pack.customThumbnailUrl
+            const thumbnail = resolveApiAssetUrl(pack.customThumbnailUrl)
             return (
               <div
                 key={pack.id}

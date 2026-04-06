@@ -6,15 +6,16 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
-import { uploadFile } from '@/features/models/api/modelApi'
+import { getFilePreviewUrl, uploadFile } from '@/features/models/api/modelApi'
 import {
   addProjectConceptImage,
   removeProjectConceptImage,
   setProjectCustomThumbnail,
   updateProject,
 } from '@/features/project/api/projectApi'
-import { type ProjectDetailDto } from '@/types'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
+import { type ProjectDetailDto } from '@/types'
 
 type ProjectDetailsInput = z.input<typeof projectDetailsFormSchema>
 type ProjectDetailsOutput = z.output<typeof projectDetailsFormSchema>
@@ -93,7 +94,7 @@ export function ProjectDetailsPanel({
         return
       }
 
-      const upload = await uploadFile(file, { uploadType: 'project-thumbnail' })
+      const upload = await uploadFile(file, { uploadType: 'file' })
       await setProjectCustomThumbnail(project.id, upload.fileId)
     },
     onSuccess: async () => {
@@ -110,7 +111,7 @@ export function ProjectDetailsPanel({
   const conceptMutation = useMutation({
     mutationFn: async (files: File[]) => {
       for (const file of files) {
-        const upload = await uploadFile(file, { uploadType: 'project-concept' })
+        const upload = await uploadFile(file, { uploadType: 'file' })
         await addProjectConceptImage(project.id, upload.fileId)
       }
     },
@@ -134,6 +135,7 @@ export function ProjectDetailsPanel({
   })
 
   const onSave = handleSubmit(values => updateMutation.mutate(values))
+  const thumbnailUrl = resolveApiAssetUrl(project.customThumbnailUrl)
 
   return (
     <div className="container-rich-details">
@@ -214,7 +216,13 @@ export function ProjectDetailsPanel({
               <div className="container-media-grid">
                 {project.conceptImages.map(image => (
                   <div key={image.fileId} className="container-media-card">
-                    <img src={image.previewUrl} alt={image.fileName} />
+                    <img
+                      src={
+                        resolveApiAssetUrl(image.previewUrl) ||
+                        getFilePreviewUrl(String(image.fileId))
+                      }
+                      alt={image.fileName}
+                    />
                     <div className="container-media-card-footer">
                       <span title={image.fileName}>{image.fileName}</span>
                       <Button
@@ -244,8 +252,8 @@ export function ProjectDetailsPanel({
             </div>
 
             <div className="container-cover-card">
-              {project.customThumbnailUrl ? (
-                <img src={project.customThumbnailUrl} alt={project.name} />
+              {thumbnailUrl ? (
+                <img src={thumbnailUrl} alt={project.name} />
               ) : (
                 <div className="container-cover-placeholder">
                   <i className="pi pi-image" />
@@ -282,9 +290,7 @@ export function ProjectDetailsPanel({
                 severity="secondary"
                 text
                 onClick={() => thumbnailMutation.mutate(null)}
-                disabled={
-                  !project.customThumbnailUrl || thumbnailMutation.isPending
-                }
+                disabled={!thumbnailUrl || thumbnailMutation.isPending}
               />
             </div>
           </div>

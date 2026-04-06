@@ -16,6 +16,22 @@ if (import.meta.env.DEV && !import.meta.env.VITE_API_BASE_URL) {
 
 export const UPLOAD_TIMEOUT = 120000 // 2 minutes per file upload
 
+export function resolveApiAssetUrl(url?: string | null): string | null {
+  if (!url) {
+    return null
+  }
+
+  if (/^(https?:|blob:|data:)/i.test(url)) {
+    return url
+  }
+
+  try {
+    return new URL(url, baseURL).toString()
+  } catch {
+    return url
+  }
+}
+
 type ApiErrorBody = {
   error?: string
   message?: string

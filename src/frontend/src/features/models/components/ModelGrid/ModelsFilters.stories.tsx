@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { type PackDto, type ProjectDto } from '@/types'
+import { type ModelCategoryDto, type PackDto, type ProjectDto } from '@/types'
 
 import { ModelsFilters } from './ModelsFilters'
 
@@ -56,6 +56,21 @@ const mockProjects: ProjectDto[] = [
   },
 ]
 
+const mockCategories: ModelCategoryDto[] = [
+  {
+    id: 1,
+    name: 'Characters',
+    path: 'Characters',
+    parentId: null,
+  },
+  {
+    id: 2,
+    name: 'Humanoid',
+    path: 'Characters / Humanoid',
+    parentId: 1,
+  },
+]
+
 const meta: Meta<typeof ModelsFilters> = {
   title: 'Models/ModelsFilters',
   component: ModelsFilters,
@@ -66,10 +81,15 @@ const meta: Meta<typeof ModelsFilters> = {
     onSearchChange: noop,
     packs: mockPacks,
     projects: mockProjects,
+    categories: mockCategories,
     selectedPackIds: [],
     selectedProjectIds: [],
+    selectedCategoryId: null,
+    hasConceptImages: false,
     onPackFilterChange: noop,
     onProjectFilterChange: noop,
+    onCategoryChange: noop,
+    onHasConceptImagesChange: noop,
     cardWidth: 200,
     onCardWidthChange: noop,
   },
