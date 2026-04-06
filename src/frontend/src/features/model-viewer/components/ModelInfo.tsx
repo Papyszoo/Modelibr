@@ -3,7 +3,6 @@ import './ModelInfo.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Chip } from 'primereact/chip'
-import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { useRef } from 'react'
@@ -21,11 +20,10 @@ import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { getModelFileFormat } from '@/utils/fileUtils'
 
 import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
+import { ModelCategorySinglePicker } from '@/features/models/components/ModelCategorySinglePicker'
 
 export function ModelInfo({ model, onModelUpdated }) {
-  const [tags, setTags] = useState(
-    model.tags ? model.tags.split(', ').filter(t => t.trim()) : []
-  )
+  const [tags, setTags] = useState(model.tags ?? [])
   const [description, setDescription] = useState(model.description || '')
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     model.category?.id ?? model.categoryId ?? null
@@ -39,7 +37,7 @@ export function ModelInfo({ model, onModelUpdated }) {
 
   // Sync local state when the model prop updates (e.g. after React Query refetch)
   useEffect(() => {
-    setTags(model.tags ? model.tags.split(', ').filter(t => t.trim()) : [])
+    setTags(model.tags ?? [])
     setDescription(model.description || '')
     setSelectedCategoryId(model.category?.id ?? model.categoryId ?? null)
   }, [
@@ -60,13 +58,14 @@ export function ModelInfo({ model, onModelUpdated }) {
   const saveModelInfoMutation = useMutation({
     mutationFn: async ({
       tagsString,
+      tags,
       desc,
       categoryId,
     }: {
-      tagsString: string
+      tags: string[]
       desc: string
       categoryId?: number | null
-    }) => updateModelTags(model.id, tagsString, desc, categoryId),
+    }) => updateModelTags(model.id, tags, desc, categoryId),
     onSuccess: () => {
       invalidateModelQueries()
       if (onModelUpdated) {
@@ -96,9 +95,8 @@ export function ModelInfo({ model, onModelUpdated }) {
   }
 
   const handleSave = () => {
-    const tagsString = tags.join(', ')
     saveModelInfoMutation.mutate({
-      tagsString,
+      tags,
       desc: description,
       categoryId: selectedCategoryId,
     })
@@ -127,11 +125,6 @@ export function ModelInfo({ model, onModelUpdated }) {
     meshCount: model.meshCount,
     materialCount: model.materialCount,
   }
-
-  const categoryOptions = categories.map(category => ({
-    label: category.path,
-    value: category.id,
-  }))
 
   return (
     <div className="model-info">
@@ -162,14 +155,10 @@ export function ModelInfo({ model, onModelUpdated }) {
           <div className="model-info-item model-info-item-wide">
             <label>Category:</label>
             <div className="model-info-category-row">
-              <Dropdown
-                value={selectedCategoryId}
-                options={categoryOptions}
-                onChange={e => setSelectedCategoryId(e.value ?? null)}
-                placeholder="Uncategorized"
-                showClear
-                filter
-                className="model-info-category-dropdown"
+              <ModelCategorySinglePicker
+                categories={categories}
+                selectedCategoryId={selectedCategoryId}
+                onChange={setSelectedCategoryId}
               />
               <Button
                 label="Manage"

@@ -29,6 +29,14 @@ export interface GetAllModelCategoriesResponse {
   categories: ModelCategoryDto[]
 }
 
+export interface ModelTagDto {
+  name: string
+}
+
+export interface GetAllModelTagsResponse {
+  tags: ModelTagDto[]
+}
+
 export interface UpsertModelCategoryRequest {
   name: string
   description?: string

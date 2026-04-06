@@ -4,7 +4,9 @@ import { baseURL, client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
 import { type PaginatedResponse } from '@/types'
 import {
   type GetAllModelCategoriesResponse,
+  type GetAllModelTagsResponse,
   type ModelCategoryDto,
+  type ModelTagDto,
   type UpsertModelCategoryRequest,
 } from '@/types'
 import { type Model } from '@/utils/fileUtils'
@@ -115,7 +117,8 @@ export async function getModelsPaginated(options: {
   packId?: number
   projectId?: number
   textureSetId?: number
-  categoryId?: number
+  categoryIds?: number[]
+  tags?: string[]
   hasConceptImages?: boolean
 }): Promise<PaginatedResponse<Model>> {
   const params = new URLSearchParams()
@@ -126,8 +129,12 @@ export async function getModelsPaginated(options: {
     params.append('projectId', options.projectId.toString())
   if (options.textureSetId)
     params.append('textureSetId', options.textureSetId.toString())
-  if (options.categoryId)
-    params.append('categoryId', options.categoryId.toString())
+  for (const categoryId of options.categoryIds ?? []) {
+    params.append('categoryId', categoryId.toString())
+  }
+  for (const tag of options.tags ?? []) {
+    params.append('tag', tag)
+  }
   if (typeof options.hasConceptImages === 'boolean') {
     params.append('hasConceptImages', String(options.hasConceptImages))
   }
@@ -162,12 +169,12 @@ export function getFilePreviewUrl(fileId: string, channel?: string): string {
 
 export async function updateModelTags(
   modelId: string,
-  tags: string,
+  tags: string[],
   description: string,
   categoryId?: number | null
 ): Promise<{
   modelId: number
-  tags: string
+  tags: string[]
   description: string
   categoryId?: number | null
 }> {
@@ -183,6 +190,11 @@ export async function getModelCategories(): Promise<ModelCategoryDto[]> {
   const response =
     await client.get<GetAllModelCategoriesResponse>('/model-categories')
   return response.data.categories
+}
+
+export async function getModelTags(): Promise<ModelTagDto[]> {
+  const response = await client.get<GetAllModelTagsResponse>('/model-tags')
+  return response.data.tags
 }
 
 export async function createModelCategory(

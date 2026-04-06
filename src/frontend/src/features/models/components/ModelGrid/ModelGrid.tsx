@@ -83,6 +83,7 @@ export function ModelGrid({
     packs,
     projects,
     categories,
+    tags,
     pagination,
     isLoadingMore,
     uploading,
@@ -94,8 +95,11 @@ export function ModelGrid({
     onDragLeave,
     searchQuery,
     setSearchQuery,
-    selectedCategoryId,
-    setSelectedCategoryId,
+    selectedCategoryKeys,
+    setSelectedCategoryKeys,
+    selectedCategoryIds,
+    selectedTagNames,
+    setSelectedTagNames,
     hasConceptImages,
     setHasConceptImages,
     effectivePackIds,
@@ -368,13 +372,17 @@ export function ModelGrid({
         packs={packs}
         projects={projects}
         categories={categories}
+        tags={tags}
         selectedPackIds={effectivePackIds}
         selectedProjectIds={effectiveProjectIds}
-        selectedCategoryId={selectedCategoryId}
+        selectedCategoryKeys={selectedCategoryKeys}
+        selectedCategoryIds={selectedCategoryIds}
+        selectedTagNames={selectedTagNames}
         hasConceptImages={hasConceptImages}
         onPackFilterChange={handlePackFilterChange}
         onProjectFilterChange={handleProjectFilterChange}
-        onCategoryChange={setSelectedCategoryId}
+        onCategoryChange={setSelectedCategoryKeys}
+        onTagChange={setSelectedTagNames}
         onHasConceptImagesChange={setHasConceptImages}
         packFilterDisabled={packFilterDisabled}
         projectFilterDisabled={projectFilterDisabled}
@@ -412,88 +420,92 @@ export function ModelGrid({
           onMouseUp={handleGridMouseUp}
           onMouseLeave={handleGridMouseUp}
         >
-          <VirtuosoGrid
-            customScrollParent={scrollParent ?? undefined}
-            totalCount={filteredModels.length + (isContainerContext ? 1 : 0)}
-            overscan={200}
-            components={gridComponents}
-            context={{ cardWidth }}
-            endReached={() => {
-              if (pagination.hasMore && !isLoadingMore) {
-                fetchModels(true)
-              }
-            }}
-            itemContent={index => {
-              // Last item is the "Add" card in container context
-              if (isContainerContext && index === filteredModels.length) {
+          <div className="model-grid-selection-content">
+            <VirtuosoGrid
+              customScrollParent={scrollParent ?? undefined}
+              totalCount={filteredModels.length + (isContainerContext ? 1 : 0)}
+              overscan={200}
+              components={gridComponents}
+              context={{ cardWidth }}
+              endReached={() => {
+                if (pagination.hasMore && !isLoadingMore) {
+                  fetchModels(true)
+                }
+              }}
+              itemContent={index => {
+                // Last item is the "Add" card in container context
+                if (isContainerContext && index === filteredModels.length) {
+                  return (
+                    <div
+                      className="model-card model-card-add"
+                      onClick={openAddModelDialog}
+                    >
+                      <div className="model-card-add-content">
+                        <i className="pi pi-plus" />
+                        <span>Add Model</span>
+                      </div>
+                    </div>
+                  )
+                }
+
+                const model = filteredModels[index]
+                if (!model) return null
+
+                const modelId = String(model.id)
+                const isSelected = selectedModelIds.has(modelId)
+                const modelName = getModelName(model)
+
                 return (
                   <div
-                    className="model-card model-card-add"
-                    onClick={openAddModelDialog}
+                    className={`model-card${isSelected ? ' selected' : ''}`}
+                    data-model-id={model.id}
+                    onClick={() => handleModelSelect(model)}
+                    onContextMenu={event => {
+                      if (isSelectionEnabled && selectedModels.length > 1) {
+                        contextMenuRef.current?.show(event, {
+                          models: selectedModels,
+                          mode: 'bulk',
+                        })
+                        return
+                      }
+
+                      contextMenuRef.current?.show(event, {
+                        models: [model],
+                        mode: 'single',
+                      })
+                    }}
                   >
-                    <div className="model-card-add-content">
-                      <i className="pi pi-plus" />
-                      <span>Add Model</span>
+                    <div className="model-card-thumbnail">
+                      {isSelectionEnabled ? (
+                        <button
+                          type="button"
+                          className="model-select-checkbox"
+                          onMouseDown={event => event.stopPropagation()}
+                          onClick={event =>
+                            toggleModelSelection(modelId, event)
+                          }
+                          aria-label={`${isSelected ? 'Deselect' : 'Select'} ${modelName}`}
+                          aria-pressed={isSelected}
+                        >
+                          <i
+                            className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
+                          />
+                        </button>
+                      ) : null}
+
+                      <ThumbnailDisplay
+                        modelId={model.id}
+                        modelName={model.name}
+                      />
+                      <div className="model-card-overlay">
+                        <span className="model-card-name">{modelName}</span>
+                      </div>
                     </div>
                   </div>
                 )
-              }
-
-              const model = filteredModels[index]
-              if (!model) return null
-
-              const modelId = String(model.id)
-              const isSelected = selectedModelIds.has(modelId)
-              const modelName = getModelName(model)
-
-              return (
-                <div
-                  className={`model-card${isSelected ? ' selected' : ''}`}
-                  data-model-id={model.id}
-                  onClick={() => handleModelSelect(model)}
-                  onContextMenu={event => {
-                    if (isSelectionEnabled && selectedModels.length > 1) {
-                      contextMenuRef.current?.show(event, {
-                        models: selectedModels,
-                        mode: 'bulk',
-                      })
-                      return
-                    }
-
-                    contextMenuRef.current?.show(event, {
-                      models: [model],
-                      mode: 'single',
-                    })
-                  }}
-                >
-                  <div className="model-card-thumbnail">
-                    {isSelectionEnabled ? (
-                      <button
-                        type="button"
-                        className="model-select-checkbox"
-                        onMouseDown={event => event.stopPropagation()}
-                        onClick={event => toggleModelSelection(modelId, event)}
-                        aria-label={`${isSelected ? 'Deselect' : 'Select'} ${modelName}`}
-                        aria-pressed={isSelected}
-                      >
-                        <i
-                          className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
-                        />
-                      </button>
-                    ) : null}
-
-                    <ThumbnailDisplay
-                      modelId={model.id}
-                      modelName={model.name}
-                    />
-                    <div className="model-card-overlay">
-                      <span className="model-card-name">{modelName}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            }}
-          />
+              }}
+            />
+          </div>
 
           {isSelectionEnabled && isAreaSelecting && selectionBox ? (
             <div

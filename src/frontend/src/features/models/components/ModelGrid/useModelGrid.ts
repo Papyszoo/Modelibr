@@ -27,7 +27,8 @@ export function useModelGrid({
   const data = useModelData({
     effectivePackIds: filters.effectivePackIds,
     effectiveProjectIds: filters.effectiveProjectIds,
-    selectedCategoryId: filters.selectedCategoryId,
+    selectedCategoryIds: filters.selectedCategoryIds,
+    selectedTagNames: filters.selectedTagNames,
     hasConceptImages: filters.hasConceptImages,
     textureSetId,
   })
@@ -75,6 +76,7 @@ export function useModelGrid({
     packs: data.packs,
     projects: data.projects,
     categories: data.categories,
+    tags: data.tags,
     pagination: data.pagination,
     isLoadingMore: data.isLoadingMore,
 
@@ -92,8 +94,11 @@ export function useModelGrid({
     // Search & Filters
     searchQuery: filters.searchQuery,
     setSearchQuery: filters.setSearchQuery,
-    selectedCategoryId: filters.selectedCategoryId,
-    setSelectedCategoryId: filters.setSelectedCategoryId,
+    selectedCategoryKeys: filters.selectedCategoryKeys,
+    setSelectedCategoryKeys: filters.setSelectedCategoryKeys,
+    selectedCategoryIds: filters.selectedCategoryIds,
+    selectedTagNames: filters.selectedTagNames,
+    setSelectedTagNames: filters.setSelectedTagNames,
     hasConceptImages: filters.hasConceptImages,
     setHasConceptImages: filters.setHasConceptImages,
     effectivePackIds: filters.effectivePackIds,

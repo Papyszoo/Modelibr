@@ -29,7 +29,7 @@ namespace Application.Models
                 Name = model.Name,
                 CreatedAt = model.CreatedAt,
                 UpdatedAt = model.UpdatedAt,
-                Tags = model.Tags,
+                Tags = ModelDtoMappings.ToTagNames(model.Tags),
                 Description = model.Description,
                 Category = model.ModelCategory == null ? null : new ModelCategorySummaryDto
                 {
@@ -94,7 +94,7 @@ namespace Application.Models
         public string Name { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
         public DateTime UpdatedAt { get; init; }
-        public string? Tags { get; init; }
+        public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
         public string? Description { get; init; }
         public ModelCategorySummaryDto? Category { get; init; }
         public ICollection<ModelConceptImageDto> ConceptImages { get; init; } = new List<ModelConceptImageDto>();

@@ -172,6 +172,14 @@ export const handlers = [
     return HttpResponse.json({ categories: mockModelCategories })
   }),
 
+  http.get(`${BASE_URL}/model-tags`, () => {
+    const tags = [...new Set(mockModels.flatMap(model => model.tags ?? []))]
+      .sort((left, right) => left.localeCompare(right))
+      .map(name => ({ name }))
+
+    return HttpResponse.json({ tags })
+  }),
+
   http.post(`${BASE_URL}/models/:id/concept-images`, () => {
     return new HttpResponse(null, { status: 204 })
   }),

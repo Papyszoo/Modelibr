@@ -451,7 +451,14 @@ export const dynamicDemoHandlers = [
     const packId = url.searchParams.get('packId')
     const projectId = url.searchParams.get('projectId')
     const textureSetId = url.searchParams.get('textureSetId')
-    const categoryId = url.searchParams.get('categoryId')
+    const categoryIds = url.searchParams
+      .getAll('categoryId')
+      .map(value => Number(value))
+      .filter(Number.isFinite)
+    const tags = url.searchParams
+      .getAll('tag')
+      .map(tag => tag.trim().toLowerCase())
+      .filter(Boolean)
     const hasConceptImages = url.searchParams.get('hasConceptImages')
 
     let models = await getAll('models')
@@ -475,8 +482,15 @@ export const dynamicDemoHandlers = [
         m.textureSets?.some(ts => ts.id === Number(textureSetId))
       )
     }
-    if (categoryId) {
-      models = models.filter(m => m.categoryId === Number(categoryId))
+    if (categoryIds.length > 0) {
+      models = models.filter(
+        model => model.categoryId && categoryIds.includes(model.categoryId)
+      )
+    }
+    if (tags.length > 0) {
+      models = models.filter(model =>
+        (model.tags ?? []).some(tag => tags.includes(tag.toLowerCase()))
+      )
     }
     if (hasConceptImages !== null) {
       const wantsConceptImages = hasConceptImages === 'true'
@@ -498,6 +512,15 @@ export const dynamicDemoHandlers = [
       })
     }
     return HttpResponse.json(enriched)
+  }),
+
+  http.get('*/model-tags', async () => {
+    const models = await getAll('models')
+    const tags = [...new Set(models.flatMap(model => model.tags ?? []))]
+      .sort((left, right) => left.localeCompare(right))
+      .map(name => ({ name }))
+
+    return HttpResponse.json({ tags })
   }),
 
   // Get single model
@@ -623,7 +646,7 @@ export const dynamicDemoHandlers = [
       id: modelId,
       name: file.name.replace(/\.[^.]+$/, ''),
       description: '',
-      tags: '',
+      tags: [],
       files: [demoFile],
       createdAt: ts,
       updatedAt: ts,
@@ -703,7 +726,7 @@ export const dynamicDemoHandlers = [
     const model = await getById('models', Number(params.id))
     if (!model) return new HttpResponse(null, { status: 404 })
     const body = (await request.json()) as {
-      tags?: string
+      tags?: string[]
       description?: string
       categoryId?: number | null
     }

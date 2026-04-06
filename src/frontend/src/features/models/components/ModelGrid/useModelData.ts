@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import { getModelsPaginated } from '@/features/models/api/modelApi'
 import {
   useModelCategoriesQuery,
+  useModelTagsQuery,
   usePacksQuery,
   useProjectsQuery,
 } from '@/features/models/api/queries'
@@ -14,7 +15,8 @@ const PAGE_SIZE = 50
 interface UseModelDataOptions {
   effectivePackIds: number[]
   effectiveProjectIds: number[]
-  selectedCategoryId: number | null
+  selectedCategoryIds: number[]
+  selectedTagNames: string[]
   hasConceptImages: boolean
   textureSetId?: number
 }
@@ -22,7 +24,8 @@ interface UseModelDataOptions {
 export function useModelData({
   effectivePackIds,
   effectiveProjectIds,
-  selectedCategoryId,
+  selectedCategoryIds,
+  selectedTagNames,
   hasConceptImages,
   textureSetId,
 }: UseModelDataOptions) {
@@ -42,7 +45,14 @@ export function useModelData({
   } = useInfiniteQuery({
     queryKey: [
       'models',
-      { packId, projectId, textureSetId, selectedCategoryId, hasConceptImages },
+      {
+        packId,
+        projectId,
+        textureSetId,
+        selectedCategoryIds,
+        selectedTagNames,
+        hasConceptImages,
+      },
     ],
     queryFn: ({ pageParam }) =>
       getModelsPaginated({
@@ -51,7 +61,9 @@ export function useModelData({
         packId,
         projectId,
         textureSetId,
-        categoryId: selectedCategoryId ?? undefined,
+        categoryIds:
+          selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+        tags: selectedTagNames.length > 0 ? selectedTagNames : undefined,
         hasConceptImages: hasConceptImages || undefined,
       }),
     initialPageParam: 1,
@@ -65,6 +77,7 @@ export function useModelData({
   const packsQuery = usePacksQuery()
   const projectsQuery = useProjectsQuery()
   const categoriesQuery = useModelCategoriesQuery()
+  const tagsQuery = useModelTagsQuery()
 
   const models = paginatedData?.pages.flatMap(p => p.items) ?? []
   const totalCount = paginatedData?.pages[0]?.totalCount ?? 0
@@ -103,6 +116,7 @@ export function useModelData({
     packs: packsQuery.data ?? [],
     projects: projectsQuery.data ?? [],
     categories: categoriesQuery.data ?? [],
+    tags: tagsQuery.data ?? [],
     pagination,
     isLoadingMore: isFetchingNextPage,
     fetchModels,

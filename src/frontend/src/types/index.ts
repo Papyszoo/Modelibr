@@ -1,7 +1,9 @@
 export {
   type GetAllModelCategoriesResponse,
+  type GetAllModelTagsResponse,
   type ModelCategoryDto,
   type ModelConceptImageDto,
+  type ModelTagDto,
   type ModelTechnicalMetadataDto,
   type UpsertModelCategoryRequest,
 } from '@/features/models/types'

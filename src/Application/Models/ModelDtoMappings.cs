@@ -5,6 +5,14 @@ namespace Application.Models;
 
 internal static class ModelDtoMappings
 {
+    public static IReadOnlyList<string> ToTagNames(IEnumerable<ModelTag> tags)
+    {
+        return tags
+            .Select(tag => tag.Name)
+            .OrderBy(name => name)
+            .ToArray();
+    }
+
     public static ModelConceptImageDto ToConceptImageDto(ModelConceptImage conceptImage)
     {
         return new ModelConceptImageDto

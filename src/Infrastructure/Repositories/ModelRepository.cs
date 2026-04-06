@@ -32,6 +32,7 @@ internal sealed class ModelRepository : IModelRepository
             .AsNoTracking()
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
             .Include(m => m.ModelCategory)
             .Include(m => m.ConceptImages)
                 .ThenInclude(ci => ci.File)
@@ -49,7 +50,7 @@ internal sealed class ModelRepository : IModelRepository
 
     public async Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null, int? categoryId = null, bool? hasConceptImages = null,
+        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
@@ -63,8 +64,11 @@ internal sealed class ModelRepository : IModelRepository
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
 
-        if (categoryId.HasValue)
-            query = query.Where(m => m.ModelCategoryId == categoryId.Value);
+        if (categoryIds != null && categoryIds.Count > 0)
+            query = query.Where(m => m.ModelCategoryId.HasValue && categoryIds.Contains(m.ModelCategoryId.Value));
+
+        if (normalizedTagNames != null && normalizedTagNames.Count > 0)
+            query = query.Where(m => m.Tags.Any(tag => normalizedTagNames.Contains(tag.NormalizedName)));
 
         if (hasConceptImages.HasValue)
             query = hasConceptImages.Value
@@ -79,6 +83,7 @@ internal sealed class ModelRepository : IModelRepository
             .Take(pageSize)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
             .Include(m => m.ModelCategory)
             .Include(m => m.ConceptImages)
                 .ThenInclude(ci => ci.File)
@@ -98,7 +103,7 @@ internal sealed class ModelRepository : IModelRepository
 
     public async Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null, int? categoryId = null, bool? hasConceptImages = null,
+        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
@@ -112,8 +117,11 @@ internal sealed class ModelRepository : IModelRepository
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
 
-        if (categoryId.HasValue)
-            query = query.Where(m => m.ModelCategoryId == categoryId.Value);
+        if (categoryIds != null && categoryIds.Count > 0)
+            query = query.Where(m => m.ModelCategoryId.HasValue && categoryIds.Contains(m.ModelCategoryId.Value));
+
+        if (normalizedTagNames != null && normalizedTagNames.Count > 0)
+            query = query.Where(m => m.Tags.Any(tag => normalizedTagNames.Contains(tag.NormalizedName)));
 
         if (hasConceptImages.HasValue)
             query = hasConceptImages.Value
@@ -133,7 +141,10 @@ internal sealed class ModelRepository : IModelRepository
                 Name = m.Name,
                 CreatedAt = m.CreatedAt,
                 UpdatedAt = m.UpdatedAt,
-                Tags = m.Tags,
+                Tags = m.Tags
+                    .OrderBy(tag => tag.Name)
+                    .Select(tag => tag.Name)
+                    .ToArray(),
                 Description = m.Description,
                 CategoryId = m.ModelCategoryId,
                 CategoryPath = m.ModelCategory != null ? m.ModelCategory.Name : null,
@@ -181,6 +192,7 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
             .Include(m => m.ModelCategory)
             .Include(m => m.ConceptImages)
                 .ThenInclude(ci => ci.File)
@@ -208,6 +220,7 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
             .Include(m => m.ModelCategory)
             .Include(m => m.ConceptImages)
                 .ThenInclude(ci => ci.File)
@@ -255,6 +268,7 @@ internal sealed class ModelRepository : IModelRepository
             .Where(m => m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
             .Include(m => m.ModelCategory)
             .Include(m => m.ConceptImages)
                 .ThenInclude(ci => ci.File)
@@ -277,6 +291,7 @@ internal sealed class ModelRepository : IModelRepository
             .Where(m => m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
             .Include(m => m.ModelCategory)
             .Include(m => m.ConceptImages)
                 .ThenInclude(ci => ci.File)

@@ -45,6 +45,46 @@ export function buildModelCategoryTree(
   return buildNodes(groupByParent(filteredCategories), null)
 }
 
+export function filterModelCategoryTree(
+  nodes: TreeNode[],
+  query: string
+): TreeNode[] {
+  const normalizedQuery = query.trim().toLowerCase()
+
+  if (!normalizedQuery) {
+    return nodes
+  }
+
+  const filterNode = (node: TreeNode): TreeNode | null => {
+    const filteredChildren = (node.children ?? [])
+      .map(filterNode)
+      .filter((child): child is TreeNode => child !== null)
+    const label = String(node.label ?? '').toLowerCase()
+
+    if (label.includes(normalizedQuery) || filteredChildren.length > 0) {
+      return {
+        ...node,
+        children: filteredChildren,
+      }
+    }
+
+    return null
+  }
+
+  return nodes.map(filterNode).filter((node): node is TreeNode => node !== null)
+}
+
+export function findModelCategoryById(
+  categories: ModelCategoryDto[],
+  categoryId?: number | null
+): ModelCategoryDto | null {
+  if (!categoryId) {
+    return null
+  }
+
+  return categories.find(category => category.id === categoryId) ?? null
+}
+
 export function buildExpandedKeys(nodes: TreeNode[]): Record<string, boolean> {
   const expandedKeys: Record<string, boolean> = {}
 

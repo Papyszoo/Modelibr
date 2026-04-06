@@ -115,6 +115,11 @@
   flex: 1;
 }
 
+.model-info-category-row .model-category-single-trigger {
+  flex: 1;
+  width: 100%;
+}
+
 .model-info-concept-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

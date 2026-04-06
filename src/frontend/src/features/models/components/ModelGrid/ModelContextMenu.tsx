@@ -283,7 +283,7 @@ export const ModelContextMenu = forwardRef<
         for (const model of selectedModels) {
           await updateModelTags(
             String(model.id),
-            model.tags ?? '',
+            model.tags ?? [],
             model.description ?? '',
             categoryId
           )

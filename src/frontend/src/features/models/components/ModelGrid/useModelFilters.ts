@@ -3,6 +3,16 @@ import { useCallback, useMemo, useState } from 'react'
 import { type PageType, useCardWidthStore } from '@/stores/cardWidthStore'
 import { type Model } from '@/utils/fileUtils'
 
+export interface ModelCategorySelectionState {
+  checked?: boolean
+  partialChecked?: boolean
+}
+
+export type ModelCategorySelectionKeys = Record<
+  string,
+  ModelCategorySelectionState
+>
+
 interface UseModelFiltersOptions {
   packId?: number
   projectId?: number
@@ -10,9 +20,9 @@ interface UseModelFiltersOptions {
 
 export function useModelFilters({ packId, projectId }: UseModelFiltersOptions) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
-    null
-  )
+  const [selectedCategoryKeys, setSelectedCategoryKeys] =
+    useState<ModelCategorySelectionKeys>({})
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([])
   const [hasConceptImages, setHasConceptImages] = useState(false)
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>(
     packId ? [packId] : []
@@ -32,6 +42,14 @@ export function useModelFilters({ packId, projectId }: UseModelFiltersOptions) {
 
   const effectivePackIds = packId ? [packId] : selectedPackIds
   const effectiveProjectIds = projectId ? [projectId] : selectedProjectIds
+  const selectedCategoryIds = useMemo(
+    () =>
+      Object.entries(selectedCategoryKeys)
+        .filter(([, state]) => state?.checked)
+        .map(([key]) => Number(key))
+        .filter(Number.isFinite),
+    [selectedCategoryKeys]
+  )
 
   const handlePackFilterChange = useCallback(
     (packIds: number[]) => {
@@ -76,8 +94,11 @@ export function useModelFilters({ packId, projectId }: UseModelFiltersOptions) {
   return {
     searchQuery,
     setSearchQuery,
-    selectedCategoryId,
-    setSelectedCategoryId,
+    selectedCategoryKeys,
+    setSelectedCategoryKeys,
+    selectedCategoryIds,
+    selectedTagNames,
+    setSelectedTagNames,
     hasConceptImages,
     setHasConceptImages,
     effectivePackIds,

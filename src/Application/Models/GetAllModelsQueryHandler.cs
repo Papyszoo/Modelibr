@@ -19,12 +19,15 @@ namespace Application.Models
         {
             IEnumerable<ModelListDto> modelListDtos;
             int? totalCount = null;
+            var normalizedTags = ModelTag.SanitizeNames(query.Tags)
+                .Select(ModelTag.NormalizeName)
+                .ToArray();
 
             if (query.Page.HasValue && query.PageSize.HasValue)
             {
                 var result = await _modelRepository.GetPagedListAsync(
                     query.Page.Value, query.PageSize.Value,
-                    query.PackId, query.ProjectId, query.TextureSetId, query.CategoryId, query.HasConceptImages,
+                    query.PackId, query.ProjectId, query.TextureSetId, query.CategoryIds, normalizedTags, query.HasConceptImages,
                     cancellationToken);
                 modelListDtos = result.Items;
                 totalCount = result.TotalCount;
@@ -51,9 +54,14 @@ namespace Application.Models
                     models = models.Where(m => m.TextureSets.Any(ts => ts.Id == query.TextureSetId.Value));
                 }
 
-                if (query.CategoryId.HasValue)
+                if (query.CategoryIds != null && query.CategoryIds.Count > 0)
                 {
-                    models = models.Where(m => m.ModelCategoryId == query.CategoryId.Value);
+                    models = models.Where(m => m.ModelCategoryId.HasValue && query.CategoryIds.Contains(m.ModelCategoryId.Value));
+                }
+
+                if (normalizedTags.Length > 0)
+                {
+                    models = models.Where(m => m.Tags.Any(tag => normalizedTags.Contains(tag.NormalizedName)));
                 }
 
                 if (query.HasConceptImages.HasValue)
@@ -70,7 +78,7 @@ namespace Application.Models
                     Name = m.Name,
                     CreatedAt = m.CreatedAt,
                     UpdatedAt = m.UpdatedAt,
-                    Tags = m.Tags,
+                    Tags = ModelDtoMappings.ToTagNames(m.Tags),
                     Description = m.Description,
                     CategoryId = m.ModelCategoryId,
                     CategoryPath = ModelDtoMappings.BuildCategoryPath(m.ModelCategory),
@@ -101,7 +109,7 @@ namespace Application.Models
         }
     }
 
-    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null, int? TextureSetId = null, int? CategoryId = null, bool? HasConceptImages = null, int? Page = null, int? PageSize = null) : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null, int? TextureSetId = null, IReadOnlyCollection<int>? CategoryIds = null, IReadOnlyCollection<string>? Tags = null, bool? HasConceptImages = null, int? Page = null, int? PageSize = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
     
@@ -114,7 +122,7 @@ namespace Application.Models
         public string Name { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
         public DateTime UpdatedAt { get; init; }
-        public string? Tags { get; init; }
+        public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
         public string? Description { get; init; }
         public int? CategoryId { get; init; }
         public string? CategoryPath { get; init; }

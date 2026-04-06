@@ -7,6 +7,7 @@ namespace Domain.Models
         private readonly List<TextureSet> _textureSets = new();
         private readonly List<Pack> _packs = new();
         private readonly List<Project> _projects = new();
+        private readonly List<ModelTag> _tags = new();
         private readonly List<ModelVersion> _versions = new();
         private readonly List<ModelConceptImage> _conceptImages = new();
 
@@ -14,7 +15,6 @@ namespace Domain.Models
         public string Name { get; private set; } = string.Empty;
         public DateTime CreatedAt { get; private set; }
         public DateTime UpdatedAt { get; private set; }
-        public string? Tags { get; private set; }
         public string? Description { get; private set; }
         public int? ModelCategoryId { get; private set; }
 
@@ -27,6 +27,17 @@ namespace Domain.Models
         // Navigation property for active version
         public ModelVersion? ActiveVersion { get; private set; }
         public ModelCategory? ModelCategory { get; private set; }
+
+        public ICollection<ModelTag> Tags
+        {
+            get => _tags;
+            set
+            {
+                _tags.Clear();
+                if (value != null)
+                    _tags.AddRange(value);
+            }
+        }
 
         // Navigation property for many-to-many relationship with TextureSets - EF Core requires this to be settable
         public ICollection<TextureSet> TextureSets 
@@ -191,14 +202,22 @@ namespace Domain.Models
         }
 
         /// <summary>
-        /// Sets the AI-generated tags and description for this model.
+        /// Replaces the model metadata tags and description.
         /// </summary>
-        /// <param name="tags">Comma-separated list of tags with optional confidence scores</param>
-        /// <param name="description">Generated description of the model</param>
-        /// <param name="updatedAt">When the tags were set</param>
-        public void SetTagsAndDescription(string? tags, string? description, DateTime updatedAt)
+        /// <param name="tags">Normalized tag entities assigned to the model</param>
+        /// <param name="description">Model description</param>
+        /// <param name="updatedAt">When the metadata was updated</param>
+        public void SetMetadata(IEnumerable<ModelTag> tags, string? description, DateTime updatedAt)
         {
-            Tags = tags;
+            _tags.Clear();
+            if (tags != null)
+            {
+                foreach (var tag in tags.GroupBy(tag => tag.NormalizedName).Select(group => group.First()))
+                {
+                    _tags.Add(tag);
+                }
+            }
+
             Description = description;
             UpdatedAt = updatedAt;
         }

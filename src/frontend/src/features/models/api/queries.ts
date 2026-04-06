@@ -7,6 +7,7 @@ import { type QueryConfig } from '@/lib/react-query'
 import {
   getModelById,
   getModelCategories,
+  getModelTags,
   getModelsPaginated,
 } from './modelApi'
 
@@ -18,7 +19,8 @@ export function getModelsQueryOptions(params: {
   packId?: number
   projectId?: number
   textureSetId?: number
-  categoryId?: number
+  categoryIds?: number[]
+  tags?: string[]
   hasConceptImages?: boolean
 }) {
   return queryOptions({
@@ -34,7 +36,8 @@ type UseModelsQueryOptions = {
     packId?: number
     projectId?: number
     textureSetId?: number
-    categoryId?: number
+    categoryIds?: number[]
+    tags?: string[]
     hasConceptImages?: boolean
   }
   queryConfig?: QueryConfig<typeof getModelsQueryOptions>
@@ -132,6 +135,26 @@ export function useModelCategoriesQuery({
 }: UseModelCategoriesQueryOptions = {}) {
   return useQuery({
     ...getModelCategoriesQueryOptions(),
+    ...queryConfig,
+  })
+}
+
+export function getModelTagsQueryOptions() {
+  return queryOptions({
+    queryKey: ['model-tags'] as const,
+    queryFn: () => getModelTags(),
+  })
+}
+
+type UseModelTagsQueryOptions = {
+  queryConfig?: QueryConfig<typeof getModelTagsQueryOptions>
+}
+
+export function useModelTagsQuery({
+  queryConfig = {},
+}: UseModelTagsQueryOptions = {}) {
+  return useQuery({
+    ...getModelTagsQueryOptions(),
     ...queryConfig,
   })
 }

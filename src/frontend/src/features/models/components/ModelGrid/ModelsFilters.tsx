@@ -3,14 +3,19 @@ import '@/shared/components/FilterPanel.css'
 import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
-import { TreeSelect } from 'primereact/treeselect'
 import { type MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
 
+import { ModelCategoryFilterPicker } from '@/features/models/components/ModelGrid/ModelCategoryFilterPicker'
 import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
-import { buildModelCategoryTree } from '@/features/models/utils/categoryTree'
-import { type ModelCategoryDto, type PackDto, type ProjectDto } from '@/types'
+import {
+  type ModelCategoryDto,
+  type ModelTagDto,
+  type PackDto,
+  type ProjectDto,
+} from '@/types'
 
 import { CardWidthButton } from './CardWidthButton'
+import { type ModelCategorySelectionKeys } from './useModelFilters'
 
 interface ModelsFiltersProps {
   searchQuery: string
@@ -18,13 +23,17 @@ interface ModelsFiltersProps {
   packs: PackDto[]
   projects: ProjectDto[]
   categories: ModelCategoryDto[]
+  tags: ModelTagDto[]
   selectedPackIds: number[]
   selectedProjectIds: number[]
-  selectedCategoryId: number | null
+  selectedCategoryKeys: ModelCategorySelectionKeys
+  selectedCategoryIds: number[]
+  selectedTagNames: string[]
   hasConceptImages: boolean
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
-  onCategoryChange: (categoryId: number | null) => void
+  onCategoryChange: (keys: ModelCategorySelectionKeys) => void
+  onTagChange: (tags: string[]) => void
   onHasConceptImagesChange: (value: boolean) => void
   packFilterDisabled?: boolean
   projectFilterDisabled?: boolean
@@ -43,13 +52,17 @@ export function ModelsFilters({
   packs,
   projects,
   categories,
+  tags,
   selectedPackIds,
   selectedProjectIds,
-  selectedCategoryId,
+  selectedCategoryKeys,
+  selectedCategoryIds,
+  selectedTagNames,
   hasConceptImages,
   onPackFilterChange,
   onProjectFilterChange,
   onCategoryChange,
+  onTagChange,
   onHasConceptImagesChange,
   packFilterDisabled = false,
   projectFilterDisabled = false,
@@ -74,24 +87,25 @@ export function ModelsFilters({
     label: project.name,
     value: project.id,
   }))
-
-  const categoryTreeNodes = buildModelCategoryTree(categories)
+  const tagOptions = tags.map(tag => ({
+    label: tag.name,
+    value: tag.name,
+  }))
   const hasActiveSearch = searchQuery.trim().length > 0
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
-    selectedCategoryId !== null ||
+    selectedCategoryIds.length > 0 ||
+    selectedTagNames.length > 0 ||
     hasConceptImages
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
     selectedProjectIds.length > 0,
-    selectedCategoryId !== null,
+    selectedCategoryIds.length > 0,
+    selectedTagNames.length > 0,
     hasConceptImages,
   ].filter(Boolean).length
-
-  const selectedCategoryKey =
-    selectedCategoryId !== null ? String(selectedCategoryId) : null
   const selectedCountLabel = `${selectedModelCount} model${selectedModelCount === 1 ? '' : 's'}`
 
   useEffect(() => {
@@ -234,43 +248,24 @@ export function ModelsFilters({
               />
             )}
             {categories.length > 0 && (
-              <TreeSelect
-                value={selectedCategoryKey}
-                options={categoryTreeNodes}
-                onChange={e => {
-                  const value =
-                    typeof e.value === 'string' || e.value === null
-                      ? e.value
-                      : String(e.value)
-                  onCategoryChange(value ? Number(value) : null)
-                }}
-                placeholder="Category"
-                className="list-filters-control list-filters-tree-select"
+              <ModelCategoryFilterPicker
+                categories={categories}
+                selectedKeys={selectedCategoryKeys}
+                onChange={onCategoryChange}
+                onManageClick={() => setShowCategoryManager(true)}
+              />
+            )}
+            {tags.length > 0 && (
+              <MultiSelect
+                value={selectedTagNames}
+                options={tagOptions}
+                onChange={event => onTagChange(event.value || [])}
+                placeholder="Filter by Tags"
+                className="list-filters-control"
+                display="chip"
                 showClear
                 filter
-                filterPlaceholder="Search categories..."
-                selectionMode="single"
-                panelHeaderTemplate={options => (
-                  <div className={options.className}>
-                    <div className="model-category-panel-header">
-                      {options.filterElement}
-                      <Button
-                        icon="pi pi-cog"
-                        text
-                        rounded
-                        aria-label="Manage model categories"
-                        tooltip="Manage model categories"
-                        tooltipOptions={{ position: 'left' }}
-                        onClick={event => {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          options.onCloseClick()
-                          setShowCategoryManager(true)
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
+                filterPlaceholder="Search tags..."
               />
             )}
             <div className="list-filters-switch models-filter-switch">
@@ -289,7 +284,8 @@ export function ModelsFilters({
                 onClick={() => {
                   onPackFilterChange([])
                   onProjectFilterChange([])
-                  onCategoryChange(null)
+                  onCategoryChange({})
+                  onTagChange([])
                   onHasConceptImagesChange(false)
                 }}
               />
@@ -298,9 +294,10 @@ export function ModelsFilters({
 
           {packs.length === 0 &&
           projects.length === 0 &&
-          categories.length === 0 ? (
+          categories.length === 0 &&
+          tags.length === 0 ? (
             <span className="list-filters-empty">
-              No category, pack, or project filters yet.
+              No category, tag, pack, or project filters yet.
             </span>
           ) : null}
         </div>

@@ -27,10 +27,11 @@ describe('ModelInfo', () => {
 
   const mockModel = {
     id: 'test-model-123',
+    name: 'Test Model',
     createdAt: '2024-01-15T10:30:00Z',
     updatedAt: '2024-01-16T14:45:00Z',
     files: [{ originalFileName: 'test-model.obj' }],
-    tags: '',
+    tags: [],
     description: '',
     textureSets: [],
   }
@@ -103,7 +104,7 @@ describe('ModelInfo', () => {
   it('should display model tags when provided', () => {
     const modelWithTags = {
       ...mockModel,
-      tags: 'character, sci-fi, robot',
+      tags: ['character', 'sci-fi', 'robot'],
     }
 
     renderWithQueryClient(<ModelInfo model={modelWithTags} />)

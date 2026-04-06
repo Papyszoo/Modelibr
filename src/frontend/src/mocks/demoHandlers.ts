@@ -16,7 +16,7 @@ const mockModels = [
     id: '1',
     name: 'Test Cube',
     description: 'A simple cube model for testing',
-    tags: 'test,cube,basic',
+    tags: ['test', 'cube', 'basic'],
     files: [
       {
         id: '101',
@@ -43,7 +43,7 @@ const mockModels = [
     id: '2',
     name: 'Test Cone',
     description: 'A cone model exported as FBX',
-    tags: 'test,cone,fbx',
+    tags: ['test', 'cone', 'fbx'],
     files: [
       {
         id: '102',
@@ -70,7 +70,7 @@ const mockModels = [
     id: '3',
     name: 'Test Cylinder',
     description: 'A cylinder shape',
-    tags: 'test,cylinder',
+    tags: ['test', 'cylinder'],
     files: [
       {
         id: '103',
@@ -97,7 +97,7 @@ const mockModels = [
     id: '4',
     name: 'Test Icosphere',
     description: 'An icosphere model',
-    tags: 'test,icosphere',
+    tags: ['test', 'icosphere'],
     files: [
       {
         id: '104',
@@ -124,7 +124,7 @@ const mockModels = [
     id: '5',
     name: 'Test Torus',
     description: 'A torus model',
-    tags: 'test,torus',
+    tags: ['test', 'torus'],
     files: [
       {
         id: '105',
@@ -633,6 +633,14 @@ export const demoHandlers = [
     const packId = url.searchParams.get('packId')
     const projectId = url.searchParams.get('projectId')
     const textureSetId = url.searchParams.get('textureSetId')
+    const categoryIds = url.searchParams
+      .getAll('categoryId')
+      .map(value => Number(value))
+      .filter(Number.isFinite)
+    const tags = url.searchParams
+      .getAll('tag')
+      .map(tag => tag.trim().toLowerCase())
+      .filter(Boolean)
 
     let filtered = [...mockModels]
     if (packId) {
@@ -653,6 +661,16 @@ export const demoHandlers = [
         m.textureSets?.some(ts => ts.id === Number(textureSetId))
       )
     }
+    if (categoryIds.length > 0) {
+      filtered = filtered.filter(
+        model => model.categoryId && categoryIds.includes(model.categoryId)
+      )
+    }
+    if (tags.length > 0) {
+      filtered = filtered.filter(model =>
+        (model.tags ?? []).some(tag => tags.includes(tag.toLowerCase()))
+      )
+    }
 
     // If page param is present, return paginated format
     if (url.searchParams.has('page')) {
@@ -668,6 +686,14 @@ export const demoHandlers = [
 
     // Otherwise return array
     return HttpResponse.json(filtered)
+  }),
+
+  http.get('*/model-tags', () => {
+    const tags = [...new Set(mockModels.flatMap(model => model.tags ?? []))]
+      .sort((left, right) => left.localeCompare(right))
+      .map(name => ({ name }))
+
+    return HttpResponse.json({ tags })
   }),
 
   // Single model

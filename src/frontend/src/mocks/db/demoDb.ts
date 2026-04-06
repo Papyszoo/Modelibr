@@ -29,7 +29,7 @@ export interface DemoModel {
   id: number
   name: string
   description: string
-  tags: string
+  tags: string[]
   files: DemoFile[]
   createdAt: string
   updatedAt: string
@@ -466,7 +466,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 1,
       name: 'Test Cube',
       description: 'A simple cube model for testing',
-      tags: 'test,cube,basic',
+      tags: ['test', 'cube', 'basic'],
       files: [
         {
           id: 101,
@@ -496,7 +496,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 2,
       name: 'Test Cone',
       description: 'A cone model exported as FBX',
-      tags: 'test,cone,fbx',
+      tags: ['test', 'cone', 'fbx'],
       files: [
         {
           id: 102,
@@ -526,7 +526,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 3,
       name: 'Test Cylinder',
       description: 'A cylinder shape',
-      tags: 'test,cylinder',
+      tags: ['test', 'cylinder'],
       files: [
         {
           id: 103,
@@ -556,7 +556,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 4,
       name: 'Test Icosphere',
       description: 'An icosphere model',
-      tags: 'test,icosphere',
+      tags: ['test', 'icosphere'],
       files: [
         {
           id: 104,
@@ -586,7 +586,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 5,
       name: 'Test Torus',
       description: 'A torus model',
-      tags: 'test,torus',
+      tags: ['test', 'torus'],
       files: [
         {
           id: 105,

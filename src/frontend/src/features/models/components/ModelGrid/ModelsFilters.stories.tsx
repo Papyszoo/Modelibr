@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { type ModelCategoryDto, type PackDto, type ProjectDto } from '@/types'
+import {
+  type ModelCategoryDto,
+  type ModelTagDto,
+  type PackDto,
+  type ProjectDto,
+} from '@/types'
 
 import { ModelsFilters } from './ModelsFilters'
 
@@ -71,6 +76,12 @@ const mockCategories: ModelCategoryDto[] = [
   },
 ]
 
+const mockTags: ModelTagDto[] = [
+  { name: 'character' },
+  { name: 'fantasy' },
+  { name: 'environment' },
+]
+
 const meta: Meta<typeof ModelsFilters> = {
   title: 'Models/ModelsFilters',
   component: ModelsFilters,
@@ -82,16 +93,25 @@ const meta: Meta<typeof ModelsFilters> = {
     packs: mockPacks,
     projects: mockProjects,
     categories: mockCategories,
+    tags: mockTags,
     selectedPackIds: [],
     selectedProjectIds: [],
-    selectedCategoryId: null,
+    selectedCategoryKeys: {},
+    selectedCategoryIds: [],
+    selectedTagNames: [],
     hasConceptImages: false,
     onPackFilterChange: noop,
     onProjectFilterChange: noop,
     onCategoryChange: noop,
+    onTagChange: noop,
     onHasConceptImagesChange: noop,
     cardWidth: 200,
     onCardWidthChange: noop,
+    modelCount: 12,
+    selectedModelCount: 0,
+    onUploadClick: noop,
+    onRefreshClick: noop,
+    onBulkActionsClick: noop,
   },
 }
 
@@ -110,6 +130,7 @@ export const WithActiveFilters: Story = {
   args: {
     selectedPackIds: [1],
     selectedProjectIds: [1],
+    selectedTagNames: ['character'],
   },
 }
 

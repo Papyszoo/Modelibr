@@ -148,10 +148,16 @@
 
 .model-grid-selection-surface {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 100%;
 }
 
 .model-grid-selection-surface.is-selecting {
   cursor: crosshair;
+}
+
+.model-grid-selection-content {
+  min-height: 100%;
 }
 
 /* Model Card */
@@ -183,21 +189,21 @@
   left: 0.5rem;
   z-index: 2;
   opacity: 0;
-  transition: opacity 0.2s ease;
-  width: 1.4rem;
-  height: 1.4rem;
-  display: inline-flex;
+  transition: opacity 0.2s;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--text-color);
+  background: rgba(255, 255, 255, 0.9);
   cursor: pointer;
 }
 
 .model-select-checkbox i {
   font-size: 1rem;
+  color: var(--text-color);
 }
 
 .model-card:hover .model-select-checkbox,
@@ -206,6 +212,10 @@
 }
 
 .model-card.selected .model-select-checkbox {
+  opacity: 1;
+}
+
+.model-card.selected .model-select-checkbox i {
   color: var(--primary-color);
 }
 
@@ -292,6 +302,49 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+
+.model-category-filter-trigger,
+.model-category-single-trigger {
+  justify-content: flex-start;
+  min-width: 13rem;
+}
+
+.model-category-filter-trigger.has-value,
+.model-category-single-trigger.has-value {
+  border-color: var(--primary-color);
+}
+
+.model-category-filter-overlay .p-overlaypanel-content {
+  padding: 0;
+}
+
+.model-category-filter-popover {
+  width: min(30rem, 80vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem;
+}
+
+.model-category-filter-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.model-category-filter-search {
+  flex: 1;
+}
+
+.model-category-filter-tree {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.model-category-single-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* No results state */

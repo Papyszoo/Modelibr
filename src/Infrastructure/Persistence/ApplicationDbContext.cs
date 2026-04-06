@@ -14,6 +14,7 @@ namespace Infrastructure.Persistence
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
+        public DbSet<ModelTag> ModelTags => Set<ModelTag>();
         public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
         public DbSet<Stage> Stages => Set<Stage>();
@@ -139,6 +140,27 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(m => m.ModelCategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                entity.HasMany(m => m.Tags)
+                    .WithMany(t => t.Models)
+                    .UsingEntity<Dictionary<string, object>>(
+                        "ModelTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<Model>()
+                            .WithMany()
+                            .HasForeignKey("ModelId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("ModelTagAssignments");
+                            join.HasKey("ModelId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
+
                 entity.HasMany(m => m.ConceptImages)
                     .WithOne(ci => ci.Model)
                     .HasForeignKey(ci => ci.ModelId)
@@ -153,6 +175,23 @@ namespace Infrastructure.Persistence
 
                 // Global query filter for soft deletes
                 entity.HasQueryFilter(m => !m.IsDeleted);
+            });
+
+            modelBuilder.Entity<ModelTag>(entity =>
+            {
+                entity.ToTable("ModelTags");
+                entity.HasKey(tag => tag.Id);
+                entity.Property(tag => tag.Name)
+                    .IsRequired()
+                    .HasMaxLength(100);
+                entity.Property(tag => tag.NormalizedName)
+                    .IsRequired()
+                    .HasMaxLength(100);
+                entity.Property(tag => tag.CreatedAt).IsRequired();
+                entity.Property(tag => tag.UpdatedAt).IsRequired();
+
+                entity.HasIndex(tag => tag.NormalizedName)
+                    .IsUnique();
             });
 
             // Configure ModelVersion entity

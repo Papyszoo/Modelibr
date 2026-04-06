@@ -23,6 +23,17 @@ public static class ModelEndpoints
         .WithName("Update Model Tags")
         .WithTags("Models");
 
+        app.MapGet("/model-tags", async (IQueryHandler<GetAllModelTagsQuery, GetAllModelTagsResponse> queryHandler, CancellationToken cancellationToken) =>
+        {
+            var result = await queryHandler.Handle(new GetAllModelTagsQuery(), cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+        .WithName("Get All Model Tags")
+        .WithTags("Models");
+
         app.MapPost("/models/{modelId}/concept-images", AddConceptImage)
         .WithName("Add Model Concept Image")
         .WithTags("Models");
@@ -31,9 +42,9 @@ public static class ModelEndpoints
         .WithName("Remove Model Concept Image")
         .WithTags("Models");
 
-        app.MapGet("/models", async (int? packId, int? projectId, int? textureSetId, int? categoryId, bool? hasConceptImages, int? page, int? pageSize, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, CancellationToken cancellationToken) =>
+        app.MapGet("/models", async (int? packId, int? projectId, int? textureSetId, int[]? categoryId, string[]? tag, bool? hasConceptImages, int? page, int? pageSize, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId, textureSetId, categoryId, hasConceptImages, page, pageSize), cancellationToken);
+            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId, textureSetId, categoryId, tag, hasConceptImages, page, pageSize), cancellationToken);
             
             if (result.IsFailure)
             {
@@ -262,6 +273,6 @@ public static class ModelEndpoints
     }
 }
 
-public record UpdateModelTagsRequest(string? Tags, string? Description, int? CategoryId);
+public record UpdateModelTagsRequest(IReadOnlyList<string>? Tags, string? Description, int? CategoryId);
 public record SetDefaultTextureSetRequest(int? TextureSetId, int? ModelVersionId);
 public record AttachFileRequest(int FileId);
