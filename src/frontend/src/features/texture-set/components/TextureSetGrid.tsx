@@ -74,6 +74,7 @@ export function TextureSetGrid({
   const [dropTargetTextureSet, setDropTargetTextureSet] =
     useState<TextureSetDto | null>(null)
   const [dragOverCardId, setDragOverCardId] = useState<number | null>(null)
+  const selectedTextureSetRef = useRef<TextureSetDto | null>(null)
   const contextMenu = useRef<ContextMenu>(null)
   const toast = useRef<Toast>(null)
   const isShowingMergeDialog = useRef(false)
@@ -81,11 +82,17 @@ export function TextureSetGrid({
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.textureSets
 
+  const setActiveTextureSet = (textureSet: TextureSetDto | null) => {
+    selectedTextureSetRef.current = textureSet
+    setSelectedTextureSet(textureSet)
+  }
+
   const handleAddToPack = async (packId: number) => {
-    if (!selectedTextureSet) return
+    const textureSet = selectedTextureSetRef.current
+    if (!textureSet) return
 
     try {
-      await addTextureSetToPack(packId, selectedTextureSet.id)
+      await addTextureSetToPack(packId, textureSet.id)
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
@@ -105,10 +112,11 @@ export function TextureSetGrid({
   }
 
   const handleSoftDelete = async () => {
-    if (!selectedTextureSet) return
+    const textureSet = selectedTextureSetRef.current
+    if (!textureSet) return
 
     try {
-      await softDeleteTextureSet(selectedTextureSet.id)
+      await softDeleteTextureSet(textureSet.id)
       toast.current?.show({
         severity: 'success',
         summary: 'Recycled',
@@ -117,7 +125,7 @@ export function TextureSetGrid({
       })
       // Call the callback to remove the texture set from the list without making a new request
       if (onTextureSetRecycled) {
-        onTextureSetRecycled(selectedTextureSet.id)
+        onTextureSetRecycled(textureSet.id)
       }
     } catch (error) {
       console.error('Failed to recycle texture set:', error)
@@ -337,9 +345,10 @@ export function TextureSetGrid({
   const ALL_PROXY_SIZES = [256, 512, 1024, 2048]
 
   const handleGenerateProxy = async (size: number) => {
-    if (!selectedTextureSet) return
+    const textureSet = selectedTextureSetRef.current
+    if (!textureSet) return
     try {
-      await regenerateTextureSetThumbnail(selectedTextureSet.id, {
+      await regenerateTextureSetThumbnail(textureSet.id, {
         proxySize: size,
       })
       toast.current?.show({
@@ -363,10 +372,11 @@ export function TextureSetGrid({
   }
 
   const handleRegenerateThumbnail = async () => {
-    if (!selectedTextureSet) return
+    const textureSet = selectedTextureSetRef.current
+    if (!textureSet) return
 
     try {
-      await regenerateTextureSetThumbnail(selectedTextureSet.id)
+      await regenerateTextureSetThumbnail(textureSet.id)
       toast.current?.show({
         severity: 'success',
         summary: 'Thumbnail',
@@ -521,7 +531,7 @@ export function TextureSetGrid({
               onClick={() => onTextureSetSelect(textureSet)}
               onContextMenu={e => {
                 e.preventDefault()
-                setSelectedTextureSet(textureSet)
+                setActiveTextureSet(textureSet)
                 contextMenu.current?.show(e)
               }}
             >
