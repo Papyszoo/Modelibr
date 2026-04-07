@@ -73,11 +73,14 @@ Do not pull backend guidance into a frontend-only task, and do not pull demo or 
 
 The main agent owns final verification.
 
-- Use targeted checks while iterating.
-- Before closing a code change, run the relevant required suites.
+- After any code change, run targeted checks while iterating and rerun the affected suites after each meaningful edit until they are green.
+- Before closing a code change, run the full required local QA suites for every affected layer.
+- Do not finish a session with known failing checks. Failures found while verifying a change must be investigated and fixed in the same session unless the user explicitly redirects scope.
+- Never remove tests, weaken assertions, add blanket skips, convert failures into always-passing behavior, or otherwise reduce test quality just to get green. Test coverage and test strictness must stay at least as strong as before the change.
 - When backend changes are involved, run `dotnet build Modelibr.sln` and `dotnet test Modelibr.sln --no-build`.
 - When frontend changes are involved, run `cd src/frontend && npm test && npm run lint && npm run build`.
-- When E2E-relevant behavior changes are involved, run `cd tests/e2e && npm run test`.
+- When frontend-visible behavior changes are involved, run `cd tests/e2e && npm run test` before finishing.
+- If a verification failure is caused by environment or infrastructure rather than product code, document the blocker explicitly and do not claim the change is fully verified.
 
 ## Scoped Guidance Only
 
@@ -112,6 +115,8 @@ These focused agents are the only workflow specializations this orchestrator sho
 ## CI Alignment
 
 Local QA instructions are intentionally stricter than CI pipeline gates. CI (`ci-and-deploy.yml`, `code-quality.yml`) is a minimum bar. The agent must still run the full local verification commands listed in the QA section.
+
+- No shortcuts: the agent must not trade correctness for speed by skipping required suites, stopping at partial verification, or leaving failing tests for a later session without explicit user approval.
 
 - Dockerfile or compose changes may affect `docker-publish.yml` GHCR image publishing.
 - Frontend-visible changes that alter demo behavior must validate `build:demo`.

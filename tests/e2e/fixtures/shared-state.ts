@@ -15,7 +15,7 @@
  * by Page ensures full isolation between parallel scenarios.
  */
 
-import type { Page } from '@playwright/test';
+import type { Page } from "@playwright/test";
 
 // ── Data interfaces ──────────────────────────────────────────────────
 
@@ -37,12 +37,15 @@ export interface PackData {
     id: number;
     name: string;
     description?: string;
+    licenseType?: string;
+    url?: string;
 }
 
 export interface ProjectData {
     id: number;
     name: string;
     description?: string;
+    notes?: string;
 }
 
 export interface SpriteData {

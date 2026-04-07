@@ -4,7 +4,7 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--surface-card, #1e1e2e);
+  background: var(--surface-card);
 }
 
 .panel-wrapper-header {
@@ -12,8 +12,8 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.35rem 0.5rem;
-  background: var(--surface-ground, #181825);
-  border-bottom: 1px solid var(--surface-border, #333);
+  background: var(--surface-ground);
+  border-bottom: 1px solid var(--surface-border);
   min-height: 32px;
   flex-shrink: 0;
   user-select: none;
@@ -22,7 +22,7 @@
 .panel-wrapper-title {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-color, #fff);
+  color: var(--text-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -41,17 +41,19 @@
   margin-left: auto;
 }
 
-.panel-expand-btn,
-.panel-close-btn {
+.panel-wrapper-header button.panel-expand-btn,
+.panel-wrapper-header button.panel-close-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 22px;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 3px;
-  background: transparent;
-  color: var(--text-color-secondary, #aaa);
+  background: transparent !important;
+  color: var(--text-color-secondary) !important;
+  appearance: none;
+  -webkit-appearance: none;
   cursor: pointer;
   padding: 0;
   font-size: 0.7rem;
@@ -60,14 +62,25 @@
     color 0.15s;
 }
 
-.panel-expand-btn:hover {
-  background: var(--surface-hover, #333);
-  color: var(--primary-color, #6366f1);
+.panel-wrapper-header button.panel-expand-btn:hover {
+  background: var(--surface-hover) !important;
+  color: var(--primary-color) !important;
 }
 
-.panel-close-btn:hover {
+.panel-wrapper-header button.panel-close-btn:hover {
   background: rgba(239, 68, 68, 0.2);
   color: #ef4444;
+}
+
+.panel-wrapper-header button.panel-expand-btn:focus-visible,
+.panel-wrapper-header button.panel-close-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.16);
+}
+
+.panel-expand-btn i,
+.panel-close-btn i {
+  color: inherit;
 }
 
 .panel-wrapper-content {
@@ -80,7 +93,7 @@
 /* Resize dividers between panels and canvas */
 .viewer-resize-divider {
   flex-shrink: 0;
-  background: var(--surface-border, #333);
+  background: var(--surface-border);
   transition: background 0.15s;
   position: relative;
   z-index: 10;
@@ -88,7 +101,7 @@
 
 .viewer-resize-divider:hover,
 .viewer-resize-divider.resizing {
-  background: var(--primary-color, #6366f1);
+  background: var(--primary-color);
 }
 
 .viewer-resize-divider-h {

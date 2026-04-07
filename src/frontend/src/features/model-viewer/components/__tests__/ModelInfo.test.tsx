@@ -1,15 +1,24 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 
 import { ModelInfo } from '@/features/model-viewer/components/ModelInfo'
 
-// Mock the ApiClient
-jest.mock('../../../../services/ApiClient', () => ({
-  __esModule: true,
-  apiClient: {
-    updateModelTags: jest.fn(),
-  },
+jest.mock('@/features/models/api/modelApi', () => ({
+  addModelConceptImage: jest.fn(),
+  getFilePreviewUrl: jest.fn(fileId => `/files/${fileId}/preview`),
+  getFileUrl: jest.fn(fileId => `/files/${fileId}`),
+  removeModelConceptImage: jest.fn(),
+  updateModelTags: jest.fn(),
+  uploadFile: jest.fn(),
+}))
+
+jest.mock('@/features/models/api/queries', () => ({
+  useModelCategoriesQuery: jest.fn(() => ({ data: [] })),
+}))
+
+jest.mock('@/lib/apiBase', () => ({
+  resolveApiAssetUrl: (url?: string | null) => url ?? null,
 }))
 
 describe('ModelInfo', () => {
@@ -27,10 +36,11 @@ describe('ModelInfo', () => {
 
   const mockModel = {
     id: 'test-model-123',
+    name: 'Test Model',
     createdAt: '2024-01-15T10:30:00Z',
     updatedAt: '2024-01-16T14:45:00Z',
     files: [{ originalFileName: 'test-model.obj' }],
-    tags: '',
+    tags: [],
     description: '',
     textureSets: [],
   }
@@ -103,7 +113,7 @@ describe('ModelInfo', () => {
   it('should display model tags when provided', () => {
     const modelWithTags = {
       ...mockModel,
-      tags: 'character, sci-fi, robot',
+      tags: ['character', 'sci-fi', 'robot'],
     }
 
     renderWithQueryClient(<ModelInfo model={modelWithTags} />)
@@ -117,5 +127,33 @@ describe('ModelInfo', () => {
     renderWithQueryClient(<ModelInfo model={mockModel} />)
 
     expect(screen.getByText('Save Changes')).toBeInTheDocument()
+  })
+
+  it('opens concept images in the lightbox viewer', () => {
+    const modelWithConceptImage = {
+      ...mockModel,
+      conceptImages: [
+        {
+          fileId: 7,
+          fileName: 'concept-sheet.png',
+          previewUrl: '/concept-preview.png',
+          fileUrl: '/concept-full.png',
+          sortOrder: 0,
+        },
+      ],
+    }
+
+    renderWithQueryClient(<ModelInfo model={modelWithConceptImage} />)
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Open concept image concept-sheet.png',
+      })
+    )
+
+    expect(screen.getByAltText('concept-sheet.png full view')).toHaveAttribute(
+      'src',
+      '/concept-full.png'
+    )
   })
 })

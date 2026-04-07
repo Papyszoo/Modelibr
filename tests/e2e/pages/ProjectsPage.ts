@@ -1,4 +1,4 @@
-import { Page, Locator } from "@playwright/test";
+import { Page, Locator, expect } from "@playwright/test";
 import {
     navigateToAppClean,
     openTabViaMenu,
@@ -10,6 +10,7 @@ export interface ProjectInfo {
     id: number;
     name: string;
     description?: string;
+    notes?: string;
 }
 
 export class ProjectsPage {
@@ -81,6 +82,7 @@ export class ProjectsPage {
     async createProject(
         name: string,
         description?: string,
+        metadata?: { notes?: string },
     ): Promise<ProjectInfo> {
         // Delete any stale projects with this name from prior runs to avoid list overflow,
         // which can cause the newly-created card to be outside the rendered DOM.
@@ -135,6 +137,12 @@ export class ProjectsPage {
             console.log(`[Action] Filled project description: ${description}`);
         }
 
+        if (metadata?.notes) {
+            const notesInput = this.page.locator("#project-notes");
+            await notesInput.fill(metadata.notes);
+            console.log(`[Action] Filled project notes: ${metadata.notes}`);
+        }
+
         // Click Create button and wait for API response
         const dialogCreateBtn = this.page.locator(
             '.p-dialog-footer button:has-text("Create")',
@@ -179,7 +187,7 @@ export class ProjectsPage {
         console.log(
             `[Project] Created project "${name}" with ID: ${project?.id}`,
         );
-        return { id: project?.id, name, description };
+        return { id: project?.id, name, description, notes: metadata?.notes };
     }
 
     async openProject(projectName: string, projectId?: number): Promise<void> {
@@ -237,5 +245,71 @@ export class ProjectsPage {
     ): Promise<boolean> {
         const projectCard = this.getProjectCard(projectName, projectId);
         return await projectCard.isVisible();
+    }
+
+    private async assertDecodedImage(
+        image: Locator,
+        context: string,
+        expectedFileId?: number,
+    ): Promise<void> {
+        await expect(image).toBeVisible({ timeout: 15000 });
+        await expect
+            .poll(
+                async () => {
+                    return await image.evaluate((img: HTMLImageElement) => {
+                        return img.complete && img.naturalWidth > 0;
+                    });
+                },
+                {
+                    message: `Waiting for ${context} image to decode`,
+                    timeout: 15000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toBe(true);
+
+        const details = await image.evaluate((img: HTMLImageElement) => ({
+            src: img.getAttribute("src"),
+            currentSrc: img.currentSrc,
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+        }));
+
+        if (expectedFileId !== undefined) {
+            expect(details.currentSrc || details.src).toContain(
+                `/files/${expectedFileId}`,
+            );
+        }
+
+        console.log(
+            `[UI] ${context} image loaded: ${details.naturalWidth}x${details.naturalHeight} (${details.currentSrc || details.src})`,
+        );
+    }
+
+    async assertProjectCardCustomThumbnailLoaded(
+        projectName: string,
+        expectedFileId: number,
+        projectId?: number,
+    ): Promise<void> {
+        const card = this.getProjectCard(projectName, projectId);
+        await expect(card).toBeVisible({ timeout: 15000 });
+        await this.assertDecodedImage(
+            card.locator("img").first(),
+            `project card for \"${projectName}\"`,
+            expectedFileId,
+        );
+    }
+
+    async assertProjectDetailCustomThumbnailLoaded(
+        projectName: string,
+        expectedFileId: number,
+    ): Promise<void> {
+        const viewer = this.page.locator(".container-viewer").first();
+        await expect(viewer).toBeVisible({ timeout: 15000 });
+        await this.assertDecodedImage(
+            viewer.locator(`img[alt="${projectName}"]`).first(),
+            `project detail for \"${projectName}\"`,
+            expectedFileId,
+        );
     }
 }

@@ -265,7 +265,7 @@ Universal (Global Material) texture sets get auto-generated preview thumbnails. 
 - Upload via drag-and-drop or file picker
 - Click model card to open in viewer
 - Show upload progress and status
-- Context menu for model actions (delete, add to pack, add to project)
+- Context menu for model actions (delete, add tags, add to pack, add to project, change category)
 - ModelGrid is a reusable standalone component accepting `projectId`, `packId`, `textureSetId` props
 - Filters are additive (pack + project can be combined)
 - When a prop is provided, its corresponding filter is pre-selected and disabled

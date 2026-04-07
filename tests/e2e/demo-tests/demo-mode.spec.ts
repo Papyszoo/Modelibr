@@ -32,7 +32,7 @@ async function createUploadCopy(sourceFileName, targetFileName) {
     };
 }
 
-async function createPack(page, name, description) {
+async function createPack(page, name, description, licenseType, url) {
     await navigateToTab(page, "packs");
 
     await page.getByRole("button", { name: "Create Pack" }).click();
@@ -42,6 +42,15 @@ async function createPack(page, name, description) {
 
     await dialog.locator("#pack-name").fill(name);
     await dialog.locator("#pack-description").fill(description);
+    if (licenseType) {
+        await dialog.locator("#pack-license .p-dropdown-trigger").click();
+        await page
+            .locator(".p-dropdown-item", { hasText: licenseType })
+            .click();
+    }
+    if (url) {
+        await dialog.locator("#pack-url").fill(url);
+    }
     await dialog.locator('.p-dialog-footer button:has-text("Create")').click();
 
     await expect(dialog).toBeHidden({ timeout: 15000 });
@@ -56,6 +65,36 @@ async function openPack(page, name) {
     const packCard = page.locator(".pack-grid-card", { hasText: name }).first();
     await expect(packCard).toBeVisible({ timeout: 15000 });
     await packCard.click();
+    await expect(page.locator(".container-viewer")).toBeVisible({
+        timeout: 15000,
+    });
+}
+
+async function createProject(page, name, description, notes) {
+    await navigateToTab(page, "projects");
+
+    await page.getByRole("button", { name: "Create Project" }).click();
+
+    const dialog = page.locator('.p-dialog:has-text("Create New Project")');
+    await expect(dialog).toBeVisible();
+
+    await dialog.locator("#project-name").fill(name);
+    await dialog.locator("#project-description").fill(description);
+    await dialog.locator("#project-notes").fill(notes);
+    await dialog.locator('.p-dialog-footer button:has-text("Create")').click();
+
+    await expect(dialog).toBeHidden({ timeout: 15000 });
+    await expect(
+        page.locator(".project-grid-card", { hasText: name }).first(),
+    ).toBeVisible({ timeout: 15000 });
+}
+
+async function openProject(page, name) {
+    const projectCard = page
+        .locator(".project-grid-card", { hasText: name })
+        .first();
+    await expect(projectCard).toBeVisible({ timeout: 15000 });
+    await projectCard.click();
     await expect(page.locator(".container-viewer")).toBeVisible({
         timeout: 15000,
     });
@@ -102,6 +141,14 @@ test.describe("demo mode e2e", () => {
         await modelListPage.goto();
         await expect(page.getByText("Test Cube").first()).toBeVisible();
         await expect(page.getByText("Test Torus").first()).toBeVisible();
+        await page.getByRole("button", { name: /^filters$/i }).click();
+        await page
+            .locator(
+                "#model-grid-filters-panel .models-filter-switch .p-inputswitch",
+            )
+            .click();
+        await expect(page.locator('[data-model-id="1"]')).toBeVisible();
+        await expect(page.locator('[data-model-id="2"]')).toHaveCount(0);
 
         await textureSetsPage.goto();
         await textureSetsPage.selectKindTab("Global Materials");
@@ -115,19 +162,25 @@ test.describe("demo mode e2e", () => {
         );
 
         await navigateToTab(page, "packs");
-        await expect(
-            page.locator(".pack-grid-card", { hasText: "Demo Pack" }).first(),
-        ).toBeVisible();
+        const demoPackCard = page
+            .locator(".pack-grid-card", { hasText: "Demo Pack" })
+            .first();
+        await expect(demoPackCard).toBeVisible();
+        await expect(demoPackCard).toContainText("Royalty Free");
+        await expect(demoPackCard.locator("img")).toBeVisible();
         await expect(
             page.locator(".pack-grid-card", { hasText: "Shapes Pack" }).first(),
         ).toBeVisible();
 
         await navigateToTab(page, "projects");
+        const demoProjectCard = page
+            .locator(".project-grid-card", { hasText: "Demo Project" })
+            .first();
+        await expect(demoProjectCard).toBeVisible();
+        await expect(demoProjectCard.locator("img")).toBeVisible();
         await expect(
-            page
-                .locator(".project-grid-card", { hasText: "Demo Project" })
-                .first(),
-        ).toBeVisible();
+            demoProjectCard.locator(".project-grid-card-stats span").last(),
+        ).toContainText("1");
 
         await spriteListPage.goto();
         expect(await spriteListPage.getSpriteCount()).toBeGreaterThanOrEqual(1);
@@ -201,7 +254,13 @@ test.describe("demo mode e2e", () => {
             },
         );
 
-        await textureSetsPage.recycleTextureSet(textureSetName);
+        await textureSetsPage.openContextMenu(textureSetName);
+        await textureSetsPage.selectContextMenuOption("Recycle");
+        await expect(
+            page.locator(".p-toast-message", {
+                hasText: "Texture set moved to recycled files",
+            }),
+        ).toBeVisible({ timeout: 15000 });
 
         await recycledFilesPage.goto();
         await expect
@@ -232,6 +291,107 @@ test.describe("demo mode e2e", () => {
         await expect(
             page.locator(".p-tabview-nav li", { hasText: /^Models: 1$/ }),
         ).toBeVisible();
+    });
+
+    test("creates a pack with metadata and uploads a custom thumbnail", async ({
+        page,
+    }) => {
+        const thumbnail = await createUploadCopy(
+            "blue_color.png",
+            `DemoPackThumb-${Date.now()}.png`,
+        );
+        const packName = `Demo Metadata Pack ${Date.now()}`;
+
+        try {
+            await createPack(
+                page,
+                packName,
+                "Pack metadata coverage in demo mode",
+                "CC0",
+                "https://example.com/demo-pack",
+            );
+
+            const packCard = page
+                .locator(".pack-grid-card", { hasText: packName })
+                .first();
+            await expect(packCard).toContainText("CC0");
+
+            await openPack(page, packName);
+            await page
+                .locator('.container-rich-side input[type="file"]')
+                .first()
+                .setInputFiles(thumbnail.filePath);
+            await expect(
+                page.locator(".container-cover-card img").first(),
+            ).toBeVisible({ timeout: 15000 });
+
+            await navigateToTab(page, "packs");
+            const reloadedCard = page
+                .locator(".pack-grid-card", { hasText: packName })
+                .first();
+            await expect(reloadedCard).toContainText("CC0");
+            await expect(reloadedCard.locator("img")).toBeVisible();
+        } finally {
+            await thumbnail.cleanup();
+        }
+    });
+
+    test("creates a project with notes, thumbnail, and concept art", async ({
+        page,
+    }) => {
+        const thumbnail = await createUploadCopy(
+            "green_color.png",
+            `DemoProjectThumb-${Date.now()}.png`,
+        );
+        const concept = await createUploadCopy(
+            "yellow_color.png",
+            `DemoProjectConcept-${Date.now()}.png`,
+        );
+        const projectName = `Demo Project ${Date.now()}`;
+        const notes = "Demo mode keeps project notes and media editable.";
+
+        try {
+            await createProject(
+                page,
+                projectName,
+                "Project media coverage in demo mode",
+                notes,
+            );
+
+            await openProject(page, projectName);
+            await expect(page.locator("#project-notes")).toHaveValue(notes);
+
+            await page
+                .locator('.container-rich-side input[type="file"]')
+                .first()
+                .setInputFiles(thumbnail.filePath);
+            await expect(
+                page.locator(".container-cover-card img").first(),
+            ).toBeVisible({ timeout: 15000 });
+
+            await page
+                .locator('.container-rich-main input[type="file"][multiple]')
+                .first()
+                .setInputFiles(concept.filePath);
+            await expect(
+                page.locator(".container-media-card").first(),
+            ).toBeVisible({
+                timeout: 15000,
+            });
+
+            await navigateToTab(page, "projects");
+            const projectCard = page
+                .locator(".project-grid-card", { hasText: projectName })
+                .first();
+            await expect(projectCard).toContainText(notes);
+            await expect(projectCard.locator("img")).toBeVisible();
+            await expect(
+                projectCard.locator(".project-grid-card-stats span").last(),
+            ).toContainText("1");
+        } finally {
+            await thumbnail.cleanup();
+            await concept.cleanup();
+        }
     });
 
     test("shows the demo-only Blender settings restriction", async ({

@@ -14,8 +14,13 @@ public class Pack : AggregateRoot
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
+    public string? LicenseType { get; private set; }
+    public string? Url { get; private set; }
+    public int? CustomThumbnailFileId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+
+    public File? CustomThumbnailFile { get; private set; }
 
     // Navigation property for many-to-many relationship with Models - EF Core requires this to be settable
     public ICollection<Model> Models
@@ -73,9 +78,11 @@ public class Pack : AggregateRoot
     /// <param name="createdAt">When the pack was created</param>
     /// <returns>A new Pack instance</returns>
     /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
-    public static Pack Create(string name, string? description, DateTime createdAt)
+    public static Pack Create(string name, string? description, string? licenseType, string? url, DateTime createdAt)
     {
         ValidateName(name);
+        ValidateLicenseType(licenseType);
+        ValidateUrl(url);
 
         if (description != null && description.Length > 1000)
             throw new ArgumentException("Pack description cannot exceed 1000 characters.", nameof(description));
@@ -84,6 +91,8 @@ public class Pack : AggregateRoot
         {
             Name = name.Trim(),
             Description = description?.Trim(),
+            LicenseType = licenseType?.Trim(),
+            Url = url?.Trim(),
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -96,15 +105,26 @@ public class Pack : AggregateRoot
     /// <param name="description">The new description</param>
     /// <param name="updatedAt">When the update occurred</param>
     /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
-    public void Update(string name, string? description, DateTime updatedAt)
+    public void Update(string name, string? description, string? licenseType, string? url, DateTime updatedAt)
     {
         ValidateName(name);
+        ValidateLicenseType(licenseType);
+        ValidateUrl(url);
 
         if (description != null && description.Length > 1000)
             throw new ArgumentException("Pack description cannot exceed 1000 characters.", nameof(description));
 
         Name = name.Trim();
         Description = description?.Trim();
+        LicenseType = licenseType?.Trim();
+        Url = url?.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    public void SetCustomThumbnail(File? file, DateTime updatedAt)
+    {
+        CustomThumbnailFileId = file?.Id;
+        CustomThumbnailFile = file;
         UpdatedAt = updatedAt;
     }
 
@@ -365,5 +385,23 @@ public class Pack : AggregateRoot
 
         if (name.Length > 200)
             throw new ArgumentException("Pack name cannot exceed 200 characters.", nameof(name));
+    }
+
+    private static void ValidateLicenseType(string? licenseType)
+    {
+        if (licenseType != null && licenseType.Length > 100)
+            throw new ArgumentException("Pack license type cannot exceed 100 characters.", nameof(licenseType));
+    }
+
+    private static void ValidateUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        if (url.Length > 500)
+            throw new ArgumentException("Pack URL cannot exceed 500 characters.", nameof(url));
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+            throw new ArgumentException("Pack URL must be a valid absolute URL.", nameof(url));
     }
 }

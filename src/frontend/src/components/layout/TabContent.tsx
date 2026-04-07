@@ -88,7 +88,7 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
   const renderContent = (): JSX.Element => {
     switch (tab.type) {
       case 'modelList':
-        return <ModelList isTabContent={true} />
+        return <ModelList isTabContent={true} tabId={tab.id} />
 
       case 'modelViewer':
         if (!tab.modelId) {
@@ -99,7 +99,7 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return <ModelViewer modelId={tab.modelId} side={side} />
+        return <ModelViewer modelId={tab.modelId} side={side} tabId={tab.id} />
 
       case 'textureSets':
         return <TextureSetList />

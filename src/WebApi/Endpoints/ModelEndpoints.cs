@@ -23,9 +23,28 @@ public static class ModelEndpoints
         .WithName("Update Model Tags")
         .WithTags("Models");
 
-        app.MapGet("/models", async (int? packId, int? projectId, int? textureSetId, int? page, int? pageSize, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, CancellationToken cancellationToken) =>
+        app.MapGet("/model-tags", async (IQueryHandler<GetAllModelTagsQuery, GetAllModelTagsResponse> queryHandler, CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId, textureSetId, page, pageSize), cancellationToken);
+            var result = await queryHandler.Handle(new GetAllModelTagsQuery(), cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+        .WithName("Get All Model Tags")
+        .WithTags("Models");
+
+        app.MapPost("/models/{modelId}/concept-images", AddConceptImage)
+        .WithName("Add Model Concept Image")
+        .WithTags("Models");
+
+        app.MapDelete("/models/{modelId}/concept-images/{fileId}", RemoveConceptImage)
+        .WithName("Remove Model Concept Image")
+        .WithTags("Models");
+
+        app.MapGet("/models", async (int? packId, int? projectId, int? textureSetId, int[]? categoryId, string[]? tag, bool? hasConceptImages, int? page, int? pageSize, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, CancellationToken cancellationToken) =>
+        {
+            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId, textureSetId, categoryId, tag, hasConceptImages, page, pageSize), cancellationToken);
             
             if (result.IsFailure)
             {
@@ -215,7 +234,8 @@ public static class ModelEndpoints
         var command = new UpdateModelTagsCommand(
             modelId,
             request.Tags,
-            request.Description
+            request.Description,
+            request.CategoryId
         );
 
         var result = await commandHandler.Handle(command, cancellationToken);
@@ -227,7 +247,32 @@ public static class ModelEndpoints
 
         return Results.Ok(result.Value);
     }
+
+    private static async Task<IResult> AddConceptImage(
+        int modelId,
+        AttachFileRequest request,
+        ICommandHandler<AddModelConceptImageCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new AddModelConceptImageCommand(modelId, request.FileId), cancellationToken);
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+    }
+
+    private static async Task<IResult> RemoveConceptImage(
+        int modelId,
+        int fileId,
+        ICommandHandler<RemoveModelConceptImageCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RemoveModelConceptImageCommand(modelId, fileId), cancellationToken);
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+    }
 }
 
-public record UpdateModelTagsRequest(string? Tags, string? Description);
+public record UpdateModelTagsRequest(IReadOnlyList<string>? Tags, string? Description, int? CategoryId);
 public record SetDefaultTextureSetRequest(int? TextureSetId, int? ModelVersionId);
+public record AttachFileRequest(int FileId);

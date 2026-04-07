@@ -39,7 +39,7 @@ internal class UpdateProjectCommandHandler : ICommandHandler<UpdateProjectComman
             }
 
             // Update the project using domain method
-            project.Update(command.Name, command.Description, _dateTimeProvider.UtcNow);
+            project.Update(command.Name, command.Description, command.Notes, _dateTimeProvider.UtcNow);
 
             await _projectRepository.UpdateAsync(project, cancellationToken);
 
@@ -53,4 +53,4 @@ internal class UpdateProjectCommandHandler : ICommandHandler<UpdateProjectComman
     }
 }
 
-public record UpdateProjectCommand(int Id, string Name, string? Description) : ICommand;
+public record UpdateProjectCommand(int Id, string Name, string? Description, string? Notes) : ICommand;

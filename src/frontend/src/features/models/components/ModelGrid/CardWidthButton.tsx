@@ -24,10 +24,12 @@ export function CardWidthButton({
     <>
       <Button
         icon="pi pi-th-large"
+        label="Card Width"
         className="p-button-text p-button-sm card-width-toggle-btn"
         tooltip="Card Width"
         tooltipOptions={{ position: 'bottom' }}
         onClick={e => overlayRef.current?.toggle(e)}
+        aria-label="Card Width"
       />
       <OverlayPanel ref={overlayRef} className="card-width-overlay">
         <div className="card-width-overlay-content">

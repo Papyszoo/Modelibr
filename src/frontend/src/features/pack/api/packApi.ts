@@ -8,6 +8,7 @@ import {
   type GetAllSoundsResponse,
   type GetAllSpritesResponse,
   type GetAllTextureSetsResponse,
+  type PackDetailDto,
   type PackDto,
   type SoundDto,
   type SpriteDto,
@@ -26,9 +27,9 @@ export async function getAllPacks(
 export async function getPackById(
   id: number,
   options: { skipCache?: boolean } = {}
-): Promise<PackDto> {
+): Promise<PackDetailDto> {
   void options
-  const response = await client.get<PackDto>(`/packs/${id}`)
+  const response = await client.get<PackDetailDto>(`/packs/${id}`)
   return response.data
 }
 
@@ -48,6 +49,13 @@ export async function updatePack(
 
 export async function deletePack(id: number): Promise<void> {
   await client.delete(`/packs/${id}`)
+}
+
+export async function setPackCustomThumbnail(
+  id: number,
+  fileId: number | null
+): Promise<void> {
+  await client.put(`/packs/${id}/thumbnail`, { fileId })
 }
 
 export async function addModelToPack(

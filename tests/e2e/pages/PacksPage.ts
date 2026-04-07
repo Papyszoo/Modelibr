@@ -1,4 +1,4 @@
-import { Page, Locator } from "@playwright/test";
+import { Page, Locator, expect } from "@playwright/test";
 import { navigateToTab } from "../helpers/navigation-helper";
 
 const API_BASE = "http://localhost:8090";
@@ -7,6 +7,8 @@ export interface PackInfo {
     id: number;
     name: string;
     description?: string;
+    licenseType?: string;
+    url?: string;
 }
 
 export class PacksPage {
@@ -44,19 +46,26 @@ export class PacksPage {
         console.log("[Navigation] Navigated to Pack List");
     }
 
-    async createPack(name: string, description?: string): Promise<PackInfo> {
-        // Check if pack already exists via API (idempotent)
+    async createPack(
+        name: string,
+        description?: string,
+        metadata?: { licenseType?: string; url?: string },
+    ): Promise<PackInfo> {
+        // Remove stale packs with the same name so metadata tests always
+        // validate the values created by the current scenario.
         const checkResponse = await this.page.request.get(`${API_BASE}/packs`);
         if (checkResponse.ok()) {
             const checkData = await checkResponse.json();
-            const existing = (checkData.packs || []).find(
+            const existing = (checkData.packs || []).filter(
                 (p: any) => p.name === name,
             );
-            if (existing) {
-                console.log(
-                    `[Pack] Pack "${name}" already exists (ID: ${existing.id}), skipping creation`,
+            for (const stalePack of existing) {
+                await this.page.request.delete(
+                    `${API_BASE}/packs/${stalePack.id}`,
                 );
-                return { id: existing.id, name, description };
+                console.log(
+                    `[Pack] Deleted stale pack "${name}" (ID: ${stalePack.id})`,
+                );
             }
         }
 
@@ -90,6 +99,30 @@ export class PacksPage {
             const descInput = this.page.locator("#pack-description");
             await descInput.fill(description);
             console.log(`[Action] Filled pack description: ${description}`);
+        }
+
+        if (metadata?.licenseType) {
+            const licenseDropdown = this.page.locator("#pack-license");
+            await licenseDropdown.waitFor({ state: "visible", timeout: 10000 });
+            await licenseDropdown.locator(".p-dropdown-trigger").click();
+
+            const licenseOption = this.page.locator(
+                `[role="option"][aria-label="${metadata.licenseType}"]`,
+            );
+            await licenseOption.first().waitFor({
+                state: "visible",
+                timeout: 5000,
+            });
+            await licenseOption.first().click();
+            console.log(
+                `[Action] Filled pack license type: ${metadata.licenseType}`,
+            );
+        }
+
+        if (metadata?.url) {
+            const urlInput = this.page.locator("#pack-url");
+            await urlInput.fill(metadata.url);
+            console.log(`[Action] Filled pack URL: ${metadata.url}`);
         }
 
         // Click Create button in dialog footer
@@ -132,7 +165,13 @@ export class PacksPage {
         console.log(`[Action] Pack card "${name}" visible in grid`);
 
         console.log(`[Pack] Created pack "${name}" with ID: ${pack?.id}`);
-        return { id: pack?.id, name, description };
+        return {
+            id: pack?.id,
+            name,
+            description,
+            licenseType: metadata?.licenseType,
+            url: metadata?.url,
+        };
     }
 
     async openPack(packName: string, packId?: number): Promise<void> {
@@ -177,6 +216,72 @@ export class PacksPage {
         } catch {
             return false;
         }
+    }
+
+    private async assertDecodedImage(
+        image: Locator,
+        context: string,
+        expectedFileId?: number,
+    ): Promise<void> {
+        await expect(image).toBeVisible({ timeout: 15000 });
+        await expect
+            .poll(
+                async () => {
+                    return await image.evaluate((img: HTMLImageElement) => {
+                        return img.complete && img.naturalWidth > 0;
+                    });
+                },
+                {
+                    message: `Waiting for ${context} image to decode`,
+                    timeout: 15000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toBe(true);
+
+        const details = await image.evaluate((img: HTMLImageElement) => ({
+            src: img.getAttribute("src"),
+            currentSrc: img.currentSrc,
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+        }));
+
+        if (expectedFileId !== undefined) {
+            expect(details.currentSrc || details.src).toContain(
+                `/files/${expectedFileId}`,
+            );
+        }
+
+        console.log(
+            `[UI] ${context} image loaded: ${details.naturalWidth}x${details.naturalHeight} (${details.currentSrc || details.src})`,
+        );
+    }
+
+    async assertPackCardCustomThumbnailLoaded(
+        packName: string,
+        expectedFileId: number,
+        packId?: number,
+    ): Promise<void> {
+        const card = this.getPackCard(packName, packId);
+        await expect(card).toBeVisible({ timeout: 15000 });
+        await this.assertDecodedImage(
+            card.locator("img").first(),
+            `pack card for \"${packName}\"`,
+            expectedFileId,
+        );
+    }
+
+    async assertPackDetailCustomThumbnailLoaded(
+        packName: string,
+        expectedFileId: number,
+    ): Promise<void> {
+        const viewer = this.page.locator(".container-viewer").first();
+        await expect(viewer).toBeVisible({ timeout: 15000 });
+        await this.assertDecodedImage(
+            viewer.locator(`img[alt="${packName}"]`).first(),
+            `pack detail for \"${packName}\"`,
+            expectedFileId,
+        );
     }
 
     // PackViewer methods (ContainerViewer with tabs)

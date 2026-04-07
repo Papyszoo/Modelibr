@@ -2,12 +2,24 @@ import { type SoundDto } from '@/features/sounds/types'
 import { type SpriteDto } from '@/features/sprite/types'
 import { type TextureSetDto } from '@/features/texture-set/types'
 import { type Model } from '@/utils/fileUtils'
+import { type ReactNode } from 'react'
+
+export interface ContainerConceptImage {
+  fileId: number
+  fileName: string
+  previewUrl: string
+  fileUrl: string
+  sortOrder: number
+}
 
 // Unified container DTO - structurally identical to PackDto and ProjectDto
 export interface ContainerDto {
   id: number
   name: string
   description?: string
+  notes?: string
+  licenseType?: string
+  url?: string
   createdAt: string
   updatedAt: string
   modelCount: number
@@ -15,9 +27,23 @@ export interface ContainerDto {
   spriteCount: number
   soundCount: number
   isEmpty: boolean
+  customThumbnailUrl?: string | null
+  conceptImageCount?: number
+  conceptImages?: ContainerConceptImage[]
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
+}
+
+export interface ContainerDetailsRenderProps {
+  container: ContainerDto
+  refetchContainer: () => Promise<void>
+  showToast: (opts: {
+    severity: string
+    summary: string
+    detail: string
+    life: number
+  }) => void
 }
 
 export interface ContainerAdapter {
@@ -25,6 +51,7 @@ export interface ContainerAdapter {
   containerId: number
   label: string // 'Pack' | 'Project'
   cssPrefix: string // 'container'
+  renderDetails?: (props: ContainerDetailsRenderProps) => ReactNode
 
   // Data loading
   loadContainer: (id: number) => Promise<ContainerDto>

@@ -21,18 +21,22 @@ import {
   type ContainerAdapter,
   type ContainerDto,
 } from '@/shared/types/ContainerTypes'
-import { type PackDto } from '@/types'
+import { type PackDetailDto } from '@/types'
+
+import { PackDetailsPanel } from './PackDetailsPanel'
 
 interface PackViewerProps {
   packId: number
   tabId?: string
 }
 
-function toContainerDto(pack: PackDto): ContainerDto {
+function toContainerDto(pack: PackDetailDto): ContainerDto {
   return {
     id: pack.id,
     name: pack.name,
     description: pack.description,
+    licenseType: pack.licenseType,
+    url: pack.url,
     createdAt: pack.createdAt,
     updatedAt: pack.updatedAt,
     modelCount: pack.modelCount,
@@ -40,6 +44,7 @@ function toContainerDto(pack: PackDto): ContainerDto {
     spriteCount: pack.spriteCount,
     soundCount: pack.soundCount,
     isEmpty: pack.isEmpty,
+    customThumbnailUrl: pack.customThumbnailUrl,
     models: pack.models,
     textureSets: pack.textureSets,
     sprites: pack.sprites,
@@ -53,6 +58,13 @@ export function PackViewer({ packId, tabId }: PackViewerProps) {
       containerId: packId,
       label: 'Pack',
       cssPrefix: 'container',
+      renderDetails: ({ container, refetchContainer, showToast }) => (
+        <PackDetailsPanel
+          pack={container as PackDetailDto}
+          refetchContainer={refetchContainer}
+          showToast={showToast}
+        />
+      ),
       loadContainer: async id => {
         const pack = await getPackById(id)
         return toContainerDto(pack)

@@ -2,6 +2,7 @@ import './PackList.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
+import { Dropdown } from 'primereact/dropdown'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
 import { useRef } from 'react'
@@ -9,7 +10,9 @@ import { useRef } from 'react'
 import { deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { FilterPanel } from '@/shared/components/FilterPanel'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type PackDto } from '@/types'
 
@@ -21,6 +24,8 @@ export function PackList() {
   const packs = packsQuery.data ?? []
   const loading = packsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedLicense, setSelectedLicense] = useState<string | null>(null)
   const toast = useRef<Toast>(null)
   const { openPackDetailsTab } = useTabContext()
 
@@ -70,11 +75,25 @@ export function PackList() {
     await deletePackMutation.mutateAsync(packId)
   }
 
-  const getPackThumbnail = (_pack: PackDto) => {
-    // TODO: Add pack thumbnail support
-    // For now, return null - will be implemented when thumbnail upload is added
-    return null
-  }
+  const licenseOptions = Array.from(
+    new Set(packs.map(pack => pack.licenseType).filter(Boolean))
+  ).map(license => ({ label: license, value: license }))
+
+  const activeFilterCount = [
+    searchQuery.trim().length > 0,
+    selectedLicense !== null,
+  ].filter(Boolean).length
+
+  const filteredPacks = packs.filter(pack => {
+    const matchesSearch =
+      searchQuery.trim().length === 0 ||
+      pack.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (pack.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+
+    const matchesLicense =
+      !selectedLicense || pack.licenseType === selectedLicense
+    return matchesSearch && matchesLicense
+  })
 
   return (
     <div className="pack-list">
@@ -82,31 +101,65 @@ export function PackList() {
 
       <div className="pack-list-header">
         <h2>Packs</h2>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <Button
+          label="Create Pack"
+          icon="pi pi-plus"
+          onClick={() => setShowCreateDialog(true)}
+        />
+      </div>
+
+      <FilterPanel activeCount={activeFilterCount} summaryLabel="Pack Filters">
+        <div className="list-filters-search">
+          <i className="pi pi-search" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search packs"
+            className="list-filters-search-input"
+          />
+        </div>
+
+        <div className="list-filters-row">
+          <Dropdown
+            value={selectedLicense}
+            options={licenseOptions}
+            onChange={e => setSelectedLicense(e.value ?? null)}
+            placeholder="License"
+            showClear
+            className="list-filters-control"
+          />
           <CardWidthSlider
             value={cardWidth}
             min={200}
             max={500}
             onChange={width => setCardWidth('packs', width)}
           />
-          <Button
-            label="Create Pack"
-            icon="pi pi-plus"
-            onClick={() => setShowCreateDialog(true)}
-          />
+          {activeFilterCount > 0 ? (
+            <Button
+              icon="pi pi-times"
+              className="p-button-text p-button-sm list-filters-clear"
+              tooltip="Clear pack filters"
+              tooltipOptions={{ position: 'bottom' }}
+              onClick={() => {
+                setSearchQuery('')
+                setSelectedLicense(null)
+              }}
+            />
+          ) : null}
         </div>
-      </div>
+      </FilterPanel>
 
       {loading ? (
         <div className="pack-list-loading">
           <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }} />
           <p>Loading packs...</p>
         </div>
-      ) : packs.length === 0 ? (
+      ) : filteredPacks.length === 0 ? (
         <div className="pack-list-empty">
           <i className="pi pi-box" style={{ fontSize: '3rem' }} />
-          <h3>No Packs Yet</h3>
-          <p>Create your first pack to organize models and texture sets</p>
+          <h3>No Matching Packs</h3>
+          <p>Adjust the filters or create a new pack.</p>
           <Button
             label="Create Pack"
             icon="pi pi-plus"
@@ -120,8 +173,8 @@ export function PackList() {
             gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
           }}
         >
-          {packs.map(pack => {
-            const thumbnail = getPackThumbnail(pack)
+          {filteredPacks.map(pack => {
+            const thumbnail = resolveApiAssetUrl(pack.customThumbnailUrl)
             return (
               <div
                 key={pack.id}
@@ -146,6 +199,12 @@ export function PackList() {
                     <p className="pack-grid-card-description">
                       {pack.description}
                     </p>
+                  )}
+                  {(pack.licenseType || pack.url) && (
+                    <div className="pack-grid-card-stats">
+                      {pack.licenseType && <span>{pack.licenseType}</span>}
+                      {pack.url && <span>Link</span>}
+                    </div>
                   )}
                   <div className="pack-grid-card-stats">
                     <span>

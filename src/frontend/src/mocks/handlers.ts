@@ -8,6 +8,21 @@ const createModel = (id: number, name: string) => ({
   name,
   description: `Description for ${name}`,
   tags: ['test'],
+  categoryId: null,
+  category: null,
+  categoryPath: null,
+  conceptImages: [],
+  conceptImageCount: 0,
+  hasConceptImages: false,
+  technicalMetadata: {
+    latestVersionId: id,
+    latestVersionNumber: 1,
+    triangleCount: 1200,
+    vertexCount: 700,
+    meshCount: 1,
+    materialCount: 1,
+    updatedAt: '2025-01-15T10:00:00Z',
+  },
   createdAt: '2025-01-15T10:00:00Z',
   updatedAt: '2025-01-15T10:00:00Z',
   isRecycled: false,
@@ -18,6 +33,17 @@ const createPack = (id: number, name: string) => ({
   id,
   name,
   description: `${name} description`,
+  licenseType: 'Royalty Free',
+  url: `https://example.com/${id}`,
+  customThumbnailUrl: null,
+  modelCount: 0,
+  textureSetCount: 0,
+  spriteCount: 0,
+  soundCount: 0,
+  isEmpty: true,
+  models: [],
+  textureSets: [],
+  sprites: [],
   createdAt: '2025-01-15T10:00:00Z',
   updatedAt: '2025-01-15T10:00:00Z',
 })
@@ -26,6 +52,18 @@ const createProject = (id: number, name: string) => ({
   id,
   name,
   description: `${name} description`,
+  notes: 'Demo project notes',
+  customThumbnailUrl: null,
+  conceptImageCount: 0,
+  conceptImages: [],
+  modelCount: 0,
+  textureSetCount: 0,
+  spriteCount: 0,
+  soundCount: 0,
+  isEmpty: true,
+  models: [],
+  textureSets: [],
+  sprites: [],
   createdAt: '2025-01-15T10:00:00Z',
   updatedAt: '2025-01-15T10:00:00Z',
 })
@@ -89,6 +127,22 @@ const mockSounds = Array.from({ length: 6 }, (_, i) =>
 const mockTextureSets = Array.from({ length: 4 }, (_, i) =>
   createTextureSet(i + 1, `Texture Set ${i + 1}`)
 )
+const mockModelCategories = [
+  {
+    id: 1,
+    name: 'Environment',
+    description: 'Environment',
+    parentId: null,
+    path: 'Environment',
+  },
+  {
+    id: 2,
+    name: 'Props',
+    description: 'Props',
+    parentId: 1,
+    path: 'Environment / Props',
+  },
+]
 
 export const handlers = [
   // Models (paginated)
@@ -114,6 +168,26 @@ export const handlers = [
     return HttpResponse.json(model)
   }),
 
+  http.get(`${BASE_URL}/model-categories`, () => {
+    return HttpResponse.json({ categories: mockModelCategories })
+  }),
+
+  http.get(`${BASE_URL}/model-tags`, () => {
+    const tags = [...new Set(mockModels.flatMap(model => model.tags ?? []))]
+      .sort((left, right) => left.localeCompare(right))
+      .map(name => ({ name }))
+
+    return HttpResponse.json({ tags })
+  }),
+
+  http.post(`${BASE_URL}/models/:id/concept-images`, () => {
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete(`${BASE_URL}/models/:id/concept-images/:fileId`, () => {
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   // Model versions
   http.get(`${BASE_URL}/models/:modelId/versions`, ({ params }) => {
     const modelId = Number(params.modelId)
@@ -133,9 +207,39 @@ export const handlers = [
     return HttpResponse.json({ packs: mockPacks })
   }),
 
+  http.get(`${BASE_URL}/packs/:id`, ({ params }) => {
+    const pack = mockPacks.find(item => item.id === Number(params.id))
+    return pack
+      ? HttpResponse.json(pack)
+      : new HttpResponse(null, { status: 404 })
+  }),
+
+  http.put(`${BASE_URL}/packs/:id/thumbnail`, () => {
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   // Projects
   http.get(`${BASE_URL}/projects`, () => {
     return HttpResponse.json({ projects: mockProjects })
+  }),
+
+  http.get(`${BASE_URL}/projects/:id`, ({ params }) => {
+    const project = mockProjects.find(item => item.id === Number(params.id))
+    return project
+      ? HttpResponse.json(project)
+      : new HttpResponse(null, { status: 404 })
+  }),
+
+  http.put(`${BASE_URL}/projects/:id/thumbnail`, () => {
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post(`${BASE_URL}/projects/:id/concept-images`, () => {
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete(`${BASE_URL}/projects/:id/concept-images/:fileId`, () => {
+    return new HttpResponse(null, { status: 204 })
   }),
 
   // Sounds (paginated)

@@ -1,10 +1,11 @@
 import { Environment, OrbitControls, Stage, useHelper } from '@react-three/drei'
-import { type JSX, Suspense, useRef } from 'react'
+import { useThree } from '@react-three/fiber'
+import { type JSX, Suspense, useCallback, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
-import { getFileUrl } from '@/features/models/api/modelApi'
 import { useEnvironmentPresets } from '@/features/model-viewer/hooks/useEnvironmentPresets'
+import { getFileUrl } from '@/features/models/api/modelApi'
 import { type Model as ModelType } from '@/utils/fileUtils'
 
 import { MeshHighlighter } from './MeshHighlighter'
@@ -58,6 +59,19 @@ interface SceneProps {
   materialTextureSets?: MaterialTextureSets
   defaultFileId?: number | null
   preserveMaterials?: boolean
+  cameraState?: ViewerCameraState
+  onCameraChange?: (state: ViewerCameraState) => void
+}
+
+export interface ViewerCameraState {
+  position: [number, number, number]
+  target: [number, number, number]
+  zoom: number
+}
+
+interface OrbitControlsHandle {
+  target: THREE.Vector3
+  update: () => void
 }
 
 export function Scene({
@@ -66,7 +80,12 @@ export function Scene({
   materialTextureSets,
   defaultFileId,
   preserveMaterials = false,
+  cameraState,
+  onCameraChange,
 }: SceneProps): JSX.Element {
+  const { camera } = useThree()
+  const controlsRef = useRef<OrbitControlsHandle | null>(null)
+
   // Find the renderable file - prioritize defaultFileId if set
   let renderableFile = model.files?.find(f => f.isRenderable)
 
@@ -94,6 +113,37 @@ export function Scene({
   const backgroundIntensity = settings?.backgroundIntensity ?? 1.0
   const environmentIntensity = settings?.environmentIntensity ?? 1.0
   const { envMap } = useEnvironmentPresets(environmentPreset)
+
+  useEffect(() => {
+    if (!cameraState) {
+      return
+    }
+
+    camera.position.set(...cameraState.position)
+    camera.zoom = cameraState.zoom
+    camera.updateProjectionMatrix()
+
+    if (controlsRef.current) {
+      controlsRef.current.target.set(...cameraState.target)
+      controlsRef.current.update()
+    }
+  }, [camera, cameraState])
+
+  const handleCameraChange = useCallback(() => {
+    if (!onCameraChange || !controlsRef.current) {
+      return
+    }
+
+    onCameraChange({
+      position: [camera.position.x, camera.position.y, camera.position.z],
+      target: [
+        controlsRef.current.target.x,
+        controlsRef.current.target.y,
+        controlsRef.current.target.z,
+      ],
+      zoom: camera.zoom,
+    })
+  }, [camera, onCameraChange])
 
   // Fallback to first file if no renderable found
   if (!renderableFile) {
@@ -224,6 +274,7 @@ export function Scene({
 
       {/* Orbit controls for interaction */}
       <OrbitControls
+        ref={controlsRef}
         key={`orbit-${modelUrl}`}
         enablePan={true}
         enableZoom={true}
@@ -233,6 +284,7 @@ export function Scene({
         rotateSpeed={orbitSpeed}
         zoomSpeed={zoomSpeed}
         panSpeed={panSpeed}
+        onEnd={handleCameraChange}
       />
     </>
   )

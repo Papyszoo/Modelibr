@@ -37,6 +37,12 @@ public static class ModelVersionEndpoints
             .AddEndpointFilter<WorkerApiKeyFilter>()
             .WithOpenApi();
 
+        app.MapPut("/model-versions/{versionId}/technical-metadata", UpdateTechnicalMetadata)
+            .WithName("Update Technical Metadata")
+            .WithSummary("Updates material names and technical stats extracted from the newest renderable file")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
+            .WithOpenApi();
+
         app.MapPut("/model-versions/{versionId}/main-variant", SetMainVariant)
             .WithName("Set Main Variant")
             .WithSummary("Sets the main variant for a model version")
@@ -248,8 +254,33 @@ public static class ModelVersionEndpoints
 
         return Results.NoContent();
     }
+
+    private static async Task<IResult> UpdateTechnicalMetadata(
+        int versionId,
+        [FromBody] UpdateTechnicalMetadataRequest request,
+        ICommandHandler<UpdateTechnicalMetadataCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UpdateTechnicalMetadataCommand(
+                versionId,
+                request.MaterialNames ?? new List<string>(),
+                request.TriangleCount,
+                request.VertexCount,
+                request.MeshCount,
+                request.MaterialCount),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
 }
 
 public record UpdateMaterialNamesRequest(List<string> MaterialNames);
+public record UpdateTechnicalMetadataRequest(List<string>? MaterialNames, int? TriangleCount, int? VertexCount, int? MeshCount, int? MaterialCount);
 public record SetMainVariantRequest(string VariantName);
 public record AddVariantNameRequest(string VariantName);

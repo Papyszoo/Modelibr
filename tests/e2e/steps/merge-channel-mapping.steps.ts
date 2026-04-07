@@ -7,6 +7,7 @@ import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { TextureType } from "../../../src/frontend/src/types/index.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { navigateToTab } from "../helpers/navigation-helper";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +55,7 @@ async function openTextureSetViewerForVerification(
 
         if (!viewerOpened) {
             await page.reload({ waitUntil: "domcontentloaded" });
+            await navigateToTab(page, "textureSets");
             await page.waitForSelector(".texture-set-list, .texture-set-card", {
                 state: "visible",
                 timeout: 15000,

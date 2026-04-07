@@ -17,6 +17,33 @@ export interface ModelFile {
   updatedAt: string
 }
 
+export interface ModelCategorySummary {
+  id: number
+  name: string
+  description?: string
+  parentId?: number | null
+  path: string
+}
+
+export interface ModelConceptImage {
+  fileId: number
+  fileName: string
+  previewUrl: string
+  fileUrl: string
+  mimeType?: string
+  sortOrder: number
+}
+
+export interface ModelTechnicalMetadata {
+  latestVersionId?: number | null
+  latestVersionNumber?: number | null
+  triangleCount?: number | null
+  vertexCount?: number | null
+  meshCount?: number | null
+  materialCount?: number | null
+  updatedAt?: string | null
+}
+
 /**
  * Interface representing a model
  */
@@ -24,14 +51,30 @@ export interface Model {
   id: string
   name: string
   description?: string
-  tags?: string
+  tags?: string[]
   files: ModelFile[]
   createdAt: string
   updatedAt: string
+  categoryId?: number | null
+  categoryPath?: string | null
+  category?: ModelCategorySummary | null
+  conceptImages?: ModelConceptImage[]
+  conceptImageCount?: number
+  hasConceptImages?: boolean
+  technicalMetadata?: ModelTechnicalMetadata
   defaultTextureSetId?: number
   activeVersionId?: number
+  latestVersionId?: number | null
+  latestVersionNumber?: number | null
+  triangleCount?: number | null
+  vertexCount?: number | null
+  meshCount?: number | null
+  materialCount?: number | null
+  thumbnailUrl?: string | null
+  pngThumbnailUrl?: string | null
   textureSets?: { id: number; name: string }[]
   packs?: { id: number; name: string }[]
+  projects?: { id: number; name: string }[]
 }
 
 /**

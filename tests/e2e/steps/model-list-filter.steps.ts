@@ -207,6 +207,25 @@ Then(
     },
 );
 
+Then(
+    "the model list should not show model {string}",
+    async ({ page }, modelStateName: string) => {
+        const model = getScenarioState(page).getModel(modelStateName);
+        if (!model) {
+            throw new Error(
+                `Model "${modelStateName}" not found in shared state`,
+            );
+        }
+
+        const modelListPage = new ModelListPage(page);
+        const modelCard = modelListPage.getModelCard(model.name, model.id);
+        await expect(modelCard).not.toBeVisible({ timeout: 10000 });
+        console.log(
+            `[UI] Model "${model.name}" is not visible in model list ✓`,
+        );
+    },
+);
+
 Then("the model list should show all models", async ({ page }) => {
     // Wait for the model list to load
     await page.waitForLoadState("domcontentloaded");

@@ -381,6 +381,20 @@ export class ApiHelper {
         return response.data;
     }
 
+    async setPackCustomThumbnail(
+        packId: number,
+        fileId: number | null,
+    ): Promise<void> {
+        const response = await this.client.put(`/packs/${packId}/thumbnail`, {
+            fileId,
+        });
+        if (response.status !== 200 && response.status !== 204) {
+            throw new Error(
+                `Failed to set pack thumbnail: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
     /**
      * Create a project
      */
@@ -398,6 +412,21 @@ export class ApiHelper {
             );
         }
         return response.data;
+    }
+
+    async setProjectCustomThumbnail(
+        projectId: number,
+        fileId: number | null,
+    ): Promise<void> {
+        const response = await this.client.put(
+            `/projects/${projectId}/thumbnail`,
+            { fileId },
+        );
+        if (response.status !== 200 && response.status !== 204) {
+            throw new Error(
+                `Failed to set project thumbnail: ${response.status} ${response.statusText}`,
+            );
+        }
     }
 
     /**

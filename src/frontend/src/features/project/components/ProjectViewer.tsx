@@ -21,18 +21,21 @@ import {
   type ContainerAdapter,
   type ContainerDto,
 } from '@/shared/types/ContainerTypes'
-import { type ProjectDto } from '@/types'
+import { type ProjectDetailDto } from '@/types'
+
+import { ProjectDetailsPanel } from './ProjectDetailsPanel'
 
 interface ProjectViewerProps {
   projectId: number
   tabId?: string
 }
 
-function toContainerDto(project: ProjectDto): ContainerDto {
+function toContainerDto(project: ProjectDetailDto): ContainerDto {
   return {
     id: project.id,
     name: project.name,
     description: project.description,
+    notes: project.notes,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     modelCount: project.modelCount,
@@ -40,6 +43,9 @@ function toContainerDto(project: ProjectDto): ContainerDto {
     spriteCount: project.spriteCount,
     soundCount: project.soundCount,
     isEmpty: project.isEmpty,
+    customThumbnailUrl: project.customThumbnailUrl,
+    conceptImageCount: project.conceptImageCount,
+    conceptImages: project.conceptImages,
     models: project.models,
     textureSets: project.textureSets,
     sprites: project.sprites,
@@ -53,6 +59,13 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       containerId: projectId,
       label: 'Project',
       cssPrefix: 'container',
+      renderDetails: ({ container, refetchContainer, showToast }) => (
+        <ProjectDetailsPanel
+          project={container as ProjectDetailDto}
+          refetchContainer={refetchContainer}
+          showToast={showToast}
+        />
+      ),
       loadContainer: async id => {
         const project = await getProjectById(id)
         return toContainerDto(project)

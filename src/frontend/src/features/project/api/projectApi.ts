@@ -8,6 +8,8 @@ import {
   type GetAllSoundsResponse,
   type GetAllSpritesResponse,
   type GetAllTextureSetsResponse,
+  type ProjectConceptImageDto,
+  type ProjectDetailDto,
   type ProjectDto,
   type SoundDto,
   type SpriteDto,
@@ -26,9 +28,9 @@ export async function getAllProjects(
 export async function getProjectById(
   id: number,
   options: { skipCache?: boolean } = {}
-): Promise<ProjectDto> {
+): Promise<ProjectDetailDto> {
   void options
-  const response = await client.get<ProjectDto>(`/projects/${id}`)
+  const response = await client.get<ProjectDetailDto>(`/projects/${id}`)
   return response.data
 }
 
@@ -51,6 +53,27 @@ export async function updateProject(
 
 export async function deleteProject(id: number): Promise<void> {
   await client.delete(`/projects/${id}`)
+}
+
+export async function setProjectCustomThumbnail(
+  id: number,
+  fileId: number | null
+): Promise<void> {
+  await client.put(`/projects/${id}/thumbnail`, { fileId })
+}
+
+export async function addProjectConceptImage(
+  id: number,
+  fileId: number
+): Promise<void> {
+  await client.post(`/projects/${id}/concept-images`, { fileId })
+}
+
+export async function removeProjectConceptImage(
+  id: number,
+  fileId: number
+): Promise<void> {
+  await client.delete(`/projects/${id}/concept-images/${fileId}`)
 }
 
 export async function addModelToProject(
@@ -171,3 +194,5 @@ export async function getSoundsByProject(
   )
   return response.data.sounds
 }
+
+export type { ProjectConceptImageDto }

@@ -247,7 +247,7 @@ export class TextureSetsPage {
      */
     async selectContextMenuOption(option: string): Promise<void> {
         const menuItem = this.page.locator(
-            `.p-contextmenu .p-menuitem:has-text("${option}")`,
+            `.p-contextmenu .p-menuitem:has-text("${option}") .p-menuitem-link`,
         );
         await menuItem.click();
     }

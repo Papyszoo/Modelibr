@@ -1,0 +1,141 @@
+.list-filters-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--surface-card);
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.list-filters-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.list-filters-toolbar-spacer {
+  flex: 1;
+}
+
+.list-filters-summary {
+  font-size: 0.82rem;
+  color: var(--text-color-secondary);
+}
+
+.list-filters-summary strong {
+  color: var(--text-color);
+}
+
+.list-filters-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.list-filters-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.list-filters-search:focus-within {
+  border-color: var(--primary-color);
+  background: var(--surface-card);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 100, 108, 255), 0.1);
+}
+
+.list-filters-search .pi-search {
+  color: var(--text-color-secondary);
+  font-size: 0.875rem;
+  padding: 0.75rem;
+  pointer-events: none;
+}
+
+.list-filters-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  padding: 0.75rem 0.75rem 0.75rem 0;
+}
+
+.list-filters-search-input::placeholder {
+  color: var(--text-color-secondary);
+}
+
+.list-filters-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.list-filters-control {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.list-filters-control .p-multiselect-label,
+.list-filters-control .p-dropdown-label,
+.list-filters-control .p-treeselect-label {
+  padding: 0.5rem 0.75rem;
+}
+
+.list-filters-control .p-multiselect-token {
+  font-size: 0.75rem;
+}
+
+.list-filters-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.5rem;
+  padding: 0 0.125rem;
+}
+
+.list-filters-empty {
+  color: var(--text-color-secondary);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+.list-filters-clear {
+  padding: 0.5rem;
+}
+
+.list-filters-tree-select {
+  min-width: 220px;
+}
+
+.list-filters-tree-select .p-treeselect-label {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .list-filters-shell {
+    padding: 0.75rem;
+  }
+
+  .list-filters-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .list-filters-row {
+    align-items: stretch;
+  }
+
+  .list-filters-control,
+  .list-filters-tree-select {
+    min-width: 100%;
+    max-width: 100%;
+  }
+}

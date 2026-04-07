@@ -1,11 +1,25 @@
 import { createBdd } from "playwright-bdd";
 import { expect, Page } from "@playwright/test";
 import { getScenarioState } from "../fixtures/shared-state";
+import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import { ApiHelper } from "../helpers/api-helper";
 import { ProjectsPage } from "../pages/ProjectsPage";
 
 const { Given, When, Then } = createBdd();
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+const apiHelper = new ApiHelper(API_BASE);
+
+function getProjectThumbnailFileId(
+    page: Page,
+    projectName: string,
+): number | null {
+    return (
+        getScenarioState(page).getCustom<number>(
+            `projectThumbnailFileId:${projectName}`,
+        ) ?? null
+    );
+}
 
 /**
  * Resolves a model from shared state, falling back to DB lookup.
@@ -165,6 +179,22 @@ When(
     },
 );
 
+When(
+    "I create a project named {string} with description {string} and notes {string}",
+    async ({ page }, name: string, description: string, notes: string) => {
+        const projectsPage = new ProjectsPage(page);
+        const projectInfo = await projectsPage.createProject(
+            name,
+            description,
+            {
+                notes,
+            },
+        );
+        getScenarioState(page).saveProject(name, projectInfo);
+        console.log(`[Action] Created and stored project "${name}" with notes`);
+    },
+);
+
 // Open project
 When("I open the project {string}", async ({ page }, projectName: string) => {
     const projectsPage = new ProjectsPage(page);
@@ -182,6 +212,50 @@ When("I delete the project {string}", async ({ page }, projectName: string) => {
     await projectsPage.deleteProject(projectName, project?.id);
     console.log(`[Action] Deleted project "${projectName}"`);
 });
+
+When(
+    "I upload the image {string} as the custom thumbnail for project {string}",
+    async ({ page }, fileName: string, projectName: string) => {
+        const project = getScenarioState(page).getProject(projectName);
+        if (!project) {
+            throw new Error(
+                `Project "${projectName}" not found in shared state`,
+            );
+        }
+
+        const filePath = await UniqueFileGenerator.generate(fileName);
+        const { fileId } = await apiHelper.uploadFile(filePath);
+        await apiHelper.setProjectCustomThumbnail(project.id, fileId);
+        getScenarioState(page).setCustom(
+            `projectThumbnailFileId:${projectName}`,
+            fileId,
+        );
+
+        await expect
+            .poll(
+                async () => {
+                    const response = await page.request.get(
+                        `${API_BASE}/projects/${project.id}`,
+                    );
+                    if (!response.ok()) {
+                        return "";
+                    }
+                    const data = await response.json();
+                    return data.customThumbnailUrl ?? "";
+                },
+                {
+                    message: `Waiting for project \"${projectName}\" thumbnail URL to update`,
+                    timeout: 15000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toContain(`/files/${fileId}`);
+
+        console.log(
+            `[Action] Uploaded custom thumbnail for project "${projectName}" (fileId: ${fileId})`,
+        );
+    },
+);
 
 // Add model to project
 When(
@@ -354,6 +428,72 @@ Then(
             .first();
         await expect(nameElement).toBeVisible({ timeout: 5000 });
         console.log(`[UI] Project name "${projectName}" is displayed ✓`);
+    },
+);
+
+Then(
+    "the project {string} card should show notes {string}",
+    async ({ page }, projectName: string, notes: string) => {
+        const project = getScenarioState(page).getProject(projectName);
+        const projectCard = new ProjectsPage(page).getProjectCard(
+            projectName,
+            project?.id,
+        );
+        await expect(projectCard).toContainText(notes, { timeout: 10000 });
+        console.log(
+            `[UI] Project card "${projectName}" shows notes "${notes}" ✓`,
+        );
+    },
+);
+
+Then(
+    "the project details should show notes {string}",
+    async ({ page }, notes: string) => {
+        const viewer = page.locator(".container-viewer").first();
+        await expect(viewer).toBeVisible({ timeout: 10000 });
+        await expect(viewer.locator("#project-notes")).toHaveValue(notes, {
+            timeout: 10000,
+        });
+        console.log(`[UI] Project details show notes "${notes}" ✓`);
+    },
+);
+
+Then(
+    "the project {string} card should render the uploaded custom thumbnail",
+    async ({ page }, projectName: string) => {
+        const project = getScenarioState(page).getProject(projectName);
+        const fileId = getProjectThumbnailFileId(page, projectName);
+        if (!project || fileId === null) {
+            throw new Error(
+                `Missing project or uploaded thumbnail state for "${projectName}"`,
+            );
+        }
+
+        const projectsPage = new ProjectsPage(page);
+        await projectsPage.navigateToProjectList();
+        await projectsPage.assertProjectCardCustomThumbnailLoaded(
+            projectName,
+            fileId,
+            project.id,
+        );
+    },
+);
+
+Then(
+    "the project {string} details should render the uploaded custom thumbnail",
+    async ({ page }, projectName: string) => {
+        const fileId = getProjectThumbnailFileId(page, projectName);
+        if (fileId === null) {
+            throw new Error(
+                `Missing uploaded thumbnail state for project "${projectName}"`,
+            );
+        }
+
+        const projectsPage = new ProjectsPage(page);
+        await projectsPage.assertProjectDetailCustomThumbnailLoaded(
+            projectName,
+            fileId,
+        );
     },
 );
 

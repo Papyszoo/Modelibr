@@ -17,6 +17,8 @@ export interface PackDto {
   id: number
   name: string
   description?: string
+  licenseType?: string
+  url?: string
   createdAt: string
   updatedAt: string
   modelCount: number
@@ -24,10 +26,13 @@ export interface PackDto {
   spriteCount: number
   soundCount: number
   isEmpty: boolean
+  customThumbnailUrl?: string | null
   models: PackModelDto[]
   textureSets: PackTextureSetDto[]
   sprites: PackSpriteDto[]
 }
+
+export type PackDetailDto = PackDto
 
 export interface GetAllPacksResponse {
   packs: PackDto[]
@@ -36,15 +41,21 @@ export interface GetAllPacksResponse {
 export interface CreatePackRequest {
   name: string
   description?: string
+  licenseType?: string
+  url?: string
 }
 
 export interface CreatePackResponse {
   id: number
   name: string
   description?: string
+  licenseType?: string
+  url?: string
 }
 
 export interface UpdatePackRequest {
   name: string
   description?: string
+  licenseType?: string
+  url?: string
 }

@@ -32,6 +32,10 @@ internal sealed class ModelRepository : IModelRepository
             .AsNoTracking()
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
+            .Include(m => m.ModelCategory)
+            .Include(m => m.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
@@ -39,13 +43,14 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
 
     public async Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null,
+        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
@@ -58,6 +63,17 @@ internal sealed class ModelRepository : IModelRepository
 
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
+
+        if (categoryIds != null && categoryIds.Count > 0)
+            query = query.Where(m => m.ModelCategoryId.HasValue && categoryIds.Contains(m.ModelCategoryId.Value));
+
+        if (normalizedTagNames != null && normalizedTagNames.Count > 0)
+            query = query.Where(m => m.Tags.Any(tag => normalizedTagNames.Contains(tag.NormalizedName)));
+
+        if (hasConceptImages.HasValue)
+            query = hasConceptImages.Value
+                ? query.Where(m => m.ConceptImages.Any())
+                : query.Where(m => !m.ConceptImages.Any());
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -67,6 +83,10 @@ internal sealed class ModelRepository : IModelRepository
             .Take(pageSize)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
+            .Include(m => m.ModelCategory)
+            .Include(m => m.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
@@ -74,6 +94,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
@@ -82,7 +103,7 @@ internal sealed class ModelRepository : IModelRepository
 
     public async Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null,
+        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
@@ -95,6 +116,17 @@ internal sealed class ModelRepository : IModelRepository
 
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
+
+        if (categoryIds != null && categoryIds.Count > 0)
+            query = query.Where(m => m.ModelCategoryId.HasValue && categoryIds.Contains(m.ModelCategoryId.Value));
+
+        if (normalizedTagNames != null && normalizedTagNames.Count > 0)
+            query = query.Where(m => m.Tags.Any(tag => normalizedTagNames.Contains(tag.NormalizedName)));
+
+        if (hasConceptImages.HasValue)
+            query = hasConceptImages.Value
+                ? query.Where(m => m.ConceptImages.Any())
+                : query.Where(m => !m.ConceptImages.Any());
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -109,9 +141,40 @@ internal sealed class ModelRepository : IModelRepository
                 Name = m.Name,
                 CreatedAt = m.CreatedAt,
                 UpdatedAt = m.UpdatedAt,
-                Tags = m.Tags,
+                Tags = m.Tags
+                    .OrderBy(tag => tag.Name)
+                    .Select(tag => tag.Name)
+                    .ToArray(),
                 Description = m.Description,
+                CategoryId = m.ModelCategoryId,
+                CategoryPath = m.ModelCategory != null ? m.ModelCategory.Name : null,
+                ConceptImageCount = m.ConceptImages.Count,
+                HasConceptImages = m.ConceptImages.Any(),
                 ActiveVersionId = m.ActiveVersionId,
+                LatestVersionId = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => (int?)v.Id)
+                    .FirstOrDefault(),
+                LatestVersionNumber = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => (int?)v.VersionNumber)
+                    .FirstOrDefault(),
+                TriangleCount = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.TriangleCount)
+                    .FirstOrDefault(),
+                VertexCount = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.VertexCount)
+                    .FirstOrDefault(),
+                MeshCount = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.MeshCount)
+                    .FirstOrDefault(),
+                MaterialCount = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.MaterialCount)
+                    .FirstOrDefault(),
                 ThumbnailUrl = m.ActiveVersion != null && m.ActiveVersion.Thumbnail != null && m.ActiveVersion.Thumbnail.Status == ThumbnailStatus.Ready
                     ? "/model-versions/" + m.ActiveVersion.Id + "/thumbnail/file?t=" + m.ActiveVersion.Thumbnail.UpdatedAt.ToString("yyyyMMddHHmmss")
                     : null,
@@ -129,6 +192,10 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
+            .Include(m => m.ModelCategory)
+            .Include(m => m.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
@@ -136,6 +203,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
@@ -152,6 +220,10 @@ internal sealed class ModelRepository : IModelRepository
         return await _context.Models
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
+            .Include(m => m.ModelCategory)
+            .Include(m => m.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
@@ -159,6 +231,7 @@ internal sealed class ModelRepository : IModelRepository
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.TextureMappings)
             .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)), cancellationToken);
     }
@@ -195,6 +268,10 @@ internal sealed class ModelRepository : IModelRepository
             .Where(m => m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
+            .Include(m => m.ModelCategory)
+            .Include(m => m.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)
@@ -214,6 +291,10 @@ internal sealed class ModelRepository : IModelRepository
             .Where(m => m.IsDeleted)
             .Include(m => m.Packs)
             .Include(m => m.Projects)
+            .Include(m => m.Tags)
+            .Include(m => m.ModelCategory)
+            .Include(m => m.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .Include(m => m.ActiveVersion)
                 .ThenInclude(v => v.Files)
             .Include(m => m.ActiveVersion)

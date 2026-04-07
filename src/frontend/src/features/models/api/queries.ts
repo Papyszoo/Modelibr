@@ -4,7 +4,12 @@ import { getAllPacks } from '@/features/pack/api/packApi'
 import { getAllProjects } from '@/features/project/api/projectApi'
 import { type QueryConfig } from '@/lib/react-query'
 
-import { getModelById, getModelsPaginated } from './modelApi'
+import {
+  getModelById,
+  getModelCategories,
+  getModelTags,
+  getModelsPaginated,
+} from './modelApi'
 
 // --- Models (paginated) ---
 
@@ -14,6 +19,9 @@ export function getModelsQueryOptions(params: {
   packId?: number
   projectId?: number
   textureSetId?: number
+  categoryIds?: number[]
+  tags?: string[]
+  hasConceptImages?: boolean
 }) {
   return queryOptions({
     queryKey: ['models', params] as const,
@@ -28,6 +36,9 @@ type UseModelsQueryOptions = {
     packId?: number
     projectId?: number
     textureSetId?: number
+    categoryIds?: number[]
+    tags?: string[]
+    hasConceptImages?: boolean
   }
   queryConfig?: QueryConfig<typeof getModelsQueryOptions>
 }
@@ -104,6 +115,46 @@ export function useProjectsQuery({
 }: UseProjectsQueryOptions = {}) {
   return useQuery({
     ...getProjectsQueryOptions(),
+    ...queryConfig,
+  })
+}
+
+export function getModelCategoriesQueryOptions() {
+  return queryOptions({
+    queryKey: ['model-categories'] as const,
+    queryFn: () => getModelCategories(),
+  })
+}
+
+type UseModelCategoriesQueryOptions = {
+  queryConfig?: QueryConfig<typeof getModelCategoriesQueryOptions>
+}
+
+export function useModelCategoriesQuery({
+  queryConfig = {},
+}: UseModelCategoriesQueryOptions = {}) {
+  return useQuery({
+    ...getModelCategoriesQueryOptions(),
+    ...queryConfig,
+  })
+}
+
+export function getModelTagsQueryOptions() {
+  return queryOptions({
+    queryKey: ['model-tags'] as const,
+    queryFn: () => getModelTags(),
+  })
+}
+
+type UseModelTagsQueryOptions = {
+  queryConfig?: QueryConfig<typeof getModelTagsQueryOptions>
+}
+
+export function useModelTagsQuery({
+  queryConfig = {},
+}: UseModelTagsQueryOptions = {}) {
+  return useQuery({
+    ...getModelTagsQueryOptions(),
     ...queryConfig,
   })
 }

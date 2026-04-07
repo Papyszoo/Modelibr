@@ -3,6 +3,7 @@ import { expect } from "@playwright/test";
 import { ModelListPage } from "../pages/ModelListPage";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import { getScenarioState } from "../fixtures/shared-state";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -21,6 +22,8 @@ When("I upload a 3D model {string}", async ({ page }, fileName: string) => {
     const modelList = new ModelListPage(page);
     // Use UniqueFileGenerator to get a unique copy (avoids deduplication)
     const filePath = await UniqueFileGenerator.generate(fileName);
+    getScenarioState(page).uploadTrackerModelName = path.parse(fileName).name;
+    getScenarioState(page).uploadTrackerVersionId = 0;
     await modelList.uploadModel(filePath);
 });
 
@@ -44,41 +47,96 @@ Then(
 Then(
     "the model status should eventually be {string}",
     async ({ page }, status: string) => {
-        // The model grid doesn't show "Ready" text - it shows thumbnails when ready
-        // Wait for a model card to appear with either a thumbnail image or placeholder
-        // A "Ready" status means the thumbnail should be loaded
         if (status.toLowerCase() === "ready") {
-            const thumbnailSelector =
-                ".model-card .thumbnail-image, .model-card .thumbnail-image-container img";
+            const { DbHelper } = await import("../fixtures/db-helper");
+            const db = new DbHelper();
+            const trackedModelName =
+                getScenarioState(page).uploadTrackerModelName;
 
-            // With VirtuosoGrid only visible model cards have DOM elements.
-            // First try: wait for SignalR to push the thumbnail status update
-            // into the React Query cache, which triggers a re-render.
-            const found = await page
-                .locator(thumbnailSelector)
-                .first()
-                .waitFor({ state: "visible", timeout: 120000 })
-                .then(() => true)
-                .catch(() => false);
-
-            if (!found) {
-                // Fallback: SignalR may have missed the event or React Query
-                // cache still holds stale "Pending" status. Reload the page so
-                // useThumbnail fetches fresh data from the API.
-                console.log(
-                    "[Fallback] Thumbnail not visible after 120s via SignalR, refreshing page...",
+            if (!trackedModelName) {
+                throw new Error(
+                    "No uploaded model name tracked for readiness verification",
                 );
-                await page.reload({ waitUntil: "domcontentloaded" });
-                await page.waitForSelector(
-                    ".model-card, .no-results, .empty-state",
-                    { state: "visible", timeout: 15000 },
-                );
-                await expect(
-                    page.locator(thumbnailSelector).first(),
-                ).toBeVisible({
-                    timeout: 60000,
-                });
             }
+
+            const query = `SELECT t."Status", m."Id" as "ModelId", m."Name" as "ModelName", mv."Id" as "VersionId"
+                           FROM "ModelVersions" mv
+                           JOIN "Models" m ON m."Id" = mv."ModelId"
+                           LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
+                           WHERE m."DeletedAt" IS NULL AND m."Name" = $1
+                           ORDER BY mv."CreatedAt" DESC
+                           LIMIT 1`;
+
+            let trackedModelId: number | null = null;
+
+            await expect
+                .poll(
+                    async () => {
+                        const result = await db.query(query, [
+                            trackedModelName,
+                        ]);
+                        if (result.rows.length === 0) {
+                            console.log(
+                                `[Status] Waiting for uploaded model \"${trackedModelName}\" to appear in database...`,
+                            );
+                            return -1;
+                        }
+
+                        const row = result.rows[0];
+                        trackedModelId = row.ModelId;
+
+                        if (row.Status === 3) {
+                            throw new Error(
+                                `Thumbnail generation failed for \"${row.ModelName}\" (model=${row.ModelId}, version=${row.VersionId})`,
+                            );
+                        }
+
+                        console.log(
+                            `[Status] Model \"${row.ModelName}\" thumbnail status=${row.Status ?? "null"} (model=${row.ModelId}, version=${row.VersionId})`,
+                        );
+                        return row.Status ?? -1;
+                    },
+                    {
+                        message: `Waiting for model \"${trackedModelName}\" to reach thumbnail Ready state`,
+                        timeout: 240000,
+                        intervals: [3000],
+                    },
+                )
+                .toBe(2);
+
+            await page.reload({ waitUntil: "domcontentloaded" });
+            await page.waitForSelector(
+                ".model-card, .no-results, .empty-state",
+                {
+                    state: "visible",
+                    timeout: 15000,
+                },
+            );
+
+            const modelCard = trackedModelId
+                ? page
+                      .locator(`.model-card[data-model-id="${trackedModelId}"]`)
+                      .first()
+                : page
+                      .locator(".model-card")
+                      .filter({ hasText: trackedModelName })
+                      .first();
+
+            await expect(modelCard).toBeVisible({ timeout: 15000 });
+
+            const readyThumbnail = modelCard.locator(
+                ".thumbnail-image, .thumbnail-image-container img, .thumbnail-placeholder[aria-label='No thumbnail available']",
+            );
+
+            await expect(readyThumbnail.first()).toBeVisible({
+                timeout: 15000,
+            });
+            console.log(
+                `[Verify] Model \"${trackedModelName}\" reached Ready status and rendered its final thumbnail state ✓`,
+            );
+
+            getScenarioState(page).uploadTrackerModelName = null;
+            getScenarioState(page).uploadTrackerVersionId = 0;
         } else {
             // For other statuses, look for the thumbnail placeholder
             await expect(

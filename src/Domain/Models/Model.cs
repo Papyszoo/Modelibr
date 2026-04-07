@@ -7,14 +7,16 @@ namespace Domain.Models
         private readonly List<TextureSet> _textureSets = new();
         private readonly List<Pack> _packs = new();
         private readonly List<Project> _projects = new();
+        private readonly List<ModelTag> _tags = new();
         private readonly List<ModelVersion> _versions = new();
+        private readonly List<ModelConceptImage> _conceptImages = new();
 
         public int Id { get; private set; }
         public string Name { get; private set; } = string.Empty;
         public DateTime CreatedAt { get; private set; }
         public DateTime UpdatedAt { get; private set; }
-        public string? Tags { get; private set; }
         public string? Description { get; private set; }
+        public int? ModelCategoryId { get; private set; }
 
         public int? ActiveVersionId { get; private set; }
         public bool IsDeleted { get; private set; }
@@ -24,6 +26,18 @@ namespace Domain.Models
         
         // Navigation property for active version
         public ModelVersion? ActiveVersion { get; private set; }
+        public ModelCategory? ModelCategory { get; private set; }
+
+        public ICollection<ModelTag> Tags
+        {
+            get => _tags;
+            set
+            {
+                _tags.Clear();
+                if (value != null)
+                    _tags.AddRange(value);
+            }
+        }
 
         // Navigation property for many-to-many relationship with TextureSets - EF Core requires this to be settable
         public ICollection<TextureSet> TextureSets 
@@ -70,6 +84,17 @@ namespace Domain.Models
                 _versions.Clear();
                 if (value != null)
                     _versions.AddRange(value);
+            }
+        }
+
+        public ICollection<ModelConceptImage> ConceptImages
+        {
+            get => _conceptImages;
+            set
+            {
+                _conceptImages.Clear();
+                if (value != null)
+                    _conceptImages.AddRange(value);
             }
         }
 
@@ -177,16 +202,57 @@ namespace Domain.Models
         }
 
         /// <summary>
-        /// Sets the AI-generated tags and description for this model.
+        /// Replaces the model metadata tags and description.
         /// </summary>
-        /// <param name="tags">Comma-separated list of tags with optional confidence scores</param>
-        /// <param name="description">Generated description of the model</param>
-        /// <param name="updatedAt">When the tags were set</param>
-        public void SetTagsAndDescription(string? tags, string? description, DateTime updatedAt)
+        /// <param name="tags">Normalized tag entities assigned to the model</param>
+        /// <param name="description">Model description</param>
+        /// <param name="updatedAt">When the metadata was updated</param>
+        public void SetMetadata(IEnumerable<ModelTag> tags, string? description, DateTime updatedAt)
         {
-            Tags = tags;
+            _tags.Clear();
+            if (tags != null)
+            {
+                foreach (var tag in tags.GroupBy(tag => tag.NormalizedName).Select(group => group.First()))
+                {
+                    _tags.Add(tag);
+                }
+            }
+
             Description = description;
             UpdatedAt = updatedAt;
+        }
+
+        public void AssignCategory(int? categoryId, DateTime updatedAt)
+        {
+            ModelCategoryId = categoryId;
+            UpdatedAt = updatedAt;
+        }
+
+        public void AddConceptImage(File file, DateTime createdAt)
+        {
+            ArgumentNullException.ThrowIfNull(file);
+
+            if (_conceptImages.Any(ci => ci.FileId == file.Id))
+                return;
+
+            var nextSortOrder = _conceptImages.Count == 0 ? 0 : _conceptImages.Max(ci => ci.SortOrder) + 1;
+            _conceptImages.Add(ModelConceptImage.Create(Id, file.Id, nextSortOrder, createdAt));
+            UpdatedAt = createdAt;
+        }
+
+        public void RemoveConceptImage(int fileId, DateTime updatedAt)
+        {
+            var conceptImage = _conceptImages.FirstOrDefault(ci => ci.FileId == fileId);
+            if (conceptImage == null)
+                return;
+
+            _conceptImages.Remove(conceptImage);
+            UpdatedAt = updatedAt;
+        }
+
+        public IReadOnlyList<ModelConceptImage> GetConceptImages()
+        {
+            return _conceptImages.OrderBy(ci => ci.SortOrder).ToList().AsReadOnly();
         }
 
         /// <summary>
@@ -277,7 +343,7 @@ namespace Domain.Models
         /// <returns>The latest version, or null if no versions exist</returns>
         public ModelVersion? GetLatestVersion()
         {
-            return _versions.OrderByDescending(v => v.CreatedAt).FirstOrDefault();
+            return _versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
         }
 
         /// <summary>

@@ -29,8 +29,21 @@ namespace Application.Models
                 Name = model.Name,
                 CreatedAt = model.CreatedAt,
                 UpdatedAt = model.UpdatedAt,
-                Tags = model.Tags,
+                Tags = ModelDtoMappings.ToTagNames(model.Tags),
                 Description = model.Description,
+                Category = model.ModelCategory == null ? null : new ModelCategorySummaryDto
+                {
+                    Id = model.ModelCategory.Id,
+                    Name = model.ModelCategory.Name,
+                    Description = model.ModelCategory.Description,
+                    ParentId = model.ModelCategory.ParentId,
+                    Path = ModelDtoMappings.BuildCategoryPath(model.ModelCategory) ?? model.ModelCategory.Name
+                },
+                ConceptImages = model.ConceptImages
+                    .OrderBy(ci => ci.SortOrder)
+                    .Select(ModelDtoMappings.ToConceptImageDto)
+                    .ToList(),
+                TechnicalMetadata = ModelDtoMappings.ToTechnicalMetadataDto(model.GetLatestVersion()),
                 ActiveVersionId = model.ActiveVersionId,
                 ThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
                     ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/file?t={model.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
@@ -81,8 +94,11 @@ namespace Application.Models
         public string Name { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
         public DateTime UpdatedAt { get; init; }
-        public string? Tags { get; init; }
+        public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
         public string? Description { get; init; }
+        public ModelCategorySummaryDto? Category { get; init; }
+        public ICollection<ModelConceptImageDto> ConceptImages { get; init; } = new List<ModelConceptImageDto>();
+        public ModelTechnicalMetadataDto TechnicalMetadata { get; init; } = new();
         public int? ActiveVersionId { get; init; }
         public string? ThumbnailUrl { get; init; }
         public string? PngThumbnailUrl { get; init; }
