@@ -19,12 +19,15 @@ namespace Application.Models
         {
             IEnumerable<ModelListDto> modelListDtos;
             int? totalCount = null;
+            var normalizedTags = ModelTag.SanitizeNames(query.Tags)
+                .Select(ModelTag.NormalizeName)
+                .ToArray();
 
             if (query.Page.HasValue && query.PageSize.HasValue)
             {
                 var result = await _modelRepository.GetPagedListAsync(
                     query.Page.Value, query.PageSize.Value,
-                    query.PackId, query.ProjectId, query.TextureSetId,
+                    query.PackId, query.ProjectId, query.TextureSetId, query.CategoryIds, normalizedTags, query.HasConceptImages,
                     cancellationToken);
                 modelListDtos = result.Items;
                 totalCount = result.TotalCount;
@@ -51,22 +54,53 @@ namespace Application.Models
                     models = models.Where(m => m.TextureSets.Any(ts => ts.Id == query.TextureSetId.Value));
                 }
 
-                // NOTE: Keep this mapping in sync with ModelRepository.GetPagedListAsync
-                modelListDtos = models.Select(m => new ModelListDto
+                if (query.CategoryIds != null && query.CategoryIds.Count > 0)
                 {
-                    Id = m.Id,
-                    Name = m.Name,
-                    CreatedAt = m.CreatedAt,
-                    UpdatedAt = m.UpdatedAt,
-                    Tags = m.Tags,
-                    Description = m.Description,
-                    ActiveVersionId = m.ActiveVersionId,
-                    ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
-                        ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
-                        : null,
-                    PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
-                        ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
-                        : null
+                    models = models.Where(m => m.ModelCategoryId.HasValue && query.CategoryIds.Contains(m.ModelCategoryId.Value));
+                }
+
+                if (normalizedTags.Length > 0)
+                {
+                    models = models.Where(m => m.Tags.Any(tag => normalizedTags.Contains(tag.NormalizedName)));
+                }
+
+                if (query.HasConceptImages.HasValue)
+                {
+                    models = query.HasConceptImages.Value
+                        ? models.Where(m => m.ConceptImages.Any())
+                        : models.Where(m => !m.ConceptImages.Any());
+                }
+
+                // NOTE: Keep this mapping in sync with ModelRepository.GetPagedListAsync
+                modelListDtos = models.Select(m =>
+                {
+                    var latest = m.GetLatestVersion();
+                    return new ModelListDto
+                    {
+                        Id = m.Id,
+                        Name = m.Name,
+                        CreatedAt = m.CreatedAt,
+                        UpdatedAt = m.UpdatedAt,
+                        Tags = ModelDtoMappings.ToTagNames(m.Tags),
+                        Description = m.Description,
+                        CategoryId = m.ModelCategoryId,
+                        CategoryPath = ModelDtoMappings.BuildCategoryPath(m.ModelCategory),
+                        ConceptImageCount = m.ConceptImages.Count,
+                        HasConceptImages = m.ConceptImages.Any(),
+                        ActiveVersionId = m.ActiveVersionId,
+                        LatestVersionId = latest?.Id,
+                        LatestVersionNumber = latest?.VersionNumber,
+                        TriangleCount = latest?.TriangleCount,
+                        VertexCount = latest?.VertexCount,
+                        MeshCount = latest?.MeshCount,
+                        MaterialCount = latest?.MaterialCount,
+                        ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
+                            ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
+                            : null,
+                        PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
+                            ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
+                            : null
+                    };
                 }).ToList();
             }
 
@@ -79,7 +113,7 @@ namespace Application.Models
         }
     }
 
-    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null, int? TextureSetId = null, int? Page = null, int? PageSize = null) : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null, int? TextureSetId = null, IReadOnlyCollection<int>? CategoryIds = null, IReadOnlyCollection<string>? Tags = null, bool? HasConceptImages = null, int? Page = null, int? PageSize = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
     
@@ -92,9 +126,19 @@ namespace Application.Models
         public string Name { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
         public DateTime UpdatedAt { get; init; }
-        public string? Tags { get; init; }
+        public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
         public string? Description { get; init; }
+        public int? CategoryId { get; init; }
+        public string? CategoryPath { get; init; }
+        public int ConceptImageCount { get; init; }
+        public bool HasConceptImages { get; init; }
         public int? ActiveVersionId { get; init; }
+        public int? LatestVersionId { get; init; }
+        public int? LatestVersionNumber { get; init; }
+        public int? TriangleCount { get; init; }
+        public int? VertexCount { get; init; }
+        public int? MeshCount { get; init; }
+        public int? MaterialCount { get; init; }
         public string? ThumbnailUrl { get; init; }
         public string? PngThumbnailUrl { get; init; }
     }

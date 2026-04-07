@@ -2,7 +2,12 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import { getModelsPaginated } from '@/features/models/api/modelApi'
-import { usePacksQuery, useProjectsQuery } from '@/features/models/api/queries'
+import {
+  useModelCategoriesQuery,
+  useModelTagsQuery,
+  usePacksQuery,
+  useProjectsQuery,
+} from '@/features/models/api/queries'
 import { type PaginationState } from '@/types'
 
 const PAGE_SIZE = 50
@@ -10,12 +15,18 @@ const PAGE_SIZE = 50
 interface UseModelDataOptions {
   effectivePackIds: number[]
   effectiveProjectIds: number[]
+  selectedCategoryIds: number[]
+  selectedTagNames: string[]
+  hasConceptImages: boolean
   textureSetId?: number
 }
 
 export function useModelData({
   effectivePackIds,
   effectiveProjectIds,
+  selectedCategoryIds,
+  selectedTagNames,
+  hasConceptImages,
   textureSetId,
 }: UseModelDataOptions) {
   const queryClient = useQueryClient()
@@ -32,7 +43,17 @@ export function useModelData({
     isLoading,
     error: queryError,
   } = useInfiniteQuery({
-    queryKey: ['models', { packId, projectId, textureSetId }],
+    queryKey: [
+      'models',
+      {
+        packId,
+        projectId,
+        textureSetId,
+        selectedCategoryIds,
+        selectedTagNames,
+        hasConceptImages,
+      },
+    ],
     queryFn: ({ pageParam }) =>
       getModelsPaginated({
         page: pageParam,
@@ -40,8 +61,13 @@ export function useModelData({
         packId,
         projectId,
         textureSetId,
+        categoryIds:
+          selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+        tags: selectedTagNames.length > 0 ? selectedTagNames : undefined,
+        hasConceptImages: hasConceptImages || undefined,
       }),
     initialPageParam: 1,
+    placeholderData: previousData => previousData,
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce((sum, p) => sum + p.items.length, 0)
       return loaded < lastPage.totalCount ? allPages.length + 1 : undefined
@@ -51,6 +77,8 @@ export function useModelData({
   // Fetch filter options (packs and projects) with React Query
   const packsQuery = usePacksQuery()
   const projectsQuery = useProjectsQuery()
+  const categoriesQuery = useModelCategoriesQuery()
+  const tagsQuery = useModelTagsQuery()
 
   const models = paginatedData?.pages.flatMap(p => p.items) ?? []
   const totalCount = paginatedData?.pages[0]?.totalCount ?? 0
@@ -84,10 +112,12 @@ export function useModelData({
 
   return {
     models,
-    loading: isLoading,
+    loading: isLoading && !paginatedData,
     error: queryError ? `Failed to fetch models: ${queryError.message}` : '',
     packs: packsQuery.data ?? [],
     projects: projectsQuery.data ?? [],
+    categories: categoriesQuery.data ?? [],
+    tags: tagsQuery.data ?? [],
     pagination,
     isLoadingMore: isFetchingNextPage,
     fetchModels,

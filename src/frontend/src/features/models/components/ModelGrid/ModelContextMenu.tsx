@@ -1,9 +1,19 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { ContextMenu } from 'primereact/contextmenu'
 import { type MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
-import { softDeleteModel } from '@/features/models/api/modelApi'
+import {
+  softDeleteModel,
+  updateModelTags,
+} from '@/features/models/api/modelApi'
 import {
   addModelToPack,
   removeModelFromPack,
@@ -21,15 +31,33 @@ import {
   openInFileExplorer,
 } from '@/utils/webdavUtils'
 
+import { AddModelTagsDialog } from './AddModelTagsDialog'
+import { ChangeModelCategoryDialog } from './ChangeModelCategoryDialog'
+
 export interface ModelContextMenuHandle {
-  show: (event: React.MouseEvent, model: Model) => void
+  show: (
+    event: React.MouseEvent,
+    options: {
+      models: Model[]
+      mode?: 'single' | 'bulk'
+    }
+  ) => void
 }
 
 interface ModelContextMenuComponentProps {
-  onModelRecycled?: (modelId: number) => void
-  onModelRemoved?: (modelId: number) => void
   hideAddToPack?: boolean
   hideAddToProject?: boolean
+  allowCategoryChange?: boolean
+  categories?: Array<{
+    id: number
+    name: string
+    description?: string
+    parentId?: number | null
+    path: string
+  }>
+  tags?: Array<{
+    name: string
+  }>
   /** When set, shows "Remove from pack" context menu option */
   packId?: number
   /** When set, shows "Remove from project" context menu option */
@@ -44,26 +72,40 @@ export const ModelContextMenu = forwardRef<
 >(
   (
     {
-      onModelRecycled,
-      onModelRemoved,
       hideAddToPack = false,
       hideAddToProject = false,
+      allowCategoryChange = false,
+      categories = [],
+      tags = [],
       packId,
       projectId,
       pathPrefix,
     },
     ref
   ) => {
-    const [selectedModel, setSelectedModel] = useState<Model | null>(null)
+    const queryClient = useQueryClient()
+    const [selectedModels, setSelectedModels] = useState<Model[]>([])
+    const [menuMode, setMenuMode] = useState<'single' | 'bulk'>('single')
     const [showPackDialog, setShowPackDialog] = useState(false)
     const [showProjectDialog, setShowProjectDialog] = useState(false)
+    const [showCategoryDialog, setShowCategoryDialog] = useState(false)
+    const [showTagsDialog, setShowTagsDialog] = useState(false)
     const contextMenu = useRef<ContextMenu>(null)
     const toast = useRef<Toast>(null)
 
+    const selectedCount = selectedModels.length
+    const primaryModel = selectedModels[0] ?? null
+    const isBulkMenu = menuMode === 'bulk'
+    const selectedCountLabel = `${selectedCount} model${selectedCount === 1 ? '' : 's'}`
+    const titleLabel = `Selected ${selectedCountLabel}`
+
     useImperativeHandle(ref, () => ({
-      show: (event: React.MouseEvent, model: Model) => {
+      show: (event: React.MouseEvent, options) => {
         event.preventDefault()
-        setSelectedModel(model)
+        setSelectedModels(options.models)
+        setMenuMode(
+          options.mode ?? (options.models.length > 1 ? 'bulk' : 'single')
+        )
         contextMenu.current?.show(event as unknown as React.SyntheticEvent)
       },
     }))
@@ -75,9 +117,23 @@ export const ModelContextMenu = forwardRef<
       return `Model ${model.id}`
     }
 
+    const invalidateRelatedQueries = async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['models'] }),
+        queryClient.invalidateQueries({ queryKey: ['packs'] }),
+        queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['model-tags'] }),
+        ...selectedModels.map(model =>
+          queryClient.invalidateQueries({
+            queryKey: ['models', 'detail', String(model.id)],
+          })
+        ),
+      ])
+    }
+
     const handleShowInFolder = async () => {
-      if (!selectedModel) return
-      const modelName = getModelName(selectedModel)
+      if (!primaryModel) return
+      const modelName = getModelName(primaryModel)
       const virtualPath = pathPrefix
         ? `${pathPrefix}/${modelName}`
         : `Models/${modelName}`
@@ -91,8 +147,8 @@ export const ModelContextMenu = forwardRef<
     }
 
     const handleCopyPath = async () => {
-      if (!selectedModel) return
-      const modelName = getModelName(selectedModel)
+      if (!primaryModel) return
+      const modelName = getModelName(primaryModel)
       const virtualPath = pathPrefix
         ? `${pathPrefix}/${modelName}`
         : `Models/${modelName}`
@@ -107,14 +163,17 @@ export const ModelContextMenu = forwardRef<
       })
     }
 
-    const handleAddToPack = async (packId: number) => {
-      if (!selectedModel) return
+    const handleAddToPack = async (selectedPackId: number) => {
+      if (selectedModels.length === 0) return
       try {
-        await addModelToPack(packId, Number(selectedModel.id))
+        for (const model of selectedModels) {
+          await addModelToPack(selectedPackId, Number(model.id))
+        }
+        await invalidateRelatedQueries()
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
-          detail: 'Model added to pack',
+          detail: `${selectedCountLabel} added to pack`,
           life: 3000,
         })
         setShowPackDialog(false)
@@ -129,14 +188,17 @@ export const ModelContextMenu = forwardRef<
       }
     }
 
-    const handleAddToProject = async (projectId: number) => {
-      if (!selectedModel) return
+    const handleAddToProject = async (selectedProjectId: number) => {
+      if (selectedModels.length === 0) return
       try {
-        await addModelToProject(projectId, Number(selectedModel.id))
+        for (const model of selectedModels) {
+          await addModelToProject(selectedProjectId, Number(model.id))
+        }
+        await invalidateRelatedQueries()
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
-          detail: 'Model added to project',
+          detail: `${selectedCountLabel} added to project`,
           life: 3000,
         })
         setShowProjectDialog(false)
@@ -152,18 +214,18 @@ export const ModelContextMenu = forwardRef<
     }
 
     const handleSoftDelete = async () => {
-      if (!selectedModel) return
+      if (selectedModels.length === 0) return
       try {
-        await softDeleteModel(Number(selectedModel.id))
+        for (const model of selectedModels) {
+          await softDeleteModel(Number(model.id))
+        }
+        await invalidateRelatedQueries()
         toast.current?.show({
           severity: 'success',
           summary: 'Recycled',
-          detail: 'Model moved to recycled files',
+          detail: `${selectedCountLabel} moved to recycled files`,
           life: 3000,
         })
-        if (onModelRecycled) {
-          onModelRecycled(Number(selectedModel.id))
-        }
       } catch (error) {
         console.error('Failed to recycle model:', error)
         toast.current?.show({
@@ -176,16 +238,16 @@ export const ModelContextMenu = forwardRef<
     }
 
     const handleRemoveFromPack = async () => {
-      if (!selectedModel || !packId) return
+      if (!primaryModel || !packId) return
       try {
-        await removeModelFromPack(packId, Number(selectedModel.id))
+        await removeModelFromPack(packId, Number(primaryModel.id))
+        await invalidateRelatedQueries()
         toast.current?.show({
           severity: 'success',
           summary: 'Removed',
           detail: 'Model removed from pack',
           life: 3000,
         })
-        onModelRemoved?.(Number(selectedModel.id))
       } catch (error) {
         console.error('Failed to remove model from pack:', error)
         toast.current?.show({
@@ -198,16 +260,16 @@ export const ModelContextMenu = forwardRef<
     }
 
     const handleRemoveFromProject = async () => {
-      if (!selectedModel || !projectId) return
+      if (!primaryModel || !projectId) return
       try {
-        await removeModelFromProject(projectId, Number(selectedModel.id))
+        await removeModelFromProject(projectId, Number(primaryModel.id))
+        await invalidateRelatedQueries()
         toast.current?.show({
           severity: 'success',
           summary: 'Removed',
           detail: 'Model removed from project',
           life: 3000,
         })
-        onModelRemoved?.(Number(selectedModel.id))
       } catch (error) {
         console.error('Failed to remove model from project:', error)
         toast.current?.show({
@@ -219,80 +281,267 @@ export const ModelContextMenu = forwardRef<
       }
     }
 
-    const contextMenuItems: MenuItem[] = [
-      {
-        label: 'Show in Folder',
-        icon: 'pi pi-folder-open',
-        command: () => handleShowInFolder(),
-      },
-      {
-        label: 'Copy Folder Path',
-        icon: 'pi pi-copy',
-        command: () => handleCopyPath(),
-      },
-      { separator: true },
-      ...(!hideAddToPack
-        ? [
-            {
-              label: 'Add to pack',
-              icon: 'pi pi-box',
-              command: () => {
-                setShowPackDialog(true)
+    const handleChangeCategory = async (categoryId: number) => {
+      if (selectedModels.length === 0) {
+        return
+      }
+
+      try {
+        for (const model of selectedModels) {
+          await updateModelTags(
+            String(model.id),
+            model.tags ?? [],
+            model.description ?? '',
+            categoryId
+          )
+        }
+        await invalidateRelatedQueries()
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Updated',
+          detail: `Category changed for ${selectedCountLabel}`,
+          life: 3000,
+        })
+      } catch (error) {
+        console.error('Failed to change model category:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to change model category',
+          life: 3000,
+        })
+        throw error
+      }
+    }
+
+    const mergeModelTags = (existingTags: string[], tagsToAdd: string[]) => {
+      const seen = new Set(existingTags.map(tag => tag.trim().toLowerCase()))
+      const merged = [...existingTags]
+
+      for (const tag of tagsToAdd) {
+        const trimmedTag = tag.trim()
+        const normalizedTag = trimmedTag.toLowerCase()
+
+        if (!trimmedTag || seen.has(normalizedTag)) {
+          continue
+        }
+
+        seen.add(normalizedTag)
+        merged.push(trimmedTag)
+      }
+
+      return merged
+    }
+
+    const handleAddTags = async (tagsToAdd: string[]) => {
+      if (selectedModels.length === 0 || tagsToAdd.length === 0) {
+        return
+      }
+
+      try {
+        for (const model of selectedModels) {
+          await updateModelTags(
+            String(model.id),
+            mergeModelTags(model.tags ?? [], tagsToAdd),
+            model.description ?? '',
+            model.categoryId ?? model.category?.id ?? null
+          )
+        }
+
+        await invalidateRelatedQueries()
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Updated',
+          detail: `Tags added to ${selectedCountLabel}`,
+          life: 3000,
+        })
+      } catch (error) {
+        console.error('Failed to add model tags:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to add tags',
+          life: 3000,
+        })
+        throw error
+      }
+    }
+
+    const contextMenuItems = useMemo<MenuItem[]>(() => {
+      if (isBulkMenu) {
+        return [
+          {
+            disabled: true,
+            template: () => (
+              <div className="model-context-menu-title">{titleLabel}</div>
+            ),
+          },
+          { separator: true },
+          {
+            label: `Recycle ${selectedCountLabel}`,
+            icon: 'pi pi-trash',
+            command: () => handleSoftDelete(),
+          },
+          {
+            label: 'Change category',
+            icon: 'pi pi-sitemap',
+            command: () => {
+              setShowCategoryDialog(true)
+            },
+          },
+          {
+            label: 'Add tags',
+            icon: 'pi pi-tags',
+            command: () => {
+              setShowTagsDialog(true)
+            },
+          },
+          {
+            label: 'Add to Project',
+            icon: 'pi pi-folder',
+            command: () => {
+              setShowProjectDialog(true)
+            },
+          },
+          {
+            label: 'Add to Pack',
+            icon: 'pi pi-box',
+            command: () => {
+              setShowPackDialog(true)
+            },
+          },
+        ]
+      }
+
+      return [
+        {
+          label: 'Show in Folder',
+          icon: 'pi pi-folder-open',
+          command: () => handleShowInFolder(),
+        },
+        {
+          label: 'Copy Folder Path',
+          icon: 'pi pi-copy',
+          command: () => handleCopyPath(),
+        },
+        { separator: true },
+        ...(!hideAddToPack
+          ? [
+              {
+                label: 'Add to Pack',
+                icon: 'pi pi-box',
+                command: () => {
+                  setShowPackDialog(true)
+                },
               },
-            },
-          ]
-        : []),
-      ...(!hideAddToProject
-        ? [
-            {
-              label: 'Add to project',
-              icon: 'pi pi-folder',
-              command: () => {
-                setShowProjectDialog(true)
+            ]
+          : []),
+        ...(!hideAddToProject
+          ? [
+              {
+                label: 'Add to Project',
+                icon: 'pi pi-folder',
+                command: () => {
+                  setShowProjectDialog(true)
+                },
               },
-            },
-          ]
-        : []),
-      ...(packId
-        ? [
-            {
-              label: 'Remove from pack',
-              icon: 'pi pi-times',
-              command: () => handleRemoveFromPack(),
-            },
-          ]
-        : []),
-      ...(projectId
-        ? [
-            {
-              label: 'Remove from project',
-              icon: 'pi pi-times',
-              command: () => handleRemoveFromProject(),
-            },
-          ]
-        : []),
-      {
-        label: 'Recycle',
-        icon: 'pi pi-trash',
-        command: () => handleSoftDelete(),
-      },
-    ]
+            ]
+          : []),
+        ...(allowCategoryChange
+          ? [
+              {
+                label: 'Change category',
+                icon: 'pi pi-sitemap',
+                command: () => {
+                  setShowCategoryDialog(true)
+                },
+              },
+            ]
+          : []),
+        {
+          label: 'Add tags',
+          icon: 'pi pi-tags',
+          command: () => {
+            setShowTagsDialog(true)
+          },
+        },
+        ...(packId
+          ? [
+              {
+                label: 'Remove from pack',
+                icon: 'pi pi-times',
+                command: () => handleRemoveFromPack(),
+              },
+            ]
+          : []),
+        ...(projectId
+          ? [
+              {
+                label: 'Remove from project',
+                icon: 'pi pi-times',
+                command: () => handleRemoveFromProject(),
+              },
+            ]
+          : []),
+        {
+          label: 'Recycle',
+          icon: 'pi pi-trash',
+          command: () => handleSoftDelete(),
+        },
+      ]
+    }, [
+      allowCategoryChange,
+      hideAddToPack,
+      hideAddToProject,
+      isBulkMenu,
+      packId,
+      projectId,
+      selectedCountLabel,
+      titleLabel,
+    ])
 
     return (
       <>
         <Toast ref={toast} />
         <ContextMenu model={contextMenuItems} ref={contextMenu} />
 
+        <ChangeModelCategoryDialog
+          visible={showCategoryDialog}
+          categories={categories}
+          selectedCount={selectedCount}
+          initialCategoryId={
+            primaryModel?.categoryId ?? primaryModel?.category?.id ?? null
+          }
+          onHide={() => setShowCategoryDialog(false)}
+          onConfirm={handleChangeCategory}
+        />
+
+        <AddModelTagsDialog
+          visible={showTagsDialog}
+          availableTags={tags}
+          selectedCount={selectedCount}
+          onHide={() => setShowTagsDialog(false)}
+          onConfirm={handleAddTags}
+        />
+
         <SelectPackDialog
           visible={showPackDialog}
           onHide={() => setShowPackDialog(false)}
           onSelect={handleAddToPack}
+          header={
+            isBulkMenu ? `Add ${selectedCountLabel} to Pack` : 'Add to Pack'
+          }
         />
 
         <SelectProjectDialog
           visible={showProjectDialog}
           onHide={() => setShowProjectDialog(false)}
           onSelect={handleAddToProject}
+          header={
+            isBulkMenu
+              ? `Add ${selectedCountLabel} to Project`
+              : 'Add to Project'
+          }
         />
       </>
     )

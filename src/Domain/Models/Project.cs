@@ -10,12 +10,17 @@ public class Project : AggregateRoot
     private readonly List<TextureSet> _textureSets = new();
     private readonly List<Sprite> _sprites = new();
     private readonly List<Sound> _sounds = new();
+    private readonly List<ProjectConceptImage> _conceptImages = new();
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
+    public string? Notes { get; private set; }
+    public int? CustomThumbnailFileId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+
+    public File? CustomThumbnailFile { get; private set; }
 
     // Navigation property for many-to-many relationship with Models - EF Core requires this to be settable
     public ICollection<Model> Models
@@ -65,6 +70,17 @@ public class Project : AggregateRoot
         }
     }
 
+    public ICollection<ProjectConceptImage> ConceptImages
+    {
+        get => _conceptImages;
+        set
+        {
+            _conceptImages.Clear();
+            if (value != null)
+                _conceptImages.AddRange(value);
+        }
+    }
+
     /// <summary>
     /// Creates a new Project with the specified name and optional description.
     /// </summary>
@@ -75,7 +91,13 @@ public class Project : AggregateRoot
     /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
     public static Project Create(string name, string? description, DateTime createdAt)
     {
+        return Create(name, description, null, createdAt);
+    }
+
+    public static Project Create(string name, string? description, string? notes, DateTime createdAt)
+    {
         ValidateName(name);
+        ValidateNotes(notes);
 
         if (description != null && description.Length > 1000)
             throw new ArgumentException("Project description cannot exceed 1000 characters.", nameof(description));
@@ -84,6 +106,7 @@ public class Project : AggregateRoot
         {
             Name = name.Trim(),
             Description = description?.Trim(),
+            Notes = notes?.Trim(),
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -98,14 +121,55 @@ public class Project : AggregateRoot
     /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
     public void Update(string name, string? description, DateTime updatedAt)
     {
+        Update(name, description, null, updatedAt);
+    }
+
+    public void Update(string name, string? description, string? notes, DateTime updatedAt)
+    {
         ValidateName(name);
+        ValidateNotes(notes);
 
         if (description != null && description.Length > 1000)
             throw new ArgumentException("Project description cannot exceed 1000 characters.", nameof(description));
 
         Name = name.Trim();
         Description = description?.Trim();
+        Notes = notes?.Trim();
         UpdatedAt = updatedAt;
+    }
+
+    public void SetCustomThumbnail(File? file, DateTime updatedAt)
+    {
+        CustomThumbnailFileId = file?.Id;
+        CustomThumbnailFile = file;
+        UpdatedAt = updatedAt;
+    }
+
+    public void AddConceptImage(File file, DateTime createdAt)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+
+        if (_conceptImages.Any(ci => ci.FileId == file.Id))
+            return;
+
+        var nextSortOrder = _conceptImages.Count == 0 ? 0 : _conceptImages.Max(ci => ci.SortOrder) + 1;
+        _conceptImages.Add(ProjectConceptImage.Create(Id, file.Id, nextSortOrder, createdAt));
+        UpdatedAt = createdAt;
+    }
+
+    public void RemoveConceptImage(int fileId, DateTime updatedAt)
+    {
+        var conceptImage = _conceptImages.FirstOrDefault(ci => ci.FileId == fileId);
+        if (conceptImage == null)
+            return;
+
+        _conceptImages.Remove(conceptImage);
+        UpdatedAt = updatedAt;
+    }
+
+    public IReadOnlyList<ProjectConceptImage> GetConceptImages()
+    {
+        return _conceptImages.OrderBy(ci => ci.SortOrder).ToList().AsReadOnly();
     }
 
     /// <summary>
@@ -365,5 +429,11 @@ public class Project : AggregateRoot
 
         if (name.Length > 200)
             throw new ArgumentException("Project name cannot exceed 200 characters.", nameof(name));
+    }
+
+    private static void ValidateNotes(string? notes)
+    {
+        if (notes != null && notes.Length > 4000)
+            throw new ArgumentException("Project notes cannot exceed 4000 characters.", nameof(notes));
     }
 }

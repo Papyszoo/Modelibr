@@ -4,7 +4,14 @@ import { Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { useQueryClient } from '@tanstack/react-query'
 import { Toast } from 'primereact/toast'
-import { type JSX, useCallback, useMemo, useRef, useState } from 'react'
+import {
+  type JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type * as THREE from 'three'
 
 import { ModelProvider } from '@/contexts/ModelContext'
@@ -20,6 +27,7 @@ import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUplo
 import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
+import { useTabUiState } from '@/hooks/useTabUiState'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
@@ -29,7 +37,10 @@ import { type Model } from '@/utils/fileUtils'
 
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { FileUploadModal } from './FileUploadModal'
-import { Scene as ModelPreviewScene } from './ModelPreviewScene'
+import {
+  Scene as ModelPreviewScene,
+  type ViewerCameraState,
+} from './ModelPreviewScene'
 import { type ExpandAction, PanelWrapper } from './PanelWrapper'
 import { type MaterialTextureSets } from './TexturedModel'
 import { VersionStrip } from './VersionStrip'
@@ -40,24 +51,112 @@ interface ModelViewerProps {
   model?: Model
   modelId?: string
   side?: 'left' | 'right'
+  tabId?: string
+}
+
+interface ViewerCornerState {
+  topLeft: 'vertical' | 'horizontal'
+  topRight: 'vertical' | 'horizontal'
+  bottomLeft: 'vertical' | 'horizontal'
+  bottomRight: 'vertical' | 'horizontal'
+}
+
+interface ViewerPanelSizes {
+  left: number
+  right: number
+  top: number
+  bottom: number
+}
+
+interface ViewerLayoutState {
+  leftPanel: PanelContent
+  rightPanel: PanelContent
+  topPanel: PanelContent
+  bottomPanel: PanelContent
+  corners: ViewerCornerState
+  panelSizes: ViewerPanelSizes
+}
+
+const DEFAULT_VIEWER_CORNERS: ViewerCornerState = {
+  topLeft: 'vertical',
+  topRight: 'vertical',
+  bottomLeft: 'vertical',
+  bottomRight: 'vertical',
+}
+
+const DEFAULT_PANEL_SIZES: ViewerPanelSizes = {
+  left: 250,
+  right: 280,
+  top: 200,
+  bottom: 200,
+}
+
+const DEFAULT_VIEWER_LAYOUT: ViewerLayoutState = {
+  leftPanel: null,
+  rightPanel: null,
+  topPanel: null,
+  bottomPanel: null,
+  corners: DEFAULT_VIEWER_CORNERS,
+  panelSizes: DEFAULT_PANEL_SIZES,
+}
+
+const DEFAULT_VIEWER_CAMERA_STATE: ViewerCameraState = {
+  position: [0, 0, 5],
+  target: [0, 0, 0],
+  zoom: 1,
+}
+
+function isSameCameraState(
+  left: ViewerCameraState,
+  right: ViewerCameraState
+): boolean {
+  const positionsMatch = left.position.every(
+    (value, index) => Math.abs(value - right.position[index]) < 0.0001
+  )
+  const targetsMatch = left.target.every(
+    (value, index) => Math.abs(value - right.target[index]) < 0.0001
+  )
+  return (
+    positionsMatch && targetsMatch && Math.abs(left.zoom - right.zoom) < 0.0001
+  )
 }
 
 export function ModelViewer({
   model: propModel,
   modelId,
   side = 'left',
+  tabId,
 }: ModelViewerProps): JSX.Element {
   const viewerSettings = useViewerSettingsStore(s => s.settings)
   const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+  const stableTabId =
+    tabId ?? (modelId ? `model-viewer-${modelId}` : 'model-viewer-standalone')
+  const [savedLayout, setSavedLayout] = useTabUiState<ViewerLayoutState>(
+    stableTabId,
+    'modelViewerLayout',
+    DEFAULT_VIEWER_LAYOUT
+  )
+  const [savedCameraState, setSavedCameraState] =
+    useTabUiState<ViewerCameraState>(
+      stableTabId,
+      'modelViewerCamera',
+      DEFAULT_VIEWER_CAMERA_STATE
+    )
 
   // --- Panel state ---
-  const [leftPanel, setLeftPanel] = useState<PanelContent>(null)
-  const [rightPanel, setRightPanel] = useState<PanelContent>(null)
-  const [topPanel, setTopPanel] = useState<PanelContent>(null)
-  const [bottomPanel, setBottomPanel] = useState<PanelContent>(null)
+  const [leftPanel, setLeftPanel] = useState<PanelContent>(
+    savedLayout.leftPanel
+  )
+  const [rightPanel, setRightPanel] = useState<PanelContent>(
+    savedLayout.rightPanel
+  )
+  const [topPanel, setTopPanel] = useState<PanelContent>(savedLayout.topPanel)
+  const [bottomPanel, setBottomPanel] = useState<PanelContent>(
+    savedLayout.bottomPanel
+  )
 
   // Panel open order tracking (for corner ownership defaults)
   const panelOpenOrder = useRef<string[]>([])
@@ -65,22 +164,49 @@ export function ModelViewer({
   // Corner ownership: which panel owns each corner
   // 'vertical' means the side panel (left/right) owns the corner
   // 'horizontal' means the top/bottom panel owns the corner
-  const [corners, setCorners] = useState({
-    topLeft: 'vertical' as 'vertical' | 'horizontal',
-    topRight: 'vertical' as 'vertical' | 'horizontal',
-    bottomLeft: 'vertical' as 'vertical' | 'horizontal',
-    bottomRight: 'vertical' as 'vertical' | 'horizontal',
-  })
+  const [corners, setCorners] = useState<ViewerCornerState>(savedLayout.corners)
 
   // Panel sizes (pixels)
-  const [panelSizes, setPanelSizes] = useState({
-    left: 250,
-    right: 280,
-    top: 200,
-    bottom: 200,
-  })
+  const [panelSizes, setPanelSizes] = useState<ViewerPanelSizes>(
+    savedLayout.panelSizes
+  )
+  const [cameraState, setCameraState] =
+    useState<ViewerCameraState>(savedCameraState)
   const [resizing, setResizing] = useState<string | null>(null)
   const resizeStart = useRef({ pos: 0, size: 0 })
+
+  useEffect(() => {
+    setSavedLayout({
+      leftPanel,
+      rightPanel,
+      topPanel,
+      bottomPanel,
+      corners,
+      panelSizes,
+    })
+  }, [
+    bottomPanel,
+    corners,
+    leftPanel,
+    panelSizes,
+    rightPanel,
+    setSavedLayout,
+    topPanel,
+  ])
+
+  const handleCameraStateChange = useCallback(
+    (nextState: ViewerCameraState) => {
+      setCameraState(currentState => {
+        if (isSameCameraState(currentState, nextState)) {
+          return currentState
+        }
+
+        setSavedCameraState(nextState)
+        return nextState
+      })
+    },
+    [setSavedCameraState]
+  )
 
   // Panel open/close handlers with corner ownership tracking
   const handlePanelChange = useCallback(
@@ -736,6 +862,10 @@ export function ModelViewer({
                       shadows
                       className="viewer-canvas"
                       data-testid="model-viewer-canvas"
+                      camera={{
+                        position: cameraState.position,
+                        zoom: cameraState.zoom,
+                      }}
                       gl={{
                         antialias: true,
                         alpha: true,
@@ -768,6 +898,8 @@ export function ModelViewer({
                         }
                         defaultFileId={defaultFileId}
                         preserveMaterials={useEmbeddedMaterials}
+                        cameraState={cameraState}
+                        onCameraChange={handleCameraStateChange}
                       />
                     </Canvas>
                   </CanvasErrorBoundary>

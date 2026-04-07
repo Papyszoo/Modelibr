@@ -1248,8 +1248,8 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
         const tabCount = await allTabs.count();
         for (let i = 0; i < tabCount; i++) {
             const tab = allTabs.nth(i);
-            const tabText = await tab.textContent();
-            const rawName = tabText?.replace(/\(\d+\)\s*$/, "").trim();
+            const tabText = await tab.locator("span").first().textContent();
+            const rawName = tabText?.trim();
             if (rawName === categoryName) {
                 return i;
             }

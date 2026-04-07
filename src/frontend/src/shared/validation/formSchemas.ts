@@ -127,18 +127,28 @@ export const packCreateFormSchema = z
   .object({
     name: z.string().trim().min(1, 'Pack name is required').max(200),
     description: z.string().trim(),
+    licenseType: z.string().trim().max(200),
+    url: z.union([z.string().trim().url('Enter a valid URL'), z.literal('')]),
   })
   .transform(values => ({
     name: values.name,
     description: values.description || undefined,
+    licenseType: values.licenseType || undefined,
+    url: values.url || undefined,
   }))
 
 export const projectCreateFormSchema = z
   .object({
     name: z.string().trim().min(1, 'Project name is required').max(200),
     description: z.string().trim(),
+    notes: z.string().trim(),
   })
   .transform(values => ({
     name: values.name,
     description: values.description || undefined,
+    notes: values.notes || undefined,
   }))
+
+export const packDetailsFormSchema = packCreateFormSchema
+
+export const projectDetailsFormSchema = projectCreateFormSchema

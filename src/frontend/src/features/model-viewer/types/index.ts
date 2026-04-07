@@ -11,6 +11,11 @@ export interface ModelVersionDto {
   description?: string
   createdAt: string
   defaultTextureSetId?: number
+  triangleCount?: number | null
+  vertexCount?: number | null
+  meshCount?: number | null
+  materialCount?: number | null
+  technicalDetailsUpdatedAt?: string | null
   thumbnailUrl?: string
   pngThumbnailUrl?: string
   files: VersionFileDto[]

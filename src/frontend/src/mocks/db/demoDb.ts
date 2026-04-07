@@ -29,14 +29,26 @@ export interface DemoModel {
   id: number
   name: string
   description: string
-  tags: string
+  tags: string[]
   files: DemoFile[]
   createdAt: string
   updatedAt: string
   activeVersionId: number | null
   defaultTextureSetId: number | null
+  categoryId?: number | null
+  conceptImages: DemoConceptImage[]
   textureSets: { id: number; name: string }[]
   packs: { id: number; name: string }[]
+  projects?: { id: number; name: string }[]
+}
+
+export interface DemoConceptImage {
+  fileId: number
+  fileName: string
+  previewUrl: string
+  fileUrl: string
+  sortOrder: number
+  mimeType?: string
 }
 
 export interface DemoModelVersion {
@@ -46,6 +58,11 @@ export interface DemoModelVersion {
   description: string
   createdAt: string
   defaultTextureSetId: number | null
+  triangleCount?: number | null
+  vertexCount?: number | null
+  meshCount?: number | null
+  materialCount?: number | null
+  technicalDetailsUpdatedAt?: string | null
   thumbnailUrl: string | null
   pngThumbnailUrl: string | null
   files: {
@@ -135,6 +152,8 @@ export interface DemoPack {
   id: number
   name: string
   description: string
+  licenseType?: string
+  url?: string
   createdAt: string
   updatedAt: string
   modelCount: number
@@ -142,6 +161,8 @@ export interface DemoPack {
   spriteCount: number
   soundCount: number
   isEmpty: boolean
+  customThumbnailFileId?: number | null
+  customThumbnailUrl?: string | null
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
@@ -152,6 +173,7 @@ export interface DemoProject {
   id: number
   name: string
   description: string
+  notes?: string
   createdAt: string
   updatedAt: string
   modelCount: number
@@ -159,6 +181,9 @@ export interface DemoProject {
   spriteCount: number
   soundCount: number
   isEmpty: boolean
+  customThumbnailFileId?: number | null
+  customThumbnailUrl?: string | null
+  conceptImages: DemoConceptImage[]
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
@@ -169,6 +194,7 @@ export interface DemoCategory {
   id: number
   name: string
   description: string | null
+  parentId?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -226,6 +252,7 @@ interface DemoDbSchema extends DBSchema {
   sounds: { key: number; value: DemoSound }
   packs: { key: number; value: DemoPack }
   projects: { key: number; value: DemoProject }
+  modelCategories: { key: number; value: DemoCategory }
   spriteCategories: { key: number; value: DemoCategory }
   soundCategories: { key: number; value: DemoCategory }
   fileBlobs: { key: number; value: DemoFileBlob }
@@ -241,7 +268,7 @@ let dbPromise: Promise<IDBPDatabase<DemoDbSchema>> | null = null
 
 export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 3, {
+    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 4, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('models', { keyPath: 'id' })
@@ -254,6 +281,7 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
           db.createObjectStore('sounds', { keyPath: 'id' })
           db.createObjectStore('packs', { keyPath: 'id' })
           db.createObjectStore('projects', { keyPath: 'id' })
+          db.createObjectStore('modelCategories', { keyPath: 'id' })
           db.createObjectStore('spriteCategories', { keyPath: 'id' })
           db.createObjectStore('soundCategories', { keyPath: 'id' })
           db.createObjectStore('fileBlobs', { keyPath: 'fileId' })
@@ -265,6 +293,12 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
         }
         if (oldVersion < 3) {
           db.createObjectStore('recycledItems', { keyPath: 'id' })
+        }
+        if (
+          oldVersion < 4 &&
+          !db.objectStoreNames.contains('modelCategories')
+        ) {
+          db.createObjectStore('modelCategories', { keyPath: 'id' })
         }
       },
     })
@@ -296,6 +330,7 @@ type StoreNames =
   | 'sounds'
   | 'packs'
   | 'projects'
+  | 'modelCategories'
   | 'spriteCategories'
   | 'soundCategories'
 
@@ -431,7 +466,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 1,
       name: 'Test Cube',
       description: 'A simple cube model for testing',
-      tags: 'test,cube,basic',
+      tags: ['test', 'cube', 'basic'],
       files: [
         {
           id: 101,
@@ -451,14 +486,26 @@ export async function seedIfEmpty(): Promise<void> {
       updatedAt: now,
       activeVersionId: 1,
       defaultTextureSetId: null,
+      categoryId: 2,
+      conceptImages: [
+        {
+          fileId: 205,
+          fileName: 'red_color.png',
+          previewUrl: '/files/205/preview?channel=rgb',
+          fileUrl: '/files/205',
+          sortOrder: 0,
+          mimeType: 'image/png',
+        },
+      ],
       textureSets: [],
       packs: [{ id: 1, name: 'Demo Pack' }],
+      projects: [{ id: 1, name: 'Demo Project' }],
     },
     {
       id: 2,
       name: 'Test Cone',
       description: 'A cone model exported as FBX',
-      tags: 'test,cone,fbx',
+      tags: ['test', 'cone', 'fbx'],
       files: [
         {
           id: 102,
@@ -478,14 +525,17 @@ export async function seedIfEmpty(): Promise<void> {
       updatedAt: now,
       activeVersionId: 2,
       defaultTextureSetId: null,
+      categoryId: 3,
+      conceptImages: [],
       textureSets: [],
       packs: [],
+      projects: [{ id: 1, name: 'Demo Project' }],
     },
     {
       id: 3,
       name: 'Test Cylinder',
       description: 'A cylinder shape',
-      tags: 'test,cylinder',
+      tags: ['test', 'cylinder'],
       files: [
         {
           id: 103,
@@ -505,14 +555,17 @@ export async function seedIfEmpty(): Promise<void> {
       updatedAt: now,
       activeVersionId: 3,
       defaultTextureSetId: null,
+      categoryId: 2,
+      conceptImages: [],
       textureSets: [{ id: 1, name: 'Basic Texture Set' }],
       packs: [{ id: 1, name: 'Demo Pack' }],
+      projects: [],
     },
     {
       id: 4,
       name: 'Test Icosphere',
       description: 'An icosphere model',
-      tags: 'test,icosphere',
+      tags: ['test', 'icosphere'],
       files: [
         {
           id: 104,
@@ -532,14 +585,17 @@ export async function seedIfEmpty(): Promise<void> {
       updatedAt: now,
       activeVersionId: 4,
       defaultTextureSetId: null,
+      categoryId: 1,
+      conceptImages: [],
       textureSets: [],
       packs: [],
+      projects: [{ id: 1, name: 'Demo Project' }],
     },
     {
       id: 5,
       name: 'Test Torus',
       description: 'A torus model',
-      tags: 'test,torus',
+      tags: ['test', 'torus'],
       files: [
         {
           id: 105,
@@ -559,8 +615,11 @@ export async function seedIfEmpty(): Promise<void> {
       updatedAt: now,
       activeVersionId: 5,
       defaultTextureSetId: 2,
+      categoryId: 3,
+      conceptImages: [],
       textureSets: [{ id: 2, name: 'Color Textures' }],
       packs: [{ id: 2, name: 'Shapes Pack' }],
+      projects: [],
     },
   ]
 
@@ -572,6 +631,11 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
+      triangleCount: 12,
+      vertexCount: 8,
+      meshCount: 1,
+      materialCount: 1,
+      technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
       files: [
@@ -597,6 +661,11 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
+      triangleCount: 96,
+      vertexCount: 64,
+      meshCount: 1,
+      materialCount: 1,
+      technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
       files: [
@@ -622,6 +691,11 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
+      triangleCount: 128,
+      vertexCount: 88,
+      meshCount: 1,
+      materialCount: 1,
+      technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
       files: [
@@ -649,6 +723,11 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: null,
+      triangleCount: 320,
+      vertexCount: 162,
+      meshCount: 1,
+      materialCount: 1,
+      technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
       files: [
@@ -674,6 +753,11 @@ export async function seedIfEmpty(): Promise<void> {
       description: 'Initial version',
       createdAt: now,
       defaultTextureSetId: 2,
+      triangleCount: 256,
+      vertexCount: 144,
+      meshCount: 1,
+      materialCount: 1,
+      technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
       files: [
@@ -894,6 +978,8 @@ export async function seedIfEmpty(): Promise<void> {
       id: 1,
       name: 'Demo Pack',
       description: 'A sample pack with various assets',
+      licenseType: 'Royalty Free',
+      url: 'https://example.com/demo-pack',
       createdAt: now,
       updatedAt: now,
       modelCount: 2,
@@ -901,6 +987,8 @@ export async function seedIfEmpty(): Promise<void> {
       spriteCount: 0,
       soundCount: 0,
       isEmpty: false,
+      customThumbnailFileId: 206,
+      customThumbnailUrl: '/files/206/preview?channel=rgb',
       models: [
         { id: 1, name: 'Test Cube' },
         { id: 3, name: 'Test Cylinder' },
@@ -913,6 +1001,8 @@ export async function seedIfEmpty(): Promise<void> {
       id: 2,
       name: 'Shapes Pack',
       description: 'Collection of basic 3D shapes',
+      licenseType: 'CC BY',
+      url: 'https://example.com/shapes-pack',
       createdAt: now,
       updatedAt: now,
       modelCount: 1,
@@ -920,6 +1010,8 @@ export async function seedIfEmpty(): Promise<void> {
       spriteCount: 0,
       soundCount: 0,
       isEmpty: false,
+      customThumbnailFileId: null,
+      customThumbnailUrl: null,
       models: [{ id: 5, name: 'Test Torus' }],
       textureSets: [{ id: 2, name: 'Color Textures' }],
       sprites: [],
@@ -932,6 +1024,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 1,
       name: 'Demo Project',
       description: 'A demo project showcasing Modelibr',
+      notes: 'Use this project to test concept art and custom covers.',
       createdAt: now,
       updatedAt: now,
       modelCount: 3,
@@ -939,6 +1032,18 @@ export async function seedIfEmpty(): Promise<void> {
       spriteCount: 1,
       soundCount: 1,
       isEmpty: false,
+      customThumbnailFileId: 207,
+      customThumbnailUrl: '/files/207/preview?channel=rgb',
+      conceptImages: [
+        {
+          fileId: 210,
+          fileName: 'yellow_color.png',
+          previewUrl: '/files/210/preview?channel=rgb',
+          fileUrl: '/files/210',
+          sortOrder: 0,
+          mimeType: 'image/png',
+        },
+      ],
       models: [
         { id: 1, name: 'Test Cube' },
         { id: 2, name: 'Test Cone' },
@@ -947,6 +1052,33 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [{ id: 1, name: 'Basic Texture Set' }],
       sprites: [{ id: 1, name: 'Demo Sprite' }],
       sounds: [{ id: 1, name: 'Test Tone' }],
+    },
+  ]
+
+  const seedModelCategories: DemoCategory[] = [
+    {
+      id: 1,
+      name: 'Environment',
+      description: 'Large scene pieces and level assets',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 2,
+      name: 'Props',
+      description: 'Reusable props and set dressing',
+      parentId: 1,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 3,
+      name: 'Characters',
+      description: 'Character meshes and NPCs',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
     },
   ]
 
@@ -980,6 +1112,7 @@ export async function seedIfEmpty(): Promise<void> {
       'sounds',
       'packs',
       'projects',
+      'modelCategories',
       'spriteCategories',
       'soundCategories',
       'meta',
@@ -993,6 +1126,8 @@ export async function seedIfEmpty(): Promise<void> {
   for (const sn of seedSounds) await tx.objectStore('sounds').put(sn)
   for (const pk of seedPacks) await tx.objectStore('packs').put(pk)
   for (const pj of seedProjects) await tx.objectStore('projects').put(pj)
+  for (const mc of seedModelCategories)
+    await tx.objectStore('modelCategories').put(mc)
   for (const sc of seedSpriteCategories)
     await tx.objectStore('spriteCategories').put(sc)
   for (const sc of seedSoundCategories)
@@ -1009,6 +1144,7 @@ export async function seedIfEmpty(): Promise<void> {
   await metaStore.put({ key: 'seq_packs', value: 100 })
   await metaStore.put({ key: 'seq_projects', value: 100 })
   await metaStore.put({ key: 'seq_files', value: 1000 })
+  await metaStore.put({ key: 'seq_modelCategories', value: 100 })
   await metaStore.put({ key: 'seq_spriteCategories', value: 100 })
   await metaStore.put({ key: 'seq_soundCategories', value: 100 })
 

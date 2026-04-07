@@ -1,6 +1,7 @@
 import { setupWorker } from 'msw/browser'
 
 import { seedIfEmpty } from './db/demoDb'
+import { ensureDemoDataShape } from './dynamic-demo/shared'
 import {
   dynamicDemoHandlers,
   prewarmSeedThumbnails,
@@ -15,5 +16,8 @@ export { prewarmSeedThumbnails }
 
 // Seed IndexedDB with demo data on first load
 if (isDemo) {
-  seedIfEmpty()
+  void (async () => {
+    await seedIfEmpty()
+    await ensureDemoDataShape()
+  })()
 }

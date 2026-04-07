@@ -348,23 +348,37 @@ export class ModelDataService {
   }
 
   /**
-   * Save extracted material names to the API for a model version.
-   * Calls PUT /model-versions/{versionId}/material-names (worker-authenticated).
+   * Save extracted technical metadata to the API for a model version.
+   * Calls PUT /model-versions/{versionId}/technical-metadata (worker-authenticated).
    * @param {number} modelVersionId - The model version ID
-   * @param {string[]} materialNames - Array of material names
+   * @param {Object} metadata - Extracted technical metadata
+   * @param {string[]} metadata.materialNames - Array of material names
+   * @param {number|null} metadata.triangleCount - Total triangle count
+   * @param {number|null} metadata.vertexCount - Total vertex count
+   * @param {number|null} metadata.meshCount - Total mesh count
+   * @param {number|null} metadata.materialCount - Total distinct material count
    * @returns {Promise<boolean>} True if saved successfully
    */
-  async saveMaterialNames(modelVersionId, materialNames) {
+  async saveTechnicalMetadata(modelVersionId, metadata) {
     try {
-      logger.info('Saving material names for model version', {
+      logger.info('Saving technical metadata for model version', {
         modelVersionId,
-        materialNames,
-        count: materialNames.length,
+        materialNames: metadata.materialNames,
+        triangleCount: metadata.triangleCount,
+        vertexCount: metadata.vertexCount,
+        meshCount: metadata.meshCount,
+        materialCount: metadata.materialCount,
       })
 
       await this.apiClient.put(
-        `/model-versions/${modelVersionId}/material-names`,
-        { materialNames },
+        `/model-versions/${modelVersionId}/technical-metadata`,
+        {
+          materialNames: metadata.materialNames,
+          triangleCount: metadata.triangleCount,
+          vertexCount: metadata.vertexCount,
+          meshCount: metadata.meshCount,
+          materialCount: metadata.materialCount,
+        },
         {
           headers: {
             ...(config.workerApiKey
@@ -374,19 +388,30 @@ export class ModelDataService {
         }
       )
 
-      logger.info('Material names saved successfully', {
+      logger.info('Technical metadata saved successfully', {
         modelVersionId,
-        count: materialNames.length,
+        materialCount: metadata.materialNames.length,
       })
 
       return true
     } catch (error) {
-      logger.warn('Failed to save material names', {
+      logger.warn('Failed to save technical metadata', {
         modelVersionId,
         error: error.message,
         status: error.response?.status,
       })
       return false
     }
+  }
+
+  async saveMaterialNames(modelVersionId, materialNames) {
+    const uniqueNames = [...new Set(materialNames)]
+    return this.saveTechnicalMetadata(modelVersionId, {
+      materialNames: uniqueNames,
+      triangleCount: null,
+      vertexCount: null,
+      meshCount: null,
+      materialCount: uniqueNames.length,
+    })
   }
 }

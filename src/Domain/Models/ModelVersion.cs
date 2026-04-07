@@ -15,6 +15,11 @@ public class ModelVersion
     public DateTime? DeletedAt { get; private set; }
     public int? DefaultTextureSetId { get; private set; }
     public int? ThumbnailId { get; private set; }
+    public int? TriangleCount { get; private set; }
+    public int? VertexCount { get; private set; }
+    public int? MeshCount { get; private set; }
+    public int? MaterialCount { get; private set; }
+    public DateTime? TechnicalDetailsUpdatedAt { get; private set; }
     
     /// <summary>
     /// Material names extracted from the 3D model file (e.g. from GLB/GLTF materials).
@@ -118,7 +123,27 @@ public class ModelVersion
     /// </summary>
     public void SetMaterialNames(List<string> materialNames, DateTime updatedAt)
     {
-        MaterialNames = materialNames ?? new List<string>();
+        UpdateTechnicalMetadata(materialNames, TriangleCount, VertexCount, MeshCount, materialNames?.Count, updatedAt);
+    }
+
+    public void UpdateTechnicalMetadata(
+        List<string>? materialNames,
+        int? triangleCount,
+        int? vertexCount,
+        int? meshCount,
+        int? materialCount,
+        DateTime updatedAt)
+    {
+        MaterialNames = (materialNames ?? new List<string>())
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        TriangleCount = triangleCount;
+        VertexCount = vertexCount;
+        MeshCount = meshCount;
+        MaterialCount = materialCount ?? MaterialNames.Count;
+        TechnicalDetailsUpdatedAt = updatedAt;
         UpdatedAt = updatedAt;
     }
 

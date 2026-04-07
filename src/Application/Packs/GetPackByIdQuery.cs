@@ -28,6 +28,8 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDet
             Id = pack.Id,
             Name = pack.Name,
             Description = pack.Description,
+            LicenseType = pack.LicenseType,
+            Url = pack.Url,
             CreatedAt = pack.CreatedAt,
             UpdatedAt = pack.UpdatedAt,
             ModelCount = pack.ModelCount,
@@ -35,6 +37,7 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDet
             SpriteCount = pack.SpriteCount,
             SoundCount = pack.SoundCount,
             IsEmpty = pack.IsEmpty,
+            CustomThumbnailUrl = pack.CustomThumbnailFileId.HasValue ? $"/files/{pack.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
             Models = pack.Models.Select(m => new PackModelDto
             {
                 Id = m.Id,
@@ -66,6 +69,8 @@ public record PackDetailDto
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
+    public string? LicenseType { get; init; }
+    public string? Url { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
@@ -73,6 +78,7 @@ public record PackDetailDto
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
     public bool IsEmpty { get; init; }
+    public string? CustomThumbnailUrl { get; init; }
     public ICollection<PackModelDto> Models { get; init; } = new List<PackModelDto>();
     public ICollection<PackTextureSetDto> TextureSets { get; init; } = new List<PackTextureSetDto>();
     public ICollection<PackSpriteDto> Sprites { get; init; } = new List<PackSpriteDto>();

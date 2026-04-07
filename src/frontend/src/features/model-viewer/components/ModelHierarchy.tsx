@@ -2,10 +2,10 @@ import './ModelHierarchy.css'
 
 import { Tree } from 'primereact/tree'
 import { type TreeNode } from 'primereact/treenode'
-import { useCallback, type JSX } from 'react'
+import { type JSX, useCallback } from 'react'
 
-import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { type HierarchyNode } from '@/features/model-viewer/hooks/useModelHierarchy'
+import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 
 interface ModelHierarchyProps {
   hierarchy: HierarchyNode | null

@@ -3,25 +3,28 @@ import 'primereact/resources/themes/lara-light-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
 
-import { type JSX, useCallback, useState } from 'react'
+import { type JSX } from 'react'
 
 import { type TabContextValue } from '@/contexts/TabContext'
 import { useTabContext } from '@/hooks/useTabContext'
 
 import { ModelGrid } from './ModelGrid'
-import { ModelListHeader } from './ModelListHeader'
 
 interface ModelListProps {
   onBackToUpload?: () => void
   isTabContent?: boolean
+  tabId?: string
 }
 
 export function ModelList({
   onBackToUpload,
   isTabContent = false,
+  tabId,
 }: ModelListProps): JSX.Element {
   if (isTabContent) {
-    return <ModelListWithTabContext onBackToUpload={onBackToUpload} />
+    return (
+      <ModelListWithTabContext onBackToUpload={onBackToUpload} tabId={tabId} />
+    )
   }
 
   return (
@@ -35,8 +38,10 @@ export function ModelList({
 
 function ModelListWithTabContext({
   onBackToUpload,
+  tabId,
 }: {
   onBackToUpload?: () => void
+  tabId?: string
 }): JSX.Element {
   const tabContext = useTabContext()
   return (
@@ -44,32 +49,29 @@ function ModelListWithTabContext({
       onBackToUpload={onBackToUpload}
       tabContext={tabContext}
       isTabContent={true}
+      tabId={tabId}
     />
   )
 }
 
 function ModelListContent({
-  onBackToUpload,
+  tabContext,
+  tabId,
   isTabContent,
 }: {
   onBackToUpload?: () => void
   tabContext: TabContextValue | null
   isTabContent: boolean
+  tabId?: string
 }): JSX.Element {
-  const [modelCount, setModelCount] = useState(0)
-  const handleTotalCountChange = useCallback((count: number) => {
-    setModelCount(count)
-  }, [])
+  const viewStateScope =
+    isTabContent && tabContext && tabId
+      ? `${tabContext.side}:${tabId}`
+      : undefined
 
   return (
     <div className={`model-list ${isTabContent ? 'model-list-tab' : ''}`}>
-      <ModelListHeader
-        isTabContent={isTabContent}
-        onBackToUpload={onBackToUpload}
-        modelCount={modelCount}
-      />
-
-      <ModelGrid onTotalCountChange={handleTotalCountChange} />
+      <ModelGrid viewStateScope={viewStateScope} />
     </div>
   )
 }

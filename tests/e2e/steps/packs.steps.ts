@@ -1,6 +1,8 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { getScenarioState } from "../fixtures/shared-state";
+import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import { ApiHelper } from "../helpers/api-helper";
 import { PacksPage } from "../pages/PacksPage";
 import { navigateToTab } from "../helpers/navigation-helper";
 
@@ -14,6 +16,15 @@ interface DataTable {
 const { Given, When, Then } = createBdd();
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+const apiHelper = new ApiHelper(API_BASE);
+
+function getPackThumbnailFileId(page: any, packName: string): number | null {
+    return (
+        getScenarioState(page).getCustom<number>(
+            `packThumbnailFileId:${packName}`,
+        ) ?? null
+    );
+}
 
 // ============= Navigation Steps =============
 
@@ -187,6 +198,26 @@ When(
     },
 );
 
+When(
+    "I create a pack named {string} with description {string} license type {string} and url {string}",
+    async (
+        { page },
+        name: string,
+        description: string,
+        licenseType: string,
+        url: string,
+    ) => {
+        const packsPage = new PacksPage(page);
+        const pack = await packsPage.createPack(name, description, {
+            licenseType,
+            url,
+        });
+
+        getScenarioState(page).savePack(name, pack);
+        console.log(`[Action] Created and stored pack "${name}" with metadata`);
+    },
+);
+
 When("I open the pack {string}", async ({ page }, packName: string) => {
     const packsPage = new PacksPage(page);
     const pack = getScenarioState(page).getPack(packName);
@@ -202,6 +233,48 @@ When("I delete the pack {string}", async ({ page }, packName: string) => {
     await packsPage.deletePack(packName, pack?.id);
     console.log(`[Action] Deleted pack "${packName}"`);
 });
+
+When(
+    "I upload the image {string} as the custom thumbnail for pack {string}",
+    async ({ page }, fileName: string, packName: string) => {
+        const pack = getScenarioState(page).getPack(packName);
+        if (!pack) {
+            throw new Error(`Pack "${packName}" not found in shared state`);
+        }
+
+        const filePath = await UniqueFileGenerator.generate(fileName);
+        const { fileId } = await apiHelper.uploadFile(filePath);
+        await apiHelper.setPackCustomThumbnail(pack.id, fileId);
+        getScenarioState(page).setCustom(
+            `packThumbnailFileId:${packName}`,
+            fileId,
+        );
+
+        await expect
+            .poll(
+                async () => {
+                    const response = await page.request.get(
+                        `${API_BASE}/packs/${pack.id}`,
+                    );
+                    if (!response.ok()) {
+                        return "";
+                    }
+                    const data = await response.json();
+                    return data.customThumbnailUrl ?? "";
+                },
+                {
+                    message: `Waiting for pack \"${packName}\" thumbnail URL to update`,
+                    timeout: 15000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toContain(`/files/${fileId}`);
+
+        console.log(
+            `[Action] Uploaded custom thumbnail for pack "${packName}" (fileId: ${fileId})`,
+        );
+    },
+);
 
 // ============= Pack Assertion Steps =============
 
@@ -258,6 +331,89 @@ Then(
         const header = page.locator(".container-header h2");
         await expect(header).toContainText(packName);
         console.log(`[UI] Pack name "${packName}" is displayed ✓`);
+    },
+);
+
+Then(
+    "the pack {string} card should show license type {string}",
+    async ({ page }, packName: string, licenseType: string) => {
+        const pack = getScenarioState(page).getPack(packName);
+        const packCard = new PacksPage(page).getPackCard(packName, pack?.id);
+        await expect(packCard).toContainText(licenseType, { timeout: 10000 });
+        console.log(
+            `[UI] Pack card "${packName}" shows license type "${licenseType}" ✓`,
+        );
+    },
+);
+
+Then(
+    "the pack {string} card should show a link badge",
+    async ({ page }, packName: string) => {
+        const pack = getScenarioState(page).getPack(packName);
+        const packCard = new PacksPage(page).getPackCard(packName, pack?.id);
+        await expect(packCard.locator("text=Link")).toBeVisible({
+            timeout: 10000,
+        });
+        console.log(`[UI] Pack card "${packName}" shows link badge ✓`);
+    },
+);
+
+Then(
+    "the pack details should show license type {string} and url {string}",
+    async ({ page }, licenseType: string, url: string) => {
+        const viewer = page.locator(".container-viewer").first();
+        await expect(viewer).toBeVisible({ timeout: 10000 });
+        await expect(viewer.locator("#pack-url")).toHaveValue(url, {
+            timeout: 10000,
+        });
+
+        const licenseField = viewer
+            .locator(
+                "#pack-license input, #pack-license .p-dropdown-label, #pack-license .p-inputtext",
+            )
+            .first();
+        await expect(licenseField).toHaveValue(licenseType, {
+            timeout: 10000,
+        });
+        console.log(
+            `[UI] Pack details show license type "${licenseType}" and URL ✓`,
+        );
+    },
+);
+
+Then(
+    "the pack {string} card should render the uploaded custom thumbnail",
+    async ({ page }, packName: string) => {
+        const pack = getScenarioState(page).getPack(packName);
+        const fileId = getPackThumbnailFileId(page, packName);
+        if (!pack || fileId === null) {
+            throw new Error(
+                `Missing pack or uploaded thumbnail state for "${packName}"`,
+            );
+        }
+
+        const packsPage = new PacksPage(page);
+        await packsPage.navigateToPackList();
+        await packsPage.assertPackCardCustomThumbnailLoaded(
+            packName,
+            fileId,
+            pack.id,
+        );
+    },
+);
+
+Then(
+    "the pack {string} details should render the uploaded custom thumbnail",
+    async ({ page }, packName: string) => {
+        const fileId = getPackThumbnailFileId(page, packName);
+        if (fileId === null) {
+            throw new Error(
+                `Missing uploaded thumbnail state for pack "${packName}"`,
+            );
+        }
+
+        const packsPage = new PacksPage(page);
+        await packsPage.assertPackDetailCustomThumbnailLoaded(packName, fileId);
     },
 );
 

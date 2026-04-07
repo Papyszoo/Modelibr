@@ -1,0 +1,98 @@
+.model-category-manager {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.2fr);
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.model-category-dialog .p-dialog-header {
+  padding-bottom: 0.5rem;
+}
+
+.model-category-dialog .p-dialog-content {
+  padding: 0.5rem 0 0;
+}
+
+.model-category-list,
+.model-category-editor {
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 1.125rem;
+  background: var(--surface-card);
+}
+
+.model-category-list-header,
+.model-category-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.model-category-list-header h4,
+.model-category-editor h4 {
+  margin: 0;
+}
+
+.model-category-list-tree {
+  margin-top: 0.875rem;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.model-category-tree {
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  background: var(--surface-ground);
+  padding: 0.5rem;
+}
+
+.model-category-tree .p-tree {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.model-category-tree .p-treenode-content {
+  border-radius: 8px;
+}
+
+.model-category-tree .p-treenode-content.p-highlight {
+  background: rgba(var(--primary-color-rgb), 0.18);
+  color: var(--text-color);
+}
+
+.model-category-tree .p-treenode-content.p-highlight .p-tree-toggler,
+.model-category-tree .p-treenode-content.p-highlight .p-treenode-label,
+.model-category-tree .p-treenode-content.p-highlight .p-checkbox,
+.model-category-tree .p-treenode-content.p-highlight .p-checkbox-icon {
+  color: var(--text-color);
+}
+
+.model-category-empty-state {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color-secondary);
+  border: 1px dashed var(--surface-border);
+  border-radius: 10px;
+}
+
+.model-category-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.model-category-parent-select,
+.model-category-parent-fallback {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .model-category-manager {
+    grid-template-columns: 1fr;
+  }
+}

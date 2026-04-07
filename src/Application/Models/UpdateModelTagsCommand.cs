@@ -4,12 +4,14 @@ namespace Application.Models;
 
 public record UpdateModelTagsCommand(
     int ModelId,
-    string? Tags,
-    string? Description
+    IReadOnlyCollection<string>? Tags,
+    string? Description,
+    int? CategoryId
 ) : ICommand<UpdateModelTagsResponse>;
 
 public record UpdateModelTagsResponse(
     int ModelId,
-    string? Tags,
-    string? Description
+    IReadOnlyList<string> Tags,
+    string? Description,
+    int? CategoryId
 );

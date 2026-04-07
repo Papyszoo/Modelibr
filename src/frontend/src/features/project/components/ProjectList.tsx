@@ -2,6 +2,7 @@ import './ProjectList.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
+import { InputSwitch } from 'primereact/inputswitch'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
 import { useRef } from 'react'
@@ -9,7 +10,9 @@ import { useRef } from 'react'
 import { deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { FilterPanel } from '@/shared/components/FilterPanel'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ProjectDto } from '@/types'
 
@@ -21,6 +24,8 @@ export function ProjectList() {
   const projects = projectsQuery.data ?? []
   const loading = projectsQuery.isLoading
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [onlyWithConceptArt, setOnlyWithConceptArt] = useState(false)
   const toast = useRef<Toast>(null)
   const { openProjectDetailsTab } = useTabContext()
 
@@ -72,11 +77,22 @@ export function ProjectList() {
     await deleteProjectMutation.mutateAsync(projectId)
   }
 
-  const getProjectThumbnail = (_project: ProjectDto) => {
-    // TODO: Add project thumbnail support
-    // For now, return null - will be implemented when thumbnail upload is added
-    return null
-  }
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch =
+      searchQuery.trim().length === 0 ||
+      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (project.description ?? '')
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
+
+    const matchesConcept = !onlyWithConceptArt || project.conceptImageCount > 0
+    return matchesSearch && matchesConcept
+  })
+
+  const activeFilterCount = [
+    searchQuery.trim().length > 0,
+    onlyWithConceptArt,
+  ].filter(Boolean).length
 
   return (
     <div className="project-list">
@@ -84,31 +100,67 @@ export function ProjectList() {
 
       <div className="project-list-header">
         <h2>Projects</h2>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <Button
+          label="Create Project"
+          icon="pi pi-plus"
+          onClick={() => setShowCreateDialog(true)}
+        />
+      </div>
+
+      <FilterPanel
+        activeCount={activeFilterCount}
+        summaryLabel="Project Filters"
+      >
+        <div className="list-filters-search">
+          <i className="pi pi-search" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search projects"
+            className="list-filters-search-input"
+          />
+        </div>
+
+        <div className="list-filters-row">
+          <div className="list-filters-switch">
+            <InputSwitch
+              checked={onlyWithConceptArt}
+              onChange={e => setOnlyWithConceptArt(Boolean(e.value))}
+            />
+            <span>Concept art</span>
+          </div>
           <CardWidthSlider
             value={cardWidth}
             min={200}
             max={500}
             onChange={width => setCardWidth('projects', width)}
           />
-          <Button
-            label="Create Project"
-            icon="pi pi-plus"
-            onClick={() => setShowCreateDialog(true)}
-          />
+          {activeFilterCount > 0 ? (
+            <Button
+              icon="pi pi-times"
+              className="p-button-text p-button-sm list-filters-clear"
+              tooltip="Clear project filters"
+              tooltipOptions={{ position: 'bottom' }}
+              onClick={() => {
+                setSearchQuery('')
+                setOnlyWithConceptArt(false)
+              }}
+            />
+          ) : null}
         </div>
-      </div>
+      </FilterPanel>
 
       {loading ? (
         <div className="project-list-loading">
           <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }} />
           <p>Loading projects...</p>
         </div>
-      ) : projects.length === 0 ? (
+      ) : filteredProjects.length === 0 ? (
         <div className="project-list-empty">
           <i className="pi pi-box" style={{ fontSize: '3rem' }} />
-          <h3>No Projects Yet</h3>
-          <p>Create your first project to organize models and texture sets</p>
+          <h3>No Matching Projects</h3>
+          <p>Adjust the filters or create a new project.</p>
           <Button
             label="Create Project"
             icon="pi pi-plus"
@@ -122,8 +174,8 @@ export function ProjectList() {
             gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
           }}
         >
-          {projects.map(project => {
-            const thumbnail = getProjectThumbnail(project)
+          {filteredProjects.map(project => {
+            const thumbnail = resolveApiAssetUrl(project.customThumbnailUrl)
             return (
               <div
                 key={project.id}
@@ -149,6 +201,11 @@ export function ProjectList() {
                       {project.description}
                     </p>
                   )}
+                  {project.notes && (
+                    <p className="project-grid-card-description">
+                      {project.notes}
+                    </p>
+                  )}
                   <div className="project-grid-card-stats">
                     <span>
                       <i className="pi pi-box" /> {project.modelCount}
@@ -161,6 +218,9 @@ export function ProjectList() {
                     </span>
                     <span>
                       <i className="pi pi-volume-up" /> {project.soundCount}
+                    </span>
+                    <span>
+                      <i className="pi pi-images" /> {project.conceptImageCount}
                     </span>
                   </div>
                 </div>

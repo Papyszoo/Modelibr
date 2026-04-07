@@ -12,6 +12,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .pack-list-header h2 {
@@ -160,4 +162,15 @@
 
 .pack-grid-card:hover .pack-grid-card-actions {
   opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .pack-list {
+    padding: 0.75rem;
+  }
+
+  .pack-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
 }

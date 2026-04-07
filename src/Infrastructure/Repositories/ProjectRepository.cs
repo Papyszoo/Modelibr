@@ -29,6 +29,9 @@ internal sealed class ProjectRepository : IProjectRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.CustomThumbnailFile)
+            .Include(p => p.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
@@ -40,6 +43,9 @@ internal sealed class ProjectRepository : IProjectRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.CustomThumbnailFile)
+            .Include(p => p.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
@@ -51,6 +57,9 @@ internal sealed class ProjectRepository : IProjectRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.CustomThumbnailFile)
+            .Include(p => p.ConceptImages)
+                .ThenInclude(ci => ci.File)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }

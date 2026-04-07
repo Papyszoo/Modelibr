@@ -34,6 +34,21 @@ public static class ProjectEndpoints
             .WithSummary("Deletes a project")
             .WithOpenApi();
 
+        app.MapPut("/projects/{id}/thumbnail", SetCustomThumbnail)
+            .WithName("Set Project Custom Thumbnail")
+            .WithSummary("Sets or clears a custom project thumbnail")
+            .WithOpenApi();
+
+        app.MapPost("/projects/{id}/concept-images", AddConceptImage)
+            .WithName("Add Project Concept Image")
+            .WithSummary("Associates an uploaded file as a project concept image")
+            .WithOpenApi();
+
+        app.MapDelete("/projects/{id}/concept-images/{fileId}", RemoveConceptImage)
+            .WithName("Remove Project Concept Image")
+            .WithSummary("Removes an associated project concept image")
+            .WithOpenApi();
+
         // Project-Model association
         app.MapPost("/projects/{projectId}/models/{modelId}", AddModelToProject)
             .WithName("Add Model to Project")
@@ -115,7 +130,7 @@ public static class ProjectEndpoints
         ICommandHandler<CreateProjectCommand, CreateProjectResponse> commandHandler,
         CancellationToken cancellationToken)
     {
-        var command = new CreateProjectCommand(request.Name, request.Description);
+        var command = new CreateProjectCommand(request.Name, request.Description, request.Notes);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess
@@ -129,7 +144,7 @@ public static class ProjectEndpoints
         ICommandHandler<UpdateProjectCommand> commandHandler,
         CancellationToken cancellationToken)
     {
-        var command = new UpdateProjectCommand(id, request.Name, request.Description);
+        var command = new UpdateProjectCommand(id, request.Name, request.Description, request.Notes);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess
@@ -287,8 +302,39 @@ public static class ProjectEndpoints
             ? Results.NoContent()
             : Results.BadRequest(result.Error);
     }
+
+    private static async Task<IResult> SetCustomThumbnail(
+        int id,
+        [FromBody] AttachOptionalFileRequest request,
+        ICommandHandler<SetProjectCustomThumbnailCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new SetProjectCustomThumbnailCommand(id, request.FileId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddConceptImage(
+        int id,
+        [FromBody] AttachFileRequest request,
+        ICommandHandler<AddProjectConceptImageCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new AddProjectConceptImageCommand(id, request.FileId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveConceptImage(
+        int id,
+        int fileId,
+        ICommandHandler<RemoveProjectConceptImageCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RemoveProjectConceptImageCommand(id, fileId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
 }
 
 // Request DTOs
-public record CreateProjectRequest(string Name, string? Description);
-public record UpdateProjectRequest(string Name, string? Description);
+public record CreateProjectRequest(string Name, string? Description, string? Notes);
+public record UpdateProjectRequest(string Name, string? Description, string? Notes);
+public record AttachOptionalFileRequest(int? FileId);

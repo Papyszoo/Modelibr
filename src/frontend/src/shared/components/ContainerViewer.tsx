@@ -76,31 +76,39 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
           className="container-tabs"
         >
           <TabPanel header="Details">
-            <div className="container-details">
-              {container.description && (
+            {adapter.renderDetails ? (
+              adapter.renderDetails({
+                container,
+                refetchContainer,
+                showToast,
+              })
+            ) : (
+              <div className="container-details">
+                {container.description && (
+                  <div className="container-detail-row">
+                    <label>Description</label>
+                    <p>{container.description}</p>
+                  </div>
+                )}
                 <div className="container-detail-row">
-                  <label>Description</label>
-                  <p>{container.description}</p>
+                  <label>Created</label>
+                  <p>{new Date(container.createdAt).toLocaleDateString()}</p>
                 </div>
-              )}
-              <div className="container-detail-row">
-                <label>Created</label>
-                <p>{new Date(container.createdAt).toLocaleDateString()}</p>
-              </div>
-              <div className="container-detail-row">
-                <label>Updated</label>
-                <p>{new Date(container.updatedAt).toLocaleDateString()}</p>
-              </div>
-              <div className="container-detail-row">
-                <label>Assets</label>
-                <div className="container-detail-assets">
-                  <span>{container.modelCount} models</span>
-                  <span>{container.textureSetCount} texture sets</span>
-                  <span>{container.spriteCount} sprites</span>
-                  <span>{container.soundCount} sounds</span>
+                <div className="container-detail-row">
+                  <label>Updated</label>
+                  <p>{new Date(container.updatedAt).toLocaleDateString()}</p>
+                </div>
+                <div className="container-detail-row">
+                  <label>Assets</label>
+                  <div className="container-detail-assets">
+                    <span>{container.modelCount} models</span>
+                    <span>{container.textureSetCount} texture sets</span>
+                    <span>{container.spriteCount} sprites</span>
+                    <span>{container.soundCount} sounds</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </TabPanel>
 
           <TabPanel header={`Models: ${modelTotalCount}`}>

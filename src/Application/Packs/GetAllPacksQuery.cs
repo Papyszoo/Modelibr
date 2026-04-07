@@ -22,11 +22,15 @@ internal class GetAllPacksQueryHandler : IQueryHandler<GetAllPacksQuery, GetAllP
             Id = p.Id,
             Name = p.Name,
             Description = p.Description,
+            LicenseType = p.LicenseType,
+            Url = p.Url,
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt,
             ModelCount = p.ModelCount,
             TextureSetCount = p.TextureSetCount,
             SpriteCount = p.SpriteCount,
+            SoundCount = p.SoundCount,
+            CustomThumbnailUrl = p.CustomThumbnailFileId.HasValue ? $"/files/{p.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
             IsEmpty = p.IsEmpty
         }).ToList();
 
@@ -45,10 +49,14 @@ public record PackListDto
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
+    public string? LicenseType { get; init; }
+    public string? Url { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
     public int TextureSetCount { get; init; }
     public int SpriteCount { get; init; }
+    public int SoundCount { get; init; }
+    public string? CustomThumbnailUrl { get; init; }
     public bool IsEmpty { get; init; }
 }
