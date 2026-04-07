@@ -183,7 +183,9 @@ export class ThumbnailProcessor extends BaseProcessor {
             technicalMetadata
           )
         } else {
-          jobLogger.warn('Skipping technical metadata save — extraction returned no data')
+          jobLogger.warn(
+            'Skipping technical metadata save — extraction returned no data'
+          )
         }
       } catch (matError) {
         jobLogger.warn(
