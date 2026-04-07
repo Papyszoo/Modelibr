@@ -405,12 +405,13 @@ export class ModelDataService {
   }
 
   async saveMaterialNames(modelVersionId, materialNames) {
+    const uniqueNames = [...new Set(materialNames)]
     return this.saveTechnicalMetadata(modelVersionId, {
-      materialNames,
+      materialNames: uniqueNames,
       triangleCount: null,
       vertexCount: null,
       meshCount: null,
-      materialCount: materialNames.length,
+      materialCount: uniqueNames.length,
     })
   }
 }

@@ -1350,13 +1350,7 @@ export class PuppeteerRenderer {
   async extractTechnicalMetadata() {
     if (!this.page || this.page.isClosed()) {
       logger.warn('Cannot extract technical metadata — page not available')
-      return {
-        materialNames: [],
-        triangleCount: 0,
-        vertexCount: 0,
-        meshCount: 0,
-        materialCount: 0,
-      }
+      return null
     }
 
     try {
@@ -1411,13 +1405,7 @@ export class PuppeteerRenderer {
         logger.warn('Failed to extract technical metadata', {
           error: result.error,
         })
-        return {
-          materialNames: [],
-          triangleCount: 0,
-          vertexCount: 0,
-          meshCount: 0,
-          materialCount: 0,
-        }
+        return null
       }
 
       logger.info('Extracted technical metadata from model', {
@@ -1433,13 +1421,7 @@ export class PuppeteerRenderer {
       logger.warn('Error extracting technical metadata', {
         error: error.message,
       })
-      return {
-        materialNames: [],
-        triangleCount: 0,
-        vertexCount: 0,
-        meshCount: 0,
-        materialCount: 0,
-      }
+      return null
     }
   }
 

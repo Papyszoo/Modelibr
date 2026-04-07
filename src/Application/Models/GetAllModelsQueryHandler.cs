@@ -72,31 +72,35 @@ namespace Application.Models
                 }
 
                 // NOTE: Keep this mapping in sync with ModelRepository.GetPagedListAsync
-                modelListDtos = models.Select(m => new ModelListDto
+                modelListDtos = models.Select(m =>
                 {
-                    Id = m.Id,
-                    Name = m.Name,
-                    CreatedAt = m.CreatedAt,
-                    UpdatedAt = m.UpdatedAt,
-                    Tags = ModelDtoMappings.ToTagNames(m.Tags),
-                    Description = m.Description,
-                    CategoryId = m.ModelCategoryId,
-                    CategoryPath = ModelDtoMappings.BuildCategoryPath(m.ModelCategory),
-                    ConceptImageCount = m.ConceptImages.Count,
-                    HasConceptImages = m.ConceptImages.Any(),
-                    ActiveVersionId = m.ActiveVersionId,
-                    LatestVersionId = m.GetLatestVersion()?.Id,
-                    LatestVersionNumber = m.GetLatestVersion()?.VersionNumber,
-                    TriangleCount = m.GetLatestVersion()?.TriangleCount,
-                    VertexCount = m.GetLatestVersion()?.VertexCount,
-                    MeshCount = m.GetLatestVersion()?.MeshCount,
-                    MaterialCount = m.GetLatestVersion()?.MaterialCount,
-                    ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
-                        ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
-                        : null,
-                    PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
-                        ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
-                        : null
+                    var latest = m.GetLatestVersion();
+                    return new ModelListDto
+                    {
+                        Id = m.Id,
+                        Name = m.Name,
+                        CreatedAt = m.CreatedAt,
+                        UpdatedAt = m.UpdatedAt,
+                        Tags = ModelDtoMappings.ToTagNames(m.Tags),
+                        Description = m.Description,
+                        CategoryId = m.ModelCategoryId,
+                        CategoryPath = ModelDtoMappings.BuildCategoryPath(m.ModelCategory),
+                        ConceptImageCount = m.ConceptImages.Count,
+                        HasConceptImages = m.ConceptImages.Any(),
+                        ActiveVersionId = m.ActiveVersionId,
+                        LatestVersionId = latest?.Id,
+                        LatestVersionNumber = latest?.VersionNumber,
+                        TriangleCount = latest?.TriangleCount,
+                        VertexCount = latest?.VertexCount,
+                        MeshCount = latest?.MeshCount,
+                        MaterialCount = latest?.MaterialCount,
+                        ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
+                            ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
+                            : null,
+                        PngThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready && !string.IsNullOrEmpty(m.ActiveVersion.Thumbnail.PngThumbnailPath)
+                            ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/png-file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
+                            : null
+                    };
                 }).ToList();
             }
 

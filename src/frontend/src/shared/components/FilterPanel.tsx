@@ -18,11 +18,7 @@ export function FilterPanel({
 }: FilterPanelProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed)
   const summaryText =
-    activeCount > 0
-      ? `${activeCount} active`
-      : isOpen
-        ? 'ready'
-        : 'collapsed by default'
+    activeCount > 0 ? `${activeCount} active` : isOpen ? 'ready' : 'collapsed'
 
   return (
     <div className="list-filters-shell">

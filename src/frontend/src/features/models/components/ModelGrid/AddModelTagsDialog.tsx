@@ -15,7 +15,7 @@ interface AddModelTagsDialogProps {
 }
 
 function normalizeTagKey(value: string): string {
-  return value.trim().toLocaleLowerCase()
+  return value.trim().toLowerCase()
 }
 
 function splitTagInput(value: string): string[] {

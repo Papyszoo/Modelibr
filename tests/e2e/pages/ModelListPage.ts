@@ -259,7 +259,7 @@ export class ModelListPage {
 
     /**
      * Filter the model list by pack name using the filter bar multiselect.
-     * Waits for the "Filter by Packs" dropdown to appear (packs query may be slow),
+     * Waits for the "Packs" dropdown to appear (packs query may be slow),
      * then retries with reload if the specific pack isn't listed.
      */
     async filterByPack(packName: string): Promise<void> {
@@ -268,7 +268,7 @@ export class ModelListPage {
 
             // Wait for the Packs multiselect to appear (packs query must complete)
             const packsMultiselect = this.page.locator(
-                '#model-grid-filters-panel .p-multiselect:has-text("Filter by Packs")',
+                '#model-grid-filters-panel .p-multiselect:has-text("Packs")',
             );
             try {
                 await packsMultiselect.waitFor({
@@ -334,7 +334,7 @@ export class ModelListPage {
             await this.ensureFiltersOpen();
 
             const projectsMultiselect = this.page.locator(
-                '#model-grid-filters-panel .p-multiselect:has-text("Filter by Projects")',
+                '#model-grid-filters-panel .p-multiselect:has-text("Projects")',
             );
             await projectsMultiselect.click();
             await this.page

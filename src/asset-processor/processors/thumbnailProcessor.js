@@ -177,10 +177,14 @@ export class ThumbnailProcessor extends BaseProcessor {
       // Step 3.2: Extract and save technical metadata from the loaded model
       try {
         const technicalMetadata = await renderer.extractTechnicalMetadata()
-        await this.modelDataService.saveTechnicalMetadata(
-          job.modelVersionId,
-          technicalMetadata
-        )
+        if (technicalMetadata) {
+          await this.modelDataService.saveTechnicalMetadata(
+            job.modelVersionId,
+            technicalMetadata
+          )
+        } else {
+          jobLogger.warn('Skipping technical metadata save — extraction returned no data')
+        }
       } catch (matError) {
         jobLogger.warn(
           'Failed to extract/save technical metadata, continuing',

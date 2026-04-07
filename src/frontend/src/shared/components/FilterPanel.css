@@ -48,7 +48,7 @@
 .list-filters-search:focus-within {
   border-color: var(--primary-color);
   background: var(--surface-card);
-  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 100, 108, 255), 0.1);
 }
 
 .list-filters-search .pi-search {
