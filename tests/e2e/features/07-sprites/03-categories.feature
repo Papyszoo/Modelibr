@@ -1,4 +1,4 @@
-@depends-on:sprites-setup @sprites @categories
+@depends-on:sprites-setup @sprites @categories @serial
 Feature: Sprite Categories CRUD Operations
   Create, Read, Update, Delete operations for sprite categories.
 
