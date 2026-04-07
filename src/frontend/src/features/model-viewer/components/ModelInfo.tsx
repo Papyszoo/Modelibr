@@ -57,7 +57,6 @@ export function ModelInfo({ model, onModelUpdated }) {
 
   const saveModelInfoMutation = useMutation({
     mutationFn: async ({
-      tagsString,
       tags,
       desc,
       categoryId,
@@ -161,9 +160,12 @@ export function ModelInfo({ model, onModelUpdated }) {
                 onChange={setSelectedCategoryId}
               />
               <Button
-                label="Manage"
-                icon="pi pi-sitemap"
+                icon="pi pi-cog"
                 text
+                rounded
+                aria-label="Manage model categories"
+                tooltip="Manage model categories"
+                tooltipOptions={{ position: 'left' }}
                 onClick={() => setShowCategoryManager(true)}
               />
             </div>
@@ -285,11 +287,14 @@ export function ModelInfo({ model, onModelUpdated }) {
               className="tag-input"
             />
             <Button
-              label="Add Tag"
               icon="pi pi-plus"
+              aria-label="Add tag"
+              tooltip="Add tag"
+              tooltipOptions={{ position: 'top' }}
               onClick={handleAddTag}
               disabled={!newTag.trim()}
               size="small"
+              className="tag-add-button"
             />
           </div>
         </div>

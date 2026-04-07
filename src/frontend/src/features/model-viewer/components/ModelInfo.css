@@ -87,11 +87,16 @@
 
 .tag-input-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .tag-input {
-  flex: 1;
+  flex: 1 1 12rem;
+}
+
+.tag-add-button {
+  flex: 0 0 auto;
 }
 
 .description-textarea {
@@ -109,6 +114,49 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.model-category-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  background: var(--surface-card);
+  color: var(--text-color);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.model-category-trigger:hover {
+  border-color: var(--primary-color);
+}
+
+.model-category-trigger:focus-visible {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.12);
+}
+
+.model-category-trigger-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-category-trigger .pi {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
 }
 
 .model-info-category-dropdown {
@@ -116,7 +164,7 @@
 }
 
 .model-info-category-row .model-category-single-trigger {
-  flex: 1;
+  flex: 1 1 14rem;
   width: 100%;
 }
 
@@ -225,7 +273,14 @@
 }
 
 .model-category-tree .p-treenode-content.p-highlight {
-  background: var(--primary-50);
+  background: rgba(var(--primary-color-rgb), 0.18);
+  color: var(--text-color);
+}
+
+.model-category-tree .p-treenode-content.p-highlight .p-tree-toggler,
+.model-category-tree .p-treenode-content.p-highlight .p-treenode-label,
+.model-category-tree .p-treenode-content.p-highlight .p-checkbox,
+.model-category-tree .p-treenode-content.p-highlight .p-checkbox-icon {
   color: var(--text-color);
 }
 
@@ -255,5 +310,15 @@
   .model-category-manager,
   .model-info-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .tag-input-group > * {
+    width: 100%;
+  }
+
+  .tag-add-button {
+    width: auto;
   }
 }

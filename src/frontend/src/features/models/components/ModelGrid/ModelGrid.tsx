@@ -14,6 +14,10 @@ import {
 import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { useTabContext } from '@/hooks/useTabContext'
+import {
+  DEFAULT_MODEL_LIST_VIEW_STATE,
+  useModelListViewStore,
+} from '@/stores/modelListViewStore'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 
 import { AddModelDialog } from './AddModelDialog'
@@ -51,6 +55,7 @@ export function ModelGrid({
   projectId,
   packId,
   textureSetId,
+  viewStateScope,
   onTotalCountChange,
 }: ModelGridProps) {
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null)
@@ -59,8 +64,16 @@ export function ModelGrid({
   const selectionSurfaceRef = useRef<HTMLDivElement | null>(null)
   const { openModelDetailsTab } = useTabContext()
   const [showAddModelDialog, setShowAddModelDialog] = useState(false)
+  const persistedViewState = useModelListViewStore(state =>
+    viewStateScope
+      ? (state.views[viewStateScope] ?? DEFAULT_MODEL_LIST_VIEW_STATE)
+      : null
+  )
+  const setPersistedViewState = useModelListViewStore(
+    state => state.setViewState
+  )
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(
-    new Set()
+    () => new Set(persistedViewState?.selectedModelIds ?? [])
   )
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState<{
@@ -71,6 +84,50 @@ export function ModelGrid({
   } | null>(null)
   const isContainerContext = !!packId || !!projectId
   const isSelectionEnabled = !isContainerContext && !textureSetId
+
+  const areSelectionSetsEqual = useCallback(
+    (left: Set<string>, right: Set<string>) => {
+      if (left.size !== right.size) {
+        return false
+      }
+
+      for (const value of left) {
+        if (!right.has(value)) {
+          return false
+        }
+      }
+
+      return true
+    },
+    []
+  )
+
+  const updatePersistedViewState = useCallback(
+    (patch: Partial<typeof DEFAULT_MODEL_LIST_VIEW_STATE>) => {
+      if (!viewStateScope) {
+        return
+      }
+
+      setPersistedViewState(viewStateScope, patch)
+    },
+    [setPersistedViewState, viewStateScope]
+  )
+
+  const setSelectedModelIdsState = useCallback(
+    (updater: Set<string> | ((previous: Set<string>) => Set<string>)) => {
+      setSelectedModelIds(previous => {
+        const next = typeof updater === 'function' ? updater(previous) : updater
+
+        if (next === previous || areSelectionSetsEqual(previous, next)) {
+          return previous
+        }
+
+        updatePersistedViewState({ selectedModelIds: [...next] })
+        return next
+      })
+    },
+    [areSelectionSetsEqual, updatePersistedViewState]
+  )
 
   const openAddModelDialog = useCallback(() => {
     setShowAddModelDialog(true)
@@ -115,7 +172,17 @@ export function ModelGrid({
     getModelName,
     buildPathPrefix,
     toast,
-  } = useModelGrid({ projectId, packId, textureSetId })
+    isSearchOpen,
+    setIsSearchOpen,
+    isFiltersOpen,
+    setIsFiltersOpen,
+  } = useModelGrid({
+    projectId,
+    packId,
+    textureSetId,
+    persistedViewState,
+    onPersistedViewStateChange: updatePersistedViewState,
+  })
 
   const selectedModels = useMemo(
     () =>
@@ -133,7 +200,7 @@ export function ModelGrid({
       return
     }
 
-    setSelectedModelIds(new Set())
+    setSelectedModelIdsState(new Set())
   }, [isSelectionEnabled])
 
   useEffect(() => {
@@ -142,14 +209,14 @@ export function ModelGrid({
     }
 
     const visibleIds = new Set(filteredModels.map(model => String(model.id)))
-    setSelectedModelIds(previous => {
+    setSelectedModelIdsState(previous => {
       const next = new Set(
         [...previous].filter(modelId => visibleIds.has(modelId))
       )
 
       return next.size === previous.size ? previous : next
     })
-  }, [filteredModels, isSelectionEnabled])
+  }, [filteredModels, isSelectionEnabled, setSelectedModelIdsState])
 
   const handleModelSelect = (model: { id: string; name: string }) => {
     openModelDetailsTab(model.id, model.name)
@@ -160,7 +227,7 @@ export function ModelGrid({
       event.preventDefault()
       event.stopPropagation()
 
-      setSelectedModelIds(previous => {
+      setSelectedModelIdsState(previous => {
         const next = new Set(previous)
         if (next.has(modelId)) {
           next.delete(modelId)
@@ -170,7 +237,7 @@ export function ModelGrid({
         return next
       })
     },
-    []
+    [setSelectedModelIdsState]
   )
 
   const handleGridMouseDown = useCallback(
@@ -272,13 +339,29 @@ export function ModelGrid({
       })
 
       if (nextSelected.size > 0) {
-        setSelectedModelIds(nextSelected)
+        setSelectedModelIdsState(nextSelected)
       }
     }
 
     setIsAreaSelecting(false)
     setSelectionBox(null)
-  }, [isAreaSelecting, isSelectionEnabled, scrollParent, selectionBox])
+  }, [
+    isAreaSelecting,
+    isSelectionEnabled,
+    scrollParent,
+    selectionBox,
+    setSelectedModelIdsState,
+  ])
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedModelIdsState(
+      new Set(filteredModels.map(model => String(model.id)))
+    )
+  }, [filteredModels, setSelectedModelIdsState])
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedModelIdsState(new Set())
+  }, [setSelectedModelIdsState])
 
   const handleBulkActionsClick = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
@@ -367,6 +450,10 @@ export function ModelGrid({
       />
 
       <ModelsFilters
+        isSearchOpen={isSearchOpen}
+        onSearchToggle={setIsSearchOpen}
+        isFiltersOpen={isFiltersOpen}
+        onFiltersToggle={setIsFiltersOpen}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         packs={packs}
@@ -393,6 +480,9 @@ export function ModelGrid({
         onUploadClick={() => fileInputRef.current?.click()}
         onRefreshClick={handleRefresh}
         onBulkActionsClick={handleBulkActionsClick}
+        onSelectAllClick={handleSelectAll}
+        onDeselectAllClick={handleDeselectAll}
+        visibleModelCount={filteredModels.length}
       />
 
       {uploading && (

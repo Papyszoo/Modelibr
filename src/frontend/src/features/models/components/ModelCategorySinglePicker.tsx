@@ -60,15 +60,19 @@ export function ModelCategorySinglePicker({
 
   return (
     <>
-      <Button
+      <button
         type="button"
-        label={selectedCategory?.path ?? placeholder}
-        icon="pi pi-sitemap"
-        className={`p-button-outlined model-category-single-trigger${selectedCategory ? ' has-value' : ''}`}
+        className={`model-category-trigger model-category-single-trigger${selectedCategory ? ' has-value' : ''}`}
         onClick={event => overlayRef.current?.toggle(event)}
         aria-haspopup="dialog"
         aria-label="Select model category"
-      />
+        title={selectedCategory?.path ?? placeholder}
+      >
+        <span className="model-category-trigger-label">
+          {selectedCategory?.path ?? placeholder}
+        </span>
+        <i className="pi pi-chevron-down" aria-hidden="true" />
+      </button>
 
       <OverlayPanel
         ref={overlayRef}

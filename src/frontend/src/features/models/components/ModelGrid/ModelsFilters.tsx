@@ -3,7 +3,7 @@ import '@/shared/components/FilterPanel.css'
 import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
-import { type MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
+import { type MouseEvent as ReactMouseEvent, useState } from 'react'
 
 import { ModelCategoryFilterPicker } from '@/features/models/components/ModelGrid/ModelCategoryFilterPicker'
 import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
@@ -18,6 +18,10 @@ import { CardWidthButton } from './CardWidthButton'
 import { type ModelCategorySelectionKeys } from './useModelFilters'
 
 interface ModelsFiltersProps {
+  isSearchOpen: boolean
+  onSearchToggle: (value: boolean) => void
+  isFiltersOpen: boolean
+  onFiltersToggle: (value: boolean) => void
   searchQuery: string
   onSearchChange: (query: string) => void
   packs: PackDto[]
@@ -44,9 +48,16 @@ interface ModelsFiltersProps {
   onUploadClick: () => void
   onRefreshClick: () => void
   onBulkActionsClick: (event: ReactMouseEvent<HTMLElement>) => void
+  onSelectAllClick: () => void
+  onDeselectAllClick: () => void
+  visibleModelCount: number
 }
 
 export function ModelsFilters({
+  isSearchOpen,
+  onSearchToggle,
+  isFiltersOpen,
+  onFiltersToggle,
   searchQuery,
   onSearchChange,
   packs,
@@ -73,9 +84,10 @@ export function ModelsFilters({
   onUploadClick,
   onRefreshClick,
   onBulkActionsClick,
+  onSelectAllClick,
+  onDeselectAllClick,
+  visibleModelCount,
 }: ModelsFiltersProps) {
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
 
   const packOptions = packs.map(pack => ({
@@ -108,18 +120,6 @@ export function ModelsFilters({
   ].filter(Boolean).length
   const selectedCountLabel = `${selectedModelCount} model${selectedModelCount === 1 ? '' : 's'}`
 
-  useEffect(() => {
-    if (hasActiveSearch) {
-      setIsSearchOpen(true)
-    }
-  }, [hasActiveSearch])
-
-  useEffect(() => {
-    if (hasActiveFilters) {
-      setIsFiltersOpen(true)
-    }
-  }, [hasActiveFilters])
-
   const countLabel = `${modelCount} model${modelCount === 1 ? '' : 's'}`
 
   return (
@@ -136,7 +136,7 @@ export function ModelsFilters({
             icon="pi pi-search"
             label="Search"
             className={`p-button-text p-button-sm model-grid-toolbar-button${isSearchOpen || hasActiveSearch ? ' is-active' : ''}`}
-            onClick={() => setIsSearchOpen(current => !current)}
+            onClick={() => onSearchToggle(!isSearchOpen)}
             aria-label="Search"
             aria-expanded={isSearchOpen}
             aria-controls="model-grid-search-panel"
@@ -145,7 +145,7 @@ export function ModelsFilters({
             icon="pi pi-sliders-h"
             label="Filters"
             className={`p-button-text p-button-sm model-grid-toolbar-button${isFiltersOpen || hasActiveFilters ? ' is-active' : ''}`}
-            onClick={() => setIsFiltersOpen(current => !current)}
+            onClick={() => onFiltersToggle(!isFiltersOpen)}
             aria-label="Filters"
             aria-expanded={isFiltersOpen}
             aria-controls="model-grid-filters-panel"
@@ -160,15 +160,6 @@ export function ModelsFilters({
             max={400}
             onChange={onCardWidthChange}
           />
-          {selectedModelCount > 0 ? (
-            <Button
-              icon="pi pi-list-check"
-              label="Bulk actions"
-              className="p-button-text p-button-sm model-grid-toolbar-button is-active"
-              onClick={onBulkActionsClick}
-              aria-label={`Bulk actions for ${selectedCountLabel}`}
-            />
-          ) : null}
           <Button
             icon="pi pi-upload"
             label="Upload"
@@ -194,6 +185,37 @@ export function ModelsFilters({
           <span>{countLabel}</span>
         </div>
       </div>
+
+      {selectedModelCount > 0 ? (
+        <div className="model-grid-selection-toolbar" aria-live="polite">
+          <span className="model-grid-selection-summary">
+            {selectedCountLabel} selected.
+          </span>
+          <div className="model-grid-selection-actions">
+            <Button
+              icon="pi pi-list-check"
+              label="Bulk actions"
+              className="p-button-text p-button-sm model-grid-toolbar-button is-active"
+              onClick={onBulkActionsClick}
+              aria-label={`Bulk actions for ${selectedCountLabel}`}
+            />
+            <Button
+              label="Select All"
+              className="p-button-text p-button-sm model-grid-toolbar-button"
+              onClick={onSelectAllClick}
+              disabled={
+                visibleModelCount === 0 ||
+                selectedModelCount >= visibleModelCount
+              }
+            />
+            <Button
+              label="Deselect All"
+              className="p-button-text p-button-sm model-grid-toolbar-button"
+              onClick={onDeselectAllClick}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div
         id="model-grid-search-panel"
@@ -253,6 +275,7 @@ export function ModelsFilters({
                 selectedKeys={selectedCategoryKeys}
                 onChange={onCategoryChange}
                 onManageClick={() => setShowCategoryManager(true)}
+                disabled={categories.length === 0}
               />
             )}
             {tags.length > 0 && (

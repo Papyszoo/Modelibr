@@ -17,6 +17,7 @@ interface ModelCategoryFilterPickerProps {
   selectedKeys: ModelCategorySelectionKeys
   onChange: (keys: ModelCategorySelectionKeys) => void
   onManageClick: () => void
+  disabled?: boolean
 }
 
 export function ModelCategoryFilterPicker({
@@ -24,6 +25,7 @@ export function ModelCategoryFilterPicker({
   selectedKeys,
   onChange,
   onManageClick,
+  disabled = false,
 }: ModelCategoryFilterPickerProps) {
   const overlayRef = useRef<OverlayPanel | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -40,23 +42,36 @@ export function ModelCategoryFilterPicker({
     () => buildExpandedKeys(filteredNodes),
     [filteredNodes]
   )
-  const selectedCount = Object.values(selectedKeys).filter(
-    state => state?.checked
-  ).length
+  const selectedNames = useMemo(
+    () =>
+      categories
+        .filter(category => selectedKeys[String(category.id)]?.checked)
+        .map(category => category.name)
+        .sort((left, right) => left.localeCompare(right)),
+    [categories, selectedKeys]
+  )
+  const selectedCount = selectedNames.length
   const buttonLabel =
-    selectedCount > 0 ? `Categories (${selectedCount})` : 'Categories'
+    selectedCount === 0
+      ? 'Categories'
+      : selectedCount <= 2
+        ? selectedNames.join(', ')
+        : `${selectedNames.slice(0, 2).join(', ')} +${selectedCount - 2}`
 
   return (
     <>
-      <Button
+      <button
         type="button"
-        label={buttonLabel}
-        icon="pi pi-sitemap"
-        className={`p-button-outlined list-filters-control model-category-filter-trigger${selectedCount > 0 ? ' has-value' : ''}`}
+        className={`list-filters-control model-category-trigger model-category-filter-trigger${selectedCount > 0 ? ' has-value' : ''}`}
         onClick={event => overlayRef.current?.toggle(event)}
         aria-haspopup="dialog"
         aria-label="Filter by categories"
-      />
+        title={selectedCount > 0 ? selectedNames.join(', ') : 'Categories'}
+        disabled={disabled}
+      >
+        <span className="model-category-trigger-label">{buttonLabel}</span>
+        <i className="pi pi-chevron-down" aria-hidden="true" />
+      </button>
 
       <OverlayPanel
         ref={overlayRef}

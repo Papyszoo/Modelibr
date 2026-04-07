@@ -88,7 +88,7 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
   const renderContent = (): JSX.Element => {
     switch (tab.type) {
       case 'modelList':
-        return <ModelList isTabContent={true} />
+        return <ModelList isTabContent={true} tabId={tab.id} />
 
       case 'modelViewer':
         if (!tab.modelId) {

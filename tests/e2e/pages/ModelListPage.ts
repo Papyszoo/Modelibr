@@ -247,14 +247,14 @@ export class ModelListPage {
     }
 
     /**
-     * Get the active-filter indicator in the shared filter panel summary.
-     * The new collapsed filter UI may hide the control body after data refreshes,
-     * but the summary remains stable and reflects the active filter count.
+     * Get active filter chips in the current filter panel.
+     * The current UI renders active pack/project selections as PrimeReact
+     * multiselect tokens inside the panel rather than in a separate summary bar.
      */
     getFilterTokens(): Locator {
-        return this.page
-            .locator(".list-filters-summary")
-            .filter({ hasText: /\bactive\b/i });
+        return this.page.locator(
+            "#model-grid-filters-panel .p-multiselect-token",
+        );
     }
 
     /**
@@ -268,7 +268,7 @@ export class ModelListPage {
 
             // Wait for the Packs multiselect to appear (packs query must complete)
             const packsMultiselect = this.page.locator(
-                '.list-filters-panel .p-multiselect:has-text("Filter by Packs")',
+                '#model-grid-filters-panel .p-multiselect:has-text("Filter by Packs")',
             );
             try {
                 await packsMultiselect.waitFor({
@@ -334,7 +334,7 @@ export class ModelListPage {
             await this.ensureFiltersOpen();
 
             const projectsMultiselect = this.page.locator(
-                '.list-filters-panel .p-multiselect:has-text("Filter by Projects")',
+                '#model-grid-filters-panel .p-multiselect:has-text("Filter by Projects")',
             );
             await projectsMultiselect.click();
             await this.page
@@ -387,14 +387,14 @@ export class ModelListPage {
             await this.page.waitForLoadState("domcontentloaded");
         } else {
             const packsClear = this.page
-                .locator(".list-filters-panel .p-multiselect")
+                .locator("#model-grid-filters-panel .p-multiselect")
                 .first()
                 .locator(".p-multiselect-clear-icon");
             if (await packsClear.isVisible().catch(() => false)) {
                 await packsClear.click();
             }
             const projectsClear = this.page
-                .locator(".list-filters-panel .p-multiselect")
+                .locator("#model-grid-filters-panel .p-multiselect")
                 .nth(1)
                 .locator(".p-multiselect-clear-icon");
             if (await projectsClear.isVisible().catch(() => false)) {

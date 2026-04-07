@@ -189,7 +189,7 @@ When("I remove the first tag", async ({ page }) => {
     }).toPass({ timeout: 10000, intervals: [500, 500, 500] });
 
     setTagCountBeforeRemove(page, initialCount);
-    console.log(`[State] Tags before removal: ${tagCountBeforeRemove}`);
+    console.log(`[State] Tags before removal: ${initialCount}`);
 
     // Click the remove icon on the first tag chip
     const firstChipRemove = infoPanel

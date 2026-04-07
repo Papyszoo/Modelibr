@@ -67,6 +67,7 @@ export function useModelData({
         hasConceptImages: hasConceptImages || undefined,
       }),
     initialPageParam: 1,
+    placeholderData: previousData => previousData,
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce((sum, p) => sum + p.items.length, 0)
       return loaded < lastPage.totalCount ? allPages.length + 1 : undefined
@@ -111,7 +112,7 @@ export function useModelData({
 
   return {
     models,
-    loading: isLoading,
+    loading: isLoading && !paginatedData,
     error: queryError ? `Failed to fetch models: ${queryError.message}` : '',
     packs: packsQuery.data ?? [],
     projects: projectsQuery.data ?? [],

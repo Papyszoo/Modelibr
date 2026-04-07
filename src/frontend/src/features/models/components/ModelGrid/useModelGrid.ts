@@ -1,6 +1,7 @@
 import { type Toast } from 'primereact/toast'
 import { useCallback, useRef } from 'react'
 
+import { type ModelListViewState } from '@/stores/modelListViewStore'
 import { type PackDto, type ProjectDto } from '@/types'
 
 import { useModelData } from './useModelData'
@@ -11,17 +12,26 @@ interface UseModelGridOptions {
   projectId?: number
   packId?: number
   textureSetId?: number
+  persistedViewState?: ModelListViewState | null
+  onPersistedViewStateChange?: (patch: Partial<ModelListViewState>) => void
 }
 
 export function useModelGrid({
   projectId,
   packId,
   textureSetId,
+  persistedViewState,
+  onPersistedViewStateChange,
 }: UseModelGridOptions) {
   const toast = useRef<Toast>(null)
 
   // Filters (search, pack/project selection, card width)
-  const filters = useModelFilters({ packId, projectId })
+  const filters = useModelFilters({
+    packId,
+    projectId,
+    persistedViewState,
+    onPersistedViewStateChange,
+  })
 
   // Data fetching (models, packs, projects, pagination)
   const data = useModelData({
@@ -92,6 +102,10 @@ export function useModelGrid({
     onDragLeave: upload.onDragLeave,
 
     // Search & Filters
+    isSearchOpen: filters.isSearchOpen,
+    setIsSearchOpen: filters.setIsSearchOpen,
+    isFiltersOpen: filters.isFiltersOpen,
+    setIsFiltersOpen: filters.setIsFiltersOpen,
     searchQuery: filters.searchQuery,
     setSearchQuery: filters.setSearchQuery,
     selectedCategoryKeys: filters.selectedCategoryKeys,

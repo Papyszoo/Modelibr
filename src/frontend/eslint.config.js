@@ -53,7 +53,12 @@ const featureBoundaryConfigs = featureNames.map(featureName => {
 })
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage']),
+  globalIgnores([
+    'dist',
+    'coverage',
+    'storybook-static',
+    'public/mockServiceWorker.js',
+  ]),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

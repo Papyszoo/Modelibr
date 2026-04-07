@@ -58,7 +58,14 @@
 }
 
 .model-category-tree .p-treenode-content.p-highlight {
-  background: var(--primary-50);
+  background: rgba(var(--primary-color-rgb), 0.18);
+  color: var(--text-color);
+}
+
+.model-category-tree .p-treenode-content.p-highlight .p-tree-toggler,
+.model-category-tree .p-treenode-content.p-highlight .p-treenode-label,
+.model-category-tree .p-treenode-content.p-highlight .p-checkbox,
+.model-category-tree .p-treenode-content.p-highlight .p-checkbox-icon {
   color: var(--text-color);
 }
 
