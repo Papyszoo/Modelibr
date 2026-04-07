@@ -11,16 +11,17 @@ import { useEffect, useState } from 'react'
 import {
   addModelConceptImage,
   getFilePreviewUrl,
+  getFileUrl,
   removeModelConceptImage,
   updateModelTags,
   uploadFile,
 } from '@/features/models/api/modelApi'
 import { useModelCategoriesQuery } from '@/features/models/api/queries'
-import { resolveApiAssetUrl } from '@/lib/apiBase'
-import { getModelFileFormat } from '@/utils/fileUtils'
-
 import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
 import { ModelCategorySinglePicker } from '@/features/models/components/ModelCategorySinglePicker'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
+import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
+import { getModelFileFormat } from '@/utils/fileUtils'
 
 export function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(model.tags ?? [])
@@ -30,6 +31,9 @@ export function ModelInfo({ model, onModelUpdated }) {
   )
   const [newTag, setNewTag] = useState('')
   const [showCategoryManager, setShowCategoryManager] = useState(false)
+  const [activeConceptImageIndex, setActiveConceptImageIndex] = useState<
+    number | null
+  >(null)
   const conceptFileInputRef = useRef<HTMLInputElement | null>(null)
   const queryClient = useQueryClient()
   const categoriesQuery = useModelCategoriesQuery()
@@ -124,6 +128,16 @@ export function ModelInfo({ model, onModelUpdated }) {
     meshCount: model.meshCount,
     materialCount: model.materialCount,
   }
+  const conceptImages = model.conceptImages ?? []
+  const lightboxImages = conceptImages.map(image => ({
+    id: image.fileId,
+    name: image.fileName,
+    previewUrl:
+      resolveApiAssetUrl(image.previewUrl) ||
+      getFilePreviewUrl(String(image.fileId)),
+    fullUrl:
+      resolveApiAssetUrl(image.fileUrl) || getFileUrl(String(image.fileId)),
+  }))
 
   return (
     <div className="model-info">
@@ -229,17 +243,33 @@ export function ModelInfo({ model, onModelUpdated }) {
           }}
         />
 
-        {model.conceptImages && model.conceptImages.length > 0 ? (
+        <ImageLightboxDialog
+          visible={activeConceptImageIndex !== null}
+          title="Model concept image"
+          images={lightboxImages}
+          activeIndex={activeConceptImageIndex ?? 0}
+          onIndexChange={setActiveConceptImageIndex}
+          onHide={() => setActiveConceptImageIndex(null)}
+        />
+
+        {conceptImages.length > 0 ? (
           <div className="model-info-concept-grid">
-            {model.conceptImages.map(image => (
+            {conceptImages.map((image, index) => (
               <div key={image.fileId} className="model-info-concept-card">
-                <img
-                  src={
-                    resolveApiAssetUrl(image.previewUrl) ||
-                    getFilePreviewUrl(String(image.fileId))
-                  }
-                  alt={image.fileName}
-                />
+                <button
+                  type="button"
+                  className="model-info-concept-preview"
+                  aria-label={`Open concept image ${image.fileName}`}
+                  onClick={() => setActiveConceptImageIndex(index)}
+                >
+                  <img
+                    src={
+                      resolveApiAssetUrl(image.previewUrl) ||
+                      getFilePreviewUrl(String(image.fileId))
+                    }
+                    alt={image.fileName}
+                  />
+                </button>
                 <div className="model-info-concept-footer">
                   <span title={image.fileName}>{image.fileName}</span>
                   <Button
@@ -247,9 +277,10 @@ export function ModelInfo({ model, onModelUpdated }) {
                     text
                     rounded
                     severity="danger"
-                    onClick={() =>
+                    onClick={event => {
+                      event.stopPropagation()
                       removeConceptImageMutation.mutate(image.fileId)
-                    }
+                    }}
                   />
                 </div>
               </div>

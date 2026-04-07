@@ -1,0 +1,130 @@
+.image-lightbox-dialog .p-dialog-content {
+  padding: 0;
+}
+
+.image-lightbox {
+  display: flex;
+  flex-direction: column;
+  min-height: min(78vh, 52rem);
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.image-lightbox-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.75rem;
+}
+
+.image-lightbox-meta {
+  min-width: 0;
+}
+
+.image-lightbox-title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-lightbox-counter {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.image-lightbox-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.image-lightbox-action.p-button {
+  color: #e2e8f0;
+}
+
+.image-lightbox-action.p-button:hover {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.image-lightbox-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.image-lightbox-stage img {
+  display: block;
+  max-width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.6);
+  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.45);
+}
+
+.image-lightbox-thumbnails {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+  gap: 0.5rem;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.image-lightbox-thumb {
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.72);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.image-lightbox-thumb:hover {
+  transform: translateY(-1px);
+  border-color: rgba(226, 232, 240, 0.7);
+}
+
+.image-lightbox-thumb.is-active {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.image-lightbox-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+@media (max-width: 640px) {
+  .image-lightbox-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .image-lightbox-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .image-lightbox-stage {
+    padding-inline: 0.75rem;
+  }
+
+  .image-lightbox-thumbnails {
+    padding-inline: 0.75rem;
+  }
+}

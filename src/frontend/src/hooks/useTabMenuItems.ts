@@ -77,11 +77,15 @@ export const useTabMenuItems = ({
         {
           separator: true,
         },
-        ...recentlyClosedTabs.map(tab => ({
-          label: `Reopen: ${tab.label || tab.type}`,
+        {
+          label: 'Reopen',
           icon: 'pi pi-history',
-          command: () => onReopenTab(tab),
-        }))
+          items: recentlyClosedTabs.map(tab => ({
+            label: tab.label || tab.type,
+            icon: 'pi pi-history',
+            command: () => onReopenTab(tab),
+          })),
+        }
       )
     }
 

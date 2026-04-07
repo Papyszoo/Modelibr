@@ -2,11 +2,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
-import { getFilePreviewUrl, uploadFile } from '@/features/models/api/modelApi'
+import {
+  getFilePreviewUrl,
+  getFileUrl,
+  uploadFile,
+} from '@/features/models/api/modelApi'
 import {
   addProjectConceptImage,
   removeProjectConceptImage,
@@ -14,6 +18,7 @@ import {
   updateProject,
 } from '@/features/project/api/projectApi'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
+import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
 import { type ProjectDetailDto } from '@/types'
 
@@ -39,6 +44,9 @@ export function ProjectDetailsPanel({
   const queryClient = useQueryClient()
   const thumbnailInputRef = useRef<HTMLInputElement | null>(null)
   const conceptInputRef = useRef<HTMLInputElement | null>(null)
+  const [activeConceptImageIndex, setActiveConceptImageIndex] = useState<
+    number | null
+  >(null)
 
   const defaultValues = useMemo(
     () => ({
@@ -136,6 +144,15 @@ export function ProjectDetailsPanel({
 
   const onSave = handleSubmit(values => updateMutation.mutate(values))
   const thumbnailUrl = resolveApiAssetUrl(project.customThumbnailUrl)
+  const lightboxImages = project.conceptImages.map(image => ({
+    id: image.fileId,
+    name: image.fileName,
+    previewUrl:
+      resolveApiAssetUrl(image.previewUrl) ||
+      getFilePreviewUrl(String(image.fileId)),
+    fullUrl:
+      resolveApiAssetUrl(image.fileUrl) || getFileUrl(String(image.fileId)),
+  }))
 
   return (
     <div className="container-rich-details">
@@ -207,6 +224,15 @@ export function ProjectDetailsPanel({
               }}
             />
 
+            <ImageLightboxDialog
+              visible={activeConceptImageIndex !== null}
+              title="Project concept image"
+              images={lightboxImages}
+              activeIndex={activeConceptImageIndex ?? 0}
+              onIndexChange={setActiveConceptImageIndex}
+              onHide={() => setActiveConceptImageIndex(null)}
+            />
+
             {project.conceptImages.length === 0 ? (
               <div className="container-empty-media">
                 <i className="pi pi-images" />
@@ -214,15 +240,22 @@ export function ProjectDetailsPanel({
               </div>
             ) : (
               <div className="container-media-grid">
-                {project.conceptImages.map(image => (
+                {project.conceptImages.map((image, index) => (
                   <div key={image.fileId} className="container-media-card">
-                    <img
-                      src={
-                        resolveApiAssetUrl(image.previewUrl) ||
-                        getFilePreviewUrl(String(image.fileId))
-                      }
-                      alt={image.fileName}
-                    />
+                    <button
+                      type="button"
+                      className="container-media-preview"
+                      aria-label={`Open concept image ${image.fileName}`}
+                      onClick={() => setActiveConceptImageIndex(index)}
+                    >
+                      <img
+                        src={
+                          resolveApiAssetUrl(image.previewUrl) ||
+                          getFilePreviewUrl(String(image.fileId))
+                        }
+                        alt={image.fileName}
+                      />
+                    </button>
                     <div className="container-media-card-footer">
                       <span title={image.fileName}>{image.fileName}</span>
                       <Button
@@ -230,9 +263,10 @@ export function ProjectDetailsPanel({
                         text
                         rounded
                         severity="danger"
-                        onClick={() =>
+                        onClick={event => {
+                          event.stopPropagation()
                           removeConceptMutation.mutate(image.fileId)
-                        }
+                        }}
                       />
                     </div>
                   </div>

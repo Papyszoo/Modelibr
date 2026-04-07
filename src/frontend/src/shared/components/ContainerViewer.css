@@ -192,11 +192,25 @@
   background: var(--surface-card);
 }
 
-.container-media-card img {
+.container-media-preview {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
+
+.container-media-preview img {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
+}
+
+.container-media-preview:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
 }
 
 .container-media-card-footer {

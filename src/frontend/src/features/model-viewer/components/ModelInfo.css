@@ -181,7 +181,16 @@
   background: var(--surface-card);
 }
 
-.model-info-concept-card img {
+.model-info-concept-preview {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
+
+.model-info-concept-preview img {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -201,6 +210,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.8rem;
+}
+
+.model-info-concept-preview:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
 }
 
 .model-info-empty {

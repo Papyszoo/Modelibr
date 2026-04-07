@@ -31,6 +31,7 @@ import {
   openInFileExplorer,
 } from '@/utils/webdavUtils'
 
+import { AddModelTagsDialog } from './AddModelTagsDialog'
 import { ChangeModelCategoryDialog } from './ChangeModelCategoryDialog'
 
 export interface ModelContextMenuHandle {
@@ -54,6 +55,9 @@ interface ModelContextMenuComponentProps {
     parentId?: number | null
     path: string
   }>
+  tags?: Array<{
+    name: string
+  }>
   /** When set, shows "Remove from pack" context menu option */
   packId?: number
   /** When set, shows "Remove from project" context menu option */
@@ -72,6 +76,7 @@ export const ModelContextMenu = forwardRef<
       hideAddToProject = false,
       allowCategoryChange = false,
       categories = [],
+      tags = [],
       packId,
       projectId,
       pathPrefix,
@@ -84,6 +89,7 @@ export const ModelContextMenu = forwardRef<
     const [showPackDialog, setShowPackDialog] = useState(false)
     const [showProjectDialog, setShowProjectDialog] = useState(false)
     const [showCategoryDialog, setShowCategoryDialog] = useState(false)
+    const [showTagsDialog, setShowTagsDialog] = useState(false)
     const contextMenu = useRef<ContextMenu>(null)
     const toast = useRef<Toast>(null)
 
@@ -116,6 +122,7 @@ export const ModelContextMenu = forwardRef<
         queryClient.invalidateQueries({ queryKey: ['models'] }),
         queryClient.invalidateQueries({ queryKey: ['packs'] }),
         queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['model-tags'] }),
         ...selectedModels.map(model =>
           queryClient.invalidateQueries({
             queryKey: ['models', 'detail', String(model.id)],
@@ -307,6 +314,59 @@ export const ModelContextMenu = forwardRef<
       }
     }
 
+    const mergeModelTags = (existingTags: string[], tagsToAdd: string[]) => {
+      const seen = new Set(existingTags.map(tag => tag.trim().toLowerCase()))
+      const merged = [...existingTags]
+
+      for (const tag of tagsToAdd) {
+        const trimmedTag = tag.trim()
+        const normalizedTag = trimmedTag.toLowerCase()
+
+        if (!trimmedTag || seen.has(normalizedTag)) {
+          continue
+        }
+
+        seen.add(normalizedTag)
+        merged.push(trimmedTag)
+      }
+
+      return merged
+    }
+
+    const handleAddTags = async (tagsToAdd: string[]) => {
+      if (selectedModels.length === 0 || tagsToAdd.length === 0) {
+        return
+      }
+
+      try {
+        for (const model of selectedModels) {
+          await updateModelTags(
+            String(model.id),
+            mergeModelTags(model.tags ?? [], tagsToAdd),
+            model.description ?? '',
+            model.categoryId ?? model.category?.id ?? null
+          )
+        }
+
+        await invalidateRelatedQueries()
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Updated',
+          detail: `Tags added to ${selectedCountLabel}`,
+          life: 3000,
+        })
+      } catch (error) {
+        console.error('Failed to add model tags:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to add tags',
+          life: 3000,
+        })
+        throw error
+      }
+    }
+
     const contextMenuItems = useMemo<MenuItem[]>(() => {
       if (isBulkMenu) {
         return [
@@ -327,6 +387,13 @@ export const ModelContextMenu = forwardRef<
             icon: 'pi pi-sitemap',
             command: () => {
               setShowCategoryDialog(true)
+            },
+          },
+          {
+            label: 'Add tags',
+            icon: 'pi pi-tags',
+            command: () => {
+              setShowTagsDialog(true)
             },
           },
           {
@@ -391,6 +458,13 @@ export const ModelContextMenu = forwardRef<
               },
             ]
           : []),
+        {
+          label: 'Add tags',
+          icon: 'pi pi-tags',
+          command: () => {
+            setShowTagsDialog(true)
+          },
+        },
         ...(packId
           ? [
               {
@@ -440,6 +514,14 @@ export const ModelContextMenu = forwardRef<
           }
           onHide={() => setShowCategoryDialog(false)}
           onConfirm={handleChangeCategory}
+        />
+
+        <AddModelTagsDialog
+          visible={showTagsDialog}
+          availableTags={tags}
+          selectedCount={selectedCount}
+          onHide={() => setShowTagsDialog(false)}
+          onConfirm={handleAddTags}
         />
 
         <SelectPackDialog

@@ -5,8 +5,8 @@ import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 import { type MouseEvent as ReactMouseEvent, useState } from 'react'
 
-import { ModelCategoryFilterPicker } from '@/features/models/components/ModelGrid/ModelCategoryFilterPicker'
 import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
+import { ModelCategoryFilterPicker } from '@/features/models/components/ModelGrid/ModelCategoryFilterPicker'
 import {
   type ModelCategoryDto,
   type ModelTagDto,
@@ -246,7 +246,7 @@ export function ModelsFilters({
                 value={selectedPackIds}
                 options={packOptions}
                 onChange={e => onPackFilterChange(e.value || [])}
-                placeholder="Filter by Packs"
+                placeholder="Packs"
                 className="list-filters-control"
                 display="chip"
                 showClear={!packFilterDisabled}
@@ -260,7 +260,7 @@ export function ModelsFilters({
                 value={selectedProjectIds}
                 options={projectOptions}
                 onChange={e => onProjectFilterChange(e.value || [])}
-                placeholder="Filter by Projects"
+                placeholder="Projects"
                 className="list-filters-control"
                 display="chip"
                 showClear={!projectFilterDisabled}
@@ -283,7 +283,7 @@ export function ModelsFilters({
                 value={selectedTagNames}
                 options={tagOptions}
                 onChange={event => onTagChange(event.value || [])}
-                placeholder="Filter by Tags"
+                placeholder="Tags"
                 className="list-filters-control"
                 display="chip"
                 showClear

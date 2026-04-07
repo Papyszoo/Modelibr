@@ -47,6 +47,29 @@
   background: var(--surface-hover) !important;
 }
 
+.model-hierarchy .hierarchy-tree-component .p-tree-toggler {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-right: 0.25rem;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--text-color-secondary) !important;
+}
+
+.model-hierarchy .hierarchy-tree-component .p-tree-toggler:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-color) !important;
+}
+
+.model-hierarchy .hierarchy-tree-component .p-tree-toggler:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.16);
+}
+
+.model-hierarchy .hierarchy-tree-component .p-tree-toggler-icon {
+  color: inherit !important;
+}
+
 .hierarchy-tree-component .p-treenode-content.p-highlight {
   background: var(--primary-color) !important;
   color: var(--primary-color-text) !important;

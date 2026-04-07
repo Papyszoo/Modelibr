@@ -99,7 +99,7 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
             </div>
           )
         }
-        return <ModelViewer modelId={tab.modelId} side={side} />
+        return <ModelViewer modelId={tab.modelId} side={side} tabId={tab.id} />
 
       case 'textureSets':
         return <TextureSetList />

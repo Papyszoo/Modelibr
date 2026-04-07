@@ -14,11 +14,11 @@ import {
 import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { useTabContext } from '@/hooks/useTabContext'
+import { ThumbnailDisplay } from '@/shared/thumbnail'
 import {
   DEFAULT_MODEL_LIST_VIEW_STATE,
   useModelListViewStore,
 } from '@/stores/modelListViewStore'
-import { ThumbnailDisplay } from '@/shared/thumbnail'
 
 import { AddModelDialog } from './AddModelDialog'
 import {
@@ -444,6 +444,7 @@ export function ModelGrid({
         hideAddToProject={!!projectId}
         allowCategoryChange={isSelectionEnabled}
         categories={categories}
+        tags={tags}
         packId={packId}
         projectId={projectId}
         pathPrefix={buildPathPrefix()}

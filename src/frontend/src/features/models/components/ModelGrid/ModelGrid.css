@@ -222,15 +222,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid var(--surface-border);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface-card);
+  color: var(--text-color);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  appearance: none;
+  -webkit-appearance: none;
   cursor: pointer;
 }
 
 .model-select-checkbox i {
   font-size: 1rem;
-  color: var(--text-color);
+  color: inherit;
 }
 
 .model-card:hover .model-select-checkbox,
@@ -240,6 +244,7 @@
 
 .model-card.selected .model-select-checkbox {
   opacity: 1;
+  border-color: rgba(var(--primary-color-rgb), 0.45);
 }
 
 .model-card.selected .model-select-checkbox i {
@@ -331,6 +336,56 @@
   gap: 0.75rem;
 }
 
+.model-add-tags-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.model-add-tags-description {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
+.model-add-tags-input-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.model-add-tags-input {
+  flex: 1;
+}
+
+.model-add-tags-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.model-add-tags-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.model-add-tags-suggestions-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
+.model-add-tags-suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.model-add-tags-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
 .model-category-trigger {
   display: inline-flex;
   align-items: center;
@@ -344,6 +399,8 @@
   border-radius: 10px;
   background: var(--surface-card);
   color: var(--text-color);
+  appearance: none;
+  -webkit-appearance: none;
   cursor: pointer;
   transition:
     border-color 0.2s ease,
@@ -496,6 +553,10 @@
 @media (max-width: 768px) {
   .model-grid-toolbar {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .model-add-tags-input-row {
     flex-direction: column;
   }
 
