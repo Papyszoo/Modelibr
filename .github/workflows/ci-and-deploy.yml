@@ -447,7 +447,7 @@ jobs:
         name: Generate Feature Videos
         runs-on: ubuntu-latest
         needs: [detect-changes]
-        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch'
 
         steps:
             - name: Checkout code
@@ -619,14 +619,14 @@ jobs:
                   .github/scripts/fetch-test-reports.sh
 
             - name: Download feature videos for deploy builds
-              if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+              if: github.event_name == 'workflow_dispatch'
               uses: actions/download-artifact@v4.1.3
               with:
                   name: feature-videos-${{ github.run_number }}
                   path: docs/static/videos/
 
             - name: Verify feature videos for deploy builds
-              if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+              if: github.event_name == 'workflow_dispatch'
               run: |
                   expected_videos=(
                     model-management.webm
