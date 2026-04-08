@@ -447,7 +447,7 @@ jobs:
         name: Generate Feature Videos
         runs-on: ubuntu-latest
         needs: [detect-changes]
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
 
         steps:
             - name: Checkout code
@@ -482,7 +482,6 @@ jobs:
 
             - name: Generate videos
               id: generate
-              continue-on-error: true
               working-directory: docs/videos
               run: npx playwright test --config=playwright.config.ts
               env:
@@ -499,7 +498,7 @@ jobs:
                   name: feature-videos-${{ github.run_number }}
                   path: docs/static/videos/
                   retention-days: 30
-                  if-no-files-found: ignore
+                  if-no-files-found: error
 
             - name: Stop services
               if: always()
@@ -619,7 +618,35 @@ jobs:
                   chmod +x .github/scripts/fetch-test-reports.sh
                   .github/scripts/fetch-test-reports.sh
 
-            - name: Download feature videos
+            - name: Download feature videos for deploy builds
+              if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+              uses: actions/download-artifact@v4.1.3
+              with:
+                  name: feature-videos-${{ github.run_number }}
+                  path: docs/static/videos/
+
+            - name: Verify feature videos for deploy builds
+              if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+              run: |
+                  expected_videos=(
+                    model-management.webm
+                    recycled-files.webm
+                    user-interface.webm
+                    sprites.webm
+                    sounds.webm
+                    projects.webm
+                    packs.webm
+                  )
+
+                  for video in "${expected_videos[@]}"; do
+                    if [ ! -f "docs/static/videos/$video" ]; then
+                      echo "Missing required documentation video: $video"
+                      exit 1
+                    fi
+                  done
+
+            - name: Download feature videos for preview builds
+              if: github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/main'
               uses: actions/download-artifact@v4.1.3
               continue-on-error: true
               with:

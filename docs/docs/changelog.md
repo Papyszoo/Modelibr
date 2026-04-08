@@ -9,6 +9,17 @@ History of completed features and improvements.
 
 ---
 
+## 2026-04-08
+
+### README and Getting Started Refresh
+
+- Reworked the README to focus on product capabilities and navigation instead of stack summaries
+- Added the live demo link, more direct documentation links, and clearer feedback and bug-reporting guidance
+- Changed the default frontend port from `3000` to `3010` in local config and startup docs
+- Fixed getting-started docs to use the correct HTTPS localhost URL and the `asset-processor` service name
+
+---
+
 ## 2026-02-03
 
 ### WebDAV Hierarchical Restructuring

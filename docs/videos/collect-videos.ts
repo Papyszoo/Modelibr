@@ -64,9 +64,23 @@ for (const videoPath of videos) {
 }
 
 if (copied === 0) {
-    console.log("No matching videos found. Run 'npm run generate' first.");
+    console.error("No matching videos found. Run 'npm run generate' first.");
+    process.exit(1);
 } else {
     console.log(
         `\nCopied ${copied} video(s) to ${path.relative(process.cwd(), targetDir)}/`,
     );
+}
+
+if (process.env.CI === "true") {
+    const missingOutputs = Object.values(videoMapping).filter(
+        (outputName) => !fs.existsSync(path.join(targetDir, outputName)),
+    );
+
+    if (missingOutputs.length > 0) {
+        console.error(
+            `Missing expected documentation videos: ${missingOutputs.join(", ")}`,
+        );
+        process.exit(1);
+    }
 }

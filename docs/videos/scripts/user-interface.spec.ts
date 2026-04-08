@@ -328,7 +328,6 @@ test.describe("User Interface", () => {
 
         // Move mouse to center so the final frame is clean
         await page.mouse.move(640, 360, { steps: 15 });
-        await longPause(page);
-        await viewerPause(page, 3000);
+        await viewerPause(page, 1200);
     });
 });

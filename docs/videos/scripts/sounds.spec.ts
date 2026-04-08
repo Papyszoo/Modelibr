@@ -108,7 +108,7 @@ test.describe("Sounds", () => {
         await mediumPause(page);
 
         // Let it play briefly, then pause
-        await page.waitForTimeout(1500);
+        await viewerPause(page, 900);
         if (playBtnBox) {
             await firstPlayBtn.click();
         }
@@ -260,11 +260,6 @@ test.describe("Sounds", () => {
 
         // Move mouse to center for a clean final frame
         await page.mouse.move(640, 360, { steps: 15 });
-        await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 9: Final pause showing the sounds grid
-        // ────────────────────────────────────────────────────────────
-        await viewerPause(page, 3000);
+        await viewerPause(page, 1200);
     });
 });

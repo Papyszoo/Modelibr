@@ -38,7 +38,7 @@ test.describe("Projects", () => {
         }
 
         // Wait for worker to process models
-        await page.waitForTimeout(3000);
+        await mediumPause(page);
 
         // ── Navigate to Projects page ──
         await navigateTo(page, "/?leftTabs=projects&activeLeft=projects");
@@ -128,7 +128,7 @@ test.describe("Projects", () => {
         await mediumPause(page);
 
         // Wait for project viewer to load
-        await page.waitForTimeout(2000);
+        await mediumPause(page);
         await disableHighlights(page);
         await longPause(page);
 
@@ -265,7 +265,7 @@ test.describe("Projects", () => {
         // Step 7: Show both project cards
         // ────────────────────────────────────────────────────────────
 
-        await page.waitForTimeout(1500);
+        await shortPause(page);
 
         // Hover over project cards
         const allCards = page.locator(".project-grid-card");
@@ -285,7 +285,6 @@ test.describe("Projects", () => {
 
         // ── Final pause ──
         await page.mouse.move(640, 360, { steps: 15 });
-        await longPause(page);
-        await viewerPause(page, 2000);
+        await viewerPause(page, 1200);
     });
 });

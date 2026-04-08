@@ -5,16 +5,16 @@ slug: /
 
 # Getting Started
 
-Modelibr is a self-hosted 3D model library that helps you organize, preview, and manage your 3D assets.
+Modelibr is a self-hosted game asset library that helps you keep models, texture sets, sprites, sounds, and grouped asset collections in one place.
 
 ## Features
 
-- **3D Model Library** - Upload and organize OBJ, FBX, GLTF/GLB, and Blender files
-- **Automatic Thumbnails** - Generated previews for quick browsing
-- **Version Control** - Track changes with multiple versions per model
-- **Texture Sets** - Manage PBR textures and apply them to models
-- **Blender Integration** - Direct import/export via addon
-- **Recycle Bin** - Safe deletion with restore capability
+- **Models with version history** - Keep track of changes without losing older versions
+- **Texture sets** - Manage PBR textures, defaults, and channel-packed maps
+- **Sprites and sounds** - Keep 2D and audio assets in the same library as your models
+- **Projects and packs** - Group assets either for a specific job or for reuse across jobs
+- **Recycle bin and deduplication** - Recover mistakes without wasting storage
+- **Optional Blender workflow** - Use Blender-related tooling and WebDAV when it fits your process
 
 ## Quick Start
 
@@ -83,7 +83,7 @@ Modelibr comes with a default configuration that works out of the box, but you c
 
 - `HTTPS_PORT`: HTTPS port for the backend API (Default: 8443).
 - `EXPOSE_443_PORT`: Also bind to port 443 for Windows WebDAV compatibility (Default: true).
-- `FRONTEND_PORT`: Port for the web interface (Default: 3000).
+- `FRONTEND_PORT`: Port for the web interface (Default: 3010).
 - `POSTGRES_PASSWORD`: Database password (change this for security).
 - **Note**: The data storage path is managed by Docker volumes (mapped to `./data` folder in the project root) and does not need to be changed in the `.env` file for standard usage.
 
@@ -102,12 +102,14 @@ This command tells Docker to download the necessary components (images) and star
 :::
 
 **Check if it's running:**
-Run `docker compose ps` to see the status of the containers. All services (`webapi`, `frontend`, `thumbnail-worker`, `postgres`) should be "running" or "healthy".
+Run `docker compose ps` to see the status of the containers. All services (`webapi`, `frontend`, `asset-processor`, `postgres`) should be "running" or "healthy".
 
 ### 5. Access the Interface
 
 Open your browser and visit:
-[**http://localhost:3000**](http://localhost:3000)
+[**https://localhost:3010**](https://localhost:3010)
+
+Your browser may show a warning on first launch because Modelibr uses a local self-signed certificate in development.
 
 ### Where is my data?
 

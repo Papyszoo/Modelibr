@@ -6,23 +6,23 @@ import { Page } from "@playwright/test";
  */
 
 /** Pause so the viewer can see what just happened */
-export async function viewerPause(page: Page, ms = 1500) {
+export async function viewerPause(page: Page, ms = 900) {
     await page.waitForTimeout(ms);
 }
 
 /** Short pause between rapid actions */
 export async function shortPause(page: Page) {
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(300);
 }
 
 /** Medium pause to let viewer read/see a result */
 export async function mediumPause(page: Page) {
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(700);
 }
 
 /** Long pause for important moments */
 export async function longPause(page: Page) {
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(1300);
 }
 
 /**
@@ -55,7 +55,7 @@ export async function humanClick(
     options?: { offsetX?: number; offsetY?: number },
 ) {
     await smoothMoveTo(page, selector, options);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(180);
     const element = page.locator(selector).first();
     const box = await element.boundingBox();
     if (!box) throw new Error(`Element not found for click: ${selector}`);
@@ -70,7 +70,7 @@ export async function humanClick(
  */
 export async function humanRightClick(page: Page, selector: string) {
     await smoothMoveTo(page, selector);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(180);
     const element = page.locator(selector).first();
     const box = await element.boundingBox();
     if (!box) throw new Error(`Element not found for right-click: ${selector}`);

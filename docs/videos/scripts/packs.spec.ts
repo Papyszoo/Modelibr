@@ -38,7 +38,7 @@ test.describe("Packs", () => {
         }
 
         // Wait for worker to process models
-        await page.waitForTimeout(3000);
+        await mediumPause(page);
 
         // ── Navigate to Packs page ──
         await navigateTo(page, "/?leftTabs=packs&activeLeft=packs");
@@ -128,7 +128,7 @@ test.describe("Packs", () => {
         await mediumPause(page);
 
         // Wait for pack viewer to load
-        await page.waitForTimeout(2000);
+        await mediumPause(page);
         await disableHighlights(page);
         await longPause(page);
 
@@ -267,7 +267,7 @@ test.describe("Packs", () => {
         // Step 7: Show both pack cards with hover
         // ────────────────────────────────────────────────────────────
 
-        await page.waitForTimeout(1500);
+        await shortPause(page);
 
         // Hover over pack cards
         const allCards = page.locator(".pack-grid-card");
@@ -287,7 +287,6 @@ test.describe("Packs", () => {
 
         // ── Final pause ──
         await page.mouse.move(640, 360, { steps: 15 });
-        await longPause(page);
-        await viewerPause(page, 2000);
+        await viewerPause(page, 1200);
     });
 });

@@ -11,7 +11,7 @@ React application with TypeScript, Three.js for 3D rendering, PrimeReact UI comp
 ```bash
 cd src/frontend
 npm install
-npm run dev          # Start at http://localhost:5173
+npm run dev          # Start at http://localhost:3010
 ```
 
 **Environment:** Set `VITE_API_BASE_URL` in the root `.env`
@@ -424,7 +424,7 @@ Universal (Global Material) texture sets get auto-generated preview thumbnails. 
 | Thumbnail display | `features/model-viewer/components/ThumbnailWindow.tsx` |
 | Model list display | `features/models/components/ModelGrid/ModelGrid.tsx` (thumbnail cards) |
 | Backend API | `WebApi/Endpoints/ThumbnailEndpoints.cs` (487 lines - many endpoints) |
-| Worker service | `src/thumbnail-worker/` (see `docs/WORKER.md`) |
+| Worker service | `src/asset-processor/` (see `docs/docs/ai-documentation/WORKER.md`) |
 | SignalR updates | Worker sends status via SignalR hub |
 
 **Key behaviors:**
@@ -522,7 +522,7 @@ The primary store for tab and window management. Replaces the former URL-based s
 
 ## Technology Stack
 
-- **React 18+**, TypeScript, Vite
+- **React 19+**, TypeScript, Vite
 - **Three.js** + React Three Fiber + Drei
 - **PrimeReact** UI components
 - **Zustand** for navigation/tab state (persisted to localStorage)

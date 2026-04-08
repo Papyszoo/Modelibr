@@ -2,11 +2,12 @@
 
 Playwright scripts that generate demo videos for the Docusaurus documentation site.
 
-> **Videos are generated automatically in CI.** The `generate-videos` job in the GitHub Actions
-> workflow spins up the E2E Docker environment, runs Playwright scripts to record demo videos,
-> and includes them in the Docusaurus build before deploying to GitHub Pages.
+> **Videos are generated automatically for deploy builds.** The `generate-videos` job in the
+> GitHub Actions workflow spins up the E2E Docker environment, runs Playwright scripts to record
+> demo videos, and includes them in the Docusaurus build before deploying to GitHub Pages from
+> `main` (and when run manually with `workflow_dispatch`).
 >
-> Videos are **not** committed to the repository — they are generated fresh on every CI run.
+> Videos are **not** committed to the repository — they are generated fresh for deploy builds.
 
 ## CI Pipeline
 
