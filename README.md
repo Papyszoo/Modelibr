@@ -1,36 +1,36 @@
 # Modelibr
 
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
-[![React](https://img.shields.io/badge/React-18-61DAFB)](https://reactjs.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-0.180-000000)](https://threejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Supported-2496ED)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-## Your Personal 3D Asset Library
+Modelibr is a self-hosted game asset library. It keeps **models**, **texture sets**, **sprites**, and **sounds** in one place, lets you preview them in the browser, and helps you organize them into **projects** and reusable **packs**.
 
-**Self-hosted. Open source. No cloud required.**
+**[Main Site](https://papyszoo.github.io/Modelibr/)** | **[Documentation](https://papyszoo.github.io/Modelibr/docs)** | **[Live Demo](https://papyszoo.github.io/Modelibr/demo/)** | **[Discord](https://discord.gg/KgwgTDVP3F)** | **[GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)**
 
-Organize, preview, and manage your 3D models with automatic animated thumbnails, version control, and seamless Blender integration. All on your own hardware, 100% offline.
-
-📚 **[Documentation](https://Papyszoo.github.io/Modelibr/)** | 💬 **[Discord](https://discord.gg/KgwgTDVP3F)**
+The live demo stores its data in your browser, so what you add there is visible only to you.
 
 ---
 
-## ✨ Key Features
+## Main features
 
-| Feature                 | Description                                                 |
-| ----------------------- | ----------------------------------------------------------- |
-| **Animated Thumbnails** | Every model gets a rotating 360° preview automatically      |
-| **Version Control**     | Keep multiple versions of each model, rollback anytime      |
-| **Texture Sets**        | PBR materials with real-time preview on customizable shapes |
-| **Smart Deduplication** | Same file uploaded twice? Storage is shared automatically   |
-| **Self-Hosted**         | Your data stays on your hardware. Works 100% offline        |
+| Title | Description |
+| --- | --- |
+| **All your asset types in one place** | Store models, texture sets, sprites, and sounds in the same library instead of spreading them across different tools. |
+| **Projects and packs** | Group assets into project-specific collections or reusable packs you can use again later. |
+| **Model version history** | Keep multiple versions of the same model and switch between them when needed. |
+| **Built-in previews** | Browse models, sprites, and sounds with generated previews that make the library easier to scan. |
+| **Texture set workflows** | Attach texture sets to model versions, choose defaults, and work with channel-packed maps. |
+| **Dual-panel workspace** | Open tabs side by side and keep your current layout in the URL for easy sharing and return visits. |
+| **WebDAV access** | Work with the library through a file-browser style workflow when that fits better than a browser-only flow. |
+| **Blender CLI at runtime** | Download Blender CLI from Settings when you need it instead of treating it as a fixed install requirement from day one. |
+| **Recycle bin and deduplication** | Restore deleted assets and avoid wasting storage on identical files. |
 
 ---
 
-## 🚀 Quick Start
-
-### 1. Run with Docker
+## Quick start
 
 ```bash
 git clone https://github.com/Papyszoo/Modelibr.git
@@ -39,64 +39,46 @@ cp .env.example .env
 docker compose up -d
 ```
 
-### 2. Access the App
-
-Open **http://localhost:3000** in your browser.
-
-### 3. Start Uploading
-
-Drag and drop your 3D models into the browser. That's it!
+Open **https://localhost:3010** in your browser. The first visit uses a self-signed certificate, so your browser may ask you to continue manually.
 
 ---
 
-## 🎯 Who Is This For?
+## WebDAV and Blender
 
-- **3D Artists** — Visual library with search, tags, and automatic thumbnails
-- **Game Dev Teams** — Self-hosted server everyone on your team can access
-- **Hobbyists** — Organize, preview, and rediscover your collection
-
----
-
-## 📁 Supported Formats
-
-| Format        | Extension | Preview                        |
-| ------------- | --------- | ------------------------------ |
-| glTF Binary   | `.glb`    | ✅                             |
-| glTF          | `.gltf`   | ✅                             |
-| Autodesk FBX  | `.fbx`    | ✅                             |
-| Wavefront OBJ | `.obj`    | ✅                             |
-| Blender       | `.blend`  | Extract .glb using blender CLI |
+- WebDAV gives Modelibr a more file-browser style workflow, which is useful when you want the library to sit closer to art-pipeline tools.
+- Blender-related flows are part of the repository, and Blender CLI can be downloaded at runtime from the Settings page when you want that workflow.
+- If you want more detail, start with the [main site](https://papyszoo.github.io/Modelibr/) and the [documentation](https://papyszoo.github.io/Modelibr/docs).
 
 ---
 
-## 🛠️ Tech Stack
+## Read more
 
-| Layer              | Technologies                         |
-| ------------------ | ------------------------------------ |
-| **Frontend**       | React 18, Three.js 0.180, TypeScript |
-| **Backend**        | .NET 9.0, PostgreSQL, REST API       |
-| **Infrastructure** | Docker, Automated thumbnails         |
-
----
-
-## 🤝 Contributing
-
-**All contributions and feature requests are welcome!**
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Have an idea? [Open an issue](https://github.com/Papyszoo/Modelibr/issues) or join our [Discord](https://discord.gg/KgwgTDVP3F) to discuss!
+- [Getting Started](https://papyszoo.github.io/Modelibr/docs)
+- [Model Management](https://papyszoo.github.io/Modelibr/docs/features/models)
+- [Texture Sets](https://papyszoo.github.io/Modelibr/docs/features/texture-sets)
+- [Packs](https://papyszoo.github.io/Modelibr/docs/features/packs)
+- [Projects](https://papyszoo.github.io/Modelibr/docs/features/projects)
+- [User Interface](https://papyszoo.github.io/Modelibr/docs/features/user-interface)
 
 ---
 
-## 📝 License
+## Supported model uploads
+
+- `.obj`
+- `.fbx`
+- `.gltf`
+- `.glb`
+- `.blend`
+
+---
+
+## Feedback and bug reports
+
+- **Feature requests and general feedback:** [Discord](https://discord.gg/KgwgTDVP3F)
+- **Bug reports:** [Discord](https://discord.gg/KgwgTDVP3F) or [GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)
+
+---
+
+## License
 
 MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-**[📚 Full Documentation](https://Papyszoo.github.io/Modelibr/)** | **[💬 Join Discord](https://discord.gg/KgwgTDVP3F)** | **[⭐ Star on GitHub](https://github.com/Papyszoo/Modelibr)**

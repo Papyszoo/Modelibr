@@ -268,7 +268,7 @@ test.describe("Model Management", () => {
 
         // Wait for the upload progress — the version upload uses the same upload window
         // Give it time to complete the upload
-        await page.waitForTimeout(5000);
+        await mediumPause(page);
 
         // Close any upload progress window if visible
         const uploadCloseBtn2 = page
@@ -343,9 +343,6 @@ test.describe("Model Management", () => {
 
         // Move mouse away from the dropdown so the final frame is clean
         await page.mouse.move(640, 360, { steps: 15 });
-        await longPause(page);
-
-        // Extra pause for the viewer to absorb the final screen
-        await viewerPause(page, 3000);
+        await viewerPause(page, 1200);
     });
 });

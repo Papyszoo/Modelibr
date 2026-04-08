@@ -61,8 +61,8 @@ namespace WebApi
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
-                        ?? new[] { "http://localhost:3000", "https://localhost:3000" };
+                    var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+                        ?? new[] { "http://localhost:3010", "https://localhost:3010" };
 
                     policy.WithOrigins(allowedOrigins)
                           .AllowAnyMethod()

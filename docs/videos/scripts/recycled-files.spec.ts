@@ -271,6 +271,6 @@ test.describe("Recycled Files", () => {
         }
 
         // Final viewer pause to show the restored model is back
-        await viewerPause(page, 3000);
+        await viewerPause(page, 1200);
     });
 });
