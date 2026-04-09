@@ -7,6 +7,7 @@
     "scripts": {
         "generate": "npx playwright test --config=playwright.config.ts",
         "generate:models": "npx playwright test --config=playwright.config.ts --grep \"Model Management\"",
+        "generate:texture-sets": "npx playwright test --config=playwright.config.ts --grep \"Texture Sets\"",
         "generate:recycled": "npx playwright test --config=playwright.config.ts --grep \"Recycled Files\"",
         "generate:ui": "npx playwright test --config=playwright.config.ts --grep \"User Interface\"",
         "generate:sprites": "npx playwright test --config=playwright.config.ts --grep \"Sprites\"",

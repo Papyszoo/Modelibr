@@ -1,15 +1,12 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import {
     ciVideoTimeout,
-    shortPause,
     mediumPause,
     longPause,
     viewerPause,
-    smoothMoveTo,
-    humanClick,
     navigateTo,
     clearAllData,
     disableHighlights,
@@ -18,274 +15,446 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8090";
+const selectAllShortcut = process.platform === "darwin" ? "Meta+A" : "Control+A";
+
+async function showIntroSlate(page: Page) {
+    await page.setContent(`
+        <style>
+            :root {
+                color-scheme: dark;
+                font-family: Inter, system-ui, sans-serif;
+            }
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: grid;
+                place-items: center;
+                overflow: hidden;
+                background:
+                    radial-gradient(circle at top, rgba(99, 102, 241, 0.42), transparent 42%),
+                    linear-gradient(135deg, #07111f 0%, #101a2d 55%, #16233d 100%);
+                color: #f8fafc;
+            }
+            .slate {
+                padding: 32px 40px;
+                border: 1px solid rgba(148, 163, 184, 0.22);
+                border-radius: 24px;
+                background: rgba(15, 23, 42, 0.7);
+                box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+                backdrop-filter: blur(16px);
+            }
+            .eyebrow {
+                font-size: 12px;
+                letter-spacing: 0.24em;
+                text-transform: uppercase;
+                color: #93c5fd;
+                margin-bottom: 12px;
+            }
+            h1 {
+                margin: 0;
+                font-size: 52px;
+                line-height: 1.02;
+            }
+            p {
+                margin: 12px 0 0;
+                color: #cbd5e1;
+                font-size: 20px;
+            }
+        </style>
+        <div class="slate">
+            <div class="eyebrow">Modelibr</div>
+            <h1>Projects</h1>
+            <p>Build production-ready collections with context, planning, and assets.</p>
+        </div>
+    `);
+}
+
+async function installRevealOverlay(page: Page) {
+    await page.addInitScript(() => {
+        window.addEventListener("DOMContentLoaded", () => {
+            if (document.getElementById("__projects_video_overlay")) {
+                return;
+            }
+
+            const overlay = document.createElement("div");
+            overlay.id = "__projects_video_overlay";
+            overlay.innerHTML = `
+                <div class="eyebrow">Modelibr</div>
+                <h1>Projects</h1>
+                <p>Build production-ready collections with context, planning, and assets.</p>
+            `;
+
+            Object.assign(overlay.style, {
+                position: "fixed",
+                inset: "0",
+                display: "grid",
+                placeItems: "center",
+                background:
+                    "radial-gradient(circle at top, rgba(99, 102, 241, 0.42), transparent 42%), linear-gradient(135deg, #07111f 0%, #101a2d 55%, #16233d 100%)",
+                color: "#f8fafc",
+                zIndex: "999999",
+                fontFamily: "Inter, system-ui, sans-serif",
+            });
+
+            const styles = document.createElement("style");
+            styles.id = "__projects_video_overlay_styles";
+            styles.textContent = `
+                #__projects_video_overlay > div,
+                #__projects_video_overlay {
+                    text-align: left;
+                }
+                #__projects_video_overlay::before {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    background: rgba(15, 23, 42, 0.26);
+                }
+                #__projects_video_overlay .eyebrow,
+                #__projects_video_overlay h1,
+                #__projects_video_overlay p {
+                    position: relative;
+                    margin-left: 40px;
+                    margin-right: 40px;
+                }
+                #__projects_video_overlay .eyebrow {
+                    font-size: 12px;
+                    letter-spacing: 0.24em;
+                    text-transform: uppercase;
+                    color: #93c5fd;
+                    margin-bottom: 12px;
+                }
+                #__projects_video_overlay h1 {
+                    margin-top: 0;
+                    margin-bottom: 0;
+                    font-size: 52px;
+                    line-height: 1.02;
+                }
+                #__projects_video_overlay p {
+                    margin-top: 12px;
+                    color: #cbd5e1;
+                    font-size: 20px;
+                    max-width: 760px;
+                }
+            `;
+
+            document.head.appendChild(styles);
+            document.body.appendChild(overlay);
+        });
+    });
+}
+
+async function removeRevealOverlay(page: Page) {
+    await page.evaluate(() => {
+        const overlay = document.getElementById("__projects_video_overlay");
+        if (!overlay) {
+            return;
+        }
+
+        overlay.style.transition = "opacity 300ms ease";
+        overlay.style.opacity = "0";
+        window.setTimeout(() => overlay.remove(), 320);
+
+        const styles = document.getElementById("__projects_video_overlay_styles");
+        window.setTimeout(() => styles?.remove(), 340);
+    });
+}
+
+async function moveToLocator(page: Page, locator: Locator, pause = 250) {
+    const target = locator.first();
+    await target.waitFor({ state: "visible", timeout: ciVideoTimeout });
+    const box = await target.boundingBox();
+    if (!box) {
+        throw new Error("Unable to move to target locator.");
+    }
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
+        steps: 20,
+    });
+    await viewerPause(page, pause);
+}
+
+async function uploadModel(page: Page, fileName: string) {
+    const response = await page.request.post(`${API_BASE}/models`, {
+        multipart: {
+            file: {
+                name: fileName,
+                mimeType: "application/octet-stream",
+                buffer: fs.readFileSync(path.join(assetsDir, fileName)),
+            },
+        },
+    });
+
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    return Number(data.id);
+}
+
+async function uploadFile(page: Page, fileName: string, mimeType = "image/png") {
+    const response = await page.request.post(`${API_BASE}/files`, {
+        multipart: {
+            file: {
+                name: fileName,
+                mimeType,
+                buffer: fs.readFileSync(path.join(assetsDir, fileName)),
+            },
+        },
+    });
+
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    return Number(data.fileId);
+}
+
+async function createProject(page: Page, payload: {
+    name: string;
+    description: string;
+    notes: string;
+}) {
+    const response = await page.request.post(`${API_BASE}/projects`, {
+        data: payload,
+    });
+
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    return Number(data.id);
+}
+
+async function setProjectThumbnail(page: Page, projectId: number, fileId: number) {
+    const response = await page.request.put(`${API_BASE}/projects/${projectId}/thumbnail`, {
+        data: { fileId },
+    });
+    expect(response.ok()).toBeTruthy();
+}
+
+async function addProjectConcept(page: Page, projectId: number, fileId: number) {
+    const response = await page.request.post(
+        `${API_BASE}/projects/${projectId}/concept-images`,
+        {
+            data: { fileId },
+        },
+    );
+    expect(response.ok()).toBeTruthy();
+}
+
+async function addModelToProject(page: Page, projectId: number, modelId: number) {
+    const response = await page.request.post(
+        `${API_BASE}/projects/${projectId}/models/${modelId}`,
+    );
+    expect(response.ok()).toBeTruthy();
+}
 
 test.describe("Projects", () => {
     test("Projects Video", async ({ page }) => {
-        // ── Setup: clear data and upload models via API ──
+        await showIntroSlate(page);
+        await viewerPause(page, 900);
+
         await clearAllData(page);
 
-        const modelFiles = ["test-cube.glb", "test-cone.fbx"];
-        for (const file of modelFiles) {
-            const buffer = fs.readFileSync(path.join(assetsDir, file));
-            await page.request.post(`${API_BASE}/models`, {
-                multipart: {
-                    file: {
-                        name: file,
-                        mimeType: "application/octet-stream",
-                        buffer,
-                    },
+        const [cubeModelId, coneModelId, cylinderModelId] = await Promise.all([
+            uploadModel(page, "test-cube.glb"),
+            uploadModel(page, "test-cone.fbx"),
+            uploadModel(page, "test-cylinder.fbx"),
+        ]);
+
+        const [blueImageId, pinkImageId, yellowImageId, greenImageId, redImageId] =
+            await Promise.all([
+                uploadFile(page, "blue_color.png"),
+                uploadFile(page, "pink_color.png"),
+                uploadFile(page, "yellow_color.png"),
+                uploadFile(page, "green_color.png"),
+                uploadFile(page, "red_color.png"),
+            ]);
+
+        await expect
+            .poll(
+                async () => {
+                    const response = await page.request.get(`${API_BASE}/models`);
+                    if (!response.ok()) {
+                        return 0;
+                    }
+
+                    const models = await response.json();
+                    return Array.isArray(models) ? models.length : 0;
                 },
-            });
-        }
+                { timeout: ciVideoTimeout * 2 },
+            )
+            .toBeGreaterThanOrEqual(3);
 
-        // Wait for worker to process models
-        await mediumPause(page);
+        const skyHarborProjectId = await createProject(page, {
+            name: "Sky Harbor Launch",
+            description: "Cinematic launch bay with modular ships, cargo props, and lighting beats.",
+            notes: "Creative target: fast pitch-ready scene with hero angles and clear set dressing.",
+        });
+        await setProjectThumbnail(page, skyHarborProjectId, blueImageId);
+        await addProjectConcept(page, skyHarborProjectId, blueImageId);
+        await addProjectConcept(page, skyHarborProjectId, pinkImageId);
+        await addProjectConcept(page, skyHarborProjectId, yellowImageId);
+        await addModelToProject(page, skyHarborProjectId, cubeModelId);
+        await addModelToProject(page, skyHarborProjectId, coneModelId);
 
-        // ── Navigate to Projects page ──
+        const forestMarketProjectId = await createProject(page, {
+            name: "Forest Night Market",
+            description: "Cozy prop collection for lantern stalls, signage, and walkable dressing passes.",
+            notes: "Use concept boards to align shape language before adding the ambient audio pass.",
+        });
+        await setProjectThumbnail(page, forestMarketProjectId, greenImageId);
+        await addProjectConcept(page, forestMarketProjectId, greenImageId);
+        await addProjectConcept(page, forestMarketProjectId, yellowImageId);
+        await addModelToProject(page, forestMarketProjectId, cylinderModelId);
+
+        const dungeonKitProjectId = await createProject(page, {
+            name: "Dungeon Builder Kit",
+            description: "Reusable room pieces for encounter spaces, traversal tests, and layout mockups.",
+            notes: "Keep this one lean until the hero project gets final sign-off.",
+        });
+        await setProjectThumbnail(page, dungeonKitProjectId, redImageId);
+        expect(dungeonKitProjectId).toBeGreaterThan(0);
+
+        await installRevealOverlay(page);
         await navigateTo(page, "/?leftTabs=projects&activeLeft=projects");
         await disableHighlights(page);
+
+        const projectCards = page.locator(".project-grid-card");
+        await expect(projectCards).toHaveCount(3, { timeout: ciVideoTimeout });
+        await expect(page.locator(".project-grid-card img").first()).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
+        await removeRevealOverlay(page);
         await mediumPause(page);
 
-        // ────────────────────────────────────────────────────────────
-        // Step 1: Create first project "Medieval Village"
-        // ────────────────────────────────────────────────────────────
+        const searchInput = page.getByPlaceholder("Search projects");
+        const featuredCard = page
+            .locator(".project-grid-card")
+            .filter({ has: page.getByRole("heading", { name: "Sky Harbor Launch" }) });
 
-        // Click "Create New Project" button
-        const createBtn = page
-            .locator("button")
-            .filter({ hasText: /create.*project/i })
-            .first();
-        await createBtn.waitFor({ state: "visible", timeout: ciVideoTimeout });
-
-        const createBtnBox = await createBtn.boundingBox();
-        if (createBtnBox) {
-            await page.mouse.move(
-                createBtnBox.x + createBtnBox.width / 2,
-                createBtnBox.y + createBtnBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 400);
+        await moveToLocator(page, featuredCard, 320);
+        const openFiltersButton = page.getByRole("button", { name: "Open Filters" });
+        if (await openFiltersButton.isVisible().catch(() => false)) {
+            await moveToLocator(page, openFiltersButton, 220);
+            await openFiltersButton.click();
+            await viewerPause(page, 350);
         }
-        await createBtn.click();
-        await mediumPause(page);
+        await moveToLocator(page, searchInput, 220);
+        await searchInput.click();
+        await searchInput.pressSequentially("sky", { delay: 55 });
+        await viewerPause(page, 700);
+        await expect(projectCards).toHaveCount(1, { timeout: ciVideoTimeout });
 
-        // Wait for dialog
-        const dialog = page.locator(".p-dialog").first();
-        await dialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await shortPause(page);
-
-        // Type project name with human-like delay
-        const nameInput = dialog.locator("input").first();
-        await nameInput.click();
-        await nameInput.pressSequentially("Medieval Village", { delay: 70 });
-        await shortPause(page);
-
-        // Type description if there's a textarea
-        const descInput = dialog.locator("textarea, input").nth(1);
-        if (await descInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await descInput.click();
-            await descInput.pressSequentially("Assets for village scene", {
-                delay: 60,
-            });
-            await shortPause(page);
-        }
-
-        // Click Create/Save button
-        const saveBtn = dialog
-            .locator("button")
-            .filter({ hasText: /create|save/i })
-            .first();
-        await saveBtn.click();
-        await mediumPause(page);
-
-        // Wait for dialog to close
-        await dialog
-            .waitFor({ state: "hidden", timeout: ciVideoTimeout })
-            .catch(() => {});
-        await mediumPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 2: Show the project card that appeared
-        // ────────────────────────────────────────────────────────────
-
-        const projectCard = page.locator(".project-grid-card").first();
-        await projectCard.waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 3: Open the project viewer
-        // ────────────────────────────────────────────────────────────
-
-        const cardBox = await projectCard.boundingBox();
-        if (cardBox) {
-            await page.mouse.move(
-                cardBox.x + cardBox.width / 2,
-                cardBox.y + cardBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 400);
-        }
-        await projectCard.click();
-        await mediumPause(page);
-
-        // Wait for project viewer to load
-        await mediumPause(page);
+        await moveToLocator(page, featuredCard, 320);
+        await featuredCard.click();
+        await expect(
+            page.getByRole("heading", { name: /Project:\s*Sky Harbor Launch/i }),
+        ).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
         await disableHighlights(page);
         await longPause(page);
 
-        // ────────────────────────────────────────────────────────────
-        // Step 4: Add models to the project
-        // ────────────────────────────────────────────────────────────
+        const coverCard = page.locator(".container-cover-card");
+        await moveToLocator(page, coverCard, 320);
 
-        // Look for an "Add" button in the models section
-        const addModelBtn = page
-            .locator("button")
-            .filter({ hasText: /add/i })
-            .first();
-        if (await addModelBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            const addBox = await addModelBtn.boundingBox();
-            if (addBox) {
-                await page.mouse.move(
-                    addBox.x + addBox.width / 2,
-                    addBox.y + addBox.height / 2,
-                    { steps: 20 },
-                );
-                await viewerPause(page, 400);
-            }
-            await addModelBtn.click();
-            await mediumPause(page);
+        const firstConceptImage = page.getByRole("button", {
+            name: /open concept image/i,
+        }).first();
+        await moveToLocator(page, firstConceptImage, 280);
+        await firstConceptImage.click();
+        await viewerPause(page, 950);
+        await page.keyboard.press("Escape");
+        await viewerPause(page, 300);
 
-            // Wait for selection dialog
-            const selectionDialog = page.locator(".p-dialog").first();
-            if (
-                await selectionDialog
-                    .isVisible({ timeout: 5000 })
-                    .catch(() => false)
-            ) {
-                // Select models by clicking checkboxes or cards
-                const selectableItems = selectionDialog.locator(
-                    ".model-card, .selectable-card, .p-checkbox, [role='checkbox']",
-                );
-                const itemCount = await selectableItems.count();
-                for (let i = 0; i < Math.min(itemCount, 2); i++) {
-                    const item = selectableItems.nth(i);
-                    const itemBox = await item.boundingBox();
-                    if (itemBox) {
-                        await page.mouse.move(
-                            itemBox.x + itemBox.width / 2,
-                            itemBox.y + itemBox.height / 2,
-                            { steps: 15 },
-                        );
-                        await viewerPause(page, 300);
-                    }
-                    await item.click();
-                    await shortPause(page);
-                }
+        const notesField = page.getByLabel("Notes");
+        await moveToLocator(page, notesField, 240);
+        await notesField.click();
+        await notesField.press("End");
+        await page.keyboard.type("\nHero prop pass: add the cargo beacon near the launch deck.", {
+            delay: 42,
+        });
+        await viewerPause(page, 380);
 
-                // Confirm selection
-                const confirmBtn = selectionDialog
-                    .locator("button")
-                    .filter({ hasText: /confirm|add|save/i })
-                    .first();
-                if (
-                    await confirmBtn
-                        .isVisible({ timeout: 2000 })
-                        .catch(() => false)
-                ) {
-                    await confirmBtn.click();
-                    await mediumPause(page);
-                }
-            }
-        }
+        const saveButton = page.getByRole("button", { name: /^Save$/ });
+        await moveToLocator(page, saveButton, 260);
+        await saveButton.click();
+        await expect(page.getByText("Project details updated.")).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
+        await viewerPause(page, 700);
 
-        // Show the project with added models
-        await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 5: Go back to projects list
-        // ────────────────────────────────────────────────────────────
-
-        // Click on the Projects tab in the dock bar
-        const projectsTab = page
-            .locator(".draggable-tab")
-            .filter({ hasText: /projects/i })
-            .first();
-        if (await projectsTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await projectsTab.click();
-        } else {
-            // Navigate via URL
-            await navigateTo(page, "/?leftTabs=projects&activeLeft=projects");
-            await disableHighlights(page);
-        }
+        const modelsTab = page.getByRole("tab", { name: /Models:\s*2/i });
+        await moveToLocator(page, modelsTab, 220);
+        await modelsTab.click();
+        await expect(page.locator(".model-card:not(.model-card-add)").first()).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
         await mediumPause(page);
 
-        // ────────────────────────────────────────────────────────────
-        // Step 6: Create second project "Sci-Fi Station"
-        // ────────────────────────────────────────────────────────────
+        const addModelCard = page.locator(".model-card-add");
+        await moveToLocator(page, addModelCard, 240);
+        await addModelCard.click();
 
-        const createBtn2 = page
-            .locator("button")
-            .filter({ hasText: /create.*project/i })
+        const addDialog = page.locator(".p-dialog").filter({
+            has: page.getByText("Add Models to Project"),
+        });
+        await expect(addDialog).toBeVisible({ timeout: ciVideoTimeout });
+
+        const addDialogSearch = addDialog.getByPlaceholder("Search models...");
+        await moveToLocator(page, addDialogSearch, 220);
+        await addDialogSearch.click();
+        await addDialogSearch.pressSequentially("cylinder", { delay: 50 });
+        await viewerPause(page, 500);
+
+        const cylinderCard = addDialog.locator(
+            `.container-card[data-model-id="${cylinderModelId}"]`,
+        );
+        await moveToLocator(page, cylinderCard, 240);
+        await cylinderCard.click();
+
+        const confirmAddButton = page.getByRole("button", {
+            name: /Add Selected \(1\)/,
+        });
+        await moveToLocator(page, confirmAddButton, 240);
+        await confirmAddButton.click();
+
+        await expect(page.getByRole("tab", { name: /Models:\s*3/i })).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
+        await longPause(page);
+
+        const visibleModelCards = page.locator(".model-card:not(.model-card-add)");
+        const modelCardCount = await visibleModelCards.count();
+        for (let i = 0; i < Math.min(modelCardCount, 3); i++) {
+            await moveToLocator(page, visibleModelCards.nth(i), 200);
+        }
+
+        const projectsTab = page
+            .locator(".draggable-tab")
+            .filter({ hasText: /^Projects$/i })
             .first();
-        if (await createBtn2.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await createBtn2.click();
-            await mediumPause(page);
 
-            const dialog2 = page.locator(".p-dialog").first();
-            await dialog2.waitFor({ state: "visible", timeout: ciVideoTimeout });
-
-            const nameInput2 = dialog2.locator("input").first();
-            await nameInput2.click();
-            await nameInput2.pressSequentially("Sci-Fi Station", { delay: 70 });
-            await shortPause(page);
-
-            const descInput2 = dialog2.locator("textarea, input").nth(1);
-            if (
-                await descInput2.isVisible({ timeout: 1000 }).catch(() => false)
-            ) {
-                await descInput2.click();
-                await descInput2.pressSequentially("Space station assets", {
-                    delay: 60,
-                });
-                await shortPause(page);
-            }
-
-            const saveBtn2 = dialog2
-                .locator("button")
-                .filter({ hasText: /create|save/i })
-                .first();
-            await saveBtn2.click();
-            await mediumPause(page);
-
-            await dialog2
-                .waitFor({ state: "hidden", timeout: ciVideoTimeout })
-                .catch(() => {});
+        if (await projectsTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await moveToLocator(page, projectsTab, 220);
+            await projectsTab.click();
+        } else {
+            await navigateTo(page, "/?leftTabs=projects&activeLeft=projects");
+            await disableHighlights(page);
+            await removeRevealOverlay(page);
         }
 
-        // ────────────────────────────────────────────────────────────
-        // Step 7: Show both project cards
-        // ────────────────────────────────────────────────────────────
+        if (await openFiltersButton.isVisible().catch(() => false)) {
+            await moveToLocator(page, openFiltersButton, 220);
+            await openFiltersButton.click();
+            await viewerPause(page, 350);
+        }
+        await expect(searchInput).toBeVisible({ timeout: ciVideoTimeout });
+        await searchInput.click();
+        await searchInput.press(selectAllShortcut);
+        await searchInput.press("Backspace");
+        await expect(projectCards).toHaveCount(3, { timeout: ciVideoTimeout });
 
-        await shortPause(page);
-
-        // Hover over project cards
-        const allCards = page.locator(".project-grid-card");
-        const cardCount = await allCards.count();
-        for (let i = 0; i < cardCount; i++) {
-            const card = allCards.nth(i);
-            const box = await card.boundingBox();
-            if (box) {
-                await page.mouse.move(
-                    box.x + box.width / 2,
-                    box.y + box.height / 2,
-                    { steps: 20 },
-                );
-                await mediumPause(page);
-            }
+        for (let i = 0; i < 3; i++) {
+            await moveToLocator(page, projectCards.nth(i), 220);
         }
 
-        // ── Final pause ──
-        await page.mouse.move(640, 360, { steps: 15 });
+        await page.mouse.move(1120, 120, { steps: 18 });
         await viewerPause(page, 1200);
     });
 });

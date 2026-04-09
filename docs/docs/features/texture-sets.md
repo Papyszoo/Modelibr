@@ -6,6 +6,13 @@ sidebar_position: 2
 
 Texture Sets allow you to manage PBR (Physically Based Rendering) textures and apply them to your 3D models.
 
+<div className="feature-video-container">
+  <video controls width="100%" autoPlay muted loop>
+    <source src="/Modelibr/videos/texture-sets.webm" type="video/webm" />
+    <p className="video-fallback">Demo video is being generated...</p>
+  </video>
+</div>
+
 ## What is a Texture Set?
 
 A Texture Set is a collection of texture images that define a material's appearance:
@@ -151,4 +158,3 @@ Texture sets are soft deleted to the Recycle Bin:
 :::warning
 Deleting a texture set will unlink it from all model versions using it.
 :::
-

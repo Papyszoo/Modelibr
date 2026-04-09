@@ -77,12 +77,14 @@ export function SetHeader({
             onClick={handleSubmit(handleUpdateName)}
             loading={updating}
             disabled={!editedName.trim() || updating}
+            aria-label="Save texture set name"
           />
           <Button
             icon="pi pi-times"
             className="p-button-secondary"
             onClick={handleCancelEdit}
             disabled={updating}
+            aria-label="Cancel texture set name edit"
           />
         </div>
       ) : (
@@ -93,6 +95,7 @@ export function SetHeader({
             className="p-button-text p-button-sm"
             onClick={() => setEditing(true)}
             tooltip="Edit name"
+            aria-label="Edit texture set name"
           />
         </div>
       )}

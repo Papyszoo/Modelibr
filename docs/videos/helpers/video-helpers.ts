@@ -2,6 +2,8 @@ import { Page } from "@playwright/test";
 
 export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
 const videoPaceFactor = 0.65;
+const LEGACY_NAVIGATION_HASH_KEY = "__docsVideoNavigation";
+const initializedLegacyNavigationPages = new WeakSet<Page>();
 
 function paceDuration(ms: number) {
     return Math.max(120, Math.round(ms * videoPaceFactor));
@@ -17,6 +19,12 @@ type VideoTab = {
     packId?: string;
     projectId?: string;
     stageId?: string;
+};
+
+type LegacyNavigationSnapshot = {
+    tabs: VideoTab[];
+    activeTabId: string;
+    activeRightTabId: string | null;
 };
 
 const STATIC_TAB_LABELS: Record<string, string> = {
@@ -117,6 +125,81 @@ function parseTabIds(value: string | null): string[] {
         .filter(Boolean);
 }
 
+async function ensureLegacyNavigationInitScript(page: Page) {
+    if (initializedLegacyNavigationPages.has(page)) {
+        return;
+    }
+
+    await page.addInitScript(
+        ({ hashKey }) => {
+            const hashPrefix = `#${hashKey}=`;
+            if (!window.location.hash.startsWith(hashPrefix)) {
+                return;
+            }
+
+            try {
+                const rawSnapshot = window.location.hash.slice(hashPrefix.length);
+                const snapshot = JSON.parse(
+                    decodeURIComponent(rawSnapshot),
+                ) as LegacyNavigationSnapshot;
+
+                if (!snapshot || !Array.isArray(snapshot.tabs)) {
+                    return;
+                }
+
+                const storageKey = "modelibr_navigation";
+                const sessionWindowIdKey = "modelibr_windowId";
+                const storedRaw = localStorage.getItem(storageKey);
+                const stored = storedRaw
+                    ? JSON.parse(storedRaw)
+                    : {
+                          state: {
+                              activeWindows: {},
+                              recentlyClosedTabs: [],
+                              recentlyClosedWindows: [],
+                          },
+                          version: 0,
+                      };
+
+                let windowId = sessionStorage.getItem(sessionWindowIdKey);
+                if (!windowId) {
+                    windowId = crypto.randomUUID();
+                    sessionStorage.setItem(sessionWindowIdKey, windowId);
+                }
+
+                stored.state = {
+                    activeWindows: {
+                        ...(stored.state?.activeWindows || {}),
+                        [windowId]: {
+                            tabs: snapshot.tabs,
+                            activeTabId: snapshot.activeTabId,
+                            activeRightTabId: snapshot.activeRightTabId,
+                            splitterSize: 50,
+                            lastActiveAt: new Date().toISOString(),
+                        },
+                    },
+                    recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
+                    recentlyClosedWindows:
+                        stored.state?.recentlyClosedWindows || [],
+                };
+
+                localStorage.setItem(storageKey, JSON.stringify(stored));
+                history.replaceState(
+                    history.state,
+                    "",
+                    `${window.location.pathname}${window.location.search}`,
+                );
+            } catch {
+                // Ignore malformed legacy navigation snapshots and let the app
+                // fall back to its default state.
+            }
+        },
+        { hashKey: LEGACY_NAVIGATION_HASH_KEY },
+    );
+
+    initializedLegacyNavigationPages.add(page);
+}
+
 async function applyLegacyNavigationState(
     page: Page,
     path: string,
@@ -147,56 +230,19 @@ async function applyLegacyNavigationState(
         activeRightTabId = rightTabs[0]?.id || null;
     }
 
-    const targetUrl = `${baseUrl}${url.pathname}`;
-    await page.goto(targetUrl);
+    await ensureLegacyNavigationInitScript(page);
 
-    await page.evaluate(
-        ({ tabs, activeTabId, activeRightTabId }) => {
-            const storageKey = "modelibr_navigation";
-            const sessionWindowIdKey = "modelibr_windowId";
-            const storedRaw = localStorage.getItem(storageKey);
-            const stored = storedRaw
-                ? JSON.parse(storedRaw)
-                : {
-                      state: {
-                          activeWindows: {},
-                          recentlyClosedTabs: [],
-                          recentlyClosedWindows: [],
-                      },
-                      version: 0,
-                  };
+    const snapshot: LegacyNavigationSnapshot = {
+        tabs: [...leftTabs, ...rightTabs],
+        activeTabId: activeLeftTabId,
+        activeRightTabId,
+    };
 
-            let windowId = sessionStorage.getItem(sessionWindowIdKey);
-            if (!windowId) {
-                windowId = crypto.randomUUID();
-                sessionStorage.setItem(sessionWindowIdKey, windowId);
-            }
+    url.hash = `${LEGACY_NAVIGATION_HASH_KEY}=${encodeURIComponent(
+        JSON.stringify(snapshot),
+    )}`;
 
-            stored.state = {
-                activeWindows: {
-                    ...(stored.state?.activeWindows || {}),
-                    [windowId]: {
-                        tabs,
-                        activeTabId,
-                        activeRightTabId,
-                        splitterSize: 50,
-                        lastActiveAt: new Date().toISOString(),
-                    },
-                },
-                recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
-                recentlyClosedWindows: stored.state?.recentlyClosedWindows || [],
-            };
-
-            localStorage.setItem(storageKey, JSON.stringify(stored));
-        },
-        {
-            tabs: [...leftTabs, ...rightTabs],
-            activeTabId: activeLeftTabId,
-            activeRightTabId,
-        },
-    );
-
-    await page.goto(targetUrl);
+    await page.goto(url.toString());
     return true;
 }
 
@@ -347,6 +393,18 @@ export async function navigateTo(page: Page, path: string) {
         state: "visible",
         timeout: 15000,
     });
+    await page
+        .waitForFunction(
+            () =>
+                Array.from(document.querySelectorAll(".tab-loading")).every(
+                    (element) =>
+                        !(element instanceof HTMLElement) ||
+                        element.offsetParent === null,
+                ),
+            { timeout: 5000 },
+        )
+        .catch(() => {});
+    await page.waitForTimeout(paceDuration(250));
     await mediumPause(page);
 }
 
@@ -448,7 +506,16 @@ export async function clearAllData(page: Page) {
         }
     }
 
-    // Step 3: Soft-delete all models (models only have soft-delete endpoint)
+    // Step 3: Soft-delete active texture sets so reruns do not accumulate duplicates
+    const textureSetsRes = await page.request.get(`${apiBase}/texture-sets`);
+    if (textureSetsRes.ok()) {
+        const data = await textureSetsRes.json();
+        for (const textureSet of data.textureSets || []) {
+            await page.request.delete(`${apiBase}/texture-sets/${textureSet.id}`);
+        }
+    }
+
+    // Step 4: Soft-delete all models (models only have soft-delete endpoint)
     const modelsRes = await page.request.get(`${apiBase}/models`);
     if (modelsRes.ok()) {
         const models = await modelsRes.json();
@@ -457,7 +524,7 @@ export async function clearAllData(page: Page) {
         }
     }
 
-    // Step 4: Delete packs and projects (hard delete)
+    // Step 5: Delete packs and projects (hard delete)
     const packsRes = await page.request.get(`${apiBase}/packs`);
     if (packsRes.ok()) {
         const data = await packsRes.json();
@@ -473,10 +540,10 @@ export async function clearAllData(page: Page) {
         }
     }
 
-    // Step 5: Clean recycled bin again (models were soft-deleted in step 3)
+    // Step 6: Clean recycled bin again (models and texture sets were soft-deleted above)
     await cleanRecycleBin();
 
-    // Step 6: Delete sprite and sound categories
+    // Step 7: Delete sprite and sound categories
     const spriteCatsRes = await page.request.get(
         `${apiBase}/sprite-categories`,
     );

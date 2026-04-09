@@ -48,6 +48,7 @@ npm run generate
 
 ```bash
 npm run generate:models     # Model Management
+npm run generate:texture-sets # Texture Sets
 npm run generate:recycled   # Recycled Files
 npm run generate:ui         # User Interface
 npm run generate:sprites    # Sprites

@@ -1,375 +1,196 @@
 import { test, expect } from "@playwright/test";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
     ciVideoTimeout,
     shortPause,
     mediumPause,
-    longPause,
     viewerPause,
-    smoothMoveTo,
-    humanClick,
     smoothDrag,
     navigateTo,
     waitForModelCards,
-    waitForThumbnails,
     clearAllData,
     disableHighlights,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
-
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Model Management", () => {
-    test("Model Management Video", async ({ page }) => {
-        // ── Setup: clear all data so we start with a clean library ──
+    test("Model Management Video", async ({ page, request }) => {
+        const uploadModel = async (filename: string) => {
+            const response = await request.post(`${API_BASE_URL}/models`, {
+                multipart: {
+                    file: {
+                        name: filename,
+                        mimeType: "application/octet-stream",
+                        buffer: fs.readFileSync(path.join(assetsDir, filename)),
+                    },
+                },
+            });
+
+            expect(response.ok()).toBeTruthy();
+            const body = await response.json();
+            return Number(body.id ?? body.modelId);
+        };
+
+        const waitForThumbnailReady = async (modelId: number) => {
+            await expect
+                .poll(
+                    async () => {
+                        const response = await request.get(
+                            `${API_BASE_URL}/models/${modelId}/thumbnail`,
+                        );
+                        if (!response.ok()) {
+                            return `HTTP ${response.status()}`;
+                        }
+
+                        const thumbnail = await response.json();
+                        return thumbnail.status;
+                    },
+                    {
+                        timeout: 90000,
+                        intervals: [1000, 1500, 2000],
+                    },
+                )
+                .toBe("Ready");
+        };
+
+        const moveToAndClick = async (locator: ReturnType<typeof page.locator>) => {
+            const box = await locator.boundingBox();
+            if (!box) {
+                throw new Error("Could not determine element position");
+            }
+
+            await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
+                steps: 18,
+            });
+            await viewerPause(page, 250);
+            await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+            await shortPause(page);
+        };
+
+        // Off-camera setup: prepare a small, thumbnail-ready library.
         await clearAllData(page);
 
-        // ── Navigate to the app ──
-        await navigateTo(page, "/");
+        const [primaryModelId, comparisonModelId, thirdModelId] = await Promise.all([
+            uploadModel("test-cube.glb"),
+            uploadModel("test-cylinder.fbx"),
+            uploadModel("test-cone.fbx"),
+        ]);
+
+        await Promise.all([
+            waitForThumbnailReady(primaryModelId),
+            waitForThumbnailReady(comparisonModelId),
+            waitForThumbnailReady(thirdModelId),
+        ]);
+
+        // Start on a polished split view: library on the left, hero model on the right.
+        await navigateTo(
+            page,
+            `/?leftTabs=modelList&rightTabs=model-${primaryModelId}&activeRight=model-${primaryModelId}`,
+        );
         await disableHighlights(page);
+        await waitForModelCards(page, 3);
 
-        // ────────────────────────────────────────────────────────────
-        // Step 1: Upload 4 models via the UI file chooser
-        // ────────────────────────────────────────────────────────────
-        const modelFiles = [
-            path.join(assetsDir, "test-cube.glb"),
-            path.join(assetsDir, "test-cone.fbx"),
-            path.join(assetsDir, "test-cylinder.fbx"),
-            path.join(assetsDir, "test-icosphere.fbx"),
-        ];
+        const leftPanel = page.locator(".p-splitter-panel").first();
+        const rightPanel = page.locator(".p-splitter-panel").nth(1);
 
-        // Move mouse to the upload button so the viewer sees cursor intent
-        await smoothMoveTo(page, 'button[aria-label="Upload models"]');
+        await expect(rightPanel.locator("canvas").first()).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
         await viewerPause(page, 400);
 
-        // Trigger file chooser and upload 4 models
-        const fileChooserPromise = page.waitForEvent("filechooser");
-        await page.getByLabel("Upload models").click();
-        const fileChooser = await fileChooserPromise;
-        await fileChooser.setFiles(modelFiles);
-
-        // Wait for the upload progress window to appear
-        await page
-            .locator("#upload-progress-window")
-            .waitFor({ state: "visible", timeout: 15000 });
-        await mediumPause(page);
-
-        // Wait for upload completion (all 4 completed)
-        await page
-            .locator(".upload-summary-text")
-            .filter({ hasText: /4 completed/i })
-            .waitFor({ state: "visible", timeout: 60000 });
-        await longPause(page);
-
-        // Close the upload progress window
-        const closeButton = page
-            .locator('#upload-progress-window button[title="Close"]')
+        // Open a second model for an immediate side-by-side comparison.
+        const comparisonCard = leftPanel
+            .locator(`.model-card[data-model-id="${comparisonModelId}"]`)
             .first();
-        if (await closeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await humanClick(
-                page,
-                '#upload-progress-window button[title="Close"]',
-            );
-        } else {
-            // Try clicking outside to dismiss
-            await page.mouse.click(10, 10);
-        }
-        await mediumPause(page);
-
-        // Wait for model cards to appear
-        await waitForModelCards(page, 4);
-
-        // Wait for thumbnails to be generated (worker service renders them)
-        await waitForThumbnails(page, 4, 90000);
-        await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 2: Select first model, then open it on the right panel
-        // ────────────────────────────────────────────────────────────
-
-        // Click the first model card to open it
-        await humanClick(page, ".model-card >> nth=0");
-        await mediumPause(page);
-
-        // Get the model ID from the currently active tab or URL
-        // We need the model ID to construct the URL for side-by-side view
-        const firstModelId = await page.evaluate(() => {
-            const activeTab = document.querySelector(".draggable-tab.active");
-            if (activeTab) {
-                const tabId =
-                    activeTab.getAttribute("data-tab-id") || activeTab.id || "";
-                const match = tabId.match(/model-(\d+)/);
-                if (match) return match[1];
-            }
-            // Fallback: parse from URL
-            const url = new URL(window.location.href);
-            const params = url.searchParams;
-            const rightTabs =
-                params.get("rightTabs") || params.get("leftTabs") || "";
-            const match = rightTabs.match(/model-(\d+)/);
-            return match ? match[1] : null;
+        await comparisonCard.waitFor({
+            state: "visible",
+            timeout: ciVideoTimeout,
         });
+        await moveToAndClick(comparisonCard);
 
-        // If we found the model ID, navigate to show it on the right panel
-        // with the model list on the left
-        if (firstModelId) {
-            await navigateTo(
-                page,
-                `/?leftTabs=modelList&rightTabs=model-${firstModelId}&activeRight=model-${firstModelId}`,
-            );
-        } else {
-            // Fallback: get model IDs from API
-            const modelsRes = await page.request.get(`${API_BASE_URL}/models`);
-            const models = await modelsRes.json();
-            if (models.length > 0) {
-                const id = models[0].id;
-                await navigateTo(
-                    page,
-                    `/?leftTabs=modelList&rightTabs=model-${id}&activeRight=model-${id}`,
-                );
-            }
-        }
-        await disableHighlights(page);
-        await mediumPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 3: Open the second model on the left panel
-        // ────────────────────────────────────────────────────────────
-
-        // Click the second model card in the left panel to open it there
-        const leftPanel = page.locator(".p-splitter-panel >> nth=0");
-        await leftPanel
-            .locator(".model-card >> nth=1")
-            .waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await shortPause(page);
-
-        // Smoothly move to the second model card and click it
-        const secondCard = leftPanel.locator(".model-card >> nth=1");
-        const secondCardBox = await secondCard.boundingBox();
-        if (secondCardBox) {
-            await page.mouse.move(
-                secondCardBox.x + secondCardBox.width / 2,
-                secondCardBox.y + secondCardBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 400);
-            await page.mouse.click(
-                secondCardBox.x + secondCardBox.width / 2,
-                secondCardBox.y + secondCardBox.height / 2,
-            );
-        }
-        await mediumPause(page);
-
-        // Wait for the model to load — a canvas should appear in the left panel
-        await leftPanel
-            .locator("canvas")
-            .waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 4: Rotate camera on the left viewer (left-click drag)
-        // ────────────────────────────────────────────────────────────
-
-        // Find the canvas in the left panel
         const leftCanvas = leftPanel.locator("canvas").first();
-        const canvasBox = await leftCanvas.boundingBox();
+        await leftCanvas.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        await viewerPause(page, 250);
 
+        // One quick orbit to show the viewer without lingering on it.
+        const canvasBox = await leftCanvas.boundingBox();
         if (canvasBox) {
             const centerX = canvasBox.x + canvasBox.width / 2;
             const centerY = canvasBox.y + canvasBox.height / 2;
 
-            // Smooth drag: from center, upward and slightly right to rotate the view
             await smoothDrag(
                 page,
-                centerX,
-                centerY,
-                centerX + 80,
-                centerY - 100,
-                40, // more steps for smoother camera rotation
-                "left",
-            );
-            await mediumPause(page);
-
-            // Do a second smaller rotation for a nice viewing angle
-            await smoothDrag(
-                page,
-                centerX + 40,
-                centerY - 40,
-                centerX + 120,
-                centerY - 60,
-                30,
+                centerX - 30,
+                centerY + 10,
+                centerX + 70,
+                centerY - 55,
+                24,
                 "left",
             );
         }
-        await longPause(page);
+        await mediumPause(page);
 
-        // ────────────────────────────────────────────────────────────
-        // Step 5: Upload test-torus.fbx as a new version of the
-        //         model currently shown on the right panel
-        // ────────────────────────────────────────────────────────────
-
-        const rightPanel = page.locator(".p-splitter-panel >> nth=1");
-        await rightPanel
-            .locator(".p-menubar")
-            .waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await rightPanel
-            .locator(".version-dropdown-trigger")
-            .waitFor({ state: "visible", timeout: ciVideoTimeout });
-
-        // Open File > Add New Version in the viewer menubar
+        // Add a new version to the hero model.
         const fileMenu = rightPanel
             .locator(
                 '.p-menubar .p-menuitem-link:has(.p-menuitem-text:text-is("File"))',
             )
             .first();
-        await fileMenu.waitFor({
+        await fileMenu.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        await moveToAndClick(fileMenu);
+
+        const addVersionItem = rightPanel
+            .getByTestId("viewer-menubar")
+            .getByRole("menuitem", { name: "Add New Version" });
+        await addVersionItem.waitFor({
             state: "visible",
             timeout: ciVideoTimeout,
         });
-        const fileMenuBox = await fileMenu.boundingBox();
-        if (fileMenuBox) {
-            await page.mouse.move(
-                fileMenuBox.x + fileMenuBox.width / 2,
-                fileMenuBox.y + fileMenuBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 400);
-        }
-        await fileMenu.click();
-        await shortPause(page);
+        await moveToAndClick(addVersionItem);
 
         const versionInput = rightPanel.locator('input[type="file"]').first();
-        await versionInput.setInputFiles([path.join(assetsDir, "test-torus.fbx")]);
+        await versionInput.setInputFiles(path.join(assetsDir, "test-torus.fbx"));
 
-        // Handle the "Upload File to Model" dialog
-        // Wait for the dialog to appear
-        const uploadDialog = page.locator(
-            '.p-dialog:has-text("Upload File to Model")',
-        );
+        const uploadDialog = page.locator('.p-dialog:has-text("Upload File to Model")');
         await uploadDialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await mediumPause(page);
 
-        // Select "Create new version" radio button
         await page.getByLabel("Create new version").click();
         await shortPause(page);
 
-        // Click the "Upload" button in the dialog footer
-        // The footer is a child of the dialog with class p-dialog-footer
-        const dialogUploadBtn = uploadDialog
+        const descriptionInput = uploadDialog.locator("#description");
+        if (await descriptionInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await descriptionInput.click();
+            await descriptionInput.pressSequentially("Gameplay update", {
+                delay: 35,
+            });
+            await shortPause(page);
+        }
+
+        await uploadDialog
             .locator(".p-dialog-footer button", { hasText: "Upload" })
-            .first();
-        await dialogUploadBtn.waitFor({
-            state: "visible",
-            timeout: ciVideoTimeout,
-        });
-        await dialogUploadBtn.click();
-
-        // Wait for the upload progress — the version upload uses the same upload window
-        // Give it time to complete the upload
-        await mediumPause(page);
-
-        // Close any upload progress window if visible
-        const uploadCloseBtn2 = page
-            .locator('#upload-progress-window button[title="Close"]')
-            .first();
-        if (
-            await uploadCloseBtn2
-                .isVisible({ timeout: 2000 })
-                .catch(() => false)
-        ) {
-            await uploadCloseBtn2.click();
-            await shortPause(page);
-        }
-
-        // Dismiss any dialogs that may still be open (e.g., the upload dialog re-appearing).
-        // In CI the dialog can re-render while its close button is being targeted, so prefer
-        // waiting for it to disappear naturally, then use Escape, and only click close as a
-        // final fallback if the dialog is still definitely present.
-        const openDialog = page.locator(".p-dialog:visible").last();
-        if (await openDialog.isVisible({ timeout: 2000 }).catch(() => false)) {
-            const dialogSettled = await openDialog
-                .waitFor({ state: "hidden", timeout: 2000 })
-                .then(() => true)
-                .catch(() => false);
-
-            if (!dialogSettled) {
-                await page.keyboard.press("Escape");
-                await shortPause(page);
-            }
-
-            const dialogStillVisible = await openDialog
-                .isVisible({ timeout: 1000 })
-                .catch(() => false);
-            if (dialogStillVisible) {
-                const dialogCloseBtn = openDialog
-                    .locator(
-                        'button:has(.pi-times), button[aria-label="Close"], button:has-text("Close"), button:has-text("Cancel")',
-                    )
-                    .first();
-                if (
-                    await dialogCloseBtn
-                        .isVisible({ timeout: 1000 })
-                        .catch(() => false)
-                ) {
-                    await dialogCloseBtn.click();
-                    await shortPause(page);
-                }
-            }
-        }
-
-        // Also dismiss any remaining dialog masks.
-        const dialogMask = page.locator(".p-dialog-mask").last();
-        if (await dialogMask.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await page.keyboard.press("Escape");
-            await shortPause(page);
-        }
-
-        // Wait for the viewer to reload with the new version
-        await rightPanel
-            .locator("canvas")
-            .waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 6: Open the version dropdown to see the new version
-        // ────────────────────────────────────────────────────────────
-
-        // Click the version dropdown trigger
-        const versionDropdown = rightPanel
-            .locator(".version-dropdown-trigger")
-            .first();
-        await versionDropdown.waitFor({
-            state: "visible",
-            timeout: ciVideoTimeout,
-        });
-
-        const dropdownBox = await versionDropdown.boundingBox();
-        if (dropdownBox) {
-            await page.mouse.move(
-                dropdownBox.x + dropdownBox.width / 2,
-                dropdownBox.y + dropdownBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 400);
-        }
-        await versionDropdown.click();
-
-        // Wait for dropdown items to appear
-        await page
-            .locator(".version-dropdown-item")
             .first()
-            .waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await longPause(page);
+            .click();
 
-        // ────────────────────────────────────────────────────────────
-        // Step 7: Final pause — let the viewer see the final state
-        // ────────────────────────────────────────────────────────────
+        await uploadDialog.waitFor({ state: "hidden", timeout: 60000 });
 
-        // Move mouse away from the dropdown so the final frame is clean
-        await page.mouse.move(640, 360, { steps: 15 });
-        await viewerPause(page, 1200);
+        const versionDropdown = rightPanel.getByTestId("version-dropdown-trigger");
+        await moveToAndClick(versionDropdown);
+        const versionTwoItem = page.getByTestId("version-dropdown-item-2");
+        await versionTwoItem.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        await moveToAndClick(versionTwoItem);
+        await expect(versionDropdown).toContainText("v2", { timeout: 60000 });
+        await shortPause(page);
+
+        // Re-open the version history as the closing beat.
+        await moveToAndClick(versionDropdown);
+        await versionTwoItem.waitFor({ state: "visible", timeout: ciVideoTimeout });
+
+        await page.mouse.move(1120, 120, { steps: 14 });
+        await viewerPause(page, 700);
     });
 });

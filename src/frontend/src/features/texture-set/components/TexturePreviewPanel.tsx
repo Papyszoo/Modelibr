@@ -190,6 +190,7 @@ export function TexturePreviewPanel({
               disabled={regenerateThumbnailMutation.isPending}
               tooltip="Regenerate Thumbnail"
               tooltipOptions={{ position: 'left' }}
+              aria-label="Regenerate thumbnail"
             />
           )}
           <Button
@@ -198,6 +199,7 @@ export function TexturePreviewPanel({
             onClick={() => setSettingsWindowVisible(!settingsWindowVisible)}
             tooltip="Preview Settings"
             tooltipOptions={{ position: 'left' }}
+            aria-label="Open preview settings"
           />
           <Button
             icon="pi pi-info-circle"
@@ -205,6 +207,7 @@ export function TexturePreviewPanel({
             onClick={() => setInfoWindowVisible(!infoWindowVisible)}
             tooltip="Preview Information"
             tooltipOptions={{ position: 'left' }}
+            aria-label="Open preview information"
           />
         </div>
 
