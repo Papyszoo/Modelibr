@@ -98,7 +98,7 @@ test.describe("Sprites", () => {
                 secondBox.y + secondBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
             await page.mouse.click(
                 secondBox.x + secondBox.width / 2,
                 secondBox.y + secondBox.height / 2,
@@ -134,7 +134,7 @@ test.describe("Sprites", () => {
                 addCategoryBox.y + addCategoryBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await addCategoryBtn.click();
         await shortPause(page);
@@ -149,7 +149,7 @@ test.describe("Sprites", () => {
         // Type the category name "UI Elements"
         const nameInput = categoryDialog.locator("input").first();
         await nameInput.click();
-        await page.waitForTimeout(200);
+        await viewerPause(page, 200);
 
         // Type with human-like timing
         const categoryName = "UI Elements";

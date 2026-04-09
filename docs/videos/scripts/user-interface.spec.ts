@@ -99,7 +99,7 @@ test.describe("User Interface", () => {
                 addBtnBox.y + addBtnBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await leftAddButton.click();
         await shortPause(page);
@@ -121,13 +121,13 @@ test.describe("User Interface", () => {
                 spritesItemBox.y + spritesItemBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(300);
+            await viewerPause(page, 300);
         }
         await spritesMenuItem.click();
         await mediumPause(page);
 
         // Verify sprites tab is now visible on the left
-        await page.waitForTimeout(500);
+        await viewerPause(page, 500);
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ test.describe("User Interface", () => {
                 addBtn2Box.y + addBtn2Box.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await leftAddButton2.click();
         await shortPause(page);
@@ -198,7 +198,7 @@ test.describe("User Interface", () => {
                 soundsItemBox.y + soundsItemBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(300);
+            await viewerPause(page, 300);
         }
         await soundsMenuItem.click();
         await mediumPause(page);
@@ -223,7 +223,7 @@ test.describe("User Interface", () => {
                 { steps: 20 },
             );
         }
-        await page.waitForTimeout(400);
+        await viewerPause(page, 400);
 
         // Click the close button on the models tab
         const closeBtn = modelsTab.locator(".tab-close-btn");
@@ -236,7 +236,7 @@ test.describe("User Interface", () => {
                 closeBtnBox.y + closeBtnBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(300);
+            await viewerPause(page, 300);
             await page.mouse.click(
                 closeBtnBox.x + closeBtnBox.width / 2,
                 closeBtnBox.y + closeBtnBox.height / 2,
@@ -269,15 +269,16 @@ test.describe("User Interface", () => {
             .waitFor({ state: "visible", timeout: 5000 });
         await mediumPause(page);
 
-        // Look for "Reopen: Models List" option and click it
+        // Open the "Reopen" submenu and restore the recently closed Models tab
         const reopenItem = page.locator(".p-contextmenu .p-menuitem").filter({
-            hasText: /Reopen/i,
+            hasText: /^Reopen$/i,
         });
         const reopenVisible = await reopenItem
             .first()
             .waitFor({ state: "visible", timeout: 3000 })
             .then(() => true)
             .catch(() => false);
+        let modelsRestored = false;
         if (reopenVisible) {
             const reopenBox = await reopenItem.first().boundingBox();
             if (reopenBox) {
@@ -286,13 +287,37 @@ test.describe("User Interface", () => {
                     reopenBox.y + reopenBox.height / 2,
                     { steps: 20 },
                 );
-                await page.waitForTimeout(400);
-                await page.mouse.click(
-                    reopenBox.x + reopenBox.width / 2,
-                    reopenBox.y + reopenBox.height / 2,
-                );
+                await viewerPause(page, 400);
             }
-        } else {
+
+            const reopenedModelsItem = page
+                .locator(".p-contextmenu .p-submenu-list .p-menuitem")
+                .filter({ hasText: /^Models$/i })
+                .first();
+            const reopenedModelsVisible = await reopenedModelsItem
+                .waitFor({ state: "visible", timeout: 3000 })
+                .then(() => true)
+                .catch(() => false);
+
+            if (reopenedModelsVisible) {
+                const reopenedModelsBox = await reopenedModelsItem.boundingBox();
+                if (reopenedModelsBox) {
+                    await page.mouse.move(
+                        reopenedModelsBox.x + reopenedModelsBox.width / 2,
+                        reopenedModelsBox.y + reopenedModelsBox.height / 2,
+                        { steps: 20 },
+                    );
+                    await viewerPause(page, 300);
+                    await page.mouse.click(
+                        reopenedModelsBox.x + reopenedModelsBox.width / 2,
+                        reopenedModelsBox.y + reopenedModelsBox.height / 2,
+                    );
+                    modelsRestored = true;
+                }
+            }
+        }
+
+        if (!modelsRestored) {
             // If no "Reopen" option exists, dismiss the menu and re-add
             // the Models tab via the + button as a fallback
             await page.keyboard.press("Escape");
@@ -315,9 +340,16 @@ test.describe("User Interface", () => {
                     .catch(() => false)
             ) {
                 await modelsMenuItem.first().click();
+                modelsRestored = true;
             }
         }
         await mediumPause(page);
+
+        expect(modelsRestored).toBe(true);
+        await leftDockBar
+            .locator('.draggable-tab[data-pr-tooltip="Models List"]')
+            .first()
+            .waitFor({ state: "visible", timeout: 5000 });
 
         // Pause to show the restored tab
         await longPause(page);

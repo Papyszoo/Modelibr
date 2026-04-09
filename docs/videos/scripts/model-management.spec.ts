@@ -43,7 +43,7 @@ test.describe("Model Management", () => {
 
         // Move mouse to the upload button so the viewer sees cursor intent
         await smoothMoveTo(page, 'button[aria-label="Upload models"]');
-        await page.waitForTimeout(400);
+        await viewerPause(page, 400);
 
         // Trigger file chooser and upload 4 models
         const fileChooserPromise = page.waitForEvent("filechooser");
@@ -155,7 +155,7 @@ test.describe("Model Management", () => {
                 secondCardBox.y + secondCardBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
             await page.mouse.click(
                 secondCardBox.x + secondCardBox.width / 2,
                 secondCardBox.y + secondCardBox.height / 2,
@@ -236,7 +236,7 @@ test.describe("Model Management", () => {
                 fileMenuBox.y + fileMenuBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await fileMenu.click();
         await shortPause(page);
@@ -353,7 +353,7 @@ test.describe("Model Management", () => {
                 dropdownBox.y + dropdownBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await versionDropdown.click();
 

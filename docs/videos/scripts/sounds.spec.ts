@@ -103,7 +103,7 @@ test.describe("Sounds", () => {
                 playBtnBox.y + playBtnBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
             await firstPlayBtn.click();
         }
         await mediumPause(page);
@@ -143,7 +143,7 @@ test.describe("Sounds", () => {
                 secondBox.y + secondBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
             await page.mouse.click(
                 secondBox.x + secondBox.width / 2,
                 secondBox.y + secondBox.height / 2,
@@ -177,7 +177,7 @@ test.describe("Sounds", () => {
                 addCategoryBox.y + addCategoryBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await addCategoryBtn.click();
         await shortPause(page);
@@ -192,7 +192,7 @@ test.describe("Sounds", () => {
         // Type the category name "SFX"
         const nameInput = categoryDialog.locator("input").first();
         await nameInput.click();
-        await page.waitForTimeout(200);
+        await viewerPause(page, 200);
 
         const categoryName = "SFX";
         for (const char of categoryName) {
