@@ -1,6 +1,11 @@
 import { Page } from "@playwright/test";
 
 export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
+const videoPaceFactor = 0.65;
+
+function paceDuration(ms: number) {
+    return Math.max(120, Math.round(ms * videoPaceFactor));
+}
 
 type VideoTab = {
     id: string;
@@ -202,22 +207,22 @@ async function applyLegacyNavigationState(
 
 /** Pause so the viewer can see what just happened */
 export async function viewerPause(page: Page, ms = 900) {
-    await page.waitForTimeout(ms);
+    await page.waitForTimeout(paceDuration(ms));
 }
 
 /** Short pause between rapid actions */
 export async function shortPause(page: Page) {
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(paceDuration(300));
 }
 
 /** Medium pause to let viewer read/see a result */
 export async function mediumPause(page: Page) {
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(paceDuration(700));
 }
 
 /** Long pause for important moments */
 export async function longPause(page: Page) {
-    await page.waitForTimeout(1300);
+    await page.waitForTimeout(paceDuration(1300));
 }
 
 /**
@@ -250,7 +255,7 @@ export async function humanClick(
     options?: { offsetX?: number; offsetY?: number },
 ) {
     await smoothMoveTo(page, selector, options);
-    await page.waitForTimeout(180);
+    await page.waitForTimeout(paceDuration(180));
     const element = page.locator(selector).first();
     const box = await element.boundingBox();
     if (!box) throw new Error(`Element not found for click: ${selector}`);
@@ -265,7 +270,7 @@ export async function humanClick(
  */
 export async function humanRightClick(page: Page, selector: string) {
     await smoothMoveTo(page, selector);
-    await page.waitForTimeout(180);
+    await page.waitForTimeout(paceDuration(180));
     const element = page.locator(selector).first();
     const box = await element.boundingBox();
     if (!box) throw new Error(`Element not found for right-click: ${selector}`);
@@ -288,11 +293,11 @@ export async function smoothDrag(
     button: "left" | "right" | "middle" = "left",
 ) {
     await page.mouse.move(startX, startY, { steps: 10 });
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(paceDuration(200));
     await page.mouse.down({ button });
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(paceDuration(100));
     await page.mouse.move(endX, endY, { steps });
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(paceDuration(200));
     await page.mouse.up({ button });
     await shortPause(page);
 }

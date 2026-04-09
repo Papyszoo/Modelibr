@@ -76,7 +76,7 @@ test.describe("Recycled Files", () => {
         // Move to the 3rd model card and right-click
         const thirdModelSelector = `.model-card[data-model-id="${thirdModelId}"]`;
         await smoothMoveTo(page, thirdModelSelector);
-        await page.waitForTimeout(400);
+        await viewerPause(page, 400);
         const thirdCard = page.locator(thirdModelSelector);
         const thirdBox = await thirdCard.boundingBox();
         if (thirdBox) {
@@ -101,7 +101,7 @@ test.describe("Recycled Files", () => {
             page,
             ".p-contextmenu .p-menuitem:has-text('Recycle')",
         );
-        await page.waitForTimeout(300);
+        await viewerPause(page, 300);
         await recycleItem.click();
         await mediumPause(page);
 
@@ -114,7 +114,7 @@ test.describe("Recycled Files", () => {
 
         const fourthModelSelector = `.model-card[data-model-id="${fourthModelId}"]`;
         await smoothMoveTo(page, fourthModelSelector);
-        await page.waitForTimeout(400);
+        await viewerPause(page, 400);
         const fourthCard = page.locator(fourthModelSelector);
         const fourthBox = await fourthCard.boundingBox();
         if (fourthBox) {
@@ -139,7 +139,7 @@ test.describe("Recycled Files", () => {
             page,
             ".p-contextmenu .p-menuitem:has-text('Recycle')",
         );
-        await page.waitForTimeout(300);
+        await viewerPause(page, 300);
         await recycleItem2.click();
         await mediumPause(page);
 
@@ -192,7 +192,7 @@ test.describe("Recycled Files", () => {
         // Hover over the first recycled card to reveal action buttons
         const firstRecycled = page.locator(".recycled-card").nth(0);
         await smoothMoveTo(page, ".recycled-card >> nth=0");
-        await page.waitForTimeout(600);
+        await viewerPause(page, 600);
 
         // Click the "Delete Forever" button (trash icon in overlay)
         const deleteBtn = firstRecycled.locator(
@@ -206,7 +206,7 @@ test.describe("Recycled Files", () => {
                 deleteBtnBox.y + deleteBtnBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(300);
+            await viewerPause(page, 300);
         }
         await deleteBtn.click();
         await mediumPause(page);
@@ -228,7 +228,7 @@ test.describe("Recycled Files", () => {
                 confirmBtnBox.y + confirmBtnBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(300);
+            await viewerPause(page, 300);
         }
         await confirmButton.click();
         await mediumPause(page);
@@ -248,7 +248,7 @@ test.describe("Recycled Files", () => {
         // Hover over the remaining recycled card to reveal action buttons
         const remainingRecycled = page.locator(".recycled-card").nth(0);
         await smoothMoveTo(page, ".recycled-card >> nth=0");
-        await page.waitForTimeout(600);
+        await viewerPause(page, 600);
 
         // Click the "Restore" button (replay icon in overlay)
         const restoreBtn = remainingRecycled.locator(
@@ -262,7 +262,7 @@ test.describe("Recycled Files", () => {
                 restoreBtnBox.y + restoreBtnBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(300);
+            await viewerPause(page, 300);
         }
         await restoreBtn.click();
         await mediumPause(page);

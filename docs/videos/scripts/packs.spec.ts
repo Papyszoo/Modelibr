@@ -64,7 +64,7 @@ test.describe("Packs", () => {
                 createBtnBox.y + createBtnBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await createBtn.click();
         await mediumPause(page);
@@ -123,7 +123,7 @@ test.describe("Packs", () => {
                 cardBox.y + cardBox.height / 2,
                 { steps: 20 },
             );
-            await page.waitForTimeout(400);
+            await viewerPause(page, 400);
         }
         await packCard.click();
         await mediumPause(page);
@@ -150,7 +150,7 @@ test.describe("Packs", () => {
                     addBox.y + addBox.height / 2,
                     { steps: 20 },
                 );
-                await page.waitForTimeout(400);
+                await viewerPause(page, 400);
             }
             await addModelBtn.click();
             await mediumPause(page);
@@ -176,7 +176,7 @@ test.describe("Packs", () => {
                             itemBox.y + itemBox.height / 2,
                             { steps: 15 },
                         );
-                        await page.waitForTimeout(300);
+                        await viewerPause(page, 300);
                     }
                     await item.click();
                     await shortPause(page);
