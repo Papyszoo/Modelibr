@@ -46,22 +46,41 @@ function findVideos(dir: string): string[] {
 const videos = findVideos(testResultsDir);
 console.log(`Found ${videos.length} video(s) in test-results/`);
 
-let copied = 0;
+for (const outputName of Object.values(videoMapping)) {
+    const existingOutput = path.join(targetDir, outputName);
+    if (fs.existsSync(existingOutput)) {
+        fs.unlinkSync(existingOutput);
+    }
+}
+
+const latestVideos = new Map<string, { sourcePath: string; mtimeMs: number }>();
 for (const videoPath of videos) {
     // Extract the test name from the directory structure
     const relPath = path.relative(testResultsDir, videoPath).toLowerCase();
 
     for (const [key, outputName] of Object.entries(videoMapping)) {
-        if (relPath.includes(key.replace(/-/g, "-"))) {
-            const dest = path.join(targetDir, outputName);
-            fs.copyFileSync(videoPath, dest);
-            console.log(
-                `  ✓ ${outputName} (${(fs.statSync(dest).size / 1024 / 1024).toFixed(1)} MB)`,
-            );
-            copied++;
+        if (relPath.includes(key)) {
+            const stats = fs.statSync(videoPath);
+            const existing = latestVideos.get(outputName);
+            if (!existing || stats.mtimeMs > existing.mtimeMs) {
+                latestVideos.set(outputName, {
+                    sourcePath: videoPath,
+                    mtimeMs: stats.mtimeMs,
+                });
+            }
             break;
         }
     }
+}
+
+let copied = 0;
+for (const [outputName, { sourcePath }] of latestVideos.entries()) {
+    const dest = path.join(targetDir, outputName);
+    fs.copyFileSync(sourcePath, dest);
+    console.log(
+        `  ✓ ${outputName} (${(fs.statSync(dest).size / 1024 / 1024).toFixed(1)} MB)`,
+    );
+    copied++;
 }
 
 if (copied === 0) {

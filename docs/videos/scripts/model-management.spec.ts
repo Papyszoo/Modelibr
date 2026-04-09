@@ -4,12 +4,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
     ciVideoTimeout,
+    createRecordedPage,
     shortPause,
     mediumPause,
     viewerPause,
     smoothDrag,
     navigateTo,
     waitForModelCards,
+    waitForThumbnails,
     clearAllData,
     disableHighlights,
 } from "../helpers/video-helpers";
@@ -19,7 +21,7 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Model Management", () => {
-    test("Model Management Video", async ({ page, request }) => {
+    test("Model Management Video", async ({ browser, page: setupPage, request }, testInfo) => {
         const uploadModel = async (filename: string) => {
             const response = await request.post(`${API_BASE_URL}/models`, {
                 multipart: {
@@ -51,8 +53,8 @@ test.describe("Model Management", () => {
                         return thumbnail.status;
                     },
                     {
-                        timeout: 90000,
-                        intervals: [1000, 1500, 2000],
+                        timeout: 30000,
+                        intervals: [500, 1000, 1500],
                     },
                 )
                 .toBe("Ready");
@@ -73,7 +75,7 @@ test.describe("Model Management", () => {
         };
 
         // Off-camera setup: prepare a small, thumbnail-ready library.
-        await clearAllData(page);
+        await clearAllData(setupPage);
 
         const [primaryModelId, comparisonModelId, thirdModelId] = await Promise.all([
             uploadModel("test-cube.glb"),
@@ -87,6 +89,8 @@ test.describe("Model Management", () => {
             waitForThumbnailReady(thirdModelId),
         ]);
 
+        const { context, page } = await createRecordedPage(browser, testInfo);
+
         // Start on a polished split view: library on the left, hero model on the right.
         await navigateTo(
             page,
@@ -94,6 +98,7 @@ test.describe("Model Management", () => {
         );
         await disableHighlights(page);
         await waitForModelCards(page, 3);
+        await waitForThumbnails(page, 3, 30000);
 
         const leftPanel = page.locator(".p-splitter-panel").first();
         const rightPanel = page.locator(".p-splitter-panel").nth(1);
@@ -183,14 +188,9 @@ test.describe("Model Management", () => {
         const versionTwoItem = page.getByTestId("version-dropdown-item-2");
         await versionTwoItem.waitFor({ state: "visible", timeout: ciVideoTimeout });
         await moveToAndClick(versionTwoItem);
-        await expect(versionDropdown).toContainText("v2", { timeout: 60000 });
-        await shortPause(page);
-
-        // Re-open the version history as the closing beat.
-        await moveToAndClick(versionDropdown);
-        await versionTwoItem.waitFor({ state: "visible", timeout: ciVideoTimeout });
-
-        await page.mouse.move(1120, 120, { steps: 14 });
-        await viewerPause(page, 700);
+        await expect(versionDropdown).toContainText("v2", { timeout: 10000 });
+        await page.mouse.move(1040, 300, { steps: 16 });
+        await viewerPause(page, 900);
+        await context.close();
     });
 });

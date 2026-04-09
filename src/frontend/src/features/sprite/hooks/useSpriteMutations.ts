@@ -204,11 +204,15 @@ export function useSpriteMutations({
 
   const renameSpriteMutation = useMutation({
     mutationFn: async (vars: { sprite: SpriteDto; newName: string }) => {
-      await updateSprite(vars.sprite.id, { name: vars.newName })
+      await updateSprite(vars.sprite.id, {
+        name: vars.newName,
+        spriteType: vars.sprite.spriteType,
+        categoryId: vars.sprite.categoryId,
+      })
     },
-    onSuccess: (_data, vars) => {
+    onSuccess: async (_data, vars) => {
       setSelectedSprite({ ...vars.sprite, name: vars.newName })
-      invalidateSprites()
+      await invalidateSprites()
       setIsEditingSpriteName(false)
       toast.current?.show({
         severity: 'success',

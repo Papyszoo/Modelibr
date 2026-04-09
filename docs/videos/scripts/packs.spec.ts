@@ -4,12 +4,11 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import {
     ciVideoTimeout,
+    createRecordedPage,
     shortPause,
     mediumPause,
     longPause,
     viewerPause,
-    smoothMoveTo,
-    humanClick,
     navigateTo,
     clearAllData,
     disableHighlights,
@@ -20,14 +19,14 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Packs", () => {
-    test("Packs Video", async ({ page }) => {
+    test("Packs Video", async ({ browser, page: setupPage }, testInfo) => {
         // ── Setup: clear data and upload models via API ──
-        await clearAllData(page);
+        await clearAllData(setupPage);
 
         const modelFiles = ["test-cube.glb", "test-cone.fbx"];
         for (const file of modelFiles) {
             const buffer = fs.readFileSync(path.join(assetsDir, file));
-            await page.request.post(`${API_BASE}/models`, {
+            await setupPage.request.post(`${API_BASE}/models`, {
                 multipart: {
                     file: {
                         name: file,
@@ -38,8 +37,9 @@ test.describe("Packs", () => {
             });
         }
 
-        // Wait for worker to process models
-        await mediumPause(page);
+        await mediumPause(setupPage);
+
+        const { context, page } = await createRecordedPage(browser, testInfo);
 
         // ── Navigate to Packs page ──
         await navigateTo(page, "/?leftTabs=packs&activeLeft=packs");
@@ -47,10 +47,9 @@ test.describe("Packs", () => {
         await mediumPause(page);
 
         // ────────────────────────────────────────────────────────────
-        // Step 1: Create first pack "Environment Props"
+        // Step 1: Create one meaningful pack
         // ────────────────────────────────────────────────────────────
 
-        // Click "Create New Pack" button
         const createBtn = page
             .locator("button")
             .filter({ hasText: /create.*pack/i })
@@ -74,23 +73,21 @@ test.describe("Packs", () => {
         await dialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
         await shortPause(page);
 
-        // Type pack name with human-like delay
         const nameInput = dialog.locator("input").first();
         await nameInput.click();
-        await nameInput.pressSequentially("Environment Props", { delay: 70 });
+        await nameInput.pressSequentially("Sci-Fi Essentials", { delay: 65 });
         await shortPause(page);
 
-        // Type description if there's a textarea
         const descInput = dialog.locator("textarea, input").nth(1);
         if (await descInput.isVisible({ timeout: 1000 }).catch(() => false)) {
             await descInput.click();
-            await descInput.pressSequentially("Trees, rocks, and foliage", {
-                delay: 70,
-            });
+            await descInput.pressSequentially(
+                "Hero props, modular hull pieces, and dockside set dressing.",
+                { delay: 60 },
+            );
             await shortPause(page);
         }
 
-        // Click Create/Save button
         const saveBtn = dialog
             .locator("button")
             .filter({ hasText: /create|save/i })
@@ -105,16 +102,12 @@ test.describe("Packs", () => {
         await mediumPause(page);
 
         // ────────────────────────────────────────────────────────────
-        // Step 2: Show the pack card that appeared
+        // Step 2: Spotlight the pack card, then open it
         // ────────────────────────────────────────────────────────────
 
         const packCard = page.locator(".pack-grid-card").first();
         await packCard.waitFor({ state: "visible", timeout: ciVideoTimeout });
         await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 3: Open the pack viewer
-        // ────────────────────────────────────────────────────────────
 
         const cardBox = await packCard.boundingBox();
         if (cardBox) {
@@ -128,22 +121,21 @@ test.describe("Packs", () => {
         await packCard.click();
         await mediumPause(page);
 
-        // Wait for pack viewer to load
-        await mediumPause(page);
         await disableHighlights(page);
         await longPause(page);
 
+        const modelsTab = page.getByRole("tab", { name: /Models:\s*0/i });
+        await modelsTab.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        await modelsTab.click();
+        await mediumPause(page);
+
         // ────────────────────────────────────────────────────────────
-        // Step 4: Add models to the pack
+        // Step 3: Add both models to the pack
         // ────────────────────────────────────────────────────────────
 
-        // Look for an "Add" button in the models section
-        const addModelBtn = page
-            .locator("button")
-            .filter({ hasText: /add/i })
-            .first();
-        if (await addModelBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            const addBox = await addModelBtn.boundingBox();
+        const addModelCard = page.locator(".model-card.model-card-add");
+        if (await addModelCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+            const addBox = await addModelCard.boundingBox();
             if (addBox) {
                 await page.mouse.move(
                     addBox.x + addBox.width / 2,
@@ -152,19 +144,19 @@ test.describe("Packs", () => {
                 );
                 await viewerPause(page, 400);
             }
-            await addModelBtn.click();
+            await addModelCard.click();
             await mediumPause(page);
 
-            // Wait for selection dialog
-            const selectionDialog = page.locator(".p-dialog").first();
+            const selectionDialog = page.locator(".p-dialog").filter({
+                has: page.getByText("Add Models to Pack"),
+            });
             if (
                 await selectionDialog
                     .isVisible({ timeout: 5000 })
                     .catch(() => false)
             ) {
-                // Select models by clicking checkboxes or cards
                 const selectableItems = selectionDialog.locator(
-                    ".model-card, .selectable-card, .p-checkbox, [role='checkbox']",
+                    ".container-card[data-model-id]",
                 );
                 const itemCount = await selectableItems.count();
                 for (let i = 0; i < Math.min(itemCount, 2); i++) {
@@ -182,10 +174,8 @@ test.describe("Packs", () => {
                     await shortPause(page);
                 }
 
-                // Confirm selection
                 const confirmBtn = selectionDialog
-                    .locator("button")
-                    .filter({ hasText: /confirm|add|save/i })
+                    .getByRole("button", { name: /Add Selected \([12]\)/ })
                     .first();
                 if (
                     await confirmBtn
@@ -198,84 +188,15 @@ test.describe("Packs", () => {
             }
         }
 
-        // Show the pack with added models
-        await longPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 5: Go back to packs list
-        // ────────────────────────────────────────────────────────────
-
-        // Click on the Packs tab in the dock bar
-        const packsTab = page
-            .locator(".draggable-tab")
-            .filter({ hasText: /packs/i })
-            .first();
-        if (await packsTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await packsTab.click();
-        } else {
-            // Navigate via URL
-            await navigateTo(page, "/?leftTabs=packs&activeLeft=packs");
-            await disableHighlights(page);
-        }
-        await mediumPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 6: Create second pack "Character Assets"
-        // ────────────────────────────────────────────────────────────
-
-        const createBtn2 = page
-            .locator("button")
-            .filter({ hasText: /create.*pack/i })
-            .first();
-        if (await createBtn2.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await createBtn2.click();
-            await mediumPause(page);
-
-            const dialog2 = page.locator(".p-dialog").first();
-            await dialog2.waitFor({ state: "visible", timeout: ciVideoTimeout });
-
-            const nameInput2 = dialog2.locator("input").first();
-            await nameInput2.click();
-            await nameInput2.pressSequentially("Character Assets", {
-                delay: 70,
-            });
-            await shortPause(page);
-
-            const descInput2 = dialog2.locator("textarea, input").nth(1);
-            if (
-                await descInput2.isVisible({ timeout: 1000 }).catch(() => false)
-            ) {
-                await descInput2.click();
-                await descInput2.pressSequentially("Player and NPC models", {
-                    delay: 70,
-                });
-                await shortPause(page);
-            }
-
-            const saveBtn2 = dialog2
-                .locator("button")
-                .filter({ hasText: /create|save/i })
-                .first();
-            await saveBtn2.click();
-            await mediumPause(page);
-
-            await dialog2
-                .waitFor({ state: "hidden", timeout: ciVideoTimeout })
-                .catch(() => {});
-        }
-
-        // ────────────────────────────────────────────────────────────
-        // Step 7: Show both pack cards with hover
-        // ────────────────────────────────────────────────────────────
-
-        await shortPause(page);
-
-        // Hover over pack cards
-        const allCards = page.locator(".pack-grid-card");
-        const cardCount = await allCards.count();
-        for (let i = 0; i < cardCount; i++) {
-            const card = allCards.nth(i);
-            const box = await card.boundingBox();
+        await expect(page.getByRole("tab", { name: /Models:\s*2/i })).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
+        const assignedModelCards = page.locator(".model-card:not(.model-card-add)");
+        await expect(assignedModelCards.first()).toBeVisible({ timeout: ciVideoTimeout });
+        const assignedCount = await assignedModelCards.count();
+        for (let i = 0; i < Math.min(assignedCount, 2); i++) {
+            const modelCard = assignedModelCards.nth(i);
+            const box = await modelCard.boundingBox();
             if (box) {
                 await page.mouse.move(
                     box.x + box.width / 2,
@@ -286,8 +207,8 @@ test.describe("Packs", () => {
             }
         }
 
-        // ── Final pause ──
         await page.mouse.move(640, 360, { steps: 15 });
         await viewerPause(page, 1200);
+        await context.close();
     });
 });
