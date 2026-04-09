@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import {
+    ciVideoTimeout,
     shortPause,
     mediumPause,
     longPause,
@@ -94,7 +95,7 @@ test.describe("Recycled Files", () => {
         // Wait for the card to disappear (now 3 cards)
         await page.waitForFunction(
             () => document.querySelectorAll(".model-card").length <= 3,
-            { timeout: 10000 },
+            { timeout: ciVideoTimeout },
         );
         await mediumPause(page);
 
@@ -135,7 +136,7 @@ test.describe("Recycled Files", () => {
         // Wait for the card to disappear (now 2 cards)
         await page.waitForFunction(
             () => document.querySelectorAll(".model-card").length <= 2,
-            { timeout: 10000 },
+            { timeout: ciVideoTimeout },
         );
         await longPause(page);
 
@@ -153,12 +154,12 @@ test.describe("Recycled Files", () => {
         await page
             .locator(".recycled-card")
             .first()
-            .waitFor({ state: "visible", timeout: 15000 });
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
         await mediumPause(page);
 
         // Verify we see 2 recycled items
         const recycledCards = page.locator(".recycled-card");
-        await expect(recycledCards).toHaveCount(2, { timeout: 10000 });
+        await expect(recycledCards).toHaveCount(2, { timeout: ciVideoTimeout });
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
@@ -210,10 +211,10 @@ test.describe("Recycled Files", () => {
         await mediumPause(page);
 
         // Wait for the dialog to close and the card to disappear
-        await confirmDialog.waitFor({ state: "hidden", timeout: 10000 });
+        await confirmDialog.waitFor({ state: "hidden", timeout: ciVideoTimeout });
         await page.waitForFunction(
             () => document.querySelectorAll(".recycled-card").length <= 1,
-            { timeout: 10000 },
+            { timeout: ciVideoTimeout },
         );
         await longPause(page);
 
@@ -246,7 +247,7 @@ test.describe("Recycled Files", () => {
         // Wait for the restored card to disappear from recycled view
         await page.waitForFunction(
             () => document.querySelectorAll(".recycled-card").length === 0,
-            { timeout: 10000 },
+            { timeout: ciVideoTimeout },
         );
         await longPause(page);
 

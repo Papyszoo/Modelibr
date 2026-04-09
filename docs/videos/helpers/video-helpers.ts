@@ -1,5 +1,7 @@
 import { Page } from "@playwright/test";
 
+export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
+
 /**
  * Human-like interaction helpers for documentation videos.
  * All timing is designed to look natural on screen so viewers can follow along.

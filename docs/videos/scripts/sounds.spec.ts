@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import {
+    ciVideoTimeout,
     shortPause,
     mediumPause,
     longPause,
@@ -83,7 +84,7 @@ test.describe("Sounds", () => {
         await page
             .locator(".sound-card")
             .first()
-            .waitFor({ state: "visible", timeout: 15000 });
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
         const soundCardCount = await page.locator(".sound-card").count();
         await longPause(page);
 
@@ -246,7 +247,7 @@ test.describe("Sounds", () => {
         // Move back across the sound grid
         const firstCard = page.locator(".sound-card").first();
         await firstCard
-            .waitFor({ state: "visible", timeout: 10000 })
+            .waitFor({ state: "visible", timeout: ciVideoTimeout })
             .catch(() => {});
         const firstBox = await firstCard.boundingBox().catch(() => null);
         if (firstBox) {
