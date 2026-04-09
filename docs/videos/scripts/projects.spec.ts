@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import {
     ciVideoTimeout,
+    createRecordedPage,
     mediumPause,
     longPause,
     viewerPause,
@@ -15,7 +16,6 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8090";
-const selectAllShortcut = process.platform === "darwin" ? "Meta+A" : "Control+A";
 
 async function showIntroSlate(page: Page) {
     await page.setContent(`
@@ -244,31 +244,28 @@ async function addModelToProject(page: Page, projectId: number, modelId: number)
 }
 
 test.describe("Projects", () => {
-    test("Projects Video", async ({ page }) => {
-        await showIntroSlate(page);
-        await viewerPause(page, 900);
-
-        await clearAllData(page);
+    test("Projects Video", async ({ browser, page: setupPage }, testInfo) => {
+        await clearAllData(setupPage);
 
         const [cubeModelId, coneModelId, cylinderModelId] = await Promise.all([
-            uploadModel(page, "test-cube.glb"),
-            uploadModel(page, "test-cone.fbx"),
-            uploadModel(page, "test-cylinder.fbx"),
+            uploadModel(setupPage, "test-cube.glb"),
+            uploadModel(setupPage, "test-cone.fbx"),
+            uploadModel(setupPage, "test-cylinder.fbx"),
         ]);
 
         const [blueImageId, pinkImageId, yellowImageId, greenImageId, redImageId] =
             await Promise.all([
-                uploadFile(page, "blue_color.png"),
-                uploadFile(page, "pink_color.png"),
-                uploadFile(page, "yellow_color.png"),
-                uploadFile(page, "green_color.png"),
-                uploadFile(page, "red_color.png"),
+                uploadFile(setupPage, "blue_color.png"),
+                uploadFile(setupPage, "pink_color.png"),
+                uploadFile(setupPage, "yellow_color.png"),
+                uploadFile(setupPage, "green_color.png"),
+                uploadFile(setupPage, "red_color.png"),
             ]);
 
         await expect
             .poll(
                 async () => {
-                    const response = await page.request.get(`${API_BASE}/models`);
+                    const response = await setupPage.request.get(`${API_BASE}/models`);
                     if (!response.ok()) {
                         return 0;
                     }
@@ -280,43 +277,49 @@ test.describe("Projects", () => {
             )
             .toBeGreaterThanOrEqual(3);
 
-        const skyHarborProjectId = await createProject(page, {
+        const skyHarborProjectId = await createProject(setupPage, {
             name: "Sky Harbor Launch",
             description: "Cinematic launch bay with modular ships, cargo props, and lighting beats.",
             notes: "Creative target: fast pitch-ready scene with hero angles and clear set dressing.",
         });
-        await setProjectThumbnail(page, skyHarborProjectId, blueImageId);
-        await addProjectConcept(page, skyHarborProjectId, blueImageId);
-        await addProjectConcept(page, skyHarborProjectId, pinkImageId);
-        await addProjectConcept(page, skyHarborProjectId, yellowImageId);
-        await addModelToProject(page, skyHarborProjectId, cubeModelId);
-        await addModelToProject(page, skyHarborProjectId, coneModelId);
+        await setProjectThumbnail(setupPage, skyHarborProjectId, blueImageId);
+        await addProjectConcept(setupPage, skyHarborProjectId, blueImageId);
+        await addProjectConcept(setupPage, skyHarborProjectId, pinkImageId);
+        await addProjectConcept(setupPage, skyHarborProjectId, yellowImageId);
+        await addModelToProject(setupPage, skyHarborProjectId, cubeModelId);
+        await addModelToProject(setupPage, skyHarborProjectId, coneModelId);
 
-        const forestMarketProjectId = await createProject(page, {
+        const forestMarketProjectId = await createProject(setupPage, {
             name: "Forest Night Market",
             description: "Cozy prop collection for lantern stalls, signage, and walkable dressing passes.",
             notes: "Use concept boards to align shape language before adding the ambient audio pass.",
         });
-        await setProjectThumbnail(page, forestMarketProjectId, greenImageId);
-        await addProjectConcept(page, forestMarketProjectId, greenImageId);
-        await addProjectConcept(page, forestMarketProjectId, yellowImageId);
-        await addModelToProject(page, forestMarketProjectId, cylinderModelId);
+        await setProjectThumbnail(setupPage, forestMarketProjectId, greenImageId);
+        await addProjectConcept(setupPage, forestMarketProjectId, greenImageId);
+        await addProjectConcept(setupPage, forestMarketProjectId, yellowImageId);
+        await addModelToProject(setupPage, forestMarketProjectId, cylinderModelId);
 
-        const dungeonKitProjectId = await createProject(page, {
+        const dungeonKitProjectId = await createProject(setupPage, {
             name: "Dungeon Builder Kit",
             description: "Reusable room pieces for encounter spaces, traversal tests, and layout mockups.",
             notes: "Keep this one lean until the hero project gets final sign-off.",
         });
-        await setProjectThumbnail(page, dungeonKitProjectId, redImageId);
+        await setProjectThumbnail(setupPage, dungeonKitProjectId, redImageId);
         expect(dungeonKitProjectId).toBeGreaterThan(0);
 
+        const { context, page } = await createRecordedPage(browser, testInfo);
+        await showIntroSlate(page);
+        await viewerPause(page, 900);
         await installRevealOverlay(page);
         await navigateTo(page, "/?leftTabs=projects&activeLeft=projects");
         await disableHighlights(page);
 
         const projectCards = page.locator(".project-grid-card");
         await expect(projectCards).toHaveCount(3, { timeout: ciVideoTimeout });
-        await expect(page.locator(".project-grid-card img").first()).toBeVisible({
+        await expect(page.locator(".project-grid-card-content").first()).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
+        await expect(page.locator(".project-grid-card-description").first()).toBeVisible({
             timeout: ciVideoTimeout,
         });
         await removeRevealOverlay(page);
@@ -424,37 +427,8 @@ test.describe("Projects", () => {
         for (let i = 0; i < Math.min(modelCardCount, 3); i++) {
             await moveToLocator(page, visibleModelCards.nth(i), 200);
         }
-
-        const projectsTab = page
-            .locator(".draggable-tab")
-            .filter({ hasText: /^Projects$/i })
-            .first();
-
-        if (await projectsTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await moveToLocator(page, projectsTab, 220);
-            await projectsTab.click();
-        } else {
-            await navigateTo(page, "/?leftTabs=projects&activeLeft=projects");
-            await disableHighlights(page);
-            await removeRevealOverlay(page);
-        }
-
-        if (await openFiltersButton.isVisible().catch(() => false)) {
-            await moveToLocator(page, openFiltersButton, 220);
-            await openFiltersButton.click();
-            await viewerPause(page, 350);
-        }
-        await expect(searchInput).toBeVisible({ timeout: ciVideoTimeout });
-        await searchInput.click();
-        await searchInput.press(selectAllShortcut);
-        await searchInput.press("Backspace");
-        await expect(projectCards).toHaveCount(3, { timeout: ciVideoTimeout });
-
-        for (let i = 0; i < 3; i++) {
-            await moveToLocator(page, projectCards.nth(i), 220);
-        }
-
         await page.mouse.move(1120, 120, { steps: 18 });
         await viewerPause(page, 1200);
+        await context.close();
     });
 });

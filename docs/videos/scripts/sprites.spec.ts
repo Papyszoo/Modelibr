@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import {
     ciVideoTimeout,
+    createRecordedPage,
     shortPause,
     mediumPause,
     viewerPause,
@@ -49,9 +50,9 @@ async function clickLocator(
 }
 
 test.describe("Sprites", () => {
-    test("Sprites Video", async ({ page }) => {
+    test("Sprites Video", async ({ browser, page: setupPage }, testInfo) => {
         let heroSpriteId: number | null = null;
-        await clearAllData(page);
+        await clearAllData(setupPage);
 
         const sprites = [
             { file: "texture.png", name: "button-base" },
@@ -62,7 +63,7 @@ test.describe("Sprites", () => {
         for (const sprite of sprites) {
             const filePath = path.join(assetsDir, sprite.file);
             const buffer = fs.readFileSync(filePath);
-            const response = await page.request.post(
+            const response = await setupPage.request.post(
                 `${API_BASE_URL}/sprites/with-file?name=${encodeURIComponent(sprite.name)}`,
                 {
                     multipart: {
@@ -86,7 +87,7 @@ test.describe("Sprites", () => {
             throw new Error("Could not determine hero sprite id");
         }
 
-        const createCategoryResponse = await page.request.post(
+        const createCategoryResponse = await setupPage.request.post(
             `${API_BASE_URL}/sprite-categories`,
             {
                 data: { name: "UI Kit" },
@@ -96,7 +97,7 @@ test.describe("Sprites", () => {
         const createdCategory = await createCategoryResponse.json();
         const uiKitCategoryId = Number(createdCategory.id);
 
-        const moveHeroResponse = await page.request.put(
+        const moveHeroResponse = await setupPage.request.put(
             `${API_BASE_URL}/sprites/${heroSpriteId}`,
             {
                 data: {
@@ -107,6 +108,8 @@ test.describe("Sprites", () => {
             },
         );
         expect(moveHeroResponse.ok()).toBeTruthy();
+
+        const { context, page } = await createRecordedPage(browser, testInfo);
 
         await navigateTo(page, "/?leftTabs=sprites&activeLeft=sprites");
         await disableHighlights(page);
@@ -154,6 +157,29 @@ test.describe("Sprites", () => {
             "Primary Button",
             { timeout: ciVideoTimeout },
         );
+        await page.keyboard.press("Escape");
+        await expect(spriteModal).toBeHidden({ timeout: ciVideoTimeout });
+        await mediumPause(page);
+
+        const unassignedTab = page
+            .locator(".category-tab")
+            .filter({ hasText: /^Unassigned/i })
+            .first();
+        await clickLocator(page, unassignedTab);
+        await expect(
+            page.locator(".sprite-card").filter({ hasText: /Primary Button/i }),
+        ).toHaveCount(0, { timeout: ciVideoTimeout });
+        await expect(
+            page.locator(".sprite-card").filter({ hasText: /damage-hit/i }).first(),
+        ).toBeVisible({ timeout: ciVideoTimeout });
+        await mediumPause(page);
+
+        await clickLocator(page, uiKitTab);
+        const primaryButtonCard = spriteCards
+            .filter({ hasText: /Primary Button/i })
+            .first();
+        await expect(primaryButtonCard).toBeVisible({ timeout: ciVideoTimeout });
         await viewerPause(page, 1200);
+        await context.close();
     });
 });

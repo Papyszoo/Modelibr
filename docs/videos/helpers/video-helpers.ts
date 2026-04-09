@@ -1,12 +1,46 @@
-import { Page } from "@playwright/test";
+import {
+    type Browser,
+    type BrowserContext,
+    type Page,
+    type TestInfo,
+} from "@playwright/test";
 
 export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
 const videoPaceFactor = 0.65;
 const LEGACY_NAVIGATION_HASH_KEY = "__docsVideoNavigation";
 const initializedLegacyNavigationPages = new WeakSet<Page>();
 
+type RecordedVideoPage = {
+    context: BrowserContext;
+    page: Page;
+};
+
 function paceDuration(ms: number) {
     return Math.max(120, Math.round(ms * videoPaceFactor));
+}
+
+async function waitForTabsToSettle(page: Page) {
+    let lastError: unknown;
+    for (const timeout of [8000, 13000, 18000]) {
+        try {
+            await page.waitForFunction(
+                () =>
+                    Array.from(document.querySelectorAll(".tab-loading")).every(
+                        (element) =>
+                            !(element instanceof HTMLElement) ||
+                            element.offsetParent === null,
+                    ),
+                { timeout },
+            );
+            return;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    if (lastError) {
+        throw lastError;
+    }
 }
 
 type VideoTab = {
@@ -393,19 +427,26 @@ export async function navigateTo(page: Page, path: string) {
         state: "visible",
         timeout: 15000,
     });
-    await page
-        .waitForFunction(
-            () =>
-                Array.from(document.querySelectorAll(".tab-loading")).every(
-                    (element) =>
-                        !(element instanceof HTMLElement) ||
-                        element.offsetParent === null,
-                ),
-            { timeout: 5000 },
-        )
-        .catch(() => {});
+    await waitForTabsToSettle(page);
     await page.waitForTimeout(paceDuration(250));
     await mediumPause(page);
+}
+
+export async function createRecordedPage(
+    browser: Browser,
+    testInfo: TestInfo,
+): Promise<RecordedVideoPage> {
+    const context = await browser.newContext({
+        viewport: { width: 1280, height: 720 },
+        colorScheme: "dark",
+        recordVideo: {
+            dir: testInfo.outputDir,
+            size: { width: 1280, height: 720 },
+        },
+    });
+
+    const page = await context.newPage();
+    return { context, page };
 }
 
 /**

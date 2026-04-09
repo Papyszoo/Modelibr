@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import {
+    createRecordedPage,
     shortPause,
     mediumPause,
     longPause,
@@ -23,9 +24,9 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("User Interface", () => {
-    test("User Interface Video", async ({ page }) => {
+    test("User Interface Video", async ({ browser, page: setupPage }, testInfo) => {
         // ── Setup: clear all data so we start with a clean library ──
-        await clearAllData(page);
+        await clearAllData(setupPage);
 
         // ── Upload test data via API (fast, not shown in video) ──
 
@@ -36,7 +37,7 @@ test.describe("User Interface", () => {
         ];
         for (const file of modelFiles) {
             const buffer = fs.readFileSync(file);
-            await page.request.post(`${API_BASE_URL}/models`, {
+            await setupPage.request.post(`${API_BASE_URL}/models`, {
                 multipart: {
                     file: {
                         name: path.basename(file),
@@ -54,7 +55,7 @@ test.describe("User Interface", () => {
         ];
         for (const file of spriteFiles) {
             const buffer = fs.readFileSync(file);
-            await page.request.post(`${API_BASE_URL}/sprites/with-file`, {
+            await setupPage.request.post(`${API_BASE_URL}/sprites/with-file`, {
                 multipart: {
                     file: {
                         name: path.basename(file),
@@ -68,7 +69,7 @@ test.describe("User Interface", () => {
         // Upload 1 sound
         const soundFile = path.join(assetsDir, "test-tone.wav");
         const soundBuffer = fs.readFileSync(soundFile);
-        await page.request.post(`${API_BASE_URL}/sounds/with-file`, {
+        await setupPage.request.post(`${API_BASE_URL}/sounds/with-file`, {
             multipart: {
                 file: {
                     name: path.basename(soundFile),
@@ -77,6 +78,8 @@ test.describe("User Interface", () => {
                 },
             },
         });
+
+        const { context, page } = await createRecordedPage(browser, testInfo);
 
         // ── Navigate to the app with model list on the left ──
         await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
@@ -361,5 +364,6 @@ test.describe("User Interface", () => {
         // Move mouse to center so the final frame is clean
         await page.mouse.move(640, 360, { steps: 15 });
         await viewerPause(page, 1200);
+        await context.close();
     });
 });
