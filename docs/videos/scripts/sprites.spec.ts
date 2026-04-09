@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import {
+    ciVideoTimeout,
     shortPause,
     mediumPause,
     longPause,
@@ -64,7 +65,7 @@ test.describe("Sprites", () => {
         await page
             .locator(".sprite-card")
             .first()
-            .waitFor({ state: "visible", timeout: 15000 });
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
         // Get actual count of sprite cards (clearAllData ensures only our 4 exist)
         const spriteCount = await page.locator(".sprite-card").count();
         await longPause(page);
@@ -206,7 +207,7 @@ test.describe("Sprites", () => {
         // Move back across the sprite grid
         const firstCard = page.locator(".sprite-card").first();
         await firstCard
-            .waitFor({ state: "visible", timeout: 10000 })
+            .waitFor({ state: "visible", timeout: ciVideoTimeout })
             .catch(() => {});
         const firstBox = await firstCard.boundingBox().catch(() => null);
         if (firstBox) {

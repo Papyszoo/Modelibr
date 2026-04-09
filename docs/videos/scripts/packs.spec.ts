@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import {
+    ciVideoTimeout,
     shortPause,
     mediumPause,
     longPause,
@@ -54,7 +55,7 @@ test.describe("Packs", () => {
             .locator("button")
             .filter({ hasText: /create.*pack/i })
             .first();
-        await createBtn.waitFor({ state: "visible", timeout: 10000 });
+        await createBtn.waitFor({ state: "visible", timeout: ciVideoTimeout });
 
         const createBtnBox = await createBtn.boundingBox();
         if (createBtnBox) {
@@ -70,7 +71,7 @@ test.describe("Packs", () => {
 
         // Wait for dialog
         const dialog = page.locator(".p-dialog").first();
-        await dialog.waitFor({ state: "visible", timeout: 10000 });
+        await dialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
         await shortPause(page);
 
         // Type pack name with human-like delay
@@ -99,7 +100,7 @@ test.describe("Packs", () => {
 
         // Wait for dialog to close
         await dialog
-            .waitFor({ state: "hidden", timeout: 10000 })
+            .waitFor({ state: "hidden", timeout: ciVideoTimeout })
             .catch(() => {});
         await mediumPause(page);
 
@@ -108,7 +109,7 @@ test.describe("Packs", () => {
         // ────────────────────────────────────────────────────────────
 
         const packCard = page.locator(".pack-grid-card").first();
-        await packCard.waitFor({ state: "visible", timeout: 10000 });
+        await packCard.waitFor({ state: "visible", timeout: ciVideoTimeout });
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
@@ -231,7 +232,7 @@ test.describe("Packs", () => {
             await mediumPause(page);
 
             const dialog2 = page.locator(".p-dialog").first();
-            await dialog2.waitFor({ state: "visible", timeout: 10000 });
+            await dialog2.waitFor({ state: "visible", timeout: ciVideoTimeout });
 
             const nameInput2 = dialog2.locator("input").first();
             await nameInput2.click();
@@ -259,7 +260,7 @@ test.describe("Packs", () => {
             await mediumPause(page);
 
             await dialog2
-                .waitFor({ state: "hidden", timeout: 10000 })
+                .waitFor({ state: "hidden", timeout: ciVideoTimeout })
                 .catch(() => {});
         }
 

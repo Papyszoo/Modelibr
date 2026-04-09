@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
+    ciVideoTimeout,
     shortPause,
     mediumPause,
     longPause,
@@ -142,7 +143,7 @@ test.describe("Model Management", () => {
         const leftPanel = page.locator(".p-splitter-panel >> nth=0");
         await leftPanel
             .locator(".model-card >> nth=1")
-            .waitFor({ state: "visible", timeout: 10000 });
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
         await shortPause(page);
 
         // Smoothly move to the second model card and click it
@@ -165,7 +166,7 @@ test.describe("Model Management", () => {
         // Wait for the model to load — a canvas should appear in the left panel
         await leftPanel
             .locator("canvas")
-            .waitFor({ state: "visible", timeout: 15000 });
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
@@ -226,7 +227,10 @@ test.describe("Model Management", () => {
         const addVersionButton = rightPanel
             .locator(".viewer-controls button:has(.pi-plus)")
             .first();
-        await addVersionButton.waitFor({ state: "visible", timeout: 10000 });
+        await addVersionButton.waitFor({
+            state: "visible",
+            timeout: ciVideoTimeout,
+        });
 
         const addVersionBox = await addVersionButton.boundingBox();
         if (addVersionBox) {
@@ -251,7 +255,7 @@ test.describe("Model Management", () => {
         const uploadDialog = page.locator(
             '.p-dialog:has-text("Upload File to Model")',
         );
-        await uploadDialog.waitFor({ state: "visible", timeout: 15000 });
+        await uploadDialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
         await mediumPause(page);
 
         // Select "Create new version" radio button
@@ -263,7 +267,10 @@ test.describe("Model Management", () => {
         const dialogUploadBtn = uploadDialog
             .locator(".p-dialog-footer button", { hasText: "Upload" })
             .first();
-        await dialogUploadBtn.waitFor({ state: "visible", timeout: 5000 });
+        await dialogUploadBtn.waitFor({
+            state: "visible",
+            timeout: ciVideoTimeout,
+        });
         await dialogUploadBtn.click();
 
         // Wait for the upload progress — the version upload uses the same upload window
@@ -306,7 +313,7 @@ test.describe("Model Management", () => {
         // Wait for the viewer to reload with the new version
         await rightPanel
             .locator("canvas")
-            .waitFor({ state: "visible", timeout: 15000 });
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
@@ -317,7 +324,10 @@ test.describe("Model Management", () => {
         const versionDropdown = rightPanel
             .locator(".version-dropdown-trigger")
             .first();
-        await versionDropdown.waitFor({ state: "visible", timeout: 10000 });
+        await versionDropdown.waitFor({
+            state: "visible",
+            timeout: ciVideoTimeout,
+        });
 
         const dropdownBox = await versionDropdown.boundingBox();
         if (dropdownBox) {
@@ -334,7 +344,7 @@ test.describe("Model Management", () => {
         await page
             .locator(".version-dropdown-item")
             .first()
-            .waitFor({ state: "visible", timeout: 10000 });
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
