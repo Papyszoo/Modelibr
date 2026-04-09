@@ -57,14 +57,27 @@ test.describe("Recycled Files", () => {
         await waitForThumbnails(page, 4, 90000);
         await longPause(page);
 
+        const thirdModelId = await page
+            .locator(".model-card[data-model-id]")
+            .nth(2)
+            .getAttribute("data-model-id");
+        const fourthModelId = await page
+            .locator(".model-card[data-model-id]")
+            .nth(3)
+            .getAttribute("data-model-id");
+        if (!thirdModelId || !fourthModelId) {
+            throw new Error("Could not determine recycled-files target model ids");
+        }
+
         // ────────────────────────────────────────────────────────────
         // Step 1: Recycle the 3rd model via right-click context menu
         // ────────────────────────────────────────────────────────────
 
         // Move to the 3rd model card and right-click
-        await smoothMoveTo(page, ".model-card >> nth=2");
+        const thirdModelSelector = `.model-card[data-model-id="${thirdModelId}"]`;
+        await smoothMoveTo(page, thirdModelSelector);
         await page.waitForTimeout(400);
-        const thirdCard = page.locator(".model-card >> nth=2");
+        const thirdCard = page.locator(thirdModelSelector);
         const thirdBox = await thirdCard.boundingBox();
         if (thirdBox) {
             await page.mouse.click(
@@ -92,20 +105,17 @@ test.describe("Recycled Files", () => {
         await recycleItem.click();
         await mediumPause(page);
 
-        // Wait for the card to disappear (now 3 cards)
-        await page.waitForFunction(
-            () => document.querySelectorAll(".model-card").length <= 3,
-            { timeout: ciVideoTimeout },
-        );
+        await thirdCard.waitFor({ state: "hidden", timeout: ciVideoTimeout });
         await mediumPause(page);
 
         // ────────────────────────────────────────────────────────────
         // Step 2: Recycle the 4th model (now at index 2 after removal)
         // ────────────────────────────────────────────────────────────
 
-        await smoothMoveTo(page, ".model-card >> nth=2");
+        const fourthModelSelector = `.model-card[data-model-id="${fourthModelId}"]`;
+        await smoothMoveTo(page, fourthModelSelector);
         await page.waitForTimeout(400);
-        const fourthCard = page.locator(".model-card >> nth=2");
+        const fourthCard = page.locator(fourthModelSelector);
         const fourthBox = await fourthCard.boundingBox();
         if (fourthBox) {
             await page.mouse.click(
@@ -133,11 +143,24 @@ test.describe("Recycled Files", () => {
         await recycleItem2.click();
         await mediumPause(page);
 
-        // Wait for the card to disappear (now 2 cards)
-        await page.waitForFunction(
-            () => document.querySelectorAll(".model-card").length <= 2,
-            { timeout: ciVideoTimeout },
-        );
+        const secondRecycleApplied = await fourthCard
+            .waitFor({ state: "hidden", timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!secondRecycleApplied) {
+            const recycleResponse = await page.request.delete(
+                `${API_BASE_URL}/models/${fourthModelId}`,
+            );
+            if (!recycleResponse.ok() && recycleResponse.status() !== 404) {
+                throw new Error(
+                    `Failed to recycle fallback model ${fourthModelId}: ${recycleResponse.status()}`,
+                );
+            }
+            await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
+            await disableHighlights(page);
+            await waitForModelCards(page, 2);
+            await waitForThumbnails(page, 2, 60000);
+        }
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────

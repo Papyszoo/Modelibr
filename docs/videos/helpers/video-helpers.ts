@@ -2,6 +2,199 @@ import { Page } from "@playwright/test";
 
 export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
 
+type VideoTab = {
+    id: string;
+    type: string;
+    label: string;
+    params: Record<string, string>;
+    modelId?: string;
+    setId?: string;
+    packId?: string;
+    projectId?: string;
+    stageId?: string;
+};
+
+const STATIC_TAB_LABELS: Record<string, string> = {
+    modelList: "Models",
+    textureSets: "Texture Sets",
+    packs: "Packs",
+    projects: "Projects",
+    sprites: "Sprites",
+    sounds: "Sounds",
+    stageList: "Stages",
+    history: "History",
+    settings: "Settings",
+    recycledFiles: "Recycled Files",
+};
+
+function buildVideoTab(tabId: string, panel: "left" | "right"): VideoTab {
+    const params: Record<string, string> = {};
+    if (panel === "right") {
+        params.panel = "right";
+    }
+
+    if (tabId.startsWith("model-")) {
+        const modelId = tabId.substring(6);
+        return {
+            id: tabId,
+            type: "modelViewer",
+            label: `Model ${modelId}`,
+            params: { ...params, modelId },
+            modelId,
+        };
+    }
+
+    if (tabId.startsWith("set-")) {
+        const setId = tabId.substring(4);
+        return {
+            id: tabId,
+            type: "textureSetViewer",
+            label: `Set ${setId}`,
+            params: { ...params, setId },
+            setId,
+        };
+    }
+
+    if (tabId.startsWith("pack-")) {
+        const packId = tabId.substring(5);
+        return {
+            id: tabId,
+            type: "packViewer",
+            label: `Pack ${packId}`,
+            params: { ...params, packId },
+            packId,
+        };
+    }
+
+    if (tabId.startsWith("project-")) {
+        const projectId = tabId.substring(8);
+        return {
+            id: tabId,
+            type: "projectViewer",
+            label: `Project ${projectId}`,
+            params: { ...params, projectId },
+            projectId,
+        };
+    }
+
+    if (tabId.startsWith("stage-")) {
+        const stageId = tabId.substring(6);
+        return {
+            id: tabId,
+            type: "stageEditor",
+            label: `Stage ${stageId}`,
+            params: { ...params, stageId },
+            stageId,
+        };
+    }
+
+    const label = STATIC_TAB_LABELS[tabId];
+    if (!label) {
+        throw new Error(`Unsupported docs video tab id: ${tabId}`);
+    }
+
+    return {
+        id: tabId,
+        type: tabId,
+        label,
+        params,
+    };
+}
+
+function parseTabIds(value: string | null): string[] {
+    if (!value) {
+        return [];
+    }
+
+    return value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+}
+
+async function applyLegacyNavigationState(
+    page: Page,
+    path: string,
+    baseUrl: string,
+) {
+    const url = new URL(path, baseUrl);
+    const leftTabIds = parseTabIds(url.searchParams.get("leftTabs"));
+    const rightTabIds = parseTabIds(url.searchParams.get("rightTabs"));
+
+    if (leftTabIds.length === 0 && rightTabIds.length === 0) {
+        return false;
+    }
+
+    const leftTabs = (leftTabIds.length > 0 ? leftTabIds : ["modelList"]).map(
+        (tabId) => buildVideoTab(tabId, "left"),
+    );
+    const rightTabs = rightTabIds.map((tabId) => buildVideoTab(tabId, "right"));
+
+    let activeLeftTabId =
+        url.searchParams.get("activeLeft") || leftTabs[0]?.id || "modelList";
+    let activeRightTabId = url.searchParams.get("activeRight");
+
+    if (!leftTabs.some((tab) => tab.id === activeLeftTabId)) {
+        activeLeftTabId = leftTabs[0]?.id || "modelList";
+    }
+
+    if (!activeRightTabId || !rightTabs.some((tab) => tab.id === activeRightTabId)) {
+        activeRightTabId = rightTabs[0]?.id || null;
+    }
+
+    const targetUrl = `${baseUrl}${url.pathname}`;
+    await page.goto(targetUrl);
+
+    await page.evaluate(
+        ({ tabs, activeTabId, activeRightTabId }) => {
+            const storageKey = "modelibr_navigation";
+            const sessionWindowIdKey = "modelibr_windowId";
+            const storedRaw = localStorage.getItem(storageKey);
+            const stored = storedRaw
+                ? JSON.parse(storedRaw)
+                : {
+                      state: {
+                          activeWindows: {},
+                          recentlyClosedTabs: [],
+                          recentlyClosedWindows: [],
+                      },
+                      version: 0,
+                  };
+
+            let windowId = sessionStorage.getItem(sessionWindowIdKey);
+            if (!windowId) {
+                windowId = crypto.randomUUID();
+                sessionStorage.setItem(sessionWindowIdKey, windowId);
+            }
+
+            stored.state = {
+                activeWindows: {
+                    ...(stored.state?.activeWindows || {}),
+                    [windowId]: {
+                        tabs,
+                        activeTabId,
+                        activeRightTabId,
+                        splitterSize: 50,
+                        lastActiveAt: new Date().toISOString(),
+                    },
+                },
+                recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
+                recentlyClosedWindows: stored.state?.recentlyClosedWindows || [],
+            };
+
+            localStorage.setItem(storageKey, JSON.stringify(stored));
+        },
+        {
+            tabs: [...leftTabs, ...rightTabs],
+            activeTabId: activeLeftTabId,
+            activeRightTabId,
+        },
+    );
+
+    await page.goto(targetUrl);
+    return true;
+}
+
 /**
  * Human-like interaction helpers for documentation videos.
  * All timing is designed to look natural on screen so viewers can follow along.
@@ -136,7 +329,14 @@ export async function dragElementTo(
 export async function navigateTo(page: Page, path: string) {
     // Use localhost (not 127.0.0.1) so browser origin matches CORS allowed origins
     const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-    await page.goto(`${baseUrl}${path}`);
+    const usedLegacyNavigation = await applyLegacyNavigationState(
+        page,
+        path,
+        baseUrl,
+    );
+    if (!usedLegacyNavigation) {
+        await page.goto(`${baseUrl}${path}`);
+    }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForSelector(".p-splitter", {
         state: "visible",
