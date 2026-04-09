@@ -211,44 +211,38 @@ test.describe("Model Management", () => {
         //         model currently shown on the right panel
         // ────────────────────────────────────────────────────────────
 
-        // Click the right panel to make it active
         const rightPanel = page.locator(".p-splitter-panel >> nth=1");
-        const rightCanvas = rightPanel.locator("canvas").first();
-        const rightCanvasBox = await rightCanvas.boundingBox();
-        if (rightCanvasBox) {
-            await page.mouse.click(
-                rightCanvasBox.x + rightCanvasBox.width / 2,
-                rightCanvasBox.y + rightCanvasBox.height / 2,
-            );
-        }
-        await mediumPause(page);
+        await rightPanel
+            .locator(".p-menubar")
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
+        await rightPanel
+            .locator(".version-dropdown-trigger")
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
 
-        // Click the "Add Version" button (plus icon in viewer controls)
-        const addVersionButton = rightPanel
-            .locator(".viewer-controls button:has(.pi-plus)")
+        // Open File > Add New Version in the viewer menubar
+        const fileMenu = rightPanel
+            .locator(
+                '.p-menubar .p-menuitem-link:has(.p-menuitem-text:text-is("File"))',
+            )
             .first();
-        await addVersionButton.waitFor({
+        await fileMenu.waitFor({
             state: "visible",
             timeout: ciVideoTimeout,
         });
-
-        const addVersionBox = await addVersionButton.boundingBox();
-        if (addVersionBox) {
+        const fileMenuBox = await fileMenu.boundingBox();
+        if (fileMenuBox) {
             await page.mouse.move(
-                addVersionBox.x + addVersionBox.width / 2,
-                addVersionBox.y + addVersionBox.height / 2,
+                fileMenuBox.x + fileMenuBox.width / 2,
+                fileMenuBox.y + fileMenuBox.height / 2,
                 { steps: 20 },
             );
             await page.waitForTimeout(400);
         }
+        await fileMenu.click();
+        await shortPause(page);
 
-        // Trigger file chooser for version upload
-        const versionFileChooserPromise = page.waitForEvent("filechooser");
-        await addVersionButton.click();
-        const versionFileChooser = await versionFileChooserPromise;
-        await versionFileChooser.setFiles([
-            path.join(assetsDir, "test-torus.fbx"),
-        ]);
+        const versionInput = rightPanel.locator('input[type="file"]').first();
+        await versionInput.setInputFiles([path.join(assetsDir, "test-torus.fbx")]);
 
         // Handle the "Upload File to Model" dialog
         // Wait for the dialog to appear
