@@ -4,14 +4,10 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import {
     ciVideoTimeout,
-    shortPause,
     mediumPause,
-    longPause,
     viewerPause,
     smoothMoveTo,
-    humanClick,
     humanRightClick,
-    smoothDrag,
     navigateTo,
     waitForModelCards,
     waitForThumbnails,
@@ -26,15 +22,68 @@ const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Recycled Files", () => {
     test("Recycled Files Video", async ({ page }) => {
+        const waitForMenuStateToSettle = async () => {
+            await page.evaluate(
+                () =>
+                    new Promise<void>((resolve) =>
+                        requestAnimationFrame(() =>
+                            requestAnimationFrame(() => resolve()),
+                        ),
+                    ),
+            );
+        };
+
+        const expectNoErrorToast = async () => {
+            await expect(page.locator(".p-toast-message-error")).toHaveCount(0);
+        };
+
+        const recycleModelFromGrid = async (modelId: string) => {
+            const modelSelector = `.model-card[data-model-id="${modelId}"]`;
+            const modelCard = page.locator(modelSelector);
+
+            await humanRightClick(page, modelSelector);
+            const contextMenu = page.locator(".p-contextmenu");
+            await contextMenu.waitFor({ state: "visible", timeout: 5000 });
+            await waitForMenuStateToSettle();
+            await viewerPause(page, 500);
+
+            const recycleItem = contextMenu
+                .locator(".p-menuitem")
+                .filter({ hasText: /^Recycle$/ })
+                .first();
+
+            await smoothMoveTo(page, ".p-contextmenu .p-menuitem:has-text('Recycle')");
+            await viewerPause(page, 300);
+
+            const deleteResponse = page.waitForResponse(
+                (response) =>
+                    response.request().method() === "DELETE" &&
+                    /\/models\/\d+$/.test(new URL(response.url()).pathname) &&
+                    new URL(response.url()).pathname.endsWith(`/models/${modelId}`),
+                { timeout: ciVideoTimeout },
+            );
+
+            await recycleItem.click();
+            const response = await deleteResponse;
+            expect(response.ok()).toBeTruthy();
+
+            await expect(modelCard).toBeHidden({ timeout: ciVideoTimeout });
+            await expect(
+                page
+                    .locator(".p-toast-message-success")
+                    .filter({ hasText: /moved to recycled files/i }),
+            ).toBeVisible({ timeout: 5000 });
+            await expectNoErrorToast();
+        };
+
         // ── Setup: clear all data so we start with a clean library ──
         await clearAllData(page);
 
-        // ── Upload 4 models via API (fast, not shown in video) ──
+        // ── Upload 3 models via API (fast, not shown in video) ──
         const modelFiles = [
             path.join(assetsDir, "test-cube.glb"),
             path.join(assetsDir, "test-cone.fbx"),
             path.join(assetsDir, "test-cylinder.fbx"),
-            path.join(assetsDir, "test-icosphere.fbx"),
         ];
 
         for (const file of modelFiles) {
@@ -53,115 +102,42 @@ test.describe("Recycled Files", () => {
         // ── Navigate to model list and wait for cards + thumbnails ──
         await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
         await disableHighlights(page);
-        await waitForModelCards(page, 4);
-        await waitForThumbnails(page, 4, 90000);
-        await longPause(page);
+        await waitForModelCards(page, 3);
+        await waitForThumbnails(page, 3, 90000);
+        await mediumPause(page);
 
+        const secondModelId = await page
+            .locator(".model-card[data-model-id]")
+            .nth(1)
+            .getAttribute("data-model-id");
         const thirdModelId = await page
             .locator(".model-card[data-model-id]")
             .nth(2)
             .getAttribute("data-model-id");
-        const fourthModelId = await page
-            .locator(".model-card[data-model-id]")
-            .nth(3)
-            .getAttribute("data-model-id");
-        if (!thirdModelId || !fourthModelId) {
+        if (!secondModelId || !thirdModelId) {
             throw new Error("Could not determine recycled-files target model ids");
         }
 
         // ────────────────────────────────────────────────────────────
-        // Step 1: Recycle the 3rd model via right-click context menu
+        // Step 1: Recycle one model on-camera from the library
         // ────────────────────────────────────────────────────────────
 
-        // Move to the 3rd model card and right-click
-        const thirdModelSelector = `.model-card[data-model-id="${thirdModelId}"]`;
-        await smoothMoveTo(page, thirdModelSelector);
-        await viewerPause(page, 400);
-        const thirdCard = page.locator(thirdModelSelector);
-        const thirdBox = await thirdCard.boundingBox();
-        if (thirdBox) {
-            await page.mouse.click(
-                thirdBox.x + thirdBox.width / 2,
-                thirdBox.y + thirdBox.height / 2,
-                { button: "right" },
-            );
-        }
-        await shortPause(page);
+        await recycleModelFromGrid(thirdModelId);
+        await mediumPause(page);
 
-        // Wait for context menu and click "Recycle"
-        await page
-            .locator(".p-contextmenu")
-            .waitFor({ state: "visible", timeout: 5000 });
-        await shortPause(page);
-        const recycleItem = page
-            .locator(".p-contextmenu .p-menuitem")
-            .filter({ hasText: /Recycle/i })
-            .first();
-        await smoothMoveTo(
-            page,
-            ".p-contextmenu .p-menuitem:has-text('Recycle')",
+        // ────────────────────────────────────────────────────────────
+        // Step 2: Quietly recycle one more model so the recycle bin feels useful
+        // ────────────────────────────────────────────────────────────
+
+        const secondRecycleResponse = await page.request.delete(
+            `${API_BASE_URL}/models/${secondModelId}`,
         );
-        await viewerPause(page, 300);
-        await recycleItem.click();
-        await mediumPause(page);
-
-        await thirdCard.waitFor({ state: "hidden", timeout: ciVideoTimeout });
-        await mediumPause(page);
-
-        // ────────────────────────────────────────────────────────────
-        // Step 2: Recycle the 4th model (now at index 2 after removal)
-        // ────────────────────────────────────────────────────────────
-
-        const fourthModelSelector = `.model-card[data-model-id="${fourthModelId}"]`;
-        await smoothMoveTo(page, fourthModelSelector);
-        await viewerPause(page, 400);
-        const fourthCard = page.locator(fourthModelSelector);
-        const fourthBox = await fourthCard.boundingBox();
-        if (fourthBox) {
-            await page.mouse.click(
-                fourthBox.x + fourthBox.width / 2,
-                fourthBox.y + fourthBox.height / 2,
-                { button: "right" },
+        if (!secondRecycleResponse.ok()) {
+            throw new Error(
+                `Failed to seed recycled-files view with model ${secondModelId}: ${secondRecycleResponse.status()}`,
             );
         }
-        await shortPause(page);
-
-        // Wait for context menu and click "Recycle"
-        await page
-            .locator(".p-contextmenu")
-            .waitFor({ state: "visible", timeout: 5000 });
-        await shortPause(page);
-        const recycleItem2 = page
-            .locator(".p-contextmenu .p-menuitem")
-            .filter({ hasText: /Recycle/i })
-            .first();
-        await smoothMoveTo(
-            page,
-            ".p-contextmenu .p-menuitem:has-text('Recycle')",
-        );
-        await viewerPause(page, 300);
-        await recycleItem2.click();
-        await mediumPause(page);
-
-        const secondRecycleApplied = await fourthCard
-            .waitFor({ state: "hidden", timeout: 5000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!secondRecycleApplied) {
-            const recycleResponse = await page.request.delete(
-                `${API_BASE_URL}/models/${fourthModelId}`,
-            );
-            if (!recycleResponse.ok() && recycleResponse.status() !== 404) {
-                throw new Error(
-                    `Failed to recycle fallback model ${fourthModelId}: ${recycleResponse.status()}`,
-                );
-            }
-            await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
-            await disableHighlights(page);
-            await waitForModelCards(page, 2);
-            await waitForThumbnails(page, 2, 60000);
-        }
-        await longPause(page);
+        await viewerPause(page, 350);
 
         // ────────────────────────────────────────────────────────────
         // Step 3: Navigate to Recycled Files tab
@@ -178,12 +154,12 @@ test.describe("Recycled Files", () => {
             .locator(".recycled-card")
             .first()
             .waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await mediumPause(page);
+        await viewerPause(page, 600);
 
         // Verify we see 2 recycled items
         const recycledCards = page.locator(".recycled-card");
         await expect(recycledCards).toHaveCount(2, { timeout: ciVideoTimeout });
-        await longPause(page);
+        await mediumPause(page);
 
         // ────────────────────────────────────────────────────────────
         // Step 4: Permanently delete the first recycled model
@@ -214,7 +190,7 @@ test.describe("Recycled Files", () => {
         // Confirm in the delete confirmation dialog
         const confirmDialog = page.locator(".p-dialog");
         await confirmDialog.waitFor({ state: "visible", timeout: 5000 });
-        await shortPause(page);
+        await viewerPause(page, 700);
 
         // Click the "Delete Forever" confirm button
         const confirmButton = confirmDialog
@@ -239,7 +215,7 @@ test.describe("Recycled Files", () => {
             () => document.querySelectorAll(".recycled-card").length <= 1,
             { timeout: ciVideoTimeout },
         );
-        await longPause(page);
+        await mediumPause(page);
 
         // ────────────────────────────────────────────────────────────
         // Step 5: Restore the remaining recycled model
@@ -272,7 +248,7 @@ test.describe("Recycled Files", () => {
             () => document.querySelectorAll(".recycled-card").length === 0,
             { timeout: ciVideoTimeout },
         );
-        await longPause(page);
+        await mediumPause(page);
 
         // ────────────────────────────────────────────────────────────
         // Step 6: Go back to Models and verify
@@ -281,10 +257,10 @@ test.describe("Recycled Files", () => {
         await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
         await disableHighlights(page);
 
-        // Wait for model cards — should now be 3 (2 original + 1 restored)
-        await waitForModelCards(page, 3);
-        await waitForThumbnails(page, 3, 60000);
-        await longPause(page);
+        // Wait for model cards — should now be 2 (1 kept + 1 restored)
+        await waitForModelCards(page, 2);
+        await waitForThumbnails(page, 2, 60000);
+        await mediumPause(page);
 
         // Move mouse to center of viewport for a clean final frame
         const viewport = page.viewportSize();

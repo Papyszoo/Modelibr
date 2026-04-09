@@ -14,6 +14,7 @@ fs.mkdirSync(targetDir, { recursive: true });
 
 const videoMapping = {
     "model-management": "model-management.webm",
+    "texture-sets": "texture-sets.webm",
     "recycled-files": "recycled-files.webm",
     "user-interface": "user-interface.webm",
     sprites: "sprites.webm",
