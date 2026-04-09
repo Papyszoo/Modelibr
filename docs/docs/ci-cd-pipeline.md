@@ -8,8 +8,9 @@ Modelibr uses GitHub Actions workflows that:
 
 1. Runs all test suites (backend, frontend, asset processor, Blender addon, and E2E tests)
 2. Runs code quality checks (linting, formatting) on frontend and asset processor
-3. Automatically collects the latest 10 test reports
-4. Deploys them alongside the documentation to GitHub Pages
+3. Automatically generates the documentation feature videos
+4. Automatically collects the latest 10 test reports
+5. Deploys them alongside the documentation to GitHub Pages
 
 ## Accessing Test Reports
 
@@ -22,6 +23,7 @@ You can also access them from the navigation bar at the top of this site.
 ### How Reports Are Updated
 
 - **After any CI run completes** (from any branch, whether tests pass or fail):
+    - The workflow generates the documentation feature videos for the current run
     - The workflow fetches the last 10 test reports from all workflow runs
     - Builds the documentation using the **main branch** content
     - Deploys to GitHub Pages with the updated reports
@@ -47,6 +49,7 @@ The workflow is defined in `.github/workflows/ci-and-deploy.yml` and consists of
     - `ci-status`: Aggregates results from all tests
 
 2. **Documentation Building and Deployment** (runs after all tests, even if they fail):
+    - Generates the feature demo videos used by the docs site
     - Checks out the **current branch** for workflow scripts
     - Checks out the **main branch** for documentation content
     - Copies scripts from current branch (ensures latest tooling)
@@ -82,6 +85,10 @@ Documentation is automatically deployed to GitHub Pages when:
 
 - A commit is pushed to the `main` branch
 - All CI tests pass successfully
+
+Feature videos for the documentation are generated automatically as part of the same workflow on
+every `push`, `pull_request`, and manual `workflow_dispatch` run so the docs build always has the
+current `/Modelibr/videos/*.webm` assets available.
 
 You can also manually trigger a deployment:
 
