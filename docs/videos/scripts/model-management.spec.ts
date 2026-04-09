@@ -284,21 +284,44 @@ test.describe("Model Management", () => {
             await shortPause(page);
         }
 
-        // Dismiss any dialogs that may still be open (e.g., the upload dialog re-appearing)
-        const openDialog = page.locator(".p-dialog:visible");
-        const dialogCloseBtn = openDialog
-            .locator(
-                'button:has(.pi-times), button[aria-label="Close"], button:has-text("Close"), button:has-text("Cancel")',
-            )
-            .first();
-        if (
-            await dialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)
-        ) {
-            await dialogCloseBtn.click();
-            await shortPause(page);
+        // Dismiss any dialogs that may still be open (e.g., the upload dialog re-appearing).
+        // In CI the dialog can re-render while its close button is being targeted, so prefer
+        // waiting for it to disappear naturally, then use Escape, and only click close as a
+        // final fallback if the dialog is still definitely present.
+        const openDialog = page.locator(".p-dialog:visible").last();
+        if (await openDialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const dialogSettled = await openDialog
+                .waitFor({ state: "hidden", timeout: 2000 })
+                .then(() => true)
+                .catch(() => false);
+
+            if (!dialogSettled) {
+                await page.keyboard.press("Escape");
+                await shortPause(page);
+            }
+
+            const dialogStillVisible = await openDialog
+                .isVisible({ timeout: 1000 })
+                .catch(() => false);
+            if (dialogStillVisible) {
+                const dialogCloseBtn = openDialog
+                    .locator(
+                        'button:has(.pi-times), button[aria-label="Close"], button:has-text("Close"), button:has-text("Cancel")',
+                    )
+                    .first();
+                if (
+                    await dialogCloseBtn
+                        .isVisible({ timeout: 1000 })
+                        .catch(() => false)
+                ) {
+                    await dialogCloseBtn.click();
+                    await shortPause(page);
+                }
+            }
         }
-        // Also dismiss any remaining dialog masks
-        const dialogMask = page.locator(".p-dialog-mask");
+
+        // Also dismiss any remaining dialog masks.
+        const dialogMask = page.locator(".p-dialog-mask").last();
         if (await dialogMask.isVisible({ timeout: 1000 }).catch(() => false)) {
             await page.keyboard.press("Escape");
             await shortPause(page);
