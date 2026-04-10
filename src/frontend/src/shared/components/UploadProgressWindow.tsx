@@ -55,13 +55,15 @@ const getExtensionIcon = (
 
 // Map file type to icon
 const getFileTypeIcon = (
-  fileType: 'model' | 'texture' | 'file' | 'sprite'
+  fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound' | 'environmentMap'
 ): string => {
   const typeIconMap = {
     model: 'pi-box',
     texture: 'pi-image',
     file: 'pi-file',
     sprite: 'pi-image',
+    sound: 'pi-volume-up',
+    environmentMap: 'pi-globe',
   }
   return typeIconMap[fileType]
 }
@@ -113,6 +115,20 @@ export function UploadProgressWindow() {
         const setId = textureResult.setId || textureResult.textureSetId
         if (setId) {
           openTabInPanel('textureSetViewer', 'left', setId.toString())
+        }
+      } else if (upload.fileType === 'environmentMap') {
+        const environmentMapResult = upload.result as {
+          environmentMapId?: number
+          id?: number
+        }
+        const environmentMapId =
+          environmentMapResult.environmentMapId || environmentMapResult.id
+        if (environmentMapId) {
+          openTabInPanel(
+            'environmentMapViewer',
+            'left',
+            environmentMapId.toString()
+          )
         }
       }
     } catch (error) {
@@ -193,16 +209,19 @@ export function UploadProgressWindow() {
         </div>
 
         <div className="upload-item-actions">
-          {upload.status === 'completed' && upload.fileType !== 'sprite' && (
-            <Button
-              icon="pi pi-external-link"
-              size="small"
-              text
-              rounded
-              title="Open in new tab"
-              onClick={() => handleOpenInTab(upload)}
-            />
-          )}
+          {upload.status === 'completed' &&
+            ['model', 'texture', 'environmentMap'].includes(
+              upload.fileType
+            ) && (
+              <Button
+                icon="pi pi-external-link"
+                size="small"
+                text
+                rounded
+                title="Open in new tab"
+                onClick={() => handleOpenInTab(upload)}
+              />
+            )}
           {/* Only show remove button for files NOT in a batch */}
           {!isInBatch &&
             (upload.status === 'completed' || upload.status === 'error') && (

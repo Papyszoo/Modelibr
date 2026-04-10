@@ -1,3 +1,4 @@
+import { getEnvironmentMapById } from '@/features/environment-map/api/environmentMapApi'
 import { getModelById } from '@/features/models/api/modelApi'
 import { getPackById } from '@/features/pack/api/packApi'
 import { getProjectById } from '@/features/project/api/projectApi'
@@ -49,6 +50,10 @@ export function parseCompactTabFormat(
         tabs.push(createTab('textureSetViewer', tabId.substring(4)))
         continue
       }
+      if (tabId.startsWith('environment-map-')) {
+        tabs.push(createTab('environmentMapViewer', tabId.substring(16)))
+        continue
+      }
       if (tabId.startsWith('pack-')) {
         tabs.push(createTab('packViewer', tabId.substring(5)))
         continue
@@ -69,6 +74,8 @@ export function parseCompactTabFormat(
           'modelViewer',
           'textureSets',
           'textureSetViewer',
+          'environmentMaps',
+          'environmentMapViewer',
           'packs',
           'packViewer',
           'projects',
@@ -151,6 +158,27 @@ export async function parseCompactTabFormatAsync(
         continue
       }
 
+      if (tabId.startsWith('environment-map-')) {
+        const environmentMapId = tabId.substring(16)
+        let environmentMapName: string | undefined
+        try {
+          const environmentMap = await getEnvironmentMapById(
+            Number(environmentMapId)
+          )
+          environmentMapName = environmentMap.name
+        } catch {
+          /* fall back to ID-based label */
+        }
+        tabs.push(
+          createTab(
+            'environmentMapViewer',
+            environmentMapId,
+            environmentMapName
+          )
+        )
+        continue
+      }
+
       if (tabId.startsWith('pack-')) {
         const packId = tabId.substring(5)
         let packName: string | undefined
@@ -197,6 +225,8 @@ export async function parseCompactTabFormatAsync(
           'modelViewer',
           'textureSets',
           'textureSetViewer',
+          'environmentMaps',
+          'environmentMapViewer',
           'packs',
           'packViewer',
           'projects',

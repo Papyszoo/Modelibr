@@ -20,6 +20,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
+    private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public RestoreEntityCommandHandler(
@@ -29,6 +30,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
+        IEnvironmentMapRepository environmentMapRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _modelRepository = modelRepository;
@@ -37,6 +39,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
+        _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -99,6 +102,27 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 sound.Restore(now);
                 await _soundRepository.UpdateAsync(sound, cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Sound restored successfully"));
+
+            case "environmentmap":
+                var environmentMap = await _environmentMapRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (environmentMap == null)
+                    return Result.Failure<RestoreEntityResponse>(new Error("EnvironmentMapNotFound", "Environment map not found"));
+
+                environmentMap.Restore(now);
+                await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+                return Result.Success(new RestoreEntityResponse(true, "Environment map restored successfully"));
+
+            case "environmentmapvariant":
+                var parent = await _environmentMapRepository.GetByVariantIdIncludingDeletedAsync(request.EntityId, cancellationToken);
+                if (parent == null)
+                    return Result.Failure<RestoreEntityResponse>(new Error("EnvironmentMapVariantNotFound", "Environment map variant not found"));
+
+                if (parent.IsDeleted)
+                    return Result.Failure<RestoreEntityResponse>(new Error("EnvironmentMapDeleted", "Restore the environment map before restoring its variants."));
+
+                parent.RestoreVariant(request.EntityId, now);
+                await _environmentMapRepository.UpdateAsync(parent, cancellationToken);
+                return Result.Success(new RestoreEntityResponse(true, "Environment map variant restored successfully"));
 
             default:
                 return Result.Failure<RestoreEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));

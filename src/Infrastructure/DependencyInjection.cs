@@ -5,6 +5,7 @@ using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.WebDav;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,7 +26,10 @@ namespace Infrastructure
                 // Expand environment variables in connection string
                 connectionString = Environment.ExpandEnvironmentVariables(connectionString);
                 
-                optionsBuilder.UseNpgsql(connectionString);
+                optionsBuilder
+                    .UseNpgsql(connectionString)
+                    .ConfigureWarnings(warnings =>
+                        warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();
@@ -49,6 +53,7 @@ namespace Infrastructure
             services.AddScoped<ISpriteCategoryRepository, SpriteCategoryRepository>();
             services.AddScoped<ISoundRepository, SoundRepository>();
             services.AddScoped<ISoundCategoryRepository, SoundCategoryRepository>();
+            services.AddScoped<IEnvironmentMapRepository, EnvironmentMapRepository>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 

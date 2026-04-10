@@ -13,7 +13,9 @@ public record GetAllRecycledQueryResponse(
     IEnumerable<RecycledTextureSetDto> TextureSets,
     IEnumerable<RecycledTextureDto> Textures,
     IEnumerable<RecycledSpriteDto> Sprites,
-    IEnumerable<RecycledSoundDto> Sounds
+    IEnumerable<RecycledSoundDto> Sounds,
+    IEnumerable<RecycledEnvironmentMapDto> EnvironmentMaps,
+    IEnumerable<RecycledEnvironmentMapVariantDto> EnvironmentMapVariants
 );
 
 public record RecycledModelDto(
@@ -70,6 +72,23 @@ public record RecycledSoundDto(
     DateTime DeletedAt
 );
 
+public record RecycledEnvironmentMapDto(
+    int Id,
+    string Name,
+    DateTime DeletedAt,
+    int VariantCount,
+    int? PreviewFileId
+);
+
+public record RecycledEnvironmentMapVariantDto(
+    int Id,
+    int EnvironmentMapId,
+    string EnvironmentMapName,
+    int FileId,
+    string SizeLabel,
+    DateTime DeletedAt
+);
+
 internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQuery, GetAllRecycledQueryResponse>
 {
     private readonly IModelRepository _modelRepository;
@@ -78,6 +97,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
+    private readonly IEnvironmentMapRepository _environmentMapRepository;
 
     public GetAllRecycledQueryHandler(
         IModelRepository modelRepository,
@@ -85,7 +105,8 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
         IFileRepository fileRepository,
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
-        ISoundRepository soundRepository)
+        ISoundRepository soundRepository,
+        IEnvironmentMapRepository environmentMapRepository)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -93,6 +114,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
+        _environmentMapRepository = environmentMapRepository;
     }
 
     public async Task<Result<GetAllRecycledQueryResponse>> Handle(GetAllRecycledQuery request, CancellationToken cancellationToken)
@@ -169,6 +191,38 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             s.DeletedAt!.Value
         )).ToList();
 
+        var environmentMaps = await _environmentMapRepository.GetAllDeletedAsync(cancellationToken);
+        var environmentMapDtos = environmentMaps.Select(e =>
+        {
+            var previewVariant = e.GetPreviewVariant() ?? e.Variants.FirstOrDefault();
+            return new RecycledEnvironmentMapDto(
+                e.Id,
+                e.Name,
+                e.DeletedAt!.Value,
+                e.Variants.Count,
+                previewVariant?.FileId);
+        }).ToList();
+
+        var deletedVariantParents = await _environmentMapRepository.GetAllWithDeletedVariantsAsync(cancellationToken);
+        var environmentMapVariantDtos = environmentMaps
+            .SelectMany(e => e.Variants.Select(v => new RecycledEnvironmentMapVariantDto(
+                v.Id,
+                e.Id,
+                e.Name,
+                v.FileId,
+                v.SizeLabel,
+                v.DeletedAt ?? e.DeletedAt!.Value)))
+            .Concat(deletedVariantParents.SelectMany(e => e.Variants
+                .Where(v => v.IsDeleted)
+                .Select(v => new RecycledEnvironmentMapVariantDto(
+                    v.Id,
+                    e.Id,
+                    e.Name,
+                    v.FileId,
+                    v.SizeLabel,
+                    v.DeletedAt!.Value))))
+            .ToList();
+
         var response = new GetAllRecycledQueryResponse(
             modelDtos,
             modelVersionDtos,
@@ -176,7 +230,9 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             textureSetDtos,
             textureDtos,
             spriteDtos,
-            soundDtos
+            soundDtos,
+            environmentMapDtos,
+            environmentMapVariantDtos
         );
 
         return Result.Success(response);

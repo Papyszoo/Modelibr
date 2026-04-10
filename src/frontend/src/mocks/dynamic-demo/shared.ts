@@ -4,6 +4,7 @@ import {
   addRecycledItem,
   addUploadHistory,
   type DemoCategory,
+  type DemoEnvironmentMap,
   type DemoModel,
   type DemoModelVersion,
   type DemoPack,
@@ -61,6 +62,7 @@ export {
 
 export type {
   DemoCategory,
+  DemoEnvironmentMap,
   DemoModel,
   DemoModelVersion,
   DemoPack,
@@ -77,6 +79,8 @@ const DEMO_BASE = import.meta.env.BASE_URL ?? '/Modelibr/demo/'
 export const assetUrl = (file: string) => `${DEMO_BASE}demo-assets/${file}`
 export const thumbnailUrl = (file: string) =>
   `${DEMO_BASE}demo-assets/thumbnails/${file}`
+export const seedAssetUrl = (file: string) =>
+  file.startsWith('hdri/') ? `${DEMO_BASE}${file}` : assetUrl(file)
 
 /**
  * Infer a sensible MIME type for a File/Blob when `file.type` is missing.
@@ -105,6 +109,8 @@ export function inferMimeType(
       return 'image/bmp'
     case 'exr':
       return 'image/x-exr'
+    case 'hdr':
+      return 'image/vnd.radiance'
     case 'wav':
       return 'audio/wav'
     case 'ogg':
@@ -144,6 +150,9 @@ export const seedFileAssets: Record<number, string> = {
   401: 'texture.png',
   402: 'texture_albedo.png',
   501: 'test-tone.wav',
+  601: 'hdri/potsdamer_platz_1k.hdr',
+  602: 'global texture/normal.exr',
+  603: 'hdri/potsdamer_platz_1k.hdr',
 }
 
 export function paginate<T>(items: T[], page: number, pageSize: number) {
@@ -198,7 +207,7 @@ export async function serveFile(fileId: number): Promise<Response> {
   }
   const seedPath = seedFileAssets[fileId]
   if (seedPath) {
-    return fetchStaticAsset(assetUrl(seedPath))
+    return fetchStaticAsset(seedAssetUrl(seedPath))
   }
   return new HttpResponse(null, { status: 404 })
 }
@@ -246,6 +255,8 @@ interface UploadHistoryEntry {
   textureSetName: string | null
   spriteId: number | null
   spriteName: string | null
+  environmentMapId?: number | null
+  environmentMapName?: string | null
 }
 
 export async function trackUpload(
@@ -266,11 +277,13 @@ export function recomputePackCounts(pack: DemoPack) {
   pack.textureSetCount = pack.textureSets.length
   pack.spriteCount = pack.sprites.length
   pack.soundCount = pack.sounds.length
+  pack.environmentMapCount = (pack.environmentMaps ?? []).length
   pack.isEmpty =
     pack.modelCount +
       pack.textureSetCount +
       pack.spriteCount +
-      pack.soundCount ===
+      pack.soundCount +
+      (pack.environmentMapCount ?? 0) ===
     0
 }
 
@@ -279,12 +292,48 @@ export function recomputeProjectCounts(project: DemoProject) {
   project.textureSetCount = project.textureSets.length
   project.spriteCount = project.sprites.length
   project.soundCount = project.sounds.length
+  project.environmentMapCount = (project.environmentMaps ?? []).length
   project.isEmpty =
     project.modelCount +
       project.textureSetCount +
       project.spriteCount +
-      project.soundCount ===
+      project.soundCount +
+      (project.environmentMapCount ?? 0) ===
     0
+}
+
+export function getActiveEnvironmentMapVariants(
+  environmentMap: DemoEnvironmentMap
+) {
+  return (environmentMap.variants ?? []).filter(variant => !variant.isDeleted)
+}
+
+export function syncEnvironmentMapDerivedFields(
+  environmentMap: DemoEnvironmentMap
+): DemoEnvironmentMap {
+  const variants = getActiveEnvironmentMapVariants(environmentMap)
+  const previewVariant =
+    variants.find(variant => variant.id === environmentMap.previewVariantId) ??
+    variants[0] ??
+    null
+
+  environmentMap.variantCount = variants.length
+  environmentMap.previewVariantId = previewVariant?.id ?? null
+  environmentMap.previewFileId = previewVariant?.fileId ?? null
+  environmentMap.previewUrl = previewVariant?.previewUrl ?? null
+
+  return environmentMap
+}
+
+export function toEnvironmentMapDto(environmentMap: DemoEnvironmentMap) {
+  const synced = syncEnvironmentMapDerivedFields({ ...environmentMap })
+
+  return {
+    ...synced,
+    variants: getActiveEnvironmentMapVariants(synced),
+    packs: synced.packs ?? [],
+    projects: synced.projects ?? [],
+  }
 }
 
 export function buildCategoryPath(
@@ -466,6 +515,8 @@ export async function getVersionTextureMaps(
 export function toPackDto(pack: DemoPack) {
   return {
     ...pack,
+    environmentMapCount: pack.environmentMapCount ?? 0,
+    environmentMaps: pack.environmentMaps ?? [],
     licenseType: pack.licenseType ?? '',
     url: pack.url ?? '',
     customThumbnailFileId: pack.customThumbnailFileId ?? null,
@@ -479,6 +530,8 @@ export function toProjectDto(project: DemoProject) {
   return {
     ...project,
     notes: project.notes ?? '',
+    environmentMapCount: project.environmentMapCount ?? 0,
+    environmentMaps: project.environmentMaps ?? [],
     customThumbnailFileId: project.customThumbnailFileId ?? null,
     customThumbnailUrl: project.customThumbnailUrl ?? null,
     conceptImages,
@@ -555,6 +608,14 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack.sounds = []
       changed = true
     }
+    if (!Array.isArray(pack.environmentMaps)) {
+      pack.environmentMaps = []
+      changed = true
+    }
+    if (typeof pack.environmentMapCount !== 'number') {
+      pack.environmentMapCount = pack.environmentMaps.length
+      changed = true
+    }
     if (typeof pack.customThumbnailFileId === 'undefined') {
       pack.customThumbnailFileId = null
       changed = true
@@ -574,6 +635,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack.textureSetCount,
       pack.spriteCount,
       pack.soundCount,
+      pack.environmentMapCount,
       pack.isEmpty,
     ].join(':')
     recomputePackCounts(pack)
@@ -582,6 +644,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack.textureSetCount,
       pack.spriteCount,
       pack.soundCount,
+      pack.environmentMapCount,
       pack.isEmpty,
     ].join(':')
     if (previousSignature !== nextSignature) {
@@ -621,6 +684,14 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.sounds = []
       changed = true
     }
+    if (!Array.isArray(project.environmentMaps)) {
+      project.environmentMaps = []
+      changed = true
+    }
+    if (typeof project.environmentMapCount !== 'number') {
+      project.environmentMapCount = project.environmentMaps.length
+      changed = true
+    }
     if (typeof project.customThumbnailFileId === 'undefined') {
       project.customThumbnailFileId = null
       changed = true
@@ -646,6 +717,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.textureSetCount,
       project.spriteCount,
       project.soundCount,
+      project.environmentMapCount,
       project.isEmpty,
     ].join(':')
     recomputeProjectCounts(project)
@@ -654,6 +726,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.textureSetCount,
       project.spriteCount,
       project.soundCount,
+      project.environmentMapCount,
       project.isEmpty,
     ].join(':')
     if (previousSignature !== nextSignature) {
@@ -662,6 +735,137 @@ export async function ensureDemoDataShape(): Promise<void> {
 
     if (changed) {
       await put('projects', project)
+    }
+  }
+
+  const environmentMaps = await getAll('environmentMaps')
+  if (environmentMaps.length === 0) {
+    const ts = now()
+    const seedEnvironmentMaps: DemoEnvironmentMap[] = [
+      {
+        id: 1,
+        name: 'City Night Lights',
+        variantCount: 2,
+        previewVariantId: 1,
+        previewFileId: 601,
+        previewUrl: '/files/601/preview?channel=rgb',
+        createdAt: ts,
+        updatedAt: ts,
+        variants: [
+          {
+            id: 1,
+            sizeLabel: '1K',
+            fileId: 601,
+            fileName: 'potsdamer_platz_1k.hdr',
+            fileSizeBytes: 0,
+            createdAt: ts,
+            updatedAt: ts,
+            isDeleted: false,
+            previewUrl: '/files/601/preview?channel=rgb',
+            fileUrl: '/files/601',
+          },
+          {
+            id: 2,
+            sizeLabel: '2K',
+            fileId: 602,
+            fileName: 'potsdamer_platz_2k.exr',
+            fileSizeBytes: 0,
+            createdAt: ts,
+            updatedAt: ts,
+            isDeleted: false,
+            previewUrl: '/files/602/preview?channel=rgb',
+            fileUrl: '/files/602',
+          },
+        ],
+        packs: [{ id: 1, name: 'Demo Pack' }],
+        projects: [{ id: 1, name: 'Demo Project' }],
+      },
+      {
+        id: 2,
+        name: 'Neutral Studio',
+        variantCount: 1,
+        previewVariantId: 3,
+        previewFileId: 603,
+        previewUrl: '/files/603/preview?channel=rgb',
+        createdAt: ts,
+        updatedAt: ts,
+        variants: [
+          {
+            id: 3,
+            sizeLabel: '1K',
+            fileId: 603,
+            fileName: 'studio_small_01_1k.hdr',
+            fileSizeBytes: 0,
+            createdAt: ts,
+            updatedAt: ts,
+            isDeleted: false,
+            previewUrl: '/files/603/preview?channel=rgb',
+            fileUrl: '/files/603',
+          },
+        ],
+        packs: [{ id: 2, name: 'Shapes Pack' }],
+        projects: [],
+      },
+    ]
+
+    for (const environmentMap of seedEnvironmentMaps) {
+      await put('environmentMaps', environmentMap)
+    }
+
+    const pack1 = await getById('packs', 1)
+    if (pack1) {
+      pack1.environmentMaps = [{ id: 1, name: 'City Night Lights' }]
+      recomputePackCounts(pack1)
+      await put('packs', pack1)
+    }
+    const pack2 = await getById('packs', 2)
+    if (pack2) {
+      pack2.environmentMaps = [{ id: 2, name: 'Neutral Studio' }]
+      recomputePackCounts(pack2)
+      await put('packs', pack2)
+    }
+    const project1 = await getById('projects', 1)
+    if (project1) {
+      project1.environmentMaps = [{ id: 1, name: 'City Night Lights' }]
+      recomputeProjectCounts(project1)
+      await put('projects', project1)
+    }
+  } else {
+    for (const environmentMap of environmentMaps) {
+      let changed = false
+      if (!Array.isArray(environmentMap.variants)) {
+        environmentMap.variants = []
+        changed = true
+      }
+      if (!Array.isArray(environmentMap.packs)) {
+        environmentMap.packs = []
+        changed = true
+      }
+      if (!Array.isArray(environmentMap.projects)) {
+        environmentMap.projects = []
+        changed = true
+      }
+
+      const signature = [
+        environmentMap.variantCount,
+        environmentMap.previewVariantId,
+        environmentMap.previewFileId,
+        environmentMap.previewUrl,
+      ].join(':')
+      syncEnvironmentMapDerivedFields(environmentMap)
+      const nextSignature = [
+        environmentMap.variantCount,
+        environmentMap.previewVariantId,
+        environmentMap.previewFileId,
+        environmentMap.previewUrl,
+      ].join(':')
+      if (signature !== nextSignature) {
+        changed = true
+      }
+
+      if (changed) {
+        await put('environmentMaps', environmentMap)
+      }
     }
   }
 }
@@ -688,7 +892,9 @@ export async function prewarmSeedThumbnails(): Promise<void> {
     }
 
     try {
-      const response = await fetch(assetUrl(seedPath), { cache: 'force-cache' })
+      const response = await fetch(seedAssetUrl(seedPath), {
+        cache: 'force-cache',
+      })
       if (!response.ok) {
         continue
       }

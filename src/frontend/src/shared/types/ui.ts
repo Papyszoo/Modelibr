@@ -3,6 +3,8 @@ export type TabType =
   | 'modelViewer'
   | 'textureSets'
   | 'textureSetViewer'
+  | 'environmentMaps'
+  | 'environmentMapViewer'
   | 'packs'
   | 'packViewer'
   | 'projects'
@@ -26,6 +28,7 @@ export interface Tab {
   // Legacy convenience accessors (derived from params)
   modelId?: string
   setId?: string
+  environmentMapId?: string
   packId?: string
   projectId?: string
   stageId?: string

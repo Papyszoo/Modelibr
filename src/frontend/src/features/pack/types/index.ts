@@ -13,6 +13,11 @@ export interface PackSpriteDto {
   name: string
 }
 
+export interface PackEnvironmentMapDto {
+  id: number
+  name: string
+}
+
 export interface PackDto {
   id: number
   name: string
@@ -25,11 +30,13 @@ export interface PackDto {
   textureSetCount: number
   spriteCount: number
   soundCount: number
+  environmentMapCount?: number
   isEmpty: boolean
   customThumbnailUrl?: string | null
   models: PackModelDto[]
   textureSets: PackTextureSetDto[]
   sprites: PackSpriteDto[]
+  environmentMaps?: PackEnvironmentMapDto[]
 }
 
 export type PackDetailDto = PackDto

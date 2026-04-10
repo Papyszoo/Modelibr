@@ -138,6 +138,7 @@ namespace WebApi
             app.MapSpriteCategoryEndpoints();
             app.MapSoundEndpoints();
             app.MapSoundCategoryEndpoints();
+            app.MapEnvironmentMapEndpoints();
             app.MapBlenderEndpoints();
             app.MapAudioSelectionEndpoints();
 

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ModelGrid } from '@/features/models/components/ModelGrid'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import { ContainerEnvironmentMapsTab } from '@/shared/components/container-tabs/ContainerEnvironmentMapsTab'
 import { ContainerSoundsTab } from '@/shared/components/container-tabs/ContainerSoundsTab'
 import { ContainerSpritesTab } from '@/shared/components/container-tabs/ContainerSpritesTab'
 import { ContainerTextureSetsTab } from '@/shared/components/container-tabs/ContainerTextureSetsTab'
@@ -23,6 +24,7 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
   const [textureSetTotalCount, setTextureSetTotalCount] = useState(0)
   const [spriteTotalCount, setSpriteTotalCount] = useState(0)
   const [soundTotalCount, setSoundTotalCount] = useState(0)
+  const [environmentMapTotalCount, setEnvironmentMapTotalCount] = useState(0)
 
   const showToast = useCallback(
     (opts: {
@@ -52,6 +54,7 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
       setTextureSetTotalCount(container.textureSetCount)
       setSpriteTotalCount(container.spriteCount)
       setSoundTotalCount(container.soundCount)
+      setEnvironmentMapTotalCount(container.environmentMapCount ?? 0)
     }
   }, [container])
 
@@ -105,6 +108,9 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
                     <span>{container.textureSetCount} texture sets</span>
                     <span>{container.spriteCount} sprites</span>
                     <span>{container.soundCount} sounds</span>
+                    <span>
+                      {container.environmentMapCount ?? 0} environment maps
+                    </span>
                   </div>
                 </div>
               </div>
@@ -144,6 +150,15 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
               showToast={showToast}
               refetchContainer={refetchContainer}
               onTotalCountChange={setSoundTotalCount}
+            />
+          </TabPanel>
+
+          <TabPanel header={`Environment Maps: ${environmentMapTotalCount}`}>
+            <ContainerEnvironmentMapsTab
+              adapter={adapter}
+              showToast={showToast}
+              refetchContainer={refetchContainer}
+              onTotalCountChange={setEnvironmentMapTotalCount}
             />
           </TabPanel>
         </TabView>

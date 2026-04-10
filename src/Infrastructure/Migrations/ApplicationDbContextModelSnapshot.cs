@@ -87,6 +87,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FileId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("EnvironmentMapId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("ModelId")
                         .HasColumnType("integer");
 
@@ -119,6 +122,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("FileId");
 
+                    b.HasIndex("EnvironmentMapId");
+
                     b.HasIndex("ModelId");
 
                     b.HasIndex("PackId");
@@ -136,6 +141,89 @@ namespace Infrastructure.Migrations
                     b.HasIndex("UploadedAt");
 
                     b.ToTable("BatchUploads");
+                });
+
+            modelBuilder.Entity("Domain.Models.EnvironmentMap", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("PreviewVariantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("EnvironmentMaps");
+                });
+
+            modelBuilder.Entity("Domain.Models.EnvironmentMapVariant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EnvironmentMapId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SizeLabel")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvironmentMapId");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("EnvironmentMapId", "SizeLabel")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("EnvironmentMapVariants");
                 });
 
             modelBuilder.Entity("Domain.Models.File", b =>
@@ -1222,6 +1310,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("PackSounds", (string)null);
                 });
 
+            modelBuilder.Entity("EnvironmentMapPack", b =>
+                {
+                    b.Property<int>("EnvironmentMapsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PacksId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("EnvironmentMapsId", "PacksId");
+
+                    b.HasIndex("PacksId");
+
+                    b.ToTable("PackEnvironmentMaps", (string)null);
+                });
+
             modelBuilder.Entity("PackSprite", b =>
                 {
                     b.Property<int>("PacksId")
@@ -1267,6 +1370,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("ProjectSounds", (string)null);
                 });
 
+            modelBuilder.Entity("EnvironmentMapProject", b =>
+                {
+                    b.Property<int>("EnvironmentMapsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectsId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("EnvironmentMapsId", "ProjectsId");
+
+                    b.HasIndex("ProjectsId");
+
+                    b.ToTable("ProjectEnvironmentMaps", (string)null);
+                });
+
             modelBuilder.Entity("ProjectSprite", b =>
                 {
                     b.Property<int>("ProjectsId")
@@ -1305,6 +1423,11 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Domain.Models.EnvironmentMap", "EnvironmentMap")
+                        .WithMany()
+                        .HasForeignKey("EnvironmentMapId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Domain.Models.Model", "Model")
                         .WithMany()
                         .HasForeignKey("ModelId")
@@ -1337,6 +1460,8 @@ namespace Infrastructure.Migrations
 
                     b.Navigation("File");
 
+                    b.Navigation("EnvironmentMap");
+
                     b.Navigation("Model");
 
                     b.Navigation("Pack");
@@ -1348,6 +1473,23 @@ namespace Infrastructure.Migrations
                     b.Navigation("Sprite");
 
                     b.Navigation("TextureSet");
+                });
+
+            modelBuilder.Entity("Domain.Models.EnvironmentMapVariant", b =>
+                {
+                    b.HasOne("Domain.Models.EnvironmentMap", null)
+                        .WithMany("Variants")
+                        .HasForeignKey("EnvironmentMapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("File");
                 });
 
             modelBuilder.Entity("Domain.Models.File", b =>
@@ -1685,6 +1827,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EnvironmentMapPack", b =>
+                {
+                    b.HasOne("Domain.Models.EnvironmentMap", null)
+                        .WithMany()
+                        .HasForeignKey("EnvironmentMapsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Pack", null)
+                        .WithMany()
+                        .HasForeignKey("PacksId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PackSprite", b =>
                 {
                     b.HasOne("Domain.Models.Pack", null)
@@ -1730,6 +1887,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EnvironmentMapProject", b =>
+                {
+                    b.HasOne("Domain.Models.EnvironmentMap", null)
+                        .WithMany()
+                        .HasForeignKey("EnvironmentMapsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ProjectSprite", b =>
                 {
                     b.HasOne("Domain.Models.Project", null)
@@ -1763,6 +1935,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.File", b =>
                 {
                     b.Navigation("Models");
+                });
+
+            modelBuilder.Entity("Domain.Models.EnvironmentMap", b =>
+                {
+                    b.Navigation("Variants");
                 });
 
             modelBuilder.Entity("Domain.Models.Model", b =>

@@ -148,6 +148,33 @@ export interface DemoSound {
   waveformUrl: string | null
 }
 
+export interface DemoEnvironmentMapVariant {
+  id: number
+  sizeLabel: string
+  fileId: number
+  fileName: string
+  fileSizeBytes: number
+  createdAt: string
+  updatedAt: string
+  isDeleted: boolean
+  previewUrl: string
+  fileUrl: string
+}
+
+export interface DemoEnvironmentMap {
+  id: number
+  name: string
+  variantCount: number
+  previewVariantId?: number | null
+  previewFileId?: number | null
+  previewUrl?: string | null
+  createdAt: string
+  updatedAt: string
+  variants: DemoEnvironmentMapVariant[]
+  packs: { id: number; name: string }[]
+  projects: { id: number; name: string }[]
+}
+
 export interface DemoPack {
   id: number
   name: string
@@ -160,6 +187,7 @@ export interface DemoPack {
   textureSetCount: number
   spriteCount: number
   soundCount: number
+  environmentMapCount?: number
   isEmpty: boolean
   customThumbnailFileId?: number | null
   customThumbnailUrl?: string | null
@@ -167,6 +195,7 @@ export interface DemoPack {
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
   sounds: { id: number; name: string }[]
+  environmentMaps?: { id: number; name: string }[]
 }
 
 export interface DemoProject {
@@ -180,6 +209,7 @@ export interface DemoProject {
   textureSetCount: number
   spriteCount: number
   soundCount: number
+  environmentMapCount?: number
   isEmpty: boolean
   customThumbnailFileId?: number | null
   customThumbnailUrl?: string | null
@@ -188,6 +218,7 @@ export interface DemoProject {
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
   sounds: { id: number; name: string }[]
+  environmentMaps?: { id: number; name: string }[]
 }
 
 export interface DemoCategory {
@@ -228,6 +259,8 @@ export interface DemoUploadHistoryEntry {
   textureSetName: string | null
   spriteId: number | null
   spriteName: string | null
+  environmentMapId?: number | null
+  environmentMapName?: string | null
 }
 
 export interface DemoRecycledItem {
@@ -250,6 +283,7 @@ interface DemoDbSchema extends DBSchema {
   textureSets: { key: number; value: DemoTextureSet }
   sprites: { key: number; value: DemoSprite }
   sounds: { key: number; value: DemoSound }
+  environmentMaps: { key: number; value: DemoEnvironmentMap }
   packs: { key: number; value: DemoPack }
   projects: { key: number; value: DemoProject }
   modelCategories: { key: number; value: DemoCategory }
@@ -268,7 +302,7 @@ let dbPromise: Promise<IDBPDatabase<DemoDbSchema>> | null = null
 
 export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 4, {
+    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 5, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('models', { keyPath: 'id' })
@@ -279,6 +313,7 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
           db.createObjectStore('textureSets', { keyPath: 'id' })
           db.createObjectStore('sprites', { keyPath: 'id' })
           db.createObjectStore('sounds', { keyPath: 'id' })
+          db.createObjectStore('environmentMaps', { keyPath: 'id' })
           db.createObjectStore('packs', { keyPath: 'id' })
           db.createObjectStore('projects', { keyPath: 'id' })
           db.createObjectStore('modelCategories', { keyPath: 'id' })
@@ -299,6 +334,11 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
           !db.objectStoreNames.contains('modelCategories')
         ) {
           db.createObjectStore('modelCategories', { keyPath: 'id' })
+        }
+        if (oldVersion < 5) {
+          if (!db.objectStoreNames.contains('environmentMaps')) {
+            db.createObjectStore('environmentMaps', { keyPath: 'id' })
+          }
         }
       },
     })
@@ -328,6 +368,7 @@ type StoreNames =
   | 'textureSets'
   | 'sprites'
   | 'sounds'
+  | 'environmentMaps'
   | 'packs'
   | 'projects'
   | 'modelCategories'
@@ -973,6 +1014,73 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]
 
+  const seedEnvironmentMaps: DemoEnvironmentMap[] = [
+    {
+      id: 1,
+      name: 'City Night Lights',
+      variantCount: 2,
+      previewVariantId: 1,
+      previewFileId: 601,
+      previewUrl: '/files/601/preview?channel=rgb',
+      createdAt: now,
+      updatedAt: now,
+      variants: [
+        {
+          id: 1,
+          sizeLabel: '1K',
+          fileId: 601,
+          fileName: 'potsdamer_platz_1k.hdr',
+          fileSizeBytes: 0,
+          createdAt: now,
+          updatedAt: now,
+          isDeleted: false,
+          previewUrl: '/files/601/preview?channel=rgb',
+          fileUrl: '/files/601',
+        },
+        {
+          id: 2,
+          sizeLabel: '2K',
+          fileId: 602,
+          fileName: 'potsdamer_platz_2k.exr',
+          fileSizeBytes: 0,
+          createdAt: now,
+          updatedAt: now,
+          isDeleted: false,
+          previewUrl: '/files/602/preview?channel=rgb',
+          fileUrl: '/files/602',
+        },
+      ],
+      packs: [{ id: 1, name: 'Demo Pack' }],
+      projects: [{ id: 1, name: 'Demo Project' }],
+    },
+    {
+      id: 2,
+      name: 'Neutral Studio',
+      variantCount: 1,
+      previewVariantId: 3,
+      previewFileId: 603,
+      previewUrl: '/files/603/preview?channel=rgb',
+      createdAt: now,
+      updatedAt: now,
+      variants: [
+        {
+          id: 3,
+          sizeLabel: '1K',
+          fileId: 603,
+          fileName: 'studio_small_01_1k.hdr',
+          fileSizeBytes: 0,
+          createdAt: now,
+          updatedAt: now,
+          isDeleted: false,
+          previewUrl: '/files/603/preview?channel=rgb',
+          fileUrl: '/files/603',
+        },
+      ],
+      packs: [{ id: 2, name: 'Shapes Pack' }],
+      projects: [],
+    },
+  ]
+
   const seedPacks: DemoPack[] = [
     {
       id: 1,
@@ -986,6 +1094,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSetCount: 0,
       spriteCount: 0,
       soundCount: 0,
+      environmentMapCount: 1,
       isEmpty: false,
       customThumbnailFileId: 206,
       customThumbnailUrl: '/files/206/preview?channel=rgb',
@@ -996,6 +1105,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [],
       sprites: [],
       sounds: [],
+      environmentMaps: [{ id: 1, name: 'City Night Lights' }],
     },
     {
       id: 2,
@@ -1009,6 +1119,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSetCount: 1,
       spriteCount: 0,
       soundCount: 0,
+      environmentMapCount: 1,
       isEmpty: false,
       customThumbnailFileId: null,
       customThumbnailUrl: null,
@@ -1016,6 +1127,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [{ id: 2, name: 'Color Textures' }],
       sprites: [],
       sounds: [],
+      environmentMaps: [{ id: 2, name: 'Neutral Studio' }],
     },
   ]
 
@@ -1031,6 +1143,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSetCount: 1,
       spriteCount: 1,
       soundCount: 1,
+      environmentMapCount: 1,
       isEmpty: false,
       customThumbnailFileId: 207,
       customThumbnailUrl: '/files/207/preview?channel=rgb',
@@ -1052,6 +1165,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [{ id: 1, name: 'Basic Texture Set' }],
       sprites: [{ id: 1, name: 'Demo Sprite' }],
       sounds: [{ id: 1, name: 'Test Tone' }],
+      environmentMaps: [{ id: 1, name: 'City Night Lights' }],
     },
   ]
 
@@ -1110,6 +1224,7 @@ export async function seedIfEmpty(): Promise<void> {
       'textureSets',
       'sprites',
       'sounds',
+      'environmentMaps',
       'packs',
       'projects',
       'modelCategories',
@@ -1124,6 +1239,8 @@ export async function seedIfEmpty(): Promise<void> {
   for (const ts of seedTextureSets) await tx.objectStore('textureSets').put(ts)
   for (const sp of seedSprites) await tx.objectStore('sprites').put(sp)
   for (const sn of seedSounds) await tx.objectStore('sounds').put(sn)
+  for (const em of seedEnvironmentMaps)
+    await tx.objectStore('environmentMaps').put(em)
   for (const pk of seedPacks) await tx.objectStore('packs').put(pk)
   for (const pj of seedProjects) await tx.objectStore('projects').put(pj)
   for (const mc of seedModelCategories)
@@ -1141,6 +1258,8 @@ export async function seedIfEmpty(): Promise<void> {
   await metaStore.put({ key: 'seq_textures', value: 100 })
   await metaStore.put({ key: 'seq_sprites', value: 100 })
   await metaStore.put({ key: 'seq_sounds', value: 100 })
+  await metaStore.put({ key: 'seq_environmentMaps', value: 100 })
+  await metaStore.put({ key: 'seq_environmentMapVariants', value: 100 })
   await metaStore.put({ key: 'seq_packs', value: 100 })
   await metaStore.put({ key: 'seq_projects', value: 100 })
   await metaStore.put({ key: 'seq_files', value: 1000 })

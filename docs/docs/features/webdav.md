@@ -17,7 +17,8 @@ Use WebDAV when you want to:
 1. Mount your Modelibr library in a file browser
 2. Install Blender CLI or other DCC tools that support WebDAV-based asset access
 3. Open editable `.blend` files from your library
-4. Review library contents from another machine on your local network
+4. Browse environment maps and their size variants from Finder or File Explorer
+5. Review library contents from another machine on your local network
 
 ## Blender CLI workflow
 
@@ -33,10 +34,16 @@ That new version is then processed through the Blender CLI pipeline so Modelibr 
 
 1. Models
 2. Texture Sets
-3. Sprites
-4. Sounds
-5. Projects -> With subdirectories (Models, Texture Sets, Sprites, Sounds)
-6. Packs -> With subdirectories (Models, Texture Sets, Sprites, Sounds)
+3. EnvironmentMaps
+4. Sprites
+5. Sounds
+6. Projects -> With subdirectories (Models, Texture Sets, EnvironmentMaps, Sprites, Sounds)
+7. Packs -> With subdirectories (Models, Texture Sets, EnvironmentMaps, Sprites, Sounds)
+
+Each environment map directory exposes:
+
+- `Variants` - size-labelled files such as `1K.hdr` or `2K.exr`
+- `Files` - original uploaded filenames for the same variants
 
 ## Notes
 

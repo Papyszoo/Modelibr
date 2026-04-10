@@ -356,6 +356,14 @@
   object-fit: cover;
 }
 
+.environment-map-container-card {
+  aspect-ratio: 2 / 1;
+}
+
+.environment-map-container-card .container-card-image {
+  object-fit: contain;
+}
+
 .container-card-placeholder {
   display: flex;
   flex-direction: column;

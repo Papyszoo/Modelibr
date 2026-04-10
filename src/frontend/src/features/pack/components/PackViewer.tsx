@@ -1,16 +1,19 @@
 import { useMemo } from 'react'
 
 import {
+  addEnvironmentMapToPack,
   addModelToPack,
   addSoundToPack,
   addSpriteToPack,
   addTextureSetToPack,
   addTextureToPackWithFile,
+  getEnvironmentMapsByPack,
   getModelsByPack,
   getPackById,
   getSoundsByPack,
   getSpritesByPack,
   getTextureSetsByPack,
+  removeEnvironmentMapFromPack,
   removeModelFromPack,
   removeSoundFromPack,
   removeSpriteFromPack,
@@ -43,11 +46,13 @@ function toContainerDto(pack: PackDetailDto): ContainerDto {
     textureSetCount: pack.textureSetCount,
     spriteCount: pack.spriteCount,
     soundCount: pack.soundCount,
+    environmentMapCount: pack.environmentMapCount ?? 0,
     isEmpty: pack.isEmpty,
     customThumbnailUrl: pack.customThumbnailUrl,
     models: pack.models,
     textureSets: pack.textureSets,
     sprites: pack.sprites,
+    environmentMaps: pack.environmentMaps ?? [],
   }
 }
 
@@ -73,6 +78,7 @@ export function PackViewer({ packId, tabId }: PackViewerProps) {
       loadTextureSets: id => getTextureSetsByPack(id),
       loadSprites: id => getSpritesByPack(id),
       loadSounds: id => getSoundsByPack(id),
+      loadEnvironmentMaps: id => getEnvironmentMapsByPack(id),
       addModel: (cId, mId) => addModelToPack(cId, mId),
       removeModel: (cId, mId) => removeModelFromPack(cId, mId),
       addTextureSet: (cId, tsId) => addTextureSetToPack(cId, tsId),
@@ -81,6 +87,10 @@ export function PackViewer({ packId, tabId }: PackViewerProps) {
       removeSprite: (cId, sId) => removeSpriteFromPack(cId, sId),
       addSound: (cId, sId) => addSoundToPack(cId, sId),
       removeSound: (cId, sId) => removeSoundFromPack(cId, sId),
+      addEnvironmentMap: (cId, environmentMapId) =>
+        addEnvironmentMapToPack(cId, environmentMapId),
+      removeEnvironmentMap: (cId, environmentMapId) =>
+        removeEnvironmentMapFromPack(cId, environmentMapId),
       uploadTextureWithFile: (
         cId,
         file,

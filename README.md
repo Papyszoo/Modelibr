@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Supported-2496ED)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-Modelibr is a self-hosted game asset library. It keeps **models**, **texture sets**, **sprites**, and **sounds** in one place, lets you preview them in the browser, and helps you organize them into **projects** and reusable **packs**.
+Modelibr is a self-hosted game asset library. It keeps **models**, **texture sets**, **environment maps**, **sprites**, and **sounds** in one place, lets you preview them in the browser, and helps you organize them into **projects** and reusable **packs**.
 
 **[Main Site](https://papyszoo.github.io/Modelibr/)** | **[Documentation](https://papyszoo.github.io/Modelibr/docs)** | **[Live Demo](https://papyszoo.github.io/Modelibr/demo/)** | **[Discord](https://discord.gg/KgwgTDVP3F)** | **[GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)**
 
@@ -18,10 +18,11 @@ The live demo stores its data in your browser, so what you add there is visible 
 
 | Title | Description |
 | --- | --- |
-| **All your asset types in one place** | Store models, texture sets, sprites, and sounds in the same library instead of spreading them across different tools. |
+| **All your asset types in one place** | Store models, texture sets, environment maps, sprites, and sounds in the same library instead of spreading them across different tools. |
 | **Projects and packs** | Group assets into project-specific collections or reusable packs you can use again later. |
 | **Model version history** | Keep multiple versions of the same model and switch between them when needed. |
-| **Built-in previews** | Browse models, sprites, and sounds with generated previews that make the library easier to scan. |
+| **Built-in previews** | Browse models, environment maps, sprites, and sounds with generated previews that make the library easier to scan. |
+| **Environment map variants** | Keep multiple size variants of the same panoramic lighting asset and switch preview sizes in the browser. |
 | **Texture set workflows** | Attach texture sets to model versions, choose defaults, and work with channel-packed maps. |
 | **Dual-panel workspace** | Open tabs side by side and keep your current layout in the URL for easy sharing and return visits. |
 | **WebDAV access** | Work with the library through a file-browser style workflow when that fits better than a browser-only flow. |
@@ -46,6 +47,7 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 ## WebDAV and Blender
 
 - WebDAV gives Modelibr a more file-browser style workflow, which is useful when you want the library to sit closer to art-pipeline tools.
+- Environment maps are exposed through WebDAV globally and inside packs/projects, alongside the rest of the library.
 - Blender-related flows are part of the repository, and Blender CLI can be downloaded at runtime from the Settings page when you want that workflow.
 - If you want more detail, start with the [main site](https://papyszoo.github.io/Modelibr/) and the [documentation](https://papyszoo.github.io/Modelibr/docs).
 
@@ -56,6 +58,7 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 - [Getting Started](https://papyszoo.github.io/Modelibr/docs)
 - [Model Management](https://papyszoo.github.io/Modelibr/docs/features/models)
 - [Texture Sets](https://papyszoo.github.io/Modelibr/docs/features/texture-sets)
+- [Environment Maps](https://papyszoo.github.io/Modelibr/docs/features/environment-maps)
 - [Packs](https://papyszoo.github.io/Modelibr/docs/features/packs)
 - [Projects](https://papyszoo.github.io/Modelibr/docs/features/projects)
 - [User Interface](https://papyszoo.github.io/Modelibr/docs/features/user-interface)
@@ -69,6 +72,12 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 - `.gltf`
 - `.glb`
 - `.blend`
+
+## Supported environment map uploads
+
+- common image formats supported by the preview pipeline
+- `.hdr`
+- `.exr`
 
 ---
 

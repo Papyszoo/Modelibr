@@ -7,6 +7,7 @@ import { ProgressBar } from 'primereact/progressbar'
 import { Toast } from 'primereact/toast'
 import { useRef, useState } from 'react'
 
+import { getEnvironmentMapPrimaryPreviewUrl } from '@/features/environment-map/utils/environmentMapUtils'
 import { getFilePreviewUrl, getFileUrl } from '@/features/models/api/modelApi'
 import { useRecycledFilesQuery } from '@/features/recycled-files/api/queries'
 import {
@@ -60,6 +61,23 @@ interface RecycledSound {
   deletedAt: string
 }
 
+interface RecycledEnvironmentMap {
+  id: number
+  name: string
+  deletedAt: string
+  variantCount: number
+  previewFileId?: number | null
+}
+
+interface RecycledEnvironmentMapVariant {
+  id: number
+  environmentMapId: number
+  environmentMapName: string
+  fileId: number
+  sizeLabel: string
+  deletedAt: string
+}
+
 interface RecycledFile {
   id: number
   originalFileName: string
@@ -71,7 +89,15 @@ interface RecycledFile {
 interface DeletePreviewItem {
   id: number
   name: string
-  type: 'model' | 'modelVersion' | 'textureSet' | 'sprite' | 'sound' | 'file'
+  type:
+    | 'model'
+    | 'modelVersion'
+    | 'textureSet'
+    | 'sprite'
+    | 'sound'
+    | 'environmentMap'
+    | 'environmentMapVariant'
+    | 'file'
 }
 
 interface DeletePreviewInfo {
@@ -132,6 +158,23 @@ export function RecycledFilesList() {
     duration: s.duration,
     deletedAt: s.deletedAt,
   }))
+  const environmentMaps = (recycledData?.environmentMaps ?? []).map(envMap => ({
+    id: envMap.id,
+    name: envMap.name,
+    deletedAt: envMap.deletedAt,
+    variantCount: envMap.variantCount,
+    previewFileId: envMap.previewFileId ?? null,
+  }))
+  const environmentMapVariants = (
+    recycledData?.environmentMapVariants ?? []
+  ).map(variant => ({
+    id: variant.id,
+    environmentMapId: variant.environmentMapId,
+    environmentMapName: variant.environmentMapName,
+    fileId: variant.fileId,
+    sizeLabel: variant.sizeLabel,
+    deletedAt: variant.deletedAt,
+  }))
   const files = (recycledData?.files ?? []).map(f => ({
     id: f.id,
     originalFileName: f.originalFileName,
@@ -146,6 +189,8 @@ export function RecycledFilesList() {
     | 'textureSet'
     | 'sprite'
     | 'sound'
+    | 'environmentMap'
+    | 'environmentMapVariant'
     | 'file'
   type InvalidateKey = readonly unknown[]
 
@@ -224,6 +269,10 @@ export function RecycledFilesList() {
         await queryClient.invalidateQueries({ queryKey: ['sprites'] })
       } else if (vars.item.type === 'sound') {
         await queryClient.invalidateQueries({ queryKey: ['sounds'] })
+      } else if (vars.item.type === 'environmentMap') {
+        await queryClient.invalidateQueries({ queryKey: ['environmentMaps'] })
+      } else if (vars.item.type === 'environmentMapVariant') {
+        await queryClient.invalidateQueries({ queryKey: ['environmentMaps'] })
       } else if (vars.item.type === 'file') {
         await queryClient.invalidateQueries({ queryKey: ['textureSets'] })
       }
@@ -339,6 +388,54 @@ export function RecycledFilesList() {
     })
   }
 
+  const handleRestoreEnvironmentMap = async (
+    environmentMap: RecycledEnvironmentMap
+  ) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'environmentMap',
+      entityId: environmentMap.id,
+      successDetail: `${environmentMap.name} has been restored`,
+      errorDetail: 'Failed to restore environment map',
+      invalidateQueryKeys: [['environmentMaps']],
+    })
+  }
+
+  const handleDeletePreviewEnvironmentMap = async (
+    environmentMap: RecycledEnvironmentMap
+  ) => {
+    deletePreviewMutation.mutate({
+      entityType: 'environmentMap',
+      entityId: environmentMap.id,
+      item: { ...environmentMap, type: 'environmentMap' },
+    })
+  }
+
+  const handleRestoreEnvironmentMapVariant = async (
+    variant: RecycledEnvironmentMapVariant
+  ) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'environmentMapVariant',
+      entityId: variant.id,
+      successDetail: `${variant.environmentMapName} ${variant.sizeLabel} has been restored`,
+      errorDetail: 'Failed to restore environment map variant',
+      invalidateQueryKeys: [['environmentMaps']],
+    })
+  }
+
+  const handleDeletePreviewEnvironmentMapVariant = async (
+    variant: RecycledEnvironmentMapVariant
+  ) => {
+    deletePreviewMutation.mutate({
+      entityType: 'environmentMapVariant',
+      entityId: variant.id,
+      item: {
+        id: variant.id,
+        name: `${variant.environmentMapName} - ${variant.sizeLabel}`,
+        type: 'environmentMapVariant',
+      },
+    })
+  }
+
   const handleRestoreFile = async (file: RecycledFile) => {
     await restoreEntityMutation.mutateAsync({
       entityType: 'file',
@@ -387,6 +484,8 @@ export function RecycledFilesList() {
     textureSets.length === 0 &&
     sprites.length === 0 &&
     sounds.length === 0 &&
+    environmentMaps.length === 0 &&
+    environmentMapVariants.length === 0 &&
     files.length === 0
 
   return (
@@ -789,6 +888,154 @@ export function RecycledFilesList() {
                         </span>
                         <span className="recycled-card-meta">
                           Deleted {formatDate(sound.deletedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Environment Maps Section */}
+          {environmentMaps.length > 0 && (
+            <div className="recycled-section" data-section="environment-maps">
+              <h3 className="recycled-section-title">
+                <i className="pi pi-globe" />
+                Environment Maps ({environmentMaps.length})
+              </h3>
+              <div
+                className="recycled-cards-grid"
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
+              >
+                {environmentMaps.map(environmentMap => {
+                  const previewUrl = getEnvironmentMapPrimaryPreviewUrl({
+                    id: environmentMap.id,
+                    name: environmentMap.name,
+                    variantCount: environmentMap.variantCount,
+                    createdAt: environmentMap.deletedAt,
+                    updatedAt: environmentMap.deletedAt,
+                    previewFileId: environmentMap.previewFileId ?? null,
+                    variants: [],
+                  })
+
+                  return (
+                    <div
+                      key={environmentMap.id}
+                      className="recycled-card recycled-card-panoramic"
+                    >
+                      <div className="recycled-card-thumbnail recycled-card-thumbnail-panoramic">
+                        {previewUrl ? (
+                          <img
+                            src={previewUrl}
+                            alt={environmentMap.name}
+                            className="recycled-card-image recycled-card-image-panoramic"
+                          />
+                        ) : (
+                          <div className="environment-map-placeholder">
+                            <i className="pi pi-globe" />
+                            <span>No Preview</span>
+                          </div>
+                        )}
+                        <div className="recycled-card-actions">
+                          <Button
+                            icon="pi pi-replay"
+                            className="p-button-success p-button-rounded"
+                            onClick={() =>
+                              handleRestoreEnvironmentMap(environmentMap)
+                            }
+                            tooltip="Restore"
+                            tooltipOptions={{ position: 'bottom' }}
+                          />
+                          <Button
+                            icon="pi pi-trash"
+                            className="p-button-danger p-button-rounded"
+                            onClick={() =>
+                              handleDeletePreviewEnvironmentMap(environmentMap)
+                            }
+                            tooltip="Delete Forever"
+                            tooltipOptions={{ position: 'bottom' }}
+                          />
+                        </div>
+                        <div className="recycled-card-overlay">
+                          <span
+                            className="recycled-card-name"
+                            title={environmentMap.name}
+                          >
+                            {environmentMap.name}
+                          </span>
+                          <span className="recycled-card-meta">
+                            {environmentMap.variantCount} variant
+                            {environmentMap.variantCount === 1 ? '' : 's'} •
+                            Deleted {formatDate(environmentMap.deletedAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Environment Map Variants Section */}
+          {environmentMapVariants.length > 0 && (
+            <div
+              className="recycled-section"
+              data-section="environment-map-variants"
+            >
+              <h3 className="recycled-section-title">
+                <i className="pi pi-image" />
+                Environment Map Variants ({environmentMapVariants.length})
+              </h3>
+              <div
+                className="recycled-cards-grid"
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
+              >
+                {environmentMapVariants.map(variant => (
+                  <div
+                    key={variant.id}
+                    className="recycled-card recycled-card-panoramic"
+                  >
+                    <div className="recycled-card-thumbnail recycled-card-thumbnail-panoramic">
+                      <img
+                        src={getFilePreviewUrl(variant.fileId.toString())}
+                        alt={`${variant.environmentMapName} ${variant.sizeLabel}`}
+                        className="recycled-card-image recycled-card-image-panoramic"
+                      />
+                      <div className="recycled-card-actions">
+                        <Button
+                          icon="pi pi-replay"
+                          className="p-button-success p-button-rounded"
+                          onClick={() =>
+                            handleRestoreEnvironmentMapVariant(variant)
+                          }
+                          tooltip="Restore"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-danger p-button-rounded"
+                          onClick={() =>
+                            handleDeletePreviewEnvironmentMapVariant(variant)
+                          }
+                          tooltip="Delete Forever"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                      </div>
+                      <div className="recycled-card-overlay">
+                        <span
+                          className="recycled-card-name"
+                          title={`${variant.environmentMapName} - ${variant.sizeLabel}`}
+                        >
+                          {variant.environmentMapName} - {variant.sizeLabel}
+                        </span>
+                        <span className="recycled-card-meta">
+                          Deleted {formatDate(variant.deletedAt)}
                         </span>
                       </div>
                     </div>

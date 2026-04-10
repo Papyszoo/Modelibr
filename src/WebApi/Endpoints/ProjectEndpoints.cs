@@ -98,6 +98,16 @@ public static class ProjectEndpoints
             .WithName("Remove Sound from Project")
             .WithSummary("Removes a sound from the specified project")
             .WithOpenApi();
+
+        app.MapPost("/projects/{projectId}/environment-maps/{environmentMapId}", AddEnvironmentMapToProject)
+            .WithName("Add Environment Map to Project")
+            .WithSummary("Adds an environment map to the specified project")
+            .WithOpenApi();
+
+        app.MapDelete("/projects/{projectId}/environment-maps/{environmentMapId}", RemoveEnvironmentMapFromProject)
+            .WithName("Remove Environment Map from Project")
+            .WithSummary("Removes an environment map from the specified project")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> GetAllProjects(
@@ -330,6 +340,26 @@ public static class ProjectEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(new RemoveProjectConceptImageCommand(id, fileId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddEnvironmentMapToProject(
+        int projectId,
+        int environmentMapId,
+        ICommandHandler<AddEnvironmentMapToProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new AddEnvironmentMapToProjectCommand(projectId, environmentMapId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveEnvironmentMapFromProject(
+        int projectId,
+        int environmentMapId,
+        ICommandHandler<RemoveEnvironmentMapFromProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RemoveEnvironmentMapFromProjectCommand(projectId, environmentMapId), cancellationToken);
         return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
     }
 }

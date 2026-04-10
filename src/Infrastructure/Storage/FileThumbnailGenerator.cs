@@ -26,14 +26,14 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
     // Includes "image/*" which is the generic texture MIME type from the domain.
     private static readonly HashSet<string> SupportedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/png", "image/jpeg", "image/bmp", "image/gif", "image/webp", "image/*"
+        "image/png", "image/jpeg", "image/bmp", "image/gif", "image/webp", "image/*", "image/vnd.radiance", "image/x-exr"
     };
 
     // Texture MIME types that get 4-channel thumbnails (RGB + R + G + B).
     // "image/*" is the generic texture MIME type used for .png/.jpg/.bmp textures.
     private static readonly HashSet<string> TextureMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/png", "image/jpeg", "image/bmp", "image/*"
+        "image/png", "image/jpeg", "image/bmp", "image/*", "image/vnd.radiance", "image/x-exr"
     };
 
     public FileThumbnailGenerator(
@@ -97,10 +97,11 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
     /// </summary>
     private async Task<Image<Rgba32>> LoadImageAsync(string fullPath, CancellationToken ct)
     {
-        if (await IsExrFileAsync(fullPath, ct))
+        var extension = Path.GetExtension(fullPath);
+        if (extension.Equals(".hdr", StringComparison.OrdinalIgnoreCase) || await IsExrFileAsync(fullPath, ct))
         {
-            _logger.LogDebug("Detected EXR file, loading via Magick.NET: {Path}", fullPath);
-            return LoadExrImage(fullPath);
+            _logger.LogDebug("Detected HDR-capable file, loading via Magick.NET: {Path}", fullPath);
+            return LoadHdrCapableImage(fullPath);
         }
 
         return await Image.LoadAsync<Rgba32>(fullPath, ct);
@@ -122,7 +123,7 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
     /// Load an EXR file via Magick.NET (ImageMagick) and convert to ImageSharp Image&lt;Rgba32&gt;.
     /// Applies Reinhard tone mapping for HDR → LDR conversion, matching the worker's tone mapping.
     /// </summary>
-    private static Image<Rgba32> LoadExrImage(string fullPath)
+    private static Image<Rgba32> LoadHdrCapableImage(string fullPath)
     {
         using var magickImage = new MagickImage(fullPath);
 

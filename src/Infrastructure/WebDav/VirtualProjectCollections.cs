@@ -68,6 +68,7 @@ public sealed class VirtualProjectCollection : VirtualCollectionBase
         {
             new VirtualPlaceholderCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "Models", $"project:{_project.Id}:models"),
             new VirtualPlaceholderCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "TextureSets", $"project:{_project.Id}:texturesets"),
+            new VirtualPlaceholderCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "EnvironmentMaps", $"project:{_project.Id}:environmentmaps"),
             new VirtualPlaceholderCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "Sprites", $"project:{_project.Id}:sprites"),
             new VirtualPlaceholderCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "Sounds", $"project:{_project.Id}:sounds")
         };

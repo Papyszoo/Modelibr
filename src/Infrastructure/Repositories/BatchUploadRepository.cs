@@ -22,6 +22,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
             .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
+            .Include(bu => bu.EnvironmentMap)
             .FirstOrDefaultAsync(bu => bu.Id == id, cancellationToken);
     }
 
@@ -34,6 +35,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
             .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
+            .Include(bu => bu.EnvironmentMap)
             .Where(bu => bu.BatchId == batchId)
             .OrderBy(bu => bu.UploadedAt)
             .ToListAsync(cancellationToken);
@@ -48,6 +50,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
             .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
+            .Include(bu => bu.EnvironmentMap)
             .Where(bu => bu.UploadType == uploadType)
             .OrderByDescending(bu => bu.UploadedAt)
             .ToListAsync(cancellationToken);
@@ -62,6 +65,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
             .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
+            .Include(bu => bu.EnvironmentMap)
             .Where(bu => bu.UploadedAt >= from && bu.UploadedAt <= to)
             .OrderByDescending(bu => bu.UploadedAt)
             .ToListAsync(cancellationToken);
@@ -87,6 +91,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
             .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
+            .Include(bu => bu.EnvironmentMap)
             .FirstOrDefaultAsync(bu => bu.FileId == fileId, cancellationToken);
     }
 
@@ -99,6 +104,7 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
             .Include(bu => bu.Project)
             .Include(bu => bu.Model)
             .Include(bu => bu.TextureSet)
+            .Include(bu => bu.EnvironmentMap)
             .Where(bu => bu.ModelId == modelId)
             .ToListAsync(cancellationToken);
     }

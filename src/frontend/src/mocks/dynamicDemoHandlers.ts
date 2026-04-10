@@ -6,6 +6,7 @@ import {
   assetUrl,
   buildCategoryPath,
   buildConceptImage,
+  type DemoEnvironmentMap,
   type DemoModel,
   type DemoModelVersion,
   type DemoSound,
@@ -39,7 +40,9 @@ import {
   serveFile,
   storeFileBlob,
   storeThumbnail,
+  syncEnvironmentMapDerivedFields,
   thumbnailUrl,
+  toEnvironmentMapDto,
   trackUpload,
 } from './dynamic-demo/shared'
 import { systemHandlers } from './dynamic-demo/systemHandlers'
@@ -1486,6 +1489,286 @@ export const dynamicDemoHandlers = [
   // Texture set thumbnail regenerate
   http.post('*/texture-sets/:id/thumbnail/regenerate', async () => {
     return HttpResponse.json({ status: 'Processing' })
+  }),
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  ENVIRONMENT MAPS
+  // ════════════════════════════════════════════════════════════════════════
+
+  http.get('*/environment-maps', async ({ request }) => {
+    const url = new URL(request.url)
+    const page = Number(url.searchParams.get('page') || '1')
+    const pageSize = Number(url.searchParams.get('pageSize') || '50')
+    const packId = url.searchParams.get('packId')
+    const projectId = url.searchParams.get('projectId')
+
+    let environmentMaps = await getAll('environmentMaps')
+
+    if (packId) {
+      const id = Number(packId)
+      environmentMaps = environmentMaps.filter(environmentMap =>
+        (environmentMap.packs ?? []).some(pack => pack.id === id)
+      )
+    }
+
+    if (projectId) {
+      const id = Number(projectId)
+      environmentMaps = environmentMaps.filter(environmentMap =>
+        (environmentMap.projects ?? []).some(project => project.id === id)
+      )
+    }
+
+    const items = environmentMaps.map(environmentMap =>
+      toEnvironmentMapDto(environmentMap)
+    )
+
+    if (url.searchParams.has('page')) {
+      const result = paginate(items, page, pageSize)
+      return HttpResponse.json({
+        environmentMaps: result.items,
+        totalCount: result.totalCount,
+        page: result.page,
+        pageSize: result.pageSize,
+        totalPages: result.totalPages,
+      })
+    }
+
+    return HttpResponse.json({ environmentMaps: items })
+  }),
+
+  http.get('*/environment-maps/:id', async ({ params }) => {
+    const environmentMap = await getById('environmentMaps', Number(params.id))
+    if (!environmentMap) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(toEnvironmentMapDto(environmentMap))
+  }),
+
+  http.post('*/environment-maps/with-file', async ({ request }) => {
+    const url = new URL(request.url)
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+    if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
+
+    const environmentMapId = await nextId('environmentMaps')
+    const variantId = await nextId('environmentMapVariants')
+    const fileId = await nextId('files')
+    const ts = now()
+    const name =
+      url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
+    const sizeLabel = url.searchParams.get('sizeLabel') || '1K'
+    const previewUrl = `/files/${fileId}/preview?channel=rgb`
+    const fileUrl = `/files/${fileId}`
+
+    await storeFileBlob(
+      fileId,
+      file,
+      file.name,
+      file.type || inferMimeType(file, file.name, 'image/vnd.radiance')
+    )
+
+    const environmentMap: DemoEnvironmentMap = syncEnvironmentMapDerivedFields({
+      id: environmentMapId,
+      name,
+      variantCount: 1,
+      previewVariantId: variantId,
+      previewFileId: fileId,
+      previewUrl,
+      createdAt: ts,
+      updatedAt: ts,
+      variants: [
+        {
+          id: variantId,
+          sizeLabel,
+          fileId,
+          fileName: file.name,
+          fileSizeBytes: file.size,
+          createdAt: ts,
+          updatedAt: ts,
+          isDeleted: false,
+          previewUrl,
+          fileUrl,
+        },
+      ],
+      packs: [],
+      projects: [],
+    })
+
+    const packId = url.searchParams.get('packId')
+    const projectId = url.searchParams.get('projectId')
+    let trackPackName: string | null = null
+    let trackProjectName: string | null = null
+
+    if (packId) {
+      const pack = await getById('packs', Number(packId))
+      if (pack) {
+        trackPackName = pack.name
+        environmentMap.packs.push({ id: pack.id, name: pack.name })
+        if (!pack.environmentMaps?.some(item => item.id === environmentMapId)) {
+          pack.environmentMaps = [
+            ...(pack.environmentMaps ?? []),
+            { id: environmentMapId, name },
+          ]
+          recomputePackCounts(pack)
+          pack.updatedAt = ts
+          await put('packs', pack)
+        }
+      }
+    }
+
+    if (projectId) {
+      const project = await getById('projects', Number(projectId))
+      if (project) {
+        trackProjectName = project.name
+        environmentMap.projects.push({ id: project.id, name: project.name })
+        if (
+          !project.environmentMaps?.some(item => item.id === environmentMapId)
+        ) {
+          project.environmentMaps = [
+            ...(project.environmentMaps ?? []),
+            { id: environmentMapId, name },
+          ]
+          recomputeProjectCounts(project)
+          project.updatedAt = ts
+          await put('projects', project)
+        }
+      }
+    }
+
+    await put('environmentMaps', environmentMap)
+
+    trackUpload({
+      batchId: url.searchParams.get('batchId') || `batch-${Date.now()}`,
+      uploadType: 'EnvironmentMap',
+      fileId,
+      fileName: file.name,
+      packId: packId ? Number(packId) : null,
+      packName: trackPackName,
+      projectId: projectId ? Number(projectId) : null,
+      projectName: trackProjectName,
+      modelId: null,
+      modelName: null,
+      textureSetId: null,
+      textureSetName: null,
+      spriteId: null,
+      spriteName: null,
+      environmentMapId,
+      environmentMapName: name,
+    })
+
+    return HttpResponse.json(
+      {
+        environmentMapId,
+        name,
+        variantId,
+        fileId,
+        previewVariantId: environmentMap.previewVariantId,
+      },
+      { status: 201 }
+    )
+  }),
+
+  http.post(
+    '*/environment-maps/:id/variants/with-file',
+    async ({ params, request }) => {
+      const environmentMap = await getById('environmentMaps', Number(params.id))
+      if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+      const url = new URL(request.url)
+      const formData = await request.formData()
+      const file = formData.get('file') as File | null
+      if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
+
+      const sizeLabel = url.searchParams.get('sizeLabel') || '1K'
+      const duplicate = (environmentMap.variants ?? []).some(
+        variant =>
+          !variant.isDeleted &&
+          variant.sizeLabel.toLowerCase() === sizeLabel.toLowerCase()
+      )
+      if (duplicate) {
+        return HttpResponse.json(
+          { error: 'EnvironmentMapVariantAlreadyExists' },
+          { status: 400 }
+        )
+      }
+
+      const variantId = await nextId('environmentMapVariants')
+      const fileId = await nextId('files')
+      const ts = now()
+      const previewUrl = `/files/${fileId}/preview?channel=rgb`
+      const fileUrl = `/files/${fileId}`
+
+      await storeFileBlob(
+        fileId,
+        file,
+        file.name,
+        file.type || inferMimeType(file, file.name, 'image/vnd.radiance')
+      )
+
+      environmentMap.variants.push({
+        id: variantId,
+        sizeLabel,
+        fileId,
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        createdAt: ts,
+        updatedAt: ts,
+        isDeleted: false,
+        previewUrl,
+        fileUrl,
+      })
+      environmentMap.updatedAt = ts
+      syncEnvironmentMapDerivedFields(environmentMap)
+      await put('environmentMaps', environmentMap)
+
+      return HttpResponse.json({
+        variantId,
+        fileId,
+        sizeLabel,
+      })
+    }
+  ),
+
+  http.delete('*/environment-maps/:id/soft', async ({ params }) => {
+    const id = Number(params.id)
+    const environmentMap = await getById('environmentMaps', id)
+    if (environmentMap) {
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
+        type: 'environmentMap',
+        entityId: id,
+        name: environmentMap.name,
+        deletedAt: now(),
+        entity: { ...environmentMap } as unknown as Record<string, unknown>,
+        extra: { previewFileId: environmentMap.previewFileId ?? null },
+      })
+
+      const packs = await getAll('packs')
+      for (const pack of packs) {
+        const before = pack.environmentMaps?.length ?? 0
+        pack.environmentMaps = (pack.environmentMaps ?? []).filter(
+          item => item.id !== id
+        )
+        if ((pack.environmentMaps?.length ?? 0) !== before) {
+          recomputePackCounts(pack)
+          await put('packs', pack)
+        }
+      }
+
+      const projects = await getAll('projects')
+      for (const project of projects) {
+        const before = project.environmentMaps?.length ?? 0
+        project.environmentMaps = (project.environmentMaps ?? []).filter(
+          item => item.id !== id
+        )
+        if ((project.environmentMaps?.length ?? 0) !== before) {
+          recomputeProjectCounts(project)
+          await put('projects', project)
+        }
+      }
+    }
+
+    await remove('environmentMaps', id)
+    return new HttpResponse(null, { status: 204 })
   }),
 
   // ════════════════════════════════════════════════════════════════════════

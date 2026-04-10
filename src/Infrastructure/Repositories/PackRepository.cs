@@ -29,6 +29,7 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.EnvironmentMaps)
             .Include(p => p.CustomThumbnailFile)
             .ToListAsync(cancellationToken);
     }
@@ -40,6 +41,7 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.EnvironmentMaps)
             .Include(p => p.CustomThumbnailFile)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
@@ -51,6 +53,7 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.EnvironmentMaps)
             .Include(p => p.CustomThumbnailFile)
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }

@@ -219,6 +219,10 @@ export function PackList() {
                     <span>
                       <i className="pi pi-volume-up" /> {pack.soundCount}
                     </span>
+                    <span>
+                      <i className="pi pi-globe" />{' '}
+                      {pack.environmentMapCount ?? 0}
+                    </span>
                   </div>
                 </div>
                 <div className="pack-grid-card-actions">

@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Recycled Files
 
-The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, and sprites.
+The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, environment maps, and sprites.
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
@@ -26,6 +26,7 @@ Navigate to the **Recycled Files** tab in the left panel.
 | **Models**         | All versions move to recycle bin       |
 | **Model Versions** | Single version recycled, model remains |
 | **Texture Sets**   | Unlinked from all models               |
+| **Environment Maps** | Panoramic lighting asset recycled    |
 | **Sprites**        | Removed from sprite sheets             |
 
 ## Restoring Items

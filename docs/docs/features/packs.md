@@ -4,7 +4,7 @@ sidebar_position: 8
 
 # Packs
 
-Packs in Modelibr are reusable asset bundles that can be shared across multiple projects. Unlike projects, which represent unique work contexts, packs let you group commonly used assets together — such as a set of environment props or character models — and reuse them wherever needed.
+Packs in Modelibr are reusable asset bundles that can be shared across multiple projects. Unlike projects, which represent unique work contexts, packs let you group commonly used assets together — such as a set of environment props, panoramic lighting maps, or character models — and reuse them wherever needed.
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
@@ -28,6 +28,7 @@ Click any pack card to open the Pack Viewer, which shows all assets organized by
 | ---------------- | ------------------------------- |
 | **Models**       | 3D models included in this pack |
 | **Texture Sets** | PBR texture collections         |
+| **Environment Maps** | Panoramic lighting assets    |
 | **Sprites**      | 2D image assets                 |
 | **Sounds**       | Audio files                     |
 

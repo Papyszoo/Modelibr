@@ -23,6 +23,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | ---------------------- | --------- | ------------------------------ |
 | **Models**             | List      | Your model library grid        |
 | **Texture Sets**       | Folder    | Browse and manage texture sets |
+| **Environment Maps**   | Globe     | Browse panoramic lighting assets |
 | **Sprites**            | Image     | Your sprite/image library      |
 | **Sounds**             | Volume    | Your audio asset library       |
 | **Packs**              | Inbox     | Reusable asset bundles         |
@@ -31,6 +32,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | **Recycled Files**     | Trash     | Recover deleted items          |
 | **Model Viewer**       | Cube      | 3D viewer for a specific model |
 | **Texture Set Viewer** | Image     | Preview a texture set          |
+| **Environment Map Viewer** | Globe | Inspect a panoramic asset and its preview sizes |
 
 ### Working with Tabs
 
@@ -51,7 +53,7 @@ Copy and share URLs to give others the exact same view you're seeing.
 
 - Open tabs (left and right panels)
 - Active tab in each panel
-- Which model/texture set is being viewed
+- Which model, texture set, or environment map is being viewed
 
 ### Example URL
 

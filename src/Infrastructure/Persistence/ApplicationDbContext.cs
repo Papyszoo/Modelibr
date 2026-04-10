@@ -28,6 +28,8 @@ namespace Infrastructure.Persistence
         public DbSet<SpriteCategory> SpriteCategories => Set<SpriteCategory>();
         public DbSet<Sound> Sounds => Set<Sound>();
         public DbSet<SoundCategory> SoundCategories => Set<SoundCategory>();
+        public DbSet<EnvironmentMap> EnvironmentMaps => Set<EnvironmentMap>();
+        public DbSet<EnvironmentMapVariant> EnvironmentMapVariants => Set<EnvironmentMapVariant>();
         public DbSet<TextureProxy> TextureProxies => Set<TextureProxy>();
         public DbSet<ModelVersionTextureSet> ModelVersionTextureSets => Set<ModelVersionTextureSet>();
 
@@ -111,6 +113,16 @@ namespace Infrastructure.Persistence
                 .HasMany(s => s.Projects)
                 .WithMany(p => p.Sounds)
                 .UsingEntity(j => j.ToTable("ProjectSounds"));
+
+            modelBuilder.Entity<EnvironmentMap>()
+                .HasMany(e => e.Packs)
+                .WithMany(p => p.EnvironmentMaps)
+                .UsingEntity(j => j.ToTable("PackEnvironmentMaps"));
+
+            modelBuilder.Entity<EnvironmentMap>()
+                .HasMany(e => e.Projects)
+                .WithMany(p => p.EnvironmentMaps)
+                .UsingEntity(j => j.ToTable("ProjectEnvironmentMaps"));
 
             // Configure Model entity
             modelBuilder.Entity<Model>(entity =>
@@ -693,6 +705,11 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(bu => bu.SoundId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(bu => bu.EnvironmentMap)
+                    .WithMany()
+                    .HasForeignKey(bu => bu.EnvironmentMapId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // Configure Sprite entity
@@ -790,6 +807,51 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(c => c.Name).IsUnique();
             });
 
+            modelBuilder.Entity<EnvironmentMap>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.PreviewVariantId).IsRequired(false);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+                entity.Property(e => e.IsDeleted).IsRequired();
+                entity.Property(e => e.DeletedAt);
+
+                entity.HasIndex(e => e.Name);
+                entity.HasIndex(e => e.IsDeleted);
+
+                entity.HasQueryFilter(e => !e.IsDeleted);
+            });
+
+            modelBuilder.Entity<EnvironmentMapVariant>(entity =>
+            {
+                entity.HasKey(v => v.Id);
+                entity.Property(v => v.EnvironmentMapId).IsRequired();
+                entity.Property(v => v.FileId).IsRequired();
+                entity.Property(v => v.SizeLabel).IsRequired().HasMaxLength(50);
+                entity.Property(v => v.CreatedAt).IsRequired();
+                entity.Property(v => v.UpdatedAt).IsRequired();
+                entity.Property(v => v.IsDeleted).IsRequired();
+                entity.Property(v => v.DeletedAt);
+
+                entity.HasOne(v => v.File)
+                    .WithMany()
+                    .HasForeignKey(v => v.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne<EnvironmentMap>()
+                    .WithMany(e => e.Variants)
+                    .HasForeignKey(v => v.EnvironmentMapId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(v => v.IsDeleted);
+                entity.HasIndex(v => new { v.EnvironmentMapId, v.SizeLabel })
+                    .IsUnique()
+                    .HasFilter("\"IsDeleted\" = false");
+
+                entity.HasQueryFilter(v => !v.IsDeleted);
+            });
+
             base.OnModelCreating(modelBuilder);
         }
 
@@ -817,6 +879,7 @@ namespace Infrastructure.Persistence
                 "flac" => FileType.Flac,
                 "aac" => FileType.Aac,
                 "m4a" => FileType.M4a,
+                "hdr" => FileType.Hdr,
                 "other" => FileType.Other,
                 _ => FileType.Unknown
             };
