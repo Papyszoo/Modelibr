@@ -482,14 +482,10 @@ jobs:
             - name: Generate videos
               id: generate
               working-directory: docs/videos
-              run: npx playwright test --config=playwright.config.ts
+              run: npm run generate
               env:
                   FRONTEND_URL: http://localhost:3002
                   API_BASE_URL: http://localhost:8090
-
-            - name: Collect videos to static folder
-              working-directory: docs/videos
-              run: node collect-videos.js
 
             - name: Upload feature videos
               uses: actions/upload-artifact@v4
@@ -633,6 +629,7 @@ jobs:
               run: |
                   expected_videos=(
                     model-management.webm
+                    texture-sets.webm
                     recycled-files.webm
                     user-interface.webm
                     sprites.webm

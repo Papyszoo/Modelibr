@@ -422,6 +422,7 @@ autom4te.cache/
 *.tar.gz
 tarballs/
 test-results/
+docs/videos/.generated/
 
 # Mac bundle stuff
 *.dmg

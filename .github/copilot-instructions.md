@@ -52,7 +52,7 @@ Do not pull backend guidance into a frontend-only task, and do not pull demo or 
 | `frontend`        | `src/frontend/**` is changing                                                                                       |
 | `asset-processor` | `src/asset-processor/**` is changing                                                                                |
 | `e2e`             | `tests/e2e/**` is changing or UI behavior needs E2E coverage                                                        |
-| `docs`            | user-facing behavior, API contracts, worker behavior, testing guidance, or env docs may have changed                |
+| `docs`            | user-facing behavior, API contracts, worker behavior, testing guidance, README, feature docs, or docs-video relevance may have changed |
 | `demo`            | frontend-visible behavior, demo mocks, demo assets, or `build:demo` output may be affected                          |
 
 ### 4. Implement
@@ -64,6 +64,8 @@ Do not pull backend guidance into a frontend-only task, and do not pull demo or 
 ### 5. Check Docs
 
 - Invoke `docs` when the change may affect `README.md`, `docs/docs/ai-documentation/*.md`, `.env.example`, or user-facing feature docs.
+- Treat docs freshness as a required maintenance task, not an optional follow-up. When behavior changes, check whether `README.md` and the matching docs pages — especially `docs/docs/features/*.md` — still describe the product correctly.
+- When a change touches a documented feature, have `docs` decide whether the feature video or docs-video script should change too, and whether selectors or scripted UI steps under `docs/videos/` have gone stale.
 
 ### 6. Check Demo Mode
 
