@@ -1,19 +1,44 @@
-import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "@playwright/test";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
     ciVideoTimeout,
-    createRecordedPage,
-    shortPause,
     mediumPause,
     viewerPause,
     navigateTo,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
+const globalTextureDir = path.resolve(
+    __dirname,
+    "../../../tests/e2e/assets/global texture",
+);
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
+
+const globalTextureFiles = [
+    { file: "diffuse.jpg", textureType: 1 },
+    { file: "normal.exr", textureType: 2 },
+    { file: "roughness.exr", textureType: 5 },
+    { file: "displacement.png", textureType: 12 },
+];
+
+function getMimeType(fileName: string) {
+    if (fileName.endsWith(".jpg")) {
+        return "image/jpeg";
+    }
+    if (fileName.endsWith(".png")) {
+        return "image/png";
+    }
+    if (fileName.endsWith(".exr")) {
+        return "image/x-exr";
+    }
+
+    return "application/octet-stream";
+}
 
 async function clearTextureVideoData(request: APIRequestContext) {
     const textureSetsResponse = await request.get(`${API_BASE_URL}/texture-sets`);
@@ -27,7 +52,7 @@ async function clearTextureVideoData(request: APIRequestContext) {
     const recycledResponse = await request.get(`${API_BASE_URL}/recycled`);
     if (recycledResponse.ok()) {
         const recycled = await recycledResponse.json();
-        const entityTypes: [string, Array<{ id: number }>][]= [
+        const entityTypes: [string, Array<{ id: number }>][] = [
             ["textureSet", recycled.textureSets || []],
             ["texture", recycled.textures || []],
         ];
@@ -41,49 +66,123 @@ async function clearTextureVideoData(request: APIRequestContext) {
     }
 }
 
-async function selectDropdownOption(
-    page: Page,
-    dropdown: Locator,
-    optionName: string,
+async function uploadFileToTextureSet(
+    request: APIRequestContext,
+    textureSetId: number,
+    fileName: string,
+    textureType: number,
 ) {
-    await dropdown.click();
-    const option = page.getByRole("option", { name: optionName }).last();
-    await expect(option).toBeVisible({ timeout: ciVideoTimeout });
-    await option.click();
-    await shortPause(page);
+    const filePath = path.join(globalTextureDir, fileName);
+    const uploadResponse = await request.post(
+        `${API_BASE_URL}/files?textureSetId=${textureSetId}`,
+        {
+            multipart: {
+                file: {
+                    name: fileName,
+                    mimeType: getMimeType(fileName),
+                    buffer: fs.readFileSync(filePath),
+                },
+            },
+        },
+    );
+
+    expect(uploadResponse.ok()).toBeTruthy();
+    const uploadBody = await uploadResponse.json();
+    const fileId = Number(uploadBody.id ?? uploadBody.fileId);
+    expect(fileId).toBeTruthy();
+
+    const attachResponse = await request.post(
+        `${API_BASE_URL}/texture-sets/${textureSetId}/textures`,
+        {
+            data: {
+                FileId: fileId,
+                TextureType: textureType,
+            },
+        },
+    );
+
+    expect(attachResponse.ok()).toBeTruthy();
+}
+
+async function createGlobalTextureSet(request: APIRequestContext) {
+    const textureSetName = "Global Texture Material";
+    const [firstFile, ...remainingFiles] = globalTextureFiles;
+    const createResponse = await request.post(
+        `${API_BASE_URL}/texture-sets/with-file?name=${encodeURIComponent(textureSetName)}&textureType=${firstFile.textureType}&kind=1`,
+        {
+            multipart: {
+                file: {
+                    name: firstFile.file,
+                    mimeType: getMimeType(firstFile.file),
+                    buffer: fs.readFileSync(path.join(globalTextureDir, firstFile.file)),
+                },
+            },
+        },
+    );
+
+    expect(createResponse.ok()).toBeTruthy();
+    const createBody = await createResponse.json();
+    const textureSetId = Number(createBody.textureSetId ?? createBody.id);
+    expect(textureSetId).toBeTruthy();
+
+    for (const file of remainingFiles) {
+        await uploadFileToTextureSet(
+            request,
+            textureSetId,
+            file.file,
+            file.textureType,
+        );
+    }
+
+    await expect
+        .poll(
+            async () => {
+                const response = await request.get(
+                    `${API_BASE_URL}/texture-sets/${textureSetId}`,
+                );
+                if (!response.ok()) {
+                    return -1;
+                }
+
+                const textureSet = await response.json();
+                return textureSet.textures?.length ?? 0;
+            },
+            {
+                timeout: 15000,
+                intervals: [500, 1000, 1500],
+            },
+        )
+        .toBe(4);
+
+    return { textureSetId, textureSetName };
 }
 
 test.describe("Texture Sets", () => {
-    test("Texture Sets Video", async ({ browser, request }, testInfo) => {
+    test("Texture Sets Video", async ({ page, request }, testInfo) => {
         test.setTimeout(180000);
-
         await clearTextureVideoData(request);
-
-        const { context, page } = await createRecordedPage(browser, testInfo);
+        const { textureSetName } = await createGlobalTextureSet(request);
 
         await navigateTo(page, "/?leftTabs=textureSets&activeLeft=textureSets");
         await disableHighlights(page);
 
         const leftPanel = page.locator(".p-splitter-panel").nth(0);
-        await expect(leftPanel.locator(".texture-set-list-header h1")).toHaveText("Texture Sets", {
+        await expect(
+            leftPanel.locator(".texture-set-list-header h1"),
+        ).toHaveText("Texture Sets", {
             timeout: ciVideoTimeout,
         });
-        await mediumPause(page);
-
-        const packedTexturePath = path.join(assetsDir, "orm_test_channels.png");
-        await leftPanel
-            .getByTestId("texture-upload-input")
-            .setInputFiles(packedTexturePath);
 
         const textureSetCard = leftPanel
             .locator(".texture-set-card")
-            .filter({ hasText: /orm_test_channels/i })
+            .filter({ hasText: new RegExp(textureSetName, "i") })
             .first();
         await expect(textureSetCard).toBeVisible({ timeout: ciVideoTimeout });
-        await expect(textureSetCard.getByText(/1 texture/i)).toBeVisible({
+        await expect(textureSetCard.getByText(/4 textures?/i)).toBeVisible({
             timeout: ciVideoTimeout,
         });
         await mediumPause(page);
+        await startFeatureRecording(page, testInfo, { slug: "texture-sets" });
 
         const cardBox = await textureSetCard.boundingBox();
         if (cardBox) {
@@ -92,61 +191,49 @@ test.describe("Texture Sets", () => {
                 cardBox.y + cardBox.height / 2,
                 { steps: 18 },
             );
-            await viewerPause(page, 260);
+            await viewerPause(page, 220);
         }
         await textureSetCard.click();
 
         const viewer = page.locator(".texture-set-viewer");
-        await expect(viewer).toBeVisible({
-            timeout: ciVideoTimeout,
-        });
+        await expect(viewer).toBeVisible({ timeout: ciVideoTimeout });
         await expect(
-            viewer.getByRole("heading", { name: "orm_test_channels" }),
+            viewer.getByRole("heading", { name: textureSetName }),
         ).toBeVisible({
             timeout: ciVideoTimeout,
         });
-        await mediumPause(page);
 
         await page.getByRole("tab", { name: "Files" }).click();
-        const fileCard = viewer.locator(".file-mapping-card").first();
-        await expect(fileCard).toBeVisible({ timeout: ciVideoTimeout });
-
-        const fileTestId = await fileCard.getAttribute("data-testid");
-        const fileId = fileTestId?.replace("file-mapping-card-", "");
-        expect(fileId).toBeTruthy();
-
-        await selectDropdownOption(
-            page,
-            viewer.getByTestId(`channel-mapping-rgb-${fileId}`),
-            "Split Channels",
-        );
-        await expect(
-            viewer.getByTestId(`split-channels-${fileId}`),
-        ).toBeVisible({ timeout: ciVideoTimeout });
-
-        await selectDropdownOption(
-            page,
-            viewer.getByTestId(`channel-mapping-R-${fileId}`),
-            "AO",
-        );
-        await selectDropdownOption(
-            page,
-            viewer.getByTestId(`channel-mapping-G-${fileId}`),
-            "Roughness",
-        );
-        await selectDropdownOption(
-            page,
-            viewer.getByTestId(`channel-mapping-B-${fileId}`),
-            "Metallic",
-        );
+        const filesTab = viewer.locator(".files-tab");
+        await expect(filesTab).toBeVisible({ timeout: ciVideoTimeout });
+        for (const fileName of globalTextureFiles.map(file => file.file)) {
+            await expect(filesTab.getByText(fileName, { exact: true })).toBeVisible({
+                timeout: ciVideoTimeout,
+            });
+        }
         await mediumPause(page);
+
+        const firstFileCard = filesTab.locator(".file-mapping-card").first();
+        const firstFileCardBox = await firstFileCard.boundingBox();
+        if (firstFileCardBox) {
+            await page.mouse.move(
+                firstFileCardBox.x + firstFileCardBox.width * 0.72,
+                firstFileCardBox.y + firstFileCardBox.height * 0.42,
+                { steps: 20 },
+            );
+            await viewerPause(page, 250);
+        }
 
         await page.getByRole("tab", { name: "Preview" }).click();
         const previewCanvas = viewer.locator(".texture-preview-canvas");
         await expect(previewCanvas).toBeVisible({ timeout: ciVideoTimeout });
+        await expect(viewer.locator(".preview-control-btn").first()).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
         await expect(viewer.locator(".texture-loading-overlay")).toBeHidden({
             timeout: ciVideoTimeout,
         });
+        await viewerPause(page, 1200);
 
         const previewBox = await previewCanvas.boundingBox();
         if (previewBox) {
@@ -158,13 +245,13 @@ test.describe("Texture Sets", () => {
             await page.mouse.down();
             await page.mouse.move(
                 previewBox.x + previewBox.width * 0.72,
-                previewBox.y + previewBox.height * 0.45,
+                previewBox.y + previewBox.height * 0.44,
                 { steps: 24 },
             );
             await page.mouse.up();
         }
 
-        await viewerPause(page, 1400);
-        await context.close();
+        await viewerPause(page, 1800);
+        await stopFeatureRecording(page);
     });
 });

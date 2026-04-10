@@ -3,7 +3,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import {
-    createRecordedPage,
     shortPause,
     mediumPause,
     longPause,
@@ -16,6 +15,8 @@ import {
     navigateTo,
     clearAllData,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +25,7 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("User Interface", () => {
-    test("User Interface Video", async ({ browser, page: setupPage }, testInfo) => {
+    test("User Interface Video", async ({ page: setupPage }, testInfo) => {
         // ── Setup: clear all data so we start with a clean library ──
         await clearAllData(setupPage);
 
@@ -79,12 +80,12 @@ test.describe("User Interface", () => {
             },
         });
 
-        const { context, page } = await createRecordedPage(browser, testInfo);
+        const page = setupPage;
 
         // ── Navigate to the app with model list on the left ──
         await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
         await disableHighlights(page);
-        await longPause(page);
+        await startFeatureRecording(page, testInfo, { slug: "user-interface" });
 
         // ────────────────────────────────────────────────────────────
         // Step 1: Click the "+" add tab button on the left dock bar
@@ -364,6 +365,6 @@ test.describe("User Interface", () => {
         // Move mouse to center so the final frame is clean
         await page.mouse.move(640, 360, { steps: 15 });
         await viewerPause(page, 1200);
-        await context.close();
+        await stopFeatureRecording(page);
     });
 });

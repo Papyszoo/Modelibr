@@ -4,7 +4,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
     ciVideoTimeout,
-    createRecordedPage,
     shortPause,
     mediumPause,
     viewerPause,
@@ -14,6 +13,8 @@ import {
     waitForThumbnails,
     clearAllData,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -21,7 +22,7 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Model Management", () => {
-    test("Model Management Video", async ({ browser, page: setupPage, request }, testInfo) => {
+    test("Model Management Video", async ({ page, request }, testInfo) => {
         const uploadModel = async (filename: string) => {
             const response = await request.post(`${API_BASE_URL}/models`, {
                 multipart: {
@@ -75,7 +76,7 @@ test.describe("Model Management", () => {
         };
 
         // Off-camera setup: prepare a small, thumbnail-ready library.
-        await clearAllData(setupPage);
+        await clearAllData(page);
 
         const [primaryModelId, comparisonModelId, thirdModelId] = await Promise.all([
             uploadModel("test-cube.glb"),
@@ -88,8 +89,6 @@ test.describe("Model Management", () => {
             waitForThumbnailReady(comparisonModelId),
             waitForThumbnailReady(thirdModelId),
         ]);
-
-        const { context, page } = await createRecordedPage(browser, testInfo);
 
         // Start on a polished split view: library on the left, hero model on the right.
         await navigateTo(
@@ -107,6 +106,7 @@ test.describe("Model Management", () => {
             timeout: ciVideoTimeout,
         });
         await viewerPause(page, 400);
+        await startFeatureRecording(page, testInfo, { slug: "model-management" });
 
         // Open a second model for an immediate side-by-side comparison.
         const comparisonCard = leftPanel
@@ -191,6 +191,6 @@ test.describe("Model Management", () => {
         await expect(versionDropdown).toContainText("v2", { timeout: 10000 });
         await page.mouse.move(1040, 300, { steps: 16 });
         await viewerPause(page, 900);
-        await context.close();
+        await stopFeatureRecording(page);
     });
 });

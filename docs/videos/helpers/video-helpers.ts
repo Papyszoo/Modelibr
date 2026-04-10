@@ -1,19 +1,14 @@
 import {
-    type Browser,
-    type BrowserContext,
     type Page,
     type TestInfo,
 } from "@playwright/test";
+import { getVideoSpec } from "../video-manifest.js";
+import { getRawVideoPath } from "../video-paths.js";
 
 export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
 const videoPaceFactor = 0.65;
 const LEGACY_NAVIGATION_HASH_KEY = "__docsVideoNavigation";
 const initializedLegacyNavigationPages = new WeakSet<Page>();
-
-type RecordedVideoPage = {
-    context: BrowserContext;
-    page: Page;
-};
 
 function paceDuration(ms: number) {
     return Math.max(120, Math.round(ms * videoPaceFactor));
@@ -432,21 +427,45 @@ export async function navigateTo(page: Page, path: string) {
     await mediumPause(page);
 }
 
-export async function createRecordedPage(
-    browser: Browser,
+export async function startFeatureRecording(
+    page: Page,
     testInfo: TestInfo,
-): Promise<RecordedVideoPage> {
-    const context = await browser.newContext({
-        viewport: { width: 1280, height: 720 },
-        colorScheme: "dark",
-        recordVideo: {
-            dir: testInfo.outputDir,
-            size: { width: 1280, height: 720 },
-        },
+    options: {
+        slug: string;
+        title?: string;
+        description?: string;
+        showActions?: boolean;
+        chapterDurationMs?: number;
+    },
+) {
+    const spec = getVideoSpec(options.slug);
+    const outputPath = getRawVideoPath(spec.outputName);
+
+    await page.screencast.start({
+        path: outputPath,
+        size: { width: 1280, height: 720 },
+        quality: 90,
     });
 
-    const page = await context.newPage();
-    return { context, page };
+    if (options.showActions !== false) {
+        await page.screencast.showActions({
+            duration: paceDuration(420),
+            fontSize: 14,
+            position: "top-right",
+        });
+    }
+
+    await page.screencast.showChapter(options.title ?? spec.title, {
+        description: options.description ?? spec.description,
+        duration: paceDuration(options.chapterDurationMs ?? 900),
+    });
+
+    return outputPath;
+}
+
+export async function stopFeatureRecording(page: Page, holdMs = 250) {
+    await viewerPause(page, holdMs);
+    await page.screencast.stop();
 }
 
 /**

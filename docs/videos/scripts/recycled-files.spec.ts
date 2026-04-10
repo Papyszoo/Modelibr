@@ -1,10 +1,9 @@
-import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import {
     ciVideoTimeout,
-    createRecordedPage,
     mediumPause,
     viewerPause,
     smoothMoveTo,
@@ -14,6 +13,8 @@ import {
     waitForThumbnails,
     clearAllData,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,9 +23,8 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Recycled Files", () => {
-    test("Recycled Files Video", async ({ browser, page: setupPage }, testInfo) => {
-        let page: Page;
-        let context: BrowserContext;
+    test("Recycled Files Video", async ({ page: setupPage }, testInfo) => {
+        const page = setupPage;
 
         const waitForMenuStateToSettle = async () => {
             await page.evaluate(
@@ -92,14 +92,13 @@ test.describe("Recycled Files", () => {
             });
         }
 
-        ({ context, page } = await createRecordedPage(browser, testInfo));
-
         // ── Navigate to model list and wait for cards + thumbnails ──
         await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
         await disableHighlights(page);
         await waitForModelCards(page, 3);
         await waitForThumbnails(page, 3, 90000);
         await mediumPause(page);
+        await startFeatureRecording(page, testInfo, { slug: "recycled-files" });
 
         const secondModelId = await page
             .locator(".model-card[data-model-id]")
@@ -249,6 +248,6 @@ test.describe("Recycled Files", () => {
 
         // Final viewer pause to show the restored model is back
         await viewerPause(page, 1200);
-        await context.close();
+        await stopFeatureRecording(page);
     });
 });

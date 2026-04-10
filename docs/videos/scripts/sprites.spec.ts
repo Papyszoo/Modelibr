@@ -4,13 +4,14 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import {
     ciVideoTimeout,
-    createRecordedPage,
     shortPause,
     mediumPause,
     viewerPause,
     navigateTo,
     clearAllData,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -50,7 +51,7 @@ async function clickLocator(
 }
 
 test.describe("Sprites", () => {
-    test("Sprites Video", async ({ browser, page: setupPage }, testInfo) => {
+    test("Sprites Video", async ({ page: setupPage }, testInfo) => {
         let heroSpriteId: number | null = null;
         await clearAllData(setupPage);
 
@@ -109,7 +110,7 @@ test.describe("Sprites", () => {
         );
         expect(moveHeroResponse.ok()).toBeTruthy();
 
-        const { context, page } = await createRecordedPage(browser, testInfo);
+        const page = setupPage;
 
         await navigateTo(page, "/?leftTabs=sprites&activeLeft=sprites");
         await disableHighlights(page);
@@ -117,6 +118,7 @@ test.describe("Sprites", () => {
         const spriteCards = page.locator(".sprite-card");
         await expect(spriteCards).toHaveCount(2, { timeout: ciVideoTimeout });
         await mediumPause(page);
+        await startFeatureRecording(page, testInfo, { slug: "sprites" });
 
         for (let i = 0; i < 2; i++) {
             await moveToLocator(page, spriteCards.nth(i));
@@ -180,6 +182,6 @@ test.describe("Sprites", () => {
             .first();
         await expect(primaryButtonCard).toBeVisible({ timeout: ciVideoTimeout });
         await viewerPause(page, 1200);
-        await context.close();
+        await stopFeatureRecording(page);
     });
 });

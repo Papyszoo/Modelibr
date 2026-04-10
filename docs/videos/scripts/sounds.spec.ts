@@ -10,6 +10,8 @@ import {
     navigateTo,
     clearAllData,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,7 +20,7 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Sounds", () => {
-    test("Sounds Video", async ({ page }) => {
+    test("Sounds Video", async ({ page }, testInfo) => {
         const soundFile = path.join(assetsDir, "test-tone.wav");
         const soundBuffer = fs.readFileSync(soundFile);
         const uploadedSoundNames = [
@@ -70,6 +72,7 @@ test.describe("Sounds", () => {
             timeout: ciVideoTimeout,
         });
         await viewerPause(page, 450);
+        await startFeatureRecording(page, testInfo, { slug: "sounds" });
 
         // Step 1: Show instant sound previews from the grid.
         const ambientPreview = playButtonInCard(uploadedSoundNames[0]);
@@ -187,5 +190,6 @@ test.describe("Sounds", () => {
         await viewerPause(page, 900);
         await soundCard(renamedSound).locator(".sound-control-btn.ghost").click();
         await viewerPause(page, 700);
+        await stopFeatureRecording(page);
     });
 });

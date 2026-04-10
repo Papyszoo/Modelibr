@@ -4,13 +4,14 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import {
     ciVideoTimeout,
-    createRecordedPage,
     mediumPause,
     longPause,
     viewerPause,
     navigateTo,
     clearAllData,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -244,7 +245,7 @@ async function addModelToProject(page: Page, projectId: number, modelId: number)
 }
 
 test.describe("Projects", () => {
-    test("Projects Video", async ({ browser, page: setupPage }, testInfo) => {
+    test("Projects Video", async ({ page: setupPage }, testInfo) => {
         await clearAllData(setupPage);
 
         const [cubeModelId, coneModelId, cylinderModelId] = await Promise.all([
@@ -307,10 +308,7 @@ test.describe("Projects", () => {
         await setProjectThumbnail(setupPage, dungeonKitProjectId, redImageId);
         expect(dungeonKitProjectId).toBeGreaterThan(0);
 
-        const { context, page } = await createRecordedPage(browser, testInfo);
-        await showIntroSlate(page);
-        await viewerPause(page, 900);
-        await installRevealOverlay(page);
+        const page = setupPage;
         await navigateTo(page, "/?leftTabs=projects&activeLeft=projects");
         await disableHighlights(page);
 
@@ -322,7 +320,7 @@ test.describe("Projects", () => {
         await expect(page.locator(".project-grid-card-description").first()).toBeVisible({
             timeout: ciVideoTimeout,
         });
-        await removeRevealOverlay(page);
+        await startFeatureRecording(page, testInfo, { slug: "projects" });
         await mediumPause(page);
 
         const searchInput = page.getByPlaceholder("Search projects");
@@ -429,6 +427,6 @@ test.describe("Projects", () => {
         }
         await page.mouse.move(1120, 120, { steps: 18 });
         await viewerPause(page, 1200);
-        await context.close();
+        await stopFeatureRecording(page);
     });
 });

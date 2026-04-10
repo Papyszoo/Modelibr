@@ -11,7 +11,7 @@ import path from "path";
  */
 export default defineConfig({
     testDir: "./scripts",
-    timeout: 120_000,
+    timeout: 180_000,
     fullyParallel: false,
     forbidOnly: true,
     retries: 0,
@@ -21,11 +21,6 @@ export default defineConfig({
     use: {
         // Use localhost (not 127.0.0.1) so browser origin matches CORS allowed origins
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
-        // Record video for every test
-        video: {
-            mode: "on",
-            size: { width: 1280, height: 720 },
-        },
         // No blue Playwright border — use a plain viewport, no highlights
         screenshot: "off",
         trace: "off",

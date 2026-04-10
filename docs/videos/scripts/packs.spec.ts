@@ -4,7 +4,6 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import {
     ciVideoTimeout,
-    createRecordedPage,
     shortPause,
     mediumPause,
     longPause,
@@ -12,6 +11,8 @@ import {
     navigateTo,
     clearAllData,
     disableHighlights,
+    startFeatureRecording,
+    stopFeatureRecording,
 } from "../helpers/video-helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,14 +20,14 @@ const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
 const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Packs", () => {
-    test("Packs Video", async ({ browser, page: setupPage }, testInfo) => {
+    test("Packs Video", async ({ page }, testInfo) => {
         // ── Setup: clear data and upload models via API ──
-        await clearAllData(setupPage);
+        await clearAllData(page);
 
         const modelFiles = ["test-cube.glb", "test-cone.fbx"];
         for (const file of modelFiles) {
             const buffer = fs.readFileSync(path.join(assetsDir, file));
-            await setupPage.request.post(`${API_BASE}/models`, {
+            await page.request.post(`${API_BASE}/models`, {
                 multipart: {
                     file: {
                         name: file,
@@ -37,13 +38,10 @@ test.describe("Packs", () => {
             });
         }
 
-        await mediumPause(setupPage);
-
-        const { context, page } = await createRecordedPage(browser, testInfo);
-
         // ── Navigate to Packs page ──
         await navigateTo(page, "/?leftTabs=packs&activeLeft=packs");
         await disableHighlights(page);
+        await startFeatureRecording(page, testInfo, { slug: "packs" });
         await mediumPause(page);
 
         // ────────────────────────────────────────────────────────────
@@ -209,6 +207,6 @@ test.describe("Packs", () => {
 
         await page.mouse.move(640, 360, { steps: 15 });
         await viewerPause(page, 1200);
-        await context.close();
+        await stopFeatureRecording(page);
     });
 });

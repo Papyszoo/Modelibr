@@ -5,20 +5,24 @@
     "description": "Playwright scripts for generating Modelibr documentation videos",
     "type": "module",
     "scripts": {
-        "generate": "npx playwright test --config=playwright.config.ts",
-        "generate:models": "npx playwright test --config=playwright.config.ts --grep \"Model Management\"",
-        "generate:texture-sets": "npx playwright test --config=playwright.config.ts --grep \"Texture Sets\"",
-        "generate:recycled": "npx playwright test --config=playwright.config.ts --grep \"Recycled Files\"",
-        "generate:ui": "npx playwright test --config=playwright.config.ts --grep \"User Interface\"",
-        "generate:sprites": "npx playwright test --config=playwright.config.ts --grep \"Sprites\"",
-        "generate:sounds": "npx playwright test --config=playwright.config.ts --grep \"Sounds\"",
-        "generate:projects": "npx playwright test --config=playwright.config.ts --grep \"Projects\"",
-        "generate:packs": "npx playwright test --config=playwright.config.ts --grep \"Packs\"",
-        "postgenerate": "node collect-videos.js"
+        "generate": "node run-videos.js",
+        "generate:models": "node run-videos.js --grep \"Model Management\" --slugs model-management",
+        "generate:texture-sets": "node run-videos.js --grep \"Texture Sets\" --slugs texture-sets",
+        "generate:recycled": "node run-videos.js --grep \"Recycled Files\" --slugs recycled-files",
+        "generate:ui": "node run-videos.js --grep \"User Interface\" --slugs user-interface",
+        "generate:sprites": "node run-videos.js --grep \"Sprites\" --slugs sprites",
+        "generate:sounds": "node run-videos.js --grep \"Sounds\" --slugs sounds",
+        "generate:projects": "node run-videos.js --grep \"Projects\" --slugs projects",
+        "generate:packs": "node run-videos.js --grep \"Packs\" --slugs packs",
+        "analyze": "node analyze-videos.js",
+        "trim": "node trim-videos.js",
+        "collect": "node collect-videos.js",
+        "clean": "node clean-videos.js"
     },
     "devDependencies": {
-        "@playwright/test": "^1.49.1",
+        "@playwright/test": "^1.59.0",
         "@types/node": "^22.19.3",
+        "ffmpeg-static": "^5.2.0",
         "typescript": "^5.7.2"
     },
     "dependencies": {
