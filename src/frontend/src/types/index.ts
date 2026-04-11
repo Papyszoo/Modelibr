@@ -1,11 +1,19 @@
 export {
   type AddEnvironmentMapVariantWithFileResponse,
   type CreateEnvironmentMapWithFileResponse,
+  type EnvironmentMapCategoryDto,
   type EnvironmentMapContainerSummaryDto,
+  type EnvironmentMapCubeFace,
+  type EnvironmentMapCubeFacesDto,
+  type EnvironmentMapCubeFaceUrls,
   type EnvironmentMapDto,
+  type EnvironmentMapFileDto,
   type EnvironmentMapVariantDto,
+  type GetAllEnvironmentMapCategoriesResponse,
   type GetAllEnvironmentMapsResponse,
   type GetAllEnvironmentMapsResponsePaginated,
+  type UpdateEnvironmentMapMetadataResponse,
+  type UpsertEnvironmentMapCategoryRequest,
 } from '@/features/environment-map/types'
 export {
   type CreateModelVersionResponse,
@@ -65,6 +73,7 @@ export {
   type AddTextureToSetResponse,
   type CreateTextureSetRequest,
   type CreateTextureSetResponse,
+  type GetAllTextureSetCategoriesResponse,
   type GetAllTextureSetsResponse,
   type GetAllTextureSetsResponsePaginated,
   type GetTextureSetByIdResponse,
@@ -73,6 +82,7 @@ export {
   TextureChannel,
   type TextureDto,
   type TextureProxyDto,
+  type TextureSetCategoryDto,
   type TextureSetDto,
   TextureSetKind,
   TextureType,
@@ -80,8 +90,14 @@ export {
   type UpdateTextureSetResponse,
   type UpdateTilingScaleRequest,
   type UpdateTilingScaleResponse,
+  type UpsertTextureSetCategoryRequest,
   UvMappingMode,
 } from '@/features/texture-set/types'
+export type {
+  CategorySelectionKeys,
+  CategorySelectionState,
+  HierarchicalCategory,
+} from '@/shared/types/categories'
 export type {
   ApiError,
   PaginatedResponse,

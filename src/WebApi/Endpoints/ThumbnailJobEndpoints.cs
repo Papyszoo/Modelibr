@@ -37,6 +37,8 @@ public static class ThumbnailJobEndpoints
                 SoundId = response.Job.SoundId,
                 SoundHash = response.Job.SoundHash,
                 TextureSetId = response.Job.TextureSetId,
+                EnvironmentMapId = response.Job.EnvironmentMapId,
+                EnvironmentMapVariantId = response.Job.EnvironmentMapVariantId,
                 DefaultTextureSetId = response.Job.ModelVersion?.DefaultTextureSetId,
                 MainVariantName = response.Job.ModelVersion?.MainVariantName ?? "",
                 TextureMappings = response.Job.ModelVersion?.TextureMappings?.Select(tm => new
@@ -141,6 +143,35 @@ public static class ThumbnailJobEndpoints
         .WithName("Finish Texture Set Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
+        app.MapPost("/thumbnail-jobs/environment-maps/{jobId:int}/finish", async (
+            int jobId,
+            [FromBody] FinishEnvironmentMapJobRequest request,
+            ICommandHandler<FinishEnvironmentMapThumbnailJobCommand, FinishEnvironmentMapThumbnailJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new FinishEnvironmentMapThumbnailJobCommand(
+                jobId,
+                request.Success,
+                request.ThumbnailPath,
+                request.ErrorMessage), cancellationToken);
+
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(result.Error.Message);
+            }
+
+            return Results.Ok(new
+            {
+                result.Value.JobId,
+                result.Value.EnvironmentMapId,
+                result.Value.EnvironmentMapVariantId,
+                result.Value.Status,
+                Message = request.Success ? "Environment map thumbnail job completed successfully" : "Environment map thumbnail job marked as failed"
+            });
+        })
+        .WithName("Finish Environment Map Thumbnail Job")
+        .WithTags("ThumbnailJobs");
+
         app.MapPost("/thumbnail-jobs/{jobId:int}/events", async (
             int jobId,
             [FromBody] LogJobEventRequest request,
@@ -227,6 +258,11 @@ public record FinishTextureSetJobRequest(
     bool Success,
     string? ThumbnailPath = null,
     long? SizeBytes = null,
+    string? ErrorMessage = null);
+
+public record FinishEnvironmentMapJobRequest(
+    bool Success,
+    string? ThumbnailPath = null,
     string? ErrorMessage = null);
 
 /// <summary>

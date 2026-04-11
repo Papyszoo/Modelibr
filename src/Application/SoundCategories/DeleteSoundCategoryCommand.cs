@@ -22,7 +22,13 @@ internal class DeleteSoundCategoryCommandHandler : ICommandHandler<DeleteSoundCa
                 new Error("CategoryNotFound", $"Sound category with ID {command.Id} not found."));
         }
 
-        await _categoryRepository.DeleteAsync(command.Id, cancellationToken);
+        if (category.Children.Any())
+        {
+            return Result.Failure(
+                new Error("CategoryHasChildren", "Delete or move child categories before removing this category."));
+        }
+
+        await _categoryRepository.DeleteAsync(category, cancellationToken);
 
         return Result.Success();
     }

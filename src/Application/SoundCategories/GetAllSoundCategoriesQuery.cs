@@ -18,12 +18,9 @@ internal class GetAllSoundCategoriesQueryHandler : IQueryHandler<GetAllSoundCate
         var categories = await _categoryRepository.GetAllAsync(cancellationToken);
 
         var categoryDtos = categories
-            .Select(c => new SoundCategoryDto(
-                c.Id,
-                c.Name,
-                c.Description,
-                c.CreatedAt,
-                c.UpdatedAt))
+            .OrderBy(c => c.ParentId)
+            .ThenBy(c => c.Name)
+            .Select(c => SoundCategoryMappings.ToSummaryDto(c, categories))
             .ToList();
 
         return Result.Success(new GetAllSoundCategoriesResponse(categoryDtos));
@@ -32,11 +29,4 @@ internal class GetAllSoundCategoriesQueryHandler : IQueryHandler<GetAllSoundCate
 
 public record GetAllSoundCategoriesQuery : IQuery<GetAllSoundCategoriesResponse>;
 
-public record GetAllSoundCategoriesResponse(IReadOnlyList<SoundCategoryDto> Categories);
-
-public record SoundCategoryDto(
-    int Id,
-    string Name,
-    string? Description,
-    DateTime CreatedAt,
-    DateTime UpdatedAt);
+public record GetAllSoundCategoriesResponse(IReadOnlyList<SoundCategorySummaryDto> Categories);

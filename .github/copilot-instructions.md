@@ -78,6 +78,7 @@ The main agent owns final verification.
 - After any code change, run targeted checks while iterating and rerun the affected suites after each meaningful edit until they are green.
 - Before closing a code change, run the full required local QA suites for every affected layer.
 - Do not finish a session with known failing checks. Failures found while verifying a change must be investigated and fixed in the same session unless the user explicitly redirects scope.
+- If verification reveals unrelated failures, launch subagent immediately to investigate them and fix them in the same session.
 - Never remove tests, weaken assertions, add blanket skips, convert failures into always-passing behavior, or otherwise reduce test quality just to get green. Test coverage and test strictness must stay at least as strong as before the change.
 - When backend changes are involved, run `dotnet build Modelibr.sln` and `dotnet test Modelibr.sln --no-build`.
 - When frontend changes are involved, run `cd src/frontend && npm test && npm run lint && npm run build`.

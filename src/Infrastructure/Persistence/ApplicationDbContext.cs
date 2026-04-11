@@ -14,6 +14,7 @@ namespace Infrastructure.Persistence
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
+        public DbSet<TextureSetCategory> TextureSetCategories => Set<TextureSetCategory>();
         public DbSet<ModelTag> ModelTags => Set<ModelTag>();
         public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
@@ -28,8 +29,10 @@ namespace Infrastructure.Persistence
         public DbSet<SpriteCategory> SpriteCategories => Set<SpriteCategory>();
         public DbSet<Sound> Sounds => Set<Sound>();
         public DbSet<SoundCategory> SoundCategories => Set<SoundCategory>();
+        public DbSet<EnvironmentMapCategory> EnvironmentMapCategories => Set<EnvironmentMapCategory>();
         public DbSet<EnvironmentMap> EnvironmentMaps => Set<EnvironmentMap>();
         public DbSet<EnvironmentMapVariant> EnvironmentMapVariants => Set<EnvironmentMapVariant>();
+        public DbSet<EnvironmentMapVariantFaceFile> EnvironmentMapVariantFaceFiles => Set<EnvironmentMapVariantFaceFile>();
         public DbSet<TextureProxy> TextureProxies => Set<TextureProxy>();
         public DbSet<ModelVersionTextureSet> ModelVersionTextureSets => Set<ModelVersionTextureSet>();
 
@@ -123,6 +126,39 @@ namespace Infrastructure.Persistence
                 .HasMany(e => e.Projects)
                 .WithMany(p => p.EnvironmentMaps)
                 .UsingEntity(j => j.ToTable("ProjectEnvironmentMaps"));
+
+            modelBuilder.Entity<EnvironmentMap>(entity =>
+            {
+                entity.Property(e => e.EnvironmentMapCategoryId).IsRequired(false);
+
+                entity.HasOne(e => e.EnvironmentMapCategory)
+                    .WithMany()
+                    .HasForeignKey(e => e.EnvironmentMapCategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(e => e.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "EnvironmentMapTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<EnvironmentMap>()
+                            .WithMany()
+                            .HasForeignKey("EnvironmentMapId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("EnvironmentMapTagAssignments");
+                            join.HasKey("EnvironmentMapId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
+
+                entity.HasIndex(e => e.EnvironmentMapCategoryId);
+            });
 
             // Configure Model entity
             modelBuilder.Entity<Model>(entity =>
@@ -367,6 +403,7 @@ namespace Infrastructure.Persistence
             {
                 entity.HasKey(tp => tp.Id);
                 entity.Property(tp => tp.Name).IsRequired().HasMaxLength(200);
+                entity.Property(tp => tp.TextureSetCategoryId).IsRequired(false);
                 entity.Property(tp => tp.Kind).IsRequired()
                     .HasDefaultValue(TextureSetKind.ModelSpecific);
                 entity.Property(tp => tp.TilingScaleX).IsRequired()
@@ -393,8 +430,14 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(t => t.TextureSetId)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                entity.HasOne(tp => tp.Category)
+                    .WithMany()
+                    .HasForeignKey(tp => tp.TextureSetCategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 // Create index for efficient querying by name
                 entity.HasIndex(tp => tp.Name);
+                entity.HasIndex(tp => tp.TextureSetCategoryId);
 
                 // Add index for efficient querying by kind
                 entity.HasIndex(tp => tp.Kind);
@@ -452,6 +495,22 @@ namespace Infrastructure.Persistence
             });
 
             modelBuilder.Entity<ModelCategory>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.Description).HasMaxLength(500);
+                entity.Property(c => c.CreatedAt).IsRequired();
+                entity.Property(c => c.UpdatedAt).IsRequired();
+
+                entity.HasOne(c => c.Parent)
+                    .WithMany(c => c.Children)
+                    .HasForeignKey(c => c.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => new { c.ParentId, c.Name }).IsUnique();
+            });
+
+            modelBuilder.Entity<TextureSetCategory>(entity =>
             {
                 entity.HasKey(c => c.Id);
                 entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
@@ -541,6 +600,8 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.SoundId).IsRequired(false);
                 entity.Property(tj => tj.SoundHash).IsRequired(false).HasMaxLength(64);
                 entity.Property(tj => tj.TextureSetId).IsRequired(false);
+                entity.Property(tj => tj.EnvironmentMapId).IsRequired(false);
+                entity.Property(tj => tj.EnvironmentMapVariantId).IsRequired(false);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -592,6 +653,22 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(tj => tj.TextureSetId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired(false);
+
+                entity.HasOne(tj => tj.EnvironmentMap)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.EnvironmentMapId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                entity.HasOne(tj => tj.EnvironmentMapVariant)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.EnvironmentMapVariantId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                entity.HasIndex(tj => tj.EnvironmentMapVariantId)
+                    .IsUnique()
+                    .HasFilter("\"EnvironmentMapVariantId\" IS NOT NULL");
             });
 
             // Configure ThumbnailJobEvent entity
@@ -755,8 +832,12 @@ namespace Infrastructure.Persistence
                 entity.Property(c => c.CreatedAt).IsRequired();
                 entity.Property(c => c.UpdatedAt).IsRequired();
 
-                // Create unique index on Name
-                entity.HasIndex(c => c.Name).IsUnique();
+                entity.HasOne(c => c.Parent)
+                    .WithMany(c => c.Children)
+                    .HasForeignKey(c => c.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => new { c.ParentId, c.Name }).IsUnique();
             });
 
             // Configure Sound entity
@@ -803,8 +884,28 @@ namespace Infrastructure.Persistence
                 entity.Property(c => c.CreatedAt).IsRequired();
                 entity.Property(c => c.UpdatedAt).IsRequired();
 
-                // Create unique index on Name
-                entity.HasIndex(c => c.Name).IsUnique();
+                entity.HasOne(c => c.Parent)
+                    .WithMany(c => c.Children)
+                    .HasForeignKey(c => c.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => new { c.ParentId, c.Name }).IsUnique();
+            });
+
+            modelBuilder.Entity<EnvironmentMapCategory>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.Description).HasMaxLength(500);
+                entity.Property(c => c.CreatedAt).IsRequired();
+                entity.Property(c => c.UpdatedAt).IsRequired();
+
+                entity.HasOne(c => c.Parent)
+                    .WithMany(c => c.Children)
+                    .HasForeignKey(c => c.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => new { c.ParentId, c.Name }).IsUnique();
             });
 
             modelBuilder.Entity<EnvironmentMap>(entity =>
@@ -812,10 +913,16 @@ namespace Infrastructure.Persistence
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.PreviewVariantId).IsRequired(false);
+                entity.Property(e => e.CustomThumbnailFileId).IsRequired(false);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
                 entity.Property(e => e.IsDeleted).IsRequired();
                 entity.Property(e => e.DeletedAt);
+
+                entity.HasOne(e => e.CustomThumbnailFile)
+                    .WithMany()
+                    .HasForeignKey(e => e.CustomThumbnailFileId)
+                    .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasIndex(e => e.Name);
                 entity.HasIndex(e => e.IsDeleted);
@@ -827,8 +934,10 @@ namespace Infrastructure.Persistence
             {
                 entity.HasKey(v => v.Id);
                 entity.Property(v => v.EnvironmentMapId).IsRequired();
-                entity.Property(v => v.FileId).IsRequired();
+                entity.Property(v => v.FileId).IsRequired(false);
+                entity.Property(v => v.ProjectionType).IsRequired();
                 entity.Property(v => v.SizeLabel).IsRequired().HasMaxLength(50);
+                entity.Property(v => v.ThumbnailPath).HasMaxLength(500);
                 entity.Property(v => v.CreatedAt).IsRequired();
                 entity.Property(v => v.UpdatedAt).IsRequired();
                 entity.Property(v => v.IsDeleted).IsRequired();
@@ -844,12 +953,33 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(v => v.EnvironmentMapId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasMany(v => v.FaceFiles)
+                    .WithOne()
+                    .HasForeignKey(faceFile => faceFile.EnvironmentMapVariantId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 entity.HasIndex(v => v.IsDeleted);
                 entity.HasIndex(v => new { v.EnvironmentMapId, v.SizeLabel })
                     .IsUnique()
                     .HasFilter("\"IsDeleted\" = false");
 
                 entity.HasQueryFilter(v => !v.IsDeleted);
+            });
+
+            modelBuilder.Entity<EnvironmentMapVariantFaceFile>(entity =>
+            {
+                entity.HasKey(faceFile => faceFile.Id);
+                entity.Property(faceFile => faceFile.EnvironmentMapVariantId).IsRequired();
+                entity.Property(faceFile => faceFile.Face).IsRequired();
+                entity.Property(faceFile => faceFile.FileId).IsRequired();
+
+                entity.HasOne(faceFile => faceFile.File)
+                    .WithMany()
+                    .HasForeignKey(faceFile => faceFile.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(faceFile => new { faceFile.EnvironmentMapVariantId, faceFile.Face })
+                    .IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);

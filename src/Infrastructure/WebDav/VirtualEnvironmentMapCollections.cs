@@ -3,6 +3,7 @@ using Domain.Models;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
 using NWebDav.Server.Stores;
+using DomainFile = Domain.Models.File;
 
 namespace Infrastructure.WebDav;
 
@@ -120,33 +121,35 @@ public sealed class VirtualEnvironmentMapVariantsCollection : VirtualCollectionB
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var variant = _environmentMap.Variants.FirstOrDefault(v => !v.IsDeleted && BuildVariantFileName(v).Equals(name, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult<IStoreItem?>(variant == null ? null : CreateAssetFile(variant, name));
+        var variantFile = _environmentMap.Variants
+            .Where(v => !v.IsDeleted)
+            .SelectMany(EnvironmentMapWebDavNaming.GetVariantFiles)
+            .FirstOrDefault(v => v.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        return Task.FromResult<IStoreItem?>(variantFile.File == null ? null : CreateAssetFile(variantFile.File, name));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
         var items = _environmentMap.Variants
             .Where(v => !v.IsDeleted)
-            .Select(v => (IStoreItem)CreateAssetFile(v, BuildVariantFileName(v)));
+            .SelectMany(EnvironmentMapWebDavNaming.GetVariantFiles)
+            .Select(v => (IStoreItem)CreateAssetFile(v.File, v.Name));
 
         return Task.FromResult(items);
     }
 
-    private VirtualAssetFile CreateAssetFile(EnvironmentMapVariant variant, string name)
+    private VirtualAssetFile CreateAssetFile(DomainFile file, string name)
         => new(
             _itemPropertyManager,
             LockingManager,
             name,
-            variant.File.Sha256Hash,
-            variant.File.SizeBytes,
-            variant.File.MimeType,
-            variant.File.CreatedAt,
-            variant.File.UpdatedAt,
+            file.Sha256Hash,
+            file.SizeBytes,
+            file.MimeType,
+            file.CreatedAt,
+            file.UpdatedAt,
             _pathProvider);
-
-    private static string BuildVariantFileName(EnvironmentMapVariant variant)
-        => $"{variant.SizeLabel}.{WebDavUtilities.GetExtension(variant.File.OriginalFileName)}";
 }
 
 public sealed class VirtualEnvironmentMapFilesCollection : VirtualCollectionBase
@@ -172,29 +175,35 @@ public sealed class VirtualEnvironmentMapFilesCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var variant = _environmentMap.Variants.FirstOrDefault(v => !v.IsDeleted && v.File.OriginalFileName == name);
-        return Task.FromResult<IStoreItem?>(variant == null ? null : CreateAssetFile(variant));
+        var file = _environmentMap.Variants
+            .Where(v => !v.IsDeleted)
+            .SelectMany(EnvironmentMapWebDavNaming.GetOriginalFiles)
+            .FirstOrDefault(v => v.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            .File;
+
+        return Task.FromResult<IStoreItem?>(file == null ? null : CreateAssetFile(file));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
         var items = _environmentMap.Variants
             .Where(v => !v.IsDeleted)
-            .Select(v => (IStoreItem)CreateAssetFile(v));
+            .SelectMany(EnvironmentMapWebDavNaming.GetOriginalFiles)
+            .Select(v => (IStoreItem)CreateAssetFile(v.File));
 
         return Task.FromResult(items);
     }
 
-    private VirtualAssetFile CreateAssetFile(EnvironmentMapVariant variant)
+    private VirtualAssetFile CreateAssetFile(DomainFile file)
         => new(
             _itemPropertyManager,
             LockingManager,
-            variant.File.OriginalFileName,
-            variant.File.Sha256Hash,
-            variant.File.SizeBytes,
-            variant.File.MimeType,
-            variant.File.CreatedAt,
-            variant.File.UpdatedAt,
+            file.OriginalFileName,
+            file.Sha256Hash,
+            file.SizeBytes,
+            file.MimeType,
+            file.CreatedAt,
+            file.UpdatedAt,
             _pathProvider);
 }
 
@@ -267,5 +276,36 @@ public sealed class VirtualProjectEnvironmentMapsCollection : VirtualCollectionB
             .Where(e => !e.IsDeleted)
             .Select(e => (IStoreItem)new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, e, _itemPropertyManager, _pathProvider));
         return Task.FromResult(items);
+    }
+}
+
+internal static class EnvironmentMapWebDavNaming
+{
+    internal static IEnumerable<(string Name, DomainFile File)> GetVariantFiles(EnvironmentMapVariant variant)
+    {
+        if (variant.IsPanoramic && variant.File != null)
+        {
+            yield return ($"{variant.SizeLabel}.{WebDavUtilities.GetExtension(variant.File.OriginalFileName)}", variant.File);
+            yield break;
+        }
+
+        foreach (var faceFile in variant.GetOrderedFaceFiles())
+        {
+            yield return (
+                $"{variant.SizeLabel}_{faceFile.Face.ToString().ToLowerInvariant()}.{WebDavUtilities.GetExtension(faceFile.File.OriginalFileName)}",
+                faceFile.File);
+        }
+    }
+
+    internal static IEnumerable<(string Name, DomainFile File)> GetOriginalFiles(EnvironmentMapVariant variant)
+    {
+        if (variant.IsPanoramic && variant.File != null)
+        {
+            yield return (variant.File.OriginalFileName, variant.File);
+            yield break;
+        }
+
+        foreach (var faceFile in variant.GetOrderedFaceFiles())
+            yield return (faceFile.File.OriginalFileName, faceFile.File);
     }
 }

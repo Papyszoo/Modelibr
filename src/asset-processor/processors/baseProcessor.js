@@ -32,7 +32,12 @@ export class BaseProcessor {
    * @returns {Promise<void>}
    */
   async execute(job) {
-    const assetId = job.modelId || job.soundId || job.id
+    const assetId =
+      job.modelId ||
+      job.soundId ||
+      job.textureSetId ||
+      job.environmentMapId ||
+      job.id
     const jobLogger = withJobContext(job.id, assetId)
 
     try {

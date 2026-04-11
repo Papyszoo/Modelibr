@@ -27,7 +27,10 @@ export class UniqueFileGenerator {
         sourceFilename: string,
         options?: { uniqueFilename?: boolean },
     ): Promise<string> {
-        const sourcePath = path.join(this.ASSETS_DIR, sourceFilename);
+        const isAbsoluteSourcePath = path.isAbsolute(sourceFilename);
+        const sourcePath = isAbsoluteSourcePath
+            ? sourceFilename
+            : path.join(this.ASSETS_DIR, sourceFilename);
         const uniqueId = crypto.randomUUID();
         const shortId = uniqueId.substring(0, 8);
         const tempDir = path.join(this.TEMP_DIR, shortId);
@@ -40,14 +43,21 @@ export class UniqueFileGenerator {
         // NOT renaming is critical: the server derives entity names (texture sets,
         // models) from the uploaded filename, so renaming breaks test assertions.
         const ext = path.extname(sourceFilename).toLowerCase();
-        const uniqueFilename = options?.uniqueFilename
+        const sourceDirectory = isAbsoluteSourcePath
+            ? ""
+            : path.dirname(sourceFilename);
+        const sourceBasename = path.basename(sourceFilename);
+        const targetRelativePath = options?.uniqueFilename
             ? path.join(
-                  path.dirname(sourceFilename),
-                  `${path.basename(sourceFilename, ext)}-${shortId}${ext}`,
+                  sourceDirectory === "." ? "" : sourceDirectory,
+                  `${path.basename(sourceBasename, ext)}-${shortId}${ext}`,
               )
-            : sourceFilename;
+            : path.join(
+                  sourceDirectory === "." ? "" : sourceDirectory,
+                  sourceBasename,
+              );
 
-        const targetPath = path.join(tempDir, uniqueFilename);
+        const targetPath = path.join(tempDir, targetRelativePath);
 
         // Ensure target directory exists (handles subdirectory paths like "global texture/roughness.exr")
         await fs.mkdir(path.dirname(targetPath), { recursive: true });
@@ -75,6 +85,8 @@ export class UniqueFileGenerator {
                     `[UniqueFileGenerator] ${sourceFilename} has .png extension but is not PNG, appended unique marker`,
                 );
             }
+        } else if (ext === ".hdr") {
+            newBuffer = this.modifyHDR(originalBuffer, uniqueId);
         } else if (ext === ".wav") {
             newBuffer = this.modifyWAV(originalBuffer, uniqueId);
         } else if (ext === ".blend") {
@@ -243,6 +255,24 @@ export class UniqueFileGenerator {
         const iendChunk = buffer.subarray(iendOffset);
 
         return Buffer.concat([beforeIEND, textChunk, iendChunk]);
+    }
+
+    /**
+     * Injects a Radiance HDR comment line near the top of the header.
+     * Comment lines beginning with # are valid and ignored by decoders.
+     */
+    private static modifyHDR(buffer: Buffer, uniqueData: string): Buffer {
+        const newlineIndex = buffer.indexOf("\n");
+        if (newlineIndex === -1) {
+            throw new Error("Invalid HDR file: missing header newline");
+        }
+
+        const commentLine = Buffer.from(`# UniqueId: ${uniqueData}\n`, "ascii");
+        return Buffer.concat([
+            buffer.subarray(0, newlineIndex + 1),
+            commentLine,
+            buffer.subarray(newlineIndex + 1),
+        ]);
     }
 
     /**

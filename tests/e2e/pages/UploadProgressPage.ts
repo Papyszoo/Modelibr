@@ -148,6 +148,27 @@ export class UploadProgressPage {
         await button.click();
     }
 
+    async closeWindowIfVisible(): Promise<void> {
+        const window = this.page.locator(
+            "#upload-progress-window, .upload-progress-window",
+        );
+        const closeButton = this.page
+            .locator(
+                '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times, .upload-progress-window button[aria-label="Close"], .upload-progress-window .pi-times',
+            )
+            .first();
+
+        const isVisible = await window.first().isVisible().catch(() => false);
+        if (!isVisible) {
+            return;
+        }
+
+        if (await closeButton.isVisible().catch(() => false)) {
+            await closeButton.click();
+            await expect(window.first()).not.toBeVisible({ timeout: 10000 });
+        }
+    }
+
     /**
      * Remove an individual upload by filename
      */

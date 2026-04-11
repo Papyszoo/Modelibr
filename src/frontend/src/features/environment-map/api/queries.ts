@@ -8,13 +8,19 @@ import {
 import { type QueryConfig } from '@/lib/react-query'
 
 import {
+  addEnvironmentMapVariantUpload,
   addEnvironmentMapVariantWithFile,
+  createEnvironmentMapUpload,
   createEnvironmentMapWithFile,
   getAllEnvironmentMaps,
   getEnvironmentMapById,
   getEnvironmentMapsPaginated,
+  regenerateEnvironmentMapThumbnail,
+  setEnvironmentMapCustomThumbnail,
   softDeleteEnvironmentMap,
+  updateEnvironmentMapMetadata,
 } from './environmentMapApi'
+import { getEnvironmentMapCategories } from './environmentMapCategoryApi'
 
 export function getEnvironmentMapsQueryOptions(params: {
   page: number
@@ -42,6 +48,13 @@ export function getEnvironmentMapByIdQueryOptions(environmentMapId: number) {
   return queryOptions({
     queryKey: ['environmentMaps', 'detail', environmentMapId] as const,
     queryFn: () => getEnvironmentMapById(environmentMapId),
+  })
+}
+
+export function getEnvironmentMapCategoriesQueryOptions() {
+  return queryOptions({
+    queryKey: ['environment-map-categories'] as const,
+    queryFn: () => getEnvironmentMapCategories(),
   })
 }
 
@@ -98,23 +111,43 @@ export function useEnvironmentMapByIdQuery({
   })
 }
 
+type UseEnvironmentMapCategoriesQueryOptions = {
+  queryConfig?: QueryConfig<typeof getEnvironmentMapCategoriesQueryOptions>
+}
+
+export function useEnvironmentMapCategoriesQuery({
+  queryConfig = {},
+}: UseEnvironmentMapCategoriesQueryOptions = {}) {
+  return useQuery({
+    ...getEnvironmentMapCategoriesQueryOptions(),
+    ...queryConfig,
+  })
+}
+
 export function useCreateEnvironmentMapWithFileMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: ({
       file,
+      cubeFaces,
       options,
     }: {
-      file: File
+      file?: File
+      cubeFaces?: Partial<Record<'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz', File>>
       options?: {
         name?: string
         sizeLabel?: string
         batchId?: string
         packId?: number
         projectId?: number
+        sourceType?: string
+        projectionType?: string
       }
-    }) => createEnvironmentMapWithFile(file, options),
+    }) =>
+      file && !cubeFaces
+        ? createEnvironmentMapWithFile(file, options)
+        : createEnvironmentMapUpload({ file, cubeFaces, options }),
     onSuccess: async data => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['environmentMaps'] }),
@@ -135,13 +168,24 @@ export function useAddEnvironmentMapVariantWithFileMutation(
   return useMutation({
     mutationFn: ({
       file,
+      cubeFaces,
       options,
     }: {
-      file: File
+      file?: File
+      cubeFaces?: Partial<Record<'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz', File>>
       options?: {
         sizeLabel?: string
+        sourceType?: string
+        projectionType?: string
       }
-    }) => addEnvironmentMapVariantWithFile(environmentMapId, file, options),
+    }) =>
+      file && !cubeFaces
+        ? addEnvironmentMapVariantWithFile(environmentMapId, file, options)
+        : addEnvironmentMapVariantUpload(environmentMapId, {
+            file,
+            cubeFaces,
+            options,
+          }),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['environmentMaps'] }),
@@ -164,6 +208,80 @@ export function useRecycleEnvironmentMapMutation() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['environmentMaps'] }),
         queryClient.invalidateQueries({ queryKey: ['recycledFiles'] }),
+      ])
+    },
+  })
+}
+
+export function useSetEnvironmentMapCustomThumbnailMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      environmentMapId,
+      fileId,
+    }: {
+      environmentMapId: number
+      fileId: number | null
+    }) => setEnvironmentMapCustomThumbnail(environmentMapId, fileId),
+    onSuccess: async (_data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['environmentMaps'] }),
+        queryClient.invalidateQueries({
+          queryKey: getEnvironmentMapByIdQueryOptions(
+            variables.environmentMapId
+          ).queryKey,
+        }),
+      ])
+    },
+  })
+}
+
+export function useRegenerateEnvironmentMapThumbnailMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      environmentMapId,
+      variantId,
+    }: {
+      environmentMapId: number
+      variantId?: number
+    }) => regenerateEnvironmentMapThumbnail(environmentMapId, variantId),
+    onSuccess: async (_data, { environmentMapId }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['environmentMaps'] }),
+        queryClient.invalidateQueries({
+          queryKey:
+            getEnvironmentMapByIdQueryOptions(environmentMapId).queryKey,
+        }),
+      ])
+    },
+  })
+}
+
+export function useUpdateEnvironmentMapMetadataMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      environmentMapId,
+      tags,
+      categoryId,
+    }: {
+      environmentMapId: number
+      tags?: string[]
+      categoryId?: number | null
+    }) => updateEnvironmentMapMetadata(environmentMapId, { tags, categoryId }),
+    onSuccess: async (_data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['environmentMaps'] }),
+        queryClient.invalidateQueries({
+          queryKey: getEnvironmentMapByIdQueryOptions(
+            variables.environmentMapId
+          ).queryKey,
+        }),
+        queryClient.invalidateQueries({ queryKey: ['model-tags'] }),
       ])
     },
   })

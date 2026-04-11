@@ -54,6 +54,9 @@ namespace Infrastructure
             services.AddScoped<ISoundRepository, SoundRepository>();
             services.AddScoped<ISoundCategoryRepository, SoundCategoryRepository>();
             services.AddScoped<IEnvironmentMapRepository, EnvironmentMapRepository>();
+            services.AddScoped<IEnvironmentMapCategoryRepository, EnvironmentMapCategoryRepository>();
+            services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();
+            services.AddScoped<IEnvironmentMapSizeLabelService, EnvironmentMapSizeLabelService>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 

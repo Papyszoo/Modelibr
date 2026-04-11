@@ -1,8 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { getEnvironmentMapByIdQueryOptions } from '@/features/environment-map/api/queries'
+
 import {
   type ActiveVersionChangedEvent,
+  type EnvironmentMapThumbnailStatusChangedEvent,
   thumbnailSignalRService,
   type ThumbnailStatusChangedEvent,
 } from '../../../services/ThumbnailSignalRService'
@@ -22,12 +25,13 @@ function thumbnailStatusFromEvent(
 }
 
 /**
- * Hook to subscribe to thumbnail status changes for displayed models.
+ * Hook to subscribe to thumbnail status changes for displayed models and
+ * environment maps.
  * Automatically manages SignalR connection and subscriptions.
  *
- * Uses setQueryData to push SignalR events directly into React Query cache.
- * No invalidation/refetch is needed — the cache update triggers a re-render
- * which recomputes imgSrc and the browser loads the thumbnail image.
+ * Model thumbnail events update React Query cache directly. Environment-map
+ * thumbnail events invalidate the affected list/detail queries so they refetch
+ * the latest preview URL from the API.
  *
  * @param _modelIds - Currently unused, but reserved for future per-model subscriptions
  */
@@ -36,7 +40,7 @@ export function useThumbnailSignalR(_modelIds: number[]) {
   const queryClient = useQueryClient()
   const hasConnected = useRef(false)
 
-  // Connect and join the all-models group for broadcast notifications
+  // Connect and join the broadcast groups for thumbnail notifications
   useEffect(() => {
     let mounted = true
 
@@ -49,7 +53,10 @@ export function useThumbnailSignalR(_modelIds: number[]) {
         await thumbnailSignalRService.connect()
         if (mounted) {
           setIsConnected(thumbnailSignalRService.isConnected())
-          await thumbnailSignalRService.joinAllModelsGroup()
+          await Promise.all([
+            thumbnailSignalRService.joinAllModelsGroup(),
+            thumbnailSignalRService.joinAllEnvironmentMapsGroup(),
+          ])
         }
       } catch (error) {
         console.error('Failed to connect to thumbnail SignalR hub:', error)
@@ -100,6 +107,19 @@ export function useThumbnailSignalR(_modelIds: number[]) {
     [queryClient]
   )
 
+  const handleEnvironmentMapThumbnailStatusChanged = useCallback(
+    (event: EnvironmentMapThumbnailStatusChangedEvent) => {
+      queryClient.invalidateQueries({
+        queryKey: ['environmentMaps'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: getEnvironmentMapByIdQueryOptions(event.environmentMapId)
+          .queryKey,
+      })
+    },
+    [queryClient]
+  )
+
   // Subscribe to events
   useEffect(() => {
     const unsubscribeThumbnail =
@@ -108,12 +128,21 @@ export function useThumbnailSignalR(_modelIds: number[]) {
       )
     const unsubscribeActiveVersion =
       thumbnailSignalRService.onActiveVersionChanged(handleActiveVersionChanged)
+    const unsubscribeEnvironmentMapThumbnail =
+      thumbnailSignalRService.onEnvironmentMapThumbnailStatusChanged(
+        handleEnvironmentMapThumbnailStatusChanged
+      )
 
     return () => {
       unsubscribeThumbnail()
       unsubscribeActiveVersion()
+      unsubscribeEnvironmentMapThumbnail()
     }
-  }, [handleThumbnailStatusChanged, handleActiveVersionChanged])
+  }, [
+    handleThumbnailStatusChanged,
+    handleActiveVersionChanged,
+    handleEnvironmentMapThumbnailStatusChanged,
+  ])
 
   return { isConnected }
 }

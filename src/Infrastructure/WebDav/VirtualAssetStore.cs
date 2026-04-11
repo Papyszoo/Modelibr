@@ -523,7 +523,7 @@ public sealed class VirtualAssetStore : IStore
                 _pathProvider);
         }
 
-        var category = await categoryRepo.GetByNameAsync(categoryName);
+        var category = await categoryRepo.GetByNameAsync(categoryName, null);
         if (category == null)
             return null;
 
@@ -1068,39 +1068,45 @@ public sealed class VirtualAssetStore : IStore
 
     private IStoreItem? ResolveEnvironmentMapVariantFile(Domain.Models.EnvironmentMap environmentMap, string fileName)
     {
-        var variant = environmentMap.Variants.FirstOrDefault(v =>
-            !v.IsDeleted &&
-            $"{v.SizeLabel}.{WebDavUtilities.GetExtension(v.File.OriginalFileName)}".Equals(fileName, StringComparison.OrdinalIgnoreCase));
+        var file = environmentMap.Variants
+            .Where(v => !v.IsDeleted)
+            .SelectMany(EnvironmentMapWebDavNaming.GetVariantFiles)
+            .FirstOrDefault(v => v.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+            .File;
 
-        return variant == null
+        return file == null
             ? null
             : new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
                 fileName,
-                variant.File.Sha256Hash,
-                variant.File.SizeBytes,
-                variant.File.MimeType,
-                variant.File.CreatedAt,
-                variant.File.UpdatedAt,
+                file.Sha256Hash,
+                file.SizeBytes,
+                file.MimeType,
+                file.CreatedAt,
+                file.UpdatedAt,
                 _pathProvider);
     }
 
     private IStoreItem? ResolveEnvironmentMapOriginalFile(Domain.Models.EnvironmentMap environmentMap, string fileName)
     {
-        var variant = environmentMap.Variants.FirstOrDefault(v => !v.IsDeleted && v.File.OriginalFileName == fileName);
+        var file = environmentMap.Variants
+            .Where(v => !v.IsDeleted)
+            .SelectMany(EnvironmentMapWebDavNaming.GetOriginalFiles)
+            .FirstOrDefault(v => v.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+            .File;
 
-        return variant == null
+        return file == null
             ? null
             : new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
-                variant.File.OriginalFileName,
-                variant.File.Sha256Hash,
-                variant.File.SizeBytes,
-                variant.File.MimeType,
-                variant.File.CreatedAt,
-                variant.File.UpdatedAt,
+                file.OriginalFileName,
+                file.Sha256Hash,
+                file.SizeBytes,
+                file.MimeType,
+                file.CreatedAt,
+                file.UpdatedAt,
                 _pathProvider);
     }
 
@@ -1153,7 +1159,7 @@ public sealed class VirtualAssetStore : IStore
                 _pathProvider);
         }
 
-        var category = await categoryRepo.GetByNameAsync(categoryName);
+        var category = await categoryRepo.GetByNameAsync(categoryName, null);
         if (category == null)
             return null;
 

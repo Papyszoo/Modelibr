@@ -1,5 +1,6 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Tests;
 using Application.EnvironmentMaps;
 using Application.Services;
@@ -18,6 +19,8 @@ public class EnvironmentMapCommandHandlerTests
     private readonly Mock<IEnvironmentMapRepository> _environmentMapRepository = new();
     private readonly Mock<IBatchUploadRepository> _batchUploadRepository = new();
     private readonly Mock<IFileCreationService> _fileCreationService = new();
+    private readonly Mock<IEnvironmentMapSizeLabelService> _sizeLabelService = new();
+    private readonly Mock<IThumbnailQueue> _thumbnailQueue = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
 
     [Fact]
@@ -46,9 +49,11 @@ public class EnvironmentMapCommandHandlerTests
             _environmentMapRepository.Object,
             _batchUploadRepository.Object,
             _fileCreationService.Object,
+            _sizeLabelService.Object,
+            _thumbnailQueue.Object,
             _dateTimeProvider.Object);
 
-        var command = new CreateEnvironmentMapWithFileCommand(fileUpload, "Studio", "4K", "batch-1", 3, null);
+        var command = new CreateEnvironmentMapWithFileCommand(fileUpload, null, "Studio", "4K", "batch-1", 3, null);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -57,13 +62,12 @@ public class EnvironmentMapCommandHandlerTests
         Assert.Equal(existingVariant.Id, result.Value.VariantId);
         Assert.Equal(existingEnvironmentMap.PreviewVariantId, result.Value.PreviewVariantId);
         _environmentMapRepository.Verify(x => x.AddAsync(It.IsAny<EnvironmentMap>(), It.IsAny<CancellationToken>()), Times.Never);
-        _batchUploadRepository.Verify(x => x.AddAsync(
-            It.Is<BatchUpload>(b =>
-                b.BatchId == "batch-1" &&
-                b.UploadType == "environmentmap" &&
-                b.FileId == file.Id &&
-                b.EnvironmentMapId == existingEnvironmentMap.Id &&
-                b.PackId == 3),
+        _batchUploadRepository.Verify(x => x.AddRangeAsync(
+            It.Is<IEnumerable<BatchUpload>>(uploads => uploads.Single().BatchId == "batch-1"
+                && uploads.Single().UploadType == "environmentmap"
+                && uploads.Single().FileId == file.Id
+                && uploads.Single().EnvironmentMapId == existingEnvironmentMap.Id
+                && uploads.Single().PackId == 3),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -85,6 +89,10 @@ public class EnvironmentMapCommandHandlerTests
             .Setup(x => x.CreateOrGetExistingFileAsync(fileUpload, It.IsAny<FileType>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success(file));
 
+        _thumbnailQueue
+            .Setup(x => x.EnqueueEnvironmentMapThumbnailAsync(environmentMap.Id, It.IsAny<int>(), true, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ThumbnailJob.CreateForEnvironmentMap(environmentMap.Id, 44, now));
+
         _environmentMapRepository
             .Setup(x => x.UpdateAsync(environmentMap, It.IsAny<CancellationToken>()))
             .ReturnsAsync((EnvironmentMap map, CancellationToken _) =>
@@ -99,9 +107,11 @@ public class EnvironmentMapCommandHandlerTests
         var handler = new AddEnvironmentMapVariantWithFileCommandHandler(
             _environmentMapRepository.Object,
             _fileCreationService.Object,
+            _sizeLabelService.Object,
+            _thumbnailQueue.Object,
             _dateTimeProvider.Object);
 
-        var command = new AddEnvironmentMapVariantWithFileCommand(environmentMap.Id, fileUpload, "8K");
+        var command = new AddEnvironmentMapVariantWithFileCommand(environmentMap.Id, fileUpload, null, "8K");
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -110,6 +120,63 @@ public class EnvironmentMapCommandHandlerTests
         Assert.Equal(file.Id, result.Value.FileId);
         Assert.Equal(44, environmentMap.PreviewVariantId);
         _environmentMapRepository.Verify(x => x.UpdateAsync(environmentMap, It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task AddVariantWithFile_WhenSizeLabelMissing_InfersFromFileDimensions()
+    {
+        var now = DateTime.UtcNow;
+        _dateTimeProvider.Setup(x => x.UtcNow).Returns(now);
+
+        var environmentMap = EnvironmentMap.Create("Sky", now).WithId(77);
+        var fileUpload = CreateFileUpload("sky.hdr");
+        var file = CreateEnvironmentMapFile("sky.hdr", now).WithId(91);
+
+        _environmentMapRepository
+            .Setup(x => x.GetByIdAsync(environmentMap.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(environmentMap);
+
+        _fileCreationService
+            .Setup(x => x.CreateOrGetExistingFileAsync(fileUpload, It.IsAny<FileType>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(file));
+
+        _sizeLabelService
+            .Setup(x => x.InferSizeLabelAsync(
+                It.Is<IReadOnlyCollection<DomainFile>>(files => files.Single().Id == file.Id),
+                EnvironmentMapProjectionType.Panoramic,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success("4K"));
+
+        _thumbnailQueue
+            .Setup(x => x.EnqueueEnvironmentMapThumbnailAsync(environmentMap.Id, It.IsAny<int>(), true, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ThumbnailJob.CreateForEnvironmentMap(environmentMap.Id, 91, now));
+
+        _environmentMapRepository
+            .Setup(x => x.UpdateAsync(environmentMap, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((EnvironmentMap map, CancellationToken _) => map);
+
+        var handler = new AddEnvironmentMapVariantWithFileCommandHandler(
+            _environmentMapRepository.Object,
+            _fileCreationService.Object,
+            _sizeLabelService.Object,
+            _thumbnailQueue.Object,
+            _dateTimeProvider.Object);
+
+        var result = await handler.Handle(
+            new AddEnvironmentMapVariantWithFileCommand(environmentMap.Id, fileUpload, null, null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("4K", environmentMap.Variants.Single().SizeLabel);
+        _sizeLabelService.Verify(
+            x => x.InferSizeLabelAsync(
+                It.IsAny<IReadOnlyCollection<DomainFile>>(),
+                EnvironmentMapProjectionType.Panoramic,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        _thumbnailQueue.Verify(
+            x => x.EnqueueEnvironmentMapThumbnailAsync(environmentMap.Id, It.IsAny<int>(), true, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     private static IFileUpload CreateFileUpload(string fileName)

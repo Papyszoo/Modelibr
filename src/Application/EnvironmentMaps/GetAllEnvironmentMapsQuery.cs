@@ -42,7 +42,7 @@ internal sealed class GetAllEnvironmentMapsQueryHandler : IQueryHandler<GetAllEn
         }
 
         var items = environmentMaps
-            .Select(MapListDto)
+            .Select(EnvironmentMapDtoMappings.MapListDto)
             .ToList();
 
         int? totalPages = (totalCount.HasValue && query.PageSize.HasValue)
@@ -50,20 +50,6 @@ internal sealed class GetAllEnvironmentMapsQueryHandler : IQueryHandler<GetAllEn
             : null;
 
         return Result.Success(new GetAllEnvironmentMapsResponse(items, totalCount, query.Page, query.PageSize, totalPages));
-    }
-
-    internal static EnvironmentMapListDto MapListDto(Domain.Models.EnvironmentMap environmentMap)
-    {
-        var previewVariant = environmentMap.GetPreviewVariant();
-        return new EnvironmentMapListDto(
-            environmentMap.Id,
-            environmentMap.Name,
-            environmentMap.VariantCount,
-            environmentMap.PreviewVariantId,
-            previewVariant?.FileId,
-            previewVariant != null ? $"/files/{previewVariant.FileId}/preview?channel=rgb" : null,
-            environmentMap.CreatedAt,
-            environmentMap.UpdatedAt);
     }
 }
 

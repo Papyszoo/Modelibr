@@ -156,9 +156,7 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>
         // Assert: At least one succeeds
         Assert.Contains(responses, r => r.IsSuccessStatusCode);
 
-        // BUG: Concurrent duplicate associations cause unhandled DbUpdateException (500).
-        // Once fixed, uncomment this assertion:
-        // Assert.DoesNotContain(responses, r => r.StatusCode == HttpStatusCode.InternalServerError);
+        Assert.DoesNotContain(responses, r => r.StatusCode == HttpStatusCode.InternalServerError);
 
         // Verify the pack has exactly 1 model (not 5 duplicate entries)
         var packResp = await _client.GetAsync($"/packs/{packId}");

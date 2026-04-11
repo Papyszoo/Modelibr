@@ -1002,11 +1002,18 @@ export function RecycledFilesList() {
                     className="recycled-card recycled-card-panoramic"
                   >
                     <div className="recycled-card-thumbnail recycled-card-thumbnail-panoramic">
-                      <img
-                        src={getFilePreviewUrl(variant.fileId.toString())}
-                        alt={`${variant.environmentMapName} ${variant.sizeLabel}`}
-                        className="recycled-card-image recycled-card-image-panoramic"
-                      />
+                      {variant.fileId != null ? (
+                        <img
+                          src={getFilePreviewUrl(variant.fileId.toString())}
+                          alt={`${variant.environmentMapName} ${variant.sizeLabel}`}
+                          className="recycled-card-image recycled-card-image-panoramic"
+                        />
+                      ) : (
+                        <div className="environment-map-placeholder">
+                          <i className="pi pi-globe" />
+                          <span>No Preview</span>
+                        </div>
+                      )}
                       <div className="recycled-card-actions">
                         <Button
                           icon="pi pi-replay"

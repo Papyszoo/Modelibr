@@ -18,12 +18,9 @@ internal class GetAllSpriteCategoriesQueryHandler : IQueryHandler<GetAllSpriteCa
         var categories = await _categoryRepository.GetAllAsync(cancellationToken);
 
         var categoryDtos = categories
-            .Select(c => new SpriteCategoryDto(
-                c.Id,
-                c.Name,
-                c.Description,
-                c.CreatedAt,
-                c.UpdatedAt))
+            .OrderBy(c => c.ParentId)
+            .ThenBy(c => c.Name)
+            .Select(c => SpriteCategoryMappings.ToSummaryDto(c, categories))
             .ToList();
 
         return Result.Success(new GetAllSpriteCategoriesResponse(categoryDtos));
@@ -32,11 +29,4 @@ internal class GetAllSpriteCategoriesQueryHandler : IQueryHandler<GetAllSpriteCa
 
 public record GetAllSpriteCategoriesQuery : IQuery<GetAllSpriteCategoriesResponse>;
 
-public record GetAllSpriteCategoriesResponse(IReadOnlyList<SpriteCategoryDto> Categories);
-
-public record SpriteCategoryDto(
-    int Id,
-    string Name,
-    string? Description,
-    DateTime CreatedAt,
-    DateTime UpdatedAt);
+public record GetAllSpriteCategoriesResponse(IReadOnlyList<SpriteCategorySummaryDto> Categories);

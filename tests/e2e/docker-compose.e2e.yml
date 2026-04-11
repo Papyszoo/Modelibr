@@ -45,10 +45,12 @@ services:
             context: ../../src/asset-processor
             dockerfile: Dockerfile
         container_name: asset-processor-e2e
+        user: "0:0"
         environment:
             - WORKER_ID=worker-e2e
             - WORKER_PORT=3001
             - API_BASE_URL=http://webapi-e2e:8080
+            - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
             - MAX_CONCURRENT_JOBS=3
             - RENDER_WIDTH=256
             - RENDER_HEIGHT=256
@@ -65,6 +67,7 @@ services:
             retries: 10
         volumes:
             - worker-thumbnails:/var/lib/modelibr/thumbnails
+            - webapi-uploads:/var/lib/modelibr/uploads
             - blender-data:/var/lib/modelibr/blender
         depends_on:
             webapi-e2e:

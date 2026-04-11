@@ -14,6 +14,7 @@ namespace Application.TextureSets;
 internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse>
 {
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ITextureSetCategoryRepository _textureSetCategoryRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -22,6 +23,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
 
     public CreateTextureSetWithFileCommandHandler(
         ITextureSetRepository textureSetRepository,
+        ITextureSetCategoryRepository textureSetCategoryRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
@@ -29,6 +31,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
         ILogger<CreateTextureSetWithFileCommandHandler> logger)
     {
         _textureSetRepository = textureSetRepository;
+        _textureSetCategoryRepository = textureSetCategoryRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
@@ -60,8 +63,19 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
 
             var file = fileResult.Value;
 
+            if (command.CategoryId.HasValue)
+            {
+                var category = await _textureSetCategoryRepository.GetByIdAsync(command.CategoryId.Value, cancellationToken);
+                if (category == null)
+                {
+                    return Result.Failure<CreateTextureSetWithFileResponse>(
+                        new Error("CategoryNotFound", $"Texture set category with ID {command.CategoryId.Value} was not found."));
+                }
+            }
+
             // 3. Create the texture set
             var textureSet = TextureSet.Create(command.Name, _dateTimeProvider.UtcNow, command.Kind);
+            textureSet.AssignCategory(command.CategoryId, _dateTimeProvider.UtcNow);
             var createdTextureSet = await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 
             // 4. Create and add texture to the set
@@ -105,7 +119,8 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
                 updatedTextureSet.Name,
                 file.Id,
                 texture.Id,
-                texture.TextureType));
+                texture.TextureType,
+                updatedTextureSet.TextureSetCategoryId));
         }
         catch (ArgumentException ex)
         {
@@ -125,11 +140,13 @@ public record CreateTextureSetWithFileCommand(
     string Name,
     TextureType TextureType,
     string? BatchId,
-    TextureSetKind Kind = TextureSetKind.ModelSpecific) : ICommand<CreateTextureSetWithFileResponse>;
+    TextureSetKind Kind = TextureSetKind.ModelSpecific,
+    int? CategoryId = null) : ICommand<CreateTextureSetWithFileResponse>;
 
 public record CreateTextureSetWithFileResponse(
     int TextureSetId,
     string Name,
     int FileId,
     int TextureId,
-    TextureType TextureType);
+    TextureType TextureType,
+    int? CategoryId);

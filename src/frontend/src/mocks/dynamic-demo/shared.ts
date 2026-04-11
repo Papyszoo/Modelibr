@@ -5,6 +5,9 @@ import {
   addUploadHistory,
   type DemoCategory,
   type DemoEnvironmentMap,
+  type DemoEnvironmentMapCubeFaces,
+  type DemoEnvironmentMapFile,
+  type DemoEnvironmentMapVariant,
   type DemoModel,
   type DemoModelVersion,
   type DemoPack,
@@ -308,6 +311,158 @@ export function getActiveEnvironmentMapVariants(
   return (environmentMap.variants ?? []).filter(variant => !variant.isDeleted)
 }
 
+const ENVIRONMENT_MAP_CUBE_FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const
+
+function parseEnvironmentMapFileId(fileUrl?: string | null): number | null {
+  if (!fileUrl) return null
+
+  const match = fileUrl.match(/\/files\/(\d+)/)
+  if (!match) return null
+
+  const fileId = Number(match[1])
+  return Number.isFinite(fileId) ? fileId : null
+}
+
+function buildDemoEnvironmentMapFile(
+  fileId: number,
+  fileName: string,
+  fileSizeBytes: number,
+  fileUrl?: string | null,
+  previewUrl?: string | null
+): DemoEnvironmentMapFile {
+  return {
+    fileId,
+    fileName,
+    fileSizeBytes,
+    previewUrl: previewUrl ?? `/files/${fileId}/preview?channel=rgb`,
+    fileUrl: fileUrl ?? `/files/${fileId}`,
+  }
+}
+
+function getEnvironmentMapCubeFaces(
+  variant: DemoEnvironmentMapVariant
+): DemoEnvironmentMapCubeFaces | null {
+  if (variant.cubeFaces) {
+    return variant.cubeFaces
+  }
+
+  const cubeFaceUrls = variant.cubeFaceUrls ?? null
+  if (!cubeFaceUrls) {
+    return null
+  }
+
+  const faces = ENVIRONMENT_MAP_CUBE_FACES.map(face => {
+    const fileUrl = cubeFaceUrls[face]
+    const fileId = parseEnvironmentMapFileId(fileUrl)
+    if (!fileUrl || !fileId) {
+      return null
+    }
+
+    return [
+      face,
+      buildDemoEnvironmentMapFile(
+        fileId,
+        `${variant.fileName || 'Cube map'}_${face}`,
+        0,
+        fileUrl,
+        `/files/${fileId}/preview?channel=rgb`
+      ),
+    ] as const
+  })
+
+  if (faces.some(face => face === null)) {
+    return null
+  }
+
+  return Object.fromEntries(
+    faces as Array<
+      readonly [
+        (typeof ENVIRONMENT_MAP_CUBE_FACES)[number],
+        DemoEnvironmentMapFile,
+      ]
+    >
+  ) as DemoEnvironmentMapCubeFaces
+}
+
+function getEnvironmentMapCubeFaceUrls(
+  variant?: DemoEnvironmentMapVariant | null
+): Partial<
+  Record<(typeof ENVIRONMENT_MAP_CUBE_FACES)[number], string | null>
+> | null {
+  if (!variant) return null
+
+  if (variant.cubeFaceUrls) {
+    return variant.cubeFaceUrls
+  }
+
+  const cubeFaces = getEnvironmentMapCubeFaces(variant)
+  if (!cubeFaces) {
+    return null
+  }
+
+  return {
+    px: cubeFaces.px.fileUrl,
+    nx: cubeFaces.nx.fileUrl,
+    py: cubeFaces.py.fileUrl,
+    ny: cubeFaces.ny.fileUrl,
+    pz: cubeFaces.pz.fileUrl,
+    nz: cubeFaces.nz.fileUrl,
+  }
+}
+
+function getEnvironmentMapPanoramicFile(
+  variant: DemoEnvironmentMapVariant
+): DemoEnvironmentMapFile | null {
+  if (variant.panoramicFile) {
+    return variant.panoramicFile
+  }
+
+  if (!variant.fileId) {
+    return null
+  }
+
+  return buildDemoEnvironmentMapFile(
+    variant.fileId,
+    variant.fileName,
+    variant.fileSizeBytes,
+    variant.fileUrl
+  )
+}
+
+function getEnvironmentMapVariantSourceType(
+  variant?: DemoEnvironmentMapVariant | null
+) {
+  if (!variant) return 'single'
+  return (
+    variant.sourceType ??
+    (getEnvironmentMapCubeFaces(variant) ? 'cube' : 'single')
+  )
+}
+
+function getEnvironmentMapVariantProjectionType(
+  variant?: DemoEnvironmentMapVariant | null
+) {
+  if (!variant) return 'equirectangular'
+  return (
+    variant.projectionType ??
+    (getEnvironmentMapCubeFaces(variant) ? 'cube' : 'equirectangular')
+  )
+}
+
+function getEnvironmentMapVariantPreviewFileId(
+  variant?: DemoEnvironmentMapVariant | null
+) {
+  if (!variant) return null
+
+  return (
+    variant.previewFileId ??
+    variant.panoramicFile?.fileId ??
+    getEnvironmentMapCubeFaces(variant)?.px.fileId ??
+    variant.fileId ??
+    null
+  )
+}
+
 export function syncEnvironmentMapDerivedFields(
   environmentMap: DemoEnvironmentMap
 ): DemoEnvironmentMap {
@@ -316,11 +471,31 @@ export function syncEnvironmentMapDerivedFields(
     variants.find(variant => variant.id === environmentMap.previewVariantId) ??
     variants[0] ??
     null
+  const representativeVariant = previewVariant ?? variants[0] ?? null
 
   environmentMap.variantCount = variants.length
   environmentMap.previewVariantId = previewVariant?.id ?? null
-  environmentMap.previewFileId = previewVariant?.fileId ?? null
-  environmentMap.previewUrl = previewVariant?.previewUrl ?? null
+  environmentMap.previewSizeLabel = previewVariant?.sizeLabel ?? null
+  environmentMap.previewFileId =
+    getEnvironmentMapVariantPreviewFileId(previewVariant)
+  environmentMap.previewUrl = previewVariant
+    ? `/environment-maps/${environmentMap.id}/preview`
+    : null
+  environmentMap.sourceType = getEnvironmentMapVariantSourceType(
+    representativeVariant
+  )
+  environmentMap.projectionType = getEnvironmentMapVariantProjectionType(
+    representativeVariant
+  )
+  environmentMap.panoramicFile = representativeVariant
+    ? getEnvironmentMapPanoramicFile(representativeVariant)
+    : null
+  environmentMap.cubeFaces = representativeVariant
+    ? getEnvironmentMapCubeFaces(representativeVariant)
+    : null
+  environmentMap.cubeFaceUrls = getEnvironmentMapCubeFaceUrls(
+    representativeVariant
+  )
 
   return environmentMap
 }
@@ -330,7 +505,45 @@ export function toEnvironmentMapDto(environmentMap: DemoEnvironmentMap) {
 
   return {
     ...synced,
-    variants: getActiveEnvironmentMapVariants(synced),
+    previewFileId: synced.previewFileId ?? null,
+    previewUrl: synced.previewUrl ?? null,
+    customThumbnailFileId: synced.customThumbnailFileId ?? null,
+    customThumbnailUrl: synced.customThumbnailUrl ?? null,
+    categoryId: synced.categoryId ?? null,
+    previewSizeLabel: synced.previewSizeLabel ?? null,
+    tags: synced.tags ?? [],
+    sourceType: synced.sourceType ?? 'single',
+    projectionType: synced.projectionType ?? 'equirectangular',
+    cubeFaceUrls: synced.cubeFaceUrls ?? null,
+    panoramicFile: synced.panoramicFile ?? null,
+    cubeFaces: synced.cubeFaces ?? null,
+    variants: getActiveEnvironmentMapVariants(synced).map(variant => ({
+      ...variant,
+      previewFileId: getEnvironmentMapVariantPreviewFileId(variant),
+      fileId:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? null
+          : (variant.fileId ?? variant.panoramicFile?.fileId ?? null),
+      fileName:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? 'Cube map'
+          : variant.fileName,
+      previewUrl: getEnvironmentMapVariantPreviewFileId(variant)
+        ? `/environment-maps/${synced.id}/variants/${variant.id}/preview`
+        : null,
+      fileUrl:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? null
+          : (variant.fileUrl ?? variant.panoramicFile?.fileUrl ?? null),
+      sourceType: getEnvironmentMapVariantSourceType(variant),
+      projectionType: getEnvironmentMapVariantProjectionType(variant),
+      cubeFaceUrls: getEnvironmentMapCubeFaceUrls(variant),
+      panoramicFile:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? null
+          : getEnvironmentMapPanoramicFile(variant),
+      cubeFaces: getEnvironmentMapCubeFaces(variant),
+    })),
     packs: synced.packs ?? [],
     projects: synced.projects ?? [],
   }
@@ -735,6 +948,33 @@ export async function ensureDemoDataShape(): Promise<void> {
 
     if (changed) {
       await put('projects', project)
+    }
+  }
+
+  const sounds = await getAll('sounds')
+  for (const sound of sounds) {
+    let changed = false
+
+    if (
+      sound.id === 1 &&
+      sound.name === 'Test Tone' &&
+      sound.categoryId !== null
+    ) {
+      sound.categoryId = null
+      changed = true
+    }
+
+    if (
+      sound.id === 1 &&
+      sound.name === 'Test Tone' &&
+      sound.categoryName !== null
+    ) {
+      sound.categoryName = null
+      changed = true
+    }
+
+    if (changed) {
+      await put('sounds', sound)
     }
   }
 

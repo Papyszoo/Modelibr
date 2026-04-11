@@ -84,7 +84,7 @@ public record RecycledEnvironmentMapVariantDto(
     int Id,
     int EnvironmentMapId,
     string EnvironmentMapName,
-    int FileId,
+    int? FileId,
     string SizeLabel,
     DateTime DeletedAt
 );
@@ -200,7 +200,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
                 e.Name,
                 e.DeletedAt!.Value,
                 e.Variants.Count,
-                previewVariant?.FileId);
+                previewVariant?.GetPreviewFile()?.Id);
         }).ToList();
 
         var deletedVariantParents = await _environmentMapRepository.GetAllWithDeletedVariantsAsync(cancellationToken);
@@ -209,7 +209,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
                 v.Id,
                 e.Id,
                 e.Name,
-                v.FileId,
+                v.GetPreviewFile()?.Id,
                 v.SizeLabel,
                 v.DeletedAt ?? e.DeletedAt!.Value)))
             .Concat(deletedVariantParents.SelectMany(e => e.Variants
@@ -218,7 +218,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
                     v.Id,
                     e.Id,
                     e.Name,
-                    v.FileId,
+                    v.GetPreviewFile()?.Id,
                     v.SizeLabel,
                     v.DeletedAt!.Value))))
             .ToList();

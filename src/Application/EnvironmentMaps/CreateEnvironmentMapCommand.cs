@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Models;
 using Domain.Services;
 using SharedKernel;
@@ -10,15 +11,21 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IEnvironmentMapSizeLabelService _sizeLabelService;
+    private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CreateEnvironmentMapCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileRepository fileRepository,
+        IEnvironmentMapSizeLabelService sizeLabelService,
+        IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileRepository = fileRepository;
+        _sizeLabelService = sizeLabelService;
+        _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -33,25 +40,41 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
                     new Error("EnvironmentMapAlreadyExists", $"An environment map with the name '{command.Name}' already exists."));
             }
 
-            var file = await _fileRepository.GetByIdAsync(command.FileId, cancellationToken);
-            if (file == null)
-            {
-                return Result.Failure<CreateEnvironmentMapResponse>(
-                    new Error("FileNotFound", $"File with ID {command.FileId} was not found."));
-            }
+            var resolvedFilesResult = await EnvironmentMapVariantSupport.ResolveFromExistingFilesAsync(
+                new EnvironmentMapVariantReferenceInput(command.FileId, command.CubeFaces),
+                _fileRepository,
+                cancellationToken);
+            if (resolvedFilesResult.IsFailure)
+                return Result.Failure<CreateEnvironmentMapResponse>(resolvedFilesResult.Error);
 
             var now = _dateTimeProvider.UtcNow;
+            var sizeLabelResult = await EnvironmentMapVariantSupport.ResolveSizeLabelAsync(
+                command.SizeLabel,
+                resolvedFilesResult.Value,
+                _sizeLabelService,
+                cancellationToken);
+            if (sizeLabelResult.IsFailure)
+                return Result.Failure<CreateEnvironmentMapResponse>(sizeLabelResult.Error);
+
             var environmentMap = EnvironmentMap.Create(command.Name, now);
             var created = await _environmentMapRepository.AddAsync(environmentMap, cancellationToken);
 
-            var variant = EnvironmentMapVariant.Create(file, command.SizeLabel, now);
+            var variant = resolvedFilesResult.Value.CreateVariant(sizeLabelResult.Value, now);
             created.AddVariant(variant, now);
             await _environmentMapRepository.UpdateAsync(created, cancellationToken);
 
             created.SetPreviewVariant(variant.Id, now);
             await _environmentMapRepository.UpdateAsync(created, cancellationToken);
 
-            return Result.Success(new CreateEnvironmentMapResponse(created.Id, created.Name, variant.Id, variant.FileId, created.PreviewVariantId));
+            await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(created.Id, variant.Id, cancellationToken: cancellationToken);
+
+            return Result.Success(new CreateEnvironmentMapResponse(
+                created.Id,
+                created.Name,
+                variant.Id,
+                resolvedFilesResult.Value.PreviewFile?.Id ?? 0,
+                created.PreviewVariantId,
+                variant.ProjectionType.ToString().ToLowerInvariant()));
         }
         catch (ArgumentException ex)
         {
@@ -64,5 +87,16 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
     }
 }
 
-public record CreateEnvironmentMapCommand(string Name, int FileId, string SizeLabel) : ICommand<CreateEnvironmentMapResponse>;
-public record CreateEnvironmentMapResponse(int Id, string Name, int VariantId, int FileId, int? PreviewVariantId);
+public record CreateEnvironmentMapCommand(
+    string Name,
+    int? FileId,
+    string? SizeLabel,
+    EnvironmentMapCubeFaceFileIds? CubeFaces) : ICommand<CreateEnvironmentMapResponse>;
+
+public record CreateEnvironmentMapResponse(
+    int Id,
+    string Name,
+    int VariantId,
+    int FileId,
+    int? PreviewVariantId,
+    string ProjectionType);

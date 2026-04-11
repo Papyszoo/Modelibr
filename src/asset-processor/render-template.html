@@ -39,6 +39,7 @@
       import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
       import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
       import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'
+      import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
       import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
       import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
@@ -49,6 +50,14 @@
         renderer: null,
         model: null,
         modelContainer: null, // Container for model rotation
+        environmentRoot: null,
+        disposableTextures: [],
+        disposableMaterials: [],
+        disposableGeometries: [],
+        defaultEnvironment: null,
+        defaultEnvironmentIntensity: 0.3,
+        lights: null,
+        orbitMode: 'model',
         isReady: false,
         error: null,
         useWebGPU: false,
@@ -166,13 +175,282 @@
         scene.environment = envMap
         scene.environmentIntensity = 0.3
         roomEnv.dispose()
-        pmremGenerator.dispose()
 
         window.modelRenderer.scene = scene
         window.modelRenderer.camera = camera
         window.modelRenderer.renderer = renderer
+        window.modelRenderer.pmremGenerator = pmremGenerator
+        window.modelRenderer.defaultEnvironment = envMap
+        window.modelRenderer.defaultEnvironmentIntensity = 0.3
+        window.modelRenderer.lights = {
+          ambient: ambientLight,
+          directional: directionalLight,
+          point: pointLight,
+          spot: spotLight,
+        }
 
         return true
+      }
+
+      function registerDisposableTexture(texture) {
+        if (texture) {
+          window.modelRenderer.disposableTextures.push(texture)
+        }
+      }
+
+      function registerDisposableMaterial(material) {
+        if (material) {
+          window.modelRenderer.disposableMaterials.push(material)
+        }
+      }
+
+      function registerDisposableGeometry(geometry) {
+        if (geometry) {
+          window.modelRenderer.disposableGeometries.push(geometry)
+        }
+      }
+
+      function disposeRegisteredResources() {
+        for (const texture of window.modelRenderer.disposableTextures) {
+          try {
+            texture.dispose?.()
+          } catch (e) {
+            console.warn('Failed to dispose texture:', e)
+          }
+        }
+
+        for (const material of window.modelRenderer.disposableMaterials) {
+          try {
+            if (Array.isArray(material)) {
+              material.forEach(entry => entry?.dispose?.())
+            } else {
+              material.dispose?.()
+            }
+          } catch (e) {
+            console.warn('Failed to dispose material:', e)
+          }
+        }
+
+        for (const geometry of window.modelRenderer.disposableGeometries) {
+          try {
+            geometry.dispose?.()
+          } catch (e) {
+            console.warn('Failed to dispose geometry:', e)
+          }
+        }
+
+        window.modelRenderer.disposableTextures = []
+        window.modelRenderer.disposableMaterials = []
+        window.modelRenderer.disposableGeometries = []
+      }
+
+      function applyDefaultSceneEnvironment() {
+        const scene = window.modelRenderer.scene
+        if (!scene) return
+
+        scene.background = null
+        scene.backgroundBlurriness = 0
+        scene.environment = window.modelRenderer.defaultEnvironment
+        scene.environmentIntensity =
+          window.modelRenderer.defaultEnvironmentIntensity
+        window.modelRenderer.orbitMode = 'model'
+
+        const lights = window.modelRenderer.lights
+        if (lights) {
+          lights.ambient.intensity = 0.35
+          lights.directional.intensity = 0.45
+          lights.point.intensity = 0.2
+          lights.spot.intensity = 0.25
+        }
+      }
+
+      function applyEnvironmentSceneLighting() {
+        const lights = window.modelRenderer.lights
+        if (!lights) return
+
+        lights.ambient.intensity = 0.06
+        lights.directional.intensity = 0.12
+        lights.point.intensity = 0.05
+        lights.spot.intensity = 0.08
+      }
+
+      function createEnvironmentSphere(options = {}) {
+        const THREE = window.THREE
+        const group = new THREE.Group()
+
+        const sphereGeometry = new THREE.SphereGeometry(
+          1.15,
+          options.sphereSegments || 96,
+          Math.max(24, Math.floor((options.sphereSegments || 96) / 2))
+        )
+        const sphereMaterial = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          metalness: options.sphereMetalness ?? 1,
+          roughness: options.sphereRoughness ?? 0.08,
+          envMapIntensity: options.environmentIntensity ?? 1.2,
+        })
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial)
+        sphere.castShadow = true
+        sphere.receiveShadow = true
+        group.add(sphere)
+
+        const baseGeometry = new THREE.CircleGeometry(1.7, 64)
+        const baseMaterial = new THREE.MeshStandardMaterial({
+          color: 0x181818,
+          metalness: 0.05,
+          roughness: 0.9,
+          envMapIntensity: 0.25,
+        })
+        const base = new THREE.Mesh(baseGeometry, baseMaterial)
+        base.rotation.x = -Math.PI / 2
+        base.position.y = -1.24
+        base.receiveShadow = true
+        group.add(base)
+
+        registerDisposableGeometry(sphereGeometry)
+        registerDisposableMaterial(sphereMaterial)
+        registerDisposableGeometry(baseGeometry)
+        registerDisposableMaterial(baseMaterial)
+
+        return group
+      }
+
+      function buildPanoramicBackground(texture) {
+        const THREE = window.THREE
+        const geometry = new THREE.SphereGeometry(40, 64, 48)
+        const material = new THREE.MeshBasicMaterial({
+          map: texture,
+          side: THREE.BackSide,
+        })
+        const mesh = new THREE.Mesh(geometry, material)
+        registerDisposableGeometry(geometry)
+        registerDisposableMaterial(material)
+        return mesh
+      }
+
+      function buildCubeBackground(faceTextures) {
+        const THREE = window.THREE
+        const geometry = new THREE.BoxGeometry(60, 60, 60)
+        const materialOrder = ['px', 'nx', 'py', 'ny', 'pz', 'nz']
+        const materials = materialOrder.map(faceKey => {
+          const material = new THREE.MeshBasicMaterial({
+            map: faceTextures[faceKey],
+            side: THREE.BackSide,
+          })
+          registerDisposableMaterial(material)
+          return material
+        })
+
+        const mesh = new THREE.Mesh(geometry, materials)
+        registerDisposableGeometry(geometry)
+        return mesh
+      }
+
+      async function loadTextureDescriptor(descriptor, useSrgb = true) {
+        const THREE = window.THREE
+        if (!descriptor?.url) {
+          throw new Error('Texture descriptor url is required')
+        }
+
+        const ext = descriptor.extension?.toLowerCase() || ''
+
+        if (ext === '.exr') {
+          const loader = new window.EXRLoader()
+          const texture = await loader.loadAsync(descriptor.url)
+          texture.colorSpace = THREE.LinearSRGBColorSpace
+          texture.needsUpdate = true
+          registerDisposableTexture(texture)
+          return texture
+        }
+
+        if (ext === '.hdr') {
+          const loader = new window.RGBELoader()
+          const texture = await loader.loadAsync(descriptor.url)
+          texture.colorSpace = THREE.LinearSRGBColorSpace
+          texture.needsUpdate = true
+          registerDisposableTexture(texture)
+          return texture
+        }
+
+        const loader = new THREE.TextureLoader()
+        const texture = await loader.loadAsync(descriptor.url)
+        texture.colorSpace = useSrgb
+          ? THREE.SRGBColorSpace
+          : THREE.LinearSRGBColorSpace
+        texture.needsUpdate = true
+        registerDisposableTexture(texture)
+        return texture
+      }
+
+      async function buildCubePmrem(faceTextures) {
+        const pmremScene = new THREE.Scene()
+        pmremScene.add(buildCubeBackground(faceTextures))
+        const envRenderTarget = window.modelRenderer.pmremGenerator.fromScene(
+          pmremScene,
+          0,
+          0.1,
+          80
+        )
+        registerDisposableTexture(envRenderTarget)
+        return envRenderTarget.texture
+      }
+
+      async function loadEnvironmentPreview(source, options = {}) {
+        if (!window.modelRenderer.scene || !window.modelRenderer.pmremGenerator) {
+          throw new Error('Renderer scene is not initialized')
+        }
+
+        clearScene()
+        applyEnvironmentSceneLighting()
+
+        const scene = window.modelRenderer.scene
+        const root = new window.THREE.Group()
+        let environmentTexture = null
+
+        if (source.projectionType === 'cube') {
+          const cubeTextures = {}
+          for (const face of ['px', 'nx', 'py', 'ny', 'pz', 'nz']) {
+            cubeTextures[face] = await loadTextureDescriptor(
+              source.cubeFaces?.[face],
+              true
+            )
+          }
+
+          root.add(buildCubeBackground(cubeTextures))
+          environmentTexture = await buildCubePmrem(cubeTextures)
+          scene.background = null
+        } else {
+          const panoramicTexture = await loadTextureDescriptor(source.panoramic)
+          panoramicTexture.mapping =
+            window.THREE.EquirectangularReflectionMapping
+          const envRenderTarget =
+            window.modelRenderer.pmremGenerator.fromEquirectangular(
+              panoramicTexture
+            )
+          environmentTexture = envRenderTarget.texture
+          registerDisposableTexture(envRenderTarget)
+          root.add(buildPanoramicBackground(panoramicTexture))
+          scene.background = null
+          scene.backgroundBlurriness = 0
+        }
+
+        scene.environment = environmentTexture
+        scene.environmentIntensity = options.environmentIntensity ?? 1.2
+
+        const previewSphere = createEnvironmentSphere(options)
+        const normInfo = window.normalizeModel(previewSphere, 2.6)
+        window.modelRenderer.model = previewSphere
+        window.modelRenderer.environmentRoot = root
+        window.modelRenderer.scene.add(root)
+        window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
+        window.modelRenderer.orbitMode = 'camera'
+        window.modelRenderer.isReady = true
+
+        return {
+          success: true,
+          polygonCount: window.countPolygons(previewSphere),
+          boundingSphereRadius: normInfo.boundingSphereRadius,
+        }
       }
 
       // Load model from data URL or URL
@@ -285,27 +563,31 @@
 
       // Position camera for rendering (now rotates model instead of camera)
       function positionCamera(azimuthAngle, distance, elevationAngle = 0) {
-        // Set camera to fixed position based on distance
-        // Camera is positioned in front of the model along the Z-axis
+        const azimuthRad = (azimuthAngle * Math.PI) / 180
+        const elevationRad = (elevationAngle * Math.PI) / 180
+
+        if (window.modelRenderer.orbitMode === 'camera') {
+          const horizontalDistance = distance * Math.cos(elevationRad)
+          const cameraY = distance * Math.sin(elevationRad)
+          const cameraX = horizontalDistance * Math.sin(azimuthRad)
+          const cameraZ = horizontalDistance * Math.cos(azimuthRad)
+
+          window.modelRenderer.camera.position.set(cameraX, cameraY, cameraZ)
+          window.modelRenderer.camera.lookAt(0, 0, 0)
+
+          if (window.modelRenderer.modelContainer) {
+            window.modelRenderer.modelContainer.rotation.set(0, 0, 0)
+          }
+
+          return
+        }
+
         window.modelRenderer.camera.position.set(0, 0, distance)
         window.modelRenderer.camera.lookAt(0, 0, 0)
 
-        // Rotate the model container instead of moving the camera
         if (window.modelRenderer.modelContainer) {
-          // Convert angles to radians
-          const azimuthRad = (azimuthAngle * Math.PI) / 180
-          const elevationRad = (elevationAngle * Math.PI) / 180
-
-          // Reset rotation first to avoid accumulation
           window.modelRenderer.modelContainer.rotation.set(0, 0, 0)
-
-          // Apply rotations
-          // Azimuth rotates around Y-axis (horizontal rotation)
           window.modelRenderer.modelContainer.rotation.y = azimuthRad
-
-          // Elevation rotates around X-axis (vertical tilt)
-          // Note: We use negative elevation to maintain the same viewing angle
-          // as the old camera-orbit approach
           window.modelRenderer.modelContainer.rotation.x = -elevationRad
         }
       }
@@ -360,6 +642,8 @@
 
       // Clear the scene by removing the previous model
       function clearScene() {
+        disposeRegisteredResources()
+
         if (window.modelRenderer.modelContainer && window.modelRenderer.scene) {
           try {
             // Remove the container (which includes the model) from the scene
@@ -403,20 +687,27 @@
             // Clear the references
             window.modelRenderer.model = null
             window.modelRenderer.modelContainer = null
-            window.modelRenderer.isReady = false
-
-            console.log('Scene cleared successfully')
-            return true
           } catch (error) {
             console.error('Error clearing scene:', error)
-            // Still clear the references even if disposal fails
-            window.modelRenderer.model = null
-            window.modelRenderer.modelContainer = null
-            window.modelRenderer.isReady = false
-            return false
           }
         }
-        return false
+
+        if (window.modelRenderer.environmentRoot && window.modelRenderer.scene) {
+          try {
+            window.modelRenderer.scene.remove(window.modelRenderer.environmentRoot)
+          } catch (error) {
+            console.warn('Failed to remove environment root:', error)
+          }
+        }
+
+        window.modelRenderer.environmentRoot = null
+        window.modelRenderer.model = null
+        window.modelRenderer.modelContainer = null
+        window.modelRenderer.isReady = false
+        applyDefaultSceneEnvironment()
+
+        console.log('Scene cleared successfully')
+        return true
       }
 
       // Expose THREE and API for Puppeteer
@@ -429,7 +720,10 @@
       window.getCanvasDataURL = getCanvasDataURL
       window.countPolygons = countPolygons
       window.clearScene = clearScene
+      window.applyDefaultSceneEnvironment = applyDefaultSceneEnvironment
+      window.loadEnvironmentPreviewFromSource = loadEnvironmentPreview
       window.EXRLoader = EXRLoader
+      window.RGBELoader = RGBELoader
       window.BufferGeometryUtils = BufferGeometryUtils
 
       console.log('3D Renderer initialized and ready')

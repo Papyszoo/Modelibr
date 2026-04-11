@@ -4,6 +4,7 @@ import { config, validateConfig, getBlenderPath } from '../config.js'
 // Save original values to restore between tests
 const originalRendering = { ...config.rendering }
 const originalOrbit = { ...config.orbit }
+const originalEnvironmentMaps = { ...config.environmentMaps }
 const originalModelProcessing = { ...config.modelProcessing }
 const originalEncoding = { ...config.encoding }
 const originalThumbnailStorage = { ...config.thumbnailStorage }
@@ -12,6 +13,7 @@ const originalBlender = { ...config.blender }
 beforeEach(() => {
   Object.assign(config.rendering, originalRendering)
   Object.assign(config.orbit, originalOrbit)
+  Object.assign(config.environmentMaps, originalEnvironmentMaps)
   Object.assign(config.modelProcessing, originalModelProcessing)
   Object.assign(config.encoding, originalEncoding)
   Object.assign(config.thumbnailStorage, originalThumbnailStorage)

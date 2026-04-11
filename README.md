@@ -21,8 +21,8 @@ The live demo stores its data in your browser, so what you add there is visible 
 | **All your asset types in one place** | Store models, texture sets, environment maps, sprites, and sounds in the same library instead of spreading them across different tools. |
 | **Projects and packs** | Group assets into project-specific collections or reusable packs you can use again later. |
 | **Model version history** | Keep multiple versions of the same model and switch between them when needed. |
-| **Built-in previews** | Browse models, environment maps, sprites, and sounds with generated previews that make the library easier to scan. |
-| **Environment map variants** | Keep multiple size variants of the same panoramic lighting asset and switch preview sizes in the browser. |
+| **Built-in previews** | Browse models, environment maps, sprites, and sounds with generated previews, including a lit Three.js environment map viewer. |
+| **Environment map variants** | Upload panoramic files or six cube faces (`px/nx/py/ny/pz/nz`), keep multiple size variants, choose the preview variant, and override it with a custom thumbnail when needed. |
 | **Texture set workflows** | Attach texture sets to model versions, choose defaults, and work with channel-packed maps. |
 | **Dual-panel workspace** | Open tabs side by side and keep your current layout in the URL for easy sharing and return visits. |
 | **WebDAV access** | Work with the library through a file-browser style workflow when that fits better than a browser-only flow. |
@@ -75,9 +75,10 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 
 ## Supported environment map uploads
 
-- common image formats supported by the preview pipeline
+- panoramic uploads in common image formats supported by the preview pipeline
 - `.hdr`
 - `.exr`
+- six-face cube uploads using `px`, `nx`, `py`, `ny`, `pz`, and `nz`
 
 ---
 

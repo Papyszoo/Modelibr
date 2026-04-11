@@ -14,6 +14,7 @@ namespace Application.Sounds;
 internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse>
 {
     private readonly ISoundRepository _soundRepository;
+    private readonly ISoundCategoryRepository _soundCategoryRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -22,6 +23,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
 
     public CreateSoundWithFileCommandHandler(
         ISoundRepository soundRepository,
+        ISoundCategoryRepository soundCategoryRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
@@ -29,6 +31,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
         ILogger<CreateSoundWithFileCommandHandler> logger)
     {
         _soundRepository = soundRepository;
+        _soundCategoryRepository = soundCategoryRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
@@ -88,6 +91,16 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
                     file.Id,
                     existingSound.Duration,
                     file.SizeBytes));
+            }
+
+            if (command.CategoryId.HasValue)
+            {
+                var category = await _soundCategoryRepository.GetByIdAsync(command.CategoryId.Value, cancellationToken);
+                if (category == null)
+                {
+                    return Result.Failure<CreateSoundWithFileResponse>(
+                        new Error("CategoryNotFound", $"Sound category with ID {command.CategoryId.Value} was not found."));
+                }
             }
 
             // 4. Create new sound

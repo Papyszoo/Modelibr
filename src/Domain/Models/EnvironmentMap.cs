@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using Domain.ValueObjects;
 
 namespace Domain.Models;
 
@@ -7,14 +7,20 @@ public class EnvironmentMap : AggregateRoot
     private readonly List<EnvironmentMapVariant> _variants = new();
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
+    private readonly List<ModelTag> _tags = new();
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int? PreviewVariantId { get; private set; }
+    public int? CustomThumbnailFileId { get; private set; }
+    public int? EnvironmentMapCategoryId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTime? DeletedAt { get; private set; }
+
+    public File? CustomThumbnailFile { get; private set; }
+    public EnvironmentMapCategory? EnvironmentMapCategory { get; private set; }
 
     public ICollection<EnvironmentMapVariant> Variants
     {
@@ -46,6 +52,17 @@ public class EnvironmentMap : AggregateRoot
             _projects.Clear();
             if (value != null)
                 _projects.AddRange(value);
+        }
+    }
+
+    public ICollection<ModelTag> Tags
+    {
+        get => _tags;
+        set
+        {
+            _tags.Clear();
+            if (value != null)
+                _tags.AddRange(value);
         }
     }
 
@@ -108,6 +125,13 @@ public class EnvironmentMap : AggregateRoot
             EnsurePreviewVariant();
         }
 
+        UpdatedAt = updatedAt;
+    }
+
+    public void SetCustomThumbnail(File? file, DateTime updatedAt)
+    {
+        CustomThumbnailFileId = file?.Id;
+        CustomThumbnailFile = file;
         UpdatedAt = updatedAt;
     }
 
@@ -190,6 +214,24 @@ public class EnvironmentMap : AggregateRoot
             UpdatedAt = updatedAt;
     }
 
+    public void SetMetadata(IEnumerable<ModelTag> tags, DateTime updatedAt)
+    {
+        _tags.Clear();
+        if (tags != null)
+        {
+            foreach (var tag in tags.GroupBy(tag => tag.NormalizedName).Select(group => group.First()))
+                _tags.Add(tag);
+        }
+
+        UpdatedAt = updatedAt;
+    }
+
+    public void AssignCategory(int? categoryId, DateTime updatedAt)
+    {
+        EnvironmentMapCategoryId = categoryId;
+        UpdatedAt = updatedAt;
+    }
+
     public void SoftDelete(DateTime deletedAt)
     {
         IsDeleted = true;
@@ -215,6 +257,11 @@ public class EnvironmentMap : AggregateRoot
     public int VariantCount => _variants.Count(v => !v.IsDeleted);
     public bool IsEmpty => VariantCount == 0;
 
+    public void Touch(DateTime updatedAt)
+    {
+        UpdatedAt = updatedAt;
+    }
+
     private void EnsurePreviewVariant()
     {
         var activeVariants = _variants.Where(v => !v.IsDeleted).ToList();
@@ -228,7 +275,7 @@ public class EnvironmentMap : AggregateRoot
             return;
 
         var candidateId = activeVariants
-            .OrderByDescending(v => GetSizeScore(v.SizeLabel))
+            .OrderByDescending(v => EnvironmentMapSizeLabel.GetSortScore(v.SizeLabel))
             .ThenBy(v => v.CreatedAt)
             .Select(v => v.Id)
             .FirstOrDefault();
@@ -249,25 +296,5 @@ public class EnvironmentMap : AggregateRoot
 
         if (name.Length > 200)
             throw new ArgumentException("Environment map name cannot exceed 200 characters.", nameof(name));
-    }
-
-    private static int GetSizeScore(string sizeLabel)
-    {
-        if (string.IsNullOrWhiteSpace(sizeLabel))
-            return 0;
-
-        var match = Regex.Match(sizeLabel.Trim(), @"^(?<value>\d+)(?<suffix>[kKmM]?)$");
-        if (!match.Success)
-            return 0;
-
-        var value = int.Parse(match.Groups["value"].Value);
-        var suffix = match.Groups["suffix"].Value.ToLowerInvariant();
-
-        return suffix switch
-        {
-            "k" => value * 1024,
-            "m" => value * 1024 * 1024,
-            _ => value
-        };
     }
 }

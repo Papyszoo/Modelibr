@@ -97,6 +97,7 @@ export interface DemoTexture {
 export interface DemoTextureSet {
   id: number
   name: string
+  categoryId?: number | null
   kind: number
   tilingScaleX: number
   tilingScaleY: number
@@ -151,26 +152,63 @@ export interface DemoSound {
 export interface DemoEnvironmentMapVariant {
   id: number
   sizeLabel: string
-  fileId: number
+  previewFileId?: number | null
+  fileId?: number | null
   fileName: string
   fileSizeBytes: number
   createdAt: string
   updatedAt: string
   isDeleted: boolean
+  previewUrl?: string | null
+  fileUrl?: string | null
+  sourceType?: string | null
+  projectionType?: string | null
+  cubeFaceUrls?: Partial<
+    Record<'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz', string | null>
+  > | null
+  panoramicFile?: DemoEnvironmentMapFile | null
+  cubeFaces?: DemoEnvironmentMapCubeFaces | null
+}
+
+export interface DemoEnvironmentMapFile {
+  fileId: number
+  fileName: string
+  fileSizeBytes: number
   previewUrl: string
   fileUrl: string
+}
+
+export interface DemoEnvironmentMapCubeFaces {
+  px: DemoEnvironmentMapFile
+  nx: DemoEnvironmentMapFile
+  py: DemoEnvironmentMapFile
+  ny: DemoEnvironmentMapFile
+  pz: DemoEnvironmentMapFile
+  nz: DemoEnvironmentMapFile
 }
 
 export interface DemoEnvironmentMap {
   id: number
   name: string
   variantCount: number
+  previewSizeLabel?: string | null
   previewVariantId?: number | null
   previewFileId?: number | null
   previewUrl?: string | null
+  customThumbnailFileId?: number | null
+  customThumbnailUrl?: string | null
+  categoryId?: number | null
+  sourceType?: string | null
+  projectionType?: string | null
+  cubeFaceUrls?: Partial<
+    Record<'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz', string | null>
+  > | null
+  panoramicFile?: DemoEnvironmentMapFile | null
+  cubeFaces?: DemoEnvironmentMapCubeFaces | null
   createdAt: string
   updatedAt: string
   variants: DemoEnvironmentMapVariant[]
+  tags?: string[]
   packs: { id: number; name: string }[]
   projects: { id: number; name: string }[]
 }
@@ -287,6 +325,8 @@ interface DemoDbSchema extends DBSchema {
   packs: { key: number; value: DemoPack }
   projects: { key: number; value: DemoProject }
   modelCategories: { key: number; value: DemoCategory }
+  textureSetCategories: { key: number; value: DemoCategory }
+  environmentMapCategories: { key: number; value: DemoCategory }
   spriteCategories: { key: number; value: DemoCategory }
   soundCategories: { key: number; value: DemoCategory }
   fileBlobs: { key: number; value: DemoFileBlob }
@@ -302,7 +342,7 @@ let dbPromise: Promise<IDBPDatabase<DemoDbSchema>> | null = null
 
 export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 5, {
+    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 6, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('models', { keyPath: 'id' })
@@ -317,6 +357,8 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
           db.createObjectStore('packs', { keyPath: 'id' })
           db.createObjectStore('projects', { keyPath: 'id' })
           db.createObjectStore('modelCategories', { keyPath: 'id' })
+          db.createObjectStore('textureSetCategories', { keyPath: 'id' })
+          db.createObjectStore('environmentMapCategories', { keyPath: 'id' })
           db.createObjectStore('spriteCategories', { keyPath: 'id' })
           db.createObjectStore('soundCategories', { keyPath: 'id' })
           db.createObjectStore('fileBlobs', { keyPath: 'fileId' })
@@ -338,6 +380,14 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
         if (oldVersion < 5) {
           if (!db.objectStoreNames.contains('environmentMaps')) {
             db.createObjectStore('environmentMaps', { keyPath: 'id' })
+          }
+        }
+        if (oldVersion < 6) {
+          if (!db.objectStoreNames.contains('textureSetCategories')) {
+            db.createObjectStore('textureSetCategories', { keyPath: 'id' })
+          }
+          if (!db.objectStoreNames.contains('environmentMapCategories')) {
+            db.createObjectStore('environmentMapCategories', { keyPath: 'id' })
           }
         }
       },
@@ -372,6 +422,8 @@ type StoreNames =
   | 'packs'
   | 'projects'
   | 'modelCategories'
+  | 'textureSetCategories'
+  | 'environmentMapCategories'
   | 'spriteCategories'
   | 'soundCategories'
 
@@ -450,6 +502,11 @@ export async function getThumbnail(
   const db = await getDb()
   const record = await db.get('thumbnails', entityKey)
   return record?.blob
+}
+
+export async function removeThumbnail(entityKey: string): Promise<void> {
+  const db = await getDb()
+  await db.delete('thumbnails', entityKey)
 }
 
 // ─── Upload History helpers ─────────────────────────────────────────────
@@ -825,6 +882,7 @@ export async function seedIfEmpty(): Promise<void> {
     {
       id: 1,
       name: 'Basic Texture Set',
+      categoryId: 2,
       kind: 0,
       tilingScaleX: 1,
       tilingScaleY: 1,
@@ -861,6 +919,7 @@ export async function seedIfEmpty(): Promise<void> {
     {
       id: 2,
       name: 'Color Textures',
+      categoryId: 3,
       kind: 0,
       tilingScaleX: 1,
       tilingScaleY: 1,
@@ -915,6 +974,7 @@ export async function seedIfEmpty(): Promise<void> {
     {
       id: 3,
       name: 'Global Stone Material',
+      categoryId: 2,
       kind: 1,
       tilingScaleX: 2,
       tilingScaleY: 2,
@@ -988,8 +1048,8 @@ export async function seedIfEmpty(): Promise<void> {
       name: 'Albedo Sprite',
       fileId: 402,
       spriteType: 0,
-      categoryId: 1,
-      categoryName: 'UI Elements',
+      categoryId: 2,
+      categoryName: 'HUD',
       fileName: 'texture_albedo.png',
       fileSizeBytes: 3072,
       createdAt: now,
@@ -1019,6 +1079,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 1,
       name: 'City Night Lights',
       variantCount: 2,
+      categoryId: 2,
       previewVariantId: 1,
       previewFileId: 601,
       previewUrl: '/files/601/preview?channel=rgb',
@@ -1057,6 +1118,7 @@ export async function seedIfEmpty(): Promise<void> {
       id: 2,
       name: 'Neutral Studio',
       variantCount: 1,
+      categoryId: 3,
       previewVariantId: 3,
       previewFileId: 603,
       previewUrl: '/files/603/preview?channel=rgb',
@@ -1199,8 +1261,25 @@ export async function seedIfEmpty(): Promise<void> {
   const seedSpriteCategories: DemoCategory[] = [
     {
       id: 1,
-      name: 'UI Elements',
-      description: 'User interface sprites',
+      name: 'UI',
+      description: 'User interface sprite families',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 2,
+      name: 'HUD',
+      description: 'Heads-up display elements',
+      parentId: 1,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 3,
+      name: 'Effects',
+      description: 'VFX sprite sheets and overlays',
+      parentId: null,
       createdAt: now,
       updatedAt: now,
     },
@@ -1210,7 +1289,78 @@ export async function seedIfEmpty(): Promise<void> {
     {
       id: 1,
       name: 'Sound Effects',
-      description: 'Game sound effects',
+      description: 'Game sound effect families',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 2,
+      name: 'UI',
+      description: 'Clicks, confirms, and menu cues',
+      parentId: 1,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 3,
+      name: 'Ambience',
+      description: 'Background loops and atmospheres',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
+
+  const seedTextureSetCategories: DemoCategory[] = [
+    {
+      id: 1,
+      name: 'Materials',
+      description: 'Reusable material libraries',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 2,
+      name: 'Surfaces',
+      description: 'Tileable surface materials',
+      parentId: 1,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 3,
+      name: 'Decals',
+      description: 'Projected details and overlays',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
+
+  const seedEnvironmentMapCategories: DemoCategory[] = [
+    {
+      id: 1,
+      name: 'Outdoor',
+      description: 'Exterior lighting environments',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 2,
+      name: 'Urban',
+      description: 'City and street lighting captures',
+      parentId: 1,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 3,
+      name: 'Studio',
+      description: 'Neutral indoor lighting setups',
+      parentId: null,
       createdAt: now,
       updatedAt: now,
     },
@@ -1228,6 +1378,8 @@ export async function seedIfEmpty(): Promise<void> {
       'packs',
       'projects',
       'modelCategories',
+      'textureSetCategories',
+      'environmentMapCategories',
       'spriteCategories',
       'soundCategories',
       'meta',
@@ -1245,6 +1397,10 @@ export async function seedIfEmpty(): Promise<void> {
   for (const pj of seedProjects) await tx.objectStore('projects').put(pj)
   for (const mc of seedModelCategories)
     await tx.objectStore('modelCategories').put(mc)
+  for (const tc of seedTextureSetCategories)
+    await tx.objectStore('textureSetCategories').put(tc)
+  for (const ec of seedEnvironmentMapCategories)
+    await tx.objectStore('environmentMapCategories').put(ec)
   for (const sc of seedSpriteCategories)
     await tx.objectStore('spriteCategories').put(sc)
   for (const sc of seedSoundCategories)
@@ -1264,6 +1420,8 @@ export async function seedIfEmpty(): Promise<void> {
   await metaStore.put({ key: 'seq_projects', value: 100 })
   await metaStore.put({ key: 'seq_files', value: 1000 })
   await metaStore.put({ key: 'seq_modelCategories', value: 100 })
+  await metaStore.put({ key: 'seq_textureSetCategories', value: 100 })
+  await metaStore.put({ key: 'seq_environmentMapCategories', value: 100 })
   await metaStore.put({ key: 'seq_spriteCategories', value: 100 })
   await metaStore.put({ key: 'seq_soundCategories', value: 100 })
 

@@ -22,41 +22,7 @@ internal sealed class GetEnvironmentMapByIdQueryHandler : IQueryHandler<GetEnvir
                 new Error("EnvironmentMapNotFound", $"Environment map with ID {query.Id} was not found."));
         }
 
-        var previewVariant = environmentMap.GetPreviewVariant();
-        var dto = new EnvironmentMapDetailDto
-        {
-            Id = environmentMap.Id,
-            Name = environmentMap.Name,
-            VariantCount = environmentMap.VariantCount,
-            PreviewVariantId = environmentMap.PreviewVariantId,
-            PreviewFileId = previewVariant?.FileId,
-            PreviewUrl = previewVariant != null ? $"/files/{previewVariant.FileId}/preview?channel=rgb" : null,
-            CreatedAt = environmentMap.CreatedAt,
-            UpdatedAt = environmentMap.UpdatedAt,
-            Variants = environmentMap.Variants
-                .Where(v => !v.IsDeleted)
-                .OrderByDescending(v => v.SizeLabel)
-                .Select(v => new EnvironmentMapVariantDto(
-                    v.Id,
-                    v.SizeLabel,
-                    v.FileId,
-                    v.File.OriginalFileName,
-                    v.File.SizeBytes,
-                    v.CreatedAt,
-                    v.UpdatedAt,
-                    v.IsDeleted,
-                    $"/files/{v.FileId}/preview?channel=rgb",
-                    $"/files/{v.FileId}"))
-                .ToList(),
-            Packs = environmentMap.Packs
-                .Select(p => new EnvironmentMapPackDto(p.Id, p.Name))
-                .ToList(),
-            Projects = environmentMap.Projects
-                .Select(p => new EnvironmentMapProjectDto(p.Id, p.Name))
-                .ToList()
-        };
-
-        return Result.Success(new GetEnvironmentMapByIdResponse(dto));
+        return Result.Success(new GetEnvironmentMapByIdResponse(EnvironmentMapDtoMappings.MapDetailDto(environmentMap)));
     }
 }
 

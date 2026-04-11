@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Models;
 using Domain.Services;
 using SharedKernel;
@@ -10,15 +11,21 @@ internal sealed class AddEnvironmentMapVariantCommandHandler : ICommandHandler<A
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IEnvironmentMapSizeLabelService _sizeLabelService;
+    private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public AddEnvironmentMapVariantCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileRepository fileRepository,
+        IEnvironmentMapSizeLabelService sizeLabelService,
+        IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileRepository = fileRepository;
+        _sizeLabelService = sizeLabelService;
+        _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -33,15 +40,23 @@ internal sealed class AddEnvironmentMapVariantCommandHandler : ICommandHandler<A
                     new Error("EnvironmentMapNotFound", $"Environment map with ID {command.EnvironmentMapId} was not found."));
             }
 
-            var file = await _fileRepository.GetByIdAsync(command.FileId, cancellationToken);
-            if (file == null)
-            {
-                return Result.Failure<AddEnvironmentMapVariantResponse>(
-                    new Error("FileNotFound", $"File with ID {command.FileId} was not found."));
-            }
+            var resolvedFilesResult = await EnvironmentMapVariantSupport.ResolveFromExistingFilesAsync(
+                new EnvironmentMapVariantReferenceInput(command.FileId, command.CubeFaces),
+                _fileRepository,
+                cancellationToken);
+            if (resolvedFilesResult.IsFailure)
+                return Result.Failure<AddEnvironmentMapVariantResponse>(resolvedFilesResult.Error);
 
             var now = _dateTimeProvider.UtcNow;
-            var variant = EnvironmentMapVariant.Create(file, command.SizeLabel, now);
+            var sizeLabelResult = await EnvironmentMapVariantSupport.ResolveSizeLabelAsync(
+                command.SizeLabel,
+                resolvedFilesResult.Value,
+                _sizeLabelService,
+                cancellationToken);
+            if (sizeLabelResult.IsFailure)
+                return Result.Failure<AddEnvironmentMapVariantResponse>(sizeLabelResult.Error);
+
+            var variant = resolvedFilesResult.Value.CreateVariant(sizeLabelResult.Value, now);
             environmentMap.AddVariant(variant, now);
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
 
@@ -51,7 +66,13 @@ internal sealed class AddEnvironmentMapVariantCommandHandler : ICommandHandler<A
                 await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
             }
 
-            return Result.Success(new AddEnvironmentMapVariantResponse(variant.Id, variant.FileId, variant.SizeLabel));
+            await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(environmentMap.Id, variant.Id, forceRegenerate: true, cancellationToken: cancellationToken);
+
+            return Result.Success(new AddEnvironmentMapVariantResponse(
+                variant.Id,
+                resolvedFilesResult.Value.PreviewFile?.Id ?? 0,
+                variant.SizeLabel,
+                variant.ProjectionType.ToString().ToLowerInvariant()));
         }
         catch (ArgumentException ex)
         {
@@ -64,5 +85,10 @@ internal sealed class AddEnvironmentMapVariantCommandHandler : ICommandHandler<A
     }
 }
 
-public record AddEnvironmentMapVariantCommand(int EnvironmentMapId, int FileId, string SizeLabel) : ICommand<AddEnvironmentMapVariantResponse>;
-public record AddEnvironmentMapVariantResponse(int VariantId, int FileId, string SizeLabel);
+public record AddEnvironmentMapVariantCommand(
+    int EnvironmentMapId,
+    int? FileId,
+    string? SizeLabel,
+    EnvironmentMapCubeFaceFileIds? CubeFaces) : ICommand<AddEnvironmentMapVariantResponse>;
+
+public record AddEnvironmentMapVariantResponse(int VariantId, int FileId, string SizeLabel, string ProjectionType);

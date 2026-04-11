@@ -141,7 +141,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                     return Result.Failure<GetDeletePreviewResponse>(new Error("EnvironmentMapNotFound", "Environment map not found"));
 
                 entityName = environmentMap.Name;
-                filesToDelete.AddRange(environmentMap.Variants.Select(v => new DeletedFileInfo(v.File.FilePath, v.File.OriginalFileName, v.File.SizeBytes)));
+                filesToDelete.AddRange(EnvironmentMapDeletionHelpers.GetEnvironmentMapFiles(environmentMap).Select(file => new DeletedFileInfo(file.FilePath, file.OriginalFileName, file.SizeBytes)));
                 relatedEntities.Add($"{environmentMap.Variants.Count} variant(s)");
                 break;
 
@@ -152,7 +152,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                     return Result.Failure<GetDeletePreviewResponse>(new Error("EnvironmentMapVariantNotFound", "Environment map variant not found"));
 
                 entityName = $"{parent.Name} - {variant.SizeLabel}";
-                filesToDelete.Add(new DeletedFileInfo(variant.File.FilePath, variant.File.OriginalFileName, variant.File.SizeBytes));
+                filesToDelete.AddRange(EnvironmentMapDeletionHelpers.GetVariantFiles(variant).Select(file => new DeletedFileInfo(file.FilePath, file.OriginalFileName, file.SizeBytes)));
                 break;
 
             default:
@@ -350,8 +350,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (environmentMap == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("EnvironmentMapNotFound", "Environment map not found"));
 
-                var variantFiles = environmentMap.Variants
-                    .Select(v => new { v.File.Id, v.File.FilePath, v.File.OriginalFileName, v.File.SizeBytes })
+                var variantFiles = EnvironmentMapDeletionHelpers.GetEnvironmentMapFiles(environmentMap)
+                    .Select(file => new { file.Id, file.FilePath, file.OriginalFileName, file.SizeBytes })
                     .ToList();
 
                 await _environmentMapRepository.DeleteAsync(environmentMap.Id, cancellationToken);
@@ -375,20 +375,22 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 if (parent == null || variant == null)
                     return Result.Failure<PermanentDeleteEntityResponse>(new Error("EnvironmentMapVariantNotFound", "Environment map variant not found"));
 
-                var variantFileId = variant.File.Id;
-                var variantFilePath = variant.File.FilePath;
-                var variantFileName = variant.File.OriginalFileName;
-                var variantFileSize = variant.File.SizeBytes;
+                var variantFilesForDeletion = EnvironmentMapDeletionHelpers.GetVariantFiles(variant)
+                    .Select(file => new { file.Id, file.FilePath, file.OriginalFileName, file.SizeBytes })
+                    .ToList();
 
                 parent.HardRemoveVariant(variant.Id, DateTime.UtcNow);
                 await _environmentMapRepository.UpdateAsync(parent, cancellationToken);
 
-                var isVariantFileReferenced = await _fileRepository.IsFileHashReferencedByOthersAsync(variantFileId, cancellationToken);
-                if (!isVariantFileReferenced)
+                foreach (var fileInfo in variantFilesForDeletion)
                 {
-                    await _fileStorage.DeleteFileAsync(variantFilePath, cancellationToken);
-                    deletedFiles.Add(new DeletedFileInfo(variantFilePath, variantFileName, variantFileSize));
-                    await _fileRepository.HardDeleteAsync(variantFileId, cancellationToken);
+                    var isVariantFileReferenced = await _fileRepository.IsFileHashReferencedByOthersAsync(fileInfo.Id, cancellationToken);
+                    if (!isVariantFileReferenced)
+                    {
+                        await _fileStorage.DeleteFileAsync(fileInfo.FilePath, cancellationToken);
+                        deletedFiles.Add(new DeletedFileInfo(fileInfo.FilePath, fileInfo.OriginalFileName, fileInfo.SizeBytes));
+                        await _fileRepository.HardDeleteAsync(fileInfo.Id, cancellationToken);
+                    }
                 }
 
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Environment map variant permanently deleted", deletedFiles));
@@ -396,5 +398,36 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
             default:
                 return Result.Failure<PermanentDeleteEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));
         }
+    }
+
+}
+
+internal static class EnvironmentMapDeletionHelpers
+{
+    internal static IReadOnlyCollection<Domain.Models.File> GetEnvironmentMapFiles(Domain.Models.EnvironmentMap environmentMap)
+    {
+        var files = environmentMap.Variants
+            .SelectMany(GetVariantFiles)
+            .ToList();
+
+        if (environmentMap.CustomThumbnailFile != null)
+            files.Add(environmentMap.CustomThumbnailFile);
+
+        return files
+            .DistinctBy(file => file.Id)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    internal static IReadOnlyCollection<Domain.Models.File> GetVariantFiles(Domain.Models.EnvironmentMapVariant variant)
+    {
+        if (variant.IsPanoramic)
+            return variant.File == null ? [] : [variant.File];
+
+        return variant.FaceFiles
+            .Select(faceFile => faceFile.File)
+            .DistinctBy(file => file.Id)
+            .ToList()
+            .AsReadOnly();
     }
 }

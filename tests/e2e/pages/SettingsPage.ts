@@ -123,9 +123,7 @@ export class SettingsPage {
 
     async setMaxFileSize(value: string): Promise<void> {
         const input = this.page.locator(this.maxFileSizeInput);
-        await input.click();
-        await this.page.keyboard.press("Meta+a");
-        await this.page.keyboard.type(value, { delay: 30 });
+        await input.fill(value);
         await input.press("Tab");
     }
 
@@ -143,9 +141,7 @@ export class SettingsPage {
 
     async setThumbnailWidth(value: string): Promise<void> {
         const input = this.page.locator(this.thumbnailWidthInput);
-        await input.click();
-        await this.page.keyboard.press("Meta+a");
-        await this.page.keyboard.type(value, { delay: 30 });
+        await input.fill(value);
         await input.press("Tab");
     }
 

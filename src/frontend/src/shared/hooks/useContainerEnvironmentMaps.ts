@@ -7,10 +7,11 @@ import {
 import { useCallback, useState } from 'react'
 
 import {
-  createEnvironmentMapWithFile,
+  createEnvironmentMapUpload,
   getAllEnvironmentMaps,
   getEnvironmentMapsPaginated,
 } from '@/features/environment-map/api/environmentMapApi'
+import { prepareEnvironmentMapUploadItems } from '@/features/environment-map/utils/environmentMapUploadUtils'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { type EnvironmentMapDto } from '@/types'
@@ -173,23 +174,43 @@ export function useContainerEnvironmentMaps(
         setUploading(true)
         const batchId = uploadProgress.createBatch()
         let uploadedCount = 0
+        const items = prepareEnvironmentMapUploadItems(files)
 
-        for (const file of files) {
+        for (const item of items) {
+          const representativeFile =
+            item.file ??
+            item.cubeFaces?.px ??
+            item.cubeFaces?.nx ??
+            item.cubeFaces?.py ??
+            item.cubeFaces?.ny ??
+            item.cubeFaces?.pz ??
+            item.cubeFaces?.nz
+
+          if (!representativeFile) {
+            continue
+          }
+
           const uploadId = uploadProgress.addUpload(
-            file,
+            representativeFile,
             'environmentMap',
             batchId
           )
 
           try {
             uploadProgress.updateUploadProgress(uploadId, 35)
-            const response = await createEnvironmentMapWithFile(file, {
-              name: file.name.replace(/\.[^/.]+$/, ''),
-              sizeLabel: '1K',
-              batchId,
-              ...(adapter.type === 'pack'
-                ? { packId: adapter.containerId }
-                : { projectId: adapter.containerId }),
+            const response = await createEnvironmentMapUpload({
+              file: item.file,
+              cubeFaces: item.cubeFaces,
+              options: {
+                name: item.name,
+                sizeLabel: item.sizeLabel,
+                batchId,
+                sourceType: item.cubeFaces ? 'cube' : 'single',
+                projectionType: item.cubeFaces ? 'cube' : 'equirectangular',
+                ...(adapter.type === 'pack'
+                  ? { packId: adapter.containerId }
+                  : { projectId: adapter.containerId }),
+              },
             })
             uploadProgress.updateUploadProgress(uploadId, 70)
 

@@ -103,6 +103,25 @@ public class ThumbnailQueueTests
     }
 
     [Fact]
+    public async Task EnqueueEnvironmentMapThumbnailAsync_WhenNoExistingJob_ShouldCreateNewJob()
+    {
+        var job = ThumbnailJob.CreateForEnvironmentMap(5, 8, DateTime.UtcNow);
+
+        _mockRepository.Setup(r => r.GetByEnvironmentMapVariantIdAsync(8, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob?)null);
+        _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(job);
+
+        var result = await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(5, 8);
+
+        Assert.Equal("EnvironmentMap", result.AssetType);
+        Assert.Equal(5, result.EnvironmentMapId);
+        Assert.Equal(8, result.EnvironmentMapVariantId);
+        _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task DequeueAsync_WhenJobAvailable_ShouldClaimAndReturnJob()
     {
         // Arrange

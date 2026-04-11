@@ -54,6 +54,7 @@ export default [
       'jobProcessor.js',
       'jobApiClient.js',
       'modelFileService.js',
+      'environmentMapFileService.js',
       'modelLoaderService.js',
       'orbitFrameRenderer.js',
       'frameEncoderService.js',

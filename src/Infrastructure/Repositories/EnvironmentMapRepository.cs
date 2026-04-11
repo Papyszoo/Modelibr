@@ -75,7 +75,30 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             return null;
 
         return await BaseQuery()
-            .FirstOrDefaultAsync(e => e.Variants.Any(v => v.File.Sha256Hash == sha256Hash), cancellationToken);
+            .FirstOrDefaultAsync(e => e.Variants.Any(v => v.File != null && v.File.Sha256Hash == sha256Hash), cancellationToken);
+    }
+
+    public async Task<EnvironmentMap?> GetByFileHashesAsync(
+        IEnumerable<string> sha256Hashes,
+        EnvironmentMapProjectionType projectionType,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedHashes = sha256Hashes
+            .Where(hash => !string.IsNullOrWhiteSpace(hash))
+            .Select(hash => hash.Trim().ToLowerInvariant())
+            .Distinct()
+            .ToArray();
+
+        if (normalizedHashes.Length == 0)
+            return null;
+
+        var environmentMaps = await BaseQuery()
+            .Where(e => e.Variants.Any(v => v.ProjectionType == projectionType))
+            .ToListAsync(cancellationToken);
+
+        return environmentMaps.FirstOrDefault(e => e.Variants.Any(v =>
+            v.ProjectionType == projectionType &&
+            GetVariantHashes(v).OrderBy(hash => hash).SequenceEqual(normalizedHashes.OrderBy(hash => hash))));
     }
 
     public async Task<EnvironmentMap?> GetByVariantIdIncludingDeletedAsync(int variantId, CancellationToken cancellationToken = default)
@@ -105,8 +128,14 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             .OrderBy(e => e.Name)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Include(e => e.CustomThumbnailFile)
+            .Include(e => e.Tags)
+            .Include(e => e.EnvironmentMapCategory)
             .Include(e => e.Variants)
                 .ThenInclude(v => v.File)
+            .Include(e => e.Variants)
+                .ThenInclude(v => v.FaceFiles)
+                    .ThenInclude(faceFile => faceFile.File)
             .Include(e => e.Packs)
             .Include(e => e.Projects)
             .AsSplitQuery()
@@ -143,10 +172,25 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             : _context.EnvironmentMaps.AsQueryable();
 
         return query
+            .Include(e => e.CustomThumbnailFile)
+            .Include(e => e.Tags)
+            .Include(e => e.EnvironmentMapCategory)
             .Include(e => e.Variants)
                 .ThenInclude(v => v.File)
+            .Include(e => e.Variants)
+                .ThenInclude(v => v.FaceFiles)
+                    .ThenInclude(faceFile => faceFile.File)
             .Include(e => e.Packs)
             .Include(e => e.Projects)
             .AsSplitQuery();
+    }
+
+    private static IEnumerable<string> GetVariantHashes(EnvironmentMapVariant variant)
+    {
+        if (variant.IsPanoramic)
+            return variant.File == null ? [] : [variant.File.Sha256Hash.ToLowerInvariant()];
+
+        return variant.FaceFiles
+            .Select(faceFile => faceFile.File.Sha256Hash.ToLowerInvariant());
     }
 }

@@ -2,6 +2,7 @@ using Application.Abstractions.Repositories;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -63,7 +64,17 @@ internal sealed class PackRepository : IPackRepository
         // Only call Update for detached entities; tracked entities are saved automatically
         if (_context.Entry(pack).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
             _context.Packs.Update(pack);
-        await _context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicatePackModelAssociation(ex))
+        {
+            // Concurrent identical add requests can race on the PackModels join table.
+            // Treat the duplicate insert as an idempotent no-op.
+            _context.ChangeTracker.Clear();
+        }
     }
 
     public async Task DeleteAsync(Pack pack, CancellationToken cancellationToken = default)
@@ -71,4 +82,11 @@ internal sealed class PackRepository : IPackRepository
         _context.Packs.Remove(pack);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
+        => ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "PK_PackModels"
+        };
 }

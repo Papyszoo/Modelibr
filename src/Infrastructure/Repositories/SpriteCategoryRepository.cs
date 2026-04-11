@@ -2,7 +2,6 @@ using Application.Abstractions.Repositories;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -17,66 +16,46 @@ internal sealed class SpriteCategoryRepository : ISpriteCategoryRepository
 
     public async Task<SpriteCategory> AddAsync(SpriteCategory category, CancellationToken cancellationToken = default)
     {
-        if (category == null)
-            throw new ArgumentNullException(nameof(category));
-
-        var entityEntry = await _context.SpriteCategories.AddAsync(category, cancellationToken);
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            _context.Entry(entityEntry.Entity).State = EntityState.Detached;
-            throw new ArgumentException($"A sprite category with the name '{category.Name}' already exists.");
-        }
-        
-        return entityEntry.Entity;
+        _context.SpriteCategories.Add(category);
+        await _context.SaveChangesAsync(cancellationToken);
+        return category;
     }
 
-    public async Task<IEnumerable<SpriteCategory>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SpriteCategory>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.SpriteCategories
             .AsNoTracking()
-            .OrderBy(c => c.Name)
+            .Include(c => c.Children)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<SpriteCategory?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.SpriteCategories
+            .Include(c => c.Children)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
-    public async Task<SpriteCategory?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+    public async Task<SpriteCategory?> GetByNameAsync(string name, int? parentId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(name))
             return null;
 
         return await _context.SpriteCategories
-            .FirstOrDefaultAsync(c => c.Name == name.Trim(), cancellationToken);
+            .FirstOrDefaultAsync(c => c.Name == name.Trim() && c.ParentId == parentId, cancellationToken);
     }
 
-    public async Task<SpriteCategory> UpdateAsync(SpriteCategory category, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(SpriteCategory category, CancellationToken cancellationToken = default)
     {
-        if (category == null)
-            throw new ArgumentNullException(nameof(category));
+        if (_context.Entry(category).State == EntityState.Detached)
+            _context.SpriteCategories.Update(category);
 
-        _context.SpriteCategories.Update(category);
         await _context.SaveChangesAsync(cancellationToken);
-        
-        return category;
     }
 
-    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(SpriteCategory category, CancellationToken cancellationToken = default)
     {
-        var category = await _context.SpriteCategories
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
-
-        if (category != null)
-        {
-            _context.SpriteCategories.Remove(category);
-            await _context.SaveChangesAsync(cancellationToken);
-        }
+        _context.SpriteCategories.Remove(category);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }
