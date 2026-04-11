@@ -4,7 +4,6 @@ using Application.Abstractions.Storage;
 using Application.Abstractions.Services;
 using Application.EnvironmentMaps;
 using Application.Thumbnails;
-using Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using WebApi.Files;
@@ -30,11 +29,6 @@ public static class EnvironmentMapEndpoints
         app.MapGet("/environment-maps/{id}/preview", GetEnvironmentMapPreview)
             .WithName("Get Environment Map Preview")
             .WithSummary("Gets the preview thumbnail for an environment map")
-            .WithOpenApi();
-
-        app.MapGet("/environment-maps/{id}/thumbnail", GetEnvironmentMapPreview)
-            .WithName("Get Environment Map Thumbnail")
-            .WithSummary("Gets the thumbnail for an environment map")
             .WithOpenApi();
 
         app.MapGet("/environment-maps/{id}/variants/{variantId}/preview", GetEnvironmentMapVariantPreview)
@@ -154,7 +148,6 @@ public static class EnvironmentMapEndpoints
     private static async Task<IResult> GetEnvironmentMapPreview(
         int id,
         IEnvironmentMapRepository environmentMapRepository,
-        IUploadPathProvider uploadPathProvider,
         IFilePreviewService previewService,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
@@ -171,13 +164,11 @@ public static class EnvironmentMapEndpoints
         if (previewVariant == null)
             return Results.NotFound();
 
-        return await ServeGeneratedEnvironmentMapPreviewAsync(
+        return ServeGeneratedEnvironmentMapPreview(
             environmentMap,
             previewVariant,
-            uploadPathProvider,
             previewService,
             logger,
-            cancellationToken,
             "selected preview variant");
     }
 
@@ -185,7 +176,6 @@ public static class EnvironmentMapEndpoints
         int id,
         int variantId,
         IEnvironmentMapRepository environmentMapRepository,
-        IUploadPathProvider uploadPathProvider,
         IFilePreviewService previewService,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
@@ -199,13 +189,11 @@ public static class EnvironmentMapEndpoints
         if (variant == null)
             return Results.NotFound();
 
-        return await ServeGeneratedEnvironmentMapPreviewAsync(
+        return ServeGeneratedEnvironmentMapPreview(
             environmentMap,
             variant,
-            uploadPathProvider,
             previewService,
             logger,
-            cancellationToken,
             "requested variant");
     }
 
@@ -464,19 +452,16 @@ public static class EnvironmentMapEndpoints
             : Results.File(previewPath, "image/png");
     }
 
-    private static async Task<IResult> ServeGeneratedEnvironmentMapPreviewAsync(
+    private static IResult ServeGeneratedEnvironmentMapPreview(
         Domain.Models.EnvironmentMap environmentMap,
         Domain.Models.EnvironmentMapVariant variant,
-        IUploadPathProvider uploadPathProvider,
         IFilePreviewService previewService,
         ILogger logger,
-        CancellationToken cancellationToken,
         string previewDescription)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var thumbnailPath = ResolveEnvironmentMapThumbnailPath(uploadPathProvider, variant.ThumbnailPath);
+        var thumbnailPath = variant.ThumbnailPath;
 
-        if (thumbnailPath == null)
+        if (string.IsNullOrEmpty(thumbnailPath) || !System.IO.File.Exists(thumbnailPath))
         {
             logger.LogInformation(
                 "Environment map preview thumbnail is not ready for environment map {EnvironmentMapId}, variant {VariantId}. Serving fallback preview for {PreviewDescription}.",
@@ -500,15 +485,6 @@ public static class EnvironmentMapEndpoints
             thumbnailPath);
 
         return Results.File(thumbnailPath, ContentTypeProvider.GetContentType(thumbnailPath));
-    }
-
-    private static string? ResolveEnvironmentMapThumbnailPath(IUploadPathProvider uploadPathProvider, string? storedPath)
-    {
-        if (string.IsNullOrWhiteSpace(storedPath))
-            return null;
-
-        var fullPath = EnvironmentMapStoragePathResolver.ResolveFullPath(uploadPathProvider.UploadRootPath, storedPath);
-        return System.IO.File.Exists(fullPath) ? fullPath : null;
     }
 
     private static IResult ServePreviewFile(

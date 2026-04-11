@@ -22,31 +22,20 @@ internal class CreateSpriteCategoryCommandHandler : ICommandHandler<CreateSprite
 
     public async Task<Result<SpriteCategorySummaryDto>> Handle(CreateSpriteCategoryCommand command, CancellationToken cancellationToken)
     {
-        var existingCategory = await _categoryRepository.GetByNameAsync(command.Name.Trim(), command.ParentId, cancellationToken);
-        if (existingCategory != null)
-        {
-            return Result.Failure<SpriteCategorySummaryDto>(
-                new Error("CategoryAlreadyExists", $"A sprite category named '{command.Name}' already exists in this branch."));
-        }
+        var result = await CategoryCommandHandlers.CreateAsync(
+            _categoryRepository, command.Name, command.Description, command.ParentId,
+            "sprite category", SpriteCategory.Create, _dateTimeProvider.UtcNow, cancellationToken);
 
-        try
-        {
-            var category = SpriteCategory.Create(command.Name, command.Description, command.ParentId, _dateTimeProvider.UtcNow);
-            await _categoryRepository.AddAsync(category, cancellationToken);
-
-            return Result.Success(new SpriteCategorySummaryDto
+        return result.IsSuccess
+            ? Result.Success(new SpriteCategorySummaryDto
             {
-                Id = category.Id,
-                Name = category.Name,
-                Description = category.Description,
-                ParentId = category.ParentId,
-                Path = category.Name
-            });
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<SpriteCategorySummaryDto>(new Error("CategoryCreationFailed", ex.Message));
-        }
+                Id = result.Value.Id,
+                Name = result.Value.Name,
+                Description = result.Value.Description,
+                ParentId = result.Value.ParentId,
+                Path = result.Value.Path
+            })
+            : Result.Failure<SpriteCategorySummaryDto>(result.Error);
     }
 }
 

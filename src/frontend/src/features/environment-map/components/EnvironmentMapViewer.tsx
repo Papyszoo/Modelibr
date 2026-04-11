@@ -1,17 +1,9 @@
 import './EnvironmentMapViewer.css'
 
-import { Button } from 'primereact/button'
 import { Menubar } from 'primereact/menubar'
 import { type MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
-import {
-  type MouseEvent as ReactMouseEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   useAddEnvironmentMapVariantWithFileMutation,
@@ -19,185 +11,57 @@ import {
   useRegenerateEnvironmentMapThumbnailMutation,
   useSetEnvironmentMapCustomThumbnailMutation,
 } from '@/features/environment-map/api/queries'
+import { EnvironmentMapInformationPanel } from '@/features/environment-map/components/EnvironmentMapInformationPanel'
 import { EnvironmentMapPreviewCanvas } from '@/features/environment-map/components/EnvironmentMapPreviewCanvas'
+import { EnvironmentMapThumbnailPanel } from '@/features/environment-map/components/EnvironmentMapThumbnailPanel'
 import {
   EnvironmentMapUploadDialog,
   type EnvironmentMapUploadDialogSubmitValues,
 } from '@/features/environment-map/components/EnvironmentMapUploadDialog'
 import {
+  PANEL_OPTIONS,
+  useEnvironmentMapViewerState,
+  type ViewerPanelContent,
+} from '@/features/environment-map/hooks/useEnvironmentMapViewerState'
+import {
+  buildDownloadName,
+  downloadFromUrl,
+  getFileExtension,
+} from '@/features/environment-map/utils/downloadUtils'
+import {
   type EnvironmentMapPreviewOption,
   getEnvironmentMapPreviewOptions,
   getEnvironmentMapPrimaryPreviewUrl,
 } from '@/features/environment-map/utils/environmentMapUtils'
-import {
-  type ExpandAction,
-  PanelWrapper,
-} from '@/features/model-viewer/components/PanelWrapper'
+import { PanelWrapper } from '@/features/model-viewer/components/PanelWrapper'
 import { uploadFile } from '@/features/models/api/modelApi'
-import { useTabUiState } from '@/hooks/useTabUiState'
 
 interface EnvironmentMapViewerProps {
   environmentMapId: string
-}
-
-type ViewerPanelContent = 'information' | 'thumbnail' | null
-
-interface ViewerCornerState {
-  topLeft: 'vertical' | 'horizontal'
-  topRight: 'vertical' | 'horizontal'
-  bottomLeft: 'vertical' | 'horizontal'
-  bottomRight: 'vertical' | 'horizontal'
-}
-
-interface ViewerPanelSizes {
-  left: number
-  right: number
-  top: number
-  bottom: number
-}
-
-interface ViewerLayoutState {
-  leftPanel: ViewerPanelContent
-  rightPanel: ViewerPanelContent
-  topPanel: ViewerPanelContent
-  bottomPanel: ViewerPanelContent
-  corners: ViewerCornerState
-  panelSizes: ViewerPanelSizes
-}
-
-const DEFAULT_VIEWER_CORNERS: ViewerCornerState = {
-  topLeft: 'vertical',
-  topRight: 'vertical',
-  bottomLeft: 'vertical',
-  bottomRight: 'vertical',
-}
-
-const DEFAULT_PANEL_SIZES: ViewerPanelSizes = {
-  left: 280,
-  right: 320,
-  top: 220,
-  bottom: 260,
-}
-
-const DEFAULT_VIEWER_LAYOUT: ViewerLayoutState = {
-  leftPanel: null,
-  rightPanel: null,
-  topPanel: null,
-  bottomPanel: null,
-  corners: DEFAULT_VIEWER_CORNERS,
-  panelSizes: DEFAULT_PANEL_SIZES,
-}
-
-function getFileExtension(source?: string | null) {
-  if (!source) {
-    return ''
-  }
-
-  const withoutQuery = source.split('?')[0]
-  const extension = withoutQuery.split('.').pop()?.toLowerCase()
-  return extension || ''
-}
-
-function getExtensionFromContentType(contentType: string | null) {
-  switch (contentType?.toLowerCase()) {
-    case 'image/png':
-      return 'png'
-    case 'image/jpeg':
-      return 'jpg'
-    case 'image/webp':
-      return 'webp'
-    case 'image/vnd.radiance':
-      return 'hdr'
-    case 'image/x-exr':
-    case 'application/octet-stream':
-      return 'exr'
-    default:
-      return ''
-  }
-}
-
-function sanitizeFileStem(value: string) {
-  return value
-    .replace(/[^a-z0-9-_]+/gi, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
-function buildDownloadName(
-  baseName: string,
-  variantLabel: string,
-  extension: string
-) {
-  const suffix = sanitizeFileStem(variantLabel || 'environment')
-  const stem = `${sanitizeFileStem(baseName)}-${suffix}`
-  return extension ? `${stem}.${extension}` : stem
-}
-
-function triggerDownload(blob: Blob, fileName: string) {
-  const objectUrl = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = objectUrl
-  anchor.download = fileName
-  anchor.click()
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
-}
-
-async function downloadFromUrl(
-  url: string,
-  fileName: string,
-  explicitExtension?: string
-) {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Download failed with status ${response.status}.`)
-  }
-
-  const blob = await response.blob()
-  const extension =
-    explicitExtension ||
-    getFileExtension(fileName) ||
-    getExtensionFromContentType(response.headers.get('content-type')) ||
-    'bin'
-  const normalizedFileName = fileName.includes('.')
-    ? fileName
-    : `${fileName}.${extension}`
-
-  triggerDownload(blob, normalizedFileName)
 }
 
 export function EnvironmentMapViewer({
   environmentMapId,
 }: EnvironmentMapViewerProps) {
   const toast = useRef<Toast>(null)
-  const thumbnailInputRef = useRef<HTMLInputElement | null>(null)
   const parsedEnvironmentMapId = Number(environmentMapId)
   const stableTabId = `environment-map-${environmentMapId}`
-  const [savedLayout, setSavedLayout] = useTabUiState<ViewerLayoutState>(
-    stableTabId,
-    'environmentMapViewerLayout',
-    DEFAULT_VIEWER_LAYOUT
-  )
+
+  const {
+    leftPanel,
+    rightPanel,
+    topPanel,
+    bottomPanel,
+    corners,
+    panelSizes,
+    resizing,
+    handlePanelChange,
+    startResize,
+    getExpandActions,
+  } = useEnvironmentMapViewerState(stableTabId)
+
   const [selectedPreviewKey, setSelectedPreviewKey] = useState<string>('')
   const [showVariantDialog, setShowVariantDialog] = useState(false)
-  const [leftPanel, setLeftPanel] = useState<ViewerPanelContent>(
-    savedLayout.leftPanel
-  )
-  const [rightPanel, setRightPanel] = useState<ViewerPanelContent>(
-    savedLayout.rightPanel
-  )
-  const [topPanel, setTopPanel] = useState<ViewerPanelContent>(
-    savedLayout.topPanel
-  )
-  const [bottomPanel, setBottomPanel] = useState<ViewerPanelContent>(
-    savedLayout.bottomPanel
-  )
-  const [corners, setCorners] = useState<ViewerCornerState>(savedLayout.corners)
-  const [panelSizes, setPanelSizes] = useState<ViewerPanelSizes>(
-    savedLayout.panelSizes
-  )
-  const [resizing, setResizing] = useState<string | null>(null)
-  const resizeStart = useRef({ pos: 0, size: 0 })
-  const panelOpenOrder = useRef<string[]>([])
 
   const environmentMapQuery = useEnvironmentMapByIdQuery({
     environmentMapId: parsedEnvironmentMapId,
@@ -243,118 +107,6 @@ export function EnvironmentMapViewer({
     null
 
   const thumbnailUrl = getEnvironmentMapPrimaryPreviewUrl(environmentMap)
-
-  useEffect(() => {
-    setSavedLayout({
-      leftPanel,
-      rightPanel,
-      topPanel,
-      bottomPanel,
-      corners,
-      panelSizes,
-    })
-  }, [
-    bottomPanel,
-    corners,
-    leftPanel,
-    panelSizes,
-    rightPanel,
-    setSavedLayout,
-    topPanel,
-  ])
-
-  const handlePanelChange = useCallback(
-    (side: 'left' | 'right' | 'top' | 'bottom', value: ViewerPanelContent) => {
-      const setters = {
-        left: setLeftPanel,
-        right: setRightPanel,
-        top: setTopPanel,
-        bottom: setBottomPanel,
-      }
-      const currentPanels = {
-        left: leftPanel,
-        right: rightPanel,
-        top: topPanel,
-        bottom: bottomPanel,
-      }
-
-      if (value === null) {
-        panelOpenOrder.current = panelOpenOrder.current.filter(
-          panelSide => panelSide !== side
-        )
-      } else if (currentPanels[side] === null) {
-        panelOpenOrder.current.push(side)
-
-        if (side === 'top') {
-          setCorners(previous => ({
-            ...previous,
-            topLeft: leftPanel ? 'vertical' : 'horizontal',
-            topRight: rightPanel ? 'vertical' : 'horizontal',
-          }))
-        } else if (side === 'bottom') {
-          setCorners(previous => ({
-            ...previous,
-            bottomLeft: leftPanel ? 'vertical' : 'horizontal',
-            bottomRight: rightPanel ? 'vertical' : 'horizontal',
-          }))
-        } else if (side === 'left') {
-          setCorners(previous => ({
-            ...previous,
-            topLeft: topPanel ? 'horizontal' : 'vertical',
-            bottomLeft: bottomPanel ? 'horizontal' : 'vertical',
-          }))
-        } else if (side === 'right') {
-          setCorners(previous => ({
-            ...previous,
-            topRight: topPanel ? 'horizontal' : 'vertical',
-            bottomRight: bottomPanel ? 'horizontal' : 'vertical',
-          }))
-        }
-      }
-
-      setters[side](value)
-    },
-    [bottomPanel, leftPanel, rightPanel, topPanel]
-  )
-
-  const startResize = useCallback(
-    (side: keyof ViewerPanelSizes, event: ReactMouseEvent) => {
-      event.preventDefault()
-      const isHorizontal = side === 'left' || side === 'right'
-      resizeStart.current = {
-        pos: isHorizontal ? event.clientX : event.clientY,
-        size: panelSizes[side],
-      }
-      setResizing(side)
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const currentPos = isHorizontal ? moveEvent.clientX : moveEvent.clientY
-        const rawDelta = currentPos - resizeStart.current.pos
-        const reverse = side === 'right' || side === 'bottom'
-        const delta = reverse ? -rawDelta : rawDelta
-        const nextSize = Math.max(
-          180,
-          Math.min(640, resizeStart.current.size + delta)
-        )
-
-        setPanelSizes(previous => ({ ...previous, [side]: nextSize }))
-      }
-
-      const handleMouseUp = () => {
-        setResizing(null)
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-        document.body.style.cursor = ''
-        document.body.style.userSelect = ''
-      }
-
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize'
-      document.body.style.userSelect = 'none'
-    },
-    [panelSizes]
-  )
 
   const handleDownload = async (option: EnvironmentMapPreviewOption | null) => {
     if (!environmentMap || !option) {
@@ -535,244 +287,35 @@ export function EnvironmentMapViewer({
       return null
     }
 
-    const closePanel = () => {
-      handlePanelChange(side, null)
-    }
-
-    const hasLeft = leftPanel !== null
-    const hasRight = rightPanel !== null
-    const hasTop = topPanel !== null
-    const hasBottom = bottomPanel !== null
-
-    const getExpandActions = (): ExpandAction[] => {
-      switch (side) {
-        case 'left':
-          return [
-            ...(hasTop && corners.topLeft === 'horizontal'
-              ? [
-                  {
-                    direction: 'up' as const,
-                    tooltip: 'Expand to top-left corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        topLeft: 'vertical',
-                      })),
-                  },
-                ]
-              : []),
-            ...(hasBottom && corners.bottomLeft === 'horizontal'
-              ? [
-                  {
-                    direction: 'down' as const,
-                    tooltip: 'Expand to bottom-left corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        bottomLeft: 'vertical',
-                      })),
-                  },
-                ]
-              : []),
-          ]
-        case 'right':
-          return [
-            ...(hasTop && corners.topRight === 'horizontal'
-              ? [
-                  {
-                    direction: 'up' as const,
-                    tooltip: 'Expand to top-right corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        topRight: 'vertical',
-                      })),
-                  },
-                ]
-              : []),
-            ...(hasBottom && corners.bottomRight === 'horizontal'
-              ? [
-                  {
-                    direction: 'down' as const,
-                    tooltip: 'Expand to bottom-right corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        bottomRight: 'vertical',
-                      })),
-                  },
-                ]
-              : []),
-          ]
-        case 'top':
-          return [
-            ...(hasLeft && corners.topLeft === 'vertical'
-              ? [
-                  {
-                    direction: 'left' as const,
-                    tooltip: 'Expand to top-left corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        topLeft: 'horizontal',
-                      })),
-                  },
-                ]
-              : []),
-            ...(hasRight && corners.topRight === 'vertical'
-              ? [
-                  {
-                    direction: 'right' as const,
-                    tooltip: 'Expand to top-right corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        topRight: 'horizontal',
-                      })),
-                  },
-                ]
-              : []),
-          ]
-        case 'bottom':
-          return [
-            ...(hasLeft && corners.bottomLeft === 'vertical'
-              ? [
-                  {
-                    direction: 'left' as const,
-                    tooltip: 'Expand to bottom-left corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        bottomLeft: 'horizontal',
-                      })),
-                  },
-                ]
-              : []),
-            ...(hasRight && corners.bottomRight === 'vertical'
-              ? [
-                  {
-                    direction: 'right' as const,
-                    tooltip: 'Expand to bottom-right corner',
-                    onClick: () =>
-                      setCorners(previous => ({
-                        ...previous,
-                        bottomRight: 'horizontal',
-                      })),
-                  },
-                ]
-              : []),
-          ]
-      }
-    }
-
-    if (panel === 'information') {
-      return (
-        <div
-          className={`environment-map-viewer-panel-slot environment-map-viewer-panel-slot-${side}`}
-        >
-          <PanelWrapper
-            title="Informations"
-            side={side}
-            onClose={closePanel}
-            expandActions={getExpandActions()}
-          >
-            <div className="environment-map-viewer-panel-body">
-              <dl className="environment-map-detail-list">
-                <div>
-                  <dt>Preview size</dt>
-                  <dd>{selectedPreview?.label ?? 'Original'}</dd>
-                </div>
-                <div>
-                  <dt>Source</dt>
-                  <dd>{selectedPreview?.sourceType ?? 'Single'}</dd>
-                </div>
-                <div>
-                  <dt>Projection</dt>
-                  <dd>
-                    {selectedPreview?.projectionType ?? 'Equirectangular'}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Variants</dt>
-                  <dd>{environmentMap.variantCount}</dd>
-                </div>
-                <div>
-                  <dt>Updated</dt>
-                  <dd>{new Date(environmentMap.updatedAt).toLocaleString()}</dd>
-                </div>
-              </dl>
-            </div>
-          </PanelWrapper>
-        </div>
-      )
-    }
-
     return (
       <div
         className={`environment-map-viewer-panel-slot environment-map-viewer-panel-slot-${side}`}
       >
         <PanelWrapper
-          title="Thumbnail"
+          title={panel === 'information' ? 'Informations' : 'Thumbnail'}
           side={side}
-          onClose={closePanel}
-          expandActions={getExpandActions()}
+          onClose={() => handlePanelChange(side, null)}
+          expandActions={getExpandActions(side)}
         >
-          <div className="environment-map-viewer-panel-body environment-map-thumbnail-panel">
-            <div className="environment-map-thumbnail-card">
-              {thumbnailUrl ? (
-                <img src={thumbnailUrl} alt={environmentMap.name} />
-              ) : (
-                <div className="environment-map-thumbnail-placeholder">
-                  <i className="pi pi-image" />
-                  <span>No thumbnail available</span>
-                </div>
-              )}
-            </div>
-
-            <div className="environment-map-thumbnail-actions">
-              <input
-                ref={thumbnailInputRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={event => {
-                  const file = event.target.files?.[0] ?? null
-                  void handleThumbnailUpload(file)
-                  event.target.value = ''
-                }}
-              />
-              <Button
-                label="Upload"
-                icon="pi pi-upload"
-                className="p-button-outlined"
-                onClick={() => thumbnailInputRef.current?.click()}
-                disabled={
-                  setThumbnailMutation.isPending ||
-                  regenerateThumbnailMutation.isPending
-                }
-              />
-              <Button
-                label="Generate"
-                icon="pi pi-refresh"
-                onClick={() => void handleThumbnailRegenerate()}
-                loading={regenerateThumbnailMutation.isPending}
-                disabled={setThumbnailMutation.isPending}
-              />
-            </div>
-          </div>
+          {panel === 'information' ? (
+            <EnvironmentMapInformationPanel
+              selectedPreview={selectedPreview}
+              environmentMap={environmentMap}
+            />
+          ) : (
+            <EnvironmentMapThumbnailPanel
+              thumbnailUrl={thumbnailUrl}
+              environmentMapName={environmentMap.name}
+              isThumbnailUploading={setThumbnailMutation.isPending}
+              isRegenerating={regenerateThumbnailMutation.isPending}
+              onUpload={file => void handleThumbnailUpload(file)}
+              onRegenerate={() => void handleThumbnailRegenerate()}
+            />
+          )}
         </PanelWrapper>
       </div>
     )
   }
-
-  const panelOptions: Array<{
-    label: string
-    value: ViewerPanelContent
-    icon: string
-  }> = [
-    { label: 'Informations', value: 'information', icon: 'pi pi-info-circle' },
-    { label: 'Thumbnail', value: 'thumbnail', icon: 'pi pi-image' },
-  ]
 
   const getPanelMenuItems = (
     currentPanel: ViewerPanelContent,
@@ -788,7 +331,7 @@ export function EnvironmentMapViewer({
       command: () => onChange(null),
     },
     { separator: true },
-    ...panelOptions.map(option => ({
+    ...PANEL_OPTIONS.map(option => ({
       label: option.label,
       icon: option.icon,
       className:

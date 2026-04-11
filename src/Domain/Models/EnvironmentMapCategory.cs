@@ -1,6 +1,6 @@
 namespace Domain.Models;
 
-public class EnvironmentMapCategory : AggregateRoot
+public class EnvironmentMapCategory : AggregateRoot, IHierarchicalCategory<EnvironmentMapCategory>
 {
     private readonly List<EnvironmentMapCategory> _children = new();
 

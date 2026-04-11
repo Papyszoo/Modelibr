@@ -57,11 +57,10 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
                 return Result.Failure<CreateEnvironmentMapResponse>(sizeLabelResult.Error);
 
             var environmentMap = EnvironmentMap.Create(command.Name, now);
-            var created = await _environmentMapRepository.AddAsync(environmentMap, cancellationToken);
-
             var variant = resolvedFilesResult.Value.CreateVariant(sizeLabelResult.Value, now);
-            created.AddVariant(variant, now);
-            await _environmentMapRepository.UpdateAsync(created, cancellationToken);
+            environmentMap.AddVariant(variant, now);
+
+            var created = await _environmentMapRepository.AddAsync(environmentMap, cancellationToken);
 
             created.SetPreviewVariant(variant.Id, now);
             await _environmentMapRepository.UpdateAsync(created, cancellationToken);

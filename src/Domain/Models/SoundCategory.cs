@@ -1,6 +1,6 @@
 namespace Domain.Models;
 
-public class SoundCategory : AggregateRoot
+public class SoundCategory : AggregateRoot, IHierarchicalCategory<SoundCategory>
 {
     private readonly List<SoundCategory> _children = new();
 

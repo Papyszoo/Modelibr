@@ -13,15 +13,18 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileStorage _fileStorage;
+    private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public UploadEnvironmentMapVariantThumbnailCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileStorage fileStorage,
+        IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileStorage = fileStorage;
+        _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -52,9 +55,10 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
         try
         {
             var storedFileResult = await _fileStorage.SaveAsync(command.ThumbnailFile, FileType.Texture, cancellationToken);
+            var fullPath = Path.Combine(_pathProvider.UploadRootPath, storedFileResult.RelativePath);
             var now = _dateTimeProvider.UtcNow;
 
-            variant.SetThumbnailPath(storedFileResult.RelativePath, now);
+            variant.SetThumbnailPath(fullPath, now);
             environmentMap.Touch(now);
 
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
@@ -62,7 +66,7 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
             return Result.Success(new UploadEnvironmentMapVariantThumbnailCommandResponse(
                 command.EnvironmentMapId,
                 command.VariantId,
-                storedFileResult.RelativePath,
+                fullPath,
                 storedFileResult.SizeBytes));
         }
         catch (Exception ex)

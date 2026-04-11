@@ -40,10 +40,6 @@ export const config = {
 
   // Environment map rendering settings
   environmentMaps: {
-    uploadRootPath:
-      process.env.UPLOAD_STORAGE_PATH ||
-      process.env.ENVIRONMENT_MAP_UPLOAD_ROOT_PATH ||
-      '',
     cameraDistanceMultiplier:
       parseFloat(process.env.ENVIRONMENT_MAP_CAMERA_DISTANCE_MULTIPLIER) || 0.9,
     cameraHeight: parseFloat(process.env.ENVIRONMENT_MAP_CAMERA_HEIGHT) || 8,
@@ -203,12 +199,6 @@ export function validateConfig() {
     config.environmentMaps.backgroundBlur > 1
   ) {
     errors.push('ENVIRONMENT_MAP_BACKGROUND_BLUR must be between 0 and 1')
-  }
-
-  if (!config.environmentMaps.uploadRootPath) {
-    errors.push(
-      'UPLOAD_STORAGE_PATH or ENVIRONMENT_MAP_UPLOAD_ROOT_PATH must be specified for environment map thumbnails'
-    )
   }
 
   if (config.encoding.framerate <= 0 || config.encoding.framerate > 60) {

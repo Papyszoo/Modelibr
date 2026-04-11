@@ -76,5 +76,5 @@ internal sealed class EnvironmentMapSizeLabelService : IEnvironmentMapSizeLabelS
     }
 
     private string ResolveFullPath(string relativePath)
-        => EnvironmentMapStoragePathResolver.ResolveFullPath(_pathProvider.UploadRootPath, relativePath);
+        => Path.Combine(_pathProvider.UploadRootPath, relativePath);
 }

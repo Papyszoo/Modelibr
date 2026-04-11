@@ -14,16 +14,20 @@ import {
   EnvironmentMapContextMenu,
   type EnvironmentMapContextMenuHandle,
 } from '@/features/environment-map/components/EnvironmentMapContextMenu'
+import {
+  EnvironmentMapGrid,
+  type SelectionBox,
+} from '@/features/environment-map/components/EnvironmentMapGrid'
 import { EnvironmentMapToolbar } from '@/features/environment-map/components/EnvironmentMapToolbar'
 import {
   EnvironmentMapUploadDialog,
   type EnvironmentMapUploadDialogSubmitValues,
 } from '@/features/environment-map/components/EnvironmentMapUploadDialog'
+import { type EnvironmentMapDto } from '@/features/environment-map/types'
 import { type EnvironmentMapUploadItem } from '@/features/environment-map/utils/environmentMapUploadUtils'
 import { prepareEnvironmentMapUploadItems } from '@/features/environment-map/utils/environmentMapUploadUtils'
 import {
   getEnvironmentMapCustomThumbnailUrl,
-  getEnvironmentMapPrimaryPreviewUrl,
   getEnvironmentMapSizeLabels,
 } from '@/features/environment-map/utils/environmentMapUtils'
 import { uploadFile } from '@/features/models/api/modelApi'
@@ -34,74 +38,6 @@ import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { type CategorySelectionKeys } from '@/shared/types/categories'
 import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-
-const CARD_IMAGE_RETRY_DELAY_MS = 3000
-const MAX_CARD_IMAGE_RETRY_ATTEMPTS = 120
-
-type EnvironmentMapCardImageProps = {
-  src: string
-  alt: string
-}
-
-function EnvironmentMapCardImage({ src, alt }: EnvironmentMapCardImageProps) {
-  const [retryAttempt, setRetryAttempt] = useState(0)
-  const retryTimeoutRef = useRef<number | null>(null)
-
-  const clearRetryTimeout = useCallback(() => {
-    if (retryTimeoutRef.current == null) {
-      return
-    }
-
-    window.clearTimeout(retryTimeoutRef.current)
-    retryTimeoutRef.current = null
-  }, [])
-
-  useEffect(() => {
-    setRetryAttempt(0)
-    clearRetryTimeout()
-
-    return () => {
-      clearRetryTimeout()
-    }
-  }, [clearRetryTimeout, src])
-
-  const resolvedSrc = useMemo(() => {
-    if (retryAttempt === 0) {
-      return src
-    }
-
-    const separator = src.includes('?') ? '&' : '?'
-    return `${src}${separator}thumbnailRetry=${retryAttempt}`
-  }, [retryAttempt, src])
-
-  const scheduleRetry = useCallback(() => {
-    if (
-      retryTimeoutRef.current != null ||
-      retryAttempt >= MAX_CARD_IMAGE_RETRY_ATTEMPTS
-    ) {
-      return
-    }
-
-    retryTimeoutRef.current = window.setTimeout(() => {
-      retryTimeoutRef.current = null
-      setRetryAttempt(previous => previous + 1)
-    }, CARD_IMAGE_RETRY_DELAY_MS)
-  }, [retryAttempt])
-
-  const handleLoad = useCallback(() => {
-    clearRetryTimeout()
-  }, [clearRetryTimeout])
-
-  return (
-    <img
-      src={resolvedSrc}
-      alt={alt}
-      data-testid="environment-map-card-thumbnail"
-      onLoad={handleLoad}
-      onError={scheduleRetry}
-    />
-  )
-}
 
 export function EnvironmentMapList() {
   const toast = useRef<Toast>(null)
@@ -123,12 +59,7 @@ export function EnvironmentMapList() {
     Set<string>
   >(new Set())
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
-  const [selectionBox, setSelectionBox] = useState<{
-    startX: number
-    startY: number
-    currentX: number
-    currentY: number
-  } | null>(null)
+  const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null)
   const { openEnvironmentMapDetailsTab } = useTabContext()
   const { settings, setCardWidth } = useCardWidthStore()
   const uploadProgress = useUploadProgress()
@@ -552,6 +483,28 @@ export function EnvironmentMapList() {
     [selectedEnvironmentMaps]
   )
 
+  const handleCardContextMenu = useCallback(
+    (event: React.MouseEvent, environmentMap: EnvironmentMapDto) => {
+      const isSelected = selectedEnvironmentMapIds.has(
+        String(environmentMap.id)
+      )
+
+      if (selectedEnvironmentMaps.length > 1 && isSelected) {
+        contextMenuRef.current?.show(event, {
+          environmentMaps: selectedEnvironmentMaps,
+          mode: 'bulk',
+        })
+        return
+      }
+
+      contextMenuRef.current?.show(event, {
+        environmentMaps: [environmentMap],
+        mode: 'single',
+      })
+    },
+    [selectedEnvironmentMaps, selectedEnvironmentMapIds]
+  )
+
   return (
     <div
       ref={listScrollRef}
@@ -635,103 +588,20 @@ export function EnvironmentMapList() {
           </p>
         </div>
       ) : (
-        <div
-          ref={selectionSurfaceRef}
-          className={`environment-map-selection-surface${isAreaSelecting ? ' is-selecting' : ''}`}
+        <EnvironmentMapGrid
+          environmentMaps={filteredEnvironmentMaps}
+          cardWidth={cardWidth}
+          selectedIds={selectedEnvironmentMapIds}
+          isAreaSelecting={isAreaSelecting}
+          selectionBox={selectionBox}
+          selectionSurfaceRef={selectionSurfaceRef}
+          onCardClick={openEnvironmentMapDetailsTab}
+          onCardContextMenu={handleCardContextMenu}
+          onToggleSelection={toggleSelection}
           onMouseDown={handleGridMouseDown}
           onMouseMove={handleGridMouseMove}
           onMouseUp={handleGridMouseUp}
-          onMouseLeave={handleGridMouseUp}
-        >
-          <div
-            className="environment-map-grid"
-            style={{
-              gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
-            }}
-          >
-            {filteredEnvironmentMaps.map(environmentMap => {
-              const previewUrl =
-                getEnvironmentMapPrimaryPreviewUrl(environmentMap)
-              const environmentMapId = String(environmentMap.id)
-              const isSelected = selectedEnvironmentMapIds.has(environmentMapId)
-
-              return (
-                <article
-                  key={environmentMap.id}
-                  className={`environment-map-card${isSelected ? ' selected' : ''}`}
-                  data-environment-map-id={environmentMap.id}
-                  onClick={() =>
-                    openEnvironmentMapDetailsTab(
-                      environmentMap.id,
-                      environmentMap.name
-                    )
-                  }
-                  onContextMenu={event => {
-                    if (selectedEnvironmentMaps.length > 1 && isSelected) {
-                      contextMenuRef.current?.show(event, {
-                        environmentMaps: selectedEnvironmentMaps,
-                        mode: 'bulk',
-                      })
-                      return
-                    }
-
-                    contextMenuRef.current?.show(event, {
-                      environmentMaps: [environmentMap],
-                      mode: 'single',
-                    })
-                  }}
-                >
-                  <div className="environment-map-card-preview">
-                    <button
-                      type="button"
-                      className="environment-map-select-checkbox"
-                      onMouseDown={event => event.stopPropagation()}
-                      onClick={event =>
-                        toggleSelection(environmentMapId, event)
-                      }
-                      aria-label={`${isSelected ? 'Deselect' : 'Select'} ${environmentMap.name}`}
-                      aria-pressed={isSelected}
-                    >
-                      <i
-                        className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
-                      />
-                    </button>
-
-                    {previewUrl ? (
-                      <EnvironmentMapCardImage
-                        src={previewUrl}
-                        alt={environmentMap.name}
-                      />
-                    ) : (
-                      <div className="environment-map-card-placeholder">
-                        <i className="pi pi-globe" />
-                        <span>No Preview</span>
-                      </div>
-                    )}
-
-                    <div className="environment-map-card-overlay">
-                      <span className="environment-map-card-name">
-                        {environmentMap.name}
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-
-          {isAreaSelecting && selectionBox ? (
-            <div
-              className="environment-map-selection-box"
-              style={{
-                left: Math.min(selectionBox.startX, selectionBox.currentX),
-                top: Math.min(selectionBox.startY, selectionBox.currentY),
-                width: Math.abs(selectionBox.currentX - selectionBox.startX),
-                height: Math.abs(selectionBox.currentY - selectionBox.startY),
-              }}
-            />
-          ) : null}
-        </div>
+        />
       )}
     </div>
   )

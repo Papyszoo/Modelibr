@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Categories;
 using Domain.Models;
 using Domain.Services;
 using SharedKernel;
@@ -21,32 +22,20 @@ internal class CreateSoundCategoryCommandHandler : ICommandHandler<CreateSoundCa
 
     public async Task<Result<SoundCategorySummaryDto>> Handle(CreateSoundCategoryCommand command, CancellationToken cancellationToken)
     {
-        var existingCategory = await _categoryRepository.GetByNameAsync(command.Name.Trim(), command.ParentId, cancellationToken);
-        if (existingCategory != null)
-        {
-            return Result.Failure<SoundCategorySummaryDto>(
-                new Error("CategoryAlreadyExists", $"A sound category named '{command.Name}' already exists in this branch."));
-        }
+        var result = await CategoryCommandHandlers.CreateAsync(
+            _categoryRepository, command.Name, command.Description, command.ParentId,
+            "sound category", SoundCategory.Create, _dateTimeProvider.UtcNow, cancellationToken);
 
-        try
-        {
-            var category = SoundCategory.Create(command.Name, command.Description, command.ParentId, _dateTimeProvider.UtcNow);
-            await _categoryRepository.AddAsync(category, cancellationToken);
-
-            return Result.Success(new SoundCategorySummaryDto
+        return result.IsSuccess
+            ? Result.Success(new SoundCategorySummaryDto
             {
-                Id = category.Id,
-                Name = category.Name,
-                Description = category.Description,
-                ParentId = category.ParentId,
-                Path = category.Name
-            });
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<SoundCategorySummaryDto>(
-                new Error("CategoryCreationFailed", ex.Message));
-        }
+                Id = result.Value.Id,
+                Name = result.Value.Name,
+                Description = result.Value.Description,
+                ParentId = result.Value.ParentId,
+                Path = result.Value.Path
+            })
+            : Result.Failure<SoundCategorySummaryDto>(result.Error);
     }
 }
 

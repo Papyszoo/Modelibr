@@ -82,7 +82,7 @@
   background:
     radial-gradient(
       circle at 20% 20%,
-      rgba(59, 130, 246, 0.18),
+      rgba(var(--primary-color-rgb), 0.18),
       transparent 28%
     ),
     radial-gradient(

@@ -1,6 +1,6 @@
 import { BaseProcessor } from './baseProcessor.js'
 import { EnvironmentMapFileService } from '../environmentMapFileService.js'
-import { EnvironmentMapStorageService } from '../environmentMapStorageService.js'
+import { EnvironmentMapApiService } from '../environmentMapApiService.js'
 import { RendererPool } from '../rendererPool.js'
 import { FrameEncoderService } from '../frameEncoderService.js'
 import { config } from '../config.js'
@@ -9,7 +9,7 @@ export class EnvironmentMapProcessor extends BaseProcessor {
   constructor() {
     super()
     this.environmentMapFileService = new EnvironmentMapFileService()
-    this.environmentMapStorageService = new EnvironmentMapStorageService()
+    this.environmentMapApiService = new EnvironmentMapApiService()
     this.rendererPool = null
     this.frameEncoder = null
   }
@@ -162,13 +162,39 @@ export class EnvironmentMapProcessor extends BaseProcessor {
       environmentMapId
     )
 
-    const result = await this.environmentMapStorageService.storeThumbnail(
+    jobLogger.info('Uploading environment map thumbnails via API', {
       environmentMapId,
       variantId,
-      encodingResult
+    })
+
+    const uploadResult =
+      await this.environmentMapApiService.uploadMultipleThumbnails(
+        environmentMapId,
+        variantId,
+        {
+          webpPath: encodingResult.webpPath,
+          pngPath: encodingResult.posterPath || encodingResult.pngPath,
+        }
+      )
+
+    if (!uploadResult.allSuccessful || uploadResult.uploads.length === 0) {
+      throw new Error(
+        'Environment map thumbnail upload failed — no valid thumbnail data available'
+      )
+    }
+
+    const successfulUpload = uploadResult.uploads.find(
+      u => u.success && u.data
     )
 
-    jobLogger.info('Environment map thumbnail stored', {
+    const result = {
+      thumbnailPath: successfulUpload?.data?.thumbnailPath || null,
+      sizeBytes: successfulUpload?.data?.sizeBytes || 0,
+      width: config.rendering.outputWidth,
+      height: config.rendering.outputHeight,
+    }
+
+    jobLogger.info('Environment map thumbnail uploaded', {
       environmentMapId,
       variantId,
       thumbnailPath: result.thumbnailPath,

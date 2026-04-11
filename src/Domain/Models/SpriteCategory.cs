@@ -1,6 +1,6 @@
 namespace Domain.Models;
 
-public class SpriteCategory : AggregateRoot
+public class SpriteCategory : AggregateRoot, IHierarchicalCategory<SpriteCategory>
 {
     private readonly List<SpriteCategory> _children = new();
 

@@ -1,6 +1,6 @@
 namespace Domain.Models;
 
-public class TextureSetCategory : AggregateRoot
+public class TextureSetCategory : AggregateRoot, IHierarchicalCategory<TextureSetCategory>
 {
     private readonly List<TextureSetCategory> _children = new();
 

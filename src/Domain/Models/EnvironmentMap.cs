@@ -1,3 +1,4 @@
+using Domain.Events;
 using Domain.ValueObjects;
 
 namespace Domain.Models;
@@ -70,12 +71,16 @@ public class EnvironmentMap : AggregateRoot
     {
         ValidateName(name);
 
-        return new EnvironmentMap
+        var environmentMap = new EnvironmentMap
         {
             Name = name.Trim(),
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
+
+        environmentMap.RaiseDomainEvent(new EnvironmentMapCreatedEvent(environmentMap.Id, environmentMap.Name));
+
+        return environmentMap;
     }
 
     public void UpdateName(string name, DateTime updatedAt)
@@ -240,6 +245,8 @@ public class EnvironmentMap : AggregateRoot
 
         foreach (var variant in _variants.Where(v => !v.IsDeleted))
             variant.SoftDelete(deletedAt);
+
+        RaiseDomainEvent(new EnvironmentMapDeletedEvent(Id));
     }
 
     public void Restore(DateTime restoredAt)

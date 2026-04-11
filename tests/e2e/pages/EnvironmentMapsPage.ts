@@ -345,41 +345,25 @@ export class EnvironmentMapsPage {
         const image = this.getEnvironmentMapCardThumbnailByName(name);
         await expect(image).toBeVisible({ timeout });
 
-        const startTime = Date.now();
-        while (Date.now() - startTime < timeout) {
-            const state = await image.evaluate((node) => {
-                if (!(node instanceof HTMLImageElement)) {
-                    return {
-                        isImage: false,
-                        complete: false,
-                        naturalWidth: 0,
-                        naturalHeight: 0,
-                        currentSrc: "",
-                    };
-                }
-
-                return {
-                    isImage: true,
-                    complete: node.complete,
-                    naturalWidth: node.naturalWidth,
-                    naturalHeight: node.naturalHeight,
-                    currentSrc: node.currentSrc,
-                };
-            });
-
-            if (
-                state.isImage &&
-                state.complete &&
-                state.naturalWidth > 0 &&
-                state.naturalHeight > 0
-            ) {
-                return;
-            }
-
-            await this.page.waitForTimeout(3000);
-        }
-
-        throw new Error(`Timed out waiting for card thumbnail for ${name}`);
+        await expect
+            .poll(
+                async () => {
+                    const state = await image.evaluate((node) => {
+                        if (!(node instanceof HTMLImageElement)) {
+                            return { loaded: false };
+                        }
+                        return {
+                            loaded:
+                                node.complete &&
+                                node.naturalWidth > 0 &&
+                                node.naturalHeight > 0,
+                        };
+                    });
+                    return state.loaded;
+                },
+                { timeout, intervals: [1000, 2000, 3000] },
+            )
+            .toBe(true);
     }
 
     async getCardThumbnailState(name: string): Promise<{
@@ -606,36 +590,23 @@ export class EnvironmentMapsPage {
     async waitForViewerCustomThumbnailLoaded(timeout = 30000): Promise<void> {
         await this.openViewerPanel("Left Panel", "Thumbnail");
         const image = this.page.locator(".environment-map-thumbnail-card img");
-        const startTime = Date.now();
-        while (Date.now() - startTime < timeout) {
-            const state = await image.first().evaluate((node) => {
-                if (!(node instanceof HTMLImageElement)) {
-                    return {
-                        isImage: false,
-                        complete: false,
-                        naturalWidth: 0,
-                        naturalHeight: 0,
-                        currentSrc: "",
-                    };
-                }
 
-                return {
-                    isImage: true,
-                    complete: node.complete,
-                    naturalWidth: node.naturalWidth,
-                    naturalHeight: node.naturalHeight,
-                    currentSrc: node.currentSrc,
-                };
-            });
-
-            if (state.isImage && state.complete && state.naturalWidth > 0) {
-                return;
-            }
-
-            await this.page.waitForTimeout(3000);
-        }
-
-        throw new Error("Timed out waiting for viewer thumbnail");
+        await expect
+            .poll(
+                async () => {
+                    const state = await image.first().evaluate((node) => {
+                        if (!(node instanceof HTMLImageElement)) {
+                            return { loaded: false };
+                        }
+                        return {
+                            loaded: node.complete && node.naturalWidth > 0,
+                        };
+                    });
+                    return state.loaded;
+                },
+                { timeout, intervals: [1000, 2000, 3000] },
+            )
+            .toBe(true);
     }
 
     async getViewerThumbnailSrc(): Promise<string> {
@@ -766,7 +737,7 @@ export class EnvironmentMapsPage {
         await expect(menuLink).toBeVisible({ timeout: 5000 });
         await menuLink.scrollIntoViewIfNeeded();
         await menuLink.click({ timeout: 5000 });
-        await this.page.waitForTimeout(100);
+        await expect(menuItem.locator('.p-submenu-list')).toBeVisible({ timeout: 3000 });
         return menuItem;
     }
 
@@ -806,11 +777,10 @@ export class EnvironmentMapsPage {
                         (node as HTMLElement).click();
                     });
                 }
-                await this.page.waitForTimeout(100);
 
                 const panelVisible = await this.page
                     .locator(panelSelector)
-                    .isVisible({ timeout: 2000 })
+                    .isVisible({ timeout: 3000 })
                     .catch(() => false);
 
                 if (panelVisible) {

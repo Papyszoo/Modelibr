@@ -16,7 +16,7 @@ const mockSelectVariant = vi.fn()
 const mockDownloadVariantSource = vi.fn()
 const mockCleanupSource = vi.fn()
 
-const mockStoreThumbnail = vi.fn()
+const mockUploadMultipleThumbnails = vi.fn()
 
 const mockLoadEnvironmentPreview = vi.fn()
 const mockCalculateOptimalCameraDistance = vi.fn()
@@ -82,9 +82,9 @@ vi.mock('../environmentMapFileService.js', () => ({
   }),
 }))
 
-vi.mock('../environmentMapStorageService.js', () => ({
-  EnvironmentMapStorageService: vi.fn(function () {
-    this.storeThumbnail = mockStoreThumbnail
+vi.mock('../environmentMapApiService.js', () => ({
+  EnvironmentMapApiService: vi.fn(function () {
+    this.uploadMultipleThumbnails = mockUploadMultipleThumbnails
   }),
 }))
 
@@ -173,11 +173,18 @@ describe('EnvironmentMapProcessor', () => {
       pngPath: '/mock/thumb.png',
       posterPath: '/mock/poster.jpg',
     })
-    mockStoreThumbnail.mockResolvedValue({
-      thumbnailPath: 'previews/environment-maps/77/501.webp',
-      sizeBytes: 2048,
-      width: 256,
-      height: 256,
+    mockUploadMultipleThumbnails.mockResolvedValue({
+      allSuccessful: true,
+      uploads: [
+        {
+          type: 'webp',
+          success: true,
+          data: {
+            thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
+            sizeBytes: 2048,
+          },
+        },
+      ],
     })
   })
 
@@ -200,13 +207,12 @@ describe('EnvironmentMapProcessor', () => {
       })
     )
     expect(mockRenderFrame).toHaveBeenCalledTimes(3)
-    expect(mockStoreThumbnail).toHaveBeenCalledWith(77, 501, {
+    expect(mockUploadMultipleThumbnails).toHaveBeenCalledWith(77, 501, {
       webpPath: '/mock/thumb.webp',
-      pngPath: '/mock/thumb.png',
-      posterPath: '/mock/poster.jpg',
+      pngPath: '/mock/poster.jpg',
     })
     expect(result).toEqual({
-      thumbnailPath: 'previews/environment-maps/77/501.webp',
+      thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
       sizeBytes: 2048,
       width: 256,
       height: 256,
@@ -219,14 +225,14 @@ describe('EnvironmentMapProcessor', () => {
     const processor = new EnvironmentMapProcessor()
 
     await processor.markCompleted(job, {
-      thumbnailPath: 'previews/environment-maps/77/501.webp',
+      thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
       sizeBytes: 2048,
       width: 256,
       height: 256,
     })
 
     expect(mockFinishEnvironmentMapJob).toHaveBeenCalledWith(123, true, {
-      thumbnailPath: 'previews/environment-maps/77/501.webp',
+      thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
       sizeBytes: 2048,
       width: 256,
       height: 256,
