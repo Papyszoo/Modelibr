@@ -23,7 +23,6 @@ const globalTextureFiles = [
     { file: "diffuse.jpg", textureType: 1 },
     { file: "normal.exr", textureType: 2 },
     { file: "roughness.exr", textureType: 5 },
-    { file: "displacement.png", textureType: 12 },
 ];
 
 function getMimeType(fileName: string) {
@@ -152,14 +151,14 @@ async function createGlobalTextureSet(request: APIRequestContext) {
                 intervals: [500, 1000, 1500],
             },
         )
-        .toBe(4);
+        .toBe(3);
 
     return { textureSetId, textureSetName };
 }
 
 test.describe("Texture Sets", () => {
     test("Texture Sets Video", async ({ page, request }, testInfo) => {
-        test.setTimeout(180000);
+        test.setTimeout(300000);
         await clearTextureVideoData(request);
         const { textureSetName } = await createGlobalTextureSet(request);
 
@@ -178,7 +177,7 @@ test.describe("Texture Sets", () => {
             .filter({ hasText: new RegExp(textureSetName, "i") })
             .first();
         await expect(textureSetCard).toBeVisible({ timeout: ciVideoTimeout });
-        await expect(textureSetCard.getByText(/4 textures?/i)).toBeVisible({
+        await expect(textureSetCard.getByText(/3 textures?/i)).toBeVisible({
             timeout: ciVideoTimeout,
         });
         await mediumPause(page);
@@ -219,9 +218,9 @@ test.describe("Texture Sets", () => {
             await page.mouse.move(
                 firstFileCardBox.x + firstFileCardBox.width * 0.72,
                 firstFileCardBox.y + firstFileCardBox.height * 0.42,
-                { steps: 20 },
+                { steps: 12 },
             );
-            await viewerPause(page, 250);
+            await viewerPause(page, 180);
         }
 
         await page.getByRole("tab", { name: "Preview" }).click();
@@ -233,25 +232,25 @@ test.describe("Texture Sets", () => {
         await expect(viewer.locator(".texture-loading-overlay")).toBeHidden({
             timeout: ciVideoTimeout,
         });
-        await viewerPause(page, 1200);
+        await viewerPause(page, 900);
 
         const previewBox = await previewCanvas.boundingBox();
         if (previewBox) {
             await page.mouse.move(
                 previewBox.x + previewBox.width * 0.55,
                 previewBox.y + previewBox.height * 0.55,
-                { steps: 18 },
+                { steps: 12 },
             );
             await page.mouse.down();
             await page.mouse.move(
                 previewBox.x + previewBox.width * 0.72,
                 previewBox.y + previewBox.height * 0.44,
-                { steps: 24 },
+                { steps: 16 },
             );
             await page.mouse.up();
         }
 
-        await viewerPause(page, 1800);
+        await viewerPause(page, 1200);
         await stopFeatureRecording(page);
     });
 });
