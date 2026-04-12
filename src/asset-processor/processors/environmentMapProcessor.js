@@ -183,9 +183,7 @@ export class EnvironmentMapProcessor extends BaseProcessor {
       )
     }
 
-    const successfulUpload = uploadResult.uploads.find(
-      u => u.success && u.data
-    )
+    const successfulUpload = uploadResult.uploads.find(u => u.success && u.data)
 
     const result = {
       thumbnailPath: successfulUpload?.data?.thumbnailPath || null,

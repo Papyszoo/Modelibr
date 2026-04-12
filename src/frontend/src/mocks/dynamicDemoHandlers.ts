@@ -2036,15 +2036,17 @@ export const dynamicDemoHandlers = [
 
     syncEnvironmentMapDerivedFields(environmentMap)
 
-    if (environmentMap.customThumbnailFileId) {
-      return buildEnvironmentMapPreviewResponse(
-        environmentMap.customThumbnailFileId
-      )
-    }
-
-    return buildEnvironmentMapPreviewResponse(
-      environmentMap.previewFileId ?? null
-    )
+    const hasPreview =
+      environmentMap.customThumbnailFileId || environmentMap.previewFileId
+    return HttpResponse.json({
+      status: hasPreview ? 'Ready' : 'Pending',
+      previewVariantId: environmentMap.previewVariantId ?? null,
+      fileUrl: hasPreview
+        ? `/environment-maps/${params.id}/preview`
+        : null,
+      errorMessage: null,
+      processedAt: hasPreview ? new Date().toISOString() : null,
+    })
   }),
 
   http.get(

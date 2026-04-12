@@ -294,23 +294,8 @@
         sphere.receiveShadow = true
         group.add(sphere)
 
-        const baseGeometry = new THREE.CircleGeometry(1.7, 64)
-        const baseMaterial = new THREE.MeshStandardMaterial({
-          color: 0x181818,
-          metalness: 0.05,
-          roughness: 0.9,
-          envMapIntensity: 0.25,
-        })
-        const base = new THREE.Mesh(baseGeometry, baseMaterial)
-        base.rotation.x = -Math.PI / 2
-        base.position.y = -1.24
-        base.receiveShadow = true
-        group.add(base)
-
         registerDisposableGeometry(sphereGeometry)
         registerDisposableMaterial(sphereMaterial)
-        registerDisposableGeometry(baseGeometry)
-        registerDisposableMaterial(baseMaterial)
 
         return group
       }

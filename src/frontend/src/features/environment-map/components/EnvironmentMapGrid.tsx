@@ -1,13 +1,36 @@
-import { type EnvironmentMapDto } from '@/features/environment-map/types'
-import { getEnvironmentMapPrimaryPreviewUrl } from '@/features/environment-map/utils/environmentMapUtils'
+import { forwardRef } from 'react'
+import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
-import { EnvironmentMapCardImage } from './EnvironmentMapCardImage'
+import { type EnvironmentMapDto } from '@/features/environment-map/types'
+
+import { EnvironmentMapThumbnailDisplay } from './EnvironmentMapThumbnailDisplay'
 
 export interface SelectionBox {
   startX: number
   startY: number
   currentX: number
   currentY: number
+}
+
+const gridComponents: GridComponents<{ cardWidth: number }> = {
+  List: forwardRef(({ children, context, ...props }, ref) => (
+    <div
+      ref={ref}
+      {...props}
+      className="environment-map-grid"
+      style={{
+        ...props.style,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${context?.cardWidth ?? 180}px, 1fr))`,
+      }}
+    >
+      {children}
+    </div>
+  )),
+  Item: ({ children, ...props }) => (
+    <div {...props} style={props.style}>
+      {children}
+    </div>
+  ),
 }
 
 interface EnvironmentMapGridProps {
@@ -17,6 +40,7 @@ interface EnvironmentMapGridProps {
   isAreaSelecting: boolean
   selectionBox: SelectionBox | null
   selectionSurfaceRef: React.RefObject<HTMLDivElement | null>
+  scrollParent: HTMLDivElement | null
   onCardClick: (id: number, name: string) => void
   onCardContextMenu: (
     event: React.MouseEvent,
@@ -26,6 +50,7 @@ interface EnvironmentMapGridProps {
   onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void
   onMouseMove: (event: React.MouseEvent<HTMLDivElement>) => void
   onMouseUp: () => void
+  onEndReached: () => void
 }
 
 export function EnvironmentMapGrid({
@@ -35,12 +60,14 @@ export function EnvironmentMapGrid({
   isAreaSelecting,
   selectionBox,
   selectionSurfaceRef,
+  scrollParent,
   onCardClick,
   onCardContextMenu,
   onToggleSelection,
   onMouseDown,
   onMouseMove,
   onMouseUp,
+  onEndReached,
 }: EnvironmentMapGridProps) {
   return (
     <div
@@ -51,20 +78,22 @@ export function EnvironmentMapGrid({
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
-      <div
-        className="environment-map-grid"
-        style={{
-          gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
-        }}
-      >
-        {environmentMaps.map(environmentMap => {
-          const previewUrl = getEnvironmentMapPrimaryPreviewUrl(environmentMap)
+      <VirtuosoGrid
+        customScrollParent={scrollParent ?? undefined}
+        totalCount={environmentMaps.length}
+        overscan={200}
+        components={gridComponents}
+        context={{ cardWidth }}
+        endReached={onEndReached}
+        itemContent={index => {
+          const environmentMap = environmentMaps[index]
+          if (!environmentMap) return null
+
           const environmentMapId = String(environmentMap.id)
           const isSelected = selectedIds.has(environmentMapId)
 
           return (
             <article
-              key={environmentMap.id}
               className={`environment-map-card${isSelected ? ' selected' : ''}`}
               data-environment-map-id={environmentMap.id}
               onClick={() =>
@@ -86,17 +115,10 @@ export function EnvironmentMapGrid({
                   />
                 </button>
 
-                {previewUrl ? (
-                  <EnvironmentMapCardImage
-                    src={previewUrl}
-                    alt={environmentMap.name}
-                  />
-                ) : (
-                  <div className="environment-map-card-placeholder">
-                    <i className="pi pi-globe" />
-                    <span>No Preview</span>
-                  </div>
-                )}
+                <EnvironmentMapThumbnailDisplay
+                  environmentMapId={environmentMap.id}
+                  name={environmentMap.name}
+                />
 
                 <div className="environment-map-card-overlay">
                   <span className="environment-map-card-name">
@@ -106,8 +128,8 @@ export function EnvironmentMapGrid({
               </div>
             </article>
           )
-        })}
-      </div>
+        }}
+      />
 
       {isAreaSelecting && selectionBox ? (
         <div

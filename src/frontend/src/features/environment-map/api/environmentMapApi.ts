@@ -1,4 +1,4 @@
-import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { baseURL, client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
 import {
   type AddEnvironmentMapVariantWithFileResponse,
   type CreateEnvironmentMapWithFileResponse,
@@ -266,4 +266,32 @@ export async function updateEnvironmentMapMetadata(
   )
 
   return response.data
+}
+
+export interface EnvironmentMapThumbnailStatus {
+  status: 'Pending' | 'Processing' | 'Ready' | 'Failed'
+  previewVariantId?: number
+  fileUrl?: string
+  errorMessage?: string
+  processedAt?: string
+}
+
+export async function getEnvironmentMapThumbnailStatus(
+  environmentMapId: number
+): Promise<EnvironmentMapThumbnailStatus> {
+  const response = await client.get<EnvironmentMapThumbnailStatus>(
+    `/environment-maps/${environmentMapId}/thumbnail`
+  )
+  return response.data
+}
+
+export function getEnvironmentMapPreviewUrl(environmentMapId: number): string {
+  return `${baseURL}/environment-maps/${environmentMapId}/preview`
+}
+
+export function getEnvironmentMapVariantPreviewUrl(
+  environmentMapId: number,
+  variantId: number
+): string {
+  return `${baseURL}/environment-maps/${environmentMapId}/variants/${variantId}/preview`
 }

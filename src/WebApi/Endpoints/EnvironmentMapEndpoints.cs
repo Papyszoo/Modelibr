@@ -26,6 +26,12 @@ public static class EnvironmentMapEndpoints
             .WithSummary("Gets an environment map by ID")
             .WithOpenApi();
 
+        app.MapGet("/environment-maps/{id}/thumbnail", GetEnvironmentMapThumbnailStatus)
+            .WithName("Get Environment Map Thumbnail Status")
+            .WithSummary("Gets the thumbnail generation status for an environment map")
+            .WithTags("Thumbnails")
+            .WithOpenApi();
+
         app.MapGet("/environment-maps/{id}/preview", GetEnvironmentMapPreview)
             .WithName("Get Environment Map Preview")
             .WithSummary("Gets the preview thumbnail for an environment map")
@@ -143,6 +149,27 @@ public static class EnvironmentMapEndpoints
         return result.IsSuccess
             ? Results.Ok(result.Value.EnvironmentMap)
             : Results.NotFound(new { error = result.Error.Code, message = result.Error.Message });
+    }
+
+    private static async Task<IResult> GetEnvironmentMapThumbnailStatus(
+        int id,
+        IQueryHandler<GetEnvironmentMapThumbnailStatusQuery, GetEnvironmentMapThumbnailStatusResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetEnvironmentMapThumbnailStatusQuery(id), cancellationToken);
+
+        if (result.IsFailure)
+            return Results.NotFound(result.Error.Message);
+
+        var response = result.Value;
+        return Results.Ok(new
+        {
+            Status = response.Status.ToString(),
+            PreviewVariantId = response.PreviewVariantId,
+            FileUrl = response.FileUrl,
+            ErrorMessage = response.ErrorMessage,
+            ProcessedAt = response.ProcessedAt
+        });
     }
 
     private static async Task<IResult> GetEnvironmentMapPreview(

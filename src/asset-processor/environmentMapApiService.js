@@ -154,7 +154,10 @@ export class EnvironmentMapApiService {
         environmentMapId,
         variantId,
         paths.webpPath,
-        { width: config.rendering.outputWidth, height: config.rendering.outputHeight }
+        {
+          width: config.rendering.outputWidth,
+          height: config.rendering.outputHeight,
+        }
       )
       result.uploads.push({ type: 'webp', path: paths.webpPath, ...webpResult })
       if (!webpResult.success) result.allSuccessful = false
@@ -165,7 +168,10 @@ export class EnvironmentMapApiService {
         environmentMapId,
         variantId,
         paths.pngPath,
-        { width: config.rendering.outputWidth, height: config.rendering.outputHeight }
+        {
+          width: config.rendering.outputWidth,
+          height: config.rendering.outputHeight,
+        }
       )
       result.uploads.push({ type: 'png', path: paths.pngPath, ...pngResult })
       if (!pngResult.success) result.allSuccessful = false

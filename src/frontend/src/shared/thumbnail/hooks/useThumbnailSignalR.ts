@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { type EnvironmentMapThumbnailStatus } from '@/features/environment-map/api/environmentMapApi'
 import { getEnvironmentMapByIdQueryOptions } from '@/features/environment-map/api/queries'
 
 import {
@@ -109,9 +110,20 @@ export function useThumbnailSignalR(_modelIds: number[]) {
 
   const handleEnvironmentMapThumbnailStatusChanged = useCallback(
     (event: EnvironmentMapThumbnailStatusChangedEvent) => {
-      queryClient.invalidateQueries({
-        queryKey: ['environmentMaps'],
-      })
+      const newData: EnvironmentMapThumbnailStatus = {
+        status: event.status as EnvironmentMapThumbnailStatus['status'],
+        previewVariantId: event.environmentMapVariantId,
+        fileUrl: event.previewUrl ?? undefined,
+        errorMessage: event.errorMessage ?? undefined,
+        processedAt: event.timestamp,
+      }
+      queryClient.setQueryData(
+        ['environmentMapThumbnail', event.environmentMapId],
+        (old: EnvironmentMapThumbnailStatus | undefined) => ({
+          ...old,
+          ...newData,
+        })
+      )
       queryClient.invalidateQueries({
         queryKey: getEnvironmentMapByIdQueryOptions(event.environmentMapId)
           .queryKey,

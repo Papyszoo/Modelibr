@@ -5,10 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   useCreateEnvironmentMapWithFileMutation,
-  useEnvironmentMapsQuery,
   useSetEnvironmentMapCustomThumbnailMutation,
 } from '@/features/environment-map/api/queries'
-import { useEnvironmentMapCategoriesQuery } from '@/features/environment-map/api/queries'
 import { EnvironmentMapCategoryManagerDialog } from '@/features/environment-map/components/EnvironmentMapCategoryManagerDialog'
 import {
   EnvironmentMapContextMenu,
@@ -23,6 +21,7 @@ import {
   EnvironmentMapUploadDialog,
   type EnvironmentMapUploadDialogSubmitValues,
 } from '@/features/environment-map/components/EnvironmentMapUploadDialog'
+import { useEnvironmentMapData } from '@/features/environment-map/hooks/useEnvironmentMapData'
 import { type EnvironmentMapDto } from '@/features/environment-map/types'
 import { type EnvironmentMapUploadItem } from '@/features/environment-map/utils/environmentMapUploadUtils'
 import { prepareEnvironmentMapUploadItems } from '@/features/environment-map/utils/environmentMapUploadUtils'
@@ -31,28 +30,35 @@ import {
   getEnvironmentMapSizeLabels,
 } from '@/features/environment-map/utils/environmentMapUtils'
 import { uploadFile } from '@/features/models/api/modelApi'
-import { useModelTagsQuery } from '@/features/models/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import { type CategorySelectionKeys } from '@/shared/types/categories'
 import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
+import {
+  DEFAULT_ENV_MAP_LIST_VIEW_STATE,
+  useEnvironmentMapListViewStore,
+} from '@/stores/environmentMapListViewStore'
 
 export function EnvironmentMapList() {
   const toast = useRef<Toast>(null)
   const contextMenuRef = useRef<EnvironmentMapContextMenuHandle>(null)
   const selectionSurfaceRef = useRef<HTMLDivElement | null>(null)
   const listScrollRef = useRef<HTMLDivElement | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
-  const [selectedPreviewSizes, setSelectedPreviewSizes] = useState<string[]>([])
-  const [selectedPackIds, setSelectedPackIds] = useState<number[]>([])
-  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([])
-  const [selectedCategoryKeys, setSelectedCategoryKeys] =
-    useState<CategorySelectionKeys>({})
-  const [onlyCustomThumbnail, setOnlyCustomThumbnail] = useState(false)
+
+  const viewState = useEnvironmentMapListViewStore(
+    state => state.views['default'] ?? DEFAULT_ENV_MAP_LIST_VIEW_STATE
+  )
+  const setViewState = useEnvironmentMapListViewStore(
+    state => state.setViewState
+  )
+  const updateView = useCallback(
+    (patch: Partial<typeof DEFAULT_ENV_MAP_LIST_VIEW_STATE>) => {
+      setViewState('default', patch)
+    },
+    [setViewState]
+  )
+
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [selectedEnvironmentMapIds, setSelectedEnvironmentMapIds] = useState<
@@ -65,14 +71,18 @@ export function EnvironmentMapList() {
   const uploadProgress = useUploadProgress()
   const cardWidth = settings.environmentMaps
 
-  const environmentMapsQuery = useEnvironmentMapsQuery({
-    params: { page: 1, pageSize: 200 },
+  const {
+    environmentMaps,
+    loading,
+    categories,
+    tags,
+    pagination,
+    isLoadingMore,
+    fetchEnvironmentMaps,
+  } = useEnvironmentMapData({
+    effectivePackIds: viewState.selectedPackIds,
+    effectiveProjectIds: viewState.selectedProjectIds,
   })
-  const environmentMaps = environmentMapsQuery.data?.environmentMaps ?? []
-  const totalCount =
-    environmentMapsQuery.data?.totalCount ?? environmentMaps.length
-  const categoriesQuery = useEnvironmentMapCategoriesQuery()
-  const tagsQuery = useModelTagsQuery()
 
   const createEnvironmentMapMutation = useCreateEnvironmentMapWithFileMutation()
   const setThumbnailMutation = useSetEnvironmentMapCustomThumbnailMutation()
@@ -121,8 +131,7 @@ export function EnvironmentMapList() {
   )
 
   const selectedCategoryIds = useMemo(() => {
-    const categories = categoriesQuery.data ?? []
-    const checkedIds = Object.entries(selectedCategoryKeys)
+    const checkedIds = Object.entries(viewState.selectedCategoryKeys)
       .filter(([, state]) => state?.checked)
       .map(([key]) => Number(key))
       .filter(Number.isFinite)
@@ -132,35 +141,35 @@ export function EnvironmentMapList() {
         ...collectCategoryBranchIds(categories, categoryId),
       ])
     )
-  }, [categoriesQuery.data, selectedCategoryKeys])
+  }, [categories, viewState.selectedCategoryKeys])
 
   const filteredEnvironmentMaps = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
+    const query = viewState.searchQuery.trim().toLowerCase()
 
     return environmentMaps.filter(environmentMap => {
       const nameMatches =
         !query || environmentMap.name.toLowerCase().includes(query)
       const previewSizeMatches =
-        selectedPreviewSizes.length === 0 ||
+        viewState.selectedPreviewSizes.length === 0 ||
         getEnvironmentMapSizeLabels(environmentMap).some(sizeLabel =>
-          selectedPreviewSizes.includes(sizeLabel)
+          viewState.selectedPreviewSizes.includes(sizeLabel)
         )
       const packMatches =
-        selectedPackIds.length === 0 ||
+        viewState.selectedPackIds.length === 0 ||
         (environmentMap.packs ?? []).some(pack =>
-          selectedPackIds.includes(pack.id)
+          viewState.selectedPackIds.includes(pack.id)
         )
       const projectMatches =
-        selectedProjectIds.length === 0 ||
+        viewState.selectedProjectIds.length === 0 ||
         (environmentMap.projects ?? []).some(project =>
-          selectedProjectIds.includes(project.id)
+          viewState.selectedProjectIds.includes(project.id)
         )
       const categoryMatches =
         selectedCategoryIds.size === 0 ||
         (environmentMap.categoryId != null &&
           selectedCategoryIds.has(environmentMap.categoryId))
       const thumbnailMatches =
-        !onlyCustomThumbnail ||
+        !viewState.onlyCustomThumbnail ||
         Boolean(getEnvironmentMapCustomThumbnailUrl(environmentMap))
 
       return (
@@ -174,12 +183,12 @@ export function EnvironmentMapList() {
     })
   }, [
     environmentMaps,
-    onlyCustomThumbnail,
-    searchQuery,
+    viewState.onlyCustomThumbnail,
+    viewState.searchQuery,
     selectedCategoryIds,
-    selectedPackIds,
-    selectedPreviewSizes,
-    selectedProjectIds,
+    viewState.selectedPackIds,
+    viewState.selectedPreviewSizes,
+    viewState.selectedProjectIds,
   ])
 
   const selectedEnvironmentMaps = useMemo(
@@ -514,8 +523,8 @@ export function EnvironmentMapList() {
       <Toast ref={toast} />
       <EnvironmentMapContextMenu
         ref={contextMenuRef}
-        categories={categoriesQuery.data ?? []}
-        tags={tagsQuery.data ?? []}
+        categories={categories}
+        tags={tags}
         onManageCategories={() => setShowCategoryManager(true)}
       />
 
@@ -534,45 +543,51 @@ export function EnvironmentMapList() {
 
       <EnvironmentMapCategoryManagerDialog
         visible={showCategoryManager}
-        categories={categoriesQuery.data ?? []}
+        categories={categories}
         onHide={() => setShowCategoryManager(false)}
       />
 
       <EnvironmentMapToolbar
-        isSearchOpen={isSearchOpen}
-        onSearchToggle={setIsSearchOpen}
-        isFiltersOpen={isFiltersOpen}
-        onFiltersToggle={setIsFiltersOpen}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        isSearchOpen={viewState.isSearchOpen}
+        onSearchToggle={value => updateView({ isSearchOpen: value })}
+        isFiltersOpen={viewState.isFiltersOpen}
+        onFiltersToggle={value => updateView({ isFiltersOpen: value })}
+        searchQuery={viewState.searchQuery}
+        onSearchChange={query => updateView({ searchQuery: query })}
         previewSizeOptions={previewSizeOptions}
         packOptions={packOptions}
         projectOptions={projectOptions}
-        categories={categoriesQuery.data ?? []}
-        selectedPreviewSizes={selectedPreviewSizes}
-        selectedPackIds={selectedPackIds}
-        selectedProjectIds={selectedProjectIds}
-        selectedCategoryKeys={selectedCategoryKeys}
-        onlyCustomThumbnail={onlyCustomThumbnail}
-        onPreviewSizesChange={values => setSelectedPreviewSizes(values)}
-        onPackIdsChange={values => setSelectedPackIds(values)}
-        onProjectIdsChange={values => setSelectedProjectIds(values)}
-        onCategoryChange={setSelectedCategoryKeys}
+        categories={categories}
+        selectedPreviewSizes={viewState.selectedPreviewSizes}
+        selectedPackIds={viewState.selectedPackIds}
+        selectedProjectIds={viewState.selectedProjectIds}
+        selectedCategoryKeys={viewState.selectedCategoryKeys}
+        onlyCustomThumbnail={viewState.onlyCustomThumbnail}
+        onPreviewSizesChange={values =>
+          updateView({ selectedPreviewSizes: values })
+        }
+        onPackIdsChange={values => updateView({ selectedPackIds: values })}
+        onProjectIdsChange={values =>
+          updateView({ selectedProjectIds: values })
+        }
+        onCategoryChange={keys => updateView({ selectedCategoryKeys: keys })}
         onManageCategoriesClick={() => setShowCategoryManager(true)}
-        onOnlyCustomThumbnailChange={setOnlyCustomThumbnail}
+        onOnlyCustomThumbnailChange={value =>
+          updateView({ onlyCustomThumbnail: value })
+        }
         cardWidth={cardWidth}
         onCardWidthChange={width => setCardWidth('environmentMaps', width)}
-        totalCount={totalCount}
+        totalCount={pagination.totalCount}
         visibleCount={filteredEnvironmentMaps.length}
         selectedCount={selectedEnvironmentMaps.length}
         onUploadClick={() => setShowUploadDialog(true)}
-        onRefreshClick={() => void environmentMapsQuery.refetch()}
+        onRefreshClick={() => void fetchEnvironmentMaps()}
         onBulkActionsClick={handleBulkActionsClick}
         onSelectAllClick={handleSelectAll}
         onDeselectAllClick={handleDeselectAll}
       />
 
-      {environmentMapsQuery.isLoading ? (
+      {loading ? (
         <div className="environment-map-list-loading">
           <i className="pi pi-spin pi-spinner" />
           <p>Loading environment maps...</p>
@@ -595,12 +610,18 @@ export function EnvironmentMapList() {
           isAreaSelecting={isAreaSelecting}
           selectionBox={selectionBox}
           selectionSurfaceRef={selectionSurfaceRef}
+          scrollParent={listScrollRef.current}
           onCardClick={openEnvironmentMapDetailsTab}
           onCardContextMenu={handleCardContextMenu}
           onToggleSelection={toggleSelection}
           onMouseDown={handleGridMouseDown}
           onMouseMove={handleGridMouseMove}
           onMouseUp={handleGridMouseUp}
+          onEndReached={() => {
+            if (pagination.hasMore && !isLoadingMore) {
+              void fetchEnvironmentMaps(true)
+            }
+          }}
         />
       )}
     </div>

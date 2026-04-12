@@ -64,7 +64,7 @@ export const config = {
   // Frame encoding settings
   encoding: {
     enabled: process.env.ENCODING_ENABLED !== 'false', // enable frame encoding
-    framerate: parseFloat(process.env.ENCODING_FRAMERATE) || 10, // frames per second for WebP
+    framerate: parseFloat(process.env.ENCODING_FRAMERATE) || 5, // frames per second for WebP
     webpQuality: parseInt(process.env.WEBP_QUALITY) || 75, // WebP quality (0-100)
     jpegQuality: parseInt(process.env.JPEG_QUALITY) || 85, // JPEG quality for poster (0-100)
     cleanupTempFiles: process.env.CLEANUP_TEMP_FILES !== 'false', // cleanup temp files after encoding
