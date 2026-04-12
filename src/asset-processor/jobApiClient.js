@@ -194,9 +194,6 @@ export class JobApiClient {
    * @param {boolean} success - Whether the job succeeded
    * @param {Object} metadata - Thumbnail metadata (required when success=true)
    * @param {string} metadata.thumbnailPath - Path to the stored thumbnail
-   * @param {number} metadata.sizeBytes - Size of the thumbnail in bytes
-   * @param {number} metadata.width - Thumbnail width
-   * @param {number} metadata.height - Thumbnail height
    * @param {string} errorMessage - Error message (required when success=false)
    */
   async finishEnvironmentMapJob(

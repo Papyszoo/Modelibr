@@ -34,13 +34,21 @@ internal static class CategoryCommandHandlers
             var category = factory(name, description, parentId, now);
             await repository.AddAsync(category, cancellationToken);
 
+            var path = category.Name;
+            if (parentId.HasValue)
+            {
+                var allCategories = await repository.GetAllAsync(cancellationToken);
+                path = HierarchicalCategoryHelpers.BuildPath(
+                    category, allCategories, c => c.Id, c => c.ParentId, c => c.Name);
+            }
+
             return Result.Success(new CategorySummaryDto
             {
                 Id = category.Id,
                 Name = category.Name,
                 Description = category.Description,
                 ParentId = category.ParentId,
-                Path = category.Name
+                Path = path
             });
         }
         catch (ArgumentException ex)

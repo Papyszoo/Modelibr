@@ -234,6 +234,19 @@ test.describe("Texture Sets", () => {
         });
         await viewerPause(page, 900);
 
+        // Wait for canvas to have actual layout dimensions before calling boundingBox
+        await page.waitForFunction(
+            () => {
+                const el = document.querySelector(
+                    ".texture-set-viewer .texture-preview-canvas",
+                );
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            },
+            { timeout: ciVideoTimeout },
+        );
+
         const previewBox = await previewCanvas.boundingBox();
         if (previewBox) {
             await page.mouse.move(

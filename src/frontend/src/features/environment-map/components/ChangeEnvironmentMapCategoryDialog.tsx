@@ -60,7 +60,13 @@ export function ChangeEnvironmentMapCategoryDialog({
     const rawKey =
       typeof value === 'string' ? value : (Object.keys(value)[0] ?? null)
 
-    return rawKey ? Number(rawKey) : null
+    if (!rawKey) {
+      return null
+    }
+
+    const parsed = Number(rawKey)
+
+    return Number.isFinite(parsed) ? parsed : null
   }
 
   const handleConfirm = async () => {

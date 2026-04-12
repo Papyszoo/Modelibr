@@ -5,7 +5,6 @@ using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.WebDav;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -27,9 +26,7 @@ namespace Infrastructure
                 connectionString = Environment.ExpandEnvironmentVariables(connectionString);
                 
                 optionsBuilder
-                    .UseNpgsql(connectionString)
-                    .ConfigureWarnings(warnings =>
-                        warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
+                    .UseNpgsql(connectionString);
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();

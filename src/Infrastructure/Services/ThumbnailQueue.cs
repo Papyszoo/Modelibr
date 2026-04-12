@@ -249,15 +249,17 @@ public class ThumbnailQueue : IThumbnailQueue
         job.MarkAsFailed(errorMessage, DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
 
+        var sanitizedError = errorMessage?.ReplaceLineEndings(" ") ?? errorMessage;
+
         if (job.Status == Domain.ValueObjects.ThumbnailJobStatus.Dead)
         {
             _logger.LogWarning("Thumbnail job {JobId} for model {ModelId} version {ModelVersionId} moved to dead letter queue after {AttemptCount} attempts. Error: {ErrorMessage}", 
-                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, errorMessage);
+                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, sanitizedError);
         }
         else
         {
             _logger.LogInformation("Thumbnail job {JobId} for model {ModelId} version {ModelVersionId} failed (attempt {AttemptCount}), will retry. Error: {ErrorMessage}", 
-                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, errorMessage);
+                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, sanitizedError);
         }
     }
 

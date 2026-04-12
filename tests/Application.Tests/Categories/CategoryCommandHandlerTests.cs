@@ -77,6 +77,8 @@ public class CategoryCommandHandlerTests
     [Fact]
     public async Task Create_When_ParentIdProvided_Returns_Success()
     {
+        var parent = EnvironmentMapCategory.Create("HDRI", null, null, _now).WithId(10);
+
         _repository
             .Setup(x => x.GetByNameAsync("Sunset", 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync((EnvironmentMapCategory?)null);
@@ -84,6 +86,10 @@ public class CategoryCommandHandlerTests
         _repository
             .Setup(x => x.AddAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((EnvironmentMapCategory cat, CancellationToken _) => cat.WithId(2));
+
+        _repository
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EnvironmentMapCategory> { parent });
 
         var handler = new CreateEnvironmentMapCategoryCommandHandler(
             _repository.Object, _dateTimeProvider.Object);
@@ -95,6 +101,7 @@ public class CategoryCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Sunset", result.Value.Name);
         Assert.Equal(10, result.Value.ParentId);
+        Assert.Equal("HDRI / Sunset", result.Value.Path);
     }
 
     // ──────────────────────────────────────────────

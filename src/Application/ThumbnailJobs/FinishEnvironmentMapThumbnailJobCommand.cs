@@ -100,7 +100,7 @@ public class FinishEnvironmentMapThumbnailJobCommandHandler
             await _thumbnailQueue.MarkFailedAsync(command.JobId, command.ErrorMessage!, cancellationToken);
             await SendThumbnailNotificationAsync(environmentMap.Id, variant.Id, "Failed", now, command.ErrorMessage, cancellationToken);
             _logger.LogWarning("Environment map thumbnail job {JobId} failed for environment map {EnvironmentMapId} variant {VariantId}: {ErrorMessage}",
-                command.JobId, environmentMap.Id, variant.Id, command.ErrorMessage);
+                command.JobId, environmentMap.Id, variant.Id, command.ErrorMessage?.ReplaceLineEndings(" "));
         }
 
         return Result.Success(new FinishEnvironmentMapThumbnailJobResponse(
