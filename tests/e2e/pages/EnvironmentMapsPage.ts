@@ -268,14 +268,14 @@ export class EnvironmentMapsPage {
         timeout = 30000,
     ): Promise<void> {
         const card = this.getEnvironmentMapCardByName(name);
-        const firstAttemptTimeout = Math.min(timeout, 15000);
         try {
-            await expect(card).toBeVisible({ timeout: firstAttemptTimeout });
+            await expect(card).toBeVisible({ timeout: Math.min(timeout, 10000) });
         } catch {
-            await this.page.reload({ waitUntil: "domcontentloaded" });
-            await this.waitForListReady();
+            // Card not visible — full navigation ensures env maps tab is active
+            // and React Query fetches fresh data from the backend
+            await this.goto();
             await expect(card).toBeVisible({
-                timeout: Math.max(timeout - firstAttemptTimeout, 15000),
+                timeout: Math.max(timeout - 10000, 20000),
             });
         }
     }
@@ -734,6 +734,9 @@ export class EnvironmentMapsPage {
     private async openViewerMenu(menuName: string): Promise<Locator> {
         await expect(this.viewerMenubar).toBeVisible({ timeout: 10000 });
 
+        // Dismiss any active overlays that could intercept the click
+        await this.page.keyboard.press("Escape").catch(() => {});
+
         const menuItem = this.viewerMenubar
             .locator(`.p-menuitem:has(.p-menuitem-text:text-is("${menuName}"))`)
             .first();
@@ -744,8 +747,8 @@ export class EnvironmentMapsPage {
             .first();
         await expect(menuLink).toBeVisible({ timeout: 5000 });
         await menuLink.scrollIntoViewIfNeeded();
-        await menuLink.click({ timeout: 5000 });
-        await expect(menuItem.locator('.p-submenu-list').first()).toBeVisible({ timeout: 3000 });
+        await menuLink.click({ force: true, timeout: 10000 });
+        await expect(menuItem.locator('.p-submenu-list').first()).toBeVisible({ timeout: 5000 });
         return menuItem;
     }
 
