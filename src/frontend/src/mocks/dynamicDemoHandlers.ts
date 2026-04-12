@@ -2041,9 +2041,7 @@ export const dynamicDemoHandlers = [
     return HttpResponse.json({
       status: hasPreview ? 'Ready' : 'Pending',
       previewVariantId: environmentMap.previewVariantId ?? null,
-      fileUrl: hasPreview
-        ? `/environment-maps/${params.id}/preview`
-        : null,
+      fileUrl: hasPreview ? `/environment-maps/${params.id}/preview` : null,
       errorMessage: null,
       processedAt: hasPreview ? new Date().toISOString() : null,
     })

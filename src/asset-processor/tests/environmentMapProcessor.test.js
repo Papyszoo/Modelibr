@@ -180,7 +180,8 @@ describe('EnvironmentMapProcessor', () => {
           type: 'webp',
           success: true,
           data: {
-            thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
+            thumbnailPath:
+              '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
             sizeBytes: 2048,
           },
         },
@@ -212,7 +213,8 @@ describe('EnvironmentMapProcessor', () => {
       pngPath: '/mock/poster.jpg',
     })
     expect(result).toEqual({
-      thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
+      thumbnailPath:
+        '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
       sizeBytes: 2048,
       width: 256,
       height: 256,
@@ -225,14 +227,16 @@ describe('EnvironmentMapProcessor', () => {
     const processor = new EnvironmentMapProcessor()
 
     await processor.markCompleted(job, {
-      thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
+      thumbnailPath:
+        '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
       sizeBytes: 2048,
       width: 256,
       height: 256,
     })
 
     expect(mockFinishEnvironmentMapJob).toHaveBeenCalledWith(123, true, {
-      thumbnailPath: '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
+      thumbnailPath:
+        '/var/lib/modelibr/uploads/previews/environment-maps/77/501.webp',
       sizeBytes: 2048,
       width: 256,
       height: 256,

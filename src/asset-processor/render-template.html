@@ -381,7 +381,10 @@
       }
 
       async function loadEnvironmentPreview(source, options = {}) {
-        if (!window.modelRenderer.scene || !window.modelRenderer.pmremGenerator) {
+        if (
+          !window.modelRenderer.scene ||
+          !window.modelRenderer.pmremGenerator
+        ) {
           throw new Error('Renderer scene is not initialized')
         }
 
@@ -677,9 +680,14 @@
           }
         }
 
-        if (window.modelRenderer.environmentRoot && window.modelRenderer.scene) {
+        if (
+          window.modelRenderer.environmentRoot &&
+          window.modelRenderer.scene
+        ) {
           try {
-            window.modelRenderer.scene.remove(window.modelRenderer.environmentRoot)
+            window.modelRenderer.scene.remove(
+              window.modelRenderer.environmentRoot
+            )
           } catch (error) {
             console.warn('Failed to remove environment root:', error)
           }
