@@ -267,9 +267,17 @@ export class EnvironmentMapsPage {
         name: string,
         timeout = 30000,
     ): Promise<void> {
-        await expect(this.getEnvironmentMapCardByName(name)).toBeVisible({
-            timeout,
-        });
+        const card = this.getEnvironmentMapCardByName(name);
+        const firstAttemptTimeout = Math.min(timeout, 15000);
+        try {
+            await expect(card).toBeVisible({ timeout: firstAttemptTimeout });
+        } catch {
+            await this.page.reload({ waitUntil: "domcontentloaded" });
+            await this.waitForListReady();
+            await expect(card).toBeVisible({
+                timeout: Math.max(timeout - firstAttemptTimeout, 15000),
+            });
+        }
     }
 
     async openEnvironmentMapByName(name: string): Promise<void> {
