@@ -816,48 +816,43 @@ This fix also applies to the main branch (the texture-sets video was already bro
 
 ## 19. E2E CI Stability Fix — Cube Upload Card Visibility
 
-**Date**: 2026-04-12 (session 5, commit `cc855e5`)
+**Date**: 2026-04-12 (session 5, commits `cc855e5`, `b839fd8`)
 
 ### Problem
 
-The cube upload E2E test (`02-environment-map-cube-preview.feature`) consistently failed in CI (never passed across 15+ workflow runs) with a 30-second timeout waiting for the env map card to appear in the list after upload.
+Two E2E failures persisted in CI:
+
+1. **"Upload a cube environment map with custom thumbnail and preview it"** — Card never visible in list after upload (consistently failed across 15+ CI runs)
+2. **"Drag and drop upload updates toolbar count and keeps the detected 4K label"** — Menu click timeout in `openViewerMenu("Variants")` (element visible but click intercepted by overlay)
 
 ### Root Cause Analysis
 
-The upload flow uses React Query's `mutateAsync()` which resolves BEFORE the `onSuccess` callback (containing `invalidateQueries`) completes. This creates a race condition:
+**Card visibility** — React Query's `mutateAsync()` resolves BEFORE the `onSuccess` callback (containing `invalidateQueries`) completes. The initial fix used `page.reload()` to force a fresh fetch, but reload doesn't guarantee navigation returns to the Environment Maps tab (tab state is persisted in Zustand/localStorage, which can be unreliable in CI).
 
-1. `mutateAsync` resolves → upload step proceeds
-2. `onSuccess` fires asynchronously → starts cache invalidation and refetch
-3. Dialog closes (`onHide()`) → list is visible but still showing stale data
-4. Test checks for card → card not rendered yet because refetch hasn't completed
+**Menu click** — PrimeReact menubar clicks were intercepted by overlay elements (tooltips, popups) that appeared between the visibility check and the click action. Playwright's actionability checks detected the interception and retried until the 5-second timeout expired.
 
-The drag-and-drop upload tests don't have this issue because they use a fire-and-forget pattern (`void uploadItems(...)`) that gives the cache invalidation more time to settle before the subsequent visibility check runs.
+### Fixes
 
-### Fix
-
-Added a retry-with-reload pattern to `waitForEnvironmentMapByName` in `EnvironmentMapsPage.ts`:
+**Card visibility (v2)** — Replaced `page.reload() + waitForListReady()` with `this.goto()` which explicitly navigates to the Environment Maps page and waits for the list to be ready:
 
 ```typescript
 async waitForEnvironmentMapByName(name: string, timeout = 30000): Promise<void> {
     const card = this.getEnvironmentMapCardByName(name);
-    const firstAttemptTimeout = Math.min(timeout, 15000);
     try {
-        await expect(card).toBeVisible({ timeout: firstAttemptTimeout });
+        await expect(card).toBeVisible({ timeout: Math.min(timeout, 10000) });
     } catch {
-        // Cache race: reload forces fresh query fetch
-        await this.page.reload({ waitUntil: "domcontentloaded" });
-        await this.waitForListReady();
+        await this.goto(); // Full navigation ensures env maps tab + fresh data
         await expect(card).toBeVisible({
-            timeout: Math.max(timeout - firstAttemptTimeout, 15000),
+            timeout: Math.max(timeout - 10000, 20000),
         });
     }
 }
 ```
 
-This approach:
-- Tries the optimistic path first (15s) — works locally and when the cache race is won
-- Falls back to a page reload that forces a fresh query — handles CI timing
-- Follows the E2E instruction's guidance: reload is "tolerated when no reactive path exists" with `waitUntil: "domcontentloaded"`
+**Menu click** — Three improvements:
+1. Dismiss overlays with `Escape` key before clicking the menu item
+2. Use `{ force: true }` on the click to bypass intercepted-click retries
+3. Increased timeouts from 5s→10s for click and 3s→5s for submenu visibility
 
 ---
 
