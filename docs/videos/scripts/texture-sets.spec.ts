@@ -234,7 +234,7 @@ test.describe("Texture Sets", () => {
         });
         await viewerPause(page, 900);
 
-        // Wait for canvas to have actual layout dimensions before calling boundingBox
+        // Wait for canvas to have actual layout dimensions before getting bounding box
         await page.waitForFunction(
             () => {
                 const el = document.querySelector(
@@ -247,7 +247,21 @@ test.describe("Texture Sets", () => {
             { timeout: ciVideoTimeout },
         );
 
-        const previewBox = await previewCanvas.boundingBox();
+        // Use evaluate to get bounding rect directly (avoids actionTimeout constraint)
+        const previewBox = await page.evaluate(() => {
+            const el = document.querySelector(
+                ".texture-set-viewer .texture-preview-canvas",
+            );
+            if (!el) return null;
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return null;
+            return {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+            };
+        });
         if (previewBox) {
             await page.mouse.move(
                 previewBox.x + previewBox.width * 0.55,

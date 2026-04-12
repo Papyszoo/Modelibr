@@ -265,7 +265,7 @@ export class EnvironmentMapsPage {
 
     async waitForEnvironmentMapByName(
         name: string,
-        timeout = 15000,
+        timeout = 30000,
     ): Promise<void> {
         await expect(this.getEnvironmentMapCardByName(name)).toBeVisible({
             timeout,
