@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const CARD_IMAGE_RETRY_DELAY_MS = 3000
-const MAX_CARD_IMAGE_RETRY_ATTEMPTS = 120
+const MAX_CARD_IMAGE_RETRY_ATTEMPTS = 10
 
 interface EnvironmentMapCardImageProps {
   src: string

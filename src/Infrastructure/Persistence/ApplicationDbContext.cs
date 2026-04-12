@@ -968,18 +968,13 @@ namespace Infrastructure.Persistence
 
             modelBuilder.Entity<EnvironmentMapVariantFaceFile>(entity =>
             {
-                entity.HasKey(faceFile => faceFile.Id);
-                entity.Property(faceFile => faceFile.EnvironmentMapVariantId).IsRequired();
-                entity.Property(faceFile => faceFile.Face).IsRequired();
+                entity.HasKey(faceFile => new { faceFile.EnvironmentMapVariantId, faceFile.Face });
                 entity.Property(faceFile => faceFile.FileId).IsRequired();
 
                 entity.HasOne(faceFile => faceFile.File)
                     .WithMany()
                     .HasForeignKey(faceFile => faceFile.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasIndex(faceFile => new { faceFile.EnvironmentMapVariantId, faceFile.Face })
-                    .IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);

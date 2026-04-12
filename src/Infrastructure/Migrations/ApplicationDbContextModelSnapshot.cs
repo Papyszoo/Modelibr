@@ -277,12 +277,6 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.EnvironmentMapVariantFaceFile", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
                     b.Property<int>("EnvironmentMapVariantId")
                         .HasColumnType("integer");
 
@@ -292,12 +286,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FileId")
                         .HasColumnType("integer");
 
-                    b.HasKey("Id");
+                    b.HasKey("EnvironmentMapVariantId", "Face");
 
                     b.HasIndex("FileId");
-
-                    b.HasIndex("EnvironmentMapVariantId", "Face")
-                        .IsUnique();
 
                     b.ToTable("EnvironmentMapVariantFaceFiles");
                 });

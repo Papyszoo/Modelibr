@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260410201013_AddEnvironmentMapMetadata")]
-    partial class AddEnvironmentMapMetadata
+    [Migration("20260412001225_AddEnvironmentMaps")]
+    partial class AddEnvironmentMaps
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -163,11 +163,11 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("EnvironmentMapCategoryId")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
-
-                    b.Property<int?>("ModelCategoryId")
-                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -184,13 +184,47 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("CustomThumbnailFileId");
 
-                    b.HasIndex("IsDeleted");
+                    b.HasIndex("EnvironmentMapCategoryId");
 
-                    b.HasIndex("ModelCategoryId");
+                    b.HasIndex("IsDeleted");
 
                     b.HasIndex("Name");
 
                     b.ToTable("EnvironmentMaps");
+                });
+
+            modelBuilder.Entity("Domain.Models.EnvironmentMapCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("EnvironmentMapCategories");
                 });
 
             modelBuilder.Entity("Domain.Models.EnvironmentMapVariant", b =>
@@ -224,6 +258,10 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("ThumbnailPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -242,12 +280,6 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.EnvironmentMapVariantFaceFile", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
                     b.Property<int>("EnvironmentMapVariantId")
                         .HasColumnType("integer");
 
@@ -257,12 +289,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FileId")
                         .HasColumnType("integer");
 
-                    b.HasKey("Id");
+                    b.HasKey("EnvironmentMapVariantId", "Face");
 
                     b.HasIndex("FileId");
-
-                    b.HasIndex("EnvironmentMapVariantId", "Face")
-                        .IsUnique();
 
                     b.ToTable("EnvironmentMapVariantFaceFiles");
                 });
@@ -808,12 +837,15 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("ParentId", "Name")
                         .IsUnique();
 
                     b.ToTable("SoundCategories");
@@ -891,12 +923,15 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("ParentId", "Name")
                         .IsUnique();
 
                     b.ToTable("SpriteCategories");
@@ -1054,6 +1089,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("plane");
 
+                    b.Property<int?>("TextureSetCategoryId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ThumbnailPath")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -1089,7 +1127,43 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("Name");
 
+                    b.HasIndex("TextureSetCategoryId");
+
                     b.ToTable("TextureSets");
+                });
+
+            modelBuilder.Entity("Domain.Models.TextureSetCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("TextureSetCategories");
                 });
 
             modelBuilder.Entity("Domain.Models.Thumbnail", b =>
@@ -1168,6 +1242,12 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("EnvironmentMapId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EnvironmentMapVariantId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -1215,6 +1295,12 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EnvironmentMapId");
+
+                    b.HasIndex("EnvironmentMapVariantId")
+                        .IsUnique()
+                        .HasFilter("\"EnvironmentMapVariantId\" IS NOT NULL");
 
                     b.HasIndex("ModelId");
 
@@ -1538,14 +1624,24 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("CustomThumbnailFileId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Domain.Models.ModelCategory", "ModelCategory")
+                    b.HasOne("Domain.Models.EnvironmentMapCategory", "EnvironmentMapCategory")
                         .WithMany()
-                        .HasForeignKey("ModelCategoryId")
+                        .HasForeignKey("EnvironmentMapCategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CustomThumbnailFile");
 
-                    b.Navigation("ModelCategory");
+                    b.Navigation("EnvironmentMapCategory");
+                });
+
+            modelBuilder.Entity("Domain.Models.EnvironmentMapCategory", b =>
+                {
+                    b.HasOne("Domain.Models.EnvironmentMapCategory", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("Domain.Models.EnvironmentMapVariant", b =>
@@ -1740,6 +1836,16 @@ namespace Infrastructure.Migrations
                     b.Navigation("File");
                 });
 
+            modelBuilder.Entity("Domain.Models.SoundCategory", b =>
+                {
+                    b.HasOne("Domain.Models.SoundCategory", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("Domain.Models.Sprite", b =>
                 {
                     b.HasOne("Domain.Models.File", "File")
@@ -1762,6 +1868,16 @@ namespace Infrastructure.Migrations
                     b.Navigation("File");
 
                     b.Navigation("Thumbnail");
+                });
+
+            modelBuilder.Entity("Domain.Models.SpriteCategory", b =>
+                {
+                    b.HasOne("Domain.Models.SpriteCategory", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>
@@ -1799,8 +1915,38 @@ namespace Infrastructure.Migrations
                     b.Navigation("Texture");
                 });
 
+            modelBuilder.Entity("Domain.Models.TextureSet", b =>
+                {
+                    b.HasOne("Domain.Models.TextureSetCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("TextureSetCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("Domain.Models.TextureSetCategory", b =>
+                {
+                    b.HasOne("Domain.Models.TextureSetCategory", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("Domain.Models.ThumbnailJob", b =>
                 {
+                    b.HasOne("Domain.Models.EnvironmentMap", "EnvironmentMap")
+                        .WithMany()
+                        .HasForeignKey("EnvironmentMapId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Domain.Models.EnvironmentMapVariant", "EnvironmentMapVariant")
+                        .WithMany()
+                        .HasForeignKey("EnvironmentMapVariantId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Domain.Models.Model", "Model")
                         .WithMany()
                         .HasForeignKey("ModelId")
@@ -1820,6 +1966,10 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("TextureSetId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("EnvironmentMap");
+
+                    b.Navigation("EnvironmentMapVariant");
 
                     b.Navigation("Model");
 
@@ -2041,6 +2191,11 @@ namespace Infrastructure.Migrations
                     b.Navigation("Variants");
                 });
 
+            modelBuilder.Entity("Domain.Models.EnvironmentMapCategory", b =>
+                {
+                    b.Navigation("Children");
+                });
+
             modelBuilder.Entity("Domain.Models.EnvironmentMapVariant", b =>
                 {
                     b.Navigation("FaceFiles");
@@ -2075,6 +2230,16 @@ namespace Infrastructure.Migrations
                     b.Navigation("ConceptImages");
                 });
 
+            modelBuilder.Entity("Domain.Models.SoundCategory", b =>
+                {
+                    b.Navigation("Children");
+                });
+
+            modelBuilder.Entity("Domain.Models.SpriteCategory", b =>
+                {
+                    b.Navigation("Children");
+                });
+
             modelBuilder.Entity("Domain.Models.Texture", b =>
                 {
                     b.Navigation("Proxies");
@@ -2085,6 +2250,11 @@ namespace Infrastructure.Migrations
                     b.Navigation("ModelVersionMappings");
 
                     b.Navigation("Textures");
+                });
+
+            modelBuilder.Entity("Domain.Models.TextureSetCategory", b =>
+                {
+                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("Domain.Models.Thumbnail", b =>

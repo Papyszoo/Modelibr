@@ -2,7 +2,6 @@ namespace Domain.Models;
 
 public class EnvironmentMapVariantFaceFile
 {
-    public int Id { get; private set; }
     public int EnvironmentMapVariantId { get; private set; }
     public EnvironmentMapCubeFace Face { get; private set; }
     public int FileId { get; private set; }
