@@ -158,7 +158,7 @@ async function createGlobalTextureSet(request: APIRequestContext) {
 
 test.describe("Texture Sets", () => {
     test("Texture Sets Video", async ({ page, request }, testInfo) => {
-        test.setTimeout(300000);
+        test.setTimeout(420000);
         await clearTextureVideoData(request);
         const { textureSetName } = await createGlobalTextureSet(request);
 

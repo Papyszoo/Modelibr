@@ -781,7 +781,13 @@ Environment map thumbnails are stored as animated GIFs with LZW compression. GIF
 
 **Date**: 2026-04-12
 
-The `texture-sets.spec.ts` video was failing on both main and this branch due to `boundingBox()` timeout on the texture preview canvas. Fixed by adding explicit canvas dimension wait before calling `boundingBox()`:
+The `texture-sets.spec.ts` video was failing on both main and this branch due to `previewCanvas.boundingBox()` timeout on the texture preview canvas.
+
+**Root cause**: Playwright's `locator.boundingBox()` is subject to `actionTimeout` (15s, set in `docs/videos/playwright.config.ts`). Even after the canvas element becomes visible, the locator action can time out if the canvas hasn't achieved final layout dimensions. The `ciVideoTimeout` (30s) only applies to explicit waits, not to Playwright locator actions.
+
+**Two-part fix applied**:
+
+1. **Wait for layout dimensions** — Added `page.waitForFunction()` to confirm the canvas has non-zero `getBoundingClientRect()` before proceeding:
 
 ```typescript
 await page.waitForFunction(() => {
@@ -792,7 +798,18 @@ await page.waitForFunction(() => {
 }, { timeout: ciVideoTimeout });
 ```
 
-This ensures the WebGL canvas has actual layout dimensions before Playwright attempts to get its bounding box for mouse interactions.
+2. **Bypass actionTimeout** — Replaced `previewCanvas.boundingBox()` (Playwright locator method, subject to 15s `actionTimeout`) with `page.evaluate(() => el.getBoundingClientRect())` (raw DOM call, no timeout constraint):
+
+```typescript
+const previewBox = await page.evaluate(() => {
+    const el = document.querySelector(".texture-set-viewer .texture-preview-canvas");
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+});
+```
+
+This fix also applies to the main branch (the texture-sets video was already broken on main before this PR).
 
 ---
 
