@@ -788,13 +788,15 @@ Then(
         expect(detail.customThumbnailUrl).toContain(
             `/files/${detail.customThumbnailFileId}/preview`,
         );
+        // The card component uses /environment-maps/{id}/preview (which
+        // serves the custom thumbnail when set), not the direct file URL.
         await expect
             .poll(
                 async () =>
                     environmentMapsPage.getCardThumbnailSrc(environmentMap.name),
                 { timeout: 30000, intervals: [250, 500, 1000, 2000] },
             )
-            .toContain(`/files/${detail.customThumbnailFileId}/preview`);
+            .toContain(`/environment-maps/${environmentMap.id}/preview`);
     },
 );
 

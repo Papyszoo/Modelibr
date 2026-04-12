@@ -30,11 +30,22 @@ public class GetEnvironmentMapThumbnailStatusQueryHandler
                 new Error("EnvironmentMapNotFound", $"Environment map with ID {query.EnvironmentMapId} was not found."));
         }
 
+        // Custom thumbnail takes priority, same as the preview endpoint
+        if (environmentMap.CustomThumbnailFileId.HasValue)
+        {
+            return Result.Success(new GetEnvironmentMapThumbnailStatusResponse(
+                ThumbnailStatus.Ready,
+                environmentMap.GetPreviewVariant()?.Id,
+                $"/environment-maps/{query.EnvironmentMapId}/preview",
+                null,
+                environmentMap.UpdatedAt));
+        }
+
         var previewVariant = environmentMap.GetPreviewVariant();
         if (previewVariant == null)
         {
             return Result.Success(new GetEnvironmentMapThumbnailStatusResponse(
-                ThumbnailStatus.Pending, previewVariant?.Id, null, null, null));
+                ThumbnailStatus.Pending, null, null, null, null));
         }
 
         if (!string.IsNullOrEmpty(previewVariant.ThumbnailPath))

@@ -267,13 +267,43 @@ export class EnvironmentMapsPage {
         name: string,
         timeout = 30000,
     ): Promise<void> {
-        const card = this.getEnvironmentMapCardByName(name);
-        await expect(card).toBeVisible({ timeout });
+        const findCard = async (): Promise<boolean> => {
+            // VirtuosoGrid virtualises cards — scroll progressively to
+            // bring off-viewport items into the DOM.
+            const scrollContainer = this.page.locator(".environment-map-list");
+            const card = this.getEnvironmentMapCardByName(name);
+            if (await card.isVisible().catch(() => false)) return true;
+
+            const scrollHeight = await scrollContainer.evaluate(
+                (el) => el.scrollHeight,
+            );
+            const step = 300;
+            for (let pos = 0; pos <= scrollHeight; pos += step) {
+                await scrollContainer.evaluate(
+                    (el, y) => el.scrollTo(0, y),
+                    pos,
+                );
+                await this.page.waitForTimeout(150);
+                if (await card.isVisible().catch(() => false)) return true;
+            }
+            return false;
+        };
+
+        if (await findCard()) return;
+
+        // React Query cache may serve stale data after upload.
+        // Reload forces a fresh fetch — same pattern as model-upload steps.
+        await this.page.reload({ waitUntil: "domcontentloaded" });
+        await this.waitForListReady();
+
+        await expect
+            .poll(findCard, { timeout, intervals: [500, 1000, 2000] })
+            .toBe(true);
     }
 
     async openEnvironmentMapByName(name: string): Promise<void> {
+        await this.waitForEnvironmentMapByName(name, 15000);
         const card = this.getEnvironmentMapCardByName(name);
-        await expect(card).toBeVisible({ timeout: 15000 });
         await card.click();
         await this.waitForViewer(name);
     }

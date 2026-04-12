@@ -283,10 +283,10 @@ export function EnvironmentMapList() {
     }
 
     if (createdCount > 0) {
-      // Ensure the list refreshes synchronously after all uploads complete.
-      // Individual mutation onSuccess callbacks are fire-and-forget and may
-      // not have completed their invalidateQueries by this point.
-      await queryClient.invalidateQueries({ queryKey: ['environmentMaps'] })
+      // Cancel any in-flight fetches started by individual mutation onSuccess
+      // callbacks, then force a clean refetch so the grid receives fresh data.
+      await queryClient.cancelQueries({ queryKey: ['environmentMaps'] })
+      await queryClient.refetchQueries({ queryKey: ['environmentMaps'] })
 
       toast.current?.show({
         severity: 'success',
