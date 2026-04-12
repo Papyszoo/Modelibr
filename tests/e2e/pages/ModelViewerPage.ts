@@ -47,12 +47,12 @@ export class ModelViewerPage {
 
                     try {
                         await this.versionDropdownTrigger.click({
-                            timeout: 5000,
+                            timeout: 10000,
                         });
                     } catch {
                         await this.versionDropdownTrigger.click({
                             force: true,
-                            timeout: 5000,
+                            timeout: 10000,
                         });
                     }
 

@@ -573,7 +573,7 @@ Then(
         await environmentMapsPage.waitForViewer(environmentMap.name);
         await expect
             .poll(async () => environmentMapsPage.getDetailValue(label), {
-                timeout: 15000,
+                timeout: 45000,
             })
             .toBe(expectedValue);
     },

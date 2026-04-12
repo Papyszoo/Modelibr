@@ -17,7 +17,7 @@ public static class ThumbnailJobEndpoints
             
             if (result.IsFailure)
             {
-                return Results.BadRequest(result.Error.Message);
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
 
             var response = result.Value;
@@ -73,7 +73,7 @@ public static class ThumbnailJobEndpoints
             
             if (result.IsFailure)
             {
-                return Results.BadRequest(result.Error.Message);
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
 
             return Results.Ok(new
@@ -102,7 +102,7 @@ public static class ThumbnailJobEndpoints
             
             if (result.IsFailure)
             {
-                return Results.BadRequest(result.Error.Message);
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
 
             return Results.Ok(new
@@ -130,7 +130,7 @@ public static class ThumbnailJobEndpoints
 
             if (result.IsFailure)
             {
-                return Results.BadRequest(result.Error.Message);
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
 
             return Results.Ok(new
@@ -187,7 +187,7 @@ public static class ThumbnailJobEndpoints
             
             if (result.IsFailure)
             {
-                return Results.BadRequest(result.Error.Message);
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
 
             return Results.Ok(new

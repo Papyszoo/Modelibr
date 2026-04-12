@@ -225,8 +225,8 @@ describe('DraggableTab', () => {
     const environmentMapViewerTab: Tab = {
       id: 'environment-map-77',
       type: 'environmentMapViewer',
-      environmentMapId: 77,
-      params: { environmentMapId: 77 },
+      environmentMapId: '77',
+      params: { environmentMapId: '77' },
       internalUiState: {},
     }
 
