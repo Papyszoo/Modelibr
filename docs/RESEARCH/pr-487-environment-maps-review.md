@@ -816,7 +816,7 @@ This fix also applies to the main branch (the texture-sets video was already bro
 
 ## 19. E2E CI Stability Fix — Cube Upload Card Visibility
 
-**Date**: 2026-04-12 (session 5, commits `cc855e5`, `b839fd8`)
+**Date**: 2026-04-12 (session 5, commits `cc855e5` → `b839fd8` → `ff7e9ff`)
 
 ### Problem
 
@@ -827,32 +827,52 @@ Two E2E failures persisted in CI:
 
 ### Root Cause Analysis
 
-**Card visibility** — React Query's `mutateAsync()` resolves BEFORE the `onSuccess` callback (containing `invalidateQueries`) completes. The initial fix used `page.reload()` to force a fresh fetch, but reload doesn't guarantee navigation returns to the Environment Maps tab (tab state is persisted in Zustand/localStorage, which can be unreliable in CI).
+**Card visibility** — React Query v5's `mutateAsync()` resolves BEFORE the `onSuccess` callback (containing `invalidateQueries`) completes. In the environment map upload flow:
 
-**Menu click** — PrimeReact menubar clicks were intercepted by overlay elements (tooltips, popups) that appeared between the visibility check and the click action. Playwright's actionability checks detected the interception and retried until the 5-second timeout expired.
+1. `uploadItems()` calls `createMutation.mutateAsync(formData)` — this resolves immediately after the POST succeeds
+2. The mutation's `onSuccess` handler (in `queries.ts` lines 151-158) calls `invalidateQueries` — but this is **fire-and-forget**, running asynchronously after `mutateAsync` has already resolved
+3. The dialog's `onHide()` fires next, closing the upload dialog
+4. The list still shows stale cached data because `invalidateQueries` hasn't completed yet
+5. With `staleTime: 5 minutes` configured in `react-query.ts`, the cached data appears "fresh" and no automatic refetch occurs
+
+Multiple E2E-only workarounds were attempted and failed:
+- `page.reload()` — Zustand tab state in localStorage made tab restoration unreliable
+- `this.goto()` — Heavy-handed full navigation, still timing-dependent
+- `page.waitForResponse` for GET refetch — The refetch from `onSuccess` is unreliable in CI; timeout included form-filling + upload time
+- `window.focus` — Only works if data is already stale (not within `staleTime`)
+
+**Menu click** — PrimeReact menubar clicks were intercepted by overlay elements (tooltips, popups) that appeared between the visibility check and the click action.
 
 ### Fixes
 
-**Card visibility (v2)** — Replaced `page.reload() + waitForListReady()` with `this.goto()` which explicitly navigates to the Environment Maps page and waits for the list to be ready:
+**Card visibility (v3 — production code fix)** — The correct fix was in the production code, not the E2E test. Added explicit `await queryClient.invalidateQueries()` at the end of `uploadItems()` in `EnvironmentMapList.tsx`, which runs BEFORE the dialog's `onHide()` is called:
 
 ```typescript
-async waitForEnvironmentMapByName(name: string, timeout = 30000): Promise<void> {
-    const card = this.getEnvironmentMapCardByName(name);
-    try {
-        await expect(card).toBeVisible({ timeout: Math.min(timeout, 10000) });
-    } catch {
-        await this.goto(); // Full navigation ensures env maps tab + fresh data
-        await expect(card).toBeVisible({
-            timeout: Math.max(timeout - 10000, 20000),
-        });
-    }
-}
+// EnvironmentMapList.tsx — uploadItems function
+const queryClient = useQueryClient();
+
+const uploadItems = async (values: UploadFormValues) => {
+    // ... existing upload logic (mutations for faces + thumbnail) ...
+    
+    // Ensure list has fresh data BEFORE the upload dialog closes
+    await queryClient.invalidateQueries({ queryKey: ['environmentMaps'] });
+    
+    showSuccessToast(...);
+};
 ```
+
+This is semantically correct: the list should be invalidated after ALL uploads complete as a deterministic step, not as a side-effect of individual mutation `onSuccess` handlers. The E2E page object was simplified to just wait for dialog close + list ready — no retry/reload needed.
 
 **Menu click** — Three improvements:
 1. Dismiss overlays with `Escape` key before clicking the menu item
 2. Use `{ force: true }` on the click to bypass intercepted-click retries
 3. Increased timeouts from 5s→10s for click and 3s→5s for submenu visibility
+
+### Lessons Learned
+
+- React Query v5 `onSuccess` callbacks are fire-and-forget — they should NOT be relied upon for UI state transitions that occur immediately after `mutateAsync` resolves
+- E2E flakiness that consistently fails (not intermittent) usually indicates a production code timing issue, not a test reliability problem
+- The `staleTime` config interacts with `invalidateQueries` — even `invalidateQueries` respects whether the query is currently being fetched, but it does mark data as stale and triggers a background refetch
 
 ---
 

@@ -249,7 +249,7 @@ public class ThumbnailQueue : IThumbnailQueue
         job.MarkAsFailed(errorMessage, DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
 
-        var sanitizedError = errorMessage?.ReplaceLineEndings(" ") ?? errorMessage;
+        var sanitizedError = (errorMessage ?? string.Empty).ReplaceLineEndings(" ");
 
         if (job.Status == Domain.ValueObjects.ThumbnailJobStatus.Dead)
         {
