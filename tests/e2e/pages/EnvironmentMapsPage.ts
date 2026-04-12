@@ -737,7 +737,7 @@ export class EnvironmentMapsPage {
         await expect(menuLink).toBeVisible({ timeout: 5000 });
         await menuLink.scrollIntoViewIfNeeded();
         await menuLink.click({ timeout: 5000 });
-        await expect(menuItem.locator('.p-submenu-list')).toBeVisible({ timeout: 3000 });
+        await expect(menuItem.locator('.p-submenu-list').first()).toBeVisible({ timeout: 3000 });
         return menuItem;
     }
 
