@@ -816,7 +816,7 @@ This fix also applies to the main branch (the texture-sets video was already bro
 
 ## 19. E2E CI Stability Fix — Cube Upload Card Visibility
 
-**Date**: 2026-04-12 (session 5, commits `cc855e5` → `b839fd8` → `ff7e9ff`)
+**Date**: 2026-04-12 (sessions 5-6, commits `cc855e5` → `b839fd8` → `ff7e9ff` → `1a9c7e2`)
 
 ### Problem
 
@@ -827,41 +827,52 @@ Two E2E failures persisted in CI:
 
 ### Root Cause Analysis
 
-**Card visibility** — React Query v5's `mutateAsync()` resolves BEFORE the `onSuccess` callback (containing `invalidateQueries`) completes. In the environment map upload flow:
+**Card visibility** — Three separate issues were discovered:
 
-1. `uploadItems()` calls `createMutation.mutateAsync(formData)` — this resolves immediately after the POST succeeds
-2. The mutation's `onSuccess` handler (in `queries.ts` lines 151-158) calls `invalidateQueries` — but this is **fire-and-forget**, running asynchronously after `mutateAsync` has already resolved
-3. The dialog's `onHide()` fires next, closing the upload dialog
-4. The list still shows stale cached data because `invalidateQueries` hasn't completed yet
-5. With `staleTime: 5 minutes` configured in `react-query.ts`, the cached data appears "fresh" and no automatic refetch occurs
+1. **React Query cache deduplication**: `invalidateQueries` can be deduplicated with in-flight fetches from mutation `onSuccess` fire-and-forget callbacks, returning stale data. Fixed by using `cancelQueries` + `refetchQueries` instead.
 
-Multiple E2E-only workarounds were attempted and failed:
-- `page.reload()` — Zustand tab state in localStorage made tab restoration unreliable
-- `this.goto()` — Heavy-handed full navigation, still timing-dependent
-- `page.waitForResponse` for GET refetch — The refetch from `onSuccess` is unreliable in CI; timeout included form-filling + upload time
-- `window.focus` — Only works if data is already stale (not within `staleTime`)
+2. **VirtuosoGrid virtualization**: The `EnvironmentMapGrid` uses `react-virtuoso` which only renders items in the viewport + 200px overscan. When >5 environment maps exist, newly uploaded cards may not be in the DOM at all. The E2E test must scroll progressively to find cards.
+
+3. **Custom thumbnail status bug**: `GetEnvironmentMapThumbnailStatusQuery` only checked `previewVariant.ThumbnailPath` (auto-generated thumbnails) but not `environmentMap.CustomThumbnailFileId`. When a custom thumbnail was set, the status returned `Pending` instead of `Ready`, causing the card to show a placeholder. The E2E assertion also expected `/files/{fileId}/preview` but the component uses `/environment-maps/{id}/preview`.
 
 **Menu click** — PrimeReact menubar clicks were intercepted by overlay elements (tooltips, popups) that appeared between the visibility check and the click action.
 
 ### Fixes
 
-**Card visibility (v3 — production code fix)** — The correct fix was in the production code, not the E2E test. Added explicit `await queryClient.invalidateQueries()` at the end of `uploadItems()` in `EnvironmentMapList.tsx`, which runs BEFORE the dialog's `onHide()` is called:
+**Card visibility (v4 — comprehensive):**
 
 ```typescript
-// EnvironmentMapList.tsx — uploadItems function
-const queryClient = useQueryClient();
-
-const uploadItems = async (values: UploadFormValues) => {
-    // ... existing upload logic (mutations for faces + thumbnail) ...
-    
-    // Ensure list has fresh data BEFORE the upload dialog closes
-    await queryClient.invalidateQueries({ queryKey: ['environmentMaps'] });
-    
-    showSuccessToast(...);
-};
+// EnvironmentMapList.tsx — Cancel stale fetches, then force clean refetch
+await queryClient.cancelQueries({ queryKey: ['environmentMaps'] })
+await queryClient.refetchQueries({ queryKey: ['environmentMaps'] })
 ```
 
-This is semantically correct: the list should be invalidated after ALL uploads complete as a deterministic step, not as a side-effect of individual mutation `onSuccess` handlers. The E2E page object was simplified to just wait for dialog close + list ready — no retry/reload needed.
+```csharp
+// GetEnvironmentMapThumbnailStatusQuery.cs — Check custom thumbnail FIRST
+if (environmentMap.CustomThumbnailFileId.HasValue)
+{
+    return Result.Success(new GetEnvironmentMapThumbnailStatusResponse(
+        ThumbnailStatus.Ready, ...));
+}
+```
+
+```typescript
+// EnvironmentMapsPage.ts — Scroll VirtuosoGrid to find virtualized cards
+async waitForEnvironmentMapByName(name, timeout) {
+    const findCard = async () => {
+        // Progressive scroll through virtualized grid
+        for (let pos = 0; pos <= scrollHeight; pos += 300) {
+            await scrollContainer.evaluate(el => el.scrollTo(0, pos));
+            if (await card.isVisible()) return true;
+        }
+        return false;
+    };
+    if (await findCard()) return;
+    await page.reload();
+    await waitForListReady();
+    await expect.poll(findCard, { timeout }).toBe(true);
+}
+```
 
 **Menu click** — Three improvements:
 1. Dismiss overlays with `Escape` key before clicking the menu item
@@ -872,8 +883,9 @@ This is semantically correct: the list should be invalidated after ALL uploads c
 
 - React Query v5 `onSuccess` callbacks are fire-and-forget — they should NOT be relied upon for UI state transitions that occur immediately after `mutateAsync` resolves
 - E2E flakiness that consistently fails (not intermittent) usually indicates a production code timing issue, not a test reliability problem
-- The `staleTime` config interacts with `invalidateQueries` — even `invalidateQueries` respects whether the query is currently being fetched, but it does mark data as stale and triggers a background refetch
+- VirtuosoGrid virtualizes items out of the DOM — `toBeVisible()` assertions fail silently because the element literally doesn't exist, not because it's hidden
+- Thumbnail status queries must account for ALL thumbnail sources (custom file and auto-generated), matching the priority order of the preview endpoint
 
 ---
 
-*Generated by code review of `origin/environment-maps` branch (PR #487). Original review: commit `bd824f7` against `origin/main` (commit `6637818`). Fixes applied across 5 sessions. Follow-up recommendations fully implemented in commit `4737d3b`. PR comment resolutions and CI fixes applied in session 5.*
+*Generated by code review of `origin/environment-maps` branch (PR #487). Original review: commit `bd824f7` against `origin/main` (commit `6637818`). Fixes applied across 6 sessions. Follow-up recommendations fully implemented in commit `4737d3b`. PR comment resolutions and CI fixes applied in sessions 5-6.*
