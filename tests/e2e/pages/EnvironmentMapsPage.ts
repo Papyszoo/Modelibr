@@ -148,8 +148,6 @@ export class EnvironmentMapsPage {
     async dragAndDropUpload(
         payloads: UploadFilePayload[],
     ): Promise<{ environmentMapId: number }> {
-        const listRefetchPromise = this.waitForListRefetch();
-
         const uploadResponsePromise = this.page.waitForResponse(
             (response) =>
                 response.url().includes("/environment-maps/with-file") &&
@@ -190,7 +188,6 @@ export class EnvironmentMapsPage {
         await expect(uploadResponse.ok()).toBeTruthy();
         const payload = await uploadResponse.json();
 
-        await listRefetchPromise;
         await this.waitForListReady();
 
         return {
@@ -209,11 +206,6 @@ export class EnvironmentMapsPage {
         await this.openUploadDialog();
         await this.fillCreateDialog(values);
 
-        // Listen for list refetch BEFORE triggering upload — the mutation's
-        // onSuccess fires invalidateQueries which triggers a GET refetch.
-        // We must capture this to know the list data is fresh.
-        const listRefetchPromise = this.waitForListRefetch();
-
         const uploadResponsePromise = this.page.waitForResponse(
             (response) =>
                 response.url().includes("/environment-maps/with-file") &&
@@ -230,7 +222,6 @@ export class EnvironmentMapsPage {
         const payload = await uploadResponse.json();
 
         await expect(this.uploadDialog).toBeHidden({ timeout: 30000 });
-        await listRefetchPromise;
         await this.waitForListReady();
 
         return {
@@ -249,8 +240,6 @@ export class EnvironmentMapsPage {
         await this.openUploadDialog();
         await this.fillCreateDialog(values);
 
-        const listRefetchPromise = this.waitForListRefetch();
-
         const uploadResponsePromise = this.page.waitForResponse(
             (response) =>
                 response.url().includes("/environment-maps/with-file") &&
@@ -267,7 +256,6 @@ export class EnvironmentMapsPage {
         const payload = await uploadResponse.json();
 
         await expect(this.uploadDialog).toBeHidden({ timeout: 30000 });
-        await listRefetchPromise;
         await this.waitForListReady();
 
         return {
@@ -281,20 +269,6 @@ export class EnvironmentMapsPage {
     ): Promise<void> {
         const card = this.getEnvironmentMapCardByName(name);
         await expect(card).toBeVisible({ timeout });
-    }
-
-    /**
-     * Wait for a GET response to the environment maps list endpoint.
-     * Used to confirm React Query's cache invalidation refetch has completed.
-     */
-    private waitForListRefetch(): Promise<unknown> {
-        return this.page.waitForResponse(
-            (r) =>
-                r.url().includes("/api/environment-maps") &&
-                r.request().method() === "GET" &&
-                r.ok(),
-            { timeout: 30000 },
-        );
     }
 
     async openEnvironmentMapByName(name: string): Promise<void> {

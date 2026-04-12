@@ -1,5 +1,6 @@
 import './EnvironmentMapList.css'
 
+import { useQueryClient } from '@tanstack/react-query'
 import { Toast } from 'primereact/toast'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -86,6 +87,7 @@ export function EnvironmentMapList() {
 
   const createEnvironmentMapMutation = useCreateEnvironmentMapWithFileMutation()
   const setThumbnailMutation = useSetEnvironmentMapCustomThumbnailMutation()
+  const queryClient = useQueryClient()
 
   const previewSizeOptions = useMemo(
     () =>
@@ -281,6 +283,11 @@ export function EnvironmentMapList() {
     }
 
     if (createdCount > 0) {
+      // Ensure the list refreshes synchronously after all uploads complete.
+      // Individual mutation onSuccess callbacks are fire-and-forget and may
+      // not have completed their invalidateQueries by this point.
+      await queryClient.invalidateQueries({ queryKey: ['environmentMaps'] })
+
       toast.current?.show({
         severity: 'success',
         summary: 'Upload complete',
