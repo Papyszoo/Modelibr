@@ -1,9 +1,22 @@
 import './DemoBanner.css'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+
+const BANNER_HEIGHT = '32px'
 
 export function DemoBanner(): JSX.Element {
   const [resetting, setResetting] = useState(false)
+
+  // Publish banner height so the layout can shrink to avoid overlap
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--demo-banner-height',
+      BANNER_HEIGHT
+    )
+    return () => {
+      document.documentElement.style.removeProperty('--demo-banner-height')
+    }
+  }, [])
 
   const handleReset = useCallback(async () => {
     if (resetting) return

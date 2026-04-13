@@ -1,5 +1,5 @@
 .splitter-layout {
-  height: 100vh;
+  height: calc(100vh - var(--demo-banner-height, 0px));
   width: 100vw;
   overflow: hidden;
 }

@@ -16,8 +16,8 @@ async function bootstrap() {
       },
       onUnhandledRequest: 'bypass',
     })
-    // Seed demo data then pre-generate thumbnails/waveforms in the background
-    void initDemoData()
+    // Seed demo data (blocks until IDB is ready so first render has data)
+    await initDemoData()
   }
 
   const rootElement = document.getElementById('root')
