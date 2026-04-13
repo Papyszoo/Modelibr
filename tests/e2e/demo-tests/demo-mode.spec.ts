@@ -195,9 +195,8 @@ test.describe("demo mode e2e", () => {
         await soundListPage.closeDialog();
 
         await environmentMapsPage.goto();
-        await environmentMapsPage.waitForToolbarCountLabel("2 maps");
+        await environmentMapsPage.waitForToolbarCountLabel("1 map");
         await environmentMapsPage.waitForEnvironmentMapByName("City Night Lights");
-        await environmentMapsPage.waitForEnvironmentMapByName("Neutral Studio");
     });
 
     test("opens a seeded environment map preview in demo mode", async ({ page }) => {

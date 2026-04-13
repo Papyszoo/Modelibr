@@ -861,6 +861,72 @@ export async function generateExrChannelPreview(
 }
 
 /**
+ * Parse an HDR (Radiance RGBE) blob and render a tone-mapped PNG preview.
+ * Uses RGBELoader from three-stdlib (already a project dependency).
+ */
+export async function generateHdrChannelPreview(
+  hdrBlob: Blob,
+  channel: string = 'rgb'
+): Promise<Blob> {
+  const { RGBELoader } = await import('three-stdlib')
+  const loader = new RGBELoader()
+
+  const arrayBuffer = await hdrBlob.arrayBuffer()
+  const hdrData = loader.parse(arrayBuffer)
+  const { width, height, data } = hdrData
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')!
+  const imageData = ctx.createImageData(width, height)
+  const pixels = imageData.data
+
+  // RGBELoader outputs float data in RGBA layout (4 components per pixel)
+  for (let i = 0; i < width * height; i++) {
+    const srcIdx = i * 4
+    const dstIdx = i * 4
+
+    const r = toneMapReinhard(data[srcIdx])
+    const g = toneMapReinhard(data[srcIdx + 1])
+    const b = toneMapReinhard(data[srcIdx + 2])
+
+    switch (channel) {
+      case 'r':
+        pixels[dstIdx] = r
+        pixels[dstIdx + 1] = r
+        pixels[dstIdx + 2] = r
+        break
+      case 'g':
+        pixels[dstIdx] = g
+        pixels[dstIdx + 1] = g
+        pixels[dstIdx + 2] = g
+        break
+      case 'b':
+        pixels[dstIdx] = b
+        pixels[dstIdx + 1] = b
+        pixels[dstIdx + 2] = b
+        break
+      default: // 'rgb'
+        pixels[dstIdx] = r
+        pixels[dstIdx + 1] = g
+        pixels[dstIdx + 2] = b
+        break
+    }
+    pixels[dstIdx + 3] = 255
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      b => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/png'
+    )
+  })
+}
+
+/**
  * Generate a channel-specific preview for a standard image (PNG/JPG).
  * For 'rgb', just returns the original blob. For 'r'/'g'/'b', extracts
  * the single channel as a grayscale PNG.

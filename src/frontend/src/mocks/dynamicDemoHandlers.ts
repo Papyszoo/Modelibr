@@ -16,6 +16,7 @@ import {
   enrichModel,
   fetchStaticAsset,
   generateExrChannelPreview,
+  generateHdrChannelPreview,
   generateImageChannelPreview,
   generateModelThumbnail,
   generateModelThumbnailAsync,
@@ -340,6 +341,13 @@ async function buildEnvironmentMapPreviewResponse(fileId: number | null) {
   const fileName = source.fileName.toLowerCase()
 
   try {
+    if (fileName.endsWith('.hdr')) {
+      const preview = await generateHdrChannelPreview(source.blob, 'rgb')
+      return new HttpResponse(preview, {
+        headers: { 'Content-Type': 'image/png' },
+      })
+    }
+
     if (fileName.endsWith('.exr')) {
       const preview = await generateExrChannelPreview(source.blob, 'rgb')
       return new HttpResponse(preview, {
@@ -2014,7 +2022,17 @@ export const dynamicDemoHandlers = [
   }),
 
   http.get('*/environment-maps/:id/preview', async ({ params }) => {
-    const environmentMap = await getById('environmentMaps', Number(params.id))
+    const envMapId = Number(params.id)
+
+    // Return cached preview if available (e.g. from prewarm)
+    const cached = await getThumbnail(`envMapPreview:${envMapId}`)
+    if (cached) {
+      return new HttpResponse(cached, {
+        headers: { 'Content-Type': cached.type || 'image/png' },
+      })
+    }
+
+    const environmentMap = await getById('environmentMaps', envMapId)
     if (!environmentMap) return new HttpResponse(null, { status: 404 })
 
     syncEnvironmentMapDerivedFields(environmentMap)
@@ -2906,10 +2924,12 @@ export const dynamicDemoHandlers = [
     // Generate waveform asynchronously
     generateWaveformThumbnail(file)
       .then(async result => {
-        sound.duration = result.duration
-        sound.peaks = JSON.stringify(result.peaks)
-        sound.waveformUrl = `__demo_waveform_${soundId}__`
-        await put('sounds', sound)
+        const current = await getById('sounds', soundId)
+        if (!current) return
+        current.duration = result.duration
+        current.peaks = JSON.stringify(result.peaks)
+        current.waveformUrl = `/sounds/${soundId}/waveform`
+        await put('sounds', current)
         await storeThumbnail(`waveform:${soundId}`, result.thumbnail)
       })
       .catch(() => {

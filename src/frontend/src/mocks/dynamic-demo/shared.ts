@@ -20,6 +20,7 @@ import {
   getAllRecycledItems,
   getAllUploadHistory,
   getById,
+  getDb,
   getFileBlob,
   getThumbnail,
   getVersionsByModelId,
@@ -32,6 +33,7 @@ import {
 } from '../db/demoDb'
 import {
   generateExrChannelPreview,
+  generateHdrChannelPreview,
   generateImageChannelPreview,
   generateModelThumbnail,
   generateModelThumbnailWithTextures,
@@ -44,6 +46,7 @@ export {
   addRecycledItem,
   findRecycledItem,
   generateExrChannelPreview,
+  generateHdrChannelPreview,
   generateImageChannelPreview,
   generateModelThumbnail,
   generatePlaceholderThumbnail,
@@ -155,7 +158,6 @@ export const seedFileAssets: Record<number, string> = {
   501: 'test-tone.wav',
   601: 'hdri/potsdamer_platz_1k.hdr',
   602: 'global texture/normal.exr',
-  603: 'hdri/potsdamer_platz_1k.hdr',
 }
 
 export function paginate<T>(items: T[], page: number, pageSize: number) {
@@ -973,6 +975,12 @@ export async function ensureDemoDataShape(): Promise<void> {
       changed = true
     }
 
+    // Fix broken waveform sentinel URLs from older demo data
+    if (sound.waveformUrl && sound.waveformUrl.startsWith('__demo_waveform_')) {
+      sound.waveformUrl = `/sounds/${sound.id}/waveform`
+      changed = true
+    }
+
     if (changed) {
       await put('sounds', sound)
     }
@@ -1020,32 +1028,6 @@ export async function ensureDemoDataShape(): Promise<void> {
         packs: [{ id: 1, name: 'Demo Pack' }],
         projects: [{ id: 1, name: 'Demo Project' }],
       },
-      {
-        id: 2,
-        name: 'Neutral Studio',
-        variantCount: 1,
-        previewVariantId: 3,
-        previewFileId: 603,
-        previewUrl: '/files/603/preview?channel=rgb',
-        createdAt: ts,
-        updatedAt: ts,
-        variants: [
-          {
-            id: 3,
-            sizeLabel: '1K',
-            fileId: 603,
-            fileName: 'studio_small_01_1k.hdr',
-            fileSizeBytes: 0,
-            createdAt: ts,
-            updatedAt: ts,
-            isDeleted: false,
-            previewUrl: '/files/603/preview?channel=rgb',
-            fileUrl: '/files/603',
-          },
-        ],
-        packs: [{ id: 2, name: 'Shapes Pack' }],
-        projects: [],
-      },
     ]
 
     for (const environmentMap of seedEnvironmentMaps) {
@@ -1057,12 +1039,6 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack1.environmentMaps = [{ id: 1, name: 'City Night Lights' }]
       recomputePackCounts(pack1)
       await put('packs', pack1)
-    }
-    const pack2 = await getById('packs', 2)
-    if (pack2) {
-      pack2.environmentMaps = [{ id: 2, name: 'Neutral Studio' }]
-      recomputePackCounts(pack2)
-      await put('packs', pack2)
     }
     const project1 = await getById('projects', 1)
     if (project1) {
@@ -1108,6 +1084,34 @@ export async function ensureDemoDataShape(): Promise<void> {
       }
     }
   }
+
+  // Remove defunct "Neutral Studio" env map (id: 2) for existing users
+  const neutralStudio = await getById('environmentMaps', 2)
+  if (neutralStudio && neutralStudio.name === 'Neutral Studio') {
+    const db = await getDb()
+    await db.delete('environmentMaps', 2)
+    // Clean up pack/project references
+    const packs = await getAll('packs')
+    for (const pack of packs) {
+      if (pack.environmentMaps?.some((e: { id: number }) => e.id === 2)) {
+        pack.environmentMaps = pack.environmentMaps.filter(
+          (e: { id: number }) => e.id !== 2
+        )
+        recomputePackCounts(pack)
+        await put('packs', pack)
+      }
+    }
+    const projects = await getAll('projects')
+    for (const project of projects) {
+      if (project.environmentMaps?.some((e: { id: number }) => e.id === 2)) {
+        project.environmentMaps = project.environmentMaps.filter(
+          (e: { id: number }) => e.id !== 2
+        )
+        recomputeProjectCounts(project)
+        await put('projects', project)
+      }
+    }
+  }
 }
 
 export async function prewarmSeedThumbnails(): Promise<void> {
@@ -1145,6 +1149,87 @@ export async function prewarmSeedThumbnails(): Promise<void> {
       await storeThumbnail(`version:${versionId}`, thumbnail)
     } catch {
       // Silently ignore — thumbnail requests will still generate on demand.
+    }
+  }
+}
+
+/**
+ * Pre-generate environment map preview thumbnails for seed data.
+ * Uses the same fire-and-forget pattern as model thumbnail pre-warming.
+ */
+export async function prewarmSeedEnvironmentMapThumbnails(): Promise<void> {
+  const seedItems = [
+    { envMapId: 1, fileId: 601, fileName: 'potsdamer_platz_1k.hdr' },
+  ]
+
+  for (const { envMapId, fileId, fileName } of seedItems) {
+    const cacheKey = `envMapPreview:${envMapId}`
+    const existing = await getThumbnail(cacheKey)
+    if (existing) continue
+
+    const seedPath = seedFileAssets[fileId]
+    if (!seedPath) continue
+
+    try {
+      const response = await fetch(seedAssetUrl(seedPath), {
+        cache: 'force-cache',
+      })
+      if (!response.ok) continue
+
+      const blob = await response.blob()
+      let preview: Blob
+
+      if (fileName.endsWith('.hdr')) {
+        preview = await generateHdrChannelPreview(blob, 'rgb')
+      } else if (fileName.endsWith('.exr')) {
+        preview = await generateExrChannelPreview(blob, 'rgb')
+      } else {
+        preview = await generateImageChannelPreview(blob, 'rgb')
+      }
+
+      await storeThumbnail(cacheKey, preview)
+    } catch {
+      // Silently ignore — preview requests will still generate on demand.
+    }
+  }
+}
+
+/**
+ * Pre-generate waveform thumbnails for seed sounds.
+ */
+export async function prewarmSeedSoundWaveforms(): Promise<void> {
+  const seedItems = [{ soundId: 1, fileId: 501, fileName: 'test-tone.wav' }]
+
+  for (const { soundId, fileId, fileName } of seedItems) {
+    const cacheKey = `waveform:${soundId}`
+    const existing = await getThumbnail(cacheKey)
+    if (existing) continue
+
+    const seedPath = seedFileAssets[fileId]
+    if (!seedPath) continue
+
+    try {
+      const response = await fetch(assetUrl(seedPath), {
+        cache: 'force-cache',
+      })
+      if (!response.ok) continue
+
+      const fileBlob = new File([await response.blob()], fileName, {
+        type: 'audio/wav',
+      })
+      const result = await generateWaveformThumbnail(fileBlob)
+      await storeThumbnail(cacheKey, result.thumbnail)
+
+      // Update the sound record with waveform data
+      const sound = await getById('sounds', soundId)
+      if (sound) {
+        sound.duration = result.duration
+        sound.peaks = JSON.stringify(result.peaks)
+        sound.waveformUrl = `/sounds/${soundId}/waveform`
+        await put('sounds', sound)
+      }
+    } catch {
+      // Silently ignore — waveform will show placeholder.
     }
   }
 }

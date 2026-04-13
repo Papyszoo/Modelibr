@@ -9,16 +9,15 @@ import { AppProvider } from './app/providers'
 
 async function bootstrap() {
   if (import.meta.env.VITE_DEMO_MODE === 'true') {
-    const { worker, prewarmSeedThumbnails } = await import('./mocks/browser')
+    const { worker, initDemoData } = await import('./mocks/browser')
     await worker.start({
       serviceWorker: {
         url: `${import.meta.env.BASE_URL}mockServiceWorker.js`,
       },
       onUnhandledRequest: 'bypass',
     })
-    // Pre-generate seed model thumbnails in the background so they are
-    // ready when the user opens the Models page
-    prewarmSeedThumbnails()
+    // Seed demo data then pre-generate thumbnails/waveforms in the background
+    void initDemoData()
   }
 
   const rootElement = document.getElementById('root')
