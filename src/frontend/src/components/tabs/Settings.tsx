@@ -80,10 +80,10 @@ export function Settings(): JSX.Element {
   const [webDavInstructionsExpanded, setWebDavInstructionsExpanded] =
     useState(false)
 
-  // Accordion state
-  const [activeIndex, setActiveIndex] = useState<number | number[]>([
-    0, 1, 2, 3, 4, 5, 6,
-  ])
+  // Accordion state — in demo mode sections 4 (Blender), 5 (SSL), 6 (WebDAV) stay collapsed
+  const [activeIndex, setActiveIndex] = useState<number | number[]>(
+    isDemo ? [0, 1, 2, 3] : [0, 1, 2, 3, 4, 5, 6]
+  )
 
   const {
     register,
@@ -794,8 +794,9 @@ export function Settings(): JSX.Element {
 
           <div className="settings-section">
             <div
-              className="settings-section-header"
-              onClick={() =>
+              className={`settings-section-header${isDemo ? ' settings-section-header--locked' : ''}`}
+              onClick={() => {
+                if (isDemo) return
                 setActiveIndex(prev =>
                   Array.isArray(prev)
                     ? prev.includes(4)
@@ -803,14 +804,21 @@ export function Settings(): JSX.Element {
                       : [...prev, 4]
                     : [4]
                 )
-              }
+              }}
             >
               <span>
-                {Array.isArray(activeIndex) && activeIndex.includes(4)
-                  ? '▼'
-                  : '▶'}{' '}
+                {isDemo
+                  ? '🔒'
+                  : Array.isArray(activeIndex) && activeIndex.includes(4)
+                    ? '▼'
+                    : '▶'}{' '}
                 Blender Settings
               </span>
+              {isDemo && (
+                <span className="settings-demo-notice">
+                  Not available in demo mode
+                </span>
+              )}
             </div>
             {Array.isArray(activeIndex) && activeIndex.includes(4) && (
               <div className="settings-section-content">
@@ -852,12 +860,6 @@ export function Settings(): JSX.Element {
                     )}
                   </div>
                 </div>
-
-                {isDemo && (
-                  <div className="settings-demo-warning">
-                    Blender settings are not available in demo mode.
-                  </div>
-                )}
 
                 {/* Version Management */}
                 <div className="settings-field">
@@ -980,8 +982,9 @@ export function Settings(): JSX.Element {
           {/* ── SSL Certificate ───────────────────────────────────────── */}
           <div className="settings-section">
             <div
-              className="settings-section-header"
-              onClick={() =>
+              className={`settings-section-header${isDemo ? ' settings-section-header--locked' : ''}`}
+              onClick={() => {
+                if (isDemo) return
                 setActiveIndex(prev =>
                   Array.isArray(prev)
                     ? prev.includes(5)
@@ -989,14 +992,21 @@ export function Settings(): JSX.Element {
                       : [...prev, 5]
                     : [5]
                 )
-              }
+              }}
             >
               <span>
-                {Array.isArray(activeIndex) && activeIndex.includes(5)
-                  ? '▼'
-                  : '▶'}{' '}
+                {isDemo
+                  ? '🔒'
+                  : Array.isArray(activeIndex) && activeIndex.includes(5)
+                    ? '▼'
+                    : '▶'}{' '}
                 SSL Certificate
               </span>
+              {isDemo && (
+                <span className="settings-demo-notice">
+                  Not available in demo mode
+                </span>
+              )}
             </div>
             {Array.isArray(activeIndex) && activeIndex.includes(5) && (
               <div className="settings-section-content">
@@ -1070,8 +1080,9 @@ export function Settings(): JSX.Element {
           {/* ── WebDAV ───────────────────────────────────────────────── */}
           <div className="settings-section">
             <div
-              className="settings-section-header"
-              onClick={() =>
+              className={`settings-section-header${isDemo ? ' settings-section-header--locked' : ''}`}
+              onClick={() => {
+                if (isDemo) return
                 setActiveIndex(prev =>
                   Array.isArray(prev)
                     ? prev.includes(6)
@@ -1079,14 +1090,21 @@ export function Settings(): JSX.Element {
                       : [...prev, 6]
                     : [6]
                 )
-              }
+              }}
             >
               <span>
-                {Array.isArray(activeIndex) && activeIndex.includes(6)
-                  ? '▼'
-                  : '▶'}{' '}
+                {isDemo
+                  ? '🔒'
+                  : Array.isArray(activeIndex) && activeIndex.includes(6)
+                    ? '▼'
+                    : '▶'}{' '}
                 WebDAV
               </span>
+              {isDemo && (
+                <span className="settings-demo-notice">
+                  Not available in demo mode
+                </span>
+              )}
             </div>
             {Array.isArray(activeIndex) && activeIndex.includes(6) && (
               <div className="settings-section-content">
