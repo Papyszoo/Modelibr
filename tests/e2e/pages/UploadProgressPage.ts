@@ -40,10 +40,10 @@ export class UploadProgressPage {
     /**
      * Wait for the upload progress window to be visible
      */
-    async waitForWindowVisible(): Promise<void> {
+    async waitForWindowVisible(timeout = 30000): Promise<void> {
         await this.page.waitForSelector(this.uploadWindow, {
             state: "visible",
-            timeout: 10000,
+            timeout,
         });
     }
 

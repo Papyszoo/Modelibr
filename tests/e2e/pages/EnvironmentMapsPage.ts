@@ -791,35 +791,44 @@ export class EnvironmentMapsPage {
             "Bottom Panel",
         ].filter((candidate, index, array) => array.indexOf(candidate) === index);
 
-        for (const candidate of menuCandidates) {
-            try {
-                const menuItem = await this.openViewerMenu(candidate);
+        // Retry the full menu scan to handle slow viewer hydration on CI
+        const maxAttempts = 3;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            if (attempt > 0) {
+                await this.page.waitForTimeout(1000);
+                await this.page.keyboard.press("Escape").catch(() => {});
+            }
 
-                const submenuItem = menuItem
-                    .locator(
-                        `.p-submenu-list .p-menuitem-link:has(.p-menuitem-text:text-is("${itemLabel}"))`,
-                    )
-                    .first();
-                const submenuVisible = await submenuItem.isVisible().catch(() => false);
+            for (const candidate of menuCandidates) {
+                try {
+                    const menuItem = await this.openViewerMenu(candidate);
 
-                if (submenuVisible) {
-                    await submenuItem.click({ force: true, timeout: 2000 });
-                } else {
-                    await submenuItem.evaluate((node) => {
-                        (node as HTMLElement).click();
-                    });
+                    const submenuItem = menuItem
+                        .locator(
+                            `.p-submenu-list .p-menuitem-link:has(.p-menuitem-text:text-is("${itemLabel}"))`,
+                        )
+                        .first();
+                    const submenuVisible = await submenuItem.isVisible().catch(() => false);
+
+                    if (submenuVisible) {
+                        await submenuItem.click({ force: true, timeout: 2000 });
+                    } else {
+                        await submenuItem.evaluate((node) => {
+                            (node as HTMLElement).click();
+                        });
+                    }
+
+                    const panelVisible = await this.page
+                        .locator(panelSelector)
+                        .isVisible({ timeout: 3000 })
+                        .catch(() => false);
+
+                    if (panelVisible) {
+                        return;
+                    }
+                } catch {
+                    // Try the next panel menu.
                 }
-
-                const panelVisible = await this.page
-                    .locator(panelSelector)
-                    .isVisible({ timeout: 3000 })
-                    .catch(() => false);
-
-                if (panelVisible) {
-                    return;
-                }
-            } catch {
-                // Try the next panel menu.
             }
         }
 
