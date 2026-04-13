@@ -32,6 +32,11 @@ export const useTabMenuItems = ({
         command: () => onAddTab('sprites', 'Sprites'),
       },
       {
+        label: 'Environment Maps',
+        icon: 'pi pi-globe',
+        command: () => onAddTab('environmentMaps', 'Environment Maps'),
+      },
+      {
         label: 'Sounds',
         icon: 'pi pi-volume-up',
         command: () => onAddTab('sounds', 'Sounds'),

@@ -123,6 +123,18 @@ export const soundCategoryFormSchema = z
     description: values.description || undefined,
   }))
 
+export const hierarchicalCategoryFormSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Category name is required').max(200),
+    description: z.string().trim(),
+    parentId: z.number().int().nullable(),
+  })
+  .transform(values => ({
+    name: values.name,
+    description: values.description || undefined,
+    parentId: values.parentId,
+  }))
+
 export const packCreateFormSchema = z
   .object({
     name: z.string().trim().min(1, 'Pack name is required').max(200),
@@ -152,3 +164,97 @@ export const projectCreateFormSchema = z
 export const packDetailsFormSchema = packCreateFormSchema
 
 export const projectDetailsFormSchema = projectCreateFormSchema
+
+const fileLikeSchema = z.custom<File | null>(
+  value =>
+    value === null ||
+    (typeof value === 'object' &&
+      value !== null &&
+      'name' in value &&
+      typeof value.name === 'string'),
+  'Select a file'
+)
+
+const environmentMapCubeFacesSchema = z.object({
+  px: fileLikeSchema,
+  nx: fileLikeSchema,
+  py: fileLikeSchema,
+  ny: fileLikeSchema,
+  pz: fileLikeSchema,
+  nz: fileLikeSchema,
+})
+
+export const environmentMapUploadFormSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, 'Name is required')
+      .max(200, 'Name cannot exceed 200 characters'),
+    sizeLabel: z
+      .string()
+      .trim()
+      .max(32, 'Size label cannot exceed 32 characters'),
+    sourceMode: z.enum(['single', 'cube']),
+    assetFile: fileLikeSchema,
+    thumbnailFile: fileLikeSchema,
+    cubeFaces: environmentMapCubeFacesSchema,
+  })
+  .superRefine((values, ctx) => {
+    if (values.sourceMode === 'single' && values.assetFile === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Select an environment map file',
+        path: ['assetFile'],
+      })
+    }
+
+    if (values.sourceMode === 'cube') {
+      ;(['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const).forEach(face => {
+        if (values.cubeFaces[face] === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Select the ${face.toUpperCase()} face`,
+            path: ['cubeFaces', face],
+          })
+        }
+      })
+    }
+  })
+  .transform(values => ({
+    ...values,
+    sizeLabel: values.sizeLabel || undefined,
+    thumbnailFile: values.thumbnailFile ?? null,
+  }))
+
+export const environmentMapVariantUploadFormSchema = z
+  .object({
+    sizeLabel: z
+      .string()
+      .trim()
+      .max(32, 'Size label cannot exceed 32 characters'),
+    sourceMode: z.enum(['single', 'cube']),
+    assetFile: fileLikeSchema,
+    cubeFaces: environmentMapCubeFacesSchema,
+  })
+  .superRefine((values, ctx) => {
+    if (values.sourceMode === 'single' && values.assetFile === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Select an environment map file',
+        path: ['assetFile'],
+      })
+    }
+
+    if (values.sourceMode === 'cube') {
+      ;(['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const).forEach(face => {
+        if (values.cubeFaces[face] === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Select the ${face.toUpperCase()} face`,
+            path: ['cubeFaces', face],
+          })
+        }
+      })
+    }
+  })

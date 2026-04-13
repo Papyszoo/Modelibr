@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  type DemoEnvironmentMap,
   type DemoModel,
   type DemoSound,
   type DemoSprite,
@@ -9,8 +10,11 @@ import {
   getAll,
   getAllRecycledItems,
   getAllUploadHistory,
+  getById,
   now,
   put,
+  recomputePackCounts,
+  recomputeProjectCounts,
   removeRecycledItem,
 } from './shared'
 
@@ -185,6 +189,14 @@ export const systemHandlers = [
         duration: (r.extra?.duration as number) ?? 0,
         deletedAt: r.deletedAt,
       }))
+    const environmentMaps = allRecycled
+      .filter(r => r.type === 'environmentMap')
+      .map(r => ({
+        id: r.entityId,
+        name: r.name,
+        deletedAt: r.deletedAt,
+        previewFileId: (r.extra?.previewFileId as number) ?? null,
+      }))
     return HttpResponse.json({
       models,
       modelVersions: [],
@@ -193,6 +205,8 @@ export const systemHandlers = [
       textures: [],
       sprites,
       sounds,
+      environmentMaps,
+      environmentMapVariants: [],
     })
   }),
 
@@ -211,6 +225,43 @@ export const systemHandlers = [
           await put('sprites', item.entity as unknown as DemoSprite)
         } else if (type === 'sound') {
           await put('sounds', item.entity as unknown as DemoSound)
+        } else if (type === 'environmentMap') {
+          const environmentMap = item.entity as unknown as DemoEnvironmentMap
+          await put('environmentMaps', environmentMap)
+
+          for (const packRef of environmentMap.packs ?? []) {
+            const pack = await getById('packs', packRef.id)
+            if (!pack) continue
+            if (
+              !pack.environmentMaps?.some(
+                entry => entry.id === environmentMap.id
+              )
+            ) {
+              pack.environmentMaps = [
+                ...(pack.environmentMaps ?? []),
+                { id: environmentMap.id, name: environmentMap.name },
+              ]
+              recomputePackCounts(pack)
+              await put('packs', pack)
+            }
+          }
+
+          for (const projectRef of environmentMap.projects ?? []) {
+            const project = await getById('projects', projectRef.id)
+            if (!project) continue
+            if (
+              !project.environmentMaps?.some(
+                entry => entry.id === environmentMap.id
+              )
+            ) {
+              project.environmentMaps = [
+                ...(project.environmentMaps ?? []),
+                { id: environmentMap.id, name: environmentMap.name },
+              ]
+              recomputeProjectCounts(project)
+              await put('projects', project)
+            }
+          }
         }
       }
       await removeRecycledItem(item.id)
@@ -279,6 +330,18 @@ export const systemHandlers = [
           originalFileName: sound.fileName,
           sizeBytes: sound.fileSizeBytes ?? 0,
         })
+      } else if (type === 'environmentMap') {
+        const environmentMap = item.entity as unknown as DemoEnvironmentMap
+        for (const variant of environmentMap.variants ?? []) {
+          filesToDelete.push({
+            filePath: variant.fileName,
+            originalFileName: variant.fileName,
+            sizeBytes: variant.fileSizeBytes ?? 0,
+          })
+        }
+        relatedEntities.push(
+          `${(environmentMap.variants ?? []).filter(variant => !variant.isDeleted).length} variant(s)`
+        )
       }
     }
 

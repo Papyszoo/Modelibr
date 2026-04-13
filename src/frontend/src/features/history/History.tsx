@@ -5,6 +5,7 @@ import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
 import { useMemo, useState } from 'react'
 
+import { getEnvironmentMapById } from '@/features/environment-map/api/environmentMapApi'
 import { getModelById } from '@/features/models/api/modelApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
 import { openTabInPanel } from '@/utils/tabNavigation'
@@ -28,6 +29,8 @@ interface BatchUploadHistory {
   textureSetName: string | null
   spriteId: number | null
   spriteName: string | null
+  environmentMapId?: number | null
+  environmentMapName?: string | null
 }
 
 interface BatchGroup {
@@ -74,16 +77,19 @@ const getExtensionIcon = (
 
 // Map file type to icon
 const getFileTypeIcon = (fileType: string): string => {
+  const normalizedFileType = fileType.toLowerCase().replace(/[^a-z0-9]/g, '')
   const typeIconMap: Record<string, string> = {
     model: 'pi-box',
     texture: 'pi-image',
-    textureSet: 'pi-image',
+    textureset: 'pi-image',
     pack: 'pi-inbox',
     project: 'pi-briefcase',
     file: 'pi-file',
     sprite: 'pi-image',
+    sound: 'pi-volume-up',
+    environmentmap: 'pi-globe',
   }
-  return typeIconMap[fileType] || 'pi-file'
+  return typeIconMap[normalizedFileType] || 'pi-file'
 }
 
 export function History() {
@@ -143,6 +149,9 @@ export function History() {
   }
 
   const getUploadedToText = (upload: BatchUploadHistory): string => {
+    const normalizedUploadType = upload.uploadType
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
     // Priority: Pack > Project > Model > TextureSet > Sprite > Default
     if (upload.packId && upload.packName) {
       return `${upload.packName} Pack`
@@ -159,15 +168,24 @@ export function History() {
     if (upload.spriteId) {
       return 'Sprites Page'
     }
+    if (upload.environmentMapId) {
+      return 'Environment Maps List'
+    }
     // Fallback based on upload type
-    if (upload.uploadType === 'model') {
+    if (normalizedUploadType === 'model') {
       return 'Models List'
     }
-    if (upload.uploadType === 'texture' || upload.uploadType === 'textureSet') {
+    if (
+      normalizedUploadType === 'texture' ||
+      normalizedUploadType === 'textureset'
+    ) {
       return 'Texture Sets List'
     }
-    if (upload.uploadType === 'sprite') {
+    if (normalizedUploadType === 'sprite') {
       return 'Sprites Page'
+    }
+    if (normalizedUploadType === 'environmentmap') {
+      return 'Environment Maps List'
     }
     return 'Unknown'
   }
@@ -274,6 +292,30 @@ export function History() {
                   upload.projectId!.toString()
                 )
               }
+            />
+          )}
+          {upload.environmentMapId && (
+            <Button
+              icon="pi pi-globe"
+              size="small"
+              text
+              rounded
+              title="Open Environment Map"
+              onClick={async () => {
+                try {
+                  const environmentMap = await getEnvironmentMapById(
+                    upload.environmentMapId!
+                  )
+                  openTabInPanel(
+                    'environmentMapViewer',
+                    'left',
+                    environmentMap.id.toString(),
+                    environmentMap.name
+                  )
+                } catch (error) {
+                  console.error('Failed to open environment map:', error)
+                }
+              }}
             />
           )}
         </div>

@@ -150,6 +150,14 @@
   transition: transform 0.3s ease;
 }
 
+.recycled-card-panoramic .recycled-card-thumbnail-panoramic {
+  aspect-ratio: 2 / 1;
+}
+
+.recycled-card-image-panoramic {
+  object-fit: contain;
+}
+
 .recycled-card:hover .recycled-card-image {
   transform: scale(1.1);
 }
@@ -168,6 +176,26 @@
     var(--surface-ground),
     var(--surface-hover)
   );
+}
+
+.environment-map-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color-secondary);
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.18),
+    rgba(16, 185, 129, 0.12)
+  );
+}
+
+.environment-map-placeholder .pi {
+  font-size: 3rem;
+  opacity: 0.8;
 }
 
 .texture-set-placeholder .pi {

@@ -9,6 +9,19 @@ History of completed features and improvements.
 
 ---
 
+## 2026-04-10
+
+### Environment Maps Parity
+
+- Promoted environment maps to a first-class asset type across the app
+- Added model-style environment map list controls with search, filters, card sizing, upload, and refresh
+- Added cube upload support with explicit `px`, `nx`, `py`, `ny`, `pz`, and `nz` face mapping
+- Added generated-thumbnail parity, custom thumbnail support, and preview-variant selection
+- Added a dedicated Three.js environment map viewer page
+- Added pack/project membership, recycled-files coverage, WebDAV exposure, and demo-mode support for environment maps
+
+---
+
 ## 2026-04-08
 
 ### README and Getting Started Refresh

@@ -1,10 +1,6 @@
-export interface ModelCategoryDto {
-  id: number
-  name: string
-  description?: string
-  parentId?: number | null
-  path: string
-}
+import { type HierarchicalCategory } from '@/shared/types/categories'
+
+export type ModelCategoryDto = HierarchicalCategory
 
 export interface ModelConceptImageDto {
   fileId: number

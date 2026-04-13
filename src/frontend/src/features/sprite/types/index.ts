@@ -1,3 +1,5 @@
+import { type HierarchicalCategory } from '@/shared/types/categories'
+
 export interface SpriteDto {
   id: number
   name: string
@@ -11,13 +13,7 @@ export interface SpriteDto {
   updatedAt: string
 }
 
-export interface SpriteCategoryDto {
-  id: number
-  name: string
-  description: string | null
-  createdAt: string
-  updatedAt: string
-}
+export type SpriteCategoryDto = HierarchicalCategory
 
 export interface GetAllSpritesResponse {
   sprites: SpriteDto[]

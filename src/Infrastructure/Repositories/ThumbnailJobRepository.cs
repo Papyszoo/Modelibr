@@ -35,6 +35,9 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
     {
         return await _context.ThumbnailJobs
             .Include(tj => tj.Model)
+            .Include(tj => tj.ModelVersion)
+            .Include(tj => tj.EnvironmentMap)
+            .Include(tj => tj.EnvironmentMapVariant)
             .FirstOrDefaultAsync(tj => tj.Id == id, cancellationToken);
     }
 
@@ -82,6 +85,14 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
             .FirstOrDefaultAsync(tj => tj.TextureSetId == textureSetId, cancellationToken);
     }
 
+    public async Task<ThumbnailJob?> GetByEnvironmentMapVariantIdAsync(int environmentMapVariantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ThumbnailJobs
+            .Include(tj => tj.EnvironmentMap)
+            .Include(tj => tj.EnvironmentMapVariant)
+            .FirstOrDefaultAsync(tj => tj.EnvironmentMapVariantId == environmentMapVariantId, cancellationToken);
+    }
+
     public async Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default)
     {
         // Use a database transaction to ensure atomicity when claiming jobs
@@ -96,6 +107,8 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
                 .Include(tj => tj.Model)
                 .Include(tj => tj.ModelVersion)
                     .ThenInclude(mv => mv.TextureMappings)
+                .Include(tj => tj.EnvironmentMap)
+                .Include(tj => tj.EnvironmentMapVariant)
                 .Where(tj => tj.Status == ThumbnailJobStatus.Pending || 
                            (tj.Status == ThumbnailJobStatus.Processing && 
                             tj.LockedAt.HasValue && 
@@ -126,6 +139,8 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
         
         return await _context.ThumbnailJobs
             .Include(tj => tj.Model)
+            .Include(tj => tj.EnvironmentMap)
+            .Include(tj => tj.EnvironmentMapVariant)
             .Where(tj => tj.Status == ThumbnailJobStatus.Processing &&
                         tj.LockedAt.HasValue &&
                         tj.LockedAt.Value.AddMinutes(tj.LockTimeoutMinutes) <= currentTime)

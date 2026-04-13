@@ -6,6 +6,8 @@ import {
   assetUrl,
   buildCategoryPath,
   buildConceptImage,
+  type DemoCategory,
+  type DemoEnvironmentMap,
   type DemoModel,
   type DemoModelVersion,
   type DemoSound,
@@ -35,16 +37,331 @@ import {
   recomputePackCounts,
   recomputeProjectCounts,
   remove,
+  seedAssetUrl,
   seedFileAssets,
   serveFile,
   storeFileBlob,
   storeThumbnail,
+  syncEnvironmentMapDerivedFields,
   thumbnailUrl,
+  toEnvironmentMapDto,
   trackUpload,
 } from './dynamic-demo/shared'
 import { systemHandlers } from './dynamic-demo/systemHandlers'
 
 export { prewarmSeedThumbnails } from './dynamic-demo/shared'
+
+const ENVIRONMENT_MAP_CUBE_FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const
+type DemoCategoryStoreName =
+  | 'modelCategories'
+  | 'textureSetCategories'
+  | 'environmentMapCategories'
+  | 'spriteCategories'
+  | 'soundCategories'
+
+type DemoCategorizedAssetStoreName =
+  | 'models'
+  | 'textureSets'
+  | 'environmentMaps'
+  | 'sprites'
+  | 'sounds'
+
+const toCategoryDto = (category: DemoCategory, categories: DemoCategory[]) => ({
+  id: category.id,
+  name: category.name,
+  description: category.description ?? undefined,
+  parentId: category.parentId ?? null,
+  path: buildCategoryPath(category, categories),
+})
+
+async function listCategoryStore(storeName: DemoCategoryStoreName) {
+  const categories = await getAll(storeName)
+  return HttpResponse.json({
+    categories: categories.map(category => toCategoryDto(category, categories)),
+  })
+}
+
+async function createCategoryInStore(
+  storeName: DemoCategoryStoreName,
+  assetLabel: string,
+  body: {
+    name: string
+    description?: string
+    parentId?: number | null
+  }
+) {
+  const categories = await getAll(storeName)
+  const duplicate = categories.find(
+    category =>
+      category.parentId === (body.parentId ?? null) &&
+      category.name.trim().toLowerCase() === body.name.trim().toLowerCase()
+  )
+
+  if (duplicate) {
+    return HttpResponse.json(
+      {
+        error: 'CategoryAlreadyExists',
+        message: `A ${assetLabel} category named '${body.name}' already exists in this branch.`,
+      },
+      { status: 400 }
+    )
+  }
+
+  const id = await nextId(storeName)
+  const ts = now()
+  const category: DemoCategory = {
+    id,
+    name: body.name,
+    description: body.description ?? null,
+    parentId: body.parentId ?? null,
+    createdAt: ts,
+    updatedAt: ts,
+  }
+
+  await put(storeName, category)
+
+  return HttpResponse.json(toCategoryDto(category, [...categories, category]), {
+    status: 201,
+  })
+}
+
+async function updateCategoryInStore(
+  storeName: DemoCategoryStoreName,
+  assetLabel: string,
+  categoryId: number,
+  body: {
+    name: string
+    description?: string
+    parentId?: number | null
+  }
+) {
+  const category = await getById(storeName, categoryId)
+  if (!category) {
+    return new HttpResponse(null, { status: 404 })
+  }
+
+  const categories = await getAll(storeName)
+  if (body.parentId === category.id) {
+    return HttpResponse.json(
+      {
+        error: 'InvalidCategoryParent',
+        message: 'A category cannot be its own parent.',
+      },
+      { status: 400 }
+    )
+  }
+
+  let currentParentId = body.parentId ?? null
+  while (currentParentId) {
+    if (currentParentId === category.id) {
+      return HttpResponse.json(
+        {
+          error: 'InvalidCategoryParent',
+          message: 'A category cannot be moved under one of its descendants.',
+        },
+        { status: 400 }
+      )
+    }
+
+    currentParentId =
+      categories.find(item => item.id === currentParentId)?.parentId ?? null
+  }
+
+  const duplicate = categories.find(
+    item =>
+      item.id !== category.id &&
+      item.parentId === (body.parentId ?? null) &&
+      item.name.trim().toLowerCase() === body.name.trim().toLowerCase()
+  )
+
+  if (duplicate) {
+    return HttpResponse.json(
+      {
+        error: 'CategoryAlreadyExists',
+        message: `A ${assetLabel} category named '${body.name}' already exists in this branch.`,
+      },
+      { status: 400 }
+    )
+  }
+
+  category.name = body.name
+  category.description = body.description ?? null
+  category.parentId = body.parentId ?? null
+  category.updatedAt = now()
+
+  await put(storeName, category)
+  return new HttpResponse(null, { status: 204 })
+}
+
+async function deleteCategoryFromStore(
+  storeName: DemoCategoryStoreName,
+  categoryId: number,
+  assetStoreName: DemoCategorizedAssetStoreName
+) {
+  const categories = await getAll(storeName)
+  if (categories.some(category => category.parentId === categoryId)) {
+    return HttpResponse.json(
+      {
+        error: 'CategoryHasChildren',
+        message:
+          'Delete or move child categories before removing this category.',
+      },
+      { status: 400 }
+    )
+  }
+
+  await remove(storeName, categoryId)
+
+  const assets = await getAll(assetStoreName)
+  for (const asset of assets) {
+    if (!('categoryId' in asset) || asset.categoryId !== categoryId) {
+      continue
+    }
+
+    asset.categoryId = null
+    if ('categoryName' in asset) {
+      asset.categoryName = null
+    }
+
+    await put(assetStoreName, asset)
+  }
+
+  return new HttpResponse(null, { status: 204 })
+}
+
+async function getEnvironmentMapCubeFaceFiles(formData: FormData) {
+  const entries = await Promise.all(
+    ENVIRONMENT_MAP_CUBE_FACES.map(async face => {
+      const file = formData.get(face)
+      return [face, file instanceof File ? file : null] as const
+    })
+  )
+
+  if (entries.every(([, file]) => file === null)) {
+    return null
+  }
+
+  if (entries.some(([, file]) => file === null)) {
+    return undefined
+  }
+
+  return Object.fromEntries(entries) as Record<
+    (typeof ENVIRONMENT_MAP_CUBE_FACES)[number],
+    File
+  >
+}
+
+function buildEnvironmentMapFileRecord(
+  fileId: number,
+  fileName: string,
+  fileSizeBytes: number
+) {
+  return {
+    fileId,
+    fileName,
+    fileSizeBytes,
+    previewUrl: `/files/${fileId}/preview?channel=rgb`,
+    fileUrl: `/files/${fileId}`,
+  }
+}
+
+function buildEnvironmentMapCubeFaceRecords(
+  faceFiles: Record<
+    (typeof ENVIRONMENT_MAP_CUBE_FACES)[number],
+    { id: number; file: File }
+  >
+) {
+  return {
+    px: buildEnvironmentMapFileRecord(
+      faceFiles.px.id,
+      faceFiles.px.file.name,
+      faceFiles.px.file.size
+    ),
+    nx: buildEnvironmentMapFileRecord(
+      faceFiles.nx.id,
+      faceFiles.nx.file.name,
+      faceFiles.nx.file.size
+    ),
+    py: buildEnvironmentMapFileRecord(
+      faceFiles.py.id,
+      faceFiles.py.file.name,
+      faceFiles.py.file.size
+    ),
+    ny: buildEnvironmentMapFileRecord(
+      faceFiles.ny.id,
+      faceFiles.ny.file.name,
+      faceFiles.ny.file.size
+    ),
+    pz: buildEnvironmentMapFileRecord(
+      faceFiles.pz.id,
+      faceFiles.pz.file.name,
+      faceFiles.pz.file.size
+    ),
+    nz: buildEnvironmentMapFileRecord(
+      faceFiles.nz.id,
+      faceFiles.nz.file.name,
+      faceFiles.nz.file.size
+    ),
+  }
+}
+
+async function loadEnvironmentMapPreviewBlob(fileId: number) {
+  const stored = await getFileBlob(fileId)
+  if (stored) {
+    return { blob: stored.blob, fileName: stored.fileName }
+  }
+
+  const seedPath = seedFileAssets[fileId]
+  if (!seedPath) {
+    return null
+  }
+
+  const response = await fetch(seedAssetUrl(seedPath), { cache: 'force-cache' })
+  if (!response.ok) {
+    return null
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: seedPath.split('/').pop() ?? `file-${fileId}`,
+  }
+}
+
+async function buildEnvironmentMapPreviewResponse(fileId: number | null) {
+  if (!fileId) {
+    return new HttpResponse(null, { status: 404 })
+  }
+
+  const source = await loadEnvironmentMapPreviewBlob(fileId)
+  if (!source) {
+    return new HttpResponse(null, { status: 404 })
+  }
+
+  const fileName = source.fileName.toLowerCase()
+
+  try {
+    if (fileName.endsWith('.exr')) {
+      const preview = await generateExrChannelPreview(source.blob, 'rgb')
+      return new HttpResponse(preview, {
+        headers: { 'Content-Type': 'image/png' },
+      })
+    }
+
+    if (/\.(png|jpe?g|webp|bmp|gif)$/i.test(fileName)) {
+      const preview = await generateImageChannelPreview(source.blob, 'rgb')
+      return new HttpResponse(preview, {
+        headers: { 'Content-Type': 'image/png' },
+      })
+    }
+  } catch {
+    // Fall back to a placeholder thumbnail below.
+  }
+
+  const placeholder = await generatePlaceholderThumbnail()
+  return new HttpResponse(placeholder, {
+    headers: { 'Content-Type': 'image/png' },
+  })
+}
 
 // ─── Handlers ───────────────────────────────────────────────────────────
 
@@ -525,6 +842,80 @@ export const dynamicDemoHandlers = [
     }
     return new HttpResponse(null, { status: 204 })
   }),
+
+  http.get('*/texture-set-categories', async () =>
+    listCategoryStore('textureSetCategories')
+  ),
+
+  http.post('*/texture-set-categories', async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    return createCategoryInStore('textureSetCategories', 'texture set', body)
+  }),
+
+  http.put('*/texture-set-categories/:id', async ({ params, request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    return updateCategoryInStore(
+      'textureSetCategories',
+      'texture set',
+      Number(params.id),
+      body
+    )
+  }),
+
+  http.delete('*/texture-set-categories/:id', async ({ params }) =>
+    deleteCategoryFromStore(
+      'textureSetCategories',
+      Number(params.id),
+      'textureSets'
+    )
+  ),
+
+  http.get('*/environment-map-categories', async () =>
+    listCategoryStore('environmentMapCategories')
+  ),
+
+  http.post('*/environment-map-categories', async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    return createCategoryInStore(
+      'environmentMapCategories',
+      'environment map',
+      body
+    )
+  }),
+
+  http.put('*/environment-map-categories/:id', async ({ params, request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    return updateCategoryInStore(
+      'environmentMapCategories',
+      'environment map',
+      Number(params.id),
+      body
+    )
+  }),
+
+  http.delete('*/environment-map-categories/:id', async ({ params }) =>
+    deleteCategoryFromStore(
+      'environmentMapCategories',
+      Number(params.id),
+      'environmentMaps'
+    )
+  ),
 
   // Delete model (soft) → move to recycled
   http.delete('*/models/:id', async ({ params }) => {
@@ -1489,6 +1880,633 @@ export const dynamicDemoHandlers = [
   }),
 
   // ════════════════════════════════════════════════════════════════════════
+  //  ENVIRONMENT MAPS
+  // ════════════════════════════════════════════════════════════════════════
+
+  http.get('*/environment-maps', async ({ request }) => {
+    const url = new URL(request.url)
+    const page = Number(url.searchParams.get('page') || '1')
+    const pageSize = Number(url.searchParams.get('pageSize') || '50')
+    const packId = url.searchParams.get('packId')
+    const projectId = url.searchParams.get('projectId')
+
+    let environmentMaps = await getAll('environmentMaps')
+
+    if (packId) {
+      const id = Number(packId)
+      environmentMaps = environmentMaps.filter(environmentMap =>
+        (environmentMap.packs ?? []).some(pack => pack.id === id)
+      )
+    }
+
+    if (projectId) {
+      const id = Number(projectId)
+      environmentMaps = environmentMaps.filter(environmentMap =>
+        (environmentMap.projects ?? []).some(project => project.id === id)
+      )
+    }
+
+    const items = environmentMaps.map(environmentMap =>
+      toEnvironmentMapDto(environmentMap)
+    )
+
+    if (url.searchParams.has('page')) {
+      const result = paginate(items, page, pageSize)
+      return HttpResponse.json({
+        environmentMaps: result.items,
+        totalCount: result.totalCount,
+        page: result.page,
+        pageSize: result.pageSize,
+        totalPages: result.totalPages,
+      })
+    }
+
+    return HttpResponse.json({ environmentMaps: items })
+  }),
+
+  http.get('*/environment-maps/:id', async ({ params }) => {
+    const environmentMap = await getById('environmentMaps', Number(params.id))
+    if (!environmentMap) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(toEnvironmentMapDto(environmentMap))
+  }),
+
+  http.put('*/environment-maps/:id', async ({ params, request }) => {
+    const environmentMap = await getById('environmentMaps', Number(params.id))
+    if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+    const body = (await request.json()) as {
+      name?: string
+      previewVariantId?: number | null
+    }
+
+    if (typeof body.name === 'string' && body.name.trim()) {
+      environmentMap.name = body.name.trim()
+    }
+
+    if (body.previewVariantId !== undefined) {
+      environmentMap.previewVariantId = body.previewVariantId
+    }
+
+    environmentMap.updatedAt = now()
+    syncEnvironmentMapDerivedFields(environmentMap)
+
+    const packs = await getAll('packs')
+    for (const pack of packs) {
+      const entry = pack.environmentMaps?.find(
+        item => item.id === environmentMap.id
+      )
+      if (entry) {
+        entry.name = environmentMap.name
+        pack.updatedAt = environmentMap.updatedAt
+        await put('packs', pack)
+      }
+    }
+
+    const projects = await getAll('projects')
+    for (const project of projects) {
+      const entry = project.environmentMaps?.find(
+        item => item.id === environmentMap.id
+      )
+      if (entry) {
+        entry.name = environmentMap.name
+        project.updatedAt = environmentMap.updatedAt
+        await put('projects', project)
+      }
+    }
+
+    await put('environmentMaps', environmentMap)
+
+    return HttpResponse.json({
+      id: environmentMap.id,
+      name: environmentMap.name,
+      previewVariantId: environmentMap.previewVariantId ?? null,
+    })
+  }),
+
+  http.post('*/environment-maps/:id/metadata', async ({ params, request }) => {
+    const environmentMap = await getById('environmentMaps', Number(params.id))
+    if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+    const body = (await request.json()) as {
+      tags?: string[]
+      categoryId?: number | null
+    }
+
+    if (Array.isArray(body.tags)) {
+      environmentMap.tags = [
+        ...new Set(body.tags.map(tag => tag.trim()).filter(Boolean)),
+      ]
+    }
+
+    if (body.categoryId !== undefined) {
+      environmentMap.categoryId = body.categoryId
+    }
+
+    environmentMap.updatedAt = now()
+    syncEnvironmentMapDerivedFields(environmentMap)
+    await put('environmentMaps', environmentMap)
+
+    return HttpResponse.json({
+      environmentMapId: environmentMap.id,
+      tags: environmentMap.tags ?? [],
+      categoryId: environmentMap.categoryId ?? null,
+    })
+  }),
+
+  http.get('*/environment-maps/:id/preview', async ({ params }) => {
+    const environmentMap = await getById('environmentMaps', Number(params.id))
+    if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+    syncEnvironmentMapDerivedFields(environmentMap)
+
+    if (environmentMap.customThumbnailFileId) {
+      return buildEnvironmentMapPreviewResponse(
+        environmentMap.customThumbnailFileId
+      )
+    }
+
+    return buildEnvironmentMapPreviewResponse(
+      environmentMap.previewFileId ?? null
+    )
+  }),
+
+  http.get('*/environment-maps/:id/thumbnail', async ({ params }) => {
+    const environmentMap = await getById('environmentMaps', Number(params.id))
+    if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+    syncEnvironmentMapDerivedFields(environmentMap)
+
+    const hasPreview =
+      environmentMap.customThumbnailFileId || environmentMap.previewFileId
+    return HttpResponse.json({
+      status: hasPreview ? 'Ready' : 'Pending',
+      previewVariantId: environmentMap.previewVariantId ?? null,
+      fileUrl: hasPreview ? `/environment-maps/${params.id}/preview` : null,
+      errorMessage: null,
+      processedAt: hasPreview ? new Date().toISOString() : null,
+    })
+  }),
+
+  http.get(
+    '*/environment-maps/:id/variants/:variantId/preview',
+    async ({ params }) => {
+      const environmentMap = await getById('environmentMaps', Number(params.id))
+      if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+      const variant = (environmentMap.variants ?? []).find(
+        item => item.id === Number(params.variantId) && !item.isDeleted
+      )
+      if (!variant) return new HttpResponse(null, { status: 404 })
+
+      return buildEnvironmentMapPreviewResponse(
+        variant.previewFileId ??
+          variant.panoramicFile?.fileId ??
+          variant.cubeFaces?.px.fileId ??
+          variant.fileId ??
+          null
+      )
+    }
+  ),
+
+  http.post('*/environment-maps/with-file', async ({ request }) => {
+    const url = new URL(request.url)
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+    const cubeFaceFiles = await getEnvironmentMapCubeFaceFiles(formData)
+    if (!file && cubeFaceFiles === null) {
+      return HttpResponse.json({ error: 'No file' }, { status: 400 })
+    }
+    if (cubeFaceFiles === undefined) {
+      return HttpResponse.json(
+        { error: 'CubeEnvironmentMapFacesIncomplete' },
+        { status: 400 }
+      )
+    }
+
+    const environmentMapId = await nextId('environmentMaps')
+    const variantId = await nextId('environmentMapVariants')
+    const ts = now()
+    const name =
+      url.searchParams.get('name') ||
+      file?.name.replace(/\.[^.]+$/, '') ||
+      'Environment Map'
+    const sizeLabel = url.searchParams.get('sizeLabel') || ''
+    const sourceType =
+      url.searchParams.get('sourceType') || (cubeFaceFiles ? 'cube' : 'single')
+    const projectionType =
+      url.searchParams.get('projectionType') ||
+      (cubeFaceFiles ? 'cube' : 'equirectangular')
+
+    let fileId: number | null = null
+    let cubeFaceUrls: Partial<
+      Record<(typeof ENVIRONMENT_MAP_CUBE_FACES)[number], string | null>
+    > | null = null
+    let panoramicFile = null
+    let cubeFaces = null
+
+    if (cubeFaceFiles) {
+      cubeFaceUrls = {}
+      const cubeFaceRecords = {} as Record<
+        (typeof ENVIRONMENT_MAP_CUBE_FACES)[number],
+        { id: number; file: File }
+      >
+
+      for (const face of ENVIRONMENT_MAP_CUBE_FACES) {
+        const cubeFaceFile = cubeFaceFiles[face]
+        const faceFileId = await nextId('files')
+
+        await storeFileBlob(
+          faceFileId,
+          cubeFaceFile,
+          cubeFaceFile.name,
+          cubeFaceFile.type ||
+            inferMimeType(cubeFaceFile, cubeFaceFile.name, 'image/png')
+        )
+
+        cubeFaceUrls[face] = `/files/${faceFileId}`
+        cubeFaceRecords[face] = { id: faceFileId, file: cubeFaceFile }
+
+        if (face === 'px') {
+          fileId = faceFileId
+        }
+      }
+
+      cubeFaces = buildEnvironmentMapCubeFaceRecords(cubeFaceRecords)
+    } else if (file) {
+      fileId = await nextId('files')
+
+      await storeFileBlob(
+        fileId,
+        file,
+        file.name,
+        file.type || inferMimeType(file, file.name, 'image/vnd.radiance')
+      )
+
+      panoramicFile = buildEnvironmentMapFileRecord(
+        fileId,
+        file.name,
+        file.size
+      )
+    }
+
+    if (fileId === null) {
+      return HttpResponse.json(
+        { error: 'EnvironmentMapUploadFailed' },
+        { status: 400 }
+      )
+    }
+
+    const environmentMap: DemoEnvironmentMap = syncEnvironmentMapDerivedFields({
+      id: environmentMapId,
+      name,
+      variantCount: 1,
+      previewVariantId: variantId,
+      previewFileId: fileId,
+      previewSizeLabel: sizeLabel || null,
+      previewUrl: fileId
+        ? `/environment-maps/${environmentMapId}/preview`
+        : null,
+      customThumbnailFileId: null,
+      customThumbnailUrl: null,
+      categoryId: null,
+      sourceType,
+      projectionType,
+      cubeFaceUrls,
+      createdAt: ts,
+      updatedAt: ts,
+      tags: [],
+      variants: [
+        {
+          id: variantId,
+          sizeLabel,
+          previewFileId: fileId,
+          fileId: cubeFaces ? null : fileId,
+          fileName: cubeFaces ? 'Cube map' : (file?.name ?? name),
+          fileSizeBytes:
+            file?.size ??
+            Object.values(cubeFaceFiles ?? {}).reduce(
+              (sum, cubeFaceFile) => sum + cubeFaceFile.size,
+              0
+            ),
+          createdAt: ts,
+          updatedAt: ts,
+          isDeleted: false,
+          previewUrl: `/environment-maps/${environmentMapId}/variants/${variantId}/preview`,
+          fileUrl: panoramicFile?.fileUrl ?? null,
+          sourceType,
+          projectionType,
+          cubeFaceUrls,
+          panoramicFile,
+          cubeFaces,
+        },
+      ],
+      packs: [],
+      projects: [],
+    })
+
+    const packId = url.searchParams.get('packId')
+    const projectId = url.searchParams.get('projectId')
+    let trackPackName: string | null = null
+    let trackProjectName: string | null = null
+
+    if (packId) {
+      const pack = await getById('packs', Number(packId))
+      if (pack) {
+        trackPackName = pack.name
+        environmentMap.packs.push({ id: pack.id, name: pack.name })
+        if (!pack.environmentMaps?.some(item => item.id === environmentMapId)) {
+          pack.environmentMaps = [
+            ...(pack.environmentMaps ?? []),
+            { id: environmentMapId, name },
+          ]
+          recomputePackCounts(pack)
+          pack.updatedAt = ts
+          await put('packs', pack)
+        }
+      }
+    }
+
+    if (projectId) {
+      const project = await getById('projects', Number(projectId))
+      if (project) {
+        trackProjectName = project.name
+        environmentMap.projects.push({ id: project.id, name: project.name })
+        if (
+          !project.environmentMaps?.some(item => item.id === environmentMapId)
+        ) {
+          project.environmentMaps = [
+            ...(project.environmentMaps ?? []),
+            { id: environmentMapId, name },
+          ]
+          recomputeProjectCounts(project)
+          project.updatedAt = ts
+          await put('projects', project)
+        }
+      }
+    }
+
+    await put('environmentMaps', environmentMap)
+
+    trackUpload({
+      batchId: url.searchParams.get('batchId') || `batch-${Date.now()}`,
+      uploadType: 'EnvironmentMap',
+      fileId,
+      fileName: file?.name ?? `${name}.px`,
+      packId: packId ? Number(packId) : null,
+      packName: trackPackName,
+      projectId: projectId ? Number(projectId) : null,
+      projectName: trackProjectName,
+      modelId: null,
+      modelName: null,
+      textureSetId: null,
+      textureSetName: null,
+      spriteId: null,
+      spriteName: null,
+      environmentMapId,
+      environmentMapName: name,
+    })
+
+    return HttpResponse.json(
+      {
+        environmentMapId,
+        name,
+        variantId,
+        fileId,
+        previewVariantId: environmentMap.previewVariantId,
+        projectionType,
+      },
+      { status: 201 }
+    )
+  }),
+
+  http.post(
+    '*/environment-maps/:id/variants/with-file',
+    async ({ params, request }) => {
+      const environmentMap = await getById('environmentMaps', Number(params.id))
+      if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+      const url = new URL(request.url)
+      const formData = await request.formData()
+      const file = formData.get('file') as File | null
+      const cubeFaceFiles = await getEnvironmentMapCubeFaceFiles(formData)
+      if (!file && cubeFaceFiles === null) {
+        return HttpResponse.json({ error: 'No file' }, { status: 400 })
+      }
+      if (cubeFaceFiles === undefined) {
+        return HttpResponse.json(
+          { error: 'CubeEnvironmentMapFacesIncomplete' },
+          { status: 400 }
+        )
+      }
+
+      const sizeLabel = url.searchParams.get('sizeLabel') || ''
+      const sourceType =
+        url.searchParams.get('sourceType') ||
+        (cubeFaceFiles ? 'cube' : 'single')
+      const projectionType =
+        url.searchParams.get('projectionType') ||
+        (cubeFaceFiles ? 'cube' : 'equirectangular')
+      const duplicate = (environmentMap.variants ?? []).some(
+        variant =>
+          !variant.isDeleted &&
+          variant.sizeLabel.toLowerCase() === sizeLabel.toLowerCase()
+      )
+      if (duplicate) {
+        return HttpResponse.json(
+          { error: 'EnvironmentMapVariantAlreadyExists' },
+          { status: 400 }
+        )
+      }
+
+      const variantId = await nextId('environmentMapVariants')
+      const ts = now()
+      let fileId: number | null = null
+      let cubeFaceUrls: Partial<
+        Record<(typeof ENVIRONMENT_MAP_CUBE_FACES)[number], string | null>
+      > | null = null
+      let panoramicFile = null
+      let cubeFaces = null
+
+      if (cubeFaceFiles) {
+        cubeFaceUrls = {}
+        const cubeFaceRecords = {} as Record<
+          (typeof ENVIRONMENT_MAP_CUBE_FACES)[number],
+          { id: number; file: File }
+        >
+
+        for (const face of ENVIRONMENT_MAP_CUBE_FACES) {
+          const cubeFaceFile = cubeFaceFiles[face]
+          const faceFileId = await nextId('files')
+
+          await storeFileBlob(
+            faceFileId,
+            cubeFaceFile,
+            cubeFaceFile.name,
+            cubeFaceFile.type ||
+              inferMimeType(cubeFaceFile, cubeFaceFile.name, 'image/png')
+          )
+
+          cubeFaceUrls[face] = `/files/${faceFileId}`
+          cubeFaceRecords[face] = { id: faceFileId, file: cubeFaceFile }
+
+          if (face === 'px') {
+            fileId = faceFileId
+          }
+        }
+
+        cubeFaces = buildEnvironmentMapCubeFaceRecords(cubeFaceRecords)
+      } else if (file) {
+        fileId = await nextId('files')
+
+        await storeFileBlob(
+          fileId,
+          file,
+          file.name,
+          file.type || inferMimeType(file, file.name, 'image/vnd.radiance')
+        )
+
+        panoramicFile = buildEnvironmentMapFileRecord(
+          fileId,
+          file.name,
+          file.size
+        )
+      }
+
+      if (fileId === null) {
+        return HttpResponse.json(
+          { error: 'EnvironmentMapUploadFailed' },
+          { status: 400 }
+        )
+      }
+
+      environmentMap.variants.push({
+        id: variantId,
+        sizeLabel,
+        previewFileId: fileId,
+        fileId: cubeFaces ? null : fileId,
+        fileName: cubeFaces ? 'Cube map' : (file?.name ?? environmentMap.name),
+        fileSizeBytes:
+          file?.size ??
+          Object.values(cubeFaceFiles ?? {}).reduce(
+            (sum, cubeFaceFile) => sum + cubeFaceFile.size,
+            0
+          ),
+        createdAt: ts,
+        updatedAt: ts,
+        isDeleted: false,
+        previewUrl: `/environment-maps/${environmentMap.id}/variants/${variantId}/preview`,
+        fileUrl: panoramicFile?.fileUrl ?? null,
+        sourceType,
+        projectionType,
+        cubeFaceUrls,
+        panoramicFile,
+        cubeFaces,
+      })
+      environmentMap.updatedAt = ts
+      syncEnvironmentMapDerivedFields(environmentMap)
+      await put('environmentMaps', environmentMap)
+
+      return HttpResponse.json({
+        variantId,
+        fileId,
+        sizeLabel,
+        projectionType,
+      })
+    }
+  ),
+
+  http.put('*/environment-maps/:id/thumbnail', async ({ params, request }) => {
+    const environmentMap = await getById('environmentMaps', Number(params.id))
+    if (!environmentMap) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { fileId?: number | null }
+    environmentMap.customThumbnailFileId = body.fileId ?? null
+    environmentMap.customThumbnailUrl = body.fileId
+      ? `/files/${body.fileId}/preview?channel=rgb`
+      : null
+    environmentMap.updatedAt = now()
+    await put('environmentMaps', environmentMap)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post(
+    '*/environment-maps/:id/thumbnail/regenerate',
+    async ({ params, request }) => {
+      const environmentMap = await getById('environmentMaps', Number(params.id))
+      if (!environmentMap) return new HttpResponse(null, { status: 404 })
+
+      const url = new URL(request.url)
+      const variantIdParam = url.searchParams.get('variantId')
+      const variantId = variantIdParam ? Number(variantIdParam) : null
+
+      if (variantId) {
+        environmentMap.previewVariantId = variantId
+      }
+
+      environmentMap.customThumbnailFileId = null
+      environmentMap.customThumbnailUrl = null
+      environmentMap.updatedAt = now()
+      syncEnvironmentMapDerivedFields(environmentMap)
+      await put('environmentMaps', environmentMap)
+
+      const regeneratedVariantIds = (environmentMap.variants ?? [])
+        .filter(variant => !variant.isDeleted)
+        .map(variant => variant.id)
+
+      return HttpResponse.json({
+        message:
+          'Environment map thumbnail regeneration completed successfully.',
+        environmentMapId: environmentMap.id,
+        previewVariantId: environmentMap.previewVariantId ?? null,
+        regeneratedVariantIds,
+      })
+    }
+  ),
+
+  http.delete('*/environment-maps/:id/soft', async ({ params }) => {
+    const id = Number(params.id)
+    const environmentMap = await getById('environmentMaps', id)
+    if (environmentMap) {
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
+        type: 'environmentMap',
+        entityId: id,
+        name: environmentMap.name,
+        deletedAt: now(),
+        entity: { ...environmentMap } as unknown as Record<string, unknown>,
+        extra: { previewFileId: environmentMap.previewFileId ?? null },
+      })
+
+      const packs = await getAll('packs')
+      for (const pack of packs) {
+        const before = pack.environmentMaps?.length ?? 0
+        pack.environmentMaps = (pack.environmentMaps ?? []).filter(
+          item => item.id !== id
+        )
+        if ((pack.environmentMaps?.length ?? 0) !== before) {
+          recomputePackCounts(pack)
+          await put('packs', pack)
+        }
+      }
+
+      const projects = await getAll('projects')
+      for (const project of projects) {
+        const before = project.environmentMaps?.length ?? 0
+        project.environmentMaps = (project.environmentMaps ?? []).filter(
+          item => item.id !== id
+        )
+        if ((project.environmentMaps?.length ?? 0) !== before) {
+          recomputeProjectCounts(project)
+          await put('projects', project)
+        }
+      }
+    }
+
+    await remove('environmentMaps', id)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  // ════════════════════════════════════════════════════════════════════════
   //  SPRITES
   // ════════════════════════════════════════════════════════════════════════
 
@@ -1711,47 +2729,36 @@ export const dynamicDemoHandlers = [
   }),
 
   // Sprite categories
-  http.get('*/sprite-categories', async () => {
-    const cats = await getAll('spriteCategories')
-    return HttpResponse.json({ categories: cats })
-  }),
+  http.get('*/sprite-categories', async () =>
+    listCategoryStore('spriteCategories')
+  ),
 
   http.post('*/sprite-categories', async ({ request }) => {
     const body = (await request.json()) as {
       name: string
       description?: string
+      parentId?: number | null
     }
-    const id = await nextId('spriteCategories')
-    const ts = now()
-    const cat = {
-      id,
-      name: body.name,
-      description: body.description ?? null,
-      createdAt: ts,
-      updatedAt: ts,
-    }
-    await put('spriteCategories', cat)
-    return HttpResponse.json(cat, { status: 201 })
+    return createCategoryInStore('spriteCategories', 'sprite', body)
   }),
 
   http.put('*/sprite-categories/:id', async ({ params, request }) => {
-    const cat = await getById('spriteCategories', Number(params.id))
-    if (!cat) return new HttpResponse(null, { status: 404 })
     const body = (await request.json()) as {
       name: string
       description?: string
+      parentId?: number | null
     }
-    cat.name = body.name
-    if (body.description !== undefined) cat.description = body.description
-    cat.updatedAt = now()
-    await put('spriteCategories', cat)
-    return HttpResponse.json(cat)
+    return updateCategoryInStore(
+      'spriteCategories',
+      'sprite',
+      Number(params.id),
+      body
+    )
   }),
 
-  http.delete('*/sprite-categories/:id', async ({ params }) => {
-    await remove('spriteCategories', Number(params.id))
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.delete('*/sprite-categories/:id', async ({ params }) =>
+    deleteCategoryFromStore('spriteCategories', Number(params.id), 'sprites')
+  ),
 
   // ════════════════════════════════════════════════════════════════════════
   //  SOUNDS
@@ -2001,47 +3008,36 @@ export const dynamicDemoHandlers = [
   }),
 
   // Sound categories
-  http.get('*/sound-categories', async () => {
-    const cats = await getAll('soundCategories')
-    return HttpResponse.json({ categories: cats })
-  }),
+  http.get('*/sound-categories', async () =>
+    listCategoryStore('soundCategories')
+  ),
 
   http.post('*/sound-categories', async ({ request }) => {
     const body = (await request.json()) as {
       name: string
       description?: string
+      parentId?: number | null
     }
-    const id = await nextId('soundCategories')
-    const ts = now()
-    const cat = {
-      id,
-      name: body.name,
-      description: body.description ?? null,
-      createdAt: ts,
-      updatedAt: ts,
-    }
-    await put('soundCategories', cat)
-    return HttpResponse.json(cat, { status: 201 })
+    return createCategoryInStore('soundCategories', 'sound', body)
   }),
 
   http.put('*/sound-categories/:id', async ({ params, request }) => {
-    const cat = await getById('soundCategories', Number(params.id))
-    if (!cat) return new HttpResponse(null, { status: 404 })
     const body = (await request.json()) as {
       name: string
       description?: string
+      parentId?: number | null
     }
-    cat.name = body.name
-    if (body.description !== undefined) cat.description = body.description
-    cat.updatedAt = now()
-    await put('soundCategories', cat)
-    return HttpResponse.json(cat)
+    return updateCategoryInStore(
+      'soundCategories',
+      'sound',
+      Number(params.id),
+      body
+    )
   }),
 
-  http.delete('*/sound-categories/:id', async ({ params }) => {
-    await remove('soundCategories', Number(params.id))
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.delete('*/sound-categories/:id', async ({ params }) =>
+    deleteCategoryFromStore('soundCategories', Number(params.id), 'sounds')
+  ),
 
   ...containerHandlers,
   ...systemHandlers,

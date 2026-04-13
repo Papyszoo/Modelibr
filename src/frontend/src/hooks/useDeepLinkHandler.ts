@@ -18,6 +18,11 @@ const DEEP_LINK_PATTERNS: Array<{
     tabType: 'textureSetViewer',
     idGroup: 1,
   },
+  {
+    pattern: /^\/view\/environment-map\/(.+)$/,
+    tabType: 'environmentMapViewer',
+    idGroup: 1,
+  },
   { pattern: /^\/view\/pack\/(.+)$/, tabType: 'packViewer', idGroup: 1 },
   { pattern: /^\/view\/project\/(.+)$/, tabType: 'projectViewer', idGroup: 1 },
   { pattern: /^\/view\/stage\/(.+)$/, tabType: 'stageEditor', idGroup: 1 },

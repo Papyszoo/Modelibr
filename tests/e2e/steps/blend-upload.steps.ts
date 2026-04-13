@@ -6,6 +6,7 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
+import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import fs from "fs";
 import path from "path";
@@ -21,6 +22,7 @@ const api = new ApiHelper();
 
 const BLENDER_VERSION = "5.1.0";
 let blenderInstallVerified = false;
+const BLEND_CONTEXT_KEY = "blend-upload.context";
 
 // Per-scenario context shared across steps
 interface BlendTestContext {
@@ -36,13 +38,33 @@ interface BlendTestContext {
     initialFilePath?: string;
 }
 
-// Use a global context object that resets at the start of each scenario's Given
-let ctx: BlendTestContext = {};
+function getBlendContext(page: any): BlendTestContext {
+    return (
+        getScenarioState(page).getCustom<BlendTestContext>(BLEND_CONTEXT_KEY) ||
+        {}
+    );
+}
+
+function setBlendContext(page: any, context: BlendTestContext): void {
+    getScenarioState(page).setCustom(BLEND_CONTEXT_KEY, context);
+}
+
+function updateBlendContext(
+    page: any,
+    partial: Partial<BlendTestContext>,
+): BlendTestContext {
+    const next = {
+        ...getBlendContext(page),
+        ...partial,
+    };
+    setBlendContext(page, next);
+    return next;
+}
 
 // ── Given ────────────────────────────────────────────────────────────
 
-Given("the backend has Blender integration enabled", async () => {
-    ctx = {}; // Reset context for new scenario
+Given("the backend has Blender integration enabled", async ({ page }) => {
+    setBlendContext(page, {});
 
     // Install Blender on first invocation; skip on subsequent scenarios
     if (!blenderInstallVerified) {
@@ -50,13 +72,16 @@ Given("the backend has Blender integration enabled", async () => {
         blenderInstallVerified = true;
     }
 
-    const enabled = await api.getBlenderEnabled();
-    expect(enabled).toBe(true);
+    await expect
+        .poll(async () => api.getBlenderEnabled(), {
+            timeout: 30000,
+        })
+        .toBe(true);
 });
 
 Given(
     "a model {string} was created via WebDAV with {string}",
-    async ({}, modelName: string, blendFile: string) => {
+    async ({ page }, modelName: string, blendFile: string) => {
         // Remove any model with this name left over from a previous run to keep version count predictable
         await api.softDeleteModelsByName(modelName);
 
@@ -68,9 +93,11 @@ Given(
         // Retrieve the model to get the ID
         const model = await api.findModelByName(modelName);
         expect(model).not.toBeNull();
-        ctx.modelId = model.id;
-        ctx.modelName = modelName;
-        ctx.initialFilePath = filePath; // Save for "same content" tests
+        updateBlendContext(page, {
+            modelId: model.id,
+            modelName,
+            initialFilePath: filePath,
+        });
         console.log(
             `[Blend Setup] Created model "${modelName}" (id=${model.id}) from ${blendFile}`,
         );
@@ -82,7 +109,7 @@ Given(
 
 Given(
     "a model {string} was created from raw file {string} via WebDAV",
-    async ({}, modelName: string, blendFile: string) => {
+    async ({ page }, modelName: string, blendFile: string) => {
         // Remove any model with this name left over from a previous run
         await api.softDeleteModelsByName(modelName);
 
@@ -92,9 +119,11 @@ Given(
 
         const model = await api.findModelByName(modelName);
         expect(model).not.toBeNull();
-        ctx.modelId = model.id;
-        ctx.modelName = modelName;
-        ctx.initialFilePath = filePath;
+        updateBlendContext(page, {
+            modelId: model.id,
+            modelName,
+            initialFilePath: filePath,
+        });
         console.log(
             `[Blend Setup] Created model "${modelName}" (id=${model.id}) from RAW ${blendFile}`,
         );
@@ -103,16 +132,18 @@ Given(
 
 When(
     "I upload raw {string} as a new model {string} via WebDAV PUT",
-    async ({}, blendFile: string, modelName: string) => {
+    async ({ page }, blendFile: string, modelName: string) => {
         // Use the RAW file (same hash) to trigger dedup behavior
         const filePath = path.join(ASSETS_DIR, blendFile);
         const result = await api.createModelViaWebDavBlend(filePath, modelName);
-        ctx.webdavPutStatus = result.status;
-        ctx.modelName = modelName;
+        updateBlendContext(page, {
+            webdavPutStatus: result.status,
+            modelName,
+        });
 
         const model = await api.findModelByName(modelName);
         if (model) {
-            ctx.modelId = model.id;
+            updateBlendContext(page, { modelId: model.id });
         }
         console.log(
             `[Blend] WebDAV PUT (RAW) for "${modelName}" returned status=${result.status}`,
@@ -124,17 +155,21 @@ When(
 
 When(
     "I upload {string} as a new model {string} via WebDAV PUT",
-    async ({}, blendFile: string, modelName: string) => {
+    async ({ page }, blendFile: string, modelName: string) => {
+        await api.softDeleteModelsByName(modelName);
+
         // Use UniqueFileGenerator to avoid hash collision with previously uploaded files
         const filePath = await UniqueFileGenerator.generate(blendFile);
         const result = await api.createModelViaWebDavBlend(filePath, modelName);
-        ctx.webdavPutStatus = result.status;
-        ctx.modelName = modelName;
+        updateBlendContext(page, {
+            webdavPutStatus: result.status,
+            modelName,
+        });
 
         // Try to find the model
         const model = await api.findModelByName(modelName);
         if (model) {
-            ctx.modelId = model.id;
+            updateBlendContext(page, { modelId: model.id });
         }
         console.log(
             `[Blend] WebDAV PUT for "${modelName}" returned status=${result.status}`,
@@ -144,12 +179,18 @@ When(
 
 When(
     "I upload {string} as a new model via the REST API",
-    async ({}, blendFile: string) => {
+    async ({ page }, blendFile: string) => {
+        await api.softDeleteModelsByName(
+            path.basename(blendFile, path.extname(blendFile)),
+        );
+
         // Use UniqueFileGenerator to avoid hash collision
         const filePath = await UniqueFileGenerator.generate(blendFile);
         const result = await api.uploadModel(filePath);
-        ctx.modelId = result.id;
-        ctx.modelName = result.name;
+        updateBlendContext(page, {
+            modelId: result.id,
+            modelName: result.name,
+        });
         console.log(
             `[Blend] POST /models created model id=${result.id} name="${result.name}"`,
         );
@@ -192,10 +233,11 @@ When(
 
 When(
     "I save the same {string} to model {string} via WebDAV Safe Save",
-    async ({}, blendFile: string, modelName: string) => {
+    async ({ page }, blendFile: string, modelName: string) => {
         // Use the SAME file that was used in the Given step to test "unchanged content" detection
         const filePath =
-            ctx.initialFilePath || path.join(ASSETS_DIR, blendFile);
+            getBlendContext(page).initialFilePath ||
+            path.join(ASSETS_DIR, blendFile);
         const result = await api.createVersionViaWebDavBlendSave(
             filePath,
             modelName,
@@ -212,16 +254,19 @@ When(
 
 Then(
     "a model named {string} should exist in the API",
-    async ({}, modelName: string) => {
+    async ({ page }, modelName: string) => {
         const model = await api.findModelByName(modelName);
         expect(model).not.toBeNull();
-        ctx.modelId = model.id;
-        ctx.modelName = modelName;
+        updateBlendContext(page, {
+            modelId: model.id,
+            modelName,
+        });
         console.log(`[Verify] Model "${modelName}" exists (id=${model.id})`);
     },
 );
 
-Then("the uploaded model should exist in the API", async () => {
+Then("the uploaded model should exist in the API", async ({ page }) => {
+    const ctx = getBlendContext(page);
     expect(ctx.modelId).toBeDefined();
     const model = await api.getModel(ctx.modelId!);
     expect(model).toBeDefined();
@@ -248,7 +293,8 @@ Then(
 
 Then(
     "the uploaded model should have {int} version(s)",
-    async ({}, expectedCount: number) => {
+    async ({ page }, expectedCount: number) => {
+        const ctx = getBlendContext(page);
         expect(ctx.modelId).toBeDefined();
         const versions = await api.getModelVersions(ctx.modelId!);
         expect(versions.length).toBe(expectedCount);
@@ -296,7 +342,8 @@ Then(
 
 Then(
     "the uploaded model version {int} should have a .blend file",
-    async ({}, versionNumber: number) => {
+    async ({ page }, versionNumber: number) => {
+        const ctx = getBlendContext(page);
         expect(ctx.modelId).toBeDefined();
 
         const versions = await api.getModelVersions(ctx.modelId!);
@@ -356,7 +403,8 @@ Then(
     },
 );
 
-Then("the uploaded model should eventually have a thumbnail", async () => {
+Then("the uploaded model should eventually have a thumbnail", async ({ page }) => {
+    const ctx = getBlendContext(page);
     expect(ctx.modelId).toBeDefined();
 
     const hasThumbnail = await waitForThumbnail(ctx.modelId!);
@@ -370,7 +418,7 @@ Then("the uploaded model should eventually have a thumbnail", async () => {
 
 Then(
     "the WebDAV PUT for {string} should indicate the model already exists",
-    async ({}, modelName: string) => {
+    async ({ page }, modelName: string) => {
         // When the same .blend hash already exists, CreateModelFromBlendCommand
         // returns AlreadyExists=true. The WebDAV middleware still returns 201.
         // Verify by checking there's only one model with a matching file hash.
@@ -389,22 +437,21 @@ Then(
         );
 
         // What matters: the second PUT returned 201 (success), meaning the server handled it
-        expect(ctx.webdavPutStatus).toBe(201);
+        expect(getBlendContext(page).webdavPutStatus).toBe(201);
     },
 );
 
 // ── Multi-file WebDAV upload steps ───────────────────────────────────
-
-// Stores the model names used in the multi-file scenario so subsequent Then steps
-// can reference them without repeating the state in ctx.
-let multiFileModelNames: string[] = [];
 
 When(
     "I upload 3 unique .blend files simultaneously via WebDAV PUT as models {string}, {string}, {string}",
     async ({}, nameA: string, nameB: string, nameC: string) => {
         const blendFiles = ["test.blend", "test2.blend", "test3.blend"];
         const modelNames = [nameA, nameB, nameC];
-        multiFileModelNames = modelNames;
+
+        for (const modelName of modelNames) {
+            await api.softDeleteModelsByName(modelName);
+        }
 
         // Generate unique copies of each file so hashes are distinct
         const uniquePaths = await Promise.all(
@@ -463,7 +510,7 @@ Then(
 
 When(
     "I upload an empty .blend file as {string} via WebDAV PUT",
-    async ({}, modelName: string) => {
+    async ({ page }, modelName: string) => {
         // Clean up any pre-existing model with this name
         await api.softDeleteModelsByName(modelName);
 
@@ -471,8 +518,10 @@ When(
             `/modelibr/Models/${encodeURIComponent(modelName)}.blend`,
             Buffer.alloc(0),
         );
-        ctx.webdavPutStatus = result.status;
-        ctx.modelName = modelName;
+        updateBlendContext(page, {
+            webdavPutStatus: result.status,
+            modelName,
+        });
         console.log(
             `[Blend B1] Zero-byte PUT for "${modelName}" returned status=${result.status}`,
         );
@@ -492,13 +541,13 @@ Then(
 
 When(
     "I upload a file as {string} via WebDAV PUT",
-    async ({}, fileName: string) => {
+    async ({ page }, fileName: string) => {
         const content = Buffer.from("fake AppleDouble content");
         const result = await api.webdavPut(
             `/modelibr/Models/${encodeURIComponent(fileName)}`,
             content,
         );
-        ctx.webdavPutStatus = result.status;
+        updateBlendContext(page, { webdavPutStatus: result.status });
         console.log(
             `[Blend B2] AppleDouble PUT for "${fileName}" returned status=${result.status}`,
         );

@@ -1,8 +1,10 @@
+import { type ReactNode } from 'react'
+
+import { type EnvironmentMapDto } from '@/features/environment-map/types'
 import { type SoundDto } from '@/features/sounds/types'
 import { type SpriteDto } from '@/features/sprite/types'
 import { type TextureSetDto } from '@/features/texture-set/types'
 import { type Model } from '@/utils/fileUtils'
-import { type ReactNode } from 'react'
 
 export interface ContainerConceptImage {
   fileId: number
@@ -26,6 +28,7 @@ export interface ContainerDto {
   textureSetCount: number
   spriteCount: number
   soundCount: number
+  environmentMapCount?: number
   isEmpty: boolean
   customThumbnailUrl?: string | null
   conceptImageCount?: number
@@ -33,6 +36,7 @@ export interface ContainerDto {
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
+  environmentMaps?: { id: number; name: string }[]
 }
 
 export interface ContainerDetailsRenderProps {
@@ -59,6 +63,7 @@ export interface ContainerAdapter {
   loadTextureSets: (id: number) => Promise<TextureSetDto[]>
   loadSprites: (id: number) => Promise<SpriteDto[]>
   loadSounds: (id: number) => Promise<SoundDto[]>
+  loadEnvironmentMaps: (id: number) => Promise<EnvironmentMapDto[]>
 
   // Association mutations
   addModel: (containerId: number, modelId: number) => Promise<void>
@@ -69,6 +74,14 @@ export interface ContainerAdapter {
   removeSprite: (containerId: number, spriteId: number) => Promise<void>
   addSound: (containerId: number, soundId: number) => Promise<void>
   removeSound: (containerId: number, soundId: number) => Promise<void>
+  addEnvironmentMap: (
+    containerId: number,
+    environmentMapId: number
+  ) => Promise<void>
+  removeEnvironmentMap: (
+    containerId: number,
+    environmentMapId: number
+  ) => Promise<void>
   uploadTextureWithFile: (
     containerId: number,
     file: File,

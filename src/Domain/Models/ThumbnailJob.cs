@@ -39,6 +39,8 @@ public class ThumbnailJob
     /// The ID of the texture set this thumbnail job is for (null for model/sound jobs).
     /// </summary>
     public int? TextureSetId { get; private set; }
+    public int? EnvironmentMapId { get; private set; }
+    public int? EnvironmentMapVariantId { get; private set; }
     
     /// <summary>
     /// Type of asset this job is for: "Model", "Sound", or "TextureSet".
@@ -106,6 +108,8 @@ public class ThumbnailJob
     public ModelVersion? ModelVersion { get; set; }
     public Sound? Sound { get; set; }
     public TextureSet? TextureSet { get; set; }
+    public EnvironmentMap? EnvironmentMap { get; set; }
+    public EnvironmentMapVariant? EnvironmentMapVariant { get; set; }
 
     /// <summary>
     /// Creates a new thumbnail job for model processing.
@@ -178,6 +182,28 @@ public class ThumbnailJob
             CreatedAt = createdAt,
             UpdatedAt = createdAt,
             ProxySize = proxySize
+        };
+    }
+
+    public static ThumbnailJob CreateForEnvironmentMap(int environmentMapId, int environmentMapVariantId, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
+    {
+        if (environmentMapId <= 0)
+            throw new ArgumentException("Environment map ID must be a positive integer.", nameof(environmentMapId));
+        if (environmentMapVariantId <= 0)
+            throw new ArgumentException("Environment map variant ID must be a positive integer.", nameof(environmentMapVariantId));
+        ValidateMaxAttempts(maxAttempts);
+        ValidateLockTimeoutMinutes(lockTimeoutMinutes);
+
+        return new ThumbnailJob
+        {
+            AssetType = "EnvironmentMap",
+            EnvironmentMapId = environmentMapId,
+            EnvironmentMapVariantId = environmentMapVariantId,
+            Status = ThumbnailJobStatus.Pending,
+            MaxAttempts = maxAttempts,
+            LockTimeoutMinutes = lockTimeoutMinutes,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
         };
     }
 

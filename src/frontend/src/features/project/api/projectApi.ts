@@ -4,6 +4,8 @@ import { type Model } from '@/utils/fileUtils'
 import {
   type CreateProjectRequest,
   type CreateProjectResponse,
+  type EnvironmentMapDto,
+  type GetAllEnvironmentMapsResponse,
   type GetAllProjectsResponse,
   type GetAllSoundsResponse,
   type GetAllSpritesResponse,
@@ -193,6 +195,33 @@ export async function getSoundsByProject(
     `/sounds?projectId=${projectId}`
   )
   return response.data.sounds
+}
+
+export async function addEnvironmentMapToProject(
+  projectId: number,
+  environmentMapId: number
+): Promise<void> {
+  await client.post(
+    `/projects/${projectId}/environment-maps/${environmentMapId}`
+  )
+}
+
+export async function removeEnvironmentMapFromProject(
+  projectId: number,
+  environmentMapId: number
+): Promise<void> {
+  await client.delete(
+    `/projects/${projectId}/environment-maps/${environmentMapId}`
+  )
+}
+
+export async function getEnvironmentMapsByProject(
+  projectId: number
+): Promise<EnvironmentMapDto[]> {
+  const response = await client.get<GetAllEnvironmentMapsResponse>(
+    `/environment-maps?projectId=${projectId}`
+  )
+  return response.data.environmentMaps
 }
 
 export type { ProjectConceptImageDto }

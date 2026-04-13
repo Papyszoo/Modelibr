@@ -49,6 +49,11 @@ public interface IThumbnailQueue
     Task<ThumbnailJob> EnqueueTextureSetThumbnailAsync(int textureSetId, int? proxySize = null, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Enqueues a new thumbnail generation job for an environment map variant.
+    /// </summary>
+    Task<ThumbnailJob> EnqueueEnvironmentMapThumbnailAsync(int environmentMapId, int environmentMapVariantId, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Attempts to dequeue and claim the next pending job for processing.
     /// Includes automatic retry of jobs with expired locks.
     /// </summary>

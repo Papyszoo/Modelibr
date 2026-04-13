@@ -10,13 +10,16 @@ namespace Application.TextureSets;
 internal class CreateTextureSetCommandHandler : ICommandHandler<CreateTextureSetCommand, CreateTextureSetResponse>
 {
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ITextureSetCategoryRepository _textureSetCategoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CreateTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
+        ITextureSetCategoryRepository textureSetCategoryRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _textureSetRepository = textureSetRepository;
+        _textureSetCategoryRepository = textureSetCategoryRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -32,12 +35,23 @@ internal class CreateTextureSetCommandHandler : ICommandHandler<CreateTextureSet
                     new Error("TextureSetAlreadyExists", $"A texture set with the name '{command.Name}' already exists."));
             }
 
+            if (command.CategoryId.HasValue)
+            {
+                var category = await _textureSetCategoryRepository.GetByIdAsync(command.CategoryId.Value, cancellationToken);
+                if (category == null)
+                {
+                    return Result.Failure<CreateTextureSetResponse>(
+                        new Error("CategoryNotFound", $"Texture set category with ID {command.CategoryId.Value} was not found."));
+                }
+            }
+
             // Create new texture set using domain factory method
             var textureSet = TextureSet.Create(command.Name, _dateTimeProvider.UtcNow, command.Kind);
+            textureSet.AssignCategory(command.CategoryId, _dateTimeProvider.UtcNow);
 
             var savedTextureSet = await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 
-            return Result.Success(new CreateTextureSetResponse(savedTextureSet.Id, savedTextureSet.Name, savedTextureSet.Kind));
+            return Result.Success(new CreateTextureSetResponse(savedTextureSet.Id, savedTextureSet.Name, savedTextureSet.Kind, savedTextureSet.TextureSetCategoryId));
         }
         catch (ArgumentException ex)
         {
@@ -47,5 +61,5 @@ internal class CreateTextureSetCommandHandler : ICommandHandler<CreateTextureSet
     }
 }
 
-public record CreateTextureSetCommand(string Name, TextureSetKind Kind = TextureSetKind.ModelSpecific) : ICommand<CreateTextureSetResponse>;
-public record CreateTextureSetResponse(int Id, string Name, TextureSetKind Kind);
+public record CreateTextureSetCommand(string Name, TextureSetKind Kind = TextureSetKind.ModelSpecific, int? CategoryId = null) : ICommand<CreateTextureSetResponse>;
+public record CreateTextureSetResponse(int Id, string Name, TextureSetKind Kind, int? CategoryId);

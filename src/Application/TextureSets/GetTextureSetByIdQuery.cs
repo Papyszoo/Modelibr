@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.TextureSetCategories;
 using Domain.ValueObjects;
 using SharedKernel;
 
@@ -8,10 +9,12 @@ namespace Application.TextureSets;
 internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQuery, GetTextureSetByIdResponse>
 {
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ITextureSetCategoryRepository _textureSetCategoryRepository;
 
-    public GetTextureSetByIdQueryHandler(ITextureSetRepository textureSetRepository)
+    public GetTextureSetByIdQueryHandler(ITextureSetRepository textureSetRepository, ITextureSetCategoryRepository textureSetCategoryRepository)
     {
         _textureSetRepository = textureSetRepository;
+        _textureSetCategoryRepository = textureSetCategoryRepository;
     }
 
     public async Task<Result<GetTextureSetByIdResponse>> Handle(GetTextureSetByIdQuery query, CancellationToken cancellationToken)
@@ -24,10 +27,17 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
                 new Error("TextureSetNotFound", $"Texture set with ID {query.Id} was not found."));
         }
 
+        var categories = await _textureSetCategoryRepository.GetAllAsync(cancellationToken);
         var textureSetDetailDto = new TextureSetDetailDto
         {
             Id = textureSet.Id,
             Name = textureSet.Name,
+            CategoryId = textureSet.TextureSetCategoryId,
+            Category = textureSet.TextureSetCategoryId.HasValue
+                ? categories.FirstOrDefault(c => c.Id == textureSet.TextureSetCategoryId.Value) is { } category
+                    ? TextureSetCategoryMappings.ToSummaryDto(category, categories)
+                    : null
+                : null,
             Kind = textureSet.Kind,
             TilingScaleX = textureSet.TilingScaleX,
             TilingScaleY = textureSet.TilingScaleY,
@@ -88,6 +98,8 @@ public record TextureSetDetailDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public int? CategoryId { get; init; }
+    public TextureSetCategorySummaryDto? Category { get; init; }
     public TextureSetKind Kind { get; init; }
     public float TilingScaleX { get; init; } = 1.0f;
     public float TilingScaleY { get; init; } = 1.0f;

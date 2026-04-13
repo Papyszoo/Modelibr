@@ -113,16 +113,20 @@ jest.mock('./services/ThumbnailSignalRService', () => ({
     disconnect: jest.fn(),
     joinAllModelsGroup: jest.fn(),
     leaveAllModelsGroup: jest.fn(),
+    joinAllEnvironmentMapsGroup: jest.fn(),
+    leaveAllEnvironmentMapsGroup: jest.fn(),
     joinModelVersionGroup: jest.fn(),
     leaveModelVersionGroup: jest.fn(),
     joinModelActiveVersionGroup: jest.fn(),
     leaveModelActiveVersionGroup: jest.fn(),
     onThumbnailStatusChanged: jest.fn(() => jest.fn()),
     onActiveVersionChanged: jest.fn(() => jest.fn()),
+    onEnvironmentMapThumbnailStatusChanged: jest.fn(() => jest.fn()),
     isConnected: jest.fn(() => false),
   },
   ThumbnailStatusChangedEvent: {},
   ActiveVersionChangedEvent: {},
+  EnvironmentMapThumbnailStatusChangedEvent: {},
 }))
 
 jest.mock('@/shared/thumbnail/hooks/useThumbnail', () => ({

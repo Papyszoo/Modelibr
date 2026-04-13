@@ -165,6 +165,35 @@ public class ThumbnailQueue : IThumbnailQueue
         return createdJob;
     }
 
+    public async Task<ThumbnailJob> EnqueueEnvironmentMapThumbnailAsync(
+        int environmentMapId,
+        int environmentMapVariantId,
+        bool forceRegenerate = false,
+        int maxAttempts = 3,
+        int lockTimeoutMinutes = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var existingJob = await _thumbnailJobRepository.GetByEnvironmentMapVariantIdAsync(environmentMapVariantId, cancellationToken);
+
+        if (existingJob != null)
+        {
+            if (forceRegenerate || existingJob.Status == ThumbnailJobStatus.Dead)
+            {
+                var currentTime = DateTime.UtcNow;
+                existingJob.Reset(currentTime);
+                await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+            }
+
+            return existingJob;
+        }
+
+        var job = ThumbnailJob.CreateForEnvironmentMap(environmentMapId, environmentMapVariantId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
+        return createdJob;
+    }
+
     public async Task<ThumbnailJob?> DequeueAsync(string workerId, CancellationToken cancellationToken = default)
     {
         var job = await _thumbnailJobRepository.GetNextPendingJobAsync(cancellationToken);
@@ -220,15 +249,17 @@ public class ThumbnailQueue : IThumbnailQueue
         job.MarkAsFailed(errorMessage, DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
 
+        var sanitizedError = (errorMessage ?? string.Empty).ReplaceLineEndings(" ");
+
         if (job.Status == Domain.ValueObjects.ThumbnailJobStatus.Dead)
         {
             _logger.LogWarning("Thumbnail job {JobId} for model {ModelId} version {ModelVersionId} moved to dead letter queue after {AttemptCount} attempts. Error: {ErrorMessage}", 
-                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, errorMessage);
+                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, sanitizedError);
         }
         else
         {
             _logger.LogInformation("Thumbnail job {JobId} for model {ModelId} version {ModelVersionId} failed (attempt {AttemptCount}), will retry. Error: {ErrorMessage}", 
-                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, errorMessage);
+                jobId, job.ModelId, job.ModelVersionId, job.AttemptCount, sanitizedError);
         }
     }
 

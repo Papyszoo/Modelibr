@@ -28,6 +28,10 @@ export function resolveApiAssetUrl(url?: string | null): string | null {
   try {
     return new URL(url, baseURL).toString()
   } catch {
+    // baseURL is relative (e.g. "/api") — prepend it to the path
+    if (baseURL.startsWith('/') && url.startsWith('/')) {
+      return `${baseURL}${url}`
+    }
     return url
   }
 }

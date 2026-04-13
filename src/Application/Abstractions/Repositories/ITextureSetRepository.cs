@@ -15,6 +15,7 @@ public interface ITextureSetRepository
     Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
         int? packId = null, int? projectId = null,
+        int? categoryId = null,
         TextureSetKind? kind = null,
         CancellationToken cancellationToken = default);
     Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default);

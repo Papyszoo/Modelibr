@@ -33,6 +33,7 @@ public sealed class FileType : IEquatable<FileType>
     
     // Textures and materials
     public static readonly FileType Texture = new("texture", "Texture Image", false, FileTypeCategory.Texture);
+    public static readonly FileType Hdr = new("hdr", "Radiance HDR Image", false, FileTypeCategory.Texture);
     public static readonly FileType Material = new("material", "Material Definition", false, FileTypeCategory.Material);
     public static readonly FileType Other = new("other", "Other file type", false, FileTypeCategory.Other);
     
@@ -67,6 +68,7 @@ public sealed class FileType : IEquatable<FileType>
         { ".tga", Texture },
         { ".bmp", Texture },
         { ".exr", Texture },
+        { ".hdr", Hdr },
         { ".mtl", Material },
         { ".gif", Gif },
         { ".webp", WebP },
@@ -141,6 +143,22 @@ public sealed class FileType : IEquatable<FileType>
     public static IReadOnlyList<FileType> GetSpriteTypes() => SpriteTypes;
     
     public static IReadOnlyList<FileType> GetAudioTypes() => AudioTypes;
+
+    public static Result<FileType> ValidateForEnvironmentMapUpload(string fileName)
+    {
+        var fileTypeResult = FromFileName(fileName);
+        if (fileTypeResult.IsFailure)
+            return fileTypeResult;
+
+        var fileType = fileTypeResult.Value;
+        if (fileType.Category != FileTypeCategory.Texture)
+        {
+            return Result.Failure<FileType>(
+                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for environment map upload. Only image and HDR texture files are allowed."));
+        }
+
+        return Result.Success(fileType);
+    }
     
     public static Result<FileType> ValidateForSpriteUpload(string fileName)
     {
@@ -215,6 +233,7 @@ public sealed class FileType : IEquatable<FileType>
             "max" => "application/octet-stream",
             "maya" => "application/octet-stream",
             "texture" => "image/*",
+            "hdr" => "image/vnd.radiance",
             "material" => "text/plain",
             "sprite" => "image/*",
             "spritesheet" => "image/*",

@@ -220,6 +220,10 @@ export function ProjectList() {
                       <i className="pi pi-volume-up" /> {project.soundCount}
                     </span>
                     <span>
+                      <i className="pi pi-globe" />{' '}
+                      {project.environmentMapCount ?? 0}
+                    </span>
+                    <span>
                       <i className="pi pi-images" /> {project.conceptImageCount}
                     </span>
                   </div>

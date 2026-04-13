@@ -35,6 +35,7 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             TextureSetCount = project.TextureSetCount,
             SpriteCount = project.SpriteCount,
             SoundCount = project.SoundCount,
+            EnvironmentMapCount = project.EnvironmentMapCount,
             IsEmpty = project.IsEmpty,
             CustomThumbnailUrl = project.CustomThumbnailFileId.HasValue ? $"/files/{project.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
             ConceptImages = project.ConceptImages
@@ -61,6 +62,11 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             {
                 Id = s.Id,
                 Name = s.Name
+            }).ToList(),
+            EnvironmentMaps = project.EnvironmentMaps.Select(e => new ProjectEnvironmentMapDto
+            {
+                Id = e.Id,
+                Name = e.Name
             }).ToList()
         };
 
@@ -85,12 +91,14 @@ public record ProjectDetailDto
     public int TextureSetCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
+    public int EnvironmentMapCount { get; init; }
     public bool IsEmpty { get; init; }
     public string? CustomThumbnailUrl { get; init; }
     public ICollection<ProjectConceptImageDto> ConceptImages { get; init; } = new List<ProjectConceptImageDto>();
     public ICollection<ProjectModelDto> Models { get; init; } = new List<ProjectModelDto>();
     public ICollection<ProjectTextureSetDto> TextureSets { get; init; } = new List<ProjectTextureSetDto>();
     public ICollection<ProjectSpriteDto> Sprites { get; init; } = new List<ProjectSpriteDto>();
+    public ICollection<ProjectEnvironmentMapDto> EnvironmentMaps { get; init; } = new List<ProjectEnvironmentMapDto>();
 }
 
 public record ProjectConceptImageDto
@@ -115,6 +123,12 @@ public record ProjectTextureSetDto
 }
 
 public record ProjectSpriteDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record ProjectEnvironmentMapDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;

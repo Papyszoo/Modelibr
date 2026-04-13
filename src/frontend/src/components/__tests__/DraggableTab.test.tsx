@@ -220,4 +220,22 @@ describe('DraggableTab', () => {
     const icon = tabElement.querySelector('.tab-icon')
     expect(icon).toHaveClass('pi', 'pi-image')
   })
+
+  it('should render environmentMapViewer tab with globe icon and tooltip', () => {
+    const environmentMapViewerTab: Tab = {
+      id: 'environment-map-77',
+      type: 'environmentMapViewer',
+      environmentMapId: '77',
+      params: { environmentMapId: '77' },
+      internalUiState: {},
+    }
+
+    render(<DraggableTab {...defaultProps} tab={environmentMapViewerTab} />)
+
+    const tabElement = getByTooltip('Environment Map: 77')
+    expect(tabElement).toBeInTheDocument()
+
+    const icon = tabElement.querySelector('.tab-icon')
+    expect(icon).toHaveClass('pi', 'pi-globe')
+  })
 })

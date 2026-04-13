@@ -22,11 +22,25 @@ const apiHelper = new ApiHelper();
 
 // Note: db uses lazy pool creation and handles its own lifecycle
 
-// Tracking state for texture UUID verification - scoped to prevent cross-scenario leakage
-const textureTracker = {
-    capturedTextureUuid: null as string | null,
-    previousTextureUuid: null as string | null,
-};
+interface TextureTrackerState {
+    capturedTextureUuid: string | null;
+    previousTextureUuid: string | null;
+}
+
+function getTextureTracker(page: any): TextureTrackerState {
+    const state = getScenarioState(page);
+    const existing = state.getCustom<TextureTrackerState>("textureTracker");
+    if (existing) {
+        return existing;
+    }
+
+    const tracker: TextureTrackerState = {
+        capturedTextureUuid: null,
+        previousTextureUuid: null,
+    };
+    state.setCustom("textureTracker", tracker);
+    return tracker;
+}
 
 // Helper to get model ID from the Zustand navigation store in localStorage
 async function getModelIdFromPage(page: any): Promise<number> {
@@ -1074,6 +1088,8 @@ async function getAnyTextureUuid(page: any): Promise<string | null> {
  * Only looks at MeshStandardMaterial meshes to avoid picking up Stage shadow plane (MeshBasicMaterial).
  */
 When("I capture the current texture state", async ({ page }) => {
+    const textureTracker = getTextureTracker(page);
+
     // Poll until the Three.js scene has any texture on a MeshStandardMaterial mesh
     await expect
         .poll(
@@ -1108,11 +1124,17 @@ When("I capture the current texture state", async ({ page }) => {
 Then(
     "the applied texture should be different from the captured state",
     async ({ page }) => {
+        const textureTracker = getTextureTracker(page);
+
         // Poll for the texture UUID to change
         await expect
             .poll(
                 async () => {
-                    return await getAnyTextureUuid(page);
+                    const currentUuid = await getAnyTextureUuid(page);
+                    return (
+                        currentUuid !== null &&
+                        currentUuid !== textureTracker.capturedTextureUuid
+                    );
                 },
                 {
                     message:
@@ -1121,7 +1143,7 @@ Then(
                     intervals: [500, 1000, 2000],
                 },
             )
-            .not.toBe(textureTracker.capturedTextureUuid);
+            .toBe(true);
 
         console.log(`[Three.js] Texture changed from captured state âœ“`);
 
@@ -1137,11 +1159,17 @@ Then(
 Then(
     "the applied texture should be different from the previous state",
     async ({ page }) => {
+        const textureTracker = getTextureTracker(page);
+
         // Poll for the texture UUID to change
         await expect
             .poll(
                 async () => {
-                    return await getAnyTextureUuid(page);
+                    const currentUuid = await getAnyTextureUuid(page);
+                    return (
+                        currentUuid !== null &&
+                        currentUuid !== textureTracker.previousTextureUuid
+                    );
                 },
                 {
                     message:
@@ -1150,7 +1178,7 @@ Then(
                     intervals: [500, 1000, 2000],
                 },
             )
-            .not.toBe(textureTracker.previousTextureUuid);
+            .toBe(true);
 
         console.log(`[Three.js] Texture changed from previous state âœ“`);
 

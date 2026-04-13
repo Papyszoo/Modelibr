@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.TextureSetCategories;
 using Domain.ValueObjects;
 using SharedKernel;
 
@@ -8,10 +9,12 @@ namespace Application.TextureSets;
 internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse>
 {
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly ITextureSetCategoryRepository _textureSetCategoryRepository;
 
-    public GetAllTextureSetsQueryHandler(ITextureSetRepository textureSetRepository)
+    public GetAllTextureSetsQueryHandler(ITextureSetRepository textureSetRepository, ITextureSetCategoryRepository textureSetCategoryRepository)
     {
         _textureSetRepository = textureSetRepository;
+        _textureSetCategoryRepository = textureSetCategoryRepository;
     }
 
     public async Task<Result<GetAllTextureSetsResponse>> Handle(GetAllTextureSetsQuery query, CancellationToken cancellationToken)
@@ -24,6 +27,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             var result = await _textureSetRepository.GetPagedAsync(
                 query.Page.Value, query.PageSize.Value,
                 query.PackId, query.ProjectId,
+                query.CategoryId,
                 query.Kind,
                 cancellationToken);
             textureSets = result.Items;
@@ -37,14 +41,22 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 textureSets = textureSets.Where(ts => ts.Packs.Any(p => p.Id == query.PackId.Value));
             if (query.ProjectId.HasValue)
                 textureSets = textureSets.Where(ts => ts.Projects.Any(p => p.Id == query.ProjectId.Value));
+            if (query.CategoryId.HasValue)
+                textureSets = textureSets.Where(ts => ts.TextureSetCategoryId == query.CategoryId.Value);
             if (query.Kind.HasValue)
                 textureSets = textureSets.Where(ts => ts.Kind == query.Kind.Value);
         }
+
+        var categories = await _textureSetCategoryRepository.GetAllAsync(cancellationToken);
 
         var textureSetListDtos = textureSets.Select(tp => new TextureSetListDto
         {
             Id = tp.Id,
             Name = tp.Name,
+            CategoryId = tp.TextureSetCategoryId,
+            CategoryPath = tp.TextureSetCategoryId.HasValue
+                ? TextureSetCategoryMappings.BuildPath(categories.FirstOrDefault(c => c.Id == tp.TextureSetCategoryId.Value))
+                : null,
             Kind = tp.Kind,
             CreatedAt = tp.CreatedAt,
             UpdatedAt = tp.UpdatedAt,
@@ -75,7 +87,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
     }
 }
 
-public record GetAllTextureSetsQuery(int? PackId = null, int? ProjectId = null, int? Page = null, int? PageSize = null, TextureSetKind? Kind = null) : IQuery<GetAllTextureSetsResponse>;
+public record GetAllTextureSetsQuery(int? PackId = null, int? ProjectId = null, int? CategoryId = null, int? Page = null, int? PageSize = null, TextureSetKind? Kind = null) : IQuery<GetAllTextureSetsResponse>;
 public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 
 /// <summary>
@@ -87,6 +99,8 @@ public record TextureSetListDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public int? CategoryId { get; init; }
+    public string? CategoryPath { get; init; }
     public TextureSetKind Kind { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }

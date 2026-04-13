@@ -146,8 +146,12 @@ internal sealed class FileRepository : IFileRepository
         var soundExists = await _context.Sounds
             .Where(s => s.FileId == fileId)
             .AnyAsync(cancellationToken);
-        
-        return soundExists;
+
+        if (soundExists) return true;
+
+        return await _context.EnvironmentMapVariants
+            .Where(v => v.FileId == fileId)
+            .AnyAsync(cancellationToken);
     }
 
     public async Task HardDeleteAsync(int id, CancellationToken cancellationToken = default)

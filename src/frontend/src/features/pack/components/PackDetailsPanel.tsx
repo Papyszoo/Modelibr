@@ -229,6 +229,7 @@ export function PackDetailsPanel({
               <span>{pack.textureSetCount} texture sets</span>
               <span>{pack.spriteCount} sprites</span>
               <span>{pack.soundCount} sounds</span>
+              <span>{pack.environmentMapCount ?? 0} environment maps</span>
             </div>
           </div>
         </aside>

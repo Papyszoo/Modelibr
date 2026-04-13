@@ -4,6 +4,10 @@ import {
   addRecycledItem,
   addUploadHistory,
   type DemoCategory,
+  type DemoEnvironmentMap,
+  type DemoEnvironmentMapCubeFaces,
+  type DemoEnvironmentMapFile,
+  type DemoEnvironmentMapVariant,
   type DemoModel,
   type DemoModelVersion,
   type DemoPack,
@@ -61,6 +65,7 @@ export {
 
 export type {
   DemoCategory,
+  DemoEnvironmentMap,
   DemoModel,
   DemoModelVersion,
   DemoPack,
@@ -77,6 +82,8 @@ const DEMO_BASE = import.meta.env.BASE_URL ?? '/Modelibr/demo/'
 export const assetUrl = (file: string) => `${DEMO_BASE}demo-assets/${file}`
 export const thumbnailUrl = (file: string) =>
   `${DEMO_BASE}demo-assets/thumbnails/${file}`
+export const seedAssetUrl = (file: string) =>
+  file.startsWith('hdri/') ? `${DEMO_BASE}${file}` : assetUrl(file)
 
 /**
  * Infer a sensible MIME type for a File/Blob when `file.type` is missing.
@@ -105,6 +112,8 @@ export function inferMimeType(
       return 'image/bmp'
     case 'exr':
       return 'image/x-exr'
+    case 'hdr':
+      return 'image/vnd.radiance'
     case 'wav':
       return 'audio/wav'
     case 'ogg':
@@ -144,6 +153,9 @@ export const seedFileAssets: Record<number, string> = {
   401: 'texture.png',
   402: 'texture_albedo.png',
   501: 'test-tone.wav',
+  601: 'hdri/potsdamer_platz_1k.hdr',
+  602: 'global texture/normal.exr',
+  603: 'hdri/potsdamer_platz_1k.hdr',
 }
 
 export function paginate<T>(items: T[], page: number, pageSize: number) {
@@ -198,7 +210,7 @@ export async function serveFile(fileId: number): Promise<Response> {
   }
   const seedPath = seedFileAssets[fileId]
   if (seedPath) {
-    return fetchStaticAsset(assetUrl(seedPath))
+    return fetchStaticAsset(seedAssetUrl(seedPath))
   }
   return new HttpResponse(null, { status: 404 })
 }
@@ -246,6 +258,8 @@ interface UploadHistoryEntry {
   textureSetName: string | null
   spriteId: number | null
   spriteName: string | null
+  environmentMapId?: number | null
+  environmentMapName?: string | null
 }
 
 export async function trackUpload(
@@ -266,11 +280,13 @@ export function recomputePackCounts(pack: DemoPack) {
   pack.textureSetCount = pack.textureSets.length
   pack.spriteCount = pack.sprites.length
   pack.soundCount = pack.sounds.length
+  pack.environmentMapCount = (pack.environmentMaps ?? []).length
   pack.isEmpty =
     pack.modelCount +
       pack.textureSetCount +
       pack.spriteCount +
-      pack.soundCount ===
+      pack.soundCount +
+      (pack.environmentMapCount ?? 0) ===
     0
 }
 
@@ -279,12 +295,258 @@ export function recomputeProjectCounts(project: DemoProject) {
   project.textureSetCount = project.textureSets.length
   project.spriteCount = project.sprites.length
   project.soundCount = project.sounds.length
+  project.environmentMapCount = (project.environmentMaps ?? []).length
   project.isEmpty =
     project.modelCount +
       project.textureSetCount +
       project.spriteCount +
-      project.soundCount ===
+      project.soundCount +
+      (project.environmentMapCount ?? 0) ===
     0
+}
+
+export function getActiveEnvironmentMapVariants(
+  environmentMap: DemoEnvironmentMap
+) {
+  return (environmentMap.variants ?? []).filter(variant => !variant.isDeleted)
+}
+
+const ENVIRONMENT_MAP_CUBE_FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const
+
+function parseEnvironmentMapFileId(fileUrl?: string | null): number | null {
+  if (!fileUrl) return null
+
+  const match = fileUrl.match(/\/files\/(\d+)/)
+  if (!match) return null
+
+  const fileId = Number(match[1])
+  return Number.isFinite(fileId) ? fileId : null
+}
+
+function buildDemoEnvironmentMapFile(
+  fileId: number,
+  fileName: string,
+  fileSizeBytes: number,
+  fileUrl?: string | null,
+  previewUrl?: string | null
+): DemoEnvironmentMapFile {
+  return {
+    fileId,
+    fileName,
+    fileSizeBytes,
+    previewUrl: previewUrl ?? `/files/${fileId}/preview?channel=rgb`,
+    fileUrl: fileUrl ?? `/files/${fileId}`,
+  }
+}
+
+function getEnvironmentMapCubeFaces(
+  variant: DemoEnvironmentMapVariant
+): DemoEnvironmentMapCubeFaces | null {
+  if (variant.cubeFaces) {
+    return variant.cubeFaces
+  }
+
+  const cubeFaceUrls = variant.cubeFaceUrls ?? null
+  if (!cubeFaceUrls) {
+    return null
+  }
+
+  const faces = ENVIRONMENT_MAP_CUBE_FACES.map(face => {
+    const fileUrl = cubeFaceUrls[face]
+    const fileId = parseEnvironmentMapFileId(fileUrl)
+    if (!fileUrl || !fileId) {
+      return null
+    }
+
+    return [
+      face,
+      buildDemoEnvironmentMapFile(
+        fileId,
+        `${variant.fileName || 'Cube map'}_${face}`,
+        0,
+        fileUrl,
+        `/files/${fileId}/preview?channel=rgb`
+      ),
+    ] as const
+  })
+
+  if (faces.some(face => face === null)) {
+    return null
+  }
+
+  return Object.fromEntries(
+    faces as Array<
+      readonly [
+        (typeof ENVIRONMENT_MAP_CUBE_FACES)[number],
+        DemoEnvironmentMapFile,
+      ]
+    >
+  ) as DemoEnvironmentMapCubeFaces
+}
+
+function getEnvironmentMapCubeFaceUrls(
+  variant?: DemoEnvironmentMapVariant | null
+): Partial<
+  Record<(typeof ENVIRONMENT_MAP_CUBE_FACES)[number], string | null>
+> | null {
+  if (!variant) return null
+
+  if (variant.cubeFaceUrls) {
+    return variant.cubeFaceUrls
+  }
+
+  const cubeFaces = getEnvironmentMapCubeFaces(variant)
+  if (!cubeFaces) {
+    return null
+  }
+
+  return {
+    px: cubeFaces.px.fileUrl,
+    nx: cubeFaces.nx.fileUrl,
+    py: cubeFaces.py.fileUrl,
+    ny: cubeFaces.ny.fileUrl,
+    pz: cubeFaces.pz.fileUrl,
+    nz: cubeFaces.nz.fileUrl,
+  }
+}
+
+function getEnvironmentMapPanoramicFile(
+  variant: DemoEnvironmentMapVariant
+): DemoEnvironmentMapFile | null {
+  if (variant.panoramicFile) {
+    return variant.panoramicFile
+  }
+
+  if (!variant.fileId) {
+    return null
+  }
+
+  return buildDemoEnvironmentMapFile(
+    variant.fileId,
+    variant.fileName,
+    variant.fileSizeBytes,
+    variant.fileUrl
+  )
+}
+
+function getEnvironmentMapVariantSourceType(
+  variant?: DemoEnvironmentMapVariant | null
+) {
+  if (!variant) return 'single'
+  return (
+    variant.sourceType ??
+    (getEnvironmentMapCubeFaces(variant) ? 'cube' : 'single')
+  )
+}
+
+function getEnvironmentMapVariantProjectionType(
+  variant?: DemoEnvironmentMapVariant | null
+) {
+  if (!variant) return 'equirectangular'
+  return (
+    variant.projectionType ??
+    (getEnvironmentMapCubeFaces(variant) ? 'cube' : 'equirectangular')
+  )
+}
+
+function getEnvironmentMapVariantPreviewFileId(
+  variant?: DemoEnvironmentMapVariant | null
+) {
+  if (!variant) return null
+
+  return (
+    variant.previewFileId ??
+    variant.panoramicFile?.fileId ??
+    getEnvironmentMapCubeFaces(variant)?.px.fileId ??
+    variant.fileId ??
+    null
+  )
+}
+
+export function syncEnvironmentMapDerivedFields(
+  environmentMap: DemoEnvironmentMap
+): DemoEnvironmentMap {
+  const variants = getActiveEnvironmentMapVariants(environmentMap)
+  const previewVariant =
+    variants.find(variant => variant.id === environmentMap.previewVariantId) ??
+    variants[0] ??
+    null
+  const representativeVariant = previewVariant ?? variants[0] ?? null
+
+  environmentMap.variantCount = variants.length
+  environmentMap.previewVariantId = previewVariant?.id ?? null
+  environmentMap.previewSizeLabel = previewVariant?.sizeLabel ?? null
+  environmentMap.previewFileId =
+    getEnvironmentMapVariantPreviewFileId(previewVariant)
+  environmentMap.previewUrl = previewVariant
+    ? `/environment-maps/${environmentMap.id}/preview`
+    : null
+  environmentMap.sourceType = getEnvironmentMapVariantSourceType(
+    representativeVariant
+  )
+  environmentMap.projectionType = getEnvironmentMapVariantProjectionType(
+    representativeVariant
+  )
+  environmentMap.panoramicFile = representativeVariant
+    ? getEnvironmentMapPanoramicFile(representativeVariant)
+    : null
+  environmentMap.cubeFaces = representativeVariant
+    ? getEnvironmentMapCubeFaces(representativeVariant)
+    : null
+  environmentMap.cubeFaceUrls = getEnvironmentMapCubeFaceUrls(
+    representativeVariant
+  )
+
+  return environmentMap
+}
+
+export function toEnvironmentMapDto(environmentMap: DemoEnvironmentMap) {
+  const synced = syncEnvironmentMapDerivedFields({ ...environmentMap })
+
+  return {
+    ...synced,
+    previewFileId: synced.previewFileId ?? null,
+    previewUrl: synced.previewUrl ?? null,
+    customThumbnailFileId: synced.customThumbnailFileId ?? null,
+    customThumbnailUrl: synced.customThumbnailUrl ?? null,
+    categoryId: synced.categoryId ?? null,
+    previewSizeLabel: synced.previewSizeLabel ?? null,
+    tags: synced.tags ?? [],
+    sourceType: synced.sourceType ?? 'single',
+    projectionType: synced.projectionType ?? 'equirectangular',
+    cubeFaceUrls: synced.cubeFaceUrls ?? null,
+    panoramicFile: synced.panoramicFile ?? null,
+    cubeFaces: synced.cubeFaces ?? null,
+    variants: getActiveEnvironmentMapVariants(synced).map(variant => ({
+      ...variant,
+      previewFileId: getEnvironmentMapVariantPreviewFileId(variant),
+      fileId:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? null
+          : (variant.fileId ?? variant.panoramicFile?.fileId ?? null),
+      fileName:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? 'Cube map'
+          : variant.fileName,
+      previewUrl: getEnvironmentMapVariantPreviewFileId(variant)
+        ? `/environment-maps/${synced.id}/variants/${variant.id}/preview`
+        : null,
+      fileUrl:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? null
+          : (variant.fileUrl ?? variant.panoramicFile?.fileUrl ?? null),
+      sourceType: getEnvironmentMapVariantSourceType(variant),
+      projectionType: getEnvironmentMapVariantProjectionType(variant),
+      cubeFaceUrls: getEnvironmentMapCubeFaceUrls(variant),
+      panoramicFile:
+        getEnvironmentMapVariantSourceType(variant) === 'cube'
+          ? null
+          : getEnvironmentMapPanoramicFile(variant),
+      cubeFaces: getEnvironmentMapCubeFaces(variant),
+    })),
+    packs: synced.packs ?? [],
+    projects: synced.projects ?? [],
+  }
 }
 
 export function buildCategoryPath(
@@ -466,6 +728,8 @@ export async function getVersionTextureMaps(
 export function toPackDto(pack: DemoPack) {
   return {
     ...pack,
+    environmentMapCount: pack.environmentMapCount ?? 0,
+    environmentMaps: pack.environmentMaps ?? [],
     licenseType: pack.licenseType ?? '',
     url: pack.url ?? '',
     customThumbnailFileId: pack.customThumbnailFileId ?? null,
@@ -479,6 +743,8 @@ export function toProjectDto(project: DemoProject) {
   return {
     ...project,
     notes: project.notes ?? '',
+    environmentMapCount: project.environmentMapCount ?? 0,
+    environmentMaps: project.environmentMaps ?? [],
     customThumbnailFileId: project.customThumbnailFileId ?? null,
     customThumbnailUrl: project.customThumbnailUrl ?? null,
     conceptImages,
@@ -555,6 +821,14 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack.sounds = []
       changed = true
     }
+    if (!Array.isArray(pack.environmentMaps)) {
+      pack.environmentMaps = []
+      changed = true
+    }
+    if (typeof pack.environmentMapCount !== 'number') {
+      pack.environmentMapCount = pack.environmentMaps.length
+      changed = true
+    }
     if (typeof pack.customThumbnailFileId === 'undefined') {
       pack.customThumbnailFileId = null
       changed = true
@@ -574,6 +848,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack.textureSetCount,
       pack.spriteCount,
       pack.soundCount,
+      pack.environmentMapCount,
       pack.isEmpty,
     ].join(':')
     recomputePackCounts(pack)
@@ -582,6 +857,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack.textureSetCount,
       pack.spriteCount,
       pack.soundCount,
+      pack.environmentMapCount,
       pack.isEmpty,
     ].join(':')
     if (previousSignature !== nextSignature) {
@@ -621,6 +897,14 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.sounds = []
       changed = true
     }
+    if (!Array.isArray(project.environmentMaps)) {
+      project.environmentMaps = []
+      changed = true
+    }
+    if (typeof project.environmentMapCount !== 'number') {
+      project.environmentMapCount = project.environmentMaps.length
+      changed = true
+    }
     if (typeof project.customThumbnailFileId === 'undefined') {
       project.customThumbnailFileId = null
       changed = true
@@ -646,6 +930,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.textureSetCount,
       project.spriteCount,
       project.soundCount,
+      project.environmentMapCount,
       project.isEmpty,
     ].join(':')
     recomputeProjectCounts(project)
@@ -654,6 +939,7 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.textureSetCount,
       project.spriteCount,
       project.soundCount,
+      project.environmentMapCount,
       project.isEmpty,
     ].join(':')
     if (previousSignature !== nextSignature) {
@@ -662,6 +948,164 @@ export async function ensureDemoDataShape(): Promise<void> {
 
     if (changed) {
       await put('projects', project)
+    }
+  }
+
+  const sounds = await getAll('sounds')
+  for (const sound of sounds) {
+    let changed = false
+
+    if (
+      sound.id === 1 &&
+      sound.name === 'Test Tone' &&
+      sound.categoryId !== null
+    ) {
+      sound.categoryId = null
+      changed = true
+    }
+
+    if (
+      sound.id === 1 &&
+      sound.name === 'Test Tone' &&
+      sound.categoryName !== null
+    ) {
+      sound.categoryName = null
+      changed = true
+    }
+
+    if (changed) {
+      await put('sounds', sound)
+    }
+  }
+
+  const environmentMaps = await getAll('environmentMaps')
+  if (environmentMaps.length === 0) {
+    const ts = now()
+    const seedEnvironmentMaps: DemoEnvironmentMap[] = [
+      {
+        id: 1,
+        name: 'City Night Lights',
+        variantCount: 2,
+        previewVariantId: 1,
+        previewFileId: 601,
+        previewUrl: '/files/601/preview?channel=rgb',
+        createdAt: ts,
+        updatedAt: ts,
+        variants: [
+          {
+            id: 1,
+            sizeLabel: '1K',
+            fileId: 601,
+            fileName: 'potsdamer_platz_1k.hdr',
+            fileSizeBytes: 0,
+            createdAt: ts,
+            updatedAt: ts,
+            isDeleted: false,
+            previewUrl: '/files/601/preview?channel=rgb',
+            fileUrl: '/files/601',
+          },
+          {
+            id: 2,
+            sizeLabel: '2K',
+            fileId: 602,
+            fileName: 'potsdamer_platz_2k.exr',
+            fileSizeBytes: 0,
+            createdAt: ts,
+            updatedAt: ts,
+            isDeleted: false,
+            previewUrl: '/files/602/preview?channel=rgb',
+            fileUrl: '/files/602',
+          },
+        ],
+        packs: [{ id: 1, name: 'Demo Pack' }],
+        projects: [{ id: 1, name: 'Demo Project' }],
+      },
+      {
+        id: 2,
+        name: 'Neutral Studio',
+        variantCount: 1,
+        previewVariantId: 3,
+        previewFileId: 603,
+        previewUrl: '/files/603/preview?channel=rgb',
+        createdAt: ts,
+        updatedAt: ts,
+        variants: [
+          {
+            id: 3,
+            sizeLabel: '1K',
+            fileId: 603,
+            fileName: 'studio_small_01_1k.hdr',
+            fileSizeBytes: 0,
+            createdAt: ts,
+            updatedAt: ts,
+            isDeleted: false,
+            previewUrl: '/files/603/preview?channel=rgb',
+            fileUrl: '/files/603',
+          },
+        ],
+        packs: [{ id: 2, name: 'Shapes Pack' }],
+        projects: [],
+      },
+    ]
+
+    for (const environmentMap of seedEnvironmentMaps) {
+      await put('environmentMaps', environmentMap)
+    }
+
+    const pack1 = await getById('packs', 1)
+    if (pack1) {
+      pack1.environmentMaps = [{ id: 1, name: 'City Night Lights' }]
+      recomputePackCounts(pack1)
+      await put('packs', pack1)
+    }
+    const pack2 = await getById('packs', 2)
+    if (pack2) {
+      pack2.environmentMaps = [{ id: 2, name: 'Neutral Studio' }]
+      recomputePackCounts(pack2)
+      await put('packs', pack2)
+    }
+    const project1 = await getById('projects', 1)
+    if (project1) {
+      project1.environmentMaps = [{ id: 1, name: 'City Night Lights' }]
+      recomputeProjectCounts(project1)
+      await put('projects', project1)
+    }
+  } else {
+    for (const environmentMap of environmentMaps) {
+      let changed = false
+      if (!Array.isArray(environmentMap.variants)) {
+        environmentMap.variants = []
+        changed = true
+      }
+      if (!Array.isArray(environmentMap.packs)) {
+        environmentMap.packs = []
+        changed = true
+      }
+      if (!Array.isArray(environmentMap.projects)) {
+        environmentMap.projects = []
+        changed = true
+      }
+
+      const signature = [
+        environmentMap.variantCount,
+        environmentMap.previewVariantId,
+        environmentMap.previewFileId,
+        environmentMap.previewUrl,
+      ].join(':')
+      syncEnvironmentMapDerivedFields(environmentMap)
+      const nextSignature = [
+        environmentMap.variantCount,
+        environmentMap.previewVariantId,
+        environmentMap.previewFileId,
+        environmentMap.previewUrl,
+      ].join(':')
+      if (signature !== nextSignature) {
+        changed = true
+      }
+
+      if (changed) {
+        await put('environmentMaps', environmentMap)
+      }
     }
   }
 }
@@ -688,7 +1132,9 @@ export async function prewarmSeedThumbnails(): Promise<void> {
     }
 
     try {
-      const response = await fetch(assetUrl(seedPath), { cache: 'force-cache' })
+      const response = await fetch(seedAssetUrl(seedPath), {
+        cache: 'force-cache',
+      })
       if (!response.ok) {
         continue
       }

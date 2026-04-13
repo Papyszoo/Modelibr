@@ -34,6 +34,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersionMappings)
                 .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
             .AsSplitQuery()
@@ -44,6 +45,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
         int? packId = null, int? projectId = null,
+        int? categoryId = null,
         TextureSetKind? kind = null,
         CancellationToken cancellationToken = default)
     {
@@ -54,6 +56,9 @@ internal sealed class TextureSetRepository : ITextureSetRepository
 
         if (projectId.HasValue)
             query = query.Where(ts => ts.Projects.Any(p => p.Id == projectId.Value));
+
+        if (categoryId.HasValue)
+            query = query.Where(ts => ts.TextureSetCategoryId == categoryId.Value);
 
         if (kind.HasValue)
             query = query.Where(ts => ts.Kind == kind.Value);
@@ -70,6 +75,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
                 .ThenInclude(t => t.Proxies)
             .Include(tp => tp.ModelVersionMappings)
                 .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
             .AsSplitQuery()
@@ -88,6 +94,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersionMappings)
                 .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
             .AsSplitQuery()
@@ -104,6 +111,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersionMappings)
                 .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
             .AsSplitQuery()
@@ -119,6 +127,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
                 .ThenInclude(t => t.Proxies)
             .Include(tp => tp.ModelVersionMappings)
                 .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
             .AsSplitQuery()
@@ -135,6 +144,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersionMappings)
                 .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
             .AsSplitQuery()
@@ -151,6 +161,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersionMappings)
                 .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
             .AsSplitQuery()

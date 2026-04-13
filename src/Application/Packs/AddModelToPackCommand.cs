@@ -40,14 +40,22 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
                 new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
         }
 
-        pack.AddModel(model, _dateTimeProvider.UtcNow);
-
-        await _packRepository.UpdateAsync(pack, cancellationToken);
+        if (!pack.HasModel(model.Id))
+        {
+            pack.AddModel(model, _dateTimeProvider.UtcNow);
+            await _packRepository.UpdateAsync(pack, cancellationToken);
+        }
 
         // Update batch upload records for this model to include pack association
         var batchUploads = await _batchUploadRepository.GetByModelIdAsync(model.Id, cancellationToken);
         foreach (var batchUpload in batchUploads)
         {
+            if (batchUpload.PackId == pack.Id &&
+                string.Equals(batchUpload.UploadType, "pack", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             batchUpload.UpdatePackAssociation(pack.Id);
             batchUpload.UpdateUploadType("pack");
             await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);

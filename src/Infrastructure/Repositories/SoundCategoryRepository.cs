@@ -2,7 +2,6 @@ using Application.Abstractions.Repositories;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -17,66 +16,46 @@ internal sealed class SoundCategoryRepository : ISoundCategoryRepository
 
     public async Task<SoundCategory> AddAsync(SoundCategory category, CancellationToken cancellationToken = default)
     {
-        if (category == null)
-            throw new ArgumentNullException(nameof(category));
-
-        var entityEntry = await _context.SoundCategories.AddAsync(category, cancellationToken);
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            _context.Entry(entityEntry.Entity).State = EntityState.Detached;
-            throw new ArgumentException($"A sound category with the name '{category.Name}' already exists.");
-        }
-        
-        return entityEntry.Entity;
+        _context.SoundCategories.Add(category);
+        await _context.SaveChangesAsync(cancellationToken);
+        return category;
     }
 
-    public async Task<IEnumerable<SoundCategory>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SoundCategory>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.SoundCategories
             .AsNoTracking()
-            .OrderBy(c => c.Name)
+            .Include(c => c.Children)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<SoundCategory?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.SoundCategories
+            .Include(c => c.Children)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
-    public async Task<SoundCategory?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+    public async Task<SoundCategory?> GetByNameAsync(string name, int? parentId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(name))
             return null;
 
         return await _context.SoundCategories
-            .FirstOrDefaultAsync(c => c.Name == name.Trim(), cancellationToken);
+            .FirstOrDefaultAsync(c => c.Name == name.Trim() && c.ParentId == parentId, cancellationToken);
     }
 
-    public async Task<SoundCategory> UpdateAsync(SoundCategory category, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(SoundCategory category, CancellationToken cancellationToken = default)
     {
-        if (category == null)
-            throw new ArgumentNullException(nameof(category));
+        if (_context.Entry(category).State == EntityState.Detached)
+            _context.SoundCategories.Update(category);
 
-        _context.SoundCategories.Update(category);
         await _context.SaveChangesAsync(cancellationToken);
-        
-        return category;
     }
 
-    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(SoundCategory category, CancellationToken cancellationToken = default)
     {
-        var category = await _context.SoundCategories
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
-
-        if (category != null)
-        {
-            _context.SoundCategories.Remove(category);
-            await _context.SaveChangesAsync(cancellationToken);
-        }
+        _context.SoundCategories.Remove(category);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

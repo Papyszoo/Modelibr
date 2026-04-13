@@ -1,3 +1,5 @@
+import { type HierarchicalCategory } from '@/shared/types/categories'
+
 export interface SoundDto {
   id: number
   name: string
@@ -17,13 +19,7 @@ export interface GetAllSoundsResponse {
   sounds: SoundDto[]
 }
 
-export interface SoundCategoryDto {
-  id: number
-  name: string
-  description: string | null
-  createdAt: string
-  updatedAt: string
-}
+export type SoundCategoryDto = HierarchicalCategory
 
 export interface GetAllSoundCategoriesResponse {
   categories: SoundCategoryDto[]

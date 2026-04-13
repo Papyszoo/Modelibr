@@ -7,7 +7,7 @@ export interface UploadItem {
   status: 'pending' | 'uploading' | 'completed' | 'error'
   result?: unknown
   error?: Error
-  fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound'
+  fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound' | 'environmentMap'
   batchId?: string // ID of the batch this upload belongs to
 }
 
@@ -24,7 +24,13 @@ interface UploadProgressStore {
   isVisible: boolean
   addUpload: (
     file: File,
-    fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound',
+    fileType:
+      | 'model'
+      | 'texture'
+      | 'file'
+      | 'sprite'
+      | 'sound'
+      | 'environmentMap',
     batchId?: string
   ) => string
   updateUploadProgress: (id: string, progress: number) => void
@@ -57,7 +63,13 @@ export const useUploadProgressStore = create<UploadProgressStore>(set => ({
 
   addUpload: (
     file: File,
-    fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound',
+    fileType:
+      | 'model'
+      | 'texture'
+      | 'file'
+      | 'sprite'
+      | 'sound'
+      | 'environmentMap',
     batchId?: string
   ) => {
     const id = `upload-${Date.now()}-${Math.random()}`

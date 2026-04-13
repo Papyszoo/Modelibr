@@ -8,13 +8,16 @@ namespace Application.Sprites;
 internal class UpdateSpriteCommandHandler : ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse>
 {
     private readonly ISpriteRepository _spriteRepository;
+    private readonly ISpriteCategoryRepository _spriteCategoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public UpdateSpriteCommandHandler(
         ISpriteRepository spriteRepository,
+        ISpriteCategoryRepository spriteCategoryRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _spriteRepository = spriteRepository;
+        _spriteCategoryRepository = spriteCategoryRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -48,6 +51,16 @@ internal class UpdateSpriteCommandHandler : ICommandHandler<UpdateSpriteCommand,
 
             if (command.CategoryId != sprite.SpriteCategoryId)
             {
+                if (command.CategoryId.HasValue)
+                {
+                    var category = await _spriteCategoryRepository.GetByIdAsync(command.CategoryId.Value, cancellationToken);
+                    if (category == null)
+                    {
+                        return Result.Failure<UpdateSpriteResponse>(
+                            new Error("CategoryNotFound", $"Sprite category with ID {command.CategoryId.Value} was not found."));
+                    }
+                }
+
                 sprite.UpdateCategory(command.CategoryId, _dateTimeProvider.UtcNow);
             }
 

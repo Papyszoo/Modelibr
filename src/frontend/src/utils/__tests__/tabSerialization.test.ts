@@ -22,6 +22,7 @@ jest.mock('@/lib/apiBase', () => ({
 // Mock ApiClient with properly typed mock functions
 const mockGetModelById = jest.fn()
 const mockGetTextureSetById = jest.fn()
+const mockGetEnvironmentMapById = jest.fn()
 const mockGetPackById = jest.fn()
 const mockGetProjectById = jest.fn()
 const mockGetStageById = jest.fn()
@@ -44,6 +45,10 @@ jest.mock('@/features/models/api/modelApi', () => ({
 jest.mock('@/features/texture-set/api/textureSetApi', () => ({
   getTextureSetById: (...args: unknown[]) => mockGetTextureSetById(...args),
 }))
+jest.mock('@/features/environment-map/api/environmentMapApi', () => ({
+  getEnvironmentMapById: (...args: unknown[]) =>
+    mockGetEnvironmentMapById(...args),
+}))
 jest.mock('@/features/pack/api/packApi', () => ({
   getPackById: (...args: unknown[]) => mockGetPackById(...args),
 }))
@@ -63,6 +68,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     it('should return correct labels for different tab types', () => {
       expect(getTabLabel('modelList')).toBe('Models')
       expect(getTabLabel('textureSets')).toBe('Texture Sets')
+      expect(getTabLabel('environmentMaps')).toBe('Environment Maps')
       expect(getTabLabel('packs')).toBe('Packs')
       expect(getTabLabel('modelViewer')).toBe('Model Viewer')
       expect(getTabLabel('modelViewer', { modelId: '123' })).toBe('Model 123')
@@ -78,6 +84,12 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(
         getTabLabel('packViewer', { packId: '789', packName: 'My Pack' })
       ).toBe('My Pack')
+      expect(
+        getTabLabel('environmentMapViewer', {
+          environmentMapId: '55',
+          environmentMapName: 'Studio HDR',
+        })
+      ).toBe('Studio HDR')
       expect(
         getTabLabel('projectViewer', {
           projectId: '111',
@@ -108,12 +120,23 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     })
 
     it('should parse multiple tabs', () => {
-      const result = parseCompactTabFormat('modelList,textureSets,model-456')
-      expect(result).toHaveLength(3)
+      const result = parseCompactTabFormat(
+        'modelList,textureSets,environmentMaps,model-456'
+      )
+      expect(result).toHaveLength(4)
       expect(result[0].type).toBe('modelList')
       expect(result[1].type).toBe('textureSets')
-      expect(result[2].type).toBe('modelViewer')
-      expect(result[2].modelId).toBe('456')
+      expect(result[2].type).toBe('environmentMaps')
+      expect(result[3].type).toBe('modelViewer')
+      expect(result[3].modelId).toBe('456')
+    })
+
+    it('should parse environment map viewer tabs', () => {
+      const result = parseCompactTabFormat('environment-map-42')
+
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('environmentMapViewer')
+      expect(result[0].environmentMapId).toBe('42')
     })
 
     it('should generate deterministic IDs for same input', () => {
@@ -196,8 +219,17 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           params: {},
           internalUiState: {},
         },
+        {
+          id: 'environmentMaps',
+          type: 'environmentMaps',
+          label: 'Environment Maps',
+          params: {},
+          internalUiState: {},
+        },
       ]
-      expect(serializeToCompactFormat(tabs)).toBe('modelList,textureSets')
+      expect(serializeToCompactFormat(tabs)).toBe(
+        'modelList,textureSets,environmentMaps'
+      )
     })
 
     it('should serialize tabs with modelId', () => {
@@ -257,9 +289,17 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           params: {},
           internalUiState: {},
         },
+        {
+          id: 'environment-map-42',
+          type: 'environmentMapViewer',
+          label: 'Studio HDR',
+          environmentMapId: '42',
+          params: { environmentMapId: '42' },
+          internalUiState: {},
+        },
       ]
       expect(serializeToCompactFormat(tabs)).toBe(
-        'modelList,model-123,textureSets'
+        'modelList,model-123,textureSets,environment-map-42'
       )
     })
 
@@ -318,27 +358,36 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           params: { modelId: '123' },
           internalUiState: {},
         },
+        {
+          id: 'environmentMaps',
+          type: 'environmentMaps',
+          label: 'Environment Maps',
+          params: {},
+          internalUiState: {},
+        },
       ]
 
       // Serialize tabs to URL format
       const serialized = serializeToCompactFormat(originalTabs)
-      expect(serialized).toBe('modelList,textureSets,model-123')
+      expect(serialized).toBe('modelList,textureSets,model-123,environmentMaps')
 
       // Parse back from URL format (simulating browser refresh)
       const parsedTabs = parseCompactTabFormat(serialized)
 
       // Verify that parsed tabs have consistent structure
-      expect(parsedTabs).toHaveLength(3)
+      expect(parsedTabs).toHaveLength(4)
       expect(parsedTabs[0].type).toBe('modelList')
       expect(parsedTabs[1].type).toBe('textureSets')
       expect(parsedTabs[2].type).toBe('modelViewer')
       expect(parsedTabs[2].modelId).toBe('123')
+      expect(parsedTabs[3].type).toBe('environmentMaps')
 
       // CRITICAL: IDs should be deterministic for the same content
       const parsedAgain = parseCompactTabFormat(serialized)
       expect(parsedTabs[0].id).toBe(parsedAgain[0].id)
       expect(parsedTabs[1].id).toBe(parsedAgain[1].id)
       expect(parsedTabs[2].id).toBe(parsedAgain[2].id)
+      expect(parsedTabs[3].id).toBe(parsedAgain[3].id)
     })
   })
 
@@ -377,6 +426,20 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(result[0].label).toBe('My Pack')
       expect(result[0].packId).toBe('789')
       expect(mockGetPackById).toHaveBeenCalledWith(789)
+    })
+
+    it('should fetch environment map name from API', async () => {
+      mockGetEnvironmentMapById.mockResolvedValue({
+        id: 321,
+        name: 'Sunset Dome',
+      })
+
+      const result = await parseCompactTabFormatAsync('environment-map-321')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('environmentMapViewer')
+      expect(result[0].label).toBe('Sunset Dome')
+      expect(result[0].environmentMapId).toBe('321')
+      expect(mockGetEnvironmentMapById).toHaveBeenCalledWith(321)
     })
 
     it('should fetch project name from API', async () => {

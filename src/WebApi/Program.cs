@@ -127,6 +127,7 @@ namespace WebApi
             app.MapThumbnailEndpoints();
             app.MapThumbnailJobEndpoints();
             app.MapTextureSetEndpoints();
+            app.MapTextureSetCategoryEndpoints();
             app.MapPackEndpoints();
             app.MapProjectEndpoints();
             app.MapModelCategoryEndpoints();
@@ -138,6 +139,8 @@ namespace WebApi
             app.MapSpriteCategoryEndpoints();
             app.MapSoundEndpoints();
             app.MapSoundCategoryEndpoints();
+            app.MapEnvironmentMapCategoryEndpoints();
+            app.MapEnvironmentMapEndpoints();
             app.MapBlenderEndpoints();
             app.MapAudioSelectionEndpoints();
 

@@ -15,6 +15,10 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-folder'
     case 'textureSetViewer':
       return 'pi pi-image'
+    case 'environmentMaps':
+      return 'pi pi-globe'
+    case 'environmentMapViewer':
+      return 'pi pi-globe'
     case 'packs':
       return 'pi pi-inbox'
     case 'packViewer':
@@ -53,6 +57,10 @@ const getTabTooltip = (tab: Tab): string => {
     case 'textureSetViewer': {
       return `Texture Set: ${tab.label || tab.setId || 'Unknown'}`
     }
+    case 'environmentMaps':
+      return 'Environment Maps'
+    case 'environmentMapViewer':
+      return `Environment Map: ${tab.label || tab.environmentMapId || 'Unknown'}`
     case 'packs':
       return 'Packs'
     case 'packViewer': {

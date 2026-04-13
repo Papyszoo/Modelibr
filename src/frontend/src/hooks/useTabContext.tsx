@@ -64,6 +64,30 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openEnvironmentMapDetailsTab = (
+    environmentMapId: number,
+    name?: string
+  ): void => {
+    const existingTab = tabs.find(
+      tab =>
+        tab.type === 'environmentMapViewer' &&
+        tab.environmentMapId === environmentMapId.toString()
+    )
+
+    if (existingTab) {
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    const newTab = createTab(
+      'environmentMapViewer',
+      environmentMapId.toString(),
+      name
+    )
+    setTabs([...tabs, newTab])
+    setActiveTab(newTab.id)
+  }
+
   const openPackDetailsTab = (packId: string): void => {
     const existingTab = tabs.find(
       tab => tab.type === 'packViewer' && tab.packId === packId
@@ -104,6 +128,7 @@ export const TabProvider = ({
         tab.type === type &&
         (type === 'modelList' ||
           type === 'textureSets' ||
+          type === 'environmentMaps' ||
           type === 'packs' ||
           type === 'sprites' ||
           type === 'stageList' ||
@@ -111,6 +136,8 @@ export const TabProvider = ({
             tab.modelId === (data as { id?: string })?.id) ||
           (type === 'textureSetViewer' &&
             tab.setId === (data as { id?: string })?.id) ||
+          (type === 'environmentMapViewer' &&
+            tab.environmentMapId === (data as { id?: string })?.id) ||
           (type === 'packViewer' &&
             tab.packId === (data as { id?: string })?.id) ||
           (type === 'stageEditor' &&
@@ -136,6 +163,7 @@ export const TabProvider = ({
     setActiveTab,
     openModelDetailsTab,
     openTextureSetDetailsTab,
+    openEnvironmentMapDetailsTab,
     openPackDetailsTab,
     openProjectDetailsTab,
     openTab,

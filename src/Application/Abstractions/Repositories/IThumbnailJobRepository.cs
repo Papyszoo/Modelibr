@@ -53,6 +53,11 @@ public interface IThumbnailJobRepository
     Task<ThumbnailJob?> GetByTextureSetIdAsync(int textureSetId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets a thumbnail job by environment map variant ID, regardless of status.
+    /// </summary>
+    Task<ThumbnailJob?> GetByEnvironmentMapVariantIdAsync(int environmentMapVariantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the next pending job for processing with proper locking.
     /// </summary>
     Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default);

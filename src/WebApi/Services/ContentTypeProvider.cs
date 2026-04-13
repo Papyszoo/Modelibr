@@ -19,6 +19,7 @@ public static class ContentTypeProvider
             ".jpg" => "image/jpeg",
             ".jpeg" => "image/jpeg",
             ".exr" => "image/x-exr",
+            ".hdr" => "image/vnd.radiance",
             ".tga" => "image/x-tga",
             ".bmp" => "image/bmp",
             _ => "application/octet-stream"

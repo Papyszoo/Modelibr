@@ -1,18 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 
-import { type ModelListViewState } from '@/stores/modelListViewStore'
+import { type CategorySelectionKeys as ModelCategorySelectionKeys } from '@/shared/types/categories'
 import { type PageType, useCardWidthStore } from '@/stores/cardWidthStore'
+import { type ModelListViewState } from '@/stores/modelListViewStore'
 import { type Model } from '@/utils/fileUtils'
-
-export interface ModelCategorySelectionState {
-  checked?: boolean
-  partialChecked?: boolean
-}
-
-export type ModelCategorySelectionKeys = Record<
-  string,
-  ModelCategorySelectionState
->
 
 interface UseModelFiltersOptions {
   packId?: number

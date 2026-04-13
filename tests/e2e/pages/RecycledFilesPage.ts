@@ -19,6 +19,8 @@ export class RecycledFilesPage {
     private readonly textureSetsSection = ".recycled-section:has(.pi-images)";
     private readonly spritesSection =
         ".recycled-section[data-section='sprites']";
+    private readonly environmentMapsSection =
+        ".recycled-section[data-section='environment-maps']";
     private readonly filesSection = ".recycled-section[data-section='files']";
 
     // Card selectors
@@ -251,6 +253,25 @@ export class RecycledFilesPage {
             state: "visible",
             timeout: 15000,
         });
+    }
+
+    // ===== Environment Maps Section =====
+
+    async getRecycledEnvironmentMapCount(): Promise<number> {
+        const section = this.page.locator(this.environmentMapsSection);
+        if (!(await section.isVisible().catch(() => false))) return 0;
+        return await section.locator(this.recycledCard).count();
+    }
+
+    getEnvironmentMapCardByName(name: string) {
+        return this.page
+            .locator(this.environmentMapsSection)
+            .locator(this.recycledCard)
+            .filter({
+                has: this.page.locator(this.recycledCardName, {
+                    hasText: name,
+                }),
+            });
     }
 
     // ===== Texture Sets Section =====

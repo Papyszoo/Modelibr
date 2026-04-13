@@ -51,6 +51,11 @@ public class BatchUpload
     /// Optional reference to the sound if this was a direct upload to a sound.
     /// </summary>
     public int? SoundId { get; set; }
+
+    /// <summary>
+    /// Optional reference to the environment map if this was a direct upload to an environment map.
+    /// </summary>
+    public int? EnvironmentMapId { get; set; }
     
     /// <summary>
     /// Reference to the file that was uploaded in this batch.
@@ -91,6 +96,11 @@ public class BatchUpload
     /// Navigation property to the sound.
     /// </summary>
     public Sound? Sound { get; set; }
+
+    /// <summary>
+    /// Navigation property to the environment map.
+    /// </summary>
+    public EnvironmentMap? EnvironmentMap { get; set; }
     
     /// <summary>
     /// Creates a new batch upload record.
@@ -105,6 +115,7 @@ public class BatchUpload
     /// <param name="textureSetId">Optional texture set ID</param>
     /// <param name="spriteId">Optional sprite ID</param>
     /// <param name="soundId">Optional sound ID</param>
+    /// <param name="environmentMapId">Optional environment map ID</param>
     /// <returns>New BatchUpload instance</returns>
     public static BatchUpload Create(
         string batchId,
@@ -116,7 +127,8 @@ public class BatchUpload
         int? modelId = null,
         int? textureSetId = null,
         int? spriteId = null,
-        int? soundId = null)
+        int? soundId = null,
+        int? environmentMapId = null)
     {
         if (string.IsNullOrWhiteSpace(batchId))
             throw new ArgumentException("Batch ID cannot be null or empty.", nameof(batchId));
@@ -125,7 +137,7 @@ public class BatchUpload
             throw new ArgumentException("Upload type cannot be null or empty.", nameof(uploadType));
         
         // Validate upload type
-        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file", "sprite", "sound" };
+        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file", "sprite", "sound", "environmentmap" };
         if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
         
@@ -140,7 +152,8 @@ public class BatchUpload
             ModelId = modelId,
             TextureSetId = textureSetId,
             SpriteId = spriteId,
-            SoundId = soundId
+            SoundId = soundId,
+            EnvironmentMapId = environmentMapId
         };
     }
     
@@ -168,7 +181,7 @@ public class BatchUpload
     /// <param name="uploadType">The new upload type</param>
     public void UpdateUploadType(string uploadType)
     {
-        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file", "sprite", "sound" };
+        var validTypes = new[] { "pack", "project", "model", "textureSet", "texture", "file", "sprite", "sound", "environmentmap" };
         if (!validTypes.Contains(uploadType, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Upload type must be one of: {string.Join(", ", validTypes)}", nameof(uploadType));
         
@@ -191,5 +204,10 @@ public class BatchUpload
     public void UpdateSoundAssociation(int soundId)
     {
         SoundId = soundId;
+    }
+
+    public void UpdateEnvironmentMapAssociation(int environmentMapId)
+    {
+        EnvironmentMapId = environmentMapId;
     }
 }

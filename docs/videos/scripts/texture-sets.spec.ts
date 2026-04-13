@@ -158,7 +158,7 @@ async function createGlobalTextureSet(request: APIRequestContext) {
 
 test.describe("Texture Sets", () => {
     test("Texture Sets Video", async ({ page, request }, testInfo) => {
-        test.setTimeout(300000);
+        test.setTimeout(420000);
         await clearTextureVideoData(request);
         const { textureSetName } = await createGlobalTextureSet(request);
 
@@ -234,7 +234,34 @@ test.describe("Texture Sets", () => {
         });
         await viewerPause(page, 900);
 
-        const previewBox = await previewCanvas.boundingBox();
+        // Wait for canvas to have actual layout dimensions before getting bounding box
+        await page.waitForFunction(
+            () => {
+                const el = document.querySelector(
+                    ".texture-set-viewer .texture-preview-canvas",
+                );
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            },
+            { timeout: ciVideoTimeout },
+        );
+
+        // Use evaluate to get bounding rect directly (avoids actionTimeout constraint)
+        const previewBox = await page.evaluate(() => {
+            const el = document.querySelector(
+                ".texture-set-viewer .texture-preview-canvas",
+            );
+            if (!el) return null;
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return null;
+            return {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+            };
+        });
         if (previewBox) {
             await page.mouse.move(
                 previewBox.x + previewBox.width * 0.55,

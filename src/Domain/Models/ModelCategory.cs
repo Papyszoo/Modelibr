@@ -1,6 +1,6 @@
 namespace Domain.Models;
 
-public class ModelCategory : AggregateRoot
+public class ModelCategory : AggregateRoot, IHierarchicalCategory<ModelCategory>
 {
     private readonly List<ModelCategory> _children = new();
 

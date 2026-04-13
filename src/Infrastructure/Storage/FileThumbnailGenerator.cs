@@ -1,4 +1,5 @@
 using Application.Abstractions.Storage;
+using Infrastructure.Images;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
@@ -19,21 +20,18 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
     private readonly ILogger<FileThumbnailGenerator> _logger;
     private const int ThumbnailSize = 256;
 
-    /// <summary>EXR magic bytes: 0x76 0x2F 0x31 0x01</summary>
-    private static readonly byte[] ExrMagic = [0x76, 0x2F, 0x31, 0x01];
-
     // MIME types that can be loaded by ImageSharp for thumbnail generation.
     // Includes "image/*" which is the generic texture MIME type from the domain.
     private static readonly HashSet<string> SupportedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/png", "image/jpeg", "image/bmp", "image/gif", "image/webp", "image/*"
+        "image/png", "image/jpeg", "image/bmp", "image/gif", "image/webp", "image/*", "image/vnd.radiance", "image/x-exr"
     };
 
     // Texture MIME types that get 4-channel thumbnails (RGB + R + G + B).
     // "image/*" is the generic texture MIME type used for .png/.jpg/.bmp textures.
     private static readonly HashSet<string> TextureMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/png", "image/jpeg", "image/bmp", "image/*"
+        "image/png", "image/jpeg", "image/bmp", "image/*", "image/vnd.radiance", "image/x-exr"
     };
 
     public FileThumbnailGenerator(
@@ -97,32 +95,20 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
     /// </summary>
     private async Task<Image<Rgba32>> LoadImageAsync(string fullPath, CancellationToken ct)
     {
-        if (await IsExrFileAsync(fullPath, ct))
+        if (await HdrImageFormatDetector.IsHdrCapableAsync(fullPath, ct))
         {
-            _logger.LogDebug("Detected EXR file, loading via Magick.NET: {Path}", fullPath);
-            return LoadExrImage(fullPath);
+            _logger.LogDebug("Detected HDR-capable file, loading via Magick.NET: {Path}", fullPath);
+            return LoadHdrCapableImage(fullPath);
         }
 
         return await Image.LoadAsync<Rgba32>(fullPath, ct);
     }
 
     /// <summary>
-    /// Check if a file is EXR by reading its 4-byte magic number.
-    /// EXR magic: 0x76 0x2F 0x31 0x01
-    /// </summary>
-    private static async Task<bool> IsExrFileAsync(string fullPath, CancellationToken ct)
-    {
-        var header = new byte[4];
-        await using var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4, true);
-        var bytesRead = await fs.ReadAsync(header, ct);
-        return bytesRead == 4 && header.AsSpan().SequenceEqual(ExrMagic);
-    }
-
-    /// <summary>
     /// Load an EXR file via Magick.NET (ImageMagick) and convert to ImageSharp Image&lt;Rgba32&gt;.
     /// Applies Reinhard tone mapping for HDR → LDR conversion, matching the worker's tone mapping.
     /// </summary>
-    private static Image<Rgba32> LoadExrImage(string fullPath)
+    private static Image<Rgba32> LoadHdrCapableImage(string fullPath)
     {
         using var magickImage = new MagickImage(fullPath);
 

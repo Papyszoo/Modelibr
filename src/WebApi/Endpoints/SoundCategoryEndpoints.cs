@@ -45,7 +45,7 @@ public static class SoundCategoryEndpoints
 
     private static async Task<IResult> CreateSoundCategory(
         [FromBody] CreateSoundCategoryRequest request,
-        ICommandHandler<CreateSoundCategoryCommand, CreateSoundCategoryResponse> commandHandler,
+        ICommandHandler<CreateSoundCategoryCommand, SoundCategorySummaryDto> commandHandler,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -54,7 +54,7 @@ public static class SoundCategoryEndpoints
         }
 
         var result = await commandHandler.Handle(
-            new CreateSoundCategoryCommand(request.Name, request.Description),
+            new CreateSoundCategoryCommand(request.Name, request.Description, request.ParentId),
             cancellationToken);
 
         if (result.IsFailure)
@@ -68,7 +68,7 @@ public static class SoundCategoryEndpoints
     private static async Task<IResult> UpdateSoundCategory(
         int id,
         [FromBody] UpdateSoundCategoryRequest request,
-        ICommandHandler<UpdateSoundCategoryCommand, UpdateSoundCategoryResponse> commandHandler,
+        ICommandHandler<UpdateSoundCategoryCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -77,7 +77,7 @@ public static class SoundCategoryEndpoints
         }
 
         var result = await commandHandler.Handle(
-            new UpdateSoundCategoryCommand(id, request.Name, request.Description),
+            new UpdateSoundCategoryCommand(id, request.Name, request.Description, request.ParentId),
             cancellationToken);
 
         if (result.IsFailure)
@@ -85,7 +85,7 @@ public static class SoundCategoryEndpoints
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
 
-        return Results.Ok(result.Value);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> DeleteSoundCategory(
@@ -105,5 +105,5 @@ public static class SoundCategoryEndpoints
 }
 
 // Request DTOs
-public record CreateSoundCategoryRequest(string Name, string? Description = null);
-public record UpdateSoundCategoryRequest(string Name, string? Description = null);
+public record CreateSoundCategoryRequest(string Name, string? Description = null, int? ParentId = null);
+public record UpdateSoundCategoryRequest(string Name, string? Description = null, int? ParentId = null);

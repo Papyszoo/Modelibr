@@ -23,6 +23,7 @@ vi.mock('../jobApiClient.js', () => ({
   JobApiClient: vi.fn(function () {
     this.markJobCompleted = mockMarkJobCompleted
     this.markJobFailed = mockMarkJobFailed
+    this.finishEnvironmentMapJob = vi.fn()
   }),
 }))
 
@@ -134,6 +135,18 @@ describe('BaseProcessor', () => {
       await processor.execute(genericJob)
 
       expect(mockLogJobStarted).toHaveBeenCalledWith(44, 44, undefined)
+    })
+
+    it('should use environmentMapId when modelId and soundId are absent', async () => {
+      const environmentMapJob = {
+        id: 45,
+        environmentMapId: 300,
+        assetType: 'EnvironmentMap',
+      }
+
+      await processor.execute(environmentMapJob)
+
+      expect(mockLogJobStarted).toHaveBeenCalledWith(45, 300, undefined)
     })
 
     it('should not throw if markFailed also fails', async () => {

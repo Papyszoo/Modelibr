@@ -1,3 +1,5 @@
+import { type HierarchicalCategory } from '@/shared/types/categories'
+
 export enum TextureType {
   SplitChannel = 0,
   Albedo = 1,
@@ -61,6 +63,8 @@ export interface PackSummaryDto {
 export interface TextureSetDto {
   id: number
   name: string
+  categoryId?: number | null
+  categoryPath?: string | null
   kind: TextureSetKind
   tilingScaleX: number
   tilingScaleY: number
@@ -139,4 +143,16 @@ export interface UpdateTilingScaleResponse {
   tilingScaleY: number
   uvMappingMode: UvMappingMode
   uvScale: number
+}
+
+export type TextureSetCategoryDto = HierarchicalCategory
+
+export interface GetAllTextureSetCategoriesResponse {
+  categories: TextureSetCategoryDto[]
+}
+
+export interface UpsertTextureSetCategoryRequest {
+  name: string
+  description?: string
+  parentId?: number | null
 }

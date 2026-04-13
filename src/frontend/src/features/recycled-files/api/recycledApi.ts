@@ -39,6 +39,23 @@ export interface RecycledSoundDto {
   deletedAt: string
 }
 
+export interface RecycledEnvironmentMapDto {
+  id: number
+  name: string
+  deletedAt: string
+  variantCount: number
+  previewFileId?: number | null
+}
+
+export interface RecycledEnvironmentMapVariantDto {
+  id: number
+  environmentMapId: number
+  environmentMapName: string
+  fileId: number
+  sizeLabel: string
+  deletedAt: string
+}
+
 export interface RecycledFileDto {
   id: number
   originalFileName: string
@@ -55,6 +72,8 @@ export interface GetAllRecycledFilesResponse {
   textures: unknown[]
   sprites: RecycledSpriteDto[]
   sounds: RecycledSoundDto[]
+  environmentMaps?: RecycledEnvironmentMapDto[]
+  environmentMapVariants?: RecycledEnvironmentMapVariantDto[]
 }
 
 export async function getAllRecycledFiles(): Promise<GetAllRecycledFilesResponse> {

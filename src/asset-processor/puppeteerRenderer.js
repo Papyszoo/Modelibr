@@ -618,6 +618,91 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Load an environment map preview scene with a reflective sphere.
+   * Supports panoramic/equirectangular maps and cube-face variants.
+   * @param {Object} source - Downloaded source files
+   * @param {Object} options - Environment map rendering settings
+   * @returns {Promise<number>} Polygon count
+   */
+  async loadEnvironmentPreview(source, options = {}) {
+    if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
+      logger.warn(
+        'Renderer page is not available or frame is detached, reinitializing'
+      )
+      await this._reinitialize()
+    }
+
+    const fileEntries =
+      source?.projectionType === 'cube'
+        ? Object.values(source.cubeFaces || {})
+        : source?.panoramic
+          ? [source.panoramic]
+          : []
+
+    if (fileEntries.length === 0) {
+      throw new Error('Environment map source files are missing')
+    }
+
+    const sourceDir = path.dirname(fileEntries[0].filePath)
+    const { server: fileServer, port } =
+      await this._startTextureServer(sourceDir)
+
+    try {
+      const serializeFile = file => ({
+        url: `http://127.0.0.1:${port}/${encodeURIComponent(path.basename(file.filePath))}`,
+        extension: path.extname(file.filePath).toLowerCase(),
+      })
+
+      const sourcePayload =
+        source.projectionType === 'cube'
+          ? {
+              projectionType: 'cube',
+              cubeFaces: Object.fromEntries(
+                Object.entries(source.cubeFaces).map(([face, file]) => [
+                  face,
+                  serializeFile(file),
+                ])
+              ),
+            }
+          : {
+              projectionType: 'equirectangular',
+              panoramic: serializeFile(source.panoramic),
+            }
+
+      const result = await this.page.evaluate(
+        async (payload, renderOptions) => {
+          try {
+            return await window.loadEnvironmentPreviewFromSource(
+              payload,
+              renderOptions
+            )
+          } catch (error) {
+            console.error('Environment preview loading error:', error)
+            return { success: false, error: error.message }
+          }
+        },
+        sourcePayload,
+        options
+      )
+
+      if (!result.success) {
+        throw new Error(
+          result.error || 'Failed to initialize environment preview scene'
+        )
+      }
+
+      logger.info('Environment preview loaded in browser', {
+        polygonCount: result.polygonCount,
+        projectionType: source.projectionType,
+      })
+
+      return result.polygonCount
+    } finally {
+      await this._stopTextureServer(fileServer)
+    }
+  }
+
+  /**
    * Apply textures to the loaded model
    * @param {Object} texturePaths - Map of texture types to texture info {filePath, sourceChannel}
    * @param {string} fileType - Model file type (gltf, glb, obj, fbx) for flipY setting

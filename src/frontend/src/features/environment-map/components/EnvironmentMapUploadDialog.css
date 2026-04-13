@@ -1,0 +1,137 @@
+.environment-map-upload-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.environment-map-upload-dialog.is-drop-active {
+  border-radius: 16px;
+}
+
+.environment-map-upload-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.environment-map-upload-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.environment-map-upload-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.environment-map-upload-field label {
+  font-weight: 600;
+}
+
+.environment-map-upload-help,
+.environment-map-upload-error {
+  font-size: 0.85rem;
+}
+
+.environment-map-upload-help {
+  color: var(--text-color-secondary);
+}
+
+.environment-map-upload-error {
+  color: var(--red-500, #ef4444);
+}
+
+.environment-map-upload-mode {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.environment-map-upload-mode-button {
+  border-radius: 999px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-ground);
+  color: var(--text-color-secondary);
+}
+
+.environment-map-upload-mode-button.is-active {
+  background: var(--surface-card);
+  border-color: var(--primary-color);
+  color: var(--text-color);
+}
+
+.environment-map-upload-file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  background: var(--surface-ground);
+}
+
+.environment-map-upload-file-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-color-secondary);
+  word-break: break-word;
+}
+
+.environment-map-cube-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.environment-map-upload-dropzone {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--surface-border);
+  border-radius: 14px;
+  background: var(--surface-ground);
+  color: var(--text-color-secondary);
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.environment-map-upload-dropzone.is-drop-active {
+  border-color: var(--primary-color);
+  background: var(--surface-card);
+  color: var(--text-color);
+}
+
+.environment-map-cube-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.875rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  background: var(--surface-ground);
+}
+
+.environment-map-cube-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.environment-map-cube-card-header span {
+  color: var(--text-color-secondary);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .environment-map-upload-mode-button,
+  .environment-map-upload-file-row .p-button {
+    width: 100%;
+    justify-content: center;
+  }
+}

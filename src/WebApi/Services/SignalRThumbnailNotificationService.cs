@@ -63,4 +63,15 @@ public class SignalRThumbnailNotificationService : IThumbnailNotificationService
         await _hubContext.Clients.Group(ThumbnailHub.AllModelsGroupName)
             .SendAsync("ActiveVersionChanged", notification, cancellationToken);
     }
+
+    public async Task SendEnvironmentMapThumbnailStatusChangedAsync(EnvironmentMapThumbnailStatusChangedNotification notification, CancellationToken cancellationToken = default)
+    {
+        var environmentMapGroupName = ThumbnailHub.GetEnvironmentMapGroupName(notification.EnvironmentMapId.ToString());
+
+        await _hubContext.Clients.Group(environmentMapGroupName)
+            .SendAsync("EnvironmentMapThumbnailStatusChanged", notification, cancellationToken);
+
+        await _hubContext.Clients.Group(ThumbnailHub.AllEnvironmentMapsGroupName)
+            .SendAsync("EnvironmentMapThumbnailStatusChanged", notification, cancellationToken);
+    }
 }

@@ -12,17 +12,20 @@ namespace Application.Sprites;
 internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse>
 {
     private readonly ISpriteRepository _spriteRepository;
+    private readonly ISpriteCategoryRepository _spriteCategoryRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CreateSpriteWithFileCommandHandler(
         ISpriteRepository spriteRepository,
+        ISpriteCategoryRepository spriteCategoryRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider)
     {
         _spriteRepository = spriteRepository;
+        _spriteCategoryRepository = spriteCategoryRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
@@ -79,6 +82,16 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                     file.Id,
                     existingSprite.SpriteType,
                     file.SizeBytes));
+            }
+
+            if (command.CategoryId.HasValue)
+            {
+                var category = await _spriteCategoryRepository.GetByIdAsync(command.CategoryId.Value, cancellationToken);
+                if (category == null)
+                {
+                    return Result.Failure<CreateSpriteWithFileResponse>(
+                        new Error("CategoryNotFound", $"Sprite category with ID {command.CategoryId.Value} was not found."));
+                }
             }
 
             // 4. Create new sprite

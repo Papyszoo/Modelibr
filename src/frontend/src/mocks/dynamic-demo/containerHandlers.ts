@@ -222,6 +222,59 @@ export const containerHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  // Pack ↔ EnvironmentMap
+  http.post(
+    '*/packs/:packId/environment-maps/:environmentMapId',
+    async ({ params }) => {
+      const pack = await getById('packs', Number(params.packId))
+      const environmentMap = await getById(
+        'environmentMaps',
+        Number(params.environmentMapId)
+      )
+      if (!pack || !environmentMap)
+        return new HttpResponse(null, { status: 404 })
+      if (!pack.environmentMaps?.some(item => item.id === environmentMap.id)) {
+        pack.environmentMaps = [
+          ...(pack.environmentMaps ?? []),
+          { id: environmentMap.id, name: environmentMap.name },
+        ]
+        recomputePackCounts(pack)
+        pack.updatedAt = now()
+        await put('packs', pack)
+      }
+      if (!environmentMap.packs.some(item => item.id === pack.id)) {
+        environmentMap.packs.push({ id: pack.id, name: pack.name })
+        await put('environmentMaps', environmentMap)
+      }
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
+  http.delete(
+    '*/packs/:packId/environment-maps/:environmentMapId',
+    async ({ params }) => {
+      const pack = await getById('packs', Number(params.packId))
+      const environmentMap = await getById(
+        'environmentMaps',
+        Number(params.environmentMapId)
+      )
+      if (!pack) return new HttpResponse(null, { status: 404 })
+      pack.environmentMaps = (pack.environmentMaps ?? []).filter(
+        item => item.id !== Number(params.environmentMapId)
+      )
+      recomputePackCounts(pack)
+      pack.updatedAt = now()
+      await put('packs', pack)
+      if (environmentMap) {
+        environmentMap.packs = environmentMap.packs.filter(
+          item => item.id !== pack.id
+        )
+        await put('environmentMaps', environmentMap)
+      }
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
   // Pack texture with file upload
   http.post(
     '*/packs/:packId/textures/with-file',
@@ -515,6 +568,61 @@ export const containerHandlers = [
     await put('projects', project)
     return new HttpResponse(null, { status: 204 })
   }),
+
+  // Project ↔ EnvironmentMap
+  http.post(
+    '*/projects/:projectId/environment-maps/:environmentMapId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.projectId))
+      const environmentMap = await getById(
+        'environmentMaps',
+        Number(params.environmentMapId)
+      )
+      if (!project || !environmentMap)
+        return new HttpResponse(null, { status: 404 })
+      if (
+        !project.environmentMaps?.some(item => item.id === environmentMap.id)
+      ) {
+        project.environmentMaps = [
+          ...(project.environmentMaps ?? []),
+          { id: environmentMap.id, name: environmentMap.name },
+        ]
+        recomputeProjectCounts(project)
+        project.updatedAt = now()
+        await put('projects', project)
+      }
+      if (!environmentMap.projects.some(item => item.id === project.id)) {
+        environmentMap.projects.push({ id: project.id, name: project.name })
+        await put('environmentMaps', environmentMap)
+      }
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
+  http.delete(
+    '*/projects/:projectId/environment-maps/:environmentMapId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.projectId))
+      const environmentMap = await getById(
+        'environmentMaps',
+        Number(params.environmentMapId)
+      )
+      if (!project) return new HttpResponse(null, { status: 404 })
+      project.environmentMaps = (project.environmentMaps ?? []).filter(
+        item => item.id !== Number(params.environmentMapId)
+      )
+      recomputeProjectCounts(project)
+      project.updatedAt = now()
+      await put('projects', project)
+      if (environmentMap) {
+        environmentMap.projects = environmentMap.projects.filter(
+          item => item.id !== project.id
+        )
+        await put('environmentMaps', environmentMap)
+      }
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
 
   // Project texture with file upload
   http.post(

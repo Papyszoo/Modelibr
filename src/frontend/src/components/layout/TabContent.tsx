@@ -23,6 +23,16 @@ const TextureSetViewer = lazy(() =>
     default: module.TextureSetViewer,
   }))
 )
+const EnvironmentMapList = lazy(() =>
+  import('@/features/environment-map').then(module => ({
+    default: module.EnvironmentMapList,
+  }))
+)
+const EnvironmentMapViewer = lazy(() =>
+  import('@/features/environment-map').then(module => ({
+    default: module.EnvironmentMapViewer,
+  }))
+)
 const PackList = lazy(() =>
   import('@/features/pack').then(module => ({
     default: module.PackList,
@@ -114,6 +124,20 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
           )
         }
         return <TextureSetViewer setId={tab.setId} side={side} />
+
+      case 'environmentMaps':
+        return <EnvironmentMapList />
+
+      case 'environmentMapViewer':
+        if (!tab.environmentMapId) {
+          return (
+            <div className="tab-error">
+              <h3>Environment map data not available</h3>
+              <p>The environment map information could not be loaded.</p>
+            </div>
+          )
+        }
+        return <EnvironmentMapViewer environmentMapId={tab.environmentMapId} />
 
       case 'packs':
         return <PackList />

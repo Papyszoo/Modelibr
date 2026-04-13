@@ -2,8 +2,10 @@ import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
 import { type Model } from '@/utils/fileUtils'
 
 import {
+  type EnvironmentMapDto,
   type CreatePackRequest,
   type CreatePackResponse,
+  type GetAllEnvironmentMapsResponse,
   type GetAllPacksResponse,
   type GetAllSoundsResponse,
   type GetAllSpritesResponse,
@@ -171,4 +173,27 @@ export async function getSoundsByPack(packId: number): Promise<SoundDto[]> {
     `/sounds?packId=${packId}`
   )
   return response.data.sounds
+}
+
+export async function addEnvironmentMapToPack(
+  packId: number,
+  environmentMapId: number
+): Promise<void> {
+  await client.post(`/packs/${packId}/environment-maps/${environmentMapId}`)
+}
+
+export async function removeEnvironmentMapFromPack(
+  packId: number,
+  environmentMapId: number
+): Promise<void> {
+  await client.delete(`/packs/${packId}/environment-maps/${environmentMapId}`)
+}
+
+export async function getEnvironmentMapsByPack(
+  packId: number
+): Promise<EnvironmentMapDto[]> {
+  const response = await client.get<GetAllEnvironmentMapsResponse>(
+    `/environment-maps?packId=${packId}`
+  )
+  return response.data.environmentMaps
 }

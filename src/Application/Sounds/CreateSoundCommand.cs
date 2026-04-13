@@ -9,15 +9,18 @@ namespace Application.Sounds;
 internal class CreateSoundCommandHandler : ICommandHandler<CreateSoundCommand, CreateSoundResponse>
 {
     private readonly ISoundRepository _soundRepository;
+    private readonly ISoundCategoryRepository _soundCategoryRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CreateSoundCommandHandler(
         ISoundRepository soundRepository,
+        ISoundCategoryRepository soundCategoryRepository,
         IFileRepository fileRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _soundRepository = soundRepository;
+        _soundCategoryRepository = soundCategoryRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -38,6 +41,16 @@ internal class CreateSoundCommandHandler : ICommandHandler<CreateSoundCommand, C
             {
                 return Result.Failure<CreateSoundResponse>(
                     new Error("FileNotFound", $"File with ID {command.FileId} not found."));
+            }
+
+            if (command.CategoryId.HasValue)
+            {
+                var category = await _soundCategoryRepository.GetByIdAsync(command.CategoryId.Value, cancellationToken);
+                if (category == null)
+                {
+                    return Result.Failure<CreateSoundResponse>(
+                        new Error("CategoryNotFound", $"Sound category with ID {command.CategoryId.Value} was not found."));
+                }
             }
 
             var sound = Sound.Create(

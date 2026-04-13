@@ -70,6 +70,19 @@ public class ThumbnailJobDomainTests
     }
 
     [Fact]
+    public void CreateForEnvironmentMap_WithValidParameters_ShouldCreateThumbnailJob()
+    {
+        var createdAt = DateTime.UtcNow;
+
+        var job = ThumbnailJob.CreateForEnvironmentMap(7, 9, createdAt);
+
+        Assert.Equal("EnvironmentMap", job.AssetType);
+        Assert.Equal(7, job.EnvironmentMapId);
+        Assert.Equal(9, job.EnvironmentMapVariantId);
+        Assert.Equal(ThumbnailJobStatus.Pending, job.Status);
+    }
+
+    [Fact]
     public void TryClaim_WithValidWorker_ShouldClaimJob()
     {
         // Arrange
