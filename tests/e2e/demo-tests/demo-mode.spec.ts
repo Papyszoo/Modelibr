@@ -36,7 +36,7 @@ async function createUploadCopy(sourceFileName, targetFileName) {
 async function createPack(page, name, description, licenseType, url) {
     await navigateToTab(page, "packs");
 
-    await page.getByRole("button", { name: "Create Pack" }).click();
+    await page.getByRole("button", { name: "Create Pack" }).first().click();
 
     const dialog = page.locator('.p-dialog:has-text("Create New Pack")');
     await expect(dialog).toBeVisible();
@@ -74,7 +74,7 @@ async function openPack(page, name) {
 async function createProject(page, name, description, notes) {
     await navigateToTab(page, "projects");
 
-    await page.getByRole("button", { name: "Create Project" }).click();
+    await page.getByRole("button", { name: "Create Project" }).first().click();
 
     const dialog = page.locator('.p-dialog:has-text("Create New Project")');
     await expect(dialog).toBeVisible();
@@ -421,5 +421,53 @@ test.describe("demo mode e2e", () => {
         await expect(page.locator(".settings-demo-warning")).toHaveText(
             "Blender settings are not available in demo mode.",
         );
+    });
+
+    test("shows the demo mode banner with reset button", async ({ page }) => {
+        const modelListPage = new ModelListPage(page);
+        await modelListPage.goto();
+
+        const banner = page.getByTestId("demo-banner");
+        await expect(banner).toBeVisible();
+        await expect(banner).toContainText("Demo Mode");
+        await expect(banner).toContainText(
+            "data is stored locally in your browser",
+        );
+
+        const resetButton = page.getByTestId("demo-banner-reset");
+        await expect(resetButton).toBeVisible();
+        await expect(resetButton).toHaveText("Reset");
+    });
+
+    test("shows a thumbnail for seeded environment maps", async ({ page }) => {
+        const environmentMapsPage = new EnvironmentMapsPage(page);
+        await environmentMapsPage.goto();
+        await environmentMapsPage.waitForEnvironmentMapByName(
+            "City Night Lights",
+        );
+
+        // Wait for the generated thumbnail to appear (prewarm runs in background)
+        await expect(
+            page
+                .locator('[data-testid="environment-map-card-thumbnail"]')
+                .first(),
+        ).toBeVisible({ timeout: 30000 });
+    });
+
+    test("shows a waveform for the seeded Test Tone sound", async ({
+        page,
+    }) => {
+        const soundListPage = new SoundListPage(page);
+        await soundListPage.goto();
+
+        await expect(
+            soundListPage.getSoundCardByName("Test Tone"),
+        ).toBeVisible();
+
+        // Wait for the waveform image to appear (prewarm runs in background)
+        const soundCard = soundListPage.getSoundCardByName("Test Tone");
+        await expect(soundCard.locator("img.sound-waveform")).toBeVisible({
+            timeout: 30000,
+        });
     });
 });
