@@ -396,6 +396,15 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
   return dbPromise
 }
 
+/** Close the IDB connection so the database can be deleted cleanly. */
+export async function closeDb(): Promise<void> {
+  if (dbPromise) {
+    const db = await dbPromise
+    db.close()
+    dbPromise = null
+  }
+}
+
 // ─── ID Generator ───────────────────────────────────────────────────────
 
 export async function nextId(entity: string): Promise<number> {
@@ -1114,33 +1123,6 @@ export async function seedIfEmpty(): Promise<void> {
       packs: [{ id: 1, name: 'Demo Pack' }],
       projects: [{ id: 1, name: 'Demo Project' }],
     },
-    {
-      id: 2,
-      name: 'Neutral Studio',
-      variantCount: 1,
-      categoryId: 3,
-      previewVariantId: 3,
-      previewFileId: 603,
-      previewUrl: '/files/603/preview?channel=rgb',
-      createdAt: now,
-      updatedAt: now,
-      variants: [
-        {
-          id: 3,
-          sizeLabel: '1K',
-          fileId: 603,
-          fileName: 'studio_small_01_1k.hdr',
-          fileSizeBytes: 0,
-          createdAt: now,
-          updatedAt: now,
-          isDeleted: false,
-          previewUrl: '/files/603/preview?channel=rgb',
-          fileUrl: '/files/603',
-        },
-      ],
-      packs: [{ id: 2, name: 'Shapes Pack' }],
-      projects: [],
-    },
   ]
 
   const seedPacks: DemoPack[] = [
@@ -1181,7 +1163,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSetCount: 1,
       spriteCount: 0,
       soundCount: 0,
-      environmentMapCount: 1,
+      environmentMapCount: 0,
       isEmpty: false,
       customThumbnailFileId: null,
       customThumbnailUrl: null,
@@ -1189,7 +1171,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [{ id: 2, name: 'Color Textures' }],
       sprites: [],
       sounds: [],
-      environmentMaps: [{ id: 2, name: 'Neutral Studio' }],
+      environmentMaps: [],
     },
   ]
 

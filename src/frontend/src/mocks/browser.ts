@@ -1,23 +1,29 @@
 import { setupWorker } from 'msw/browser'
 
 import { seedIfEmpty } from './db/demoDb'
-import { ensureDemoDataShape } from './dynamic-demo/shared'
 import {
-  dynamicDemoHandlers,
+  ensureDemoDataShape,
+  prewarmSeedEnvironmentMapThumbnails,
+  prewarmSeedSoundWaveforms,
   prewarmSeedThumbnails,
-} from './dynamicDemoHandlers'
+} from './dynamic-demo/shared'
+import { dynamicDemoHandlers } from './dynamicDemoHandlers'
 import { handlers } from './handlers'
 
 const isDemo = import.meta.env.VITE_DEMO_MODE === 'true'
 const activeHandlers = isDemo ? dynamicDemoHandlers : handlers
 
 export const worker = setupWorker(...activeHandlers)
-export { prewarmSeedThumbnails }
 
-// Seed IndexedDB with demo data on first load
-if (isDemo) {
-  void (async () => {
-    await seedIfEmpty()
-    await ensureDemoDataShape()
-  })()
+/**
+ * Seed demo data and pre-warm all thumbnails/waveforms.
+ * Must be awaited before the first prewarm call to avoid races.
+ */
+export async function initDemoData(): Promise<void> {
+  await seedIfEmpty()
+  await ensureDemoDataShape()
+  // Fire-and-forget: pre-generate seed thumbnails/waveforms in the background
+  prewarmSeedThumbnails()
+  prewarmSeedEnvironmentMapThumbnails()
+  prewarmSeedSoundWaveforms()
 }
