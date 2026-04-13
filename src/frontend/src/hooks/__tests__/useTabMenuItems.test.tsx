@@ -41,4 +41,27 @@ describe('useTabMenuItems', () => {
 
     expect(onReopenTab).toHaveBeenCalledWith(recentlyClosedTabs[1])
   })
+
+  it('includes Environment Maps in the add-tab menu', () => {
+    const onAddTab = jest.fn()
+    const onReopenTab = jest.fn()
+
+    const { result } = renderHook(() =>
+      useTabMenuItems({
+        onAddTab,
+        recentlyClosedTabs: [],
+        onReopenTab,
+      })
+    )
+
+    const environmentMapsItem = result.current.find(
+      item => item.label === 'Environment Maps'
+    )
+
+    expect(environmentMapsItem).toBeDefined()
+
+    environmentMapsItem?.command?.({} as never)
+
+    expect(onAddTab).toHaveBeenCalledWith('environmentMaps', 'Environment Maps')
+  })
 })

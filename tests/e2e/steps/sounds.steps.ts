@@ -55,6 +55,40 @@ async function waitForSoundsUiReady(page: any): Promise<void> {
     }
 }
 
+async function waitForSoundCategoryTab(page: any, categoryName: string) {
+    const soundListPage = new SoundListPage(page);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        await waitForSoundsUiReady(page);
+
+        const categoryTabs = page.locator(".category-tab");
+        const tabCount = await categoryTabs.count();
+
+        for (let index = 0; index < tabCount; index += 1) {
+            const categoryTab = categoryTabs.nth(index);
+            const tabName = (await categoryTab
+                .locator("span")
+                .first()
+                .textContent()
+                .catch(() => null))?.trim();
+
+            if (
+                tabName === categoryName &&
+                (await categoryTab.isVisible().catch(() => false))
+            ) {
+                return categoryTab;
+            }
+        }
+
+        await soundListPage.goto();
+        await page.waitForLoadState("domcontentloaded");
+    }
+
+    throw new Error(
+        `Sound category "${categoryName}" was not visible after refreshing the sounds page.`,
+    );
+}
+
 async function cleanupSoundByName(
     page: any,
     name: string,
@@ -558,10 +592,7 @@ When(
 When(
     "I filter sounds by category {string}",
     async ({ page }, categoryName: string) => {
-        // Click the category tab to filter
-        const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName });
+        const categoryTab = await waitForSoundCategoryTab(page, categoryName);
         await categoryTab.click();
         // Wait for the sound grid to update reactively
         await page.waitForLoadState("domcontentloaded");
@@ -662,11 +693,8 @@ When(
 Then(
     "the sound category {string} should be visible in the category list",
     async ({ page }, categoryName: string) => {
-        const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName });
         await expect(async () => {
-            await expect(categoryTab).toBeVisible({ timeout: 5000 });
+            await waitForSoundCategoryTab(page, categoryName);
         }).toPass({ timeout: 20000 });
         console.log(
             `[Verify] Sound category "${categoryName}" is visible in category list ✓`,
@@ -771,6 +799,10 @@ Given(
 When(
     "I edit the sound category {string}",
     async ({ page }, categoryName: string) => {
+        const soundListPage = new SoundListPage(page);
+        await soundListPage.goto();
+        await waitForSoundsUiReady(page);
+
         // Ensure no dialog is blocking
         await page.keyboard.press("Escape");
         await page
@@ -778,11 +810,7 @@ When(
             .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
-        // First select the category tab
-        const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName });
-        await categoryTab.waitFor({ state: "visible", timeout: 5000 });
+        const categoryTab = await waitForSoundCategoryTab(page, categoryName);
         await categoryTab.click();
 
         // Click the edit (pencil) button on the category tab
@@ -838,6 +866,10 @@ When("I save the sound category changes", async ({ page }) => {
 When(
     "I delete the sound category {string}",
     async ({ page }, categoryName: string) => {
+        const soundListPage = new SoundListPage(page);
+        await soundListPage.goto();
+        await waitForSoundsUiReady(page);
+
         // Ensure no dialog is blocking
         await page.keyboard.press("Escape");
         await page
@@ -845,11 +877,7 @@ When(
             .waitFor({ state: "hidden", timeout: 5000 })
             .catch(() => {});
 
-        // First select the category tab
-        const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName });
-        await categoryTab.waitFor({ state: "visible", timeout: 5000 });
+        const categoryTab = await waitForSoundCategoryTab(page, categoryName);
         await categoryTab.click();
 
         // Click the delete (trash) button on the category tab

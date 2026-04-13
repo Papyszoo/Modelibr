@@ -1,16 +1,19 @@
 import { useMemo } from 'react'
 
 import {
+  addEnvironmentMapToProject,
   addModelToProject,
   addSoundToProject,
   addSpriteToProject,
   addTextureSetToProject,
   addTextureToProjectWithFile,
+  getEnvironmentMapsByProject,
   getModelsByProject,
   getProjectById,
   getSoundsByProject,
   getSpritesByProject,
   getTextureSetsByProject,
+  removeEnvironmentMapFromProject,
   removeModelFromProject,
   removeSoundFromProject,
   removeSpriteFromProject,
@@ -42,6 +45,7 @@ function toContainerDto(project: ProjectDetailDto): ContainerDto {
     textureSetCount: project.textureSetCount,
     spriteCount: project.spriteCount,
     soundCount: project.soundCount,
+    environmentMapCount: project.environmentMapCount ?? 0,
     isEmpty: project.isEmpty,
     customThumbnailUrl: project.customThumbnailUrl,
     conceptImageCount: project.conceptImageCount,
@@ -49,6 +53,7 @@ function toContainerDto(project: ProjectDetailDto): ContainerDto {
     models: project.models,
     textureSets: project.textureSets,
     sprites: project.sprites,
+    environmentMaps: project.environmentMaps ?? [],
   }
 }
 
@@ -74,6 +79,7 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       loadTextureSets: id => getTextureSetsByProject(id),
       loadSprites: id => getSpritesByProject(id),
       loadSounds: id => getSoundsByProject(id),
+      loadEnvironmentMaps: id => getEnvironmentMapsByProject(id),
       addModel: (cId, mId) => addModelToProject(cId, mId),
       removeModel: (cId, mId) => removeModelFromProject(cId, mId),
       addTextureSet: (cId, tsId) => addTextureSetToProject(cId, tsId),
@@ -82,6 +88,10 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       removeSprite: (cId, sId) => removeSpriteFromProject(cId, sId),
       addSound: (cId, sId) => addSoundToProject(cId, sId),
       removeSound: (cId, sId) => removeSoundFromProject(cId, sId),
+      addEnvironmentMap: (cId, environmentMapId) =>
+        addEnvironmentMapToProject(cId, environmentMapId),
+      removeEnvironmentMap: (cId, environmentMapId) =>
+        removeEnvironmentMapFromProject(cId, environmentMapId),
       uploadTextureWithFile: (
         cId,
         file,

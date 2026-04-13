@@ -25,4 +25,20 @@ public interface IThumbnailNotificationService
     /// <param name="thumbnailUrl">The thumbnail URL if ready, null otherwise</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task SendActiveVersionChangedAsync(int modelId, int newActiveVersionId, int? previousActiveVersionId, bool hasThumbnail, string? thumbnailUrl = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends an environment map thumbnail status changed notification.
+    /// </summary>
+    /// <param name="notification">The notification payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task SendEnvironmentMapThumbnailStatusChangedAsync(EnvironmentMapThumbnailStatusChangedNotification notification, CancellationToken cancellationToken = default);
 }
+
+public record EnvironmentMapThumbnailStatusChangedNotification(
+    int EnvironmentMapId,
+    int EnvironmentMapVariantId,
+    string Status,
+    string? PreviewUrl,
+    string? VariantPreviewUrl,
+    DateTime Timestamp,
+    string? ErrorMessage = null);

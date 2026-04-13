@@ -5,12 +5,13 @@ slug: /
 
 # Getting Started
 
-Modelibr is a self-hosted game asset library that helps you keep models, texture sets, sprites, sounds, and grouped asset collections in one place.
+Modelibr is a self-hosted game asset library that helps you keep models, texture sets, environment maps, sprites, sounds, and grouped asset collections in one place.
 
 ## Features
 
 - **Models with version history** - Keep track of changes without losing older versions
 - **Texture sets** - Manage PBR textures, defaults, and channel-packed maps
+- **Environment maps** - Upload panoramic HDRIs or cube faces, keep multiple variants, and preview lighting in the browser
 - **Sprites and sounds** - Keep 2D and audio assets in the same library as your models
 - **Projects and packs** - Group assets either for a specific job or for reuse across jobs
 - **Recycle bin and deduplication** - Recover mistakes without wasting storage
@@ -113,9 +114,9 @@ Your browser may show a warning on first launch because Modelibr uses a local se
 
 ### Where is my data?
 
-All your uploaded models, generated thumbnails, and database files are stored in the **`data`** folder within the project directory.
+All your uploaded assets, generated thumbnails, and database files are stored in the **`data`** folder within the project directory.
 
-- `data/uploads`: Your raw 3D model files.
+- `data/uploads`: Your uploaded asset files.
 - `data/thumbnails`: Generated images and 3D previews.
 - `data/postgres`: Database files.
 
@@ -127,3 +128,6 @@ Back up the `data` folder regularly to keep your library safe!
 
 - [Model Management](/docs/features/models) - Learn about versions and organization
 - [Texture Sets](/docs/features/texture-sets) - Apply PBR textures to your models
+- [Environment Maps](/docs/features/environment-maps) - Manage panoramic and cube-based lighting assets
+- [Packs](/docs/features/packs) - Build reusable asset bundles
+- [Projects](/docs/features/projects) - Organize assets for a specific production

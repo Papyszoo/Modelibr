@@ -143,6 +143,7 @@ public static class TextureSetEndpoints
     private static async Task<IResult> GetAllTextureSets(
         int? packId,
         int? projectId,
+        int? categoryId,
         int? page,
         int? pageSize,
         int? kind,
@@ -150,7 +151,7 @@ public static class TextureSetEndpoints
         CancellationToken cancellationToken)
     {
         TextureSetKind? textureSetKind = kind.HasValue ? (TextureSetKind)kind.Value : null;
-        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId, page, pageSize, textureSetKind), cancellationToken);
+        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId, categoryId, page, pageSize, textureSetKind), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -213,7 +214,7 @@ public static class TextureSetEndpoints
             return Results.BadRequest(new { error = "InvalidInput", message = "Texture set name is required." });
         }
 
-        var result = await commandHandler.Handle(new CreateTextureSetCommand(request.Name, request.Kind ?? TextureSetKind.ModelSpecific), cancellationToken);
+        var result = await commandHandler.Handle(new CreateTextureSetCommand(request.Name, request.Kind ?? TextureSetKind.ModelSpecific, request.CategoryId), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -229,6 +230,7 @@ public static class TextureSetEndpoints
         TextureType? textureType,
         string? batchId,
         int? kind,
+        int? categoryId,
         ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse> commandHandler,
         CancellationToken cancellationToken)
     {
@@ -248,7 +250,8 @@ public static class TextureSetEndpoints
                 textureSetName,
                 texType,
                 batchId,
-                textureSetKind),
+                textureSetKind,
+                categoryId),
             cancellationToken);
 
         if (result.IsFailure)
@@ -270,7 +273,7 @@ public static class TextureSetEndpoints
             return Results.BadRequest(new { error = "InvalidInput", message = "Texture set name is required." });
         }
 
-        var result = await commandHandler.Handle(new UpdateTextureSetCommand(id, request.Name), cancellationToken);
+        var result = await commandHandler.Handle(new UpdateTextureSetCommand(id, request.Name, request.CategoryId), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -590,8 +593,8 @@ public static class TextureSetEndpoints
 }
 
 // Request DTOs
-public record CreateTextureSetRequest(string Name, TextureSetKind? Kind = null);
-public record UpdateTextureSetRequest(string Name);
+public record CreateTextureSetRequest(string Name, TextureSetKind? Kind = null, int? CategoryId = null);
+public record UpdateTextureSetRequest(string Name, int? CategoryId);
 public record UpdateTextureSetKindRequest(TextureSetKind Kind);
 public record UpdateTilingScaleRequest(float TilingScaleX, float TilingScaleY, UvMappingMode? UvMappingMode = null, float? UvScale = null);
 public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);

@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { test, expect, type Page } from "@playwright/test";
 
 import { navigateToTab, openTabViaMenu } from "../helpers/navigation-helper";
+import { EnvironmentMapsPage } from "../pages/EnvironmentMapsPage";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
@@ -134,6 +135,7 @@ async function addModelToOpenPack(page, modelName, modelId) {
 test.describe("demo mode e2e", () => {
     test("shows seeded demo libraries across tabs", async ({ page }) => {
         const modelListPage = new ModelListPage(page);
+        const environmentMapsPage = new EnvironmentMapsPage(page);
         const textureSetsPage = new TextureSetsPage(page);
         const spriteListPage = new SpriteListPage(page);
         const soundListPage = new SoundListPage(page);
@@ -191,6 +193,21 @@ test.describe("demo mode e2e", () => {
         await soundListPage.clickSoundByName("Test Tone");
         await expect(page.locator(".p-dialog")).toContainText("Test Tone");
         await soundListPage.closeDialog();
+
+        await environmentMapsPage.goto();
+        await environmentMapsPage.waitForToolbarCountLabel("2 maps");
+        await environmentMapsPage.waitForEnvironmentMapByName("City Night Lights");
+        await environmentMapsPage.waitForEnvironmentMapByName("Neutral Studio");
+    });
+
+    test("opens a seeded environment map preview in demo mode", async ({ page }) => {
+        const environmentMapsPage = new EnvironmentMapsPage(page);
+
+        await environmentMapsPage.goto();
+        await environmentMapsPage.openEnvironmentMapByName("City Night Lights");
+        await environmentMapsPage.waitForPreviewSizeLabel("1K");
+        await environmentMapsPage.waitForPreviewSizeLabel("2K");
+        await environmentMapsPage.waitForThreeJsPreviewLoaded();
     });
 
     test("opens a seeded model viewer with linked materials", async ({

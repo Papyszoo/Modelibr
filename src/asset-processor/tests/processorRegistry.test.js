@@ -56,6 +56,14 @@ vi.mock('../thumbnailApiService.js', () => ({
   ThumbnailApiService: vi.fn(function () {}),
 }))
 
+vi.mock('../environmentMapFileService.js', () => ({
+  EnvironmentMapFileService: vi.fn(function () {}),
+}))
+
+vi.mock('../environmentMapApiService.js', () => ({
+  EnvironmentMapApiService: vi.fn(function () {}),
+}))
+
 vi.mock('../puppeteerRenderer.js', () => ({
   PuppeteerRenderer: vi.fn(function () {}),
 }))
@@ -78,8 +86,10 @@ vi.mock('../config.js', () => ({
     orbit: { enabled: true },
     encoding: { enabled: true },
     thumbnailStorage: { enabled: true },
+    environmentMaps: { uploadRootPath: '/tmp/uploads' },
     rendering: {},
     modelProcessing: {},
+    blender: { enabled: false },
   },
 }))
 
@@ -93,6 +103,9 @@ const { MeshAnalysisProcessor } = await import('../processors/meshProcessor.js')
 const { TextureSetProcessor } = await import(
   '../processors/textureSetProcessor.js'
 )
+const { EnvironmentMapProcessor } = await import(
+  '../processors/environmentMapProcessor.js'
+)
 
 describe('ProcessorRegistry', () => {
   let registry
@@ -102,11 +115,12 @@ describe('ProcessorRegistry', () => {
   })
 
   describe('initialization', () => {
-    it('should register Model, Sound, TextureSet, and MeshAnalysis processors', () => {
-      expect(registry.processors.size).toBe(4)
+    it('should register Model, Sound, TextureSet, EnvironmentMap, and MeshAnalysis processors', () => {
+      expect(registry.processors.size).toBe(5)
       expect(registry.processors.has('Model')).toBe(true)
       expect(registry.processors.has('Sound')).toBe(true)
       expect(registry.processors.has('TextureSet')).toBe(true)
+      expect(registry.processors.has('EnvironmentMap')).toBe(true)
       expect(registry.processors.has('MeshAnalysis')).toBe(true)
     })
 
@@ -117,6 +131,9 @@ describe('ProcessorRegistry', () => {
       expect(registry.processors.get('Sound')).toBeInstanceOf(SoundProcessor)
       expect(registry.processors.get('TextureSet')).toBeInstanceOf(
         TextureSetProcessor
+      )
+      expect(registry.processors.get('EnvironmentMap')).toBeInstanceOf(
+        EnvironmentMapProcessor
       )
       expect(registry.processors.get('MeshAnalysis')).toBeInstanceOf(
         MeshAnalysisProcessor
@@ -151,6 +168,14 @@ describe('ProcessorRegistry', () => {
       expect(processor).toBeInstanceOf(TextureSetProcessor)
     })
 
+    it('should return EnvironmentMapProcessor for EnvironmentMap asset type', () => {
+      const processor = registry.getProcessor({
+        assetType: 'EnvironmentMap',
+        id: 7,
+      })
+      expect(processor).toBeInstanceOf(EnvironmentMapProcessor)
+    })
+
     it('should return null for unknown asset type', () => {
       const processor = registry.getProcessor({ assetType: 'Unknown', id: 4 })
       expect(processor).toBeNull()
@@ -167,7 +192,7 @@ describe('ProcessorRegistry', () => {
       const mockProcessor = { processorType: 'custom', cleanup: vi.fn() }
       registry.register('Custom', mockProcessor)
       expect(registry.processors.has('Custom')).toBe(true)
-      expect(registry.getProcessor({ assetType: 'Custom', id: 6 })).toBe(
+      expect(registry.getProcessor({ assetType: 'Custom', id: 8 })).toBe(
         mockProcessor
       )
     })
@@ -175,7 +200,7 @@ describe('ProcessorRegistry', () => {
     it('should allow overriding existing processor types', () => {
       const mockProcessor = { processorType: 'override', cleanup: vi.fn() }
       registry.register('Model', mockProcessor)
-      expect(registry.getProcessor({ assetType: 'Model', id: 7 })).toBe(
+      expect(registry.getProcessor({ assetType: 'Model', id: 9 })).toBe(
         mockProcessor
       )
     })

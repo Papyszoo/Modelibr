@@ -1,57 +1,59 @@
 namespace Domain.Models;
 
-/// <summary>
-/// Represents a user-configurable sound category for organizing sounds.
-/// Categories are fully customizable - users can add, remove, and rename them.
-/// </summary>
-public class SoundCategory : AggregateRoot
+public class SoundCategory : AggregateRoot, IHierarchicalCategory<SoundCategory>
 {
+    private readonly List<SoundCategory> _children = new();
+
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
+    public int? ParentId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    /// <summary>
-    /// Creates a new sound category with the specified name and optional description.
-    /// </summary>
-    /// <param name="name">The name of the category</param>
-    /// <param name="description">Optional description of the category</param>
-    /// <param name="createdAt">When the category was created</param>
-    /// <returns>A new SoundCategory instance</returns>
-    /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
-    public static SoundCategory Create(string name, string? description, DateTime createdAt)
+    public SoundCategory? Parent { get; private set; }
+    public ICollection<SoundCategory> Children
+    {
+        get => _children;
+        set
+        {
+            _children.Clear();
+            if (value != null)
+                _children.AddRange(value);
+        }
+    }
+
+    public static SoundCategory Create(string name, string? description, int? parentId, DateTime createdAt)
     {
         ValidateName(name);
-
-        if (description != null && description.Length > 500)
-            throw new ArgumentException("Sound category description cannot exceed 500 characters.", nameof(description));
+        ValidateDescription(description);
 
         return new SoundCategory
         {
             Name = name.Trim(),
             Description = description?.Trim(),
+            ParentId = parentId,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
     }
 
-    /// <summary>
-    /// Updates the name and description of the category.
-    /// </summary>
-    /// <param name="name">The new name</param>
-    /// <param name="description">The new description</param>
-    /// <param name="updatedAt">When the update occurred</param>
-    /// <exception cref="ArgumentException">Thrown when name validation fails</exception>
     public void Update(string name, string? description, DateTime updatedAt)
     {
         ValidateName(name);
-
-        if (description != null && description.Length > 500)
-            throw new ArgumentException("Sound category description cannot exceed 500 characters.", nameof(description));
+        ValidateDescription(description);
 
         Name = name.Trim();
         Description = description?.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    public void MoveTo(int? parentId, DateTime updatedAt)
+    {
+        if (parentId.HasValue && parentId.Value == Id)
+            throw new ArgumentException("A category cannot be its own parent.", nameof(parentId));
+
+        ParentId = parentId;
         UpdatedAt = updatedAt;
     }
 
@@ -62,5 +64,11 @@ public class SoundCategory : AggregateRoot
 
         if (name.Length > 100)
             throw new ArgumentException("Sound category name cannot exceed 100 characters.", nameof(name));
+    }
+
+    private static void ValidateDescription(string? description)
+    {
+        if (description != null && description.Length > 500)
+            throw new ArgumentException("Sound category description cannot exceed 500 characters.", nameof(description));
     }
 }

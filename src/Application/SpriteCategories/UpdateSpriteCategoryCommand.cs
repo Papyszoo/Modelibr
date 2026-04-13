@@ -1,11 +1,12 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Categories;
 using Domain.Services;
 using SharedKernel;
 
 namespace Application.SpriteCategories;
 
-internal class UpdateSpriteCategoryCommandHandler : ICommandHandler<UpdateSpriteCategoryCommand, UpdateSpriteCategoryResponse>
+internal class UpdateSpriteCategoryCommandHandler : ICommandHandler<UpdateSpriteCategoryCommand>
 {
     private readonly ISpriteCategoryRepository _categoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -18,40 +19,10 @@ internal class UpdateSpriteCategoryCommandHandler : ICommandHandler<UpdateSprite
         _dateTimeProvider = dateTimeProvider;
     }
 
-    public async Task<Result<UpdateSpriteCategoryResponse>> Handle(UpdateSpriteCategoryCommand command, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var category = await _categoryRepository.GetByIdAsync(command.Id, cancellationToken);
-            if (category == null)
-            {
-                return Result.Failure<UpdateSpriteCategoryResponse>(
-                    new Error("CategoryNotFound", $"Sprite category with ID {command.Id} not found."));
-            }
-
-            if (command.Name != category.Name)
-            {
-                var existingCategory = await _categoryRepository.GetByNameAsync(command.Name, cancellationToken);
-                if (existingCategory != null && existingCategory.Id != category.Id)
-                {
-                    return Result.Failure<UpdateSpriteCategoryResponse>(
-                        new Error("CategoryAlreadyExists", $"A sprite category with the name '{command.Name}' already exists."));
-                }
-            }
-
-            category.Update(command.Name, command.Description, _dateTimeProvider.UtcNow);
-
-            var savedCategory = await _categoryRepository.UpdateAsync(category, cancellationToken);
-
-            return Result.Success(new UpdateSpriteCategoryResponse(savedCategory.Id, savedCategory.Name));
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<UpdateSpriteCategoryResponse>(
-                new Error("CategoryUpdateFailed", ex.Message));
-        }
-    }
+    public Task<Result> Handle(UpdateSpriteCategoryCommand command, CancellationToken cancellationToken)
+        => CategoryCommandHandlers.UpdateAsync(
+            _categoryRepository, command.Id, command.Name, command.Description, command.ParentId,
+            "Sprite category", _dateTimeProvider.UtcNow, cancellationToken);
 }
 
-public record UpdateSpriteCategoryCommand(int Id, string Name, string? Description = null) : ICommand<UpdateSpriteCategoryResponse>;
-public record UpdateSpriteCategoryResponse(int Id, string Name);
+public record UpdateSpriteCategoryCommand(int Id, string Name, string? Description = null, int? ParentId = null) : ICommand;

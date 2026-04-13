@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Recycled Files
 
-The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, and sprites.
+The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, environment maps, sprites, and sounds.
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
@@ -26,7 +26,10 @@ Navigate to the **Recycled Files** tab in the left panel.
 | **Models**         | All versions move to recycle bin       |
 | **Model Versions** | Single version recycled, model remains |
 | **Texture Sets**   | Unlinked from all models               |
+| **Environment Maps** | Entire environment map recycled with its panorama/cube variants |
+| **Environment Map Variants** | Single size variant recycled, environment map remains |
 | **Sprites**        | Removed from sprite sheets             |
+| **Sounds**         | Sound entry recycled with its audio file |
 
 ## Restoring Items
 
@@ -46,6 +49,8 @@ To permanently delete an item:
 
 :::danger Permanent deletion cannot be undone
 Once permanently deleted, the item and its associated files are removed from the database. However, shared files that are still used by other items are protected.
+
+For environment maps, this means unused variant files and custom-thumbnail files are deleted only when nothing else still references them.
 :::
 
 ## Shared File Protection

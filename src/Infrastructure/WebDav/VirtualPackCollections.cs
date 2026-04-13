@@ -65,6 +65,7 @@ public sealed class VirtualPackCollection : VirtualCollectionBase
         {
             new VirtualCategoryCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "Models", $"pack:{_pack.Id}:models"),
             new VirtualCategoryCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "TextureSets", $"pack:{_pack.Id}:texturesets"),
+            new VirtualCategoryCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "EnvironmentMaps", $"pack:{_pack.Id}:environmentmaps"),
             new VirtualCategoryCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "Sprites", $"pack:{_pack.Id}:sprites"),
             new VirtualCategoryCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, "Sounds", $"pack:{_pack.Id}:sounds")
         };

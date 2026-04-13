@@ -16,6 +16,7 @@ public class TextureSet : AggregateRoot
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
+    public int? TextureSetCategoryId { get; private set; }
     public TextureSetKind Kind { get; private set; } = TextureSetKind.ModelSpecific;
     public float TilingScaleX { get; private set; } = 1.0f;
     public float TilingScaleY { get; private set; } = 1.0f;
@@ -55,6 +56,8 @@ public class TextureSet : AggregateRoot
     /// File path for the PNG thumbnail variant.
     /// </summary>
     public string? PngThumbnailPath { get; private set; }
+
+    public TextureSetCategory? Category { get; private set; }
 
     // Navigation property for the collection of textures - EF Core requires this to be settable
     public ICollection<Texture> Textures
@@ -153,6 +156,12 @@ public class TextureSet : AggregateRoot
         ValidateName(name);
 
         Name = name.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    public void AssignCategory(int? categoryId, DateTime updatedAt)
+    {
+        TextureSetCategoryId = categoryId;
         UpdatedAt = updatedAt;
     }
 

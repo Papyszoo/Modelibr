@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Categories;
 using SharedKernel;
 
 namespace Application.SoundCategories;
@@ -13,19 +14,9 @@ internal class DeleteSoundCategoryCommandHandler : ICommandHandler<DeleteSoundCa
         _categoryRepository = categoryRepository;
     }
 
-    public async Task<Result> Handle(DeleteSoundCategoryCommand command, CancellationToken cancellationToken)
-    {
-        var category = await _categoryRepository.GetByIdAsync(command.Id, cancellationToken);
-        if (category == null)
-        {
-            return Result.Failure(
-                new Error("CategoryNotFound", $"Sound category with ID {command.Id} not found."));
-        }
-
-        await _categoryRepository.DeleteAsync(command.Id, cancellationToken);
-
-        return Result.Success();
-    }
+    public Task<Result> Handle(DeleteSoundCategoryCommand command, CancellationToken cancellationToken)
+        => CategoryCommandHandlers.DeleteAsync(
+            _categoryRepository, command.Id, "Sound category", cancellationToken);
 }
 
 public record DeleteSoundCategoryCommand(int Id) : ICommand;

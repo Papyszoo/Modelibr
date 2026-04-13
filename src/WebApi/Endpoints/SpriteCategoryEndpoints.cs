@@ -45,7 +45,7 @@ public static class SpriteCategoryEndpoints
 
     private static async Task<IResult> CreateSpriteCategory(
         [FromBody] CreateSpriteCategoryRequest request,
-        ICommandHandler<CreateSpriteCategoryCommand, CreateSpriteCategoryResponse> commandHandler,
+        ICommandHandler<CreateSpriteCategoryCommand, SpriteCategorySummaryDto> commandHandler,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -54,7 +54,7 @@ public static class SpriteCategoryEndpoints
         }
 
         var result = await commandHandler.Handle(
-            new CreateSpriteCategoryCommand(request.Name, request.Description),
+            new CreateSpriteCategoryCommand(request.Name, request.Description, request.ParentId),
             cancellationToken);
 
         if (result.IsFailure)
@@ -68,7 +68,7 @@ public static class SpriteCategoryEndpoints
     private static async Task<IResult> UpdateSpriteCategory(
         int id,
         [FromBody] UpdateSpriteCategoryRequest request,
-        ICommandHandler<UpdateSpriteCategoryCommand, UpdateSpriteCategoryResponse> commandHandler,
+        ICommandHandler<UpdateSpriteCategoryCommand> commandHandler,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -77,7 +77,7 @@ public static class SpriteCategoryEndpoints
         }
 
         var result = await commandHandler.Handle(
-            new UpdateSpriteCategoryCommand(id, request.Name, request.Description),
+            new UpdateSpriteCategoryCommand(id, request.Name, request.Description, request.ParentId),
             cancellationToken);
 
         if (result.IsFailure)
@@ -85,7 +85,7 @@ public static class SpriteCategoryEndpoints
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
 
-        return Results.Ok(result.Value);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> DeleteSpriteCategory(
@@ -105,5 +105,5 @@ public static class SpriteCategoryEndpoints
 }
 
 // Request DTOs
-public record CreateSpriteCategoryRequest(string Name, string? Description = null);
-public record UpdateSpriteCategoryRequest(string Name, string? Description = null);
+public record CreateSpriteCategoryRequest(string Name, string? Description = null, int? ParentId = null);
+public record UpdateSpriteCategoryRequest(string Name, string? Description = null, int? ParentId = null);

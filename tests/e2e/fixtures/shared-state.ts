@@ -75,6 +75,12 @@ export interface SoundCategoryData {
     description?: string;
 }
 
+export interface EnvironmentMapData {
+    id: number;
+    name: string;
+    variantCount?: number;
+}
+
 export interface VersionState {
     thumbnailDetails: any;
     thumbnailSrc: string | null;
@@ -92,6 +98,7 @@ export class ScenarioState {
     spriteCategories = new Map<string, SpriteCategoryData>();
     sounds = new Map<string, SoundData>();
     soundCategories = new Map<string, SoundCategoryData>();
+    environmentMaps = new Map<string, EnvironmentMapData>();
     versionStates = new Map<string, VersionState>();
     currentSprite?: string;
 
@@ -245,6 +252,20 @@ export class ScenarioState {
         return this.soundCategories.has(name);
     }
 
+    // ── Environment map management ─────────────────────────────────────
+
+    saveEnvironmentMap(name: string, data: EnvironmentMapData): void {
+        this.environmentMaps.set(name, data);
+    }
+
+    getEnvironmentMap(name: string): EnvironmentMapData | undefined {
+        return this.environmentMaps.get(name);
+    }
+
+    hasEnvironmentMap(name: string): boolean {
+        return this.environmentMaps.has(name);
+    }
+
     // ── Utilities ────────────────────────────────────────────────────
 
     clear(): void {
@@ -256,6 +277,7 @@ export class ScenarioState {
         this.spriteCategories.clear();
         this.sounds.clear();
         this.soundCategories.clear();
+        this.environmentMaps.clear();
         this.versionStates.clear();
         this._custom.clear();
         this.currentSprite = undefined;

@@ -25,7 +25,8 @@ namespace Infrastructure
                 // Expand environment variables in connection string
                 connectionString = Environment.ExpandEnvironmentVariables(connectionString);
                 
-                optionsBuilder.UseNpgsql(connectionString);
+                optionsBuilder
+                    .UseNpgsql(connectionString);
             });
 
             services.AddScoped<IModelRepository, ModelRepository>();
@@ -49,6 +50,10 @@ namespace Infrastructure
             services.AddScoped<ISpriteCategoryRepository, SpriteCategoryRepository>();
             services.AddScoped<ISoundRepository, SoundRepository>();
             services.AddScoped<ISoundCategoryRepository, SoundCategoryRepository>();
+            services.AddScoped<IEnvironmentMapRepository, EnvironmentMapRepository>();
+            services.AddScoped<IEnvironmentMapCategoryRepository, EnvironmentMapCategoryRepository>();
+            services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();
+            services.AddScoped<IEnvironmentMapSizeLabelService, EnvironmentMapSizeLabelService>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 

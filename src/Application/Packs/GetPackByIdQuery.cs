@@ -36,6 +36,7 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDet
             TextureSetCount = pack.TextureSetCount,
             SpriteCount = pack.SpriteCount,
             SoundCount = pack.SoundCount,
+            EnvironmentMapCount = pack.EnvironmentMapCount,
             IsEmpty = pack.IsEmpty,
             CustomThumbnailUrl = pack.CustomThumbnailFileId.HasValue ? $"/files/{pack.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
             Models = pack.Models.Select(m => new PackModelDto
@@ -52,6 +53,11 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDet
             {
                 Id = s.Id,
                 Name = s.Name
+            }).ToList(),
+            EnvironmentMaps = pack.EnvironmentMaps.Select(e => new PackEnvironmentMapDto
+            {
+                Id = e.Id,
+                Name = e.Name
             }).ToList()
         };
 
@@ -77,11 +83,13 @@ public record PackDetailDto
     public int TextureSetCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
+    public int EnvironmentMapCount { get; init; }
     public bool IsEmpty { get; init; }
     public string? CustomThumbnailUrl { get; init; }
     public ICollection<PackModelDto> Models { get; init; } = new List<PackModelDto>();
     public ICollection<PackTextureSetDto> TextureSets { get; init; } = new List<PackTextureSetDto>();
     public ICollection<PackSpriteDto> Sprites { get; init; } = new List<PackSpriteDto>();
+    public ICollection<PackEnvironmentMapDto> EnvironmentMaps { get; init; } = new List<PackEnvironmentMapDto>();
 }
 
 public record PackModelDto
@@ -97,6 +105,12 @@ public record PackTextureSetDto
 }
 
 public record PackSpriteDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record PackEnvironmentMapDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;

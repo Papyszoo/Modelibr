@@ -6,7 +6,7 @@ namespace Infrastructure.WebDav;
 
 /// <summary>
 /// Root collection that exposes the top-level virtual directories:
-/// Projects, Packs, Models, TextureSets, Sprites, Sounds, and Selection.
+/// Projects, Packs, Models, TextureSets, EnvironmentMaps, Sprites, Sounds, and Selection.
 /// </summary>
 public sealed class VirtualRootCollection : VirtualCollectionBase
 {
@@ -28,6 +28,7 @@ public sealed class VirtualRootCollection : VirtualCollectionBase
             "packs" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Packs", "packs")),
             "models" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Models", "models")),
             "texturesets" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "TextureSets", "texturesets")),
+            "environmentmaps" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "EnvironmentMaps", "environmentmaps")),
             "sprites" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Sprites", "sprites")),
             "sounds" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Sounds", "sounds")),
             "selection" => Task.FromResult<IStoreItem?>(new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Selection", "selection")),
@@ -43,6 +44,7 @@ public sealed class VirtualRootCollection : VirtualCollectionBase
             new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Packs", "packs"),
             new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Models", "models"),
             new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "TextureSets", "texturesets"),
+            new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "EnvironmentMaps", "environmentmaps"),
             new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Sprites", "sprites"),
             new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Sounds", "sounds"),
             new VirtualCategoryCollection(_store.CollectionPropertyManager, _store.LockingManager, "Selection", "selection")

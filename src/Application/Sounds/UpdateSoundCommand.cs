@@ -8,13 +8,16 @@ namespace Application.Sounds;
 internal class UpdateSoundCommandHandler : ICommandHandler<UpdateSoundCommand, UpdateSoundResponse>
 {
     private readonly ISoundRepository _soundRepository;
+    private readonly ISoundCategoryRepository _soundCategoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public UpdateSoundCommandHandler(
         ISoundRepository soundRepository,
+        ISoundCategoryRepository soundCategoryRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _soundRepository = soundRepository;
+        _soundCategoryRepository = soundCategoryRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -43,6 +46,16 @@ internal class UpdateSoundCommandHandler : ICommandHandler<UpdateSoundCommand, U
 
             if (command.CategoryId != sound.SoundCategoryId)
             {
+                if (command.CategoryId.HasValue)
+                {
+                    var category = await _soundCategoryRepository.GetByIdAsync(command.CategoryId.Value, cancellationToken);
+                    if (category == null)
+                    {
+                        return Result.Failure<UpdateSoundResponse>(
+                            new Error("CategoryNotFound", $"Sound category with ID {command.CategoryId.Value} was not found."));
+                    }
+                }
+
                 sound.UpdateCategory(command.CategoryId, _dateTimeProvider.UtcNow);
             }
 

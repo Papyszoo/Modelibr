@@ -66,6 +66,43 @@ public class ThumbnailHub : Hub
     }
 
     /// <summary>
+    /// Joins a group to receive notifications for a specific environment map.
+    /// </summary>
+    /// <param name="environmentMapId">The environment map ID to receive thumbnail updates for.</param>
+    public async Task JoinEnvironmentMapGroup(string environmentMapId)
+    {
+        var groupName = GetEnvironmentMapGroupName(environmentMapId);
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+    }
+
+    /// <summary>
+    /// Leaves a group for a specific environment map.
+    /// </summary>
+    /// <param name="environmentMapId">The environment map ID to stop receiving thumbnail updates for.</param>
+    public async Task LeaveEnvironmentMapGroup(string environmentMapId)
+    {
+        var groupName = GetEnvironmentMapGroupName(environmentMapId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+    }
+
+    /// <summary>
+    /// Joins a broadcast group to receive notifications for all environment maps.
+    /// Useful for environment map list view.
+    /// </summary>
+    public async Task JoinAllEnvironmentMapsGroup()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, AllEnvironmentMapsGroupName);
+    }
+
+    /// <summary>
+    /// Leaves the broadcast group for all environment maps.
+    /// </summary>
+    public async Task LeaveAllEnvironmentMapsGroup()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, AllEnvironmentMapsGroupName);
+    }
+
+    /// <summary>
     /// Gets the SignalR group name for a model version's thumbnail notifications.
     /// </summary>
     /// <param name="modelVersionId">The model version ID</param>
@@ -86,9 +123,24 @@ public class ThumbnailHub : Hub
     }
 
     /// <summary>
+    /// Gets the SignalR group name for an environment map's thumbnail notifications.
+    /// </summary>
+    /// <param name="environmentMapId">The environment map ID.</param>
+    /// <returns>The group name.</returns>
+    public static string GetEnvironmentMapGroupName(string environmentMapId)
+    {
+        return $"EnvironmentMap_{environmentMapId}_Thumbnails";
+    }
+
+    /// <summary>
     /// Group name for clients that want to receive notifications for all models.
     /// </summary>
     public static string AllModelsGroupName => "AllModels_ActiveVersion";
+
+    /// <summary>
+    /// Group name for clients that want to receive notifications for all environment maps.
+    /// </summary>
+    public static string AllEnvironmentMapsGroupName => "AllEnvironmentMaps_Thumbnails";
 
     // Legacy methods for backwards compatibility
     

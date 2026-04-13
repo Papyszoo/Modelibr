@@ -18,10 +18,23 @@ export interface ActiveVersionChangedEvent {
   timestamp: string
 }
 
+export interface EnvironmentMapThumbnailStatusChangedEvent {
+  environmentMapId: number
+  environmentMapVariantId: number
+  status: string
+  previewUrl: string | null
+  variantPreviewUrl: string | null
+  errorMessage: string | null
+  timestamp: string
+}
+
 type ThumbnailStatusChangedCallback = (
   event: ThumbnailStatusChangedEvent
 ) => void
 type ActiveVersionChangedCallback = (event: ActiveVersionChangedEvent) => void
+type EnvironmentMapThumbnailStatusChangedCallback = (
+  event: EnvironmentMapThumbnailStatusChangedEvent
+) => void
 
 // Only log in development mode
 const isDev = import.meta.env.DEV
@@ -36,6 +49,8 @@ class ThumbnailSignalRService {
   private thumbnailStatusCallbacks: Set<ThumbnailStatusChangedCallback> =
     new Set()
   private activeVersionCallbacks: Set<ActiveVersionChangedCallback> = new Set()
+  private environmentMapThumbnailStatusCallbacks: Set<EnvironmentMapThumbnailStatusChangedCallback> =
+    new Set()
   private connectPromise: Promise<void> | null = null
   private reconnectAttempts: number = 0
   private maxReconnectAttempts: number = 5
@@ -108,19 +123,40 @@ class ThumbnailSignalRService {
         }
       )
 
+      this.connection.on(
+        'EnvironmentMapThumbnailStatusChanged',
+        (event: EnvironmentMapThumbnailStatusChangedEvent) => {
+          log(
+            'ThumbnailSignalR: Received EnvironmentMapThumbnailStatusChanged event',
+            event
+          )
+          log(
+            `ThumbnailSignalR: Notifying ${this.environmentMapThumbnailStatusCallbacks.size} environment map callback(s)`
+          )
+          this.environmentMapThumbnailStatusCallbacks.forEach(callback =>
+            callback(event)
+          )
+        }
+      )
+
       this.connection.onreconnecting(() => {
         log('ThumbnailSignalR: Reconnecting...')
       })
 
       this.connection.onreconnected(async () => {
-        log('ThumbnailSignalR: Reconnected, re-joining AllModelsGroup')
+        log(
+          'ThumbnailSignalR: Reconnected, re-joining AllModelsGroup and AllEnvironmentMapsGroup'
+        )
         this.reconnectAttempts = 0
         // Re-join groups after reconnect — server-side group membership is tied to connection ID
         try {
-          await this.joinAllModelsGroup()
+          await Promise.all([
+            this.joinAllModelsGroup(),
+            this.joinAllEnvironmentMapsGroup(),
+          ])
         } catch (error) {
           console.error(
-            'ThumbnailSignalR: Failed to re-join AllModelsGroup after reconnect',
+            'ThumbnailSignalR: Failed to re-join SignalR groups after reconnect',
             error
           )
         }
@@ -157,6 +193,20 @@ class ThumbnailSignalRService {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       await this.connection.invoke('LeaveAllModelsGroup')
       log('ThumbnailSignalR: Left AllModelsGroup')
+    }
+  }
+
+  async joinAllEnvironmentMapsGroup(): Promise<void> {
+    if (this.connection?.state === signalR.HubConnectionState.Connected) {
+      await this.connection.invoke('JoinAllEnvironmentMapsGroup')
+      log('ThumbnailSignalR: Joined AllEnvironmentMapsGroup')
+    }
+  }
+
+  async leaveAllEnvironmentMapsGroup(): Promise<void> {
+    if (this.connection?.state === signalR.HubConnectionState.Connected) {
+      await this.connection.invoke('LeaveAllEnvironmentMapsGroup')
+      log('ThumbnailSignalR: Left AllEnvironmentMapsGroup')
     }
   }
 
@@ -220,6 +270,21 @@ class ThumbnailSignalRService {
       this.activeVersionCallbacks.delete(callback)
       log(
         `ThumbnailSignalR: Unregistered ActiveVersionChanged callback. Total: ${this.activeVersionCallbacks.size}`
+      )
+    }
+  }
+
+  onEnvironmentMapThumbnailStatusChanged(
+    callback: EnvironmentMapThumbnailStatusChangedCallback
+  ): () => void {
+    this.environmentMapThumbnailStatusCallbacks.add(callback)
+    log(
+      `ThumbnailSignalR: Registered EnvironmentMapThumbnailStatusChanged callback. Total: ${this.environmentMapThumbnailStatusCallbacks.size}`
+    )
+    return () => {
+      this.environmentMapThumbnailStatusCallbacks.delete(callback)
+      log(
+        `ThumbnailSignalR: Unregistered EnvironmentMapThumbnailStatusChanged callback. Total: ${this.environmentMapThumbnailStatusCallbacks.size}`
       )
     }
   }

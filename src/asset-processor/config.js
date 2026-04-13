@@ -38,6 +38,22 @@ export const config = {
     enabled: process.env.ORBIT_ENABLED !== 'false', // enable orbit rendering
   },
 
+  // Environment map rendering settings
+  environmentMaps: {
+    cameraDistanceMultiplier:
+      parseFloat(process.env.ENVIRONMENT_MAP_CAMERA_DISTANCE_MULTIPLIER) || 0.9,
+    cameraHeight: parseFloat(process.env.ENVIRONMENT_MAP_CAMERA_HEIGHT) || 8,
+    sphereSegments: parseInt(process.env.ENVIRONMENT_MAP_SPHERE_SEGMENTS) || 96,
+    sphereMetalness:
+      parseFloat(process.env.ENVIRONMENT_MAP_SPHERE_METALNESS) || 1.0,
+    sphereRoughness:
+      parseFloat(process.env.ENVIRONMENT_MAP_SPHERE_ROUGHNESS) || 0.08,
+    environmentIntensity:
+      parseFloat(process.env.ENVIRONMENT_MAP_INTENSITY) || 1.2,
+    backgroundBlur:
+      parseFloat(process.env.ENVIRONMENT_MAP_BACKGROUND_BLUR) || 0.1,
+  },
+
   // Model processing settings
   modelProcessing: {
     maxPolygonCount: parseInt(process.env.MAX_POLYGON_COUNT) || 1000000, // 1M polygons by default
@@ -48,7 +64,7 @@ export const config = {
   // Frame encoding settings
   encoding: {
     enabled: process.env.ENCODING_ENABLED !== 'false', // enable frame encoding
-    framerate: parseFloat(process.env.ENCODING_FRAMERATE) || 10, // frames per second for WebP
+    framerate: parseFloat(process.env.ENCODING_FRAMERATE) || 5, // frames per second for WebP
     webpQuality: parseInt(process.env.WEBP_QUALITY) || 75, // WebP quality (0-100)
     jpegQuality: parseInt(process.env.JPEG_QUALITY) || 85, // JPEG quality for poster (0-100)
     cleanupTempFiles: process.env.CLEANUP_TEMP_FILES !== 'false', // cleanup temp files after encoding
@@ -148,6 +164,41 @@ export function validateConfig() {
 
   if (config.modelProcessing.normalizedScale <= 0) {
     errors.push('NORMALIZED_SCALE must be greater than 0')
+  }
+
+  if (config.environmentMaps.cameraDistanceMultiplier <= 0) {
+    errors.push(
+      'ENVIRONMENT_MAP_CAMERA_DISTANCE_MULTIPLIER must be greater than 0'
+    )
+  }
+
+  if (config.environmentMaps.sphereSegments < 16) {
+    errors.push('ENVIRONMENT_MAP_SPHERE_SEGMENTS must be at least 16')
+  }
+
+  if (
+    config.environmentMaps.sphereMetalness < 0 ||
+    config.environmentMaps.sphereMetalness > 1
+  ) {
+    errors.push('ENVIRONMENT_MAP_SPHERE_METALNESS must be between 0 and 1')
+  }
+
+  if (
+    config.environmentMaps.sphereRoughness < 0 ||
+    config.environmentMaps.sphereRoughness > 1
+  ) {
+    errors.push('ENVIRONMENT_MAP_SPHERE_ROUGHNESS must be between 0 and 1')
+  }
+
+  if (config.environmentMaps.environmentIntensity <= 0) {
+    errors.push('ENVIRONMENT_MAP_INTENSITY must be greater than 0')
+  }
+
+  if (
+    config.environmentMaps.backgroundBlur < 0 ||
+    config.environmentMaps.backgroundBlur > 1
+  ) {
+    errors.push('ENVIRONMENT_MAP_BACKGROUND_BLUR must be between 0 and 1')
   }
 
   if (config.encoding.framerate <= 0 || config.encoding.framerate > 60) {

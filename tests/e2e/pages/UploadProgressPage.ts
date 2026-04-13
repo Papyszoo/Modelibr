@@ -40,10 +40,10 @@ export class UploadProgressPage {
     /**
      * Wait for the upload progress window to be visible
      */
-    async waitForWindowVisible(): Promise<void> {
+    async waitForWindowVisible(timeout = 30000): Promise<void> {
         await this.page.waitForSelector(this.uploadWindow, {
             state: "visible",
-            timeout: 10000,
+            timeout,
         });
     }
 
@@ -146,6 +146,27 @@ export class UploadProgressPage {
         const button = this.page.locator(this.clearCompletedButton);
         await expect(button).toBeVisible();
         await button.click();
+    }
+
+    async closeWindowIfVisible(): Promise<void> {
+        const window = this.page.locator(
+            "#upload-progress-window, .upload-progress-window",
+        );
+        const closeButton = this.page
+            .locator(
+                '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times, .upload-progress-window button[aria-label="Close"], .upload-progress-window .pi-times',
+            )
+            .first();
+
+        const isVisible = await window.first().isVisible().catch(() => false);
+        if (!isVisible) {
+            return;
+        }
+
+        if (await closeButton.isVisible().catch(() => false)) {
+            await closeButton.click();
+            await expect(window.first()).not.toBeVisible({ timeout: 10000 });
+        }
     }
 
     /**

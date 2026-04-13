@@ -49,7 +49,7 @@ async function openTextureSetViewerForVerification(
         const viewerOpened = await page
             .locator(".texture-set-viewer, .p-dialog")
             .first()
-            .waitFor({ state: "visible", timeout: 5000 })
+            .waitFor({ state: "visible", timeout: 15000 })
             .then(() => true)
             .catch(() => false);
 
@@ -68,6 +68,73 @@ async function openTextureSetViewerForVerification(
             });
         }
     }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000] });
+}
+
+async function waitForTextureSetTextureTypes(
+    page: any,
+    setName: string,
+    textureTypes: string[],
+    timeoutMs: number = 30000,
+) {
+    const pollIntervalMs = 2000;
+    const start = Date.now();
+    const expectedTypeValues = new Set(
+        textureTypes.map(
+            (textureType) => TextureType[textureType as keyof typeof TextureType],
+        ),
+    );
+    let resolvedSet = getScenarioState(page).getTextureSet(setName);
+
+    while (Date.now() - start < timeoutMs) {
+        if (!resolvedSet?.id) {
+            throw new Error(`Texture set "${setName}" is missing from scenario state`);
+        }
+
+        let details: any;
+        try {
+            details = await apiHelper.getTextureSetById(resolvedSet.id);
+        } catch (error) {
+            const isNotFound =
+                error instanceof Error && error.message.includes("404");
+            if (!isNotFound || !resolvedSet.name) {
+                throw error;
+            }
+
+            const fallback = await apiHelper.getTextureSetByName(resolvedSet.name, {
+                requireTextures: false,
+            });
+
+            if (!fallback?.id) {
+                throw error;
+            }
+
+            resolvedSet = {
+                id: fallback.id,
+                name: fallback.name || resolvedSet.name,
+            };
+            getScenarioState(page).saveTextureSet(setName, resolvedSet);
+            details = fallback;
+        }
+
+        const presentTypes = new Set(
+            (details?.textures ?? []).map((texture: any) => Number(texture.textureType)),
+        );
+
+        if (
+            [...expectedTypeValues].every(
+                (textureType) =>
+                    textureType !== undefined && presentTypes.has(textureType),
+            )
+        ) {
+            return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+
+    throw new Error(
+        `Texture set "${setName}" did not contain ${textureTypes.join(", ")} within ${timeoutMs}ms`,
+    );
 }
 
 // ==================== Setup Steps ====================
@@ -144,8 +211,7 @@ When(
         const targetDisplayName = targetSet?.name || targetName;
 
         // Refresh the page to see newly created texture sets
-        await page.reload();
-        await page.waitForLoadState("domcontentloaded");
+        await page.reload({ waitUntil: "domcontentloaded" });
 
         // Wait for the texture set page to render, then switch to Model-Specific tab
         await page.waitForSelector(".kind-filter-select", { timeout: 10000 });
@@ -415,6 +481,14 @@ Then(
         const set = getScenarioState(page).getTextureSet(setName);
         const displayName = set?.name || setName;
 
+        if (set?.id) {
+            await waitForTextureSetTextureTypes(page, setName, [
+                "AO",
+                "Roughness",
+                "Metallic",
+            ]);
+        }
+
         await openTextureSetViewerForVerification(page, displayName, set?.id);
 
         // Try both "Texture Types" tab (new name) and "Textures" tab (old name)
@@ -439,21 +513,23 @@ Then(
             await oldTab.click();
         }
 
-        await expect(
-            page.locator(
-                '[data-texture-type="AO"], .texture-card:has-text("AO")',
-            ),
-        ).toBeVisible({ timeout: 5000 });
-        await expect(
-            page.locator(
-                '[data-texture-type="Roughness"], .texture-card:has-text("Roughness")',
-            ),
-        ).toBeVisible({ timeout: 5000 });
-        await expect(
-            page.locator(
-                '[data-texture-type="Metallic"], .texture-card:has-text("Metallic")',
-            ),
-        ).toBeVisible({ timeout: 5000 });
+        await expect(async () => {
+            await expect(
+                page.locator(
+                    '[data-texture-type="AO"], .texture-card:has-text("AO")',
+                ),
+            ).toBeVisible({ timeout: 5000 });
+            await expect(
+                page.locator(
+                    '[data-texture-type="Roughness"], .texture-card:has-text("Roughness")',
+                ),
+            ).toBeVisible({ timeout: 5000 });
+            await expect(
+                page.locator(
+                    '[data-texture-type="Metallic"], .texture-card:has-text("Metallic")',
+                ),
+            ).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000] });
         console.log(
             `[UI] "${displayName}" has AO, Roughness, and Metallic textures`,
         );

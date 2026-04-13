@@ -88,6 +88,16 @@ public static class PackEndpoints
             .WithName("Remove Sound from Pack")
             .WithSummary("Removes a sound from the specified pack")
             .WithOpenApi();
+
+        app.MapPost("/packs/{packId}/environment-maps/{environmentMapId}", AddEnvironmentMapToPack)
+            .WithName("Add Environment Map to Pack")
+            .WithSummary("Adds an environment map to the specified pack")
+            .WithOpenApi();
+
+        app.MapDelete("/packs/{packId}/environment-maps/{environmentMapId}", RemoveEnvironmentMapFromPack)
+            .WithName("Remove Environment Map from Pack")
+            .WithSummary("Removes an environment map from the specified pack")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> GetAllPacks(
@@ -300,6 +310,26 @@ public static class PackEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(new SetPackCustomThumbnailCommand(id, request.FileId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddEnvironmentMapToPack(
+        int packId,
+        int environmentMapId,
+        ICommandHandler<AddEnvironmentMapToPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new AddEnvironmentMapToPackCommand(packId, environmentMapId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveEnvironmentMapFromPack(
+        int packId,
+        int environmentMapId,
+        ICommandHandler<RemoveEnvironmentMapFromPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RemoveEnvironmentMapFromPackCommand(packId, environmentMapId), cancellationToken);
         return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
     }
 }

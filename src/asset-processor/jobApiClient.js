@@ -19,6 +19,7 @@ export class JobApiClient {
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
+        ...(config.workerApiKey ? { 'X-Api-Key': config.workerApiKey } : {}),
       },
       // Handle self-signed certificates in development/docker environments
       httpsAgent,
@@ -188,6 +189,51 @@ export class JobApiClient {
   }
 
   /**
+   * Finish an environment map thumbnail job (mark as completed or failed)
+   * @param {number} jobId - The job ID
+   * @param {boolean} success - Whether the job succeeded
+   * @param {Object} metadata - Thumbnail metadata (required when success=true)
+   * @param {string} metadata.thumbnailPath - Path to the stored thumbnail
+   * @param {string} errorMessage - Error message (required when success=false)
+   */
+  async finishEnvironmentMapJob(
+    jobId,
+    success,
+    metadata = {},
+    errorMessage = null
+  ) {
+    try {
+      const requestData = {
+        success,
+        thumbnailPath: metadata?.thumbnailPath || null,
+        errorMessage,
+      }
+
+      await this.apiClient.post(
+        `/thumbnail-jobs/environment-maps/${jobId}/finish`,
+        requestData
+      )
+      logger.info(
+        success
+          ? 'Marked environment map thumbnail job as completed'
+          : 'Marked environment map thumbnail job as failed',
+        {
+          jobId,
+          success,
+          ...(success ? { thumbnailMetadata: metadata } : { errorMessage }),
+        }
+      )
+    } catch (error) {
+      logger.error('Failed to finish environment map thumbnail job', {
+        jobId,
+        success,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
    * Mark a job as completed (convenience wrapper)
    * @deprecated Use finishJob with success=true instead
    */
@@ -244,6 +290,46 @@ export class JobApiClient {
     } catch (error) {
       logger.error('Failed to get sound file', {
         soundId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Get environment map details, including variants and file references.
+   * @param {number} environmentMapId - The environment map ID
+   * @returns {Promise<Object>} Environment map detail response
+   */
+  async getEnvironmentMap(environmentMapId) {
+    try {
+      const response = await this.apiClient.get(
+        `/environment-maps/${environmentMapId}`
+      )
+      return response.data
+    } catch (error) {
+      logger.error('Failed to get environment map', {
+        environmentMapId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Download a file stream by file ID.
+   * @param {number} fileId - The file ID
+   * @returns {Promise<Object>} File response with stream
+   */
+  async getFile(fileId) {
+    try {
+      const response = await this.apiClient.get(`/files/${fileId}`, {
+        responseType: 'stream',
+      })
+      return response
+    } catch (error) {
+      logger.error('Failed to get file', {
+        fileId,
         error: error.message,
       })
       throw error

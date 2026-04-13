@@ -2,6 +2,7 @@ import { ThumbnailProcessor } from './thumbnailProcessor.js'
 import { SoundProcessor } from './soundProcessor.js'
 import { MeshAnalysisProcessor } from './meshProcessor.js'
 import { TextureSetProcessor } from './textureSetProcessor.js'
+import { EnvironmentMapProcessor } from './environmentMapProcessor.js'
 import { config } from '../config.js'
 import logger from '../logger.js'
 
@@ -24,6 +25,7 @@ export class ProcessorRegistry {
     this.register('Model', new ThumbnailProcessor())
     this.register('Sound', new SoundProcessor())
     this.register('TextureSet', new TextureSetProcessor())
+    this.register('EnvironmentMap', new EnvironmentMapProcessor())
     // MeshAnalysis is registered but not yet functional
     this.register('MeshAnalysis', new MeshAnalysisProcessor())
 

@@ -10,6 +10,7 @@ public class Pack : AggregateRoot
     private readonly List<TextureSet> _textureSets = new();
     private readonly List<Sprite> _sprites = new();
     private readonly List<Sound> _sounds = new();
+    private readonly List<EnvironmentMap> _environmentMaps = new();
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
@@ -67,6 +68,17 @@ public class Pack : AggregateRoot
             _sounds.Clear();
             if (value != null)
                 _sounds.AddRange(value);
+        }
+    }
+
+    public ICollection<EnvironmentMap> EnvironmentMaps
+    {
+        get => _environmentMaps;
+        set
+        {
+            _environmentMaps.Clear();
+            if (value != null)
+                _environmentMaps.AddRange(value);
         }
     }
 
@@ -344,6 +356,37 @@ public class Pack : AggregateRoot
         return _sounds.AsReadOnly();
     }
 
+    public void AddEnvironmentMap(EnvironmentMap environmentMap, DateTime updatedAt)
+    {
+        if (environmentMap == null)
+            throw new ArgumentNullException(nameof(environmentMap));
+
+        if (_environmentMaps.Any(em => em.Id == environmentMap.Id))
+            return;
+
+        _environmentMaps.Add(environmentMap);
+        UpdatedAt = updatedAt;
+    }
+
+    public void RemoveEnvironmentMap(EnvironmentMap environmentMap, DateTime updatedAt)
+    {
+        if (environmentMap == null)
+            throw new ArgumentNullException(nameof(environmentMap));
+
+        if (_environmentMaps.Remove(environmentMap))
+            UpdatedAt = updatedAt;
+    }
+
+    public bool HasEnvironmentMap(int environmentMapId)
+    {
+        return _environmentMaps.Any(em => em.Id == environmentMapId);
+    }
+
+    public IReadOnlyList<EnvironmentMap> GetEnvironmentMaps()
+    {
+        return _environmentMaps.AsReadOnly();
+    }
+
     /// <summary>
     /// Gets the count of models in this pack.
     /// </summary>
@@ -364,10 +407,12 @@ public class Pack : AggregateRoot
     /// </summary>
     public int SoundCount => _sounds.Count;
 
+    public int EnvironmentMapCount => _environmentMaps.Count;
+
     /// <summary>
     /// Checks if the pack is empty (contains no models, texture sets, sprites, or sounds).
     /// </summary>
-    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0 && _sprites.Count == 0 && _sounds.Count == 0;
+    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0 && _sprites.Count == 0 && _sounds.Count == 0 && _environmentMaps.Count == 0;
 
     /// <summary>
     /// Gets a human-readable description of the pack.
@@ -375,7 +420,7 @@ public class Pack : AggregateRoot
     /// <returns>Description including name and content counts</returns>
     public string GetSummary()
     {
-        return $"{Name} ({_models.Count} models, {_textureSets.Count} texture sets, {_sprites.Count} sprites, {_sounds.Count} sounds)";
+        return $"{Name} ({_models.Count} models, {_textureSets.Count} texture sets, {_sprites.Count} sprites, {_sounds.Count} sounds, {_environmentMaps.Count} environment maps)";
     }
 
     private static void ValidateName(string name)

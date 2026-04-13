@@ -336,6 +336,7 @@ export function ProjectDetailsPanel({
               <span>{project.textureSetCount} texture sets</span>
               <span>{project.spriteCount} sprites</span>
               <span>{project.soundCount} sounds</span>
+              <span>{project.environmentMapCount ?? 0} environment maps</span>
             </div>
           </div>
         </aside>

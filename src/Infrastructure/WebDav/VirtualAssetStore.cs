@@ -116,6 +116,7 @@ public sealed class VirtualAssetStore : IStore
             "packs" => await ResolvePackPathAsync(sp, segments),
             "models" => await ResolveGlobalModelsPathAsync(sp, segments),
             "texturesets" => await ResolveGlobalTextureSetsPathAsync(sp, segments),
+            "environmentmaps" => await ResolveGlobalEnvironmentMapsPathAsync(sp, segments),
             "sprites" => await ResolveSpriteCategoryPathAsync(sp, segments),
             "sounds" => await ResolveSoundCategoryPathAsync(sp, segments),
             "selection" => ResolveSelectionPath(segments),
@@ -143,6 +144,9 @@ public sealed class VirtualAssetStore : IStore
                 .ThenInclude(s => s.File)
             .Include(p => p.Sounds)
                 .ThenInclude(s => s.File)
+            .Include(p => p.EnvironmentMaps)
+                .ThenInclude(e => e.Variants)
+                    .ThenInclude(v => v.File)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Name == name);
     }
@@ -214,6 +218,7 @@ public sealed class VirtualAssetStore : IStore
             {
                 "models" => new VirtualProjectModelsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger),
                 "texturesets" => new VirtualProjectTextureSetsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
+                "environmentmaps" => new VirtualProjectEnvironmentMapsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
                 "sprites" => new VirtualProjectSpritesCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
                 "sounds" => new VirtualProjectSoundsCollection(_collectionPropertyManager, _lockingManager, project, _itemPropertyManager, _pathProvider),
                 _ => null
@@ -227,6 +232,7 @@ public sealed class VirtualAssetStore : IStore
         {
             "models" => ResolveModelPath(project, assetName, segments),
             "texturesets" => ResolveTextureSetPath(project, assetName, segments),
+            "environmentmaps" => ResolveEnvironmentMapPath(project.EnvironmentMaps, assetName, segments, 4),
             "sprites" => ResolveProjectSpriteFile(project, assetName),
             "sounds" => ResolveProjectSoundFile(project, assetName),
             _ => null
@@ -517,7 +523,7 @@ public sealed class VirtualAssetStore : IStore
                 _pathProvider);
         }
 
-        var category = await categoryRepo.GetByNameAsync(categoryName);
+        var category = await categoryRepo.GetByNameAsync(categoryName, null);
         if (category == null)
             return null;
 
@@ -610,6 +616,9 @@ public sealed class VirtualAssetStore : IStore
                 .ThenInclude(s => s.File)
             .Include(p => p.Sounds)
                 .ThenInclude(s => s.File)
+            .Include(p => p.EnvironmentMaps)
+                .ThenInclude(e => e.Variants)
+                    .ThenInclude(v => v.File)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Name == name);
     }
@@ -679,6 +688,7 @@ public sealed class VirtualAssetStore : IStore
             {
                 "models" => new VirtualPackModelsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger),
                 "texturesets" => new VirtualPackTextureSetsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
+                "environmentmaps" => new VirtualPackEnvironmentMapsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
                 "sprites" => new VirtualPackSpritesCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
                 "sounds" => new VirtualPackSoundsCollection(_collectionPropertyManager, _lockingManager, pack, _itemPropertyManager, _pathProvider),
                 _ => null
@@ -692,6 +702,7 @@ public sealed class VirtualAssetStore : IStore
         {
             "models" => ResolvePackModelPath(pack, assetName, segments),
             "texturesets" => ResolvePackTextureSetPath(pack, assetName, segments),
+            "environmentmaps" => ResolveEnvironmentMapPath(pack.EnvironmentMaps, assetName, segments, 4),
             "sprites" => ResolvePackSpriteFile(pack, assetName),
             "sounds" => ResolvePackSoundFile(pack, assetName),
             _ => null
@@ -1004,6 +1015,101 @@ public sealed class VirtualAssetStore : IStore
         };
     }
 
+    private async Task<IStoreItem?> ResolveGlobalEnvironmentMapsPathAsync(IServiceProvider sp, string[] segments)
+    {
+        var environmentMapRepository = sp.GetRequiredService<IEnvironmentMapRepository>();
+
+        if (segments.Length == 1)
+        {
+            var environmentMaps = await environmentMapRepository.GetAllAsync();
+            return new VirtualAllEnvironmentMapsCollection(_collectionPropertyManager, _lockingManager, environmentMaps.ToList(), _itemPropertyManager, _pathProvider);
+        }
+
+        var mapName = Uri.UnescapeDataString(segments[1]);
+        var environmentMap = await environmentMapRepository.GetByNameAsync(mapName);
+        if (environmentMap == null || environmentMap.IsDeleted)
+            return null;
+
+        return ResolveEnvironmentMapCollection(environmentMap, segments, 2);
+    }
+
+    private IStoreItem? ResolveEnvironmentMapPath(IEnumerable<Domain.Models.EnvironmentMap> environmentMaps, string name, string[] segments, int baseIndex)
+    {
+        var environmentMap = environmentMaps.FirstOrDefault(e => !e.IsDeleted && e.Name == name);
+        return environmentMap == null ? null : ResolveEnvironmentMapCollection(environmentMap, segments, baseIndex);
+    }
+
+    private IStoreItem? ResolveEnvironmentMapCollection(Domain.Models.EnvironmentMap environmentMap, string[] segments, int subDirIndex)
+    {
+        if (segments.Length == subDirIndex)
+        {
+            return new VirtualEnvironmentMapCollection(_collectionPropertyManager, _lockingManager, environmentMap, _itemPropertyManager, _pathProvider);
+        }
+
+        var subDir = Uri.UnescapeDataString(segments[subDirIndex]).ToLowerInvariant();
+        if (segments.Length == subDirIndex + 1)
+        {
+            return subDir switch
+            {
+                "variants" => new VirtualEnvironmentMapVariantsCollection(_collectionPropertyManager, _lockingManager, environmentMap, _itemPropertyManager, _pathProvider),
+                "files" => new VirtualEnvironmentMapFilesCollection(_collectionPropertyManager, _lockingManager, environmentMap, _itemPropertyManager, _pathProvider),
+                _ => null
+            };
+        }
+
+        var fileName = Uri.UnescapeDataString(segments[subDirIndex + 1]);
+        return subDir switch
+        {
+            "variants" => ResolveEnvironmentMapVariantFile(environmentMap, fileName),
+            "files" => ResolveEnvironmentMapOriginalFile(environmentMap, fileName),
+            _ => null
+        };
+    }
+
+    private IStoreItem? ResolveEnvironmentMapVariantFile(Domain.Models.EnvironmentMap environmentMap, string fileName)
+    {
+        var file = environmentMap.Variants
+            .Where(v => !v.IsDeleted)
+            .SelectMany(EnvironmentMapWebDavNaming.GetVariantFiles)
+            .FirstOrDefault(v => v.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+            .File;
+
+        return file == null
+            ? null
+            : new VirtualAssetFile(
+                _itemPropertyManager,
+                _lockingManager,
+                fileName,
+                file.Sha256Hash,
+                file.SizeBytes,
+                file.MimeType,
+                file.CreatedAt,
+                file.UpdatedAt,
+                _pathProvider);
+    }
+
+    private IStoreItem? ResolveEnvironmentMapOriginalFile(Domain.Models.EnvironmentMap environmentMap, string fileName)
+    {
+        var file = environmentMap.Variants
+            .Where(v => !v.IsDeleted)
+            .SelectMany(EnvironmentMapWebDavNaming.GetOriginalFiles)
+            .FirstOrDefault(v => v.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+            .File;
+
+        return file == null
+            ? null
+            : new VirtualAssetFile(
+                _itemPropertyManager,
+                _lockingManager,
+                file.OriginalFileName,
+                file.Sha256Hash,
+                file.SizeBytes,
+                file.MimeType,
+                file.CreatedAt,
+                file.UpdatedAt,
+                _pathProvider);
+    }
+
     private async Task<IStoreItem?> ResolveSpriteCategoryPathAsync(IServiceProvider sp, string[] segments)
     {
         var categoryRepo = sp.GetRequiredService<ISpriteCategoryRepository>();
@@ -1053,7 +1159,7 @@ public sealed class VirtualAssetStore : IStore
                 _pathProvider);
         }
 
-        var category = await categoryRepo.GetByNameAsync(categoryName);
+        var category = await categoryRepo.GetByNameAsync(categoryName, null);
         if (category == null)
             return null;
 
