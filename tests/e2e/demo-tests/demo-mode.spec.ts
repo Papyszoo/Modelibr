@@ -410,7 +410,7 @@ test.describe("demo mode e2e", () => {
         }
     });
 
-    test("shows the demo-only Blender settings restriction", async ({
+    test("locks Blender, SSL, and WebDAV settings sections in demo mode", async ({
         page,
     }) => {
         const settingsPage = new SettingsPage(page);
@@ -418,12 +418,33 @@ test.describe("demo mode e2e", () => {
         await settingsPage.navigateToSettings();
         await settingsPage.waitForLoaded();
 
-        await expect(page.locator(".settings-demo-warning")).toHaveText(
-            "Blender settings are not available in demo mode.",
-        );
+        const lockedSections = page.locator(".settings-section-header--locked");
+        await expect(lockedSections).toHaveCount(3);
+
+        // Verify each locked section shows the notice text
+        for (const name of ["Blender Settings", "SSL Certificate", "WebDAV"]) {
+            const header = page.locator(".settings-section-header--locked", {
+                hasText: name,
+            });
+            await expect(header).toBeVisible();
+            await expect(
+                header.locator(".settings-demo-notice"),
+            ).toHaveText("Not available in demo mode");
+        }
+
+        // Verify clicking a locked section does NOT expand it
+        const blenderHeader = page.locator(".settings-section-header--locked", {
+            hasText: "Blender Settings",
+        });
+        await blenderHeader.click();
+        // The section content should NOT appear
+        const blenderContent = blenderHeader
+            .locator("..")
+            .locator(".settings-section-content");
+        await expect(blenderContent).toHaveCount(0);
     });
 
-    test("shows the demo mode banner with reset button", async ({ page }) => {
+    test("shows the demo mode banner with reset and info buttons", async ({ page }) => {
         const modelListPage = new ModelListPage(page);
         await modelListPage.goto();
 
@@ -436,7 +457,23 @@ test.describe("demo mode e2e", () => {
 
         const resetButton = page.getByTestId("demo-banner-reset");
         await expect(resetButton).toBeVisible();
-        await expect(resetButton).toHaveText("Reset");
+        await expect(resetButton).toContainText("Reset");
+
+        // Info button opens the limitations modal
+        const infoButton = page.getByTestId("demo-banner-info");
+        await expect(infoButton).toBeVisible();
+        await infoButton.click();
+
+        const dialog = page.getByTestId("demo-info-dialog");
+        await expect(dialog).toBeVisible();
+        await expect(dialog).toContainText("Demo Mode Limitations");
+        await expect(dialog).toContainText("Blender Integration");
+        await expect(dialog).toContainText("SSL Certificate");
+        await expect(dialog).toContainText("WebDAV");
+
+        // Close the modal via the close button
+        await dialog.getByRole("button", { name: "Close" }).click();
+        await expect(dialog).toBeHidden();
     });
 
     test("shows a thumbnail for seeded environment maps", async ({ page }) => {
@@ -469,5 +506,30 @@ test.describe("demo mode e2e", () => {
         await expect(soundCard.locator("img.sound-waveform")).toBeVisible({
             timeout: 30000,
         });
+    });
+
+    test("shows waveform after uploading a new sound without refresh", async ({
+        page,
+    }) => {
+        const upload = await createUploadCopy(
+            "test-tone.wav",
+            `DemoUploadSound-${Date.now()}.wav`,
+        );
+        const soundListPage = new SoundListPage(page);
+
+        try {
+            await soundListPage.goto();
+            await soundListPage.uploadSound(upload.filePath);
+            await soundListPage.waitForSoundByName("DemoUploadSound", 15000);
+
+            // The waveform should appear automatically (generated during upload handler)
+            const uploadedCard =
+                soundListPage.getSoundCardByName("DemoUploadSound");
+            await expect(
+                uploadedCard.locator("img.sound-waveform"),
+            ).toBeVisible({ timeout: 30000 });
+        } finally {
+            await upload.cleanup();
+        }
     });
 });

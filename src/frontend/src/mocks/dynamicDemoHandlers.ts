@@ -2887,6 +2887,18 @@ export const dynamicDemoHandlers = [
       updatedAt: ts,
       waveformUrl: null,
     }
+
+    // Generate waveform before persisting so the response includes the URL
+    try {
+      const result = await generateWaveformThumbnail(file)
+      sound.duration = result.duration
+      sound.peaks = JSON.stringify(result.peaks)
+      sound.waveformUrl = `/sounds/${soundId}/waveform`
+      await storeThumbnail(`waveform:${soundId}`, result.thumbnail)
+    } catch {
+      // Waveform generation failed — leave waveformUrl as null
+    }
+
     await put('sounds', sound)
 
     // Track upload
@@ -2920,21 +2932,6 @@ export const dynamicDemoHandlers = [
         spriteName: null,
       })
     }
-
-    // Generate waveform asynchronously
-    generateWaveformThumbnail(file)
-      .then(async result => {
-        const current = await getById('sounds', soundId)
-        if (!current) return
-        current.duration = result.duration
-        current.peaks = JSON.stringify(result.peaks)
-        current.waveformUrl = `/sounds/${soundId}/waveform`
-        await put('sounds', current)
-        await storeThumbnail(`waveform:${soundId}`, result.thumbnail)
-      })
-      .catch(() => {
-        // Waveform generation failed, leave as-is
-      })
 
     // Auto-add to pack/project if specified
     const packId = url.searchParams.get('packId')

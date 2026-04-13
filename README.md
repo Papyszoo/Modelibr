@@ -4,7 +4,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-0.180-000000)](https://threejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Supported-2496ED)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/License-BSL_1.1-blue)](LICENSE)
 
 Modelibr is a self-hosted game asset library. It keeps **models**, **texture sets**, **environment maps**, **sprites**, and **sounds** in one place, lets you preview them in the browser, and helps you organize them into **projects** and reusable **packs**.
 
@@ -91,4 +91,4 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+Business Source License 1.1 — free to use, modify, and self-host. See [LICENSE](LICENSE) for details.

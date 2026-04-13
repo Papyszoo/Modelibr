@@ -1073,7 +1073,7 @@ export async function seedIfEmpty(): Promise<void> {
       fileId: 501,
       categoryId: null,
       categoryName: null,
-      duration: 2000,
+      duration: 2,
       peaks: null,
       fileName: 'test-tone.wav',
       fileSizeBytes: 88200,

@@ -768,7 +768,7 @@ export async function generateWaveformThumbnail(
     )
   })
 
-  return { thumbnail, peaks, duration: Math.round(duration * 1000) }
+  return { thumbnail, peaks, duration }
 }
 
 // ─── EXR Channel Previews ───────────────────────────────────────────────
@@ -782,6 +782,38 @@ function toneMapReinhard(value: number): number {
   const mapped = value / (1 + value)
   const srgb = Math.pow(mapped, 1 / 2.2)
   return Math.min(255, Math.round(srgb * 255))
+}
+
+/**
+ * Compute an auto-exposure factor from HDR pixel data using log-average
+ * luminance. This prevents the common problem of HDR images appearing
+ * almost entirely white when tone-mapped without exposure adjustment.
+ */
+function computeAutoExposure(
+  data: Float32Array | Float64Array,
+  pixelCount: number,
+  stride: number
+): number {
+  const DELTA = 1e-4 // avoid log(0)
+  let logSum = 0
+  let validCount = 0
+
+  for (let i = 0; i < pixelCount; i++) {
+    const idx = i * stride
+    const r = Math.abs(data[idx])
+    const g = stride >= 3 ? Math.abs(data[idx + 1]) : r
+    const b = stride >= 3 ? Math.abs(data[idx + 2]) : r
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    logSum += Math.log(lum + DELTA)
+    validCount++
+  }
+
+  if (validCount === 0) return 1.0
+  const logAvg = Math.exp(logSum / validCount)
+  // Target mid-grey (0.18) divided by scene average
+  const exposure = 0.18 / Math.max(logAvg, DELTA)
+  // Clamp to a reasonable range
+  return Math.max(0.01, Math.min(exposure, 20.0))
 }
 
 /**
@@ -803,6 +835,8 @@ export async function generateExrChannelPreview(
   const isRGBA = exrData.format === 1023
   const pixelStride = isRGBA ? 4 : 1
 
+  const exposure = computeAutoExposure(data, width * height, pixelStride)
+
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -815,9 +849,9 @@ export async function generateExrChannelPreview(
     const dstIdx = i * 4
 
     if (isRGBA) {
-      const r = toneMapReinhard(data[srcIdx])
-      const g = toneMapReinhard(data[srcIdx + 1])
-      const b = toneMapReinhard(data[srcIdx + 2])
+      const r = toneMapReinhard(exposure * data[srcIdx])
+      const g = toneMapReinhard(exposure * data[srcIdx + 1])
+      const b = toneMapReinhard(exposure * data[srcIdx + 2])
 
       switch (channel) {
         case 'r':
@@ -842,7 +876,7 @@ export async function generateExrChannelPreview(
           break
       }
     } else {
-      const val = toneMapReinhard(data[srcIdx])
+      const val = toneMapReinhard(exposure * data[srcIdx])
       pixels[dstIdx] = val
       pixels[dstIdx + 1] = val
       pixels[dstIdx + 2] = val
@@ -875,6 +909,8 @@ export async function generateHdrChannelPreview(
   const hdrData = loader.parse(arrayBuffer)
   const { width, height, data } = hdrData
 
+  const exposure = computeAutoExposure(data, width * height, 4)
+
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -887,9 +923,9 @@ export async function generateHdrChannelPreview(
     const srcIdx = i * 4
     const dstIdx = i * 4
 
-    const r = toneMapReinhard(data[srcIdx])
-    const g = toneMapReinhard(data[srcIdx + 1])
-    const b = toneMapReinhard(data[srcIdx + 2])
+    const r = toneMapReinhard(exposure * data[srcIdx])
+    const g = toneMapReinhard(exposure * data[srcIdx + 1])
+    const b = toneMapReinhard(exposure * data[srcIdx + 2])
 
     switch (channel) {
       case 'r':
