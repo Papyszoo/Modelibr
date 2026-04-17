@@ -20,6 +20,7 @@ public class CreateModelFromBlendCommandHandlerTests
     private readonly Mock<IFileCreationService> _mockFileCreationService;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     private readonly Mock<IDomainEventDispatcher> _mockEventDispatcher;
+    private readonly Mock<ISettingRepository> _mockSettingRepository;
     private readonly CreateModelFromBlendCommandHandler _handler;
 
     public CreateModelFromBlendCommandHandlerTests()
@@ -29,13 +30,15 @@ public class CreateModelFromBlendCommandHandlerTests
         _mockFileCreationService = new Mock<IFileCreationService>();
         _mockDateTimeProvider = new Mock<IDateTimeProvider>();
         _mockEventDispatcher = new Mock<IDomainEventDispatcher>();
+        _mockSettingRepository = new Mock<ISettingRepository>();
 
         _handler = new CreateModelFromBlendCommandHandler(
             _mockModelRepository.Object,
             _mockVersionRepository.Object,
             _mockFileCreationService.Object,
             _mockDateTimeProvider.Object,
-            _mockEventDispatcher.Object);
+            _mockEventDispatcher.Object,
+            _mockSettingRepository.Object);
     }
 
     private static IFileUpload CreateFakeBlendUpload(string fileName = "MyModel.blend")

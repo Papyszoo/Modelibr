@@ -17,19 +17,22 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IDomainEventDispatcher _domainEventDispatcher;
+    private readonly ISettingRepository _settingRepository;
 
     public CreateModelFromBlendCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
-        IDomainEventDispatcher domainEventDispatcher)
+        IDomainEventDispatcher domainEventDispatcher,
+        ISettingRepository settingRepository)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
         _domainEventDispatcher = domainEventDispatcher;
+        _settingRepository = settingRepository;
     }
 
     public async Task<Result<CreateModelFromBlendResponse>> Handle(
@@ -60,6 +63,15 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
 
         // Create model
         var modelName = command.ModelName;
+
+        // Resolve name collision based on ModelDuplicateNamePolicy setting
+        var nameResult = await ModelNameService.ResolveNameAsync(
+            modelName, _modelRepository, _settingRepository, cancellationToken);
+        if (nameResult.IsFailure)
+            return Result.Failure<CreateModelFromBlendResponse>(nameResult.Error);
+
+        modelName = nameResult.Value;
+
         try
         {
             var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
