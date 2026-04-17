@@ -257,4 +257,123 @@ public class CreateModelFromBlendCommandHandlerTests
         Assert.True(validationResult.IsSuccess);
         Assert.Equal(FileType.Blend, validationResult.Value);
     }
+
+    [Fact]
+    public async Task Handle_WithDuplicateName_WhenPolicyIsReject_ReturnsFailure()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
+
+        var fileUpload = CreateFakeBlendUpload("Chair.blend");
+        var command = new CreateModelFromBlendCommand("Chair", fileUpload);
+
+        var hash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+        var fileEntity = DomainFile.Create(
+            "Chair.blend", "Chair.blend", "/uploads/ab/cd/" + hash,
+            "application/octet-stream", FileType.Blend, 7, hash, now);
+
+        _mockFileCreationService
+            .Setup(x => x.CreateOrGetExistingFileAsync(fileUpload, It.IsAny<FileType>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(fileEntity));
+
+        _mockModelRepository
+            .Setup(x => x.GetByFileHashAsync(hash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Model?)null);
+
+        // Name already exists
+        _mockModelRepository
+            .Setup(x => x.ExistsByNameAsync("Chair", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Policy is Reject (default)
+        _mockSettingRepository
+            .Setup(x => x.GetByKeyAsync("ModelDuplicateNamePolicy", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Setting?)null);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsFailure);
+        Assert.Equal("ModelNameAlreadyExists", result.Error.Code);
+        _mockModelRepository.Verify(x => x.AddAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WithDuplicateName_WhenPolicyIsAutoRename_CreatesModelWithRenamedName()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
+
+        var fileUpload = CreateFakeBlendUpload("Chair.blend");
+        var command = new CreateModelFromBlendCommand("Chair", fileUpload);
+
+        var hash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+        var fileEntity = DomainFile.Create(
+            "Chair.blend", "Chair.blend", "/uploads/ab/cd/" + hash,
+            "application/octet-stream", FileType.Blend, 7, hash, now);
+        typeof(DomainFile).GetProperty("Id")!.SetValue(fileEntity, 1);
+
+        _mockFileCreationService
+            .Setup(x => x.CreateOrGetExistingFileAsync(fileUpload, It.IsAny<FileType>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(fileEntity));
+
+        _mockModelRepository
+            .Setup(x => x.GetByFileHashAsync(hash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Model?)null);
+
+        // Name already exists
+        _mockModelRepository
+            .Setup(x => x.ExistsByNameAsync("Chair", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Policy is AutoRename
+        var policySetting = Setting.Create("ModelDuplicateNamePolicy", "AutoRename", now);
+        _mockSettingRepository
+            .Setup(x => x.GetByKeyAsync("ModelDuplicateNamePolicy", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(policySetting);
+
+        // Existing names for prefix
+        _mockModelRepository
+            .Setup(x => x.GetNamesByPrefixAsync("Chair", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<string> { "Chair" });
+
+        Model? capturedModel = null;
+        _mockModelRepository
+            .Setup(x => x.AddAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
+            .Callback<Model, CancellationToken>((m, _) => capturedModel = m)
+            .ReturnsAsync((Model m, CancellationToken _) =>
+            {
+                typeof(Model).GetProperty("Id")!.SetValue(m, 42);
+                return m;
+            });
+
+        _mockVersionRepository
+            .Setup(x => x.AddAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion v, CancellationToken _) =>
+            {
+                typeof(ModelVersion).GetProperty("Id")!.SetValue(v, 100);
+                return v;
+            });
+
+        _mockModelRepository
+            .Setup(x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _mockEventDispatcher
+            .Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(42, result.Value.ModelId);
+        Assert.False(result.Value.AlreadyExists);
+        Assert.NotNull(capturedModel);
+        Assert.Equal("Chair (2)", capturedModel!.Name);
+    }
 }
