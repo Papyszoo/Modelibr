@@ -66,6 +66,7 @@ export const systemHandlers = [
       textureProxySize: 512,
       blenderPath: 'blender',
       blenderEnabled: false,
+      modelDuplicateNamePolicy: 'Reject',
       createdAt: '2025-01-15T10:00:00Z',
       updatedAt: '2025-01-15T10:00:00Z',
     })
@@ -141,6 +142,15 @@ export const systemHandlers = [
       downloadedBytes: null,
       totalBytes: null,
       error: null,
+    })
+  }),
+
+  http.put('*/settings/:key', async ({ params, request }) => {
+    const body = (await request.json()) as { value: string }
+    return HttpResponse.json({
+      key: params.key,
+      value: body.value,
+      updatedAt: now(),
     })
   }),
 
