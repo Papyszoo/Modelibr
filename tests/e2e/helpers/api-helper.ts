@@ -363,6 +363,23 @@ export class ApiHelper {
     }
 
     /**
+     * Upload a model via REST API, returning the raw response status and data.
+     * Does not throw on non-200 status — useful for testing error responses (e.g., 409 Conflict).
+     */
+    async uploadModelRaw(
+        filePath: string,
+    ): Promise<{ status: number; data: any }> {
+        const formData = new FormData();
+        formData.append("file", fs.createReadStream(filePath));
+
+        const response = await this.client.post("/models", formData, {
+            headers: formData.getHeaders(),
+        });
+
+        return { status: response.status, data: response.data };
+    }
+
+    /**
      * Create a pack
      */
     async createPack(
@@ -865,6 +882,32 @@ export class ApiHelper {
             throw new Error(`Failed to get model version: ${response.status}`);
         }
         return response.data.files || [];
+    }
+
+    // ── Setting helpers ────────────────────────────────────────────────
+
+    /**
+     * Update a single setting by key via PUT /settings/{key}.
+     */
+    async updateSetting(
+        key: string,
+        value: string,
+    ): Promise<{ status: number; data: any }> {
+        const response = await this.client.put(`/settings/${encodeURIComponent(key)}`, {
+            value,
+        });
+        return { status: response.status, data: response.data };
+    }
+
+    /**
+     * Get all settings via GET /settings.
+     */
+    async getSettings(): Promise<any> {
+        const response = await this.client.get("/settings");
+        if (response.status !== 200) {
+            throw new Error(`Failed to get settings: ${response.status}`);
+        }
+        return response.data;
     }
 
     // ── WebDAV verb helpers ──────────────────────────────────────────────
