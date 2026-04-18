@@ -20,8 +20,37 @@ import {
     loadAllPersistedTextureSetIds,
 } from "./fixtures/setup-state-bridge";
 
+async function ensureAutoRenamePolicy() {
+    const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
+    try {
+        const response = await fetch(
+            `${API_BASE}/settings/ModelDuplicateNamePolicy`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ value: "AutoRename" }),
+            },
+        );
+        if (!response.ok) {
+            throw new Error(
+                `PUT /settings/ModelDuplicateNamePolicy returned ${response.status}`,
+            );
+        }
+        console.log(
+            `[GlobalSetup] ModelDuplicateNamePolicy → AutoRename (${response.status})`,
+        );
+    } catch (e) {
+        console.error(
+            `[GlobalSetup] FATAL: Failed to set ModelDuplicateNamePolicy: ${e}`,
+        );
+        throw e;
+    }
+}
+
 export default async function globalSetup() {
     console.log("\n[GlobalSetup] Running pre-test cleanup...");
+
+    await ensureAutoRenamePolicy();
 
     const isSetupPhase = process.env.PW_PHASE === "setup";
 

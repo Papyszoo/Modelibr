@@ -15,10 +15,16 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { Given, When, Then } = createBdd();
+const { Given, When, Then, After } = createBdd();
 
 const ASSETS_DIR = path.join(__dirname, "..", "assets");
 const api = new ApiHelper();
+
+// Restore AutoRename policy after duplicate-name scenarios to prevent poisoning later tests
+After({ tags: "@blend-duplicate-reject or @blend-duplicate-autorename or @blend-duplicate-rest-reject" }, async () => {
+    await api.updateSetting("ModelDuplicateNamePolicy", "AutoRename");
+    console.log("[Cleanup] Restored ModelDuplicateNamePolicy to AutoRename");
+});
 
 const BLENDER_VERSION = "5.1.0";
 let blenderInstallVerified = false;
