@@ -341,9 +341,18 @@ Given(
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
         expect(data.id).toBeTruthy();
-        const actualName = path
-            .basename(uniqueFilePath)
-            .replace(/\.[^/.]+$/, "");
+
+        // Fetch the actual model name from the server (may differ due to AutoRename policy)
+        const detailResp = await page.request.get(
+            `${API_BASE}/models/${data.id}`,
+        );
+        const detailData = detailResp.ok()
+            ? await detailResp.json()
+            : null;
+        const actualName =
+            detailData?.name ||
+            path.basename(uniqueFilePath).replace(/\.[^/.]+$/, "");
+
         getScenarioState(page).saveModel(modelName, {
             id: data.id,
             name: actualName,
