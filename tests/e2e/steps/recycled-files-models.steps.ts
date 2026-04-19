@@ -59,6 +59,7 @@ GivenBdd(
         const modelDetailResponse = await page.request.get(
             `${API_BASE_URL}/models/${uploadData.id}`,
         );
+        expect(modelDetailResponse.ok()).toBe(true);
         const modelDetail = await modelDetailResponse.json();
         recycleTracker.modelName = modelDetail.name || "test-cube";
         // Track by alias for multi-model scenarios
@@ -114,6 +115,7 @@ GivenBdd(
         const modelDetailResponse = await page.request.get(
             `${API_BASE_URL}/models/${uploadData.id}`,
         );
+        expect(modelDetailResponse.ok()).toBe(true);
         const modelDetail = await modelDetailResponse.json();
         recycleTracker.modelName = modelDetail.name || "test-cube";
         modelsByAlias.set(modelName, {

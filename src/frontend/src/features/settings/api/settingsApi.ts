@@ -120,6 +120,8 @@ export async function updateSetting(
   key: string,
   value: string
 ): Promise<{ key: string; value: string; updatedAt: string }> {
-  const response = await client.put(`/settings/${key}`, { value })
+  const response = await client.put(`/settings/${encodeURIComponent(key)}`, {
+    value,
+  })
   return response.data
 }
