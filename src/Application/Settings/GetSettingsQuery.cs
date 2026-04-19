@@ -15,7 +15,7 @@ public record GetSettingsQueryResponse(
     int TextureProxySize,
     string BlenderPath,
     bool BlenderEnabled,
-    string ModelDuplicateNamePolicy,
+    string DuplicateNamePolicy,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

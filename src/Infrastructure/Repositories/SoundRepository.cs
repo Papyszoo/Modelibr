@@ -137,6 +137,22 @@ internal sealed class SoundRepository : ISoundRepository
             .FirstOrDefaultAsync(s => s.File.Sha256Hash == sha256Hash, cancellationToken);
     }
 
+    public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        return await _context.Sounds
+            .AsNoTracking()
+            .AnyAsync(s => s.Name == name, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        return await _context.Sounds
+            .AsNoTracking()
+            .Where(s => s.Name.StartsWith(prefix))
+            .Select(s => s.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Sound> UpdateAsync(Sound sound, CancellationToken cancellationToken = default)
     {
         if (sound == null)

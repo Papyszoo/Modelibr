@@ -43,7 +43,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
                 var textureProxySizeSetting = await _settingRepository.GetByKeyAsync(SettingKeys.TextureProxySize, cancellationToken);
                 var blenderPathSetting = await _settingRepository.GetByKeyAsync(SettingKeys.BlenderPath, cancellationToken);
                 var blenderEnabledSetting = await _settingRepository.GetByKeyAsync(SettingKeys.BlenderEnabled, cancellationToken);
-                var modelDuplicateNamePolicySetting = await _settingRepository.GetByKeyAsync(SettingKeys.ModelDuplicateNamePolicy, cancellationToken);
+                var modelDuplicateNamePolicySetting = await _settingRepository.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, cancellationToken);
                 var response = new GetSettingsQueryResponse(
                     long.Parse(maxFileSizeBytesSetting.Value),
                     long.Parse(maxThumbnailSizeBytesSetting?.Value ?? "10485760"),
@@ -78,7 +78,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             settings.TextureProxySize,
             (await _settingRepository.GetByKeyAsync(SettingKeys.BlenderPath, cancellationToken))?.Value ?? "blender",
             bool.Parse((await _settingRepository.GetByKeyAsync(SettingKeys.BlenderEnabled, cancellationToken))?.Value ?? "false"),
-            (await _settingRepository.GetByKeyAsync(SettingKeys.ModelDuplicateNamePolicy, cancellationToken))?.Value ?? "Reject",
+            (await _settingRepository.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, cancellationToken))?.Value ?? "Reject",
             settings.CreatedAt,
             settings.UpdatedAt
         );

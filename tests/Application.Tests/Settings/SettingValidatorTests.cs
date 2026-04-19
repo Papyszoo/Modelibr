@@ -146,7 +146,7 @@ public class SettingValidatorTests
     public void ValidateSetting_ModelDuplicateNamePolicy_ValidatesCorrectly(string value, bool shouldSucceed)
     {
         // Act
-        var result = SettingValidator.ValidateSetting(SettingKeys.ModelDuplicateNamePolicy, value);
+        var result = SettingValidator.ValidateSetting(SettingKeys.DuplicateNamePolicy, value);
 
         // Assert
         Assert.Equal(shouldSucceed, result.IsSuccess);

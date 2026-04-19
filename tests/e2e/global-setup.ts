@@ -24,7 +24,7 @@ async function ensureAutoRenamePolicy() {
     const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
     try {
         const response = await fetch(
-            `${API_BASE}/settings/ModelDuplicateNamePolicy`,
+            `${API_BASE}/settings/DuplicateNamePolicy`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -33,15 +33,15 @@ async function ensureAutoRenamePolicy() {
         );
         if (!response.ok) {
             throw new Error(
-                `PUT /settings/ModelDuplicateNamePolicy returned ${response.status}`,
+                `PUT /settings/DuplicateNamePolicy returned ${response.status}`,
             );
         }
         console.log(
-            `[GlobalSetup] ModelDuplicateNamePolicy → AutoRename (${response.status})`,
+            `[GlobalSetup] DuplicateNamePolicy → AutoRename (${response.status})`,
         );
     } catch (e) {
         console.error(
-            `[GlobalSetup] FATAL: Failed to set ModelDuplicateNamePolicy: ${e}`,
+            `[GlobalSetup] FATAL: Failed to set DuplicateNamePolicy: ${e}`,
         );
         throw e;
     }

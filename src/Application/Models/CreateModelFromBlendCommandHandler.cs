@@ -64,9 +64,12 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
         // Create model
         var modelName = command.ModelName;
 
-        // Resolve name collision based on ModelDuplicateNamePolicy setting
-        var nameResult = await ModelNameService.ResolveNameAsync(
-            modelName, _modelRepository, _settingRepository, cancellationToken);
+        // Resolve name collision based on DuplicateNamePolicy setting
+        var nameResult = await AssetNameService.ResolveNameAsync(
+            modelName, "Model",
+            _modelRepository.ExistsByNameAsync,
+            _modelRepository.GetNamesByPrefixAsync,
+            _settingRepository, cancellationToken);
         if (nameResult.IsFailure)
             return Result.Failure<CreateModelFromBlendResponse>(nameResult.Error);
 

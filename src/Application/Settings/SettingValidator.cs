@@ -21,7 +21,7 @@ internal static class SettingValidator
             SettingKeys.TextureProxySize => ValidateTextureProxySize(value),
             SettingKeys.BlenderPath => ValidateBlenderPath(value),
             SettingKeys.BlenderEnabled => ValidateBlenderEnabled(value),
-            SettingKeys.ModelDuplicateNamePolicy => ValidateModelDuplicateNamePolicy(value),
+            SettingKeys.DuplicateNamePolicy => ValidateDuplicateNamePolicy(value),
             _ => Result.Success() // Unknown keys are allowed for extensibility
         };
     }
@@ -150,10 +150,10 @@ internal static class SettingValidator
         return Result.Success();
     }
 
-    private static Result ValidateModelDuplicateNamePolicy(string value)
+    private static Result ValidateDuplicateNamePolicy(string value)
     {
         if (value is not ("Reject" or "AutoRename"))
-            return Result.Failure(new Error("InvalidSetting", "ModelDuplicateNamePolicy must be 'Reject' or 'AutoRename'."));
+            return Result.Failure(new Error("InvalidSetting", "DuplicateNamePolicy must be 'Reject' or 'AutoRename'."));
 
         return Result.Success();
     }

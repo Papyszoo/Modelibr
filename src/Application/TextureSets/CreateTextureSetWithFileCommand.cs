@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
 using Application.Abstractions.Services;
+using Application.Models;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -17,6 +18,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
     private readonly ITextureSetCategoryRepository _textureSetCategoryRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ILogger<CreateTextureSetWithFileCommandHandler> _logger;
@@ -26,6 +28,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
         ITextureSetCategoryRepository textureSetCategoryRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
         ILogger<CreateTextureSetWithFileCommandHandler> logger)
@@ -34,6 +37,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
         _textureSetCategoryRepository = textureSetCategoryRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
         _logger = logger;
@@ -73,8 +77,17 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
                 }
             }
 
-            // 3. Create the texture set
-            var textureSet = TextureSet.Create(command.Name, _dateTimeProvider.UtcNow, command.Kind);
+            // 3. Resolve name collision based on DuplicateNamePolicy setting
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                command.Name, "TextureSet",
+                _textureSetRepository.ExistsByNameAsync,
+                _textureSetRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
+                return Result.Failure<CreateTextureSetWithFileResponse>(nameResult.Error);
+
+            // 4. Create the texture set with resolved name
+            var textureSet = TextureSet.Create(nameResult.Value, _dateTimeProvider.UtcNow, command.Kind);
             textureSet.AssignCategory(command.CategoryId, _dateTimeProvider.UtcNow);
             var createdTextureSet = await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 

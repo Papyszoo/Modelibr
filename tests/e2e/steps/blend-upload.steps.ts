@@ -22,8 +22,8 @@ const api = new ApiHelper();
 
 // Restore AutoRename policy after duplicate-name scenarios to prevent poisoning later tests
 After({ tags: "@blend-duplicate-reject or @blend-duplicate-autorename or @blend-duplicate-rest-reject" }, async () => {
-    await api.updateSetting("ModelDuplicateNamePolicy", "AutoRename");
-    console.log("[Cleanup] Restored ModelDuplicateNamePolicy to AutoRename");
+    await api.updateSetting("DuplicateNamePolicy", "AutoRename");
+    console.log("[Cleanup] Restored DuplicateNamePolicy to AutoRename");
 });
 
 const BLENDER_VERSION = "5.1.0";
@@ -699,15 +699,15 @@ Given(
 );
 
 Given(
-    "the ModelDuplicateNamePolicy setting is {string}",
+    "the DuplicateNamePolicy setting is {string}",
     async ({}, policy: string) => {
         const result = await api.updateSetting(
-            "ModelDuplicateNamePolicy",
+            "DuplicateNamePolicy",
             policy,
         );
         expect(result.status).toBe(200);
         console.log(
-            `[Settings] Set ModelDuplicateNamePolicy to "${policy}" (status=${result.status})`,
+            `[Settings] Set DuplicateNamePolicy to "${policy}" (status=${result.status})`,
         );
     },
 );

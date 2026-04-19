@@ -289,7 +289,7 @@ public class CreateModelFromBlendCommandHandlerTests
 
         // Policy is Reject (default)
         _mockSettingRepository
-            .Setup(x => x.GetByKeyAsync(SettingKeys.ModelDuplicateNamePolicy, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Setting?)null);
 
         // Act
@@ -331,9 +331,9 @@ public class CreateModelFromBlendCommandHandlerTests
             .ReturnsAsync(true);
 
         // Policy is AutoRename
-        var policySetting = Setting.Create(SettingKeys.ModelDuplicateNamePolicy, "AutoRename", now);
+        var policySetting = Setting.Create(SettingKeys.DuplicateNamePolicy, "AutoRename", now);
         _mockSettingRepository
-            .Setup(x => x.GetByKeyAsync(SettingKeys.ModelDuplicateNamePolicy, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, It.IsAny<CancellationToken>()))
             .ReturnsAsync(policySetting);
 
         // Existing names for prefix
