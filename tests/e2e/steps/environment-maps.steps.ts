@@ -500,6 +500,8 @@ Then(
         const beforeCount =
             getScenarioState(page).getCustom<number>("environmentMapToolbarCount") ??
             0;
+        // Use >= to tolerate parallel workers that may also create
+        // environment maps between the "remember" and "check" steps.
         await expect
             .poll(
                 async () =>
@@ -508,7 +510,7 @@ Then(
                     ),
                 { timeout: 15000 },
             )
-            .toBe(beforeCount + increment);
+            .toBeGreaterThanOrEqual(beforeCount + increment);
     },
 );
 
