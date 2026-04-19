@@ -549,14 +549,20 @@ export class EnvironmentMapsPage {
             );
 
             const intervalId = window.setInterval(pushState, 100);
-            (window as any)[key] = { records, observer, intervalId };
+            (window as any)[key] = { records, observer, intervalId, pushState };
         }, name);
     }
 
     async getTrackedCardThumbnailTransitions(): Promise<CardThumbnailTransitionRecord[]> {
         return this.page.evaluate(() => {
             const tracking = (window as any).__environmentMapThumbnailTracking;
-            return tracking?.records ?? [];
+            if (!tracking) return [];
+            // Flush the latest DOM state before reading, so we never miss
+            // a transition that happened between the last interval tick and now.
+            if (typeof tracking.pushState === "function") {
+                tracking.pushState();
+            }
+            return tracking.records ?? [];
         });
     }
 
