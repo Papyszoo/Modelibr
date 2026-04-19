@@ -483,12 +483,13 @@ test.describe("demo mode e2e", () => {
             "City Night Lights",
         );
 
-        // Wait for the generated thumbnail to appear (prewarm runs in background)
+        // Wait for the generated thumbnail to appear (prewarm is fire-and-forget;
+        // on slow CI runners the render can take >30s)
         await expect(
             page
                 .locator('[data-testid="environment-map-card-thumbnail"]')
                 .first(),
-        ).toBeVisible({ timeout: 30000 });
+        ).toBeVisible({ timeout: 60000 });
     });
 
     test("shows a waveform for the seeded Test Tone sound", async ({
@@ -501,10 +502,11 @@ test.describe("demo mode e2e", () => {
             soundListPage.getSoundCardByName("Test Tone"),
         ).toBeVisible();
 
-        // Wait for the waveform image to appear (prewarm runs in background)
+        // Wait for the waveform image to appear (prewarm is fire-and-forget;
+        // on slow CI runners the audio decode + canvas render can take >30s)
         const soundCard = soundListPage.getSoundCardByName("Test Tone");
         await expect(soundCard.locator("img.sound-waveform")).toBeVisible({
-            timeout: 30000,
+            timeout: 60000,
         });
     });
 
@@ -527,7 +529,7 @@ test.describe("demo mode e2e", () => {
                 soundListPage.getSoundCardByName("DemoUploadSound");
             await expect(
                 uploadedCard.locator("img.sound-waveform"),
-            ).toBeVisible({ timeout: 30000 });
+            ).toBeVisible({ timeout: 60000 });
         } finally {
             await upload.cleanup();
         }
